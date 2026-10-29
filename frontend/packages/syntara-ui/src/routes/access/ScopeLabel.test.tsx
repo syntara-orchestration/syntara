@@ -23,7 +23,7 @@ describe('StatementsCell step types', () => {
     render(<StatementsCell statements={[stepStatement]} />)
     expect(screen.getByText('Step type: script')).toBeInTheDocument()
     expect(screen.getByText('step_type:write')).toBeInTheDocument()
-    expect(screen.getByText('scope: project')).toBeInTheDocument()
+    expect(screen.getByText('Scope: project')).toBeInTheDocument()
   })
 
   it('distinguishes excluded step types', () => {

@@ -56,6 +56,28 @@ type StatementsCellProps = {
   statements: PolicyStatement[]
 }
 
+type StepTypeConditionLabel = {
+  key: string
+  text: string
+}
+
+function getStepTypeConditionLabels(stmt: PolicyStatement): StepTypeConditionLabel[] {
+  if (!stmt.actions.some((action) => action.startsWith('step_type:'))) {
+    return []
+  }
+
+  const labels: StepTypeConditionLabel[] = []
+  for (const [condition, value] of Object.entries(stmt.conditions ?? {})) {
+    if (condition !== 'resource_labels' && condition !== 'resource_labels_not') continue
+    if (typeof value !== 'object' || value === null || !('kind' in value)) continue
+    if (typeof value.kind !== 'string') continue
+
+    const prefix = condition === 'resource_labels_not' ? 'Step type except' : 'Step type'
+    labels.push({ key: condition, text: `${prefix}: ${value.kind}` })
+  }
+  return labels
+}
+
 export function StatementsCell({ statements }: Readonly<StatementsCellProps>) {
   if (statements.length === 0) {
     return <>—</>
@@ -72,7 +94,7 @@ export function StatementsCell({ statements }: Readonly<StatementsCellProps>) {
               </SynLabel>
             </FlexItem>
             <FlexItem>
-              <SynLabel color="grey">scope: {stmt.scope}</SynLabel>
+              <SynLabel color="grey">Scope: {stmt.scope}</SynLabel>
             </FlexItem>
             <FlexItem>
               <LabelGroup isCompact numLabels={2}>
@@ -83,25 +105,11 @@ export function StatementsCell({ statements }: Readonly<StatementsCellProps>) {
                 ))}
               </LabelGroup>
             </FlexItem>
-            {stmt.actions.some((action) => action.startsWith('step_type:')) &&
-              Object.entries(stmt.conditions ?? {}).map(([condition, labels]) => {
-                if (
-                  (condition !== 'resource_labels' && condition !== 'resource_labels_not') ||
-                  typeof labels !== 'object' ||
-                  labels === null ||
-                  !('kind' in labels) ||
-                  typeof labels.kind !== 'string'
-                ) {
-                  return null
-                }
-                return (
-                  <FlexItem key={condition}>
-                    <SynLabel color="grey">
-                      Step type{condition === 'resource_labels_not' ? ' except' : ''}: {labels.kind}
-                    </SynLabel>
-                  </FlexItem>
-                )
-              })}
+            {getStepTypeConditionLabels(stmt).map(({ key, text }) => (
+              <FlexItem key={key}>
+                <SynLabel color="grey">{text}</SynLabel>
+              </FlexItem>
+            ))}
           </Flex>
         </StackItem>
       ))}

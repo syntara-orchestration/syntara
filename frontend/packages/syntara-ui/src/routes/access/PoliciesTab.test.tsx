@@ -274,7 +274,7 @@ describe('PoliciesTab', () => {
     render(<PoliciesTab />, { wrapper })
 
     expect(screen.getAllByText('Allow').length).toBeGreaterThan(0)
-    expect(screen.getByText('scope: any')).toBeInTheDocument()
+    expect(screen.getByText('Scope: any')).toBeInTheDocument()
     expect(screen.getByText('workflow:write')).toBeInTheDocument()
   })
 
