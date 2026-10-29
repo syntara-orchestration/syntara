@@ -24,6 +24,7 @@ from ._helpers import (
     wait_for_activity_outputs,
 )
 from ._workflows import (
+    ALL_SUPPORTED_FORM_FIELDS,
     DEFAULT_CONSUMER_CODE,
     REQUIRED_AND_OPTIONAL_FIELDS,
     SCALAR_TYPE_FIELDS,
@@ -34,6 +35,56 @@ pytestmark = [pytest.mark.e2e]
 
 _NAME_PREFIX = "e2e-form-trigger-validation"
 _DESCRIPTION = "E2E: validate Form Trigger submissions"
+_ALL_FIELDS_SUBMISSION: dict[str, Any] = {
+    "text_value": "short answer",
+    "textarea_value": "longer answer\nwith a second line",
+    "number_value": 42,
+    "masked_value": "masked-entry",
+    "dropdown_value": "blue",
+    "multi_select_value": ["red", "blue"],
+    "checkbox_value": True,
+    "date_value": {"date": "2026-02-14"},
+    "email_value": "Bob@Example.COM",
+}
+_ALL_FIELDS_EXPECTED_TYPES: dict[str, type[Any]] = {
+    "text_value": str,
+    "textarea_value": str,
+    "number_value": int,
+    "masked_value": str,
+    "dropdown_value": str,
+    "multi_select_value": list,
+    "checkbox_value": bool,
+    "date_value": str,
+    "email_value": str,
+}
+_ALL_FIELDS_ENVIRONMENT = {
+    "TEXT_VALUE": "${form.response_data.text_value}",
+    "TEXTAREA_VALUE": "${form.response_data.textarea_value}",
+    "NUMBER_VALUE": "${form.response_data.number_value}",
+    "MASKED_VALUE": "${form.response_data.masked_value}",
+    "DROPDOWN_VALUE": "${form.response_data.dropdown_value}",
+    "MULTI_SELECT_VALUE": "${form.response_data.multi_select_value}",
+    "CHECKBOX_VALUE": "${form.response_data.checkbox_value}",
+    "DATE_VALUE": "${form.response_data.date_value}",
+    "EMAIL_VALUE": "${trigger.response_data.email_value}",
+}
+_ALL_FIELDS_CONSUMER_CODE = """
+import json
+import os
+
+print(json.dumps({
+    "text_value": os.environ["TEXT_VALUE"],
+    "textarea_value": os.environ["TEXTAREA_VALUE"],
+    "number_value": json.loads(os.environ["NUMBER_VALUE"]),
+    "masked_value": os.environ["MASKED_VALUE"],
+    "dropdown_value": os.environ["DROPDOWN_VALUE"],
+    "multi_select_value": json.loads(os.environ["MULTI_SELECT_VALUE"]),
+    "checkbox_value": json.loads(os.environ["CHECKBOX_VALUE"]),
+    "date_value": os.environ["DATE_VALUE"],
+    "email_value": os.environ["EMAIL_VALUE"],
+}))
+"""
+
 _SCALAR_CONSUMER_ENVIRONMENT = {
     "NUMBER_VALUE": "${form.response_data.number_value}",
     "BOOLEAN_VALUE": "${form.response_data.boolean_value}",
@@ -96,7 +147,58 @@ def form_trigger_workflow(
     return _build
 
 
-def test_missing_required_fields_are_rejected_then_valid_submission_runs(
+def test_all_supported_form_fields_reach_downstream_consumer(
+    syntara_api: SyntaraApiRegistry,
+    form_trigger_workflow: FormTriggerWorkflowBuilder,
+    form_execution_cleanup: Callable[[UUID], None],
+) -> None:
+    """All supported Form Trigger field types retain their expected JSON shape.
+
+    Procedure:
+    1. Create a workflow with all supported Form Trigger field types.
+    2. Submit a valid value for every field, including a mixed-case email address.
+    3. Inspect persisted input, trigger output, and consumer output.
+
+    Expected:
+    - Every field value is present and has the expected JSON type at each hop.
+    - The email domain is normalized in stored input and downstream output.
+    """
+    workflow = form_trigger_workflow(
+        ALL_SUPPORTED_FORM_FIELDS,
+        consumer_code=_ALL_FIELDS_CONSUMER_CODE,
+        consumer_environment=_ALL_FIELDS_ENVIRONMENT,
+    )
+    execution = submit_form_trigger_and_track(
+        syntara_api,
+        workflow,
+        _ALL_FIELDS_SUBMISSION,
+        form_execution_cleanup,
+    )
+    execution_id = UUID(str(execution.id))
+    expected_values = {
+        **_ALL_FIELDS_SUBMISSION,
+        "date_value": "2026-02-14",
+        "email_value": "Bob@example.com",
+    }
+    assert execution.input_data is not None
+    execution_input = execution.input_data.to_dict()
+    assert execution_input == expected_values
+
+    assert_consumer_completed(syntara_api, execution_id)
+    final = wait_for_activity_outputs(syntara_api, execution_id, {"form", "consumer"})
+    activities = activities_by_id(final)
+    form_response_data = activity_output(activities["form"])["response_data"]
+    assert form_response_data == expected_values
+    downstream = activity_output(activities["consumer"])["stdout_json"]
+    assert downstream == expected_values
+    for values in (execution_input, form_response_data, downstream):
+        for field_name, expected_type in _ALL_FIELDS_EXPECTED_TYPES.items():
+            assert type(values[field_name]) is expected_type, (
+                f"Expected {field_name} to have type {expected_type.__name__}, got {type(values[field_name]).__name__}"
+            )
+
+
+def test_required_field_errors_allow_valid_submission(
     syntara_api: SyntaraApiRegistry,
     form_trigger_workflow: FormTriggerWorkflowBuilder,
     form_execution_cleanup: Callable[[UUID], None],
@@ -161,7 +263,7 @@ def test_missing_required_fields_are_rejected_then_valid_submission_runs(
         pytest.param("string_value", 42, "Must be a string, got int", id="number-for-string"),
     ],
 )
-def test_type_mismatches_are_rejected(
+def test_invalid_field_values_are_rejected(
     syntara_api: SyntaraApiRegistry,
     form_trigger_workflow: FormTriggerWorkflowBuilder,
     bad_field: str,
@@ -196,7 +298,7 @@ def test_type_mismatches_are_rejected(
     assert_no_executions_for_workflow(syntara_api, UUID(str(workflow.id)))
 
 
-def test_numeric_and_boolean_strings_are_coerced_and_reach_the_consumer(
+def test_numeric_and_boolean_strings_are_coerced_and_reach_consumer(
     syntara_api: SyntaraApiRegistry,
     form_trigger_workflow: FormTriggerWorkflowBuilder,
     form_execution_cleanup: Callable[[UUID], None],
@@ -243,7 +345,7 @@ def test_numeric_and_boolean_strings_are_coerced_and_reach_the_consumer(
     assert isinstance(downstream["boolean_value"], bool)
 
 
-def test_extra_fields_are_rejected_then_defined_fields_submit_cleanly(
+def test_unknown_fields_are_rejected_then_defined_fields_are_accepted(
     syntara_api: SyntaraApiRegistry,
     form_trigger_workflow: FormTriggerWorkflowBuilder,
     form_execution_cleanup: Callable[[UUID], None],

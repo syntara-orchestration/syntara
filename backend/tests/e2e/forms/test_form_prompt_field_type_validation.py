@@ -69,7 +69,7 @@ print(json.dumps({
 """
 
 
-def test_all_supported_field_types_resume_and_flow_to_consumer(
+def test_all_supported_form_fields_reach_downstream_consumer(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
@@ -120,7 +120,7 @@ def test_all_supported_field_types_resume_and_flow_to_consumer(
     assert isinstance(downstream_values["date_value"], str)
 
 
-def test_required_field_error_leaves_prompt_available_for_valid_response(
+def test_required_field_errors_allow_valid_submission(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
@@ -160,7 +160,7 @@ def test_required_field_error_leaves_prompt_available_for_valid_response(
     assert prompt_output["response_data"] == {"required_text": "provided"}
 
 
-def test_unparseable_number_string_is_rejected(
+def test_invalid_field_values_are_rejected(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
@@ -192,7 +192,7 @@ def test_unparseable_number_string_is_rejected(
     assert get_form_prompt(syntara_api, prompt_id).status == FormPromptStatus.PENDING
 
 
-def test_numeric_and_boolean_strings_are_coerced_and_flow_downstream(
+def test_numeric_and_boolean_strings_are_coerced_and_reach_consumer(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
@@ -269,7 +269,7 @@ def test_native_number_boolean_and_string_types_are_accepted(
     assert_consumer_completed(syntara_api, execution_id)
 
 
-def test_extra_fields_are_rejected_and_defined_fields_can_be_submitted(
+def test_unknown_fields_are_rejected_then_defined_fields_are_accepted(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,

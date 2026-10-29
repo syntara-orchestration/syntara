@@ -14,7 +14,7 @@ from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.models import ExecutionRead, WorkflowCreate, WorkflowRead
 from syntara_api_client.models.execution_status import ExecutionStatus
 
-from ._helpers import EXECUTION_POLL_TIMEOUT, assert_and_get_with_502_skip, create_form_prompt_execution
+from ._helpers import EXECUTION_POLL_TIMEOUT, assert_and_get_response, create_form_prompt_execution
 from ._workflows import dynamic_option_field
 
 if TYPE_CHECKING:
@@ -87,7 +87,7 @@ def _start(
 
 def _assert_no_prompt_row(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> None:
     """Verify failed template resolution did not persist a form prompt."""
-    listed = assert_and_get_with_502_skip(syntara_api.form_prompts.list(execution_id=exec_id, limit=5))
+    listed = assert_and_get_response(syntara_api.form_prompts.list(execution_id=exec_id, limit=5))
     assert not listed.resources, (
         f"No form prompt row should be persisted when template resolution fails; found {len(listed.resources)}"
     )

@@ -37,7 +37,7 @@ def _require_segment_server_url() -> str:
 
 _SEGMENT_SERVER_URL = _require_segment_server_url()
 
-from ._helpers import assert_and_get_with_502_skip  # noqa: E402
+from ._helpers import assert_and_get_response  # noqa: E402
 from ._workflows import form_trigger_consumer_workflow  # noqa: E402
 
 pytestmark = [pytest.mark.e2e]
@@ -107,7 +107,7 @@ class TestFormTriggerTelemetry:
                 ),
             )
         )
-        execution = assert_and_get_with_502_skip(
+        execution = assert_and_get_response(
             syntara_api.executions.create(
                 body=ExecutionCreate.from_dict(
                     {

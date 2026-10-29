@@ -23,7 +23,7 @@ from syntara_api_client.models.form_prompt_status import FormPromptStatus
 
 from ._helpers import (
     CANCEL_POLL_TIMEOUT,
-    assert_and_get_with_502_skip,
+    assert_and_get_response,
     assert_consumer_completed,
     get_form_prompt,
     start_pending_form_prompt,
@@ -127,10 +127,10 @@ def test_submission_uses_execution_version_after_node_is_removed_from_current_ve
     wait_for_form_prompt_paused(syntara_api, execution_id)
     prompt_id = UUID(str(prompt_row.id))
 
-    execution = assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=execution_id))
+    execution = assert_and_get_response(syntara_api.executions.get(execution_id=execution_id))
     workflow = cast(
         "WorkflowReadWithVersion",
-        assert_and_get_with_502_skip(syntara_api.workflows.get(workflow_id=execution.workflow_id)),
+        assert_and_get_response(syntara_api.workflows.get(workflow_id=execution.workflow_id)),
     )
     definition = workflow.version.workflow_definition.to_dict()
     removed_node_ids = {"prompt", "consumer"}
@@ -148,7 +148,7 @@ def test_submission_uses_execution_version_after_node_is_removed_from_current_ve
         ),
     )
     assert update_response.status_code == HTTPStatus.OK
-    updated_workflow = cast("WorkflowReadWithVersion", assert_and_get_with_502_skip(update_response))
+    updated_workflow = cast("WorkflowReadWithVersion", assert_and_get_response(update_response))
     assert updated_workflow.current_version > workflow.current_version
     updated_nodes = updated_workflow.version.workflow_definition.to_dict()["nodes"]
     assert all(node["id"] not in removed_node_ids for node in updated_nodes)
@@ -211,7 +211,7 @@ def test_submission_to_prompt_is_rejected_after_execution_is_cancelled(
     assert prompt_after_submission.status == FormPromptStatus.CANCELLED
     assert prompt_after_submission.to_dict().get("response_data") is None
 
-    execution_after_submission = assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=execution_id))
+    execution_after_submission = assert_and_get_response(syntara_api.executions.get(execution_id=execution_id))
     assert execution_after_submission.status == ExecutionStatus.CANCELLED
 
 
@@ -251,5 +251,5 @@ def test_duplicate_submission_does_not_change_form_prompt_response(
     assert prompt_after_duplicate.to_dict().get("response_data") == first_response
     _assert_prompt_activity_response(syntara_api, final_execution, first_response)
 
-    execution_after_duplicate = assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=execution_id))
+    execution_after_duplicate = assert_and_get_response(syntara_api.executions.get(execution_id=execution_id))
     assert execution_after_duplicate.status == ExecutionStatus.COMPLETED

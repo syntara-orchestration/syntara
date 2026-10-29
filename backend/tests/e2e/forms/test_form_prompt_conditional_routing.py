@@ -12,7 +12,7 @@ from syntara_api_client.models import ExecutionCreate, WorkflowCreate, WorkflowD
 from syntara_api_client.models.activity_data_output_data_type_0 import ActivityDataOutputDataType0
 from syntara_api_client.models.execution_status import ExecutionStatus
 
-from ._helpers import assert_and_get_with_502_skip, submit_form_prompt
+from ._helpers import assert_and_get_response, submit_form_prompt
 
 pytestmark = [pytest.mark.e2e]
 
@@ -112,7 +112,7 @@ def test_form_prompt_response_routes_to_selected_executor(
             workflow_definition=_conditional_form_prompt_workflow_definition(workflow_name),
         )
     )
-    execution = assert_and_get_with_502_skip(
+    execution = assert_and_get_response(
         syntara_api.executions.create(body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger"))
     )
     execution_id = UUID(str(execution.id))

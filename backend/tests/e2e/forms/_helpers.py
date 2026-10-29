@@ -31,7 +31,7 @@ from syntara_api_client.models.activity_data import ActivityData
 from syntara_api_client.models.activity_data_output_data_type_0 import ActivityDataOutputDataType0
 from syntara_api_client.models.error_data import ErrorData
 from syntara_api_client.models.execution_status import ExecutionStatus
-from syntara_api_client.types import Response, UnexpectedResponseException, Unset
+from syntara_api_client.types import Response, Unset
 
 from ._workflows import (
     DEFAULT_CONSUMER_CODE,
@@ -92,8 +92,8 @@ def submit_form_trigger(
     workflow: WorkflowRead,
     input_data: dict[str, Any],
 ) -> Response[Any]:
-    """POST a Form Trigger submission, skipping only on a transient Bad Gateway."""
-    response = syntara_api.executions.create(
+    """POST a Form Trigger submission."""
+    return syntara_api.executions.create(
         body=ExecutionCreate.from_dict(
             {
                 "workflow_id": str(workflow.id),
@@ -102,9 +102,6 @@ def submit_form_trigger(
             }
         )
     )
-    if response.status_code == HTTPStatus.BAD_GATEWAY:
-        pytest.skip("Backend returned 502 Bad Gateway - transient infrastructure issue")
-    return response
 
 
 def submit_form_trigger_and_track(
@@ -118,7 +115,7 @@ def submit_form_trigger_and_track(
     assert response.status_code == HTTPStatus.CREATED, (
         f"Expected 201 Created, got {response.status_code}: {response.content!r}"
     )
-    execution = cast("ExecutionRead", assert_and_get_with_502_skip(response))
+    execution = cast("ExecutionRead", assert_and_get_response(response))
     track_execution(UUID(str(execution.id)))
     return execution
 
@@ -145,7 +142,7 @@ def assert_form_validation_error(
 
 def assert_no_executions_for_workflow(syntara_api: SyntaraApiRegistry, workflow_id: UUID) -> None:
     """A rejected Form Trigger submission must leave the workflow with no executions."""
-    executions = assert_and_get_with_502_skip(
+    executions = assert_and_get_response(
         syntara_api.executions.list(additional_params={"workflow_id": str(workflow_id)}, limit=100)
     )
     assert not executions.resources, f"Rejected submission created executions: {executions.resources!r}"
@@ -181,14 +178,9 @@ def cancel_form_execution(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> Non
     response.assert_and_get()
 
 
-def assert_and_get_with_502_skip[ResponseT](response: Response[ResponseT]) -> ResponseT:
-    """Parse a response, skipping only on a transient Bad Gateway."""
-    try:
-        return response.assert_and_get()
-    except UnexpectedResponseException as exc:
-        if exc.status_code == HTTPStatus.BAD_GATEWAY:
-            pytest.skip("Backend returned 502 Bad Gateway - transient infrastructure issue")
-        raise
+def assert_and_get_response[ResponseT](response: Response[ResponseT]) -> ResponseT:
+    """Return the parsed response, raising for any unsuccessful status."""
+    return response.assert_and_get()
 
 
 def wait_for_activity_outputs(
@@ -204,7 +196,7 @@ def wait_for_activity_outputs(
     while time.monotonic() < deadline:
         execution = cast(
             "ExecutionRead",
-            assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=exec_id, include="activities")),
+            assert_and_get_response(syntara_api.executions.get(execution_id=exec_id, include="activities")),
         )
         activities = {activity.activity_id: activity for activity in (execution.activities or [])}
         missing = {
@@ -232,9 +224,6 @@ def assert_problem_response(
     Error responses intentionally use the raw body because the generated API
     client parses problem extensions differently across endpoint schemas.
     """
-    if response.status_code == HTTPStatus.BAD_GATEWAY:
-        pytest.skip("Backend returned 502 Bad Gateway - transient infrastructure issue")
-
     assert response.status_code == expected_status, (
         f"Expected {expected_status.value} {expected_status.phrase}, got {response.status_code}: {response.content!r}"
     )
@@ -270,10 +259,10 @@ def assert_definition_invalid(response: Response[Any]) -> dict[str, Any]:
 
 
 def get_form_prompt(syntara_api: SyntaraApiRegistry, prompt_id: UUID) -> FormPromptRead:
-    """GET a form prompt, skipping only on a transient Bad Gateway."""
+    """GET a form prompt."""
     return cast(
         "FormPromptRead",
-        assert_and_get_with_502_skip(syntara_api.form_prompts.get(form_prompt_id=prompt_id)),
+        assert_and_get_response(syntara_api.form_prompts.get(form_prompt_id=prompt_id)),
     )
 
 
@@ -317,14 +306,11 @@ def submit_form_prompt(
     prompt_id: UUID,
     response_data: dict[str, Any],
 ) -> Response[ErrorData | FormPromptRead]:
-    """Submit prompt data, skipping only on a transient Bad Gateway."""
-    response = syntara_api.form_prompts.submit(
+    """Submit prompt data."""
+    return syntara_api.form_prompts.submit(
         form_prompt_id=prompt_id,
         body=FormPromptSubmitRequest(response_data=FormPromptSubmitRequestResponseData.from_dict(response_data)),
     )
-    if response.status_code == HTTPStatus.BAD_GATEWAY:
-        pytest.skip("Backend returned 502 Bad Gateway - transient infrastructure issue")
-    return response
 
 
 def assert_forbidden(response: Response[Any], *, expected_code: str) -> None:
@@ -347,7 +333,7 @@ def assert_prompt_not_consumed(
     assert not prompt.response_data
     assert not prompt.responded_by
 
-    execution = assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=exec_id, include="activities"))
+    execution = assert_and_get_response(syntara_api.executions.get(execution_id=exec_id, include="activities"))
     assert execution.status not in TERMINAL_STATUSES, (
         f"Execution must not advance on a rejected submission; got {execution.status}"
     )
@@ -364,7 +350,7 @@ def wait_for_form_prompt_paused(
 ) -> ExecutionRead:
     """Wait until the execution is paused on the form-prompt activity."""
     for _ in range(timeout):
-        execution = assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=exec_id, include="activities"))
+        execution = assert_and_get_response(syntara_api.executions.get(execution_id=exec_id, include="activities"))
         activities = {activity.activity_id: activity for activity in (execution.activities or [])}
         prompt_activity = activities.get(prompt_node_id)
         if execution.status == ExecutionStatus.PAUSED and prompt_activity is not None:
@@ -424,7 +410,7 @@ def create_form_prompt_execution(
     )
     execution = cast(
         "ExecutionRead",
-        assert_and_get_with_502_skip(
+        assert_and_get_response(
             syntara_api.executions.create(body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger"))
         ),
     )

@@ -22,7 +22,7 @@ from syntara.core.constants import FieldLimits
 
 from ._helpers import (
     EXECUTION_POLL_TIMEOUT,
-    assert_and_get_with_502_skip,
+    assert_and_get_response,
     create_form_prompt_execution,
     get_form_prompt,
     start_pending_form_prompt,
@@ -199,7 +199,7 @@ def _assert_default_is_configured(prompt: FormPromptRead) -> None:
 
 def _assert_no_prompt_row(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> None:
     """Verify a pre-creation form prompt failure did not persist a form prompt."""
-    listed = assert_and_get_with_502_skip(syntara_api.form_prompts.list(execution_id=exec_id, limit=5))
+    listed = assert_and_get_response(syntara_api.form_prompts.list(execution_id=exec_id, limit=5))
     assert not listed.resources, f"Expected no form prompt row, found {len(listed.resources)}"
 
 
