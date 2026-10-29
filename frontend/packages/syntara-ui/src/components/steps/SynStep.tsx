@@ -231,12 +231,7 @@ export function SynStep(props: {
   const panelClassName = [props.className, !isSemanticZoom && !props.onClick ? stepStyles.stepRoot : undefined]
     .filter(Boolean)
     .join(' ')
-  let panelTabIndex: number | undefined = 0
-  if (props.onClick) {
-    panelTabIndex = 0
-  } else if (isSemanticZoom) {
-    panelTabIndex = undefined
-  }
+  const panelTabIndex: number | undefined = isSemanticZoom && !props.onClick ? undefined : 0
 
   return (
     <SynStepExpandedContext.Provider value={expandedContext}>
