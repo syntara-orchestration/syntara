@@ -29,6 +29,8 @@ function EditBootstrapServersField({
             id="edit-bootstrap-servers"
             aria-label="Bootstrap servers"
             aria-required
+            aria-invalid={Boolean(errorMessage)}
+            aria-describedby={errorMessage ? 'edit-bootstrap-servers-error' : undefined}
             resizeOrientation="vertical"
             rows={4}
             validated={errorMessage ? 'error' : 'default'}
@@ -42,7 +44,7 @@ function EditBootstrapServersField({
       {errorMessage && (
         <FormHelperText>
           <HelperText>
-            <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
+            <HelperTextItem id="edit-bootstrap-servers-error" icon={<RhUiErrorIcon />} variant="error">
               {errorMessage}
             </HelperTextItem>
           </HelperText>
