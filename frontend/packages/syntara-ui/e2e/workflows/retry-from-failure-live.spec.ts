@@ -239,11 +239,7 @@ test.describe('Retry from failure — real backend', () => {
         expectedStatus: 'failed',
       })
 
-      noEditPersona = await createPersona(
-        page,
-        buildUniqueName('e2e-retry-no-edit'),
-        PERSONA_ACTIONS.executionOperator
-      )
+      noEditPersona = await createPersona(page, buildUniqueName('e2e-retry-no-edit'), PERSONA_ACTIONS.executionOperator)
     } finally {
       await page.close()
     }
@@ -286,12 +282,15 @@ test.describe('Retry from failure — real backend', () => {
     const run = requireRun(completedRun, 'Completed run')
     await openExecutionDetail(app, run.executionId)
 
-    await expect(app.getByRole('button', { name: 'Retry run' })).toBeVisible()
-    await app.getByRole('button', { name: 'Retry run' }).click()
+    const fullRetryButton = app.getByRole('button', { name: 'Retry run' })
+    await expect(fullRetryButton).toBeVisible()
+    await expect(app.getByTestId('retry-from-failure-button')).toHaveCount(0)
+
+    await fullRetryButton.click()
     await expect(app.getByRole('dialog')).toBeVisible()
     await app.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click()
 
-    await app.getByRole('button', { name: 'Retry' }).click()
+    await expect(fullRetryButton).toBeVisible()
     await expect(app.getByTestId('retry-from-failure-button')).toHaveCount(0)
   })
 
@@ -324,7 +323,9 @@ test.describe('Retry from failure — real backend', () => {
     await expect(choosePoints).not.toBeChecked()
   })
 
-  test('retry override changes the failed run only and the real retry reuses upstream output @pr-check', async ({ app }) => {
+  test('retry override changes the failed run only and the real retry reuses upstream output @pr-check', async ({
+    app,
+  }) => {
     const run = requireRun(failedRun, 'Failed run')
     await openExecutionDetail(app, run.executionId)
     await app.getByRole('tab', { name: 'Details' }).click()
@@ -367,9 +368,7 @@ test.describe('Retry from failure — real backend', () => {
 
     await app.reload()
     await expect(app.getByTestId('retried-from-badge')).toContainText(run.executionId)
-    await expect
-      .poll(() => app.getByTestId('replayed-output-badge').count(), { timeout: 30_000 })
-      .toBeGreaterThan(0)
+    await expect.poll(() => app.getByTestId('replayed-output-badge').count(), { timeout: 30_000 }).toBeGreaterThan(0)
   })
 
   test('execution operator without workflow edit permission can retry but cannot override inputs', async ({
