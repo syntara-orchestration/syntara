@@ -1,0 +1,52 @@
+---
+# Fail PRs that add internal Jira references (issue keys or Jira URLs) to
+# code, comments, tests, or docs. See
+# "No Jira References in Code or Docs" in AGENTS.md.
+#
+# Only lines added by the PR are checked, so existing references don't block
+# unrelated work; touching a line that already has one requires cleaning it up.
+# Paths allowed to contain plain keys are listed in JIRA_CHECK_EXCLUDED_PATHS in
+# .github/scripts/src/lib/jira.ts; Jira URLs are rejected everywhere.
+name: Jira References
+
+on:
+  pull_request:
+  # Reported so this can be a required check; the job is skipped in the merge
+  # queue (the diff was already checked on the PR) and GitHub treats a skipped
+  # required check as satisfied.
+  merge_group:
+    branches: [devel, early-access]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jira-references-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  jira-references:
+    name: No Jira references
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      # The pull_request checkout is the PR merge commit; depth 2 brings in its
+      # first parent (the target branch tip), so HEAD^1..HEAD is exactly the PR diff.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22.13.0'
+          cache: 'npm'
+          cache-dependency-path: .github/scripts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: .github/scripts
+
+      - name: Check added lines for Jira references
+        run: npm run check:jira-references
+        working-directory: .github/scripts

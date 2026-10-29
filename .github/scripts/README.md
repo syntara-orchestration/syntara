@@ -1,6 +1,6 @@
 # GitHub Actions Scripts
 
-TypeScript GitHub Actions scripts for merge-queue monitoring and visual-regression review notifications.
+TypeScript GitHub Actions scripts for merge-queue monitoring, visual-regression review notifications, and PR convention checks.
 
 ## Development
 
@@ -30,6 +30,14 @@ export GITHUB_HEAD_REF="gh-readonly-queue/devel/pr-123-abc123"
 npm run notify:dequeue-burst
 npm run notify:queue-health
 npm run notify:visual-regression-pr
+```
+
+PR convention checks (no token needed):
+
+```bash
+PR_TITLE="fix(auth): handle expired tokens" npm run check:pr-title
+PR_BODY="$(gh pr view 123 --json body -q .body)" npm run check:pr-description
+DIFF_BASE=origin/devel npm run check:jira-references   # defaults to HEAD^1..HEAD
 ```
 
 ## Testing in CI

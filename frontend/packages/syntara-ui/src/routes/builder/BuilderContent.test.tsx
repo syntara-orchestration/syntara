@@ -86,6 +86,10 @@ vi.mock('./useBuilderPermissions', () => ({
   useBuilderPermissions: () => mockBuilderPermissions,
 }))
 
+vi.mock('../../hooks/useCanI', () => ({
+  useCanI: vi.fn(() => ({ allowed: true, isChecking: false, isError: false })),
+}))
+
 import { BuilderContent } from './BuilderContent'
 
 const queryClient = new QueryClient({
@@ -1113,7 +1117,7 @@ describe('BuilderContent', () => {
       })
     })
 
-    it('navigates to execution page on execution selection', async () => {
+    it('keeps run history open when navigating from builder history to an execution', async () => {
       vi.mocked(executionsClient.useQuery).mockImplementation((method, path) => {
         if (method === 'get' && path === '/executions') {
           return {
@@ -1155,7 +1159,7 @@ describe('BuilderContent', () => {
       expect(row).toBeInTheDocument()
       await user.click(row)
       await waitFor(() => {
-        expect(mockRequestNavigation).toHaveBeenCalledWith('/executions/exec-1')
+        expect(mockRequestNavigation).toHaveBeenCalledWith('/executions/exec-1?history=open')
       })
     })
   })
