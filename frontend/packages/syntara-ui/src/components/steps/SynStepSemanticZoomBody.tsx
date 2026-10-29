@@ -113,6 +113,7 @@ export function SynStepSemanticZoomBody(props: {
             }
           }}
         >
+          {/* eslint-disable-next-line syntara/prefer-pf-text-components -- semantic zoom tile shell; icon uses Flex, no text content */}
           <div className={tileClassName} style={tileRadiusStyle}>
             {props.icon ? (
               <Flex

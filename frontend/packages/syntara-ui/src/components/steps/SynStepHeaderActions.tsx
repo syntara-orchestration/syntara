@@ -3,9 +3,9 @@ import type { ComponentProps } from 'react'
 
 import type { StepMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useStepMenuActions'
 
-import actionsStyles from './SynStepHeaderActions.module.css'
 import { SynStepEditButton } from './SynStepEditButton'
 import { SynStepExpandToggle } from './SynStepExpandToggle'
+import actionsStyles from './SynStepHeaderActions.module.css'
 import { SynStepMenu } from './SynStepMenu'
 
 export function SynStepHeaderActions(
