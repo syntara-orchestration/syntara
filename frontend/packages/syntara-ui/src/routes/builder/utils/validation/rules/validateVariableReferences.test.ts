@@ -221,6 +221,71 @@ describe('validateVariableReferences', () => {
     })
   })
 
+  describe('loop scope', () => {
+    const loop = makeActivity({
+      id: 'activity_loop_1',
+      type: 'loop',
+      parameters: { type: 'forEach', items: '["a", "b"]' },
+    })
+    const body = makeActivity({
+      id: 'activity_body_1',
+      type: 'script',
+      parameters: { code: 'echo ${loop.item.name} ${loop.index}' },
+    })
+    const after = makeActivity({
+      id: 'activity_after_1',
+      type: 'script',
+      parameters: { code: 'echo ${loop.item.name}' },
+    })
+    const edge = (source: string, target: string, sourceHandle?: string, targetHandle?: string): EdgeConnection => ({
+      id: `${source}-${target}`,
+      source,
+      target,
+      sourceHandle: sourceHandle ?? 'source',
+      targetHandle: targetHandle ?? 'target',
+    })
+
+    it('accepts ${loop.*} in a step connected from the loop handle, even though no node is named "loop"', () => {
+      const edges = [edge(loop.id, body.id, 'loop'), edge(body.id, loop.id, 'source', 'end')]
+      expect(validateVariableReferences([loop, body], edges)).toEqual([])
+    })
+
+    it('accepts ${loop.*} in a step further down the loop body', () => {
+      const second = makeActivity({ id: 'activity_body_2', type: 'script', parameters: { code: '${loop.index}' } })
+      const edges = [
+        edge(loop.id, body.id, 'loop'),
+        edge(body.id, second.id),
+        edge(second.id, loop.id, 'source', 'end'),
+      ]
+      expect(validateVariableReferences([loop, body, second], edges)).toEqual([])
+    })
+
+    it('errors on ${loop.*} in a step connected from the done handle', () => {
+      const edges = [
+        edge(loop.id, body.id, 'loop'),
+        edge(body.id, loop.id, 'source', 'end'),
+        edge(loop.id, after.id, 'done'),
+      ]
+      const errors = validateVariableReferences([loop, body, after], edges)
+      expect(errors).toHaveLength(1)
+      expect(errors[0].nodeId).toBe(after.id)
+      expect(errors[0].message).toContain('not inside a loop body')
+      expect(errors[0].message).not.toContain('does not exist')
+    })
+
+    it('errors on ${loop.*} when the workflow has no loop', () => {
+      const errors = validateVariableReferences([after], [])
+      expect(errors).toHaveLength(1)
+      expect(errors[0].message).toContain('not inside a loop body')
+    })
+
+    it('still treats ${loop.*} as a node reference when a node is actually named loop', () => {
+      const named = makeActivity({ id: 'loop', type: 'script', parameters: { code: 'echo hi' } })
+      const consumer = makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${loop.stdout}' } })
+      expect(validateVariableReferences([named, consumer], [edge(named.id, consumer.id)])).toEqual([])
+    })
+  })
+
   describe('skipped namespaces', () => {
     it('does not error for ${workflow_context.*} references', () => {
       const activities: Activity[] = [
