@@ -132,7 +132,9 @@ export function SynStepSemanticZoomBody(props: {
                       alignItems={{ default: 'alignItemsFlexStart' }}
                       style={{ gap: 'var(--pf-t--global--spacer--sm)', minWidth: 0, flex: 1 }}
                     >
-                      {previewHeaderIcon ? <FlexItem shrink={{ default: 'shrink' }}>{previewHeaderIcon}</FlexItem> : null}
+                      {previewHeaderIcon ? (
+                        <FlexItem shrink={{ default: 'shrink' }}>{previewHeaderIcon}</FlexItem>
+                      ) : null}
                       <SynStepTitle title={props.title} subTitle={props.typeLabel} />
                     </Flex>
                     <FlexItem shrink={{ default: 'shrink' }}>
