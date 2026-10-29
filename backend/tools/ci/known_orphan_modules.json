@@ -19,6 +19,7 @@
     "syntara/example/*/*.py": "Reference implementations for developers, not production code",
     "syntara/api/main.py": "Application entrypoint — invoked via uvicorn/python -m, not imported",
     "syntara/*/worker.py": "Background worker entrypoints — invoked via python -m in podman-compose",
+    "syntara/eventstreams/consumer_entrypoint.py": "Kafka worker entrypoint — invoked via python -m syntara.eventstreams.consumer_entrypoint in podman-compose",
     "syntara/*/background_worker.py": "Background queue worker entrypoint — invoked via python -m in podman-compose",
     "syntara/*/worker_lifecycle.py": "Shared worker lifecycle utilities — imported by worker entrypoints but not by the main application graph",
     "syntara/*/utils.py": "Intra-package utilities — imported via package (from syntara.X import utils), not direct module import",

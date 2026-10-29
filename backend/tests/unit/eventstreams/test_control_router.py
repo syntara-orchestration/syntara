@@ -35,7 +35,7 @@ def test_controls_dispatch_strict_revision_checked_requests(control_client, acti
         body["reason"] = "operator_correction"
     if action == "recover":
         body.update(partition=0, policy="current_end", expected_recovery_revision=0)
-    response = client.post(f"/workflows/{workflow}/event-subscriptions/{subscription}/{action}", json=body)
+    response = client.post(f"/workflows/{workflow}/event_subscriptions/{subscription}/{action}", json=body)
     assert response.status_code == (202 if action == "recover" else 200)
     target = service.action if action in {"pause", "resume", "retry"} else getattr(service, action)
     assert target.call_args.args[:2] == (workflow, subscription)
@@ -63,7 +63,7 @@ def test_controls_dispatch_strict_revision_checked_requests(control_client, acti
 def test_control_bodies_cannot_inject_runtime_configuration(control_client, field, action):
     client, service = control_client
     response = client.post(
-        f"/workflows/{uuid4()}/event-subscriptions/{uuid4()}/{action}",
+        f"/workflows/{uuid4()}/event_subscriptions/{uuid4()}/{action}",
         json={
             "configuration_revision": 1,
             "source_generation": 1,
@@ -107,7 +107,7 @@ def test_invalid_revision_bounds_are_rejected(control_client, field, value):
     client, service = control_client
     assert (
         client.post(
-            f"/workflows/{uuid4()}/event-subscriptions/{uuid4()}/pause",
+            f"/workflows/{uuid4()}/event_subscriptions/{uuid4()}/pause",
             json={
                 "configuration_revision": 1,
                 "source_generation": 1,

@@ -127,8 +127,8 @@ async def test_metadata_parsing_with_real_protocol_responses(version: int, parti
     assert "group_id" not in create.call_args.kwargs
     request = conn.send.call_args.args[0].prepare({3: (version, version)})
     decoded = (MetadataRequest_v4 if version == 4 else MetadataRequest_v5).decode(request.encode())
-    assert decoded.topics == ["alerts"]
-    assert decoded.allow_auto_topic_creation is False
+    assert decoded.get_item("topics") == ["alerts"]
+    assert decoded.get_item("allow_auto_topic_creation") is False
     assert [call[0] for call in conn.method_calls] == ["send", "close"]
 
 

@@ -877,12 +877,15 @@ async def test_deletion_guards_pass_when_unbound(
     await service.assert_credential_not_bound(uuid4(), "unused-credential")
 
 
-async def test_deletion_guard_blocks_even_after_retirement(
+@pytest.mark.parametrize("enabled", [False, True])
+async def test_retired_empty_subscription_deletion_requires_disabled_workflow(
     test_db_session: AsyncSession,
     test_user: User,
     workflow: Workflow,
     kafka_integration: Integration,
     runtime_credential: Credential,
+    *,
+    enabled: bool,
 ) -> None:
     service = EventSubscriptionService(test_db_session, test_user)
     v1 = await _make_version(
@@ -895,10 +898,21 @@ async def test_deletion_guard_blocks_even_after_retirement(
     await service.sync_from_published_definition(workflow, v1, enabled=True)
     v2 = await _make_version(test_db_session, workflow, test_user, [], version=2)
     await service.sync_from_published_definition(workflow, v2, enabled=True)  # retires subscription
+    workflow.published_version_id = v2.id if enabled else None
+    workflow.is_enabled = enabled
+    await test_db_session.flush()
 
-    # Retirement alone does not authorize deletion; the guard still blocks.
-    with pytest.raises(EventSubscriptionInUseError):
+    if enabled:
+        # Retirement does not authorize deletion while publication remains enabled.
+        with pytest.raises(EventSubscriptionInUseError):
+            await service.assert_workflow_not_bound(workflow.id, workflow.name)
+    else:
+        # No consumers, deliveries or recovery evidence remain to protect.
         await service.assert_workflow_not_bound(workflow.id, workflow.name)
+        assert not (
+            await test_db_session.exec(select(EventSubscription).where(EventSubscription.workflow_id == workflow.id))
+        ).all()
+        assert not (await test_db_session.exec(select(EventSubscriptionSource))).all()
 
 
 async def test_workflow_delete_restrict_fk_blocks_at_database(

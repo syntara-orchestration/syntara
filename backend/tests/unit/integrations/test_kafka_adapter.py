@@ -320,7 +320,7 @@ class TestKafkaConcurrentValidation:
             msg = "password rejected"
             raise AuthenticationFailedError(msg)
 
-        original_factory = aiokafka_client.create_conn
+        original_factory = vars(aiokafka_client)["create_conn"]
         with patch("syntara.integrations.lib.kafka_connection._PinnedKafkaConnection.connect", fail_connection):
             first = asyncio.create_task(KafkaAdapter(kafka_config).validate(resolved_credential, 5))
             await entered.wait()
@@ -328,10 +328,10 @@ class TestKafkaConcurrentValidation:
             await asyncio.sleep(0)
             release.set()
             results = await asyncio.gather(first, second)
-            assert aiokafka_client.create_conn is original_factory
+            assert vars(aiokafka_client)["create_conn"] is original_factory
 
             third = await KafkaAdapter(kafka_config).validate(resolved_credential, 5)
-            assert aiokafka_client.create_conn is original_factory
+            assert vars(aiokafka_client)["create_conn"] is original_factory
 
         assert attempts == 3
         assert all(result.error_type == HealthCheckErrorType.AUTH_FAILURE for result in [*results, third])
@@ -358,7 +358,7 @@ class TestKafkaConcurrentValidation:
             closed.append(client)
             await original_close(client)
 
-        original_factory = aiokafka_client.create_conn
+        original_factory = vars(aiokafka_client)["create_conn"]
         with (
             patch("syntara.integrations.lib.kafka_connection._PinnedKafkaConnection.connect", wait_for_release),
             patch.object(KafkaHealthClient, "close", close_client),
@@ -376,7 +376,7 @@ class TestKafkaConcurrentValidation:
             finally:
                 release.set()
                 await first
-            assert aiokafka_client.create_conn is original_factory
+            assert vars(aiokafka_client)["create_conn"] is original_factory
 
         assert len(closed) == 2
 

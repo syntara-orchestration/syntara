@@ -135,3 +135,67 @@ class WorkflowsApi:
     async def async_export_version(self, **kwargs: Any) -> Response[Any]:
         endpoint_module = self._load_endpoint_module("export_workflow_version")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def list_event_subscriptions(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_event_subscriptions")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_list_event_subscriptions(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_event_subscriptions")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def test_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("test_event_subscription")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_test_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("test_event_subscription")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def get_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("get_event_subscription")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_get_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("get_event_subscription")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def pause_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("pause_event_subscription")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_pause_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("pause_event_subscription")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def resume_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("resume_event_subscription")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_resume_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("resume_event_subscription")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def retry_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("retry_event_subscription")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_retry_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("retry_event_subscription")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def recover_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("recover_event_subscription")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_recover_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("recover_event_subscription")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def retire_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("retire_event_subscription")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_retire_event_subscription(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("retire_event_subscription")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)

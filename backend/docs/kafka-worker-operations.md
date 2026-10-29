@@ -194,7 +194,7 @@ Processing concurrency is shared per worker, not a fleet-wide throughput guarant
    evidence. Clearing placement is not a replacement for stopping old workers.
 4. Keep feature activation and terminal caching disabled until database, Kafka,
    Temporal history retention and broker egress are safe. Explicitly start the
-   compatible pool using the [local example](../samples/kafka/README.md), then
+   compatible pool using the [local example](https://github.com/syntara-orchestration/syntara/blob/devel/backend/samples/kafka/README.md), then
    reconcile state before resuming selected subscriptions.
 5. Enable terminal caching separately, only with compatible readers/writers,
    shared trust inputs and the operational checks required for that deployment.
@@ -283,7 +283,7 @@ namespace. Longer retention does not extend existing cached proofs.
    paused. Register/heartbeat and reconcile before reopening admission. Prepared
    recovery runs without active consumers; it waits when the whole pool is stopped.
 
-The [manual placement reset example](../samples/kafka/reset-placement.example.sql)
+The [manual placement reset example](https://github.com/syntara-orchestration/syntara/blob/devel/backend/samples/kafka/reset-placement.example.sql)
 is limited to step 4, also applicable to obsolete topology state during rollout.
 It is never run by setup, migrations or compose. Set `KAFKA_DEPLOYMENT_ID` to the
 existing persisted `Installation.id` for the affected deployment, configure the

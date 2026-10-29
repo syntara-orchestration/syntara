@@ -30,7 +30,7 @@ from syntara.eventstreams.services.control_service import EventSubscriptionContr
 from syntara.eventstreams.services.inspection_service import EventSubscriptionInspectionService
 from syntara.workflows.models.workflow import Workflow
 
-router = SyntaraRouter(prefix="/workflows/{workflow_id}/event-subscriptions", tags=["Workflows"])
+router = SyntaraRouter(prefix="/workflows/{workflow_id}/event_subscriptions", tags=["Workflows"])
 _read = PermissionChecker("workflow", "read", resource_model=Workflow, resource_id_param="workflow_id")
 _update = PermissionChecker("workflow", "update", resource_model=Workflow, resource_id_param="workflow_id")
 _recover = PermissionChecker("event_subscription", "recover", resource_model=Workflow, resource_id_param="workflow_id")

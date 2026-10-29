@@ -125,7 +125,11 @@ class Scenario:
         )
 
     def recovery(
-        self, *, policy: RecoveryPolicy = RecoveryPolicy.RETAINED_BEGINNING, acknowledge: bool = False
+        self,
+        *,
+        policy: RecoveryPolicy = RecoveryPolicy.RETAINED_BEGINNING,
+        acknowledge: bool = False,
+        allow_disposition: bool = False,
     ) -> RecoveryRequest:
         return RecoveryRequest(
             **self.request().model_dump(),
@@ -133,6 +137,7 @@ class Scenario:
             policy=policy,
             reason="offset_expired",
             acknowledge_duplicate_risk=acknowledge,
+            allow_unscheduled_disposition=allow_disposition,
         )
 
     async def committed(self, partitions: list[int], **_kwargs: object) -> dict[int, CommittedPositionResult]:
@@ -477,22 +482,34 @@ async def test_retained_beginning_fences_unprepared_claim_without_discarding_red
         assert replay.binding is None
 
 
-async def test_current_end_cancels_only_proven_unprepared_work_below_selected_boundary(
+@pytest.mark.parametrize("allow_disposition", [False, True])
+async def test_current_end_disposition_requires_authority_for_proven_unprepared_work(
     delivery_context: DeliveryContext,
+    *,
+    allow_disposition: bool,
 ) -> None:
     scenario = Scenario(delivery_context)
     await scenario.gap()
     claim = await delivery_context.claim(50)
     await delivery_context.expire(claim)
     result = await scenario.service.recover(
-        scenario.recovery(policy=RecoveryPolicy.CURRENT_END), owner_worker_id="recovery"
+        scenario.recovery(policy=RecoveryPolicy.CURRENT_END, allow_disposition=allow_disposition),
+        owner_worker_id="recovery",
     )
-    assert result.next_offset == 100
     async with delivery_context.session_factory() as session:
-        cancelled = await session.get(EventDelivery, claim.identity.digest)
-        assert cancelled is not None
-        assert cancelled.state == DeliveryState.CANCELLED
-        assert cancelled.last_error_code == "cancelled_by_gap_recovery"
+        delivery = await session.get(EventDelivery, claim.identity.digest)
+        assert delivery is not None
+        if allow_disposition:
+            assert result.status == PositionStatus.READY
+            assert result.next_offset == 100
+            assert delivery.state == DeliveryState.CANCELLED
+            assert delivery.last_error_code == "cancelled_by_gap_recovery"
+        else:
+            assert result.status == PositionStatus.BLOCKED
+            assert result.reason == "retirement_authority_required"
+            assert result.next_offset is None
+            assert delivery.state == DeliveryState.IN_PROGRESS
+            assert scenario.commits == {}
 
 
 @pytest.mark.parametrize("recover", [False, True], ids=["initialization", "recovery"])

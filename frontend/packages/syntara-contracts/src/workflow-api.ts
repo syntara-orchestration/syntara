@@ -276,7 +276,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/workflows/{workflow_id}/event-subscriptions': {
+  '/workflows/{workflow_id}/event_subscriptions': {
     parameters: {
       query?: never
       header?: never
@@ -296,7 +296,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/workflows/{workflow_id}/event-subscriptions/test': {
+  '/workflows/{workflow_id}/event_subscriptions/test': {
     parameters: {
       query?: never
       header?: never
@@ -316,7 +316,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/workflows/{workflow_id}/event-subscriptions/{subscription_id}': {
+  '/workflows/{workflow_id}/event_subscriptions/{subscription_id}': {
     parameters: {
       query?: never
       header?: never
@@ -336,7 +336,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/workflows/{workflow_id}/event-subscriptions/{subscription_id}/pause': {
+  '/workflows/{workflow_id}/event_subscriptions/{subscription_id}/pause': {
     parameters: {
       query?: never
       header?: never
@@ -356,7 +356,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/workflows/{workflow_id}/event-subscriptions/{subscription_id}/resume': {
+  '/workflows/{workflow_id}/event_subscriptions/{subscription_id}/resume': {
     parameters: {
       query?: never
       header?: never
@@ -376,7 +376,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/workflows/{workflow_id}/event-subscriptions/{subscription_id}/retry': {
+  '/workflows/{workflow_id}/event_subscriptions/{subscription_id}/retry': {
     parameters: {
       query?: never
       header?: never
@@ -396,7 +396,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/workflows/{workflow_id}/event-subscriptions/{subscription_id}/recover': {
+  '/workflows/{workflow_id}/event_subscriptions/{subscription_id}/recover': {
     parameters: {
       query?: never
       header?: never
@@ -416,7 +416,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/workflows/{workflow_id}/event-subscriptions/{subscription_id}/retire': {
+  '/workflows/{workflow_id}/event_subscriptions/{subscription_id}/retire': {
     parameters: {
       query?: never
       header?: never

@@ -45,7 +45,7 @@ def client(service: AsyncMock) -> TestClient:
 
 @pytest.mark.parametrize("query", ["limit=0", "limit=101", "transport=other"])
 def test_list_rejects_invalid_bounds(client: TestClient, service: AsyncMock, query: str) -> None:
-    assert client.get(f"/api/v1/workflows/{uuid4()}/event-subscriptions?{query}").status_code == 422
+    assert client.get(f"/api/v1/workflows/{uuid4()}/event_subscriptions?{query}").status_code == 422
     service.list_current.assert_not_called()
 
 
@@ -55,7 +55,7 @@ def test_read_routes_preserve_initial_partition_set(
     client: TestClient, service: AsyncMock, read_route: str, partition_ids: list[int] | None
 ) -> None:
     """Real shaping and HTTP serialization preserve captured sets and missing legacy data."""
-    stored_configuration = {"transport": "kafka", "topic": "alerts", "group_id": "syntara.test"}
+    stored_configuration: dict[str, Any] = {"transport": "kafka", "topic": "alerts", "group_id": "syntara.test"}
     configuration = KafkaSourceConfiguration.model_validate(
         stored_configuration
         if partition_ids is None
@@ -83,7 +83,7 @@ def test_read_routes_preserve_initial_partition_set(
     shaped = EventSubscriptionInspectionService._shape(subscription, source)
     service.get_current.return_value = shaped
     service.list_current.return_value = EventSubscriptionListResponse(resources=[shaped])
-    url = f"/api/v1/workflows/{subscription.workflow_id}/event-subscriptions"
+    url = f"/api/v1/workflows/{subscription.workflow_id}/event_subscriptions"
 
     response = client.get(url if read_route == "list" else f"{url}/{subscription.id}")
 
@@ -101,7 +101,7 @@ def test_read_routes_preserve_initial_partition_set(
 def test_unsaved_flat_request_delegates(client: TestClient, service: AsyncMock) -> None:
     workflow_id = uuid4()
     data = {"topic": "alerts", "integration_id": str(uuid4()), "credential_id": str(uuid4())}
-    response = client.post(f"/api/v1/workflows/{workflow_id}/event-subscriptions/test", json=data)
+    response = client.post(f"/api/v1/workflows/{workflow_id}/event_subscriptions/test", json=data)
     assert response.status_code == 200
     assert response.json()["topic_read"] == response.json()["group_access"] == "unverified"
     assert service.test_unsaved.call_args.args[0] == workflow_id
@@ -122,7 +122,7 @@ def test_unsaved_rejects_invalid_or_selected_account_fields(
     client: TestClient, service: AsyncMock, change: dict[str, Any]
 ) -> None:
     data = {"topic": "alerts", "integration_id": str(uuid4()), "credential_id": str(uuid4())}
-    response = client.post(f"/api/v1/workflows/{uuid4()}/event-subscriptions/test", json={**data, **change})
+    response = client.post(f"/api/v1/workflows/{uuid4()}/event_subscriptions/test", json={**data, **change})
     assert response.status_code == 422
     service.test_unsaved.assert_not_called()
 

@@ -14,7 +14,9 @@ from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     import ssl
-    from collections.abc import Callable
+    from collections.abc import Awaitable, Callable
+
+    from aiokafka.protocol.api import Request
 
 from aiokafka.conn import AIOKafkaConnection, collect_hosts
 from aiokafka.errors import KafkaConnectionError, KafkaError
@@ -89,18 +91,22 @@ class _PinnedLoop:
         raise KafkaConnectionError(msg)
 
 
-# aiokafka 0.14 has no type declarations for its connection implementation.
-class _PinnedKafkaConnection(AIOKafkaConnection):  # type: ignore[misc]
+# aiokafka 0.14 leaves its connection methods untyped.
+class _PinnedKafkaConnection(AIOKafkaConnection):
     """Use upstream framing/authentication with a connection-local pinned loop."""
 
     _loop: Any
+
+    def __init__(self, host: str, port: int, **kwargs: object) -> None:
+        """Keep the untyped upstream constructor at the library boundary."""
+        AIOKafkaConnection.__init__(self, host, port, **kwargs)
 
     async def connect(self) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
         """Open the upstream connection through the pinned socket boundary."""
         original_loop = self._loop
         self._loop = _PinnedLoop(original_loop)
         try:
-            return cast("tuple[asyncio.StreamReader, asyncio.StreamWriter]", await super().connect())
+            return cast("tuple[asyncio.StreamReader, asyncio.StreamWriter]", await AIOKafkaConnection.connect(self))
         finally:
             self._loop = original_loop
 
@@ -112,13 +118,17 @@ class _PinnedKafkaConnection(AIOKafkaConnection):  # type: ignore[misc]
         not be awaited when no stream was established.
         """
         writer = getattr(self, "_writer", None)
-        closed = super().close(reason=reason, exc=exc)
+        closed = AIOKafkaConnection.close(self, reason=reason, exc=exc)
         if writer is None:
             if closed is not None and not closed.done():
                 closed.cancel()
             return None
         writer.transport.abort()
         return cast("asyncio.Future[None] | None", closed)
+
+    def send(self, request: Request[Any], expect_response: bool = True) -> Awaitable[Any]:  # noqa: FBT001, FBT002 - upstream signature
+        """Expose the upstream response awaitable through a typed boundary."""
+        return cast("Awaitable[Any]", AIOKafkaConnection.send(self, request, expect_response=expect_response))
 
 
 class KafkaHealthClient:

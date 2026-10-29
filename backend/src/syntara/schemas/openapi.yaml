@@ -28009,7 +28009,7 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ErrorData'
-  /workflows/{workflow_id}/event-subscriptions:
+  /workflows/{workflow_id}/event_subscriptions:
     get:
       tags:
         - Workflows
@@ -28185,7 +28185,7 @@ paths:
       x-app-permission:
         resource: workflow
         action: read
-  /workflows/{workflow_id}/event-subscriptions/test:
+  /workflows/{workflow_id}/event_subscriptions/test:
     post:
       tags:
         - Workflows
@@ -28316,7 +28316,7 @@ paths:
       x-app-permission:
         resource: workflow
         action: update
-  /workflows/{workflow_id}/event-subscriptions/{subscription_id}:
+  /workflows/{workflow_id}/event_subscriptions/{subscription_id}:
     get:
       tags:
         - Workflows
@@ -28448,7 +28448,7 @@ paths:
       x-app-permission:
         resource: workflow
         action: read
-  /workflows/{workflow_id}/event-subscriptions/{subscription_id}/pause:
+  /workflows/{workflow_id}/event_subscriptions/{subscription_id}/pause:
     post:
       tags:
         - Workflows
@@ -28586,7 +28586,7 @@ paths:
       x-app-permission:
         resource: workflow
         action: update
-  /workflows/{workflow_id}/event-subscriptions/{subscription_id}/resume:
+  /workflows/{workflow_id}/event_subscriptions/{subscription_id}/resume:
     post:
       tags:
         - Workflows
@@ -28724,7 +28724,7 @@ paths:
       x-app-permission:
         resource: workflow
         action: update
-  /workflows/{workflow_id}/event-subscriptions/{subscription_id}/retry:
+  /workflows/{workflow_id}/event_subscriptions/{subscription_id}/retry:
     post:
       tags:
         - Workflows
@@ -28862,7 +28862,7 @@ paths:
       x-app-permission:
         resource: workflow
         action: update
-  /workflows/{workflow_id}/event-subscriptions/{subscription_id}/recover:
+  /workflows/{workflow_id}/event_subscriptions/{subscription_id}/recover:
     post:
       tags:
         - Workflows
@@ -29000,7 +29000,7 @@ paths:
       x-app-permission:
         resource: workflow
         action: update
-  /workflows/{workflow_id}/event-subscriptions/{subscription_id}/retire:
+  /workflows/{workflow_id}/event_subscriptions/{subscription_id}/retire:
     post:
       tags:
         - Workflows

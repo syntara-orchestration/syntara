@@ -9,7 +9,7 @@ import asyncio
 import ssl
 from collections.abc import Iterable
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from aiokafka.conn import AIOKafkaConnection, collect_hosts, create_conn
@@ -26,7 +26,7 @@ _CLOSE_TIMEOUT_SECONDS = 1
 logger = structlog.stdlib.get_logger(__name__)
 
 
-class NonCreatingMetadataRequest(Request[MetadataRequest_v4 | MetadataRequest_v5]):  # type: ignore[misc]  # aiokafka has no typing marker
+class NonCreatingMetadataRequest(Request[MetadataRequest_v4 | MetadataRequest_v5]):
     """Refuse protocol versions without explicit auto-creation control."""
 
     API_KEY = 3
@@ -45,7 +45,7 @@ class NonCreatingMetadataRequest(Request[MetadataRequest_v4 | MetadataRequest_v5
 async def _connect(config: KafkaConfiguration, options: dict[str, Any]) -> AIOKafkaConnection | None:
     for host, port, _ in collect_hosts(list(config.bootstrap_servers), randomize=False):
         try:
-            return await create_conn(host, port, **options)
+            return cast("AIOKafkaConnection", await create_conn(host, port, **options))
         except (ssl.SSLError, IncompatibleBrokerVersion):
             # Classified by the caller. Both subclass the fallback errors below.
             raise

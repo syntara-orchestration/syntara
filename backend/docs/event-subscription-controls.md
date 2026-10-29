@@ -4,7 +4,7 @@ Subscriptions remain projections of published workflow listeners. Operational
 actions do not configure connections, select groups, edit offsets, replace frozen
 execution input, or create a new execution identity.
 
-All actions use `/workflows/{workflow_id}/event-subscriptions/{subscription_id}`
+All actions use `/workflows/{workflow_id}/event_subscriptions/{subscription_id}`
 and require the current `configuration_revision` and `source_generation` in the
 JSON body. Stale revisions or missing safety evidence return a sanitized 409.
 Retry also conflicts while a prepared delivery has an active claim, so a wakeup

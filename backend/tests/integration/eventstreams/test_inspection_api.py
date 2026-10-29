@@ -72,7 +72,7 @@ class InspectionScenario:
     @property
     def url(self) -> str:
         """Current workflow collection URL."""
-        return f"/api/v1/workflows/{self.workflow.id}/event-subscriptions"
+        return f"/api/v1/workflows/{self.workflow.id}/event_subscriptions"
 
     def parameters(self) -> dict[str, str]:
         """Unsaved parameters always identify a runtime credential explicitly."""
@@ -328,12 +328,17 @@ async def test_current_collection_paginates_and_counts_without_retired_or_other_
 
 
 @pytest.mark.usefixtures("published_subscriptions")
-async def test_detail_returns_current_source_only_and_safe_missing_errors(scenario: InspectionScenario) -> None:
+async def test_detail_returns_lifecycle_evidence_and_safe_missing_errors(scenario: InspectionScenario) -> None:
     response = await scenario.client.get(f"{scenario.url}/{scenario.subscriptions['c'].id}")
     assert response.status_code == 200, response.text
     assert response.json()["source"]["generation"] == 2
     assert response.json()["source"]["configuration"]["topic"] == "alerts.current"
-    for subscription_id in [uuid4(), scenario.subscriptions["retired"].id, scenario.subscriptions["other"].id]:
+    assert [source["generation"] for source in response.json()["sources"]] == [1, 2]
+    retired = await scenario.client.get(f"{scenario.url}/{scenario.subscriptions['retired'].id}")
+    assert retired.status_code == 200, retired.text
+    assert retired.json()["retired"] is True
+    assert retired.json()["source"]["retired_at"] is not None
+    for subscription_id in [uuid4(), scenario.subscriptions["other"].id]:
         missing = await scenario.client.get(f"{scenario.url}/{subscription_id}")
         assert missing.status_code == 404, missing.text
         assert missing.headers["content-type"] == "application/problem+json"
@@ -353,7 +358,7 @@ async def test_workflow_project_permissions_are_enforced(scenario: InspectionSce
     workflow = Workflow(name="foreign", project_id=scenario.other_project.id, created_by=scenario.user.id)
     scenario.session.add(workflow)
     await scenario.session.commit()
-    response = await scenario.client.get(f"/api/v1/workflows/{workflow.id}/event-subscriptions")
+    response = await scenario.client.get(f"/api/v1/workflows/{workflow.id}/event_subscriptions")
     assert response.status_code == 403, response.text
     await _remove_permission(scenario, "workflow:read")
     assert (await scenario.client.get(scenario.url)).status_code == 403
