@@ -3,6 +3,7 @@ import type { WorkflowAPI } from '@syntara/contracts'
 
 import { workflowClient } from '../../../client'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
+import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useBuilderPermissions } from '../useBuilderPermissions'
@@ -46,6 +47,10 @@ export function KafkaSubscribePreflight({
             Test runtime access
           </Button>
         </DisabledWithTooltip>
+        <FieldHelpPopover
+          headerContent="Test runtime access"
+          helpText="This check does not consume messages or preview payloads. Integration health and runtime access are separate checks."
+        />
       </StackItem>
       {!workflowId && (
         <StackItem>
@@ -60,12 +65,6 @@ export function KafkaSubscribePreflight({
           </Content>
         </StackItem>
       )}
-      <StackItem>
-        <Content component={ContentVariants.p}>
-          This check does not consume messages or preview payloads. Integration health and runtime access are separate
-          checks.
-        </Content>
-      </StackItem>
       <StackItem aria-live="polite" aria-atomic>
         {mutation.isPending && <Content component={ContentVariants.p}>Checking runtime access…</Content>}
         {mutation.isError && (

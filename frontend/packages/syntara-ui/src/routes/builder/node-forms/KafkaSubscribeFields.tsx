@@ -1,5 +1,5 @@
-import { Alert, Content, ContentVariants, Stack, StackItem } from '@patternfly/react-core'
-import { use } from 'react'
+import { Alert, Content, ContentVariants, ExpandableSection, Stack, StackItem } from '@patternfly/react-core'
+import { use, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { FormLabelWithHelp } from '../../../components/FormLabelWithHelp'
@@ -25,20 +25,20 @@ export function KafkaSubscribeFields({
   projectId,
 }: Readonly<{ workflowId?: string | null; projectId?: string }>) {
   const isReadOnly = useIsVersionView()
-  const { canCreate } = useCredentialPermissions({ resourceProject: projectId })
   const resources = use(KafkaSubscribeResourceContext)
+  const [deliveryExpanded, setDeliveryExpanded] = useState(false)
+  const { canCreate } = useCredentialPermissions({ resourceProject: projectId })
   const { control, setValue } = useFormContext<TriggerFormData>()
   const values = useWatch({ control })
   const parsed = triggerFormSchema.safeParse(values)
   const resourceErrors = resources ? kafkaResourceErrors(values, resources) : {}
-  const parameters =
+  const ready =
     parsed.success &&
     values.integrationId &&
     values.runtimeCredentialId &&
     values.topic &&
     !Object.keys(resourceErrors).length
-      ? kafkaSubscribeParameters(parsed.data)
-      : undefined
+  const parameters = ready ? kafkaSubscribeParameters(parsed.data) : undefined
   const preflightKey = JSON.stringify([
     workflowId,
     projectId,
@@ -123,13 +123,19 @@ export function KafkaSubscribeFields({
         </fieldset>
       </StackItem>
       <StackItem>
-        <Content component={ContentVariants.p}>
-          Each subscription uses a platform-managed group. Partitions present at first activation start with new
-          messages at the visible-end boundary saved when each partition initializes. Partitions added later start at
-          their earliest retained message. Initialized partitions resume from valid committed offsets. Missing or
-          invalid established checkpoints require recovery; they do not reset automatically. Auto-commit is off. Commit
-          follows durable scheduling or resolution, without waiting for workflow completion.
-        </Content>
+        <ExpandableSection
+          toggleText="Show message delivery details"
+          isExpanded={deliveryExpanded}
+          onToggle={(_event, expanded) => setDeliveryExpanded(expanded)}
+        >
+          <Content component={ContentVariants.p}>
+            Each subscription uses a platform-managed group. Partitions present at first activation start with new
+            messages at the visible-end boundary saved when each partition initializes. Partitions added later start at
+            their earliest retained message. Initialized partitions resume from valid committed offsets. Missing or
+            invalid established checkpoints require recovery; they do not reset automatically. Auto-commit is off.
+            Commit follows durable scheduling or resolution, without waiting for workflow completion.
+          </Content>
+        </ExpandableSection>
       </StackItem>
       <StackItem>
         <KafkaSubscribePreflight
