@@ -1223,6 +1223,51 @@ describe('RunStepDialog', () => {
       )
     })
 
+    // AAP-89481: pinning mock data on the trigger's own Output panel must be
+    // honored when running a downstream step via "Run step" -> "Use mock data",
+    // not silently replaced with an empty schema template.
+    it('pre-populates mock editor with pinned trigger mock data, not the empty schema template', async () => {
+      const pinnedTriggerProps = {
+        ...triggerPredecessorProps,
+        pinnedMockData: { 'trigger-0': { host: 'web-01', severity: 'high' } },
+      }
+      const user = userEvent.setup()
+      render(<RunStepDialog {...pinnedTriggerProps} />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Use mock data' }))
+
+      const textarea: HTMLTextAreaElement = screen.getByRole('textbox', { name: /mock json output data/i })
+      expect(JSON.parse(textarea.value || '{}') as Record<string, unknown>).toEqual({
+        host: 'web-01',
+        severity: 'high',
+      })
+    })
+
+    it('submits pinned trigger mock data as trigger_inputs, not the empty schema template', async () => {
+      const pinnedTriggerProps = {
+        ...triggerPredecessorProps,
+        pinnedMockData: { 'trigger-0': { host: 'web-01', severity: 'high' } },
+      }
+      const user = userEvent.setup()
+      render(<RunStepDialog {...pinnedTriggerProps} />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Use mock data' }))
+      await user.click(screen.getByRole('button', { name: 'Run' }))
+
+      await waitFor(() =>
+        expect(mockPost).toHaveBeenCalledWith('/workflows/{workflow_id}/test', {
+          params: { path: { workflow_id: 'wf_123' } },
+          body: {
+            target_node_id: 'step_1',
+            pre_resolved_nodes: {},
+            trigger_inputs: { host: 'web-01', severity: 'high' },
+            execute_target: true,
+            trigger_node_id: '',
+          },
+        })
+      )
+    })
+
     it('pre-populates keyed editor when trigger and regular predecessor coexist', async () => {
       const mixedProps = {
         ...triggerPredecessorProps,
