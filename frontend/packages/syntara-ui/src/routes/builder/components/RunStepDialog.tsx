@@ -462,7 +462,16 @@ export function RunStepDialog({
     detachPromise(executeTestRun({ preResolvedNodes: {}, triggerInputs: {} }))
   }, [executeTestRun])
 
+  const hasPinnedData = pinnedMockData && Object.keys(pinnedMockData).length > 0
+
   const handleRunWithMockData = useCallback(async () => {
+    if (!mockJson.trim() && hasPinnedData) {
+      setJsonError(
+        'Mock data cannot be empty when pinned data is configured. Enter JSON or cancel to keep the pinned data.'
+      )
+      return
+    }
+
     let parsedMock: Record<string, unknown> = {}
     if (mockJson.trim()) {
       try {
@@ -476,9 +485,7 @@ export function RunStepDialog({
 
     clearMocksRef.current = false
     await executeTestRun(buildMockSubmission(parsedMock, predecessors))
-  }, [mockJson, predecessors, executeTestRun])
-
-  const hasPinnedData = pinnedMockData && Object.keys(pinnedMockData).length > 0
+  }, [mockJson, hasPinnedData, predecessors, executeTestRun])
 
   if (dialogView === 'choice') {
     return (
