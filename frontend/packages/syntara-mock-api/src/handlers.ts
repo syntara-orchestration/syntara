@@ -1245,7 +1245,7 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.post('/api/v1/workflows/:workflowId/event-subscriptions/test', async ({ request, params }) => {
+  http.post('/api/v1/workflows/:workflowId/event_subscriptions/test', async ({ request, params }) => {
     const username = getUsernameFromRequest(request)
     if (username === 'viewer' || username === 'auditor') {
       return HttpResponse.json(

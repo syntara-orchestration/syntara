@@ -51,14 +51,13 @@ const initialData = {
   runtimeCredentialId: credentialId,
   topic: 'orders.created',
 }
-const integration: IntegrationsAPI.components['schemas']['IntegrationRead'] = {
+const integration: IntegrationsAPI.components['schemas']['KafkaIntegrationRead'] = {
   id: integrationId,
   name: 'Orders Kafka',
   integration_type: IntegrationTypeEnum.KAFKA,
   enabled: true,
   validation_status: 'available',
-  configuration: null,
-  kafka_configuration: { integration_type: IntegrationTypeEnum.KAFKA, bootstrap_servers: ['kafka.example.com:9093'] },
+  configuration: { integration_type: IntegrationTypeEnum.KAFKA, bootstrap_servers: ['kafka.example.com:9093'] },
 }
 
 function setupMutation(overrides = {}) {
@@ -113,10 +112,10 @@ describe('Kafka Subscribe form', () => {
       expect(screen.getByRole('button', { name: 'Kafka Integration' })).toHaveTextContent('Orders Kafka')
     )
     expect(integrationsFetchClient.GET).toHaveBeenCalledWith(
-      '/integrations',
+      '/kafka_integrations',
       expect.objectContaining({
         params: {
-          query: { integration_type: 'kafka', enabled: true, project_id: 'project-1', limit: 100, cursor: undefined },
+          query: { enabled: true, project_id: 'project-1', limit: 100, cursor: undefined },
         },
       })
     )

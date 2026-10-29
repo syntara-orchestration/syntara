@@ -30,7 +30,7 @@ const body = {
 }
 
 function preflight(username: string, parameters: object = body) {
-  return fetch(`${baseUrl}/api/v1/workflows/${workflow?.id}/event-subscriptions/test`, {
+  return fetch(`${baseUrl}/api/v1/workflows/${workflow?.id}/event_subscriptions/test`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

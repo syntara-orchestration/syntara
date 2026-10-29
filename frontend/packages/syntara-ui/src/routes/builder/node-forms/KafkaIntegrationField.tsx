@@ -34,10 +34,9 @@ export function KafkaIntegrationField({
     queryKey: ['kafka-subscribe-integrations', projectId],
     queryFn: () =>
       fetchAllPages((cursor) =>
-        integrationsFetchClient.GET('/integrations', {
+        integrationsFetchClient.GET('/kafka_integrations', {
           params: {
             query: {
-              integration_type: IntegrationTypeEnum.KAFKA,
               enabled: true,
               limit: MAX_PAGE_SIZE,
               cursor,

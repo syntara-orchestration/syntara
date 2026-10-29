@@ -26,7 +26,7 @@ export function KafkaSubscribePreflight({
 }: KafkaSubscribePreflightProps) {
   const permissions = useBuilderPermissions(!workflowId, false, projectId)
   const handleError = useMutationErrorHandler()
-  const mutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/event-subscriptions/test')
+  const mutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/event_subscriptions/test')
   const canTest = Boolean(workflowId && parameters && permissions.canEdit && !isReadOnly && !mutation.isPending)
   const testAccess = () => {
     if (!canTest || !workflowId || !parameters) return

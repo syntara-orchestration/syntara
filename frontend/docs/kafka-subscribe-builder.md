@@ -44,7 +44,7 @@ generator, then formats the two outputs.
 
 Save a new workflow before testing; the endpoint requires an existing workflow ID
 and `workflow:update` permission. **Test runtime access** submits current unsaved
-fields to `POST /workflows/{workflow_id}/event-subscriptions/test`. It does not
+fields to `POST /workflows/{workflow_id}/event_subscriptions/test`. It does not
 consume messages, start a workflow, or provide a message preview.
 
 Integration validation is shown separately. The preflight response displays
