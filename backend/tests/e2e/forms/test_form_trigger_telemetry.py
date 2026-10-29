@@ -79,7 +79,7 @@ class TestFormTriggerTelemetry:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """A real form-trigger submission emits its field metadata and omits PII and values."""
         name = unique_name("e2e-form-trigger-telemetry")
@@ -119,7 +119,7 @@ class TestFormTriggerTelemetry:
             )
         )
         execution_id = UUID(str(execution.id))
-        form_prompt_execution_cleanup(execution_id)
+        form_execution_cleanup(execution_id)
 
         message = _wait_for_form_trigger_segment_event(execution_id)
         properties = message["properties"]
