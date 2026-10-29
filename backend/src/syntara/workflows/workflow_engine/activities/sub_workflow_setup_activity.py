@@ -8,8 +8,11 @@ Follows the ScheduledExecutionLauncher pattern: class-based activity
 that receives ``session_factory`` and ``task_queue`` at construction.
 
 Idempotency: uses a deterministic child execution ID derived from
-(parent_execution_id, node_id) so retries of the setup activity
-return the existing Execution record instead of creating duplicates.
+(parent_execution_id, node_id). If the child Execution already exists, the
+activity resumes it from the version pinned on that record rather than
+re-resolving the currently-published version, so a retry that races a
+republish or unpublish of the child cannot change the definition the child
+runs, and no duplicate execution is created.
 """
 
 from __future__ import annotations
@@ -28,6 +31,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from syntara.workflows.models.execution import Execution
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -149,6 +154,26 @@ class SubWorkflowSetupActivity:
             resolve_user_display_name,
         )
 
+        # Idempotent retry: if the child execution already exists, resume from the
+        # version pinned on that record. The published version is deliberately NOT
+        # re-resolved here, so a republish or unpublish occurring between setup
+        # attempts cannot change the definition the already-created child runs.
+        async with self._session_factory() as session:
+            existing = await session.get(Execution, child_execution_id)
+            if existing is not None:
+                return await self._resume_pinned_child_execution(
+                    session,
+                    existing=existing,
+                    child_workflow_id=child_workflow_id,
+                    child_execution_id_str=child_execution_id_str,
+                    trigger_node_id=trigger_node_id,
+                    input_mapping=input_mapping,
+                    created_by_user_id=created_by_user_id,
+                    current_depth=current_depth,
+                )
+
+        # New invocation: resolve the currently-published version, validate it, and
+        # create the child execution pinned to that version.
         async with self._session_factory() as session:
             result = await session.exec(
                 select(Workflow, WorkflowVersion)
@@ -177,50 +202,31 @@ class SubWorkflowSetupActivity:
 
             author_name = await resolve_user_display_name(session, child_workflow.created_by)
 
-        child_wf_name = child_workflow.name
-        child_wf_id = child_workflow.id
-        child_wf_project_id = child_workflow.project_id
-        child_version_id = child_version.id
-        workflow_def = child_version.workflow_definition
-        now = datetime.now(UTC)
+            child_wf_name = child_workflow.name
+            child_wf_id = child_workflow.id
+            child_wf_project_id = child_workflow.project_id
+            child_version_id = child_version.id
+            child_version_number = child_version.version
+            workflow_def = child_version.workflow_definition
+            now = datetime.now(UTC)
 
-        temporal_workflow_id = f"{child_wf_name}-{child_execution_id_str}"
+            temporal_workflow_id = f"{child_wf_name}-{child_execution_id_str}"
 
-        child_metadata = build_workflow_metadata(
-            workflow_name=child_wf_name,
-            workflow_id=child_wf_id,
-            workflow_version=child_version.version,
-            workflow_published=True,
-            workflow_author=author_name,
-            project_id=child_wf_project_id,
-            execution_id=child_execution_id_str,
-            execution_mode="sub_workflow",
-            created_by=created_by_user_id,
-            created_by_user_id=created_by_user_id,
-            created_at=now.isoformat(),
-            workflow_version_id=child_version_id,
-        )
-        child_metadata["sub_workflow_depth"] = current_depth + 1
-
-        async with self._session_factory() as session:
-            existing = await session.get(Execution, child_execution_id)
-            if existing is not None:
-                logger.info(
-                    "Child execution already exists (idempotent retry)",
-                    child_execution_id=child_execution_id_str,
-                )
-                return {
-                    "execution_id": child_execution_id_str,
-                    "temporal_workflow_id": temporal_workflow_id,
-                    "workflow_definition": workflow_def,
-                    "trigger_node_id": trigger_node_id,
-                    "input_data": input_mapping,
-                    "task_queue": self._task_queue,
-                    "workflow_metadata": child_metadata,
-                    "child_workflow_id": str(child_wf_id),
-                    "child_workflow_name": child_wf_name,
-                    "child_workflow_version": child_version.version,
-                }
+            child_metadata = build_workflow_metadata(
+                workflow_name=child_wf_name,
+                workflow_id=child_wf_id,
+                workflow_version=child_version_number,
+                workflow_published=True,
+                workflow_author=author_name,
+                project_id=child_wf_project_id,
+                execution_id=child_execution_id_str,
+                execution_mode="sub_workflow",
+                created_by=created_by_user_id,
+                created_by_user_id=created_by_user_id,
+                created_at=now.isoformat(),
+                workflow_version_id=child_version_id,
+            )
+            child_metadata["sub_workflow_depth"] = current_depth + 1
 
             execution = Execution(
                 id=child_execution_id,
@@ -263,7 +269,98 @@ class SubWorkflowSetupActivity:
             "workflow_metadata": child_metadata,
             "child_workflow_id": str(child_wf_id),
             "child_workflow_name": child_wf_name,
-            "child_workflow_version": child_version.version,
+            "child_workflow_version": child_version_number,
+        }
+
+    async def _resume_pinned_child_execution(
+        self,
+        session: AsyncSession,
+        *,
+        existing: Execution,
+        child_workflow_id: UUID,
+        child_execution_id_str: str,
+        trigger_node_id: str,
+        input_mapping: dict[str, Any],
+        created_by_user_id: str,
+        current_depth: int,
+    ) -> dict[str, Any]:
+        """Resume an already-created child execution from its pinned version.
+
+        The child ``Execution`` record pins ``workflow_version_id`` at creation
+        time. On a setup-activity retry the pinned version is reloaded by id and
+        its stored definition returned, regardless of what is currently published
+        for the child workflow. This guarantees that a republish or unpublish
+        between setup attempts cannot change the definition the child runs, and
+        that an unpublish after creation does not turn a valid resume into a
+        non-retryable failure.
+        """
+        from syntara.workflows.models.workflow import Workflow  # noqa: PLC0415
+        from syntara.workflows.models.workflow_version import WorkflowVersion  # noqa: PLC0415
+        from syntara.workflows.utils.workflow_metadata import (  # noqa: PLC0415
+            build_workflow_metadata,
+            resolve_user_display_name,
+        )
+
+        if existing.workflow_id != child_workflow_id:
+            msg = (
+                f"Existing child execution '{child_execution_id_str}' belongs to workflow "
+                f"'{existing.workflow_id}', not the requested '{child_workflow_id}'. "
+                f"Refusing to resume a mismatched execution."
+            )
+            raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+
+        pinned_version = await session.get(WorkflowVersion, existing.workflow_version_id)
+        if pinned_version is None:
+            msg = (
+                f"Pinned workflow version '{existing.workflow_version_id}' for child "
+                f"execution '{child_execution_id_str}' no longer exists."
+            )
+            raise ApplicationError(msg, type="WorkflowVersionMissingError", non_retryable=True)
+
+        child_workflow = await session.get(Workflow, existing.workflow_id)
+        if child_workflow is None:
+            msg = f"Workflow '{existing.workflow_id}' for child execution '{child_execution_id_str}' no longer exists."
+            raise ApplicationError(msg, type="WorkflowMissingError", non_retryable=True)
+
+        author_name = await resolve_user_display_name(session, child_workflow.created_by)
+        created_at = existing.created_at or datetime.now(UTC)
+
+        child_metadata = build_workflow_metadata(
+            workflow_name=child_workflow.name,
+            workflow_id=child_workflow.id,
+            workflow_version=pinned_version.version,
+            workflow_published=True,
+            workflow_author=author_name,
+            project_id=child_workflow.project_id,
+            execution_id=child_execution_id_str,
+            execution_mode="sub_workflow",
+            created_by=created_by_user_id,
+            created_by_user_id=created_by_user_id,
+            created_at=created_at.isoformat(),
+            workflow_version_id=existing.workflow_version_id,
+        )
+        child_metadata["sub_workflow_depth"] = current_depth + 1
+
+        logger.info(
+            "Child execution already exists; resuming from pinned version (idempotent retry)",
+            child_execution_id=child_execution_id_str,
+            pinned_version=pinned_version.version,
+            workflow_version_id=str(existing.workflow_version_id),
+        )
+
+        resolved_input = existing.input_data if existing.input_data is not None else input_mapping
+
+        return {
+            "execution_id": child_execution_id_str,
+            "temporal_workflow_id": existing.temporal_workflow_id,
+            "workflow_definition": pinned_version.workflow_definition,
+            "trigger_node_id": trigger_node_id,
+            "input_data": resolved_input,
+            "task_queue": self._task_queue,
+            "workflow_metadata": child_metadata,
+            "child_workflow_id": str(child_workflow.id),
+            "child_workflow_name": child_workflow.name,
+            "child_workflow_version": pinned_version.version,
         }
 
     @staticmethod

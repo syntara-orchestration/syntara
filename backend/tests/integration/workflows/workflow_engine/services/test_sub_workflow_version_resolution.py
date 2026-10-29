@@ -9,7 +9,10 @@ covering:
 * a published v1 is resolved and used,
 * republishing v2 makes the next run resolve v2 without changing the caller,
 * an unpublished target raises a non-retryable error naming the target,
-* the resolved version is pinned on the persisted child execution.
+* the resolved version is pinned on the persisted child execution,
+* a setup retry (same child execution id) resumes the pinned version even if the
+  target is republished or unpublished between attempts,
+* a distinct new invocation after a republish pins the newly published version.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 import pytest
+from sqlmodel import select
 from temporalio.exceptions import ApplicationError
 
 from syntara.workflows.models.execution import Execution
@@ -218,3 +222,142 @@ async def test_resolved_version_pinned_on_child_execution(
         child_execution = await session.get(Execution, child_execution_id)
     assert child_execution is not None
     assert child_execution.workflow_version_id == version_ids[1]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_retry_after_republish_resumes_pinned_version(
+    test_db_session: AsyncSession,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    """A setup retry (same child execution id) after a republish resumes the pinned version.
+
+    Test A. The first attempt pins v1. v2 is published. A second attempt with the
+    same parent execution + node derives the same child execution id, takes the
+    resume path, and must return the pinned v1 definition without creating a
+    duplicate child execution.
+    """
+    wf_id, version_ids = await _create_child_workflow(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=test_project_id,
+        versions=[(1, "echo v1"), (2, "echo v2")],
+        publish=1,
+    )
+    setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
+    parent_exec = str(uuid4())  # stable across attempts -> same derived child execution id
+
+    first = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0)
+    assert first["child_workflow_version"] == 1
+
+    # Republish v2 between setup attempts.
+    workflow = await test_db_session.get(Workflow, wf_id)
+    assert workflow is not None
+    workflow.published_version_id = version_ids[2]
+    await test_db_session.commit()
+
+    second = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0)
+
+    # Resume path returns the pinned v1, not the now-published v2.
+    assert second["execution_id"] == first["execution_id"]
+    assert second["child_workflow_version"] == 1
+    assert second["workflow_definition"]["nodes"][0]["parameters"]["code"] == "echo v1"
+
+    # No duplicate child execution was created.
+    async with test_db_session_factory() as session:
+        rows = (await session.exec(select(Execution).where(Execution.workflow_id == wf_id))).all()
+    assert len(rows) == 1
+    assert rows[0].workflow_version_id == version_ids[1]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_retry_after_unpublish_resumes_pinned_version(
+    test_db_session: AsyncSession,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    """A setup retry after the target is unpublished still resumes the pinned version.
+
+    Test B. Unpublishing clears ``published_version_id``, which would make a fresh
+    published-version resolution fail non-retryably. The resume path must instead
+    read the pinned version by id and succeed, returning the original v1.
+    """
+    wf_id, version_ids = await _create_child_workflow(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=test_project_id,
+        versions=[(1, "echo v1")],
+        publish=1,
+    )
+    setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
+    parent_exec = str(uuid4())  # stable across attempts -> same derived child execution id
+
+    first = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0)
+    assert first["child_workflow_version"] == 1
+
+    # Unpublish the target between setup attempts.
+    workflow = await test_db_session.get(Workflow, wf_id)
+    assert workflow is not None
+    workflow.published_version_id = None
+    workflow.is_enabled = False
+    await test_db_session.commit()
+
+    second = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0)
+
+    assert second["execution_id"] == first["execution_id"]
+    assert second["child_workflow_version"] == 1
+    assert second["workflow_definition"]["nodes"][0]["parameters"]["code"] == "echo v1"
+
+    # The child execution is still pinned to v1 and was not duplicated.
+    async with test_db_session_factory() as session:
+        rows = (await session.exec(select(Execution).where(Execution.workflow_id == wf_id))).all()
+    assert len(rows) == 1
+    assert rows[0].workflow_version_id == version_ids[1]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_new_invocation_after_republish_pins_new_version(
+    test_db_session: AsyncSession,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    """A distinct new invocation after a republish resolves and pins the new version.
+
+    Test C. A different parent execution derives a different child execution id, so
+    the new-invocation path (not the resume path) runs and pins the currently
+    published v2 -- confirming the fix does not freeze all callers on v1.
+    """
+    wf_id, version_ids = await _create_child_workflow(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=test_project_id,
+        versions=[(1, "echo v1"), (2, "echo v2")],
+        publish=1,
+    )
+    setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
+
+    first = await setup.run(_params(wf_id), str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+    assert first["child_workflow_version"] == 1
+
+    # Republish v2 before the next (distinct) invocation.
+    workflow = await test_db_session.get(Workflow, wf_id)
+    assert workflow is not None
+    workflow.published_version_id = version_ids[2]
+    await test_db_session.commit()
+
+    second = await setup.run(_params(wf_id), str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+
+    assert second["execution_id"] != first["execution_id"]
+    assert second["child_workflow_version"] == 2
+    assert second["workflow_definition"]["nodes"][0]["parameters"]["code"] == "echo v2"
+
+    async with test_db_session_factory() as session:
+        child = await session.get(Execution, UUID(second["execution_id"]))
+    assert child is not None
+    assert child.workflow_version_id == version_ids[2]
