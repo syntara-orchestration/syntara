@@ -79,6 +79,7 @@ function ValidationErrorBadge() {
 // eslint-disable-next-line complexity
 export function SynStep(props: {
   children: React.ReactNode
+  nodeProps: NodeProps
   disableSource?: boolean
   disableTarget?: boolean
   enableStart?: boolean
@@ -87,8 +88,6 @@ export function SynStep(props: {
   className?: string
   style?: React.CSSProperties
   hasDashedBorder?: boolean
-  onClick?: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void
-  nodeProps: NodeProps
   collapsible?: boolean
   executionState?: ExecutionState
   showExecutionBadge?: boolean
@@ -130,7 +129,6 @@ export function SynStep(props: {
 
   const semanticZoomTileStyle = useMemo(() => {
     if (!barRadiusStyle) return undefined
-    if (barRadiusStyle.borderTopLeftRadius === '75px') return undefined
     return barRadiusStyle
   }, [barRadiusStyle])
 
@@ -163,7 +161,7 @@ export function SynStep(props: {
 
   const panelStyle: React.CSSProperties = {
     overflow: 'visible', // Allow execution badge to overflow outside node
-    cursor: props.onClick || props.hasDashedBorder ? 'pointer' : undefined,
+    cursor: props.hasDashedBorder ? 'pointer' : undefined,
     width: `${nodeWidth}px`, // Fixed width for consistent node sizing
     minWidth: `${nodeWidth}px`,
     maxWidth: `${nodeWidth}px`,
@@ -228,10 +226,7 @@ export function SynStep(props: {
         }),
   }
 
-  const panelClassName = [props.className, !isSemanticZoom && !props.onClick ? stepStyles.stepRoot : undefined]
-    .filter(Boolean)
-    .join(' ')
-  const panelTabIndex: number | undefined = isSemanticZoom && !props.onClick ? undefined : 0
+  const panelClassName = [props.className, stepStyles.stepRoot].filter(Boolean).join(' ')
 
   return (
     <SynStepExpandedContext.Provider value={expandedContext}>
@@ -240,16 +235,8 @@ export function SynStep(props: {
         variant="raised"
         className={panelClassName || undefined}
         data-testid={props.rootTestId}
-        onClick={props.onClick}
         style={panelStyle}
-        onKeyDown={(e: React.KeyboardEvent) => {
-          if (props.onClick && (e.key === 'Enter' || e.key === ' ')) {
-            e.preventDefault()
-            props.onClick(e as unknown as React.MouseEvent<HTMLDivElement, MouseEvent>)
-          }
-        }}
-        role={props.onClick ? 'button' : undefined}
-        tabIndex={panelTabIndex}
+        tabIndex={isSemanticZoom ? undefined : 0}
       >
         {isSemanticZoom && summary ? (
           <SynStepSemanticZoomBody

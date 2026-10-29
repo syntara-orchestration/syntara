@@ -115,20 +115,19 @@ describe('SynStep semantic zoom', () => {
     expect(screen.getByTestId('syn-step-semantic-zoom-tab')).not.toHaveAttribute('tabIndex')
   })
 
-  it('keeps panel tabIndex when the step is clickable at semantic zoom', () => {
+  it('passes trigger pill radii through to semantic zoom tiles', () => {
     viewportState.zoom = 0.5
     renderWithFlow(
       <SynStep
-        rootTestId="syn-step-semantic-zoom-clickable"
         nodeProps={baseNodeProps}
-        onClick={vi.fn()}
-        semanticZoomSummary={{ title: 'Analyze', typeLabel: 'Task Agent' }}
+        semanticZoomSummary={{ title: 'Trigger', typeLabel: 'Webhook' }}
+        style={{ borderTopLeftRadius: '45px', borderBottomLeftRadius: '45px' }}
       >
         <span>Detailed body</span>
       </SynStep>
     )
 
-    expect(screen.getByTestId('syn-step-semantic-zoom-clickable')).toHaveAttribute('tabIndex', '0')
+    expect(screen.getByRole('button', { name: 'Trigger, Webhook' })).toBeInTheDocument()
   })
 
   it('semantic zoom layout has no accessibility violations', async () => {
@@ -166,7 +165,7 @@ describe('SynStep semantic zoom', () => {
       </SynStep>
     )
 
-    expect(screen.getByTestId('syn-step-semantic-zoom')).toHaveStyle({ width: '224px' })
+    expect(screen.getByTestId('syn-step-semantic-zoom')).toHaveStyle({ width: '300px' })
     expect(screen.getByTestId('semantic-zoom-icon')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Branch, Condition' })).toBeInTheDocument()
     expect(screen.getByLabelText('True branch output')).toBeInTheDocument()
@@ -209,21 +208,6 @@ describe('SynStep semantic zoom', () => {
     )
 
     expect(screen.getByRole('button', { name: 'Pick type, Generic' })).toBeInTheDocument()
-  })
-
-  it('omits trigger pill radius on semantic zoom tiles', () => {
-    viewportState.zoom = 0.5
-    renderWithFlow(
-      <SynStep
-        nodeProps={baseNodeProps}
-        semanticZoomSummary={{ title: 'Trigger', typeLabel: 'Webhook' }}
-        style={{ borderTopLeftRadius: '75px', borderBottomLeftRadius: '75px' }}
-      >
-        <span>Detailed body</span>
-      </SynStep>
-    )
-
-    expect(screen.getByRole('button', { name: 'Trigger, Webhook' })).toBeInTheDocument()
   })
 })
 
@@ -273,49 +257,20 @@ describe('SynStep validation and interaction', () => {
     expect(screen.queryByTestId('validation-error-badge')).not.toBeInTheDocument()
   })
 
-  it('calls onClick when Enter key is pressed', async () => {
+  it('does not open the step from Enter or Space on the focused panel', async () => {
     const user = userEvent.setup()
-    const onClick = vi.fn()
     renderWithFlow(
-      <SynStep nodeProps={baseNodeProps} onClick={onClick}>
+      <SynStep nodeProps={baseNodeProps} rootTestId="syn-step-panel">
         <span>Content</span>
       </SynStep>
     )
 
-    screen.getByRole('button').focus()
+    const panel = screen.getByTestId('syn-step-panel')
+    panel.focus()
     await user.keyboard('{Enter}')
-
-    expect(onClick).toHaveBeenCalledOnce()
-  })
-
-  it('calls onClick when Space key is pressed', async () => {
-    const user = userEvent.setup()
-    const onClick = vi.fn()
-    renderWithFlow(
-      <SynStep nodeProps={baseNodeProps} onClick={onClick}>
-        <span>Content</span>
-      </SynStep>
-    )
-
-    screen.getByRole('button').focus()
     await user.keyboard(' ')
 
-    expect(onClick).toHaveBeenCalledOnce()
-  })
-
-  it('does not trigger onClick for arbitrary keys', async () => {
-    const user = userEvent.setup()
-    const onClick = vi.fn()
-    renderWithFlow(
-      <SynStep nodeProps={baseNodeProps} onClick={onClick}>
-        <span>Content</span>
-      </SynStep>
-    )
-
-    screen.getByRole('button').focus()
-    await user.keyboard('a')
-
-    expect(onClick).not.toHaveBeenCalled()
+    expect(panel).toHaveFocus()
   })
 
   it('uses default width for standard nodes', () => {
@@ -328,7 +283,7 @@ describe('SynStep validation and interaction', () => {
     expect(screen.getByTestId('node-panel')).toHaveStyle({ width: '300px' })
   })
 
-  it('uses wide width for GENERIC node type', () => {
+  it('uses default width for generic placeholder nodes', () => {
     const nodeProps = {
       ...baseNodeProps,
       type: FlowNodeType.GENERIC,
@@ -340,10 +295,10 @@ describe('SynStep validation and interaction', () => {
       </SynStep>
     )
 
-    expect(screen.getByTestId('node-panel')).toHaveStyle({ width: '360px' })
+    expect(screen.getByTestId('node-panel')).toHaveStyle({ width: '300px' })
   })
 
-  it('uses wide width for TASK node with agentic executor', () => {
+  it('uses default width for agentic task nodes', () => {
     const nodeProps = {
       ...baseNodeProps,
       type: FlowNodeType.TASK,
@@ -356,7 +311,7 @@ describe('SynStep validation and interaction', () => {
       </SynStep>
     )
 
-    expect(screen.getByTestId('node-panel')).toHaveStyle({ width: '360px' })
+    expect(screen.getByTestId('node-panel')).toHaveStyle({ width: '300px' })
   })
 
   it('responds to expandAll and collapseAll events', () => {

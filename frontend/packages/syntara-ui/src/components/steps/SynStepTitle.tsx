@@ -1,48 +1,70 @@
 import { Content, ContentVariants, FlexItem, Title, TitleSizes, Tooltip } from '@patternfly/react-core'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 
 import styles from './SynStepTitle.module.css'
 
-function useTruncationTooltip() {
+function useOverflowTooltip() {
   const ref = useRef<HTMLDivElement>(null)
-  const [isTruncated, setIsTruncated] = useState(false)
-  const checkTruncation = useCallback(() => {
+  const [showTooltip, setShowTooltip] = useState(false)
+
+  const measure = useCallback(() => {
     const el = ref.current
-    if (el) {
-      setIsTruncated(el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth)
+    if (!el) {
+      setShowTooltip(false)
+      return
     }
+    setShowTooltip(el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)
   }, [])
 
-  return { ref, isTruncated, onMouseEnter: checkTruncation }
+  useLayoutEffect(() => {
+    measure()
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => measure())
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [measure])
+
+  return { ref, showTooltip, onMouseEnter: measure }
 }
 
-function ClampedTitle(props: { text: string; isSubtitle?: boolean }) {
-  const { ref, isTruncated, onMouseEnter } = useTruncationTooltip()
+function TitleLine(props: { text: string; isSubtitle?: boolean }) {
+  const { ref, showTooltip, onMouseEnter } = useOverflowTooltip()
 
   const inner = (
-    <div ref={ref} className={styles.clampWrapper}>
+    <div ref={ref} className={styles.textWrapper} onMouseEnter={onMouseEnter}>
       {props.isSubtitle ? (
-        <Content component={ContentVariants.small} className={styles.subtitleClamp} onMouseEnter={onMouseEnter}>
+        <Content component={ContentVariants.small} className={styles.subtitleText}>
           {props.text}
         </Content>
       ) : (
-        <Title headingLevel="h2" size={TitleSizes.md} className={styles.titleClamp} onMouseEnter={onMouseEnter}>
+        <Title headingLevel="h2" size={TitleSizes.md} className={styles.titleText}>
           {props.text}
         </Title>
       )}
     </div>
   )
 
-  return isTruncated ? <Tooltip content={props.text}>{inner}</Tooltip> : inner
+  if (!props.text) {
+    return inner
+  }
+
+  return showTooltip ? (
+    <Tooltip content={props.text} trigger="mouseenter" entryDelay={300}>
+      {inner}
+    </Tooltip>
+  ) : (
+    inner
+  )
 }
 
 export function SynStepTitle(props: { title?: string; subTitle?: string }) {
   const headingText = props.title || props.subTitle || ''
 
   return (
-    <FlexItem grow={{ default: 'grow' }} style={{ minWidth: 0 }}>
-      <ClampedTitle text={headingText} />
-      {props.title && props.subTitle ? <ClampedTitle text={props.subTitle} isSubtitle /> : null}
+    <FlexItem grow={{ default: 'grow' }} style={{ minWidth: 0, width: '100%' }}>
+      <TitleLine text={headingText} />
+      {props.title && props.subTitle ? <TitleLine text={props.subTitle} isSubtitle /> : null}
     </FlexItem>
   )
 }

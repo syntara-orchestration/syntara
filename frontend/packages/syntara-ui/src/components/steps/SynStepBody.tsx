@@ -2,6 +2,7 @@ import { StackItem } from '@patternfly/react-core'
 import { use, type ReactNode } from 'react'
 
 import { SynStepExpandedContext } from './SynStepExpandedContext'
+import bodyStyles from './SynStepBody.module.css'
 
 export type SynStepBodyProps = {
   children: ReactNode
@@ -35,7 +36,7 @@ export function SynStepBody(props: Readonly<SynStepBodyProps>) {
       {/* Content container */}
       <div
         data-testid="node-body-scroll-container"
-        className={`nodrag nopan ${props.className ?? ''}`}
+        className={`nodrag nopan ${bodyStyles.detailsRegion} ${props.className ?? ''}`}
         style={{
           paddingTop: 'var(--pf-t--global--spacer--sm)',
           paddingBottom: 'var(--pf-t--global--spacer--sm)',

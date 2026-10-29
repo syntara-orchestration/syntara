@@ -6,6 +6,7 @@ import type { StepMenuAction } from '../../routes/workflows/canvas/nodes/hooks/u
 import { SynStepEditButton } from './SynStepEditButton'
 import { SynStepExpandToggle } from './SynStepExpandToggle'
 import { SynStepMenu } from './SynStepMenu'
+import actionsStyles from './SynStepHeaderActions.module.css'
 
 export function SynStepHeaderActions(
   props: Readonly<{
@@ -29,7 +30,7 @@ export function SynStepHeaderActions(
   }
 
   return (
-    <Flex alignItems={{ default: 'alignItemsCenter' }} className="nodrag nopan">
+    <Flex alignItems={{ default: 'alignItemsCenter' }} className={`nodrag nopan ${actionsStyles.actionsRow}`}>
       {showExpand ? (
         <FlexItem>
           <SynStepExpandToggle stepLabel={props.stepTitle} />
