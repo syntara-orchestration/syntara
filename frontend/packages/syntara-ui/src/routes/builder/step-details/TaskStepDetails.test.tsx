@@ -837,6 +837,6 @@ describe('TaskStepDetails Component', () => {
 
     renderTaskStepDetails(taskData, 'task-aap-legacy')
 
-    expect(screen.getByTestId('aap-step-form')).toBeInTheDocument()
+    expect(screen.getByTestId('aap-node-form')).toBeInTheDocument()
   })
 })
