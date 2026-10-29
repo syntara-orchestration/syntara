@@ -172,7 +172,7 @@ class TestFormPromptSubmitAPI:
                 json={"response_data": {}},
             )
 
-        expected_response = {
+        expected_response: dict[str, Any] = {
             "name": "",
             "count": None,
             "start": "",
