@@ -63,7 +63,7 @@ print(json.dumps({
     "dropdown_value": os.environ["DROPDOWN_VALUE"],
     "multi_select_value": json.loads(os.environ["MULTI_SELECT_VALUE"]),
     "checkbox_value": json.loads(os.environ["CHECKBOX_VALUE"]),
-    "date_value": json.loads(os.environ["DATE_VALUE"]),
+    "date_value": os.environ["DATE_VALUE"],
     "email_value": os.environ["EMAIL_VALUE"],
 }))
 """
@@ -110,13 +110,14 @@ def test_all_supported_field_types_resume_and_flow_to_consumer(
     prompt_output = activity_output(activities["prompt"])
     consumer_output = activity_output(activities["consumer"])
 
-    assert prompt_output["response_data"] == _ALL_FIELDS_SUBMISSION
+    expected_values = {**_ALL_FIELDS_SUBMISSION, "date_value": "2026-02-14"}
+    assert prompt_output["response_data"] == expected_values
     downstream_values = consumer_output["stdout_json"]
-    assert downstream_values == _ALL_FIELDS_SUBMISSION
+    assert downstream_values == expected_values
     assert isinstance(downstream_values["number_value"], int)
     assert isinstance(downstream_values["multi_select_value"], list)
     assert isinstance(downstream_values["checkbox_value"], bool)
-    assert isinstance(downstream_values["date_value"], dict)
+    assert isinstance(downstream_values["date_value"], str)
 
 
 def test_required_field_error_leaves_prompt_available_for_valid_response(

@@ -102,7 +102,7 @@ print(json.dumps({
     "dropdown_value": os.environ["DROPDOWN_VALUE"],
     "multi_select_value": json.loads(os.environ["MULTI_SELECT_VALUE"]),
     "checkbox_value": json.loads(os.environ["CHECKBOX_VALUE"]),
-    "date_value": json.loads(os.environ["DATE_VALUE"]),
+    "date_value": os.environ["DATE_VALUE"],
     "email_value": os.environ["EMAIL_VALUE"],
 }))
 """

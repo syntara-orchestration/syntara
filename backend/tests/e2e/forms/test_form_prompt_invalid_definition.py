@@ -447,8 +447,9 @@ def test_validate_collects_multiple_form_field_defects_in_field_order(
             "type": "date",
             "value_name": "when",
             "label": "When",
-            "include_time": True,
-            "include_timezone": False,
+            "include_date": True,
+            "include_time": False,
+            "include_timezone": True,
         },
         {
             "type": "dropdown",
