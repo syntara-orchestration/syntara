@@ -9,6 +9,8 @@ import { useIsExecutionView } from '../../../../builder/ExecutionViewContext'
 import { useIsVersionView } from '../../../../builder/VersionViewContext'
 import type { StepMenuAction } from '../hooks/useStepMenuActions'
 
+import headerStyles from './StandardStepHeader.module.css'
+
 type StandardStepHeaderProps = {
   icon?: React.ReactNode
   /** Optional badge rendered just under the icon, above title/subtitle */
@@ -17,6 +19,8 @@ type StandardStepHeaderProps = {
   subtitle?: string
   expandable?: boolean
   menuActions?: StepMenuAction[]
+  /** When set, used for header action row menu popper (e.g. semantic zoom preview). */
+  menuPopperProps?: React.ComponentProps<typeof SynStepHeaderActions>['menuPopperProps']
 }
 
 const sectionPadding = {
@@ -33,14 +37,6 @@ const badgeSectionStyle = {
 /**
  * Standard step header component that combines icon, title, subtitle, optional expand toggle, and kebab menu.
  * Reduces boilerplate in step component implementations.
- *
- * The kebab menu supports:
- * - Custom actions via additionalActions prop in useStepMenuActions
- * - Automatic separator before delete action when custom actions exist
- * - Danger styling for destructive actions (variant: 'danger')
- * - Icons for menu items
- *
- * The kebab menu is automatically hidden in execution view mode (read-only).
  */
 export function StandardStepHeader(props: Readonly<StandardStepHeaderProps>) {
   const isExecutionView = useIsExecutionView()
@@ -55,30 +51,32 @@ export function StandardStepHeader(props: Readonly<StandardStepHeaderProps>) {
   return (
     <Stack>
       <StackItem>
-        <SynStepHeader>
+        <SynStepHeader className={headerStyles.headerSection}>
           <Flex
-            alignItems={{ default: 'alignItemsFlexStart' }}
+            alignItems={{ default: 'alignItemsCenter' }}
             justifyContent={{ default: 'justifyContentSpaceBetween' }}
-            style={{ gap: 'var(--pf-t--global--spacer--sm)' }}
+            className={headerStyles.actionRow}
           >
-            <Flex
-              alignItems={{ default: 'alignItemsFlexStart' }}
-              style={{ gap: 'var(--pf-t--global--spacer--sm)', minWidth: 0, flex: 1 }}
-            >
-              {props.icon ? <FlexItem shrink={{ default: 'shrink' }}>{props.icon}</FlexItem> : null}
-              {(props.title || props.subtitle) && (
-                <SynStepTitle title={props.title ?? ''} subTitle={props.subtitle ?? ''} />
-              )}
-            </Flex>
+            {props.icon ? (
+              <FlexItem shrink={{ default: 'shrink' }}>{props.icon}</FlexItem>
+            ) : (
+              <FlexItem grow={{ default: 'grow' }} />
+            )}
             <FlexItem shrink={{ default: 'shrink' }}>
               <SynStepHeaderActions
                 stepTitle={stepTitle}
                 menuActions={props.menuActions}
                 expandable={props.expandable}
                 showMenuActions={showMenuActions}
+                menuPopperProps={props.menuPopperProps}
               />
             </FlexItem>
           </Flex>
+          {(props.title || props.subtitle) && (
+            <div className={headerStyles.titleRow}>
+              <SynStepTitle title={props.title ?? ''} subTitle={props.subtitle ?? ''} />
+            </div>
+          )}
         </SynStepHeader>
       </StackItem>
       {props.badge ? <StackItem style={badgeSectionStyle}>{props.badge}</StackItem> : null}

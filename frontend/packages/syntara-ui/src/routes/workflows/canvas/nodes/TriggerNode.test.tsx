@@ -177,7 +177,7 @@ describe('TriggerStepComponent', () => {
     )
 
     expect(screen.getByText('Webhook: /jira-updates')).toBeInTheDocument()
-    expect(screen.queryByText('Webhook trigger')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Webhook trigger')).toHaveLength(1)
   })
 
   it('hides the step menu when nodesConnectable is false', () => {
@@ -213,7 +213,7 @@ describe('TriggerStepComponent', () => {
     )
 
     expect(screen.getByText('EDA: /eda-events')).toBeInTheDocument()
-    expect(screen.queryByText('Event-Driven Ansible trigger')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Event-Driven Ansible trigger')).toHaveLength(1)
   })
 
   it('has no accessibility violations', async () => {

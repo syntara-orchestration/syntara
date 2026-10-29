@@ -1,21 +1,16 @@
-.clampWrapper {
+.textWrapper {
   min-width: 0;
+  width: 100%;
 }
 
-.titleClamp {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
+.titleText {
   margin-bottom: var(--pf-t--global--spacer--xs);
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
-.subtitleClamp {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
+.subtitleText {
   margin-bottom: var(--pf-t--global--spacer--sm);
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
