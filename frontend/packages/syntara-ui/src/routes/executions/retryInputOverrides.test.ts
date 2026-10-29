@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 
 import type { WorkflowDefShape } from '../builder/useActivityNameMap'
 
-import { getEffectiveRetryInputs, getRetryInputOverrideTargets, type ExecutionActivity } from './retryInputOverrides'
+import {
+  diffRetryInputOverrides,
+  getEffectiveRetryInputs,
+  getRetryInputEditorValue,
+  getRetryInputOverrideTargets,
+  type ExecutionActivity,
+} from './retryInputOverrides'
 
 describe('getEffectiveRetryInputs', () => {
   it('applies saved overrides to resolved values without mutating the original inputs', () => {
@@ -23,6 +29,31 @@ describe('getEffectiveRetryInputs', () => {
 
   it('returns null until either resolved inputs or overrides are available', () => {
     expect(getEffectiveRetryInputs(null, undefined)).toBeNull()
+  })
+})
+
+describe('getRetryInputEditorValue', () => {
+  it('prefills allowed parameters with saved overrides applied', () => {
+    expect(
+      getRetryInputEditorValue({ host: 'original.example', retries: 2, extra: true }, { host: 'retry.example' }, [
+        'host',
+        'retries',
+      ])
+    ).toBe(JSON.stringify({ host: 'retry.example', retries: 2 }, null, 2))
+  })
+})
+
+describe('diffRetryInputOverrides', () => {
+  it('returns only keys that changed from the resolved inputs', () => {
+    expect(
+      diffRetryInputOverrides({ host: 'original.example', retries: 2 }, { host: 'retry.example', retries: 2 })
+    ).toEqual({
+      host: 'retry.example',
+    })
+  })
+
+  it('returns undefined when the edited values match the original inputs', () => {
+    expect(diffRetryInputOverrides({ host: 'original.example' }, { host: 'original.example' })).toBeUndefined()
   })
 })
 

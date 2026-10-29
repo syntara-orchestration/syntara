@@ -29,6 +29,36 @@ export function getEffectiveRetryInputs(
   return { ...resolvedInputs, ...savedOverride }
 }
 
+function valuesEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+/** Allowed-parameter JSON shown in the retry editor, with saved overrides applied. */
+export function getRetryInputEditorValue(
+  resolvedInputs: Record<string, unknown> | null,
+  savedOverride: Record<string, unknown> | undefined,
+  parameterNames: string[]
+): string {
+  const effective = getEffectiveRetryInputs(resolvedInputs, savedOverride) ?? {}
+  const picked: Record<string, unknown> = {}
+  for (const name of parameterNames) {
+    if (name in effective) picked[name] = effective[name]
+  }
+  return JSON.stringify(picked, null, 2)
+}
+
+/** Keys that differ from the original resolved inputs, so the retry payload stays a sparse override. */
+export function diffRetryInputOverrides(
+  resolvedInputs: Record<string, unknown> | null,
+  edited: Record<string, unknown>
+): Record<string, unknown> | undefined {
+  const next: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(edited)) {
+    if (!valuesEqual(resolvedInputs?.[key], value)) next[key] = value
+  }
+  return Object.keys(next).length > 0 ? next : undefined
+}
+
 export type RetryInputOverridesState = Readonly<{
   targets: RetryInputOverrideTarget[]
   canEdit: boolean
@@ -37,7 +67,7 @@ export type RetryInputOverridesState = Readonly<{
   drafts: Readonly<Record<string, string>>
   errors: Readonly<Record<string, string>>
   editingTargetIds: ReadonlySet<string>
-  onEdit: (targetId: string) => void
+  onEdit: (targetId: string, initialDraft?: string) => void
   onCancel: (targetId: string) => void
   onSave: (targetId: string, overrides: Record<string, unknown> | undefined) => void
   onDraftChange: (

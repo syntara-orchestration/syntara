@@ -1,4 +1,14 @@
 .container {
   min-height: 0;
+  height: 100%;
   padding: var(--pf-t--global--spacer--sm);
+}
+
+.editorItem {
+  min-height: 0;
+}
+
+.editor {
+  min-height: 16rem;
+  font-family: var(--pf-t--global--font--family--mono);
 }

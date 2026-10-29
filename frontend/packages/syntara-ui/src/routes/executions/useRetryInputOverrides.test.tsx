@@ -43,9 +43,9 @@ describe('useRetryInputOverrides', () => {
       expect.objectContaining({ id: 'step-a', name: 'Deploy step', parameterNames: ['code'] }),
     ])
 
-    act(() => result.current.state.onEdit('step-a'))
+    act(() => result.current.state.onEdit('step-a', JSON.stringify({ code: 'exit 1' }, null, 2)))
     expect(result.current.hasUnsavedInputOverrides).toBe(true)
-    expect(result.current.state.drafts['step-a']).toBe('{}')
+    expect(result.current.state.drafts['step-a']).toBe(JSON.stringify({ code: 'exit 1' }, null, 2))
 
     act(() => result.current.state.onDraftChange('step-a', '{"code":"echo retry"}', { code: 'echo retry' }, undefined))
     expect(result.current.state.drafts['step-a']).toBe('{"code":"echo retry"}')

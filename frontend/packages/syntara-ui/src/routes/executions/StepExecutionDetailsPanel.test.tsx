@@ -99,15 +99,45 @@ describe('StepExecutionDetailsPanel', () => {
 
     render(<StepExecutionDetailsPanel {...defaultProps} retryInputOverride={retryInputOverride} />, { wrapper })
 
-    expect(screen.getByRole('textbox', { name: 'Search parameters data' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Parameters view selection')).toBeInTheDocument()
-    expect(screen.getByText('Effective inputs for retry')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Search input parameters data' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Input parameters view selection')).toBeInTheDocument()
+    expect(screen.getByText('Edited for retry')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit parameters for retry' })).toBeInTheDocument()
     expect(screen.getByText(/"host": "retry\.example"/)).toBeInTheDocument()
     expect(screen.getByText(/"template_id": 42/)).toBeInTheDocument()
     expect(mockActivityData.resources[0]?.input_data).toEqual({ host: '10.0.0.1', template_id: 42 })
 
     await user.click(screen.getAllByRole('button', { name: 'Table' })[0])
     expect(screen.getByLabelText('Input data')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Edit parameters for retry' }))
+    expect(retryInputOverride.onEdit).toHaveBeenCalledWith(
+      'run_aap_vm',
+      JSON.stringify({ host: 'retry.example', template_id: 42 }, null, 2)
+    )
+  })
+
+  it('replaces parameter and output panes with the retry editor while editing', () => {
+    const retryInputOverride = {
+      target: { id: 'run_aap_vm', name: 'Run AAP VM', parameterNames: ['host', 'template_id'] },
+      canEdit: true,
+      isDisabled: false,
+      savedOverride: { host: 'retry.example' },
+      draft: JSON.stringify({ host: 'retry.example', template_id: 42 }, null, 2),
+      error: undefined,
+      isEditing: true,
+      onEdit: vi.fn(),
+      onCancel: vi.fn(),
+      onSave: vi.fn(),
+      onDraftChange: vi.fn(),
+    }
+
+    render(<StepExecutionDetailsPanel {...defaultProps} retryInputOverride={retryInputOverride} />, { wrapper })
+
+    expect(screen.getByRole('textbox', { name: 'Input parameters for Run AAP VM' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset parameters' })).toBeInTheDocument()
+    expect(screen.queryByText('Output')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Input parameters view selection')).not.toBeInTheDocument()
   })
 
   it('shows output data in the output pane by default (JSON view)', () => {

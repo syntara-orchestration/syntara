@@ -344,14 +344,14 @@ test.describe('Retry from failure — real backend', () => {
     await openRetryPanel(app)
 
     await expect(app.getByText(/"code": "exit 1"/, { exact: false })).toBeVisible()
-    await app.getByRole('button', { name: 'Edit inputs' }).click()
+    await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
 
-    const editor = app.getByRole('textbox', { name: /Input overrides for/ })
+    const editor = app.getByRole('textbox', { name: /Input parameters for/ })
     await editor.fill('{"code":"echo retry-recovered"}')
     const retryButton = app.getByRole('button', { name: 'Retry 2 steps' })
     await expect(retryButton).toBeDisabled()
     await app.getByRole('button', { name: 'Save inputs' }).click()
-    await expect(app.getByText('Effective inputs for retry')).toBeVisible()
+    await expect(app.getByText('Edited for retry')).toBeVisible()
     await expect(app.getByText(/"code": "echo retry-recovered"/, { exact: false })).toBeVisible()
     await expect(retryButton).toBeEnabled()
 
@@ -396,7 +396,7 @@ test.describe('Retry from failure — real backend', () => {
 
       const panel = page.getByRole('complementary', { name: 'Retry run from failure review' })
       await expect(panel.getByText('Workflow edit permission is required to override retry inputs.')).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Edit inputs' })).toHaveCount(0)
+      await expect(page.getByRole('button', { name: 'Edit parameters for retry' })).toHaveCount(0)
 
       const retryResponsePromise = page.waitForResponse(
         (response) =>

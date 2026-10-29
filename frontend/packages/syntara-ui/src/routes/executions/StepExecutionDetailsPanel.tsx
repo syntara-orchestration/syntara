@@ -1,10 +1,12 @@
 import {
+  Button,
   Content,
   ContentVariants,
   EmptyState,
   EmptyStateBody,
   Flex,
   FlexItem,
+  Icon,
   SearchInput,
   Spinner,
   Stack,
@@ -14,9 +16,11 @@ import {
   TabTitleText,
   Title,
   TitleSizes,
+  Tooltip,
 } from '@patternfly/react-core'
 import {
   RhUiDislikeFillIcon,
+  RhUiEditIcon,
   RhUiExternalLinkIcon,
   RhUiLikeFillIcon,
   RhUiWarningFillIcon,
@@ -45,7 +49,7 @@ import { extractAgentTrace } from './agentTraceTypes'
 import { AgentTraceView } from './AgentTraceView'
 import { useStepExecutionDetails } from './hooks/useStepExecutionDetails'
 import { RetryInputOverrideDetails, type RetryInputOverrideDetailsProps } from './RetryInputOverrideDetails'
-import { getEffectiveRetryInputs } from './retryInputOverrides'
+import { getEffectiveRetryInputs, getRetryInputEditorValue } from './retryInputOverrides'
 import styles from './StepExecutionDetailsPanel.module.css'
 import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
 
@@ -57,7 +61,7 @@ type StepExecutionDetailsPanelProps = {
   stepState?: ActivityState
   /** Step type from workflow definition (e.g. 'aap_job_template'). */
   stepType?: string
-  retryInputOverride?: RetryInputOverrideDetailsProps
+  retryInputOverride?: Omit<RetryInputOverrideDetailsProps, 'resolvedInputs'>
 }
 
 function NoDataState({ label }: Readonly<{ label: string }>) {
@@ -332,7 +336,7 @@ type StepContentAreaProps = Readonly<{
   stepIsFailed: boolean
   isAgenticStep: boolean
   activeTab: 'io' | 'agent-steps'
-  retryInputOverride?: RetryInputOverrideDetailsProps
+  retryInputOverride?: Omit<RetryInputOverrideDetailsProps, 'resolvedInputs'>
 }>
 
 function StepContentArea({
@@ -365,6 +369,20 @@ function StepContentArea({
   if (activeTab === 'agent-steps' && isAgenticStep) {
     return <AgentTraceView agentTrace={extractAgentTrace(outputData)} />
   }
+
+  const hasSavedRetryOverride = Boolean(
+    retryInputOverride?.savedOverride && Object.keys(retryInputOverride.savedOverride).length > 0
+  )
+  const retryEditorProps = retryInputOverride ? { ...retryInputOverride, resolvedInputs: inputData } : undefined
+
+  if (retryEditorProps?.isEditing) {
+    return (
+      <div className={styles.retryEditorPane}>
+        <RetryInputOverrideDetails {...retryEditorProps} />
+      </div>
+    )
+  }
+
   return (
     <Flex
       flexWrap={{ default: 'nowrap' }}
@@ -372,24 +390,52 @@ function StepContentArea({
       className={styles.dataPaneContainer}
     >
       <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
-        {retryInputOverride ? (
+        {retryEditorProps ? (
           <div className={styles.retryParametersPane}>
             <DataPane
-              title="Parameters"
+              title="Input parameters"
               stepId={stepId}
               data={effectiveInputData}
               view={inputView}
               onViewChange={setInputView}
               className={styles.retryParametersViewer}
               titleAddon={
-                retryInputOverride.savedOverride && Object.keys(retryInputOverride.savedOverride).length > 0 ? (
-                  <SynLabel color="blue">Effective inputs for retry</SynLabel>
-                ) : undefined
+                <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
+                  {hasSavedRetryOverride && (
+                    <FlexItem>
+                      <SynLabel color="blue">Edited for retry</SynLabel>
+                    </FlexItem>
+                  )}
+                  {retryEditorProps.canEdit && (
+                    <FlexItem>
+                      <Tooltip content="Edit parameters for retry">
+                        <Button
+                          variant="plain"
+                          aria-label="Edit parameters for retry"
+                          isDisabled={retryEditorProps.isDisabled}
+                          onClick={() =>
+                            retryEditorProps.onEdit(
+                              retryEditorProps.target.id,
+                              getRetryInputEditorValue(
+                                inputData,
+                                retryEditorProps.savedOverride,
+                                retryEditorProps.target.parameterNames
+                              )
+                            )
+                          }
+                          icon={
+                            <Icon isInline>
+                              <RhUiEditIcon />
+                            </Icon>
+                          }
+                        />
+                      </Tooltip>
+                    </FlexItem>
+                  )}
+                </Flex>
               }
             />
-            <div className={styles.retryOverrideEditor}>
-              <RetryInputOverrideDetails {...retryInputOverride} />
-            </div>
+            <RetryInputOverrideDetails {...retryEditorProps} />
           </div>
         ) : (
           <DataPane title="Parameters" stepId={stepId} data={inputData} view={inputView} onViewChange={setInputView} />

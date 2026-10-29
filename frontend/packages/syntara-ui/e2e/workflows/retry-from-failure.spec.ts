@@ -231,9 +231,9 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
 
       await expect(app.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
       await expect(app.getByText(/"language": "bash"/, { exact: false })).toBeVisible()
-      await app.getByRole('button', { name: 'Edit inputs' }).click()
+      await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
 
-      const editor = app.getByRole('textbox', { name: /Input overrides for/ })
+      const editor = app.getByRole('textbox', { name: /Input parameters for/ })
       await editor.fill('{"code":"echo retry"}')
       await expect(editor).toBeInViewport()
       await app.screenshot({ path: testInfo.outputPath('retry-input-overrides-editing.png') })
@@ -241,9 +241,15 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await expect(retryButton).toBeDisabled()
       await app.getByRole('button', { name: 'Save inputs' }).click()
 
-      await expect(app.getByText('Effective inputs for retry')).toBeInViewport()
+      await expect(app.getByText('Edited for retry')).toBeInViewport()
       await expect(app.getByText(/"code": "echo retry"/, { exact: false })).toBeVisible()
       await expect(retryButton).toBeEnabled()
+
+      await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
+      await expect(app.getByRole('textbox', { name: /Input parameters for/ })).toHaveValue(/echo retry/)
+      await expect(app.getByRole('button', { name: 'Reset parameters' })).toBeVisible()
+      await app.getByRole('button', { name: 'Cancel' }).click()
+      await expect(app.getByText('Edited for retry')).toBeVisible()
       await app.screenshot({ path: testInfo.outputPath('retry-input-overrides-saved.png') })
 
       const retryRequestPromise = app.waitForRequest(
@@ -270,7 +276,7 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await expect(panel).toBeVisible()
       await expect(app.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
       await expect(app.getByText('Workflow edit permission is required to override retry inputs.')).toBeVisible()
-      await expect(app.getByRole('button', { name: 'Edit inputs' })).toHaveCount(0)
+      await expect(app.getByRole('button', { name: 'Edit parameters for retry' })).toHaveCount(0)
       await panel.getByTestId('retry-from-failure-confirm').click()
       await expect(app.getByText('Retry started')).toBeVisible()
     })

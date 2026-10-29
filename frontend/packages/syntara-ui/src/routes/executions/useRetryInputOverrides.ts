@@ -40,8 +40,11 @@ export function useRetryInputOverrides({
   )
 
   const onEdit = useCallback(
-    (targetId: string) => {
-      setDrafts((current) => ({ ...current, [targetId]: JSON.stringify(savedOverrides[targetId] ?? {}, null, 2) }))
+    (targetId: string, initialDraft?: string) => {
+      setDrafts((current) => ({
+        ...current,
+        [targetId]: initialDraft ?? JSON.stringify(savedOverrides[targetId] ?? {}, null, 2),
+      }))
       setErrors((current) => removeEntry(current, targetId))
       setEditingTargetIds((current) => new Set(current).add(targetId))
     },

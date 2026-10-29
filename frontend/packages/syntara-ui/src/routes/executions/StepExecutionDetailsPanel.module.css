@@ -87,10 +87,7 @@
   height: auto;
 }
 
-.retryOverrideEditor {
-  flex: 0 1 auto;
-  max-height: 45%;
+.retryEditorPane {
+  height: 100%;
   min-height: 0;
-  overflow-y: auto;
-  border-top: 1px solid var(--pf-t--global--border--color--default);
 }

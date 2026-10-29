@@ -14,28 +14,34 @@ const target: RetryInputOverrideTarget = {
   parameterNames: ['url', 'retries'],
 }
 
+const resolvedInputs = { url: 'https://original.example', retries: 1 }
+
 function RetryInputOverrideHarness({
   canEdit = true,
+  startEditing = false,
   ...handlers
 }: Partial<RetryInputOverrideDetailsProps> &
-  Pick<RetryInputOverrideDetailsProps, 'onEdit' | 'onCancel' | 'onSave' | 'onDraftChange'>) {
-  const [isEditing, setIsEditing] = useState(false)
+  Pick<RetryInputOverrideDetailsProps, 'onEdit' | 'onCancel' | 'onSave' | 'onDraftChange'> & {
+    startEditing?: boolean
+  }) {
+  const [isEditing, setIsEditing] = useState(startEditing)
   const [draft, setDraft] = useState<string>()
   const [error, setError] = useState<string>()
-  const [savedOverride, setSavedOverride] = useState<Record<string, unknown>>()
+  const [savedOverride, setSavedOverride] = useState<Record<string, unknown> | undefined>(handlers.savedOverride)
 
   return (
     <RetryInputOverrideDetails
       target={target}
+      resolvedInputs={resolvedInputs}
       canEdit={canEdit}
       isDisabled={false}
       savedOverride={savedOverride}
       draft={draft}
       error={error}
       isEditing={isEditing}
-      onEdit={(targetId) => {
-        handlers.onEdit(targetId)
-        setDraft(JSON.stringify(savedOverride ?? {}, null, 2))
+      onEdit={(targetId, initialDraft) => {
+        handlers.onEdit(targetId, initialDraft)
+        setDraft(initialDraft)
         setIsEditing(true)
       }}
       onCancel={(targetId) => {
@@ -60,7 +66,7 @@ function RetryInputOverrideHarness({
   )
 }
 
-function renderEditor(props?: Partial<RetryInputOverrideDetailsProps>) {
+function renderEditor(props?: Partial<RetryInputOverrideDetailsProps> & { startEditing?: boolean }) {
   return render(
     <RetryInputOverrideHarness
       onEdit={vi.fn()}
@@ -73,36 +79,66 @@ function renderEditor(props?: Partial<RetryInputOverrideDetailsProps>) {
 }
 
 describe('RetryInputOverrideDetails', () => {
-  it('explains the workflow edit permission and hides edit controls when permission is missing', async () => {
-    const { container } = renderEditor({ canEdit: false })
+  it('explains the workflow edit permission and hides the editor when permission is missing', async () => {
+    const { container } = renderEditor({ canEdit: false, startEditing: true })
 
     expect(screen.getByText('Workflow edit permission is required to override retry inputs.')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Edit inputs' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Input parameters for Deploy step' })).not.toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('saves a valid retry-only override and returns to the edit control', async () => {
+  it('prefills the editor with the full effective input JSON', () => {
+    renderEditor({ startEditing: true })
+
+    expect(screen.getByRole('textbox', { name: 'Input parameters for Deploy step' })).toHaveValue(
+      JSON.stringify({ url: 'https://original.example', retries: 1 }, null, 2)
+    )
+    expect(screen.queryByRole('button', { name: 'Reset parameters' })).not.toBeInTheDocument()
+  })
+
+  it('saves only the changed keys from the prefilled effective JSON', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
-    renderEditor({ onSave })
+    renderEditor({
+      onSave,
+      startEditing: true,
+      draft: JSON.stringify({ url: 'https://original.example', retries: 1 }, null, 2),
+    })
 
-    await user.click(screen.getByRole('button', { name: 'Edit inputs' }))
-    expect(screen.getByText(/Enter only the parameter keys to change/)).toBeInTheDocument()
-    const editor = screen.getByRole('textbox', { name: 'Input overrides for Deploy step' })
+    const editor = screen.getByRole('textbox', { name: 'Input parameters for Deploy step' })
     await user.clear(editor)
-    await user.paste('{"url":"https://retry.example"}')
+    await user.paste('{"url":"https://retry.example","retries":1}')
     await user.click(screen.getByRole('button', { name: 'Save inputs' }))
 
     expect(onSave).toHaveBeenCalledWith('step-a', { url: 'https://retry.example' })
-    expect(screen.getByRole('button', { name: 'Edit inputs' })).toBeInTheDocument()
+  })
+
+  it('restores original resolved values in the editor without saving yet', async () => {
+    const user = userEvent.setup()
+    const onDraftChange = vi.fn()
+    renderEditor({
+      onDraftChange,
+      startEditing: true,
+      savedOverride: { url: 'https://retry.example' },
+      draft: JSON.stringify({ url: 'https://retry.example', retries: 1 }, null, 2),
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Reset parameters' }))
+
+    expect(onDraftChange).toHaveBeenCalledWith(
+      'step-a',
+      JSON.stringify({ url: 'https://original.example', retries: 1 }, null, 2),
+      { url: 'https://original.example', retries: 1 },
+      undefined
+    )
+    expect(screen.getByRole('button', { name: 'Save inputs' })).toBeInTheDocument()
   })
 
   it('blocks saving unknown input keys and provides a validation message', async () => {
     const user = userEvent.setup()
-    renderEditor()
+    renderEditor({ startEditing: true, draft: '{}' })
 
-    await user.click(screen.getByRole('button', { name: 'Edit inputs' }))
-    const editor = screen.getByRole('textbox', { name: 'Input overrides for Deploy step' })
+    const editor = screen.getByRole('textbox', { name: 'Input parameters for Deploy step' })
     await user.clear(editor)
     await user.paste('{"extra":"not allowed"}')
 
