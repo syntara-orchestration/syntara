@@ -182,7 +182,7 @@ describe('useStepExecutionDetails', () => {
         refetch: mockRefetch,
       }
 
-      const { result } = renderHook(() => useNodeExecutionDetails('my_activity', 'exec-1'), {
+      const { result } = renderHook(() => useStepExecutionDetails('my_activity', 'exec-1'), {
         wrapper: makeWrapper(queryClient),
       })
 
@@ -213,7 +213,7 @@ describe('useStepExecutionDetails', () => {
         refetch: mockRefetch,
       }
 
-      const { result } = renderHook(() => useNodeExecutionDetails('my_activity', 'exec-1'), {
+      const { result } = renderHook(() => useStepExecutionDetails('my_activity', 'exec-1'), {
         wrapper: makeWrapper(queryClient),
       })
 
