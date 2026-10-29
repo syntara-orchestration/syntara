@@ -84,6 +84,22 @@ def _build_condition_with_downstream_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
+def _build_approval_converging_graph() -> WorkflowGraph:
+    """Build: trigger -> approval -> (approved: shared, rejected: shared).
+
+    Both approval outcomes point at the same downstream node, as reported in
+    AAP-95187.
+    """
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("approval", {"id": "approval", "type": "approval", "parameters": {}})
+    backend.add_node("shared", {"id": "shared", "type": "script", "parameters": {}})
+    backend.add_edge("trigger", "approval", None)
+    backend.add_edge("approval", "shared", {"from_port": "approved"})
+    backend.add_edge("approval", "shared", {"from_port": "rejected"})
+    return WorkflowGraph(backend)
+
+
 def _build_linear_graph() -> WorkflowGraph:
     """Build: trigger -> node_a -> node_b (linear chain)."""
     backend = InMemoryGraphBackend()
@@ -206,6 +222,44 @@ class TestSkipPropagation:
         wf._mark_downstream_as_skipped("node_a", graph)
 
         assert "node_b" in wf.skipped_nodes
+
+
+# ---------------------------------------------------------------------------
+# Tests: Approval branches converging on a shared successor (AAP-95187)
+# ---------------------------------------------------------------------------
+
+
+class TestApprovalConvergingBranches:
+    """An approval node whose approved/rejected branches both target the same successor.
+
+    The shared successor must still be scheduled, regardless of the decision.
+    """
+
+    def test_approved_decision_schedules_shared_successor(self) -> None:
+        """When the decision is 'approved', the shared successor must run."""
+        wf = _make_workflow()
+        graph = _build_approval_converging_graph()
+        wf.resolver.set_namespace("trigger", {})
+        wf.node_control_data["approval"] = {"next_port": "approved"}
+        pending: dict[str, asyncio.Task[Any]] = {}
+
+        _run_schedule_successors(wf, "approval", graph, pending)
+
+        assert "shared" in pending
+        assert "shared" not in wf.skipped_nodes
+
+    def test_rejected_decision_schedules_shared_successor(self) -> None:
+        """When the decision is 'rejected', the shared successor must also run."""
+        wf = _make_workflow()
+        graph = _build_approval_converging_graph()
+        wf.resolver.set_namespace("trigger", {})
+        wf.node_control_data["approval"] = {"next_port": "rejected"}
+        pending: dict[str, asyncio.Task[Any]] = {}
+
+        _run_schedule_successors(wf, "approval", graph, pending)
+
+        assert "shared" in pending
+        assert "shared" not in wf.skipped_nodes
 
 
 # ---------------------------------------------------------------------------
