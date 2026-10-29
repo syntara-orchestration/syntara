@@ -157,7 +157,7 @@ function ThreePanelLayout({
         gap={{ default: 'gapNone' }}
         className={styles.contentFlex}
       >
-        <FlexItem className={styles.activityList}>
+        <FlexItem className={retryMode ? `${styles.activityList} ${styles.activityListRetryMode}` : styles.activityList}>
           {showFilters && (
             <section
               className={`${styles.filterBarWrapper} ${styles.filterBarWrapperInActivityList}`}

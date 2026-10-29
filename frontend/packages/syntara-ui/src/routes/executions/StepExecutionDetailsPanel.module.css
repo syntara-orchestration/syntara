@@ -1,6 +1,6 @@
 .dataPaneTitle {
   font-weight: var(--pf-t--global--font--weight--body--bold);
-  /* Must match the wider title ("Parameters") so both panes wrap at the same threshold */
+  /* Keep both pane titles aligned when the input pane has a badge and edit action. */
   min-width: 5.5rem;
 }
 
@@ -26,13 +26,22 @@
 }
 
 .dataPaneControlsWrap {
-  /* Must be >= toggle width + search min-width + gap so inner items never wrap while next to the title */
-  flex: 1 0 30rem;
+  flex: 1 0 100%;
+  min-width: 0;
+}
+
+.dataPaneControls {
+  --pf-v6-l-flex--FlexWrap: nowrap;
+  min-width: 0;
 }
 
 .searchWrap {
-  /* Forces vertical stacking at very narrow widths (title / search / toggle each on own row) */
-  min-width: 8rem;
+  flex: 1 1 5rem;
+  min-width: 4rem;
+}
+
+.viewToggleWrap {
+  flex: 0 0 auto;
 }
 
 .tabBar {
@@ -42,7 +51,25 @@
 
 .contentContainer {
   height: 100%;
+  min-width: 0;
   overflow: hidden;
+  container-name: data-pane;
+  container-type: inline-size;
+}
+
+@container data-pane (max-width: 15rem) {
+  .dataPaneControls {
+    --pf-v6-l-flex--FlexWrap: wrap;
+  }
+
+  .searchWrap,
+  .viewToggleWrap {
+    flex: 1 0 100%;
+  }
+
+  .searchWrap {
+    min-width: 0;
+  }
 }
 
 .headerRow {
@@ -76,6 +103,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  min-width: 0;
 }
 
 .retryParametersViewer {

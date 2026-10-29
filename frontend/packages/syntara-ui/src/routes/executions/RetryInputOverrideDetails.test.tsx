@@ -108,7 +108,7 @@ describe('RetryInputOverrideDetails', () => {
     const editor = screen.getByRole('textbox', { name: 'Input parameters for Deploy step' })
     await user.clear(editor)
     await user.paste('{"url":"https://retry.example","retries":1}')
-    await user.click(screen.getByRole('button', { name: 'Save inputs' }))
+    await user.click(screen.getByRole('button', { name: 'Save parameters for retry' }))
 
     expect(onSave).toHaveBeenCalledWith('step-a', { url: 'https://retry.example' })
   })
@@ -131,7 +131,7 @@ describe('RetryInputOverrideDetails', () => {
       { url: 'https://original.example', retries: 1 },
       undefined
     )
-    expect(screen.getByRole('button', { name: 'Save inputs' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save parameters for retry' })).toBeInTheDocument()
   })
 
   it('blocks saving unknown input keys and provides a validation message', async () => {
@@ -143,6 +143,6 @@ describe('RetryInputOverrideDetails', () => {
     await user.paste('{"extra":"not allowed"}')
 
     expect(screen.getByText('Unknown parameter: extra.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save inputs' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save parameters for retry' })).toBeDisabled()
   })
 })

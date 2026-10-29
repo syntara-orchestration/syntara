@@ -119,7 +119,7 @@ export function RetryInputOverrideDetails({
           </FormHelperText>
         </FormGroup>
       </StackItem>
-      <StackItem>
+      <StackItem className={styles.actions}>
         <Flex gap={{ default: 'gapSm' }} flexWrap={{ default: 'wrap' }}>
           <FlexItem>
             <Button
@@ -127,7 +127,7 @@ export function RetryInputOverrideDetails({
               onClick={saveDraft}
               isDisabled={isDisabled || Boolean(error ?? parseResult.error)}
             >
-              Save inputs
+              Save parameters for retry
             </Button>
           </FlexItem>
           <FlexItem>

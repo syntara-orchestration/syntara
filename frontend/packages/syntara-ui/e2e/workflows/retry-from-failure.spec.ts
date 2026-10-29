@@ -225,7 +225,7 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await stubWorkflowEditPermission(app, true)
       await openExecutionDetail(app, FAILED_EXECUTION_ID)
       await app.getByRole('tab', { name: 'Details' }).click()
-      await app.getByRole('row', { name: /First Step/ }).click()
+      await app.getByRole('row', { name: /Second Step/ }).click()
       await openRetryActionsMenu(app)
       await app.getByTestId('retry-from-failure-button').click()
 
@@ -234,21 +234,59 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
 
       const editor = app.getByRole('textbox', { name: /Input parameters for/ })
+      const saveButton = app.getByRole('button', { name: 'Save parameters for retry' })
+      await expect(saveButton).toBeVisible()
+      const saveButtonFitsEditorPane = await saveButton.evaluate((button) => {
+        const editorPane = button.closest('[data-testid="retry-input-override-editor"]')
+        if (!editorPane) return false
+
+        const paneRect = editorPane.getBoundingClientRect()
+        const buttonRect = button.getBoundingClientRect()
+        return buttonRect.top >= paneRect.top && buttonRect.bottom <= paneRect.bottom
+      })
+      expect(saveButtonFitsEditorPane).toBe(true)
       await editor.fill('{"code":"echo retry"}')
       await expect(editor).toBeInViewport()
       await app.screenshot({ path: testInfo.outputPath('retry-input-overrides-editing.png') })
       const retryButton = app.getByRole('button', { name: 'Retry 2 steps' })
       await expect(retryButton).toBeDisabled()
-      await app.getByRole('button', { name: 'Save inputs' }).click()
+      await saveButton.click()
 
       await expect(app.getByText('Edited for retry')).toBeInViewport()
       await expect(app.getByText(/"code": "echo retry"/, { exact: false })).toBeVisible()
       await expect(retryButton).toBeEnabled()
 
+      const searchInput = app.getByRole('textbox', { name: 'Search input parameters data' })
+      const viewToggle = app.getByRole('group', { name: 'Input parameters view selection' })
+      const searchCenter = await searchInput.evaluate((element) => {
+        const bounds = element.getBoundingClientRect()
+        return (bounds.top + bounds.bottom) / 2
+      })
+      const viewToggleCenter = await viewToggle.evaluate((element) => {
+        const bounds = element.getBoundingClientRect()
+        return (bounds.top + bounds.bottom) / 2
+      })
+      expect(Math.abs(searchCenter - viewToggleCenter)).toBeLessThan(2)
+
+      const outputSearchInput = app.getByRole('textbox', { name: 'Search output data' })
+      const outputViewToggle = app.getByRole('group', { name: 'Output view selection' })
+      const outputSearchCenter = await outputSearchInput.evaluate((element) => {
+        const bounds = element.getBoundingClientRect()
+        return (bounds.top + bounds.bottom) / 2
+      })
+      const outputViewToggleCenter = await outputViewToggle.evaluate((element) => {
+        const bounds = element.getBoundingClientRect()
+        return (bounds.top + bounds.bottom) / 2
+      })
+      expect(Math.abs(outputSearchCenter - outputViewToggleCenter)).toBeLessThan(2)
+
       await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
       await expect(app.getByRole('textbox', { name: /Input parameters for/ })).toHaveValue(/echo retry/)
       await expect(app.getByRole('button', { name: 'Reset parameters' })).toBeVisible()
-      await app.getByRole('button', { name: 'Cancel' }).click()
+      await app
+        .getByTestId('retry-input-override-editor')
+        .getByRole('button', { name: 'Cancel' })
+        .click()
       await expect(app.getByText('Edited for retry')).toBeVisible()
       await app.screenshot({ path: testInfo.outputPath('retry-input-overrides-saved.png') })
 

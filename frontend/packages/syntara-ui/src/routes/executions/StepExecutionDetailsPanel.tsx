@@ -137,7 +137,7 @@ function DataPane({
   return (
     <Stack className={`${styles.contentContainer}${className ? ` ${className}` : ''}`}>
       <StackItem className={styles.dataPaneHeaderRow}>
-        <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }} flexWrap={{ default: 'wrap' }}>
+        <Flex alignItems={{ default: 'alignItemsFlexStart' }} gap={{ default: 'gapSm' }} flexWrap={{ default: 'wrap' }}>
           <FlexItem flex={{ default: 'flexNone' }} className={styles.dataPaneTitle}>
             <Flex
               alignItems={{ default: 'alignItemsCenter' }}
@@ -152,9 +152,9 @@ function DataPane({
             <Flex
               alignItems={{ default: 'alignItemsCenter' }}
               gap={{ default: 'gapSm' }}
-              flexWrap={{ default: 'wrap' }}
+              className={styles.dataPaneControls}
             >
-              <FlexItem grow={{ default: 'grow' }} className={styles.searchWrap}>
+              <FlexItem className={styles.searchWrap}>
                 <SearchInput
                   aria-label={`Search ${title.toLowerCase()} data`}
                   placeholder="Search"
@@ -163,7 +163,7 @@ function DataPane({
                   onClear={() => setSearchTerm('')}
                 />
               </FlexItem>
-              <FlexItem grow={{ default: 'grow' }}>
+              <FlexItem className={styles.viewToggleWrap}>
                 <ViewToggle activeView={view} onChange={onViewChange} ariaLabel={`${title} view selection`} />
               </FlexItem>
             </Flex>
@@ -377,7 +377,7 @@ function StepContentArea({
 
   if (retryEditorProps?.isEditing) {
     return (
-      <div className={styles.retryEditorPane}>
+      <div className={styles.retryEditorPane} data-testid="retry-input-override-editor">
         <RetryInputOverrideDetails {...retryEditorProps} />
       </div>
     )

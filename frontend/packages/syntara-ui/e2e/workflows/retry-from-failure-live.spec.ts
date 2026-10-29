@@ -350,7 +350,7 @@ test.describe('Retry from failure — real backend', () => {
     await editor.fill('{"code":"echo retry-recovered"}')
     const retryButton = app.getByRole('button', { name: 'Retry 2 steps' })
     await expect(retryButton).toBeDisabled()
-    await app.getByRole('button', { name: 'Save inputs' }).click()
+    await app.getByRole('button', { name: 'Save parameters for retry' }).click()
     await expect(app.getByText('Edited for retry')).toBeVisible()
     await expect(app.getByText(/"code": "echo retry-recovered"/, { exact: false })).toBeVisible()
     await expect(retryButton).toBeEnabled()
