@@ -215,8 +215,7 @@ function resolveMockExecutionCreateContext(
   const versions = getOrCreateVersionStore(String(body.workflow_id), workflow)
   const versionRecord = versions.find((v) => v.version === versionNum)
   const definition = (versionRecord?.workflow_definition ?? workflow.version?.workflow_definition) as
-    | MockExecutionWorkflowDefinition
-    | undefined
+    MockExecutionWorkflowDefinition | undefined
 
   const triggerNodeId = body.trigger_node_id
   if (triggerNodeId) {

@@ -124,9 +124,9 @@ export async function expectStaleFormTriggerSubmitBlocked(
 
   await dialog.getByRole('button', { name: FORM_TRIGGER_SUBMIT_LABEL }).click()
 
-  await expect(
-    dialog.getByText('Unable to submit this form. Try again or contact your administrator.')
-  ).toBeVisible({ timeout: 15_000 })
+  await expect(dialog.getByText('Unable to submit this form. Try again or contact your administrator.')).toBeVisible({
+    timeout: 15_000,
+  })
   await expect(dialog).toBeVisible()
   await expect(app).not.toHaveURL(/\/executions\//)
 
