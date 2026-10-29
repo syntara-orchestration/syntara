@@ -9,7 +9,8 @@ import { detachPromise } from '../../utils/detachPromise'
 
 import { applyResolvedWorkflowRun, type PendingWorkflowRunInput } from './applyResolvedWorkflowRun'
 import { workflowRunSkipsManualRunConfirmation } from './formTrigger/formTriggerRunUtils'
-import { resolveWorkflowRunTrigger, type WorkflowRunTrigger } from './resolveWorkflowRunTrigger'
+import { WorkflowFormTriggerSelectDialog } from './formTrigger/WorkflowFormTriggerSelectDialog'
+import { resolveWorkflowListRunTrigger, type WorkflowRunTrigger } from './resolveWorkflowRunTrigger'
 import {
   WORKFLOW_LIST_RUN_PREPARING_DELAY_MS,
   workflowListRunConfirmVisible,
@@ -36,6 +37,8 @@ export function WorkflowListRunResolutionSession({
   const [isResolvingRun, setIsResolvingRun] = useState(true)
   const [runConfirmVisible, setRunConfirmVisible] = useState(false)
   const [resolvedRunTrigger, setResolvedRunTrigger] = useState<WorkflowRunTrigger | null>(null)
+  const [formStepSelectVisible, setFormStepSelectVisible] = useState(false)
+  const [formStepChoices, setFormStepChoices] = useState<WorkflowRunTrigger[]>([])
 
   const closeRunDialog = runDialog.close
   const workflowToRun = runDialog.item
@@ -58,14 +61,20 @@ export function WorkflowListRunResolutionSession({
     let cancelled = false
 
     detachPromise(
-      resolveWorkflowRunTrigger(workflowToRun)
-        .then((trigger) => {
+      resolveWorkflowListRunTrigger(workflowToRun)
+        .then((resolution) => {
           if (cancelled) return
-          setResolvedRunTrigger(trigger)
-          if (!trigger) {
+          if (!resolution) {
             applyResolvedWorkflowRun(workflowToRun, null, applyRunCallbacks())
             return
           }
+          if (resolution.kind === 'chooseFormStep') {
+            setFormStepChoices(resolution.triggers)
+            setFormStepSelectVisible(true)
+            return
+          }
+          const trigger = resolution.trigger
+          setResolvedRunTrigger(trigger)
           if (workflowRunSkipsManualRunConfirmation(trigger)) {
             applyResolvedWorkflowRun(workflowToRun, trigger, applyRunCallbacks())
             return
@@ -97,18 +106,42 @@ export function WorkflowListRunResolutionSession({
     applyResolvedWorkflowRun(workflowToRun, resolvedRunTrigger, applyRunCallbacks())
   }, [applyRunCallbacks, resolvedRunTrigger, workflowToRun])
 
+  const handleFormStepSelect = useCallback(
+    (trigger: WorkflowRunTrigger) => {
+      if (!workflowToRun) return
+      setFormStepSelectVisible(false)
+      setFormStepChoices([])
+      applyResolvedWorkflowRun(workflowToRun, trigger, applyRunCallbacks())
+    },
+    [applyRunCallbacks, workflowToRun]
+  )
+
+  const handleFormStepSelectClose = useCallback(() => {
+    setFormStepSelectVisible(false)
+    setFormStepChoices([])
+    closeRunDialog()
+  }, [closeRunDialog])
+
   const preparingCandidate = workflowListRunPreparingCandidate({
     runDialogOpen: runDialog.isOpen,
     hasWorkflow: Boolean(workflowToRun),
     isResolvingRun,
     runConfirmVisible,
     hasPendingRunInput: pendingRunInput != null,
+    formStepSelectVisible,
   })
   const preparingRunOpen = useShowAfterDelay(preparingCandidate, WORKFLOW_LIST_RUN_PREPARING_DELAY_MS)
 
   return (
     <>
       <WorkflowRunPreparingModal isOpen={preparingRunOpen} onClose={runDialog.close} />
+
+      <WorkflowFormTriggerSelectDialog
+        isOpen={formStepSelectVisible && runDialog.isOpen}
+        triggers={formStepChoices}
+        onClose={handleFormStepSelectClose}
+        onSelect={handleFormStepSelect}
+      />
 
       <SynConfirmationDialog
         isOpen={workflowListRunConfirmVisible(runDialog.isOpen, runConfirmVisible)}
