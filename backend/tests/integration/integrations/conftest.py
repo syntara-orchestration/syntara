@@ -41,34 +41,23 @@ BASE_URL = "/api/v1/integrations"
 
 @pytest.fixture(autouse=True)
 def ep_cluster_commands(monkeypatch: pytest.MonkeyPatch) -> list[MessageEnvelope]:
-    """Acknowledge direct EP commands while exercising real AO database writes."""
+    """Acknowledge direct EP commands while exercising real AO database writes.
+
+    The EP Cluster shares the AO Integration's UUID, so every command is addressed
+    by that shared ``resource_id`` and the receipt echoes it back; there is no
+    separate correlation key or configuration revision.
+    """
     commands: list[MessageEnvelope] = []
-    clusters: dict[str, UUID] = {}
 
     async def submit(message: MessageEnvelope) -> TransportReceipt:
         commands.append(message)
-        revision = message.command.payload["desired_revision"]
-        assert isinstance(revision, int)
-        key = str(message.command.payload["resource_key"])
-        cluster_id = clusters.setdefault(key, uuid4())
-        if message.command.command_type == "cluster.delete":
-            clusters.pop(key, None)
+        resource_id = str(message.command.payload["resource_id"])
         return TransportReceipt(
             message_id=message.message_id,
-            resource=ResourceReference(
-                kind="cluster",
-                resource_id=cluster_id,
-                revision=revision,
-            ),
+            resource=ResourceReference(kind="cluster", resource_id=UUID(resource_id)),
         )
 
-    async def inventory(*, limit: int, filters: dict[str, str]) -> dict[str, object]:
-        key = filters["source_integration_id"]
-        resources = [{"id": str(clusters[key])}] if key in clusters else []
-        return {"resources": resources[:limit], "next": None, "prev": None}
-
     client = AsyncMock()
-    client.list_clusters.side_effect = inventory
     client.__aenter__.return_value = client
     client.submit_command.side_effect = submit
     monkeypatch.setattr(cluster_sync_commands, "ExecutionPlaneHttpClient", lambda: client)

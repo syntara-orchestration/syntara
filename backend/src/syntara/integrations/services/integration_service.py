@@ -1249,7 +1249,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         integration_name = integration.name
         tools_count = await self._count_linked_tools(integration_id)
 
-        await delete_integration_cluster(self.session, integration)
+        await delete_integration_cluster(integration)
 
         await self._hard_delete_linked_tool_params(integration_id)
         await self._hard_delete_linked_tools(integration_id)

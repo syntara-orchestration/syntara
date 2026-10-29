@@ -45,15 +45,25 @@ async def test_create_update_delete_and_recreate_submit_ep_commands(
 
     second = await auth_client.post(BASE_URL, json=payload)
     assert second.status_code == 201, second.text
-    assert second.json()["id"] != first_id
+    second_id = second.json()["id"]
+    assert second_id != first_id
+    # Every write reconciles the EP cluster with an idempotent upsert (register);
+    # only deletion sends a delete. There is no configuration revision.
     assert [message.command.command_type for message in ep_cluster_commands] == [
         "cluster.register",
-        "cluster.update",
+        "cluster.register",
         "cluster.delete",
         "cluster.register",
     ]
-    assert [message.command.payload["desired_revision"] for message in ep_cluster_commands] == [1, 2, 3, 1]
-    assert ep_cluster_commands[-1].command.payload["resource_key"] == second.json()["id"]
+    # Commands are addressed by the shared resource_id (= integration id), so the
+    # first three target the original integration and the last targets the recreated one.
+    assert [message.command.payload["resource_id"] for message in ep_cluster_commands] == [
+        first_id,
+        first_id,
+        first_id,
+        second_id,
+    ]
+    assert ep_cluster_commands[-1].command.payload["resource_id"] == second_id
 
 
 @pytest.mark.asyncio
@@ -98,5 +108,5 @@ async def test_ep_failure_preserves_ao_update_and_later_reconciliation_applies_i
     assert len(ep_cluster_commands) == 1
     result = await reconcile_integration_clusters(test_db_session_factory, UUID(integration_id))
     assert result == {"synced": 1, "failed": 0, "skipped": 0}
-    assert ep_cluster_commands[-1].command.command_type == "cluster.update"
+    assert ep_cluster_commands[-1].command.command_type == "cluster.register"
     assert ep_cluster_commands[-1].command.payload["enabled"] is False
