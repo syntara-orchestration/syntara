@@ -1,6 +1,7 @@
 """Deterministic event Execution preparation; no Temporal or broker calls."""
 
 from collections.abc import Callable
+from contextlib import nullcontext
 from copy import deepcopy
 from datetime import UTC, datetime
 
@@ -32,6 +33,7 @@ from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapsh
 from syntara.eventstreams.services.connection_provider import EventConnectionProvider
 from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
 from syntara.eventstreams.services.subscription_service import lock_source_lifecycle
+from syntara.eventstreams.services.worker_resources import EventWorkerResources
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
@@ -75,10 +77,12 @@ class EventExecutionPreparationService:
         session_factory: Callable[..., AsyncSession],
         *,
         capacity_check: DeliveryCapacityCheck | None = None,
+        resources: EventWorkerResources | None = None,
     ) -> None:
         """Inject the database factory and optional isolated delivery-capacity check."""
         self._session_factory = session_factory
         self._capacity_check = capacity_check
+        self._resources = resources
 
     async def prepare_delivery(
         self,
@@ -102,14 +106,27 @@ class EventExecutionPreparationService:
         they must not infer claim loss, terminal resolution, or permission to
         start Temporal or commit an offset from the exception.
         """
-        try:
-            async with self._session_factory() as session, session.begin():
-                result = _require_prepared(
-                    await self._prepare(session, snapshot, identity, envelope, owner_worker_id, claim)
-                )
-            return result  # noqa: RET504 - return only after the transaction commits
-        except _PreparationRefusedError as exc:
-            return exc.result
+        async with self._resources.preparation if self._resources is not None else nullcontext():
+            if (
+                claim is None
+                and self._resources is not None
+                and (not self._resources.accepting or not self._resources.scheduling_open)
+            ):
+                return PreparationBlocked()
+            try:
+                async with self._session_factory() as session, session.begin():
+                    if (
+                        claim is None
+                        and self._resources is not None
+                        and (not self._resources.accepting or not self._resources.scheduling_open)
+                    ):
+                        return PreparationBlocked()
+                    result = _require_prepared(
+                        await self._prepare(session, snapshot, identity, envelope, owner_worker_id, claim)
+                    )
+                return result  # noqa: RET504 - return only after the transaction commits
+            except _PreparationRefusedError as exc:
+                return exc.result
 
     async def _prepare(
         self,

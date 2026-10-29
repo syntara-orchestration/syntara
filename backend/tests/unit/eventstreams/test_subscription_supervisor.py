@@ -982,3 +982,19 @@ async def test_drain_ignoring_cancellation_cannot_hold_the_loss_hook_or_prevent_
             await asyncio.wait_for(harness.supervisor._cleanup_task, timeout=1)
         await harness.supervisor.stop()
     assert not harness.placement.local_in_use
+
+
+async def test_revision_change_cannot_restart_past_a_known_permanent_error(harness):
+    await harness.supervisor.apply(harness.snapshot)
+    runner = harness.runners[0]
+    runner.observation = RunnerStatus(
+        state=RuntimeState.BLOCKED, reason="activity_log_unavailable", permanent_content_error=True
+    )
+    changed = harness.snapshot.model_copy(
+        update={"configuration_revision": harness.snapshot.configuration_revision + 1}
+    )
+    result = await harness.supervisor.apply(changed)
+    assert runner.stopped
+    assert result.state == RuntimeState.BLOCKED
+    assert result.permanent_content_error
+    harness.factory.assert_awaited_once()

@@ -3,6 +3,7 @@
 import asyncio
 import random
 from collections.abc import Callable
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
@@ -38,6 +39,7 @@ from syntara.eventstreams.services.connection_provider import EventConnectionPro
 from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.subscription_service import lock_source_lifecycle
+from syntara.eventstreams.services.worker_resources import EventWorkerResources
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
 from syntara.workflows.models.execution import Execution
 
@@ -55,12 +57,14 @@ class EventAdmissionService:
         launcher: WorkflowLauncher,
         *,
         cache: TerminalDeliveryCache | None = None,
+        resources: EventWorkerResources | None = None,
     ) -> None:
         """Inject the database factory and signed Temporal adapter."""
         self._session_factory = session_factory
         self._launcher = launcher
-        self._preparation = EventExecutionPreparationService(session_factory)
         self._cache = cache
+        self._resources = resources
+        self._preparation = EventExecutionPreparationService(session_factory, resources=resources)
 
     async def schedule(self, prepared: PreparedExecution) -> SchedulingResult:
         """Reload frozen arguments; a caller's mutable dictionaries are never authoritative."""
@@ -68,22 +72,32 @@ class EventAdmissionService:
 
     async def recover_claim(self, claim: DeliveryClaim) -> SchedulingResult:
         """Recover a current claim without a consumer, ownership epoch, or new reservation."""
+        if self._resources is not None and not self._resources.scheduling_open:
+            return BlockedDelivery(error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE)
         try:
             try:
-                prepared = await self._reload(claim)
-                if isinstance(prepared, TerminalDelivery):
-                    return await self._resolved(prepared)
-                if isinstance(prepared, ClaimLost):
-                    return prepared
-                return await self._schedule(prepared)
+                return await self._recover_prepared_claim(claim)
             except ValueError:
                 return await self._failure(
                     claim, EventLaunchError(SchedulingFailureCode.EVIDENCE_MISMATCH, transient=False)
                 )
         except _STORAGE_ERRORS:
+            if self._resources is not None:
+                self._resources.database_failed()
             return BlockedDelivery(error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE)
         except ValueError:
             return BlockedDelivery(error_code=SchedulingFailureCode.EVIDENCE_MISMATCH)
+
+    async def _recover_prepared_claim(self, claim: DeliveryClaim) -> SchedulingResult:
+        """Resolve retained evidence before scheduling the frozen preparation."""
+        prepared = await self._reload(claim)
+        if isinstance(prepared, TerminalDelivery):
+            return await self._resolved(prepared)
+        if isinstance(prepared, ClaimLost):
+            return prepared
+        if self._resources is not None and not self._resources.scheduling_open:
+            return BlockedDelivery(error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE)
+        return await self._schedule(prepared)
 
     async def _reload(self, claim: DeliveryClaim) -> PreparedExecution | TerminalDelivery | ClaimLost:
         async with self._session_factory() as session, session.begin():
@@ -108,10 +122,14 @@ class EventAdmissionService:
                 return recovered
         try:
             retention = await self._verified_retention()
+            if self._resources is not None and not self._resources.scheduling_open:
+                return BlockedDelivery(error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE)
             attempted = await self._record_attempt(prepared, retention)
             if isinstance(attempted, (ClaimLost, TerminalDelivery)):
                 return await self._resolved(attempted) if isinstance(attempted, TerminalDelivery) else attempted
             prepared = prepared.model_copy(update={"claim": attempted})
+            if self._resources is not None and not self._resources.scheduling_open:
+                return BlockedDelivery(error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE)
             acceptance = await self._launcher.start(prepared)
         except EventLaunchError as exc:
             return await self._recover_failed_start(prepared, exc)
@@ -245,17 +263,27 @@ class EventAdmissionService:
                 async with asyncio.timeout(get_settings().event_delivery_cache_timeout_seconds):
                     # The provider rereads committed evidence and preserves its original expiry.
                     await self._cache.populate(terminal.identity)
+            except SQLAlchemyError:
+                if self._resources is not None:
+                    self._resources.database_failed()
+                logger.warning("event_delivery_terminal_cache_storage_unavailable")
             except Exception:  # noqa: BLE001 - cache failures cannot invalidate committed confirmation
                 logger.warning("event_delivery_terminal_cache_population_failed")
         return ResolvedDelivery(terminal=terminal)
 
     async def _confirm(self, prepared: PreparedExecution, acceptance: TemporalAcceptance) -> SchedulingResult:
+        async with self._resources.finalization if self._resources is not None else nullcontext():
+            return await self._finalize(prepared, acceptance)
+
+    async def _finalize(self, prepared: PreparedExecution, acceptance: TemporalAcceptance) -> SchedulingResult:
         try:
             async with self._session_factory() as session, session.begin():
                 result = await EventDeliveryStore(session).finalize_scheduled(prepared.claim, acceptance)
             return await self._resolved(result) if isinstance(result, TerminalDelivery) else result
         except _STORAGE_ERRORS:
             # A lost commit response may already have resolved scheduling.
+            if self._resources is not None:
+                self._resources.database_failed()
             async with self._session_factory() as session, session.begin():
                 store = EventDeliveryStore(session)
                 terminal = await store.lookup_terminal(prepared.claim.identity)
