@@ -14,7 +14,7 @@ updates:
       default-days: 3
     open-pull-requests-limit: 1
     labels:
-      - "docs"
+      - "documentation"
       - "dependencies"
   - package-ecosystem: "github-actions"
     directory: "/"
