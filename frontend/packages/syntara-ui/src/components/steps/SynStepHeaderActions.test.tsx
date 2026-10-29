@@ -25,12 +25,7 @@ describe('SynStepHeaderActions', () => {
 
     render(
       <SynStepExpandedContext.Provider value={[true, vi.fn()]}>
-        <SynStepHeaderActions
-          stepTitle="Deploy"
-          showMenuActions
-          menuActions={menuActions}
-          expandable
-        />
+        <SynStepHeaderActions stepTitle="Deploy" showMenuActions menuActions={menuActions} expandable />
       </SynStepExpandedContext.Provider>
     )
 
