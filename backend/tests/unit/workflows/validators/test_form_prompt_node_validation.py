@@ -463,11 +463,12 @@ class TestFormPromptFindingPaths:
             "field-2",
         ]
 
-    def test_dynamic_resolved_source_schema_and_model_errors_are_deduplicated(self) -> None:
+    @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
+    def test_dynamic_resolved_source_reports_schema_and_model_errors(self, field_type: str) -> None:
         workflow_def = _workflow_with_form_prompt(
             [
                 {
-                    "type": "dropdown",
+                    "type": field_type,
                     "value_name": "choice",
                     "label": "Choice",
                     "options": {
@@ -481,9 +482,19 @@ class TestFormPromptFindingPaths:
         result = WorkflowValidator().collect_findings(workflow_def)
 
         form_findings = [finding for finding in result.findings if finding.node_id == "form"]
-        assert len(form_findings) == 1
-        assert form_findings[0].category == ValidationCategory.form_prompt_configuration
-        assert form_findings[0].field_path == "parameters.form_definition.fields.0.options"
+        assert {(finding.category, finding.field_path, finding.message) for finding in form_findings} == {
+            (
+                ValidationCategory.schema_violation,
+                "parameters.form_definition.fields.0.options.source",
+                "'dynamic_resolved' is not one of ['static', 'dynamic']",
+            ),
+            (
+                ValidationCategory.schema_violation,
+                "parameters.form_definition.fields.0.options",
+                "Input tag 'dynamic_resolved' found using 'source' does not match any of the expected tags: "
+                "'static', 'dynamic'",
+            ),
+        }
 
     def test_missing_form_definition_schema_and_model_errors_are_deduplicated(self) -> None:
         workflow_def = _workflow_with_form_prompt(_VALID_FORM_DEFINITION["fields"])

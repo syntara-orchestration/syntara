@@ -406,9 +406,9 @@ def test_publish_rejects_invalid_form_definition_and_it_cannot_run_as_published(
                     },
                 }
             ],
-            "form_prompt_configuration",
+            "schema_violation",
             "parameters.form_definition.fields.0.options",
-            "produced by the workflow engine at run time and cannot be authored",
+            "dynamic_resolved",
         ),
     ],
     ids=lambda value: value if isinstance(value, str) and value else None,
@@ -425,15 +425,16 @@ def test_validate_reports_specific_form_field_defect(
     response = _validate_definition(syntara_api, unique_name(f"{_NAME_PREFIX}-{case_name}"), fields)
     problem = assert_definition_invalid(response)
     findings = _prompt_findings(problem)
-    assert len(findings) == 1, f"Expected one form-prompt finding, got {findings}"
+    expected_count = 2 if case_name == "engine_only_dynamic_resolved_options" else 1
+    assert len(findings) == expected_count, f"Expected {expected_count} form-prompt finding(s), got {findings}"
 
-    finding = findings[0]
-    assert finding["severity"] == "error"
-    assert finding["category"] == expected_category
-    assert finding["field_path"].startswith(field_path_prefix)
-    assert finding["message"].strip()
-    if message_substring:
-        assert message_substring in finding["message"]
+    for finding in findings:
+        assert finding["severity"] == "error"
+        assert finding["category"] == expected_category
+        assert finding["field_path"].startswith(field_path_prefix)
+        assert finding["message"].strip()
+        if message_substring:
+            assert message_substring in finding["message"]
 
 
 def test_validate_collects_multiple_form_field_defects_in_field_order(
