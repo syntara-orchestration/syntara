@@ -642,6 +642,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 {k: self._scrub_data(v) for k, v in self.node_inputs.items()} if include_node_results else {}
             ),
             "completed_activities": list(node_outputs.keys()),
+            "completed_nodes": self._completed_node_ids(),
             "failed_activities": self.failed_nodes,
         }
 
@@ -1901,6 +1902,38 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         """
         return list(self.skipped_nodes)
+
+    def _completed_node_ids(self) -> list[str]:
+        """Node IDs whose namespace is marked ``status == "completed"``.
+
+        This positive completion marker is set only on successful node
+        completion (``_process_completed_task``). Failed nodes carry
+        ``status == "failed"`` and skipped/disabled nodes have an empty
+        namespace, so both are excluded without inferring completion from the
+        absence of other states. Used by the ``get_completed_nodes`` query and
+        surfaced in the completion result as ``completed_nodes`` so the activity
+        finalizer has an authoritative source even if the query fails.
+        """
+        return [
+            node_id
+            for node_id, namespace in self.resolver.get_all_namespaces().items()
+            if isinstance(namespace, dict) and namespace.get("status") == "completed"
+        ]
+
+    @workflow.query
+    def get_completed_nodes(self) -> list[str]:
+        """Query to get node IDs that completed successfully.
+
+        Consumed by ActivitySyncService when finalizing an execution to mark
+        sub-workflow activity rows COMPLETED: a sub-workflow node executes via
+        an internal setup activity plus a child workflow, so no
+        ACTIVITY_TASK_COMPLETED event ever reaches its per-node activity row.
+
+        Returns:
+            List of node IDs whose namespace is marked completed.
+
+        """
+        return self._completed_node_ids()
 
     @workflow.query
     def get_detached_nodes(self) -> list[str]:

@@ -3743,6 +3743,50 @@ class TestProcessHistoryEvent:
         assert passed_failed_map == fallback_map
 
     @pytest.mark.asyncio
+    async def test_query_completed_nodes_none_falls_back_to_event_extraction(self) -> None:
+        """When _query_completed_nodes returns None, _extract_completed_nodes_from_event is used."""
+        event = self._create_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED, event_id=21)
+        fallback_completed = {"sub_wf_node"}
+
+        with (
+            patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value={}),
+            patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_query_completed_nodes", new_callable=AsyncMock, return_value=None),
+            patch.object(
+                self.service, "_extract_completed_nodes_from_event", return_value=fallback_completed
+            ) as mock_extract,
+            patch.object(self.service, "_update_execution_status_from_event", new_callable=AsyncMock) as mock_update,
+        ):
+            result = await self.service._process_history_event(
+                event, self.metadata, self.mock_handle, self.queue, self.probe_tasks
+            )
+
+        assert result is True
+        mock_extract.assert_called_once_with(event)
+        assert mock_update.call_args[0][3] == fallback_completed
+
+    @pytest.mark.asyncio
+    async def test_query_completed_nodes_success_skips_event_extraction(self) -> None:
+        """When the completion query succeeds, the payload fallback is NOT used."""
+        event = self._create_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED, event_id=22)
+
+        with (
+            patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value={}),
+            patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_query_completed_nodes", new_callable=AsyncMock, return_value={"sub_wf_node"}),
+            patch.object(self.service, "_extract_completed_nodes_from_event") as mock_extract,
+            patch.object(self.service, "_update_execution_status_from_event", new_callable=AsyncMock) as mock_update,
+        ):
+            await self.service._process_history_event(
+                event, self.metadata, self.mock_handle, self.queue, self.probe_tasks
+            )
+
+        mock_extract.assert_not_called()
+        assert mock_update.call_args[0][3] == {"sub_wf_node"}
+
+    @pytest.mark.asyncio
     async def test_processes_activity_events(self) -> None:
         """Test that activity events are processed and post-processed."""
         event = self._create_event(EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED, event_id=5)
@@ -4195,6 +4239,7 @@ class TestRunMonitorLoop:
             patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value={}),
             patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
             patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_query_completed_nodes", new_callable=AsyncMock, return_value=set()),
         ):
             result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
 

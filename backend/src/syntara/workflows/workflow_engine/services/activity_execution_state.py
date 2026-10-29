@@ -163,10 +163,40 @@ class ActivityExecutionStateMixin:
         return {}
 
     @staticmethod
+    def _extract_completed_nodes_from_event(event: HistoryEvent) -> set[str]:
+        """Extract successfully-completed node IDs from a workflow completion event.
+
+        ``_build_result`` includes ``completed_nodes`` in the completion payload:
+        the authoritative set of nodes whose namespace is marked
+        ``status == "completed"`` (the same positive marker the
+        ``get_completed_nodes`` query uses). This provides a reliable fallback
+        when that query fails (timeout, or the workflow closed before the query
+        ran), so a transient query failure cannot mark a successfully executed
+        sub-workflow node SKIPPED. Because it is a positive marker, disabled and
+        other skipped nodes (which carry no completion status) are never
+        included. Only the COMPLETED event carries a result payload.
+        """
+        if event.event_type != EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED:
+            return set()
+        completed_attrs = event.workflow_execution_completed_event_attributes
+        if not completed_attrs or not completed_attrs.result or not completed_attrs.result.payloads:
+            return set()
+        try:
+            result_data = json.loads(completed_attrs.result.payloads[0].data)
+            if isinstance(result_data, dict):
+                completed = result_data.get("completed_nodes", [])
+                if isinstance(completed, list):
+                    return {node_id for node_id in completed if isinstance(node_id, str)}
+        except Exception:  # noqa: BLE001
+            logger.debug("Could not parse completed_nodes from workflow result", exc_info=True)
+        return set()
+
+    @staticmethod
     def _finalize_non_terminal_activities(
         execution: Execution,
         execution_id: UUID,
         failed_node_map: dict[str, str] | None = None,
+        completed_node_ids: set[str] | None = None,
     ) -> None:
         """Mark any non-terminal activities as skipped when a workflow completes.
 
@@ -182,6 +212,12 @@ class ActivityExecutionStateMixin:
         the failure is recorded in the workflow state but may not have a
         corresponding Temporal activity event, so the prior DB sync could
         miss them.
+
+        When ``completed_node_ids`` is provided, activities whose base node ID
+        appears in that set are marked COMPLETED instead of SKIPPED, with
+        precedence FAILED > COMPLETED > SKIPPED. This fixes sub-workflow nodes,
+        whose work runs under an internal setup activity plus a child workflow
+        and therefore never emits an ACTIVITY_TASK_COMPLETED event.
         """
         now = datetime.now(UTC)
         finalized_count = 0
@@ -192,6 +228,8 @@ class ActivityExecutionStateMixin:
                 if error_msg is not None:
                     activity.status = ActivityStatus.FAILED
                     activity.error_details = error_msg
+                elif completed_node_ids and base_name in completed_node_ids:
+                    activity.status = ActivityStatus.COMPLETED
                 else:
                     activity.status = ActivityStatus.SKIPPED
                 activity.completed_at = now
@@ -209,6 +247,7 @@ class ActivityExecutionStateMixin:
         metadata: ExecutionMonitorMetadata,
         event: HistoryEvent,
         failed_node_map: dict[str, str] | None = None,
+        completed_node_ids: set[str] | None = None,
     ) -> None:
         """Update execution status to terminal state when workflow completes.
 
@@ -219,6 +258,9 @@ class ActivityExecutionStateMixin:
                 Used as a fallback by ``_finalize_non_terminal_activities`` to mark
                 nodes as FAILED rather than SKIPPED when the prior DB sync didn't
                 persist in time for the fresh session to see it.
+            completed_node_ids: Set of node IDs that completed successfully, from
+                ``_query_completed_nodes``. Used by ``_finalize_non_terminal_activities``
+                to mark those rows COMPLETED rather than SKIPPED.
 
         """
         async with self.session_factory() as session:
@@ -281,7 +323,9 @@ class ActivityExecutionStateMixin:
                 # Safety net: mid-workflow sync (via _sync_skipped_nodes on converge/condition
                 # completion) handles the fast path. This catches anything still non-terminal
                 # if those earlier syncs missed it (e.g. query failure, race).
-                self._finalize_non_terminal_activities(execution, metadata.execution_id, failed_node_map)
+                self._finalize_non_terminal_activities(
+                    execution, metadata.execution_id, failed_node_map, completed_node_ids
+                )
 
                 await session.commit()
 

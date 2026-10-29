@@ -352,6 +352,52 @@ class TestSubWorkflowLifecycle:
 
         assert "sub_wf_node" in result["completed_activities"]
 
+    async def test_get_completed_nodes_query_includes_sub_workflow(self, temporal_env: object) -> None:
+        """The real get_completed_nodes query returns the sub_workflow node on a real execution.
+
+        This is the authoritative completion source the activity finalizer uses to mark the
+        sub_workflow activity row COMPLETED (the node emits no ACTIVITY_TASK_COMPLETED event
+        of its own). Together with the persisted-status finalizer tests, this covers the
+        real path: real execution -> query -> finalizer -> persisted COMPLETED.
+        """
+        from temporalio.testing import WorkflowEnvironment
+
+        assert isinstance(temporal_env, WorkflowEnvironment)
+        async with Worker(
+            temporal_env.client,
+            task_queue=_TASK_QUEUE,
+            workflows=[OrchestratorWorkflow],
+            activities=_build_activities(),
+        ):
+            svc = TemporalExecutionService(temporal_client=temporal_env.client, task_queue=_TASK_QUEUE)
+            start = await svc.start_workflow(
+                workflow_def=_parent_workflow_def(),
+                workflow_name="sub-wf-completed-query",
+                trigger_node_id="trigger",
+                include_node_results=True,
+                execution_id=_PARENT_EXECUTION_ID,
+                workflow_metadata=_parent_workflow_metadata(),
+            )
+            handle = temporal_env.client.get_workflow_handle(start.temporal_workflow_id)
+            await asyncio.wait_for(handle.result(), timeout=_WORKFLOW_RESULT_TIMEOUT)
+
+            completed = await handle.query("get_completed_nodes")
+        assert isinstance(completed, list)
+        assert "sub_wf_node" in completed
+
+    async def test_completion_payload_recovers_sub_workflow(self, temporal_env: object) -> None:
+        """The completion result payload (the query-failure fallback) yields the sub_workflow node.
+
+        Validates that a transient get_completed_nodes query failure cannot mislabel a
+        successful sub_workflow node: the payload fallback (completed_activities minus
+        failed_activities) recovers it from real execution output.
+        """
+        result = await _run_parent_workflow(temporal_env)
+
+        assert "sub_wf_node" in result["completed_nodes"]
+        # completed_nodes is a positive marker, disjoint from failures.
+        assert set(result["failed_activities"]).isdisjoint(result["completed_nodes"])
+
     async def test_child_execution_id_is_deterministic(self, temporal_env: object) -> None:
         """Child execution ID is UUID5(namespace, parent_exec:node_id)."""
         result = await _run_parent_workflow(temporal_env)
@@ -392,6 +438,7 @@ class TestSubWorkflowLifecycle:
             "activity_outputs",
             "activity_inputs",
             "completed_activities",
+            "completed_nodes",
             "failed_activities",
         }
         assert result["failed_activities"] == {}

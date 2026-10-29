@@ -236,6 +236,39 @@ class ActivityNodeSyncMixin:
         else:
             return failed_node_map
 
+    async def _query_completed_nodes(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+    ) -> set[str] | None:
+        """Query the workflow for node IDs that completed successfully (read-only).
+
+        A sub-workflow node executes via an internal setup activity plus a child
+        workflow, so no ACTIVITY_TASK_COMPLETED event reaches its per-node
+        activity row; the row stays PENDING until finalization. This query lets
+        the finalizer mark such rows COMPLETED instead of SKIPPED.
+
+        Unlike ``_sync_failed_nodes`` this performs no database write: the
+        completion finalizer applies the FAILED > COMPLETED > SKIPPED precedence.
+
+        Returns:
+            Set of node IDs that completed successfully, or ``None`` when the
+            query fails (distinguishes "no completions" from "query error"). The
+            caller falls back to the completion event payload rather than
+            treating an unavailable query as evidence the node was skipped.
+
+        """
+        try:
+            completed_node_ids: list[str] = await handle.query("get_completed_nodes")
+        except Exception:
+            logger.exception(
+                "Error querying completed nodes; falling back to completion event payload",
+                execution_id=metadata.execution_id,
+            )
+            return None
+        else:
+            return set(completed_node_ids)
+
     async def _sync_nodes_to_terminal_status(
         self,
         metadata: ExecutionMonitorMetadata,
