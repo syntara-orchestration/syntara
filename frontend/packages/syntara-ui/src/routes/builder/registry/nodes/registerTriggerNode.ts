@@ -50,7 +50,7 @@ export default function registerTriggerNode() {
         subtypes: [
           {
             id: RegistryNodeId.TRIGGER_KAFKA,
-            label: 'Kafka Subscribe',
+            label: 'Kafka Subscribe trigger',
             icon: RhUiPlugFillIcon,
             description: 'Start a workflow when a Kafka message arrives.',
             formTitle: 'Configure Kafka Subscribe',

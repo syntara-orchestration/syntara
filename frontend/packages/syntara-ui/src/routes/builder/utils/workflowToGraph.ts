@@ -115,7 +115,10 @@ export function getTriggerDisplayData(trigger: Trigger): { name: string; details
       details = getWebhookStyleDetails(trigger.parameters, 'Webhook')
       break
     case TriggerTypeEnum.EVENT_SUBSCRIBE:
-      details = typeof trigger.parameters?.topic === 'string' ? `Kafka: ${trigger.parameters.topic}` : 'Kafka Subscribe'
+      details =
+        typeof trigger.parameters?.topic === 'string' && trigger.parameters.topic
+          ? `Topic: ${trigger.parameters.topic}`
+          : null
       break
     case TriggerTypeEnum.EDA_TRIGGER:
       details = getWebhookStyleDetails(trigger.parameters, 'EDA')

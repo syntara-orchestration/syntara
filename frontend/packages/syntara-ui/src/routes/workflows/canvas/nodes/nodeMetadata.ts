@@ -49,7 +49,7 @@ export const nodeMetadata: Record<string, NodeMetadata> = {
   },
   kafkaTrigger: {
     icon: RhUiPlugFillIcon,
-    label: 'Kafka Subscribe',
+    label: 'Kafka Subscribe trigger',
     disableTarget: true,
     expandable: false,
   },

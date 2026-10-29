@@ -66,6 +66,21 @@ describe('TriggerNodeComponent', () => {
     draggable: true,
   })
 
+  it('identifies the Kafka trigger separately from its configured topic', () => {
+    render(
+      <TriggerNodeComponent
+        {...createNodeProps({
+          name: 'Orders',
+          triggerType: TriggerTypeEnum.EVENT_SUBSCRIBE,
+          details: 'Topic: orders.created',
+        })}
+      />
+    )
+    expect(screen.getByRole('heading', { name: 'Orders' })).toBeInTheDocument()
+    expect(screen.getByText('Kafka Subscribe trigger')).toBeInTheDocument()
+    expect(screen.getByText('Topic: orders.created')).toBeInTheDocument()
+  })
+
   it('shows the step actions menu outside execution view', () => {
     render(<TriggerNodeComponent {...createNodeProps()} />)
 

@@ -162,7 +162,7 @@ function buildWebhookStyleTrigger(
 
 function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: string | undefined): Trigger {
   if (data.triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE) {
-    return buildKafkaSubscribeTrigger(trigger.id, name ?? 'Kafka Subscribe', data)
+    return buildKafkaSubscribeTrigger(trigger.id, name ?? 'Kafka Subscribe trigger', data)
   }
   if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER) {
     const inputSchema = parseJsonSchema(data.inputSchema)

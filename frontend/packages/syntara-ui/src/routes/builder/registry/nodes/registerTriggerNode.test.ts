@@ -83,6 +83,7 @@ describe('registerTriggerNode', () => {
     expect(registration?.subtypes).toHaveLength(5)
 
     const kafka = registration?.subtypes?.find((s) => s.id === RegistryNodeId.TRIGGER_KAFKA)
+    expect(kafka?.label).toBe('Kafka Subscribe trigger')
     expect(kafka?.initialData).toEqual({ triggerType: TriggerTypeEnum.EVENT_SUBSCRIBE })
 
     const manual = registration?.subtypes?.find((s) => s.id === RegistryNodeId.TRIGGER_MANUAL)

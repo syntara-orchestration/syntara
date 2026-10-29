@@ -87,7 +87,7 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
   } else if (isWebhook) {
     triggerTypeLabel = 'Webhook trigger'
   } else if (triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE) {
-    triggerTypeLabel = 'Kafka Subscribe'
+    triggerTypeLabel = 'Kafka Subscribe trigger'
   } else if (isEda) {
     triggerTypeLabel = 'Event-Driven Ansible trigger'
   }
@@ -141,6 +141,7 @@ function TriggerNodeDetails(
   const isScheduledTrigger = props.triggerKind === TriggerTypeEnum.SCHEDULED
   const isWebhookTrigger = props.triggerKind === TriggerTypeEnum.WEBHOOK_TRIGGER
   const isEdaTrigger = props.triggerKind === TriggerTypeEnum.EDA_TRIGGER
+  const isKafkaTrigger = props.triggerKind === TriggerTypeEnum.EVENT_SUBSCRIBE
   const normalizedDetails = props.triggerDetails ?? null
   return (
     <>
@@ -163,6 +164,7 @@ function TriggerNodeDetails(
           <Title headingLevel="h3" size={TitleSizes.md} style={{ overflowWrap: 'anywhere' }}>
             {props.triggerName}
           </Title>
+          {isKafkaTrigger && <Content component={ContentVariants.small}>Kafka Subscribe trigger</Content>}
           {isScheduledTrigger && normalizedDetails && (
             <Content component={ContentVariants.small}>Scheduled trigger</Content>
           )}
