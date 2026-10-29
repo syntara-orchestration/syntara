@@ -117,7 +117,7 @@ vi.mock('../step-forms/AAPJobTemplateForm', () => ({
     onHeaderContentChange: (content: ReactNode | null) => void
     initialData?: Record<string, unknown>
   }) => (
-    <div data-testid="aap-node-form" data-use-input-variables={String(initialData?.use_input_variables)}>
+    <div data-testid="aap-step-form" data-use-input-variables={String(initialData?.use_input_variables)}>
       <button
         onClick={() =>
           onSubmit({
@@ -328,7 +328,7 @@ describe('TaskStepDetails Component', () => {
 
     renderTaskStepDetails(taskData, 'task-aap')
 
-    expect(screen.getByTestId('aap-node-form')).toBeInTheDocument()
+    expect(screen.getByTestId('aap-step-form')).toBeInTheDocument()
   })
 
   it('renders AAPStepForm with minimal config (only job_template_id)', () => {
@@ -343,7 +343,7 @@ describe('TaskStepDetails Component', () => {
 
     renderTaskStepDetails(taskData, 'task-aap-minimal')
 
-    expect(screen.getByTestId('aap-node-form')).toBeInTheDocument()
+    expect(screen.getByTestId('aap-step-form')).toBeInTheDocument()
   })
 
   it('renders AAPStepForm for expression mode config (job_template_name without job_template_id)', () => {
@@ -360,7 +360,7 @@ describe('TaskStepDetails Component', () => {
 
     renderTaskStepDetails(taskData, 'task-aap-expr')
 
-    expect(screen.getByTestId('aap-node-form')).toBeInTheDocument()
+    expect(screen.getByTestId('aap-step-form')).toBeInTheDocument()
   })
 
   it('does not enable use_input_variables for a normally-selected template whose extra_vars contains a dragged expression', () => {
@@ -378,7 +378,7 @@ describe('TaskStepDetails Component', () => {
 
     renderTaskStepDetails(taskData, 'task-aap-dragged-var')
 
-    expect(screen.getByTestId('aap-node-form')).toHaveAttribute('data-use-input-variables', 'false')
+    expect(screen.getByTestId('aap-step-form')).toHaveAttribute('data-use-input-variables', 'false')
   })
 
   it('submits dragged extra_vars with a selected template and omits input-variable mode', async () => {
@@ -837,6 +837,6 @@ describe('TaskStepDetails Component', () => {
 
     renderTaskStepDetails(taskData, 'task-aap-legacy')
 
-    expect(screen.getByTestId('aap-node-form')).toBeInTheDocument()
+    expect(screen.getByTestId('aap-step-form')).toBeInTheDocument()
   })
 })
