@@ -161,6 +161,21 @@ describe('SynStepSemanticZoomBody', () => {
     expect(screen.queryByRole('button', { name: 'Edit Analyze Data' })).not.toBeInTheDocument()
   })
 
+  it('uses preview icon in the hover card when previewIcon is provided', async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    renderWithFlow(
+      <SynStepSemanticZoomBody
+        {...baseProps}
+        icon={<span data-testid="tile-icon">tile</span>}
+        previewIcon={<span data-testid="preview-icon">preview</span>}
+        menuActions={[{ id: 'view-details', label: 'Edit', onClick: vi.fn() }]}
+      />
+    )
+
+    await user.hover(screen.getByRole('button', { name: 'Analyze Data, Task Agent' }))
+    expect(screen.getByTestId('preview-icon')).toBeInTheDocument()
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = renderWithFlow(
       <SynStepSemanticZoomBody
