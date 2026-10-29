@@ -60,7 +60,7 @@ describe('renderStepIcon', () => {
     expect(icon.style.transform).toContain('scale(1.4)')
   })
 
-  it('rotates the logic-condition step icon', () => {
+  it('rotates the condition step icon', () => {
     const view = renderStepIcon(MockIcon, RegistryStepId.LOGIC_CONDITION)
     render(<>{view}</>)
 
@@ -68,7 +68,7 @@ describe('renderStepIcon', () => {
     expect(iconWrapper).toHaveStyle({ transform: 'rotate(90deg)' })
   })
 
-  it('rotates the logic-converge step icon', () => {
+  it('rotates the converge step icon', () => {
     const view = renderStepIcon(MockIcon, RegistryStepId.LOGIC_CONVERGE)
     render(<>{view}</>)
 

@@ -364,10 +364,10 @@ test.describe('Access Management — Policies Tab Columns', () => {
 
     expect(hasAllowLabel || hasDenyLabel, 'No statement effect labels rendered; statements data required').toBeTruthy()
 
-    // At least one scope label should be visible (e.g. "scope: any").
+    // At least one scope label should be visible (e.g. "Scope: any").
     // Use count check rather than toBeVisible so strict mode is not triggered by
     // having multiple rows each rendering a scope chip.
-    expect(await statementsColumn.getByText(/^scope:/).count()).toBeGreaterThan(0)
+    expect(await statementsColumn.getByText(/^Scope:/).count()).toBeGreaterThan(0)
   })
 
   test('project-scoped policies show a clickable project link', async ({ app }) => {

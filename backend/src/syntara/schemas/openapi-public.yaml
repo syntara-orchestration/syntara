@@ -14,7 +14,7 @@
 openapi: 3.1.0
 info:
   title: Syntara API
-  version: 1.3.1
+  version: 1.3.2
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -4602,7 +4602,7 @@ paths:
   /authz/resource_actions:
     get:
       summary: List available resource types and actions
-      description: Returns the catalog of all resource types and the actions that can be performed on each.
+      description: Returns the catalog of all resource types and the actions that can be performed on each. Built from route dependency introspection, built-in policies, and explicit non-routed pairs such as step_type:write.
       operationId: get_resource_actions
       x-app-permission:
         resource: null

@@ -7,7 +7,7 @@ import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
 import { SynStepHeader } from '../../../../components/steps/SynStepHeader'
 import { SynStepMenu } from '../../../../components/steps/SynStepMenu'
-import { FlowNodeType } from '../../../../constants'
+import { FlowNodeType, RegistryStepId, type RegistryStepIdUnion } from '../../../../constants'
 import { parseTriggerIndex } from '../../../../utils/triggerNodeIds'
 import { useIsActiveExecution } from '../../../builder/ActiveExecutionContext'
 import { useIsExecutionView } from '../../../builder/ExecutionViewContext'
@@ -36,16 +36,16 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
   const isEda = triggerType === TriggerTypeEnum.EDA_TRIGGER
 
   let metadata = stepMetadata.trigger
-  let iconId = 'trigger-manual'
+  let iconId: RegistryStepIdUnion = RegistryStepId.TRIGGER_MANUAL
   if (isScheduled) {
     metadata = stepMetadata.scheduledTrigger
-    iconId = 'trigger-scheduled'
+    iconId = RegistryStepId.TRIGGER_SCHEDULED
   } else if (isWebhook) {
     metadata = stepMetadata.webhookTrigger
-    iconId = 'trigger-webhook'
+    iconId = RegistryStepId.TRIGGER_WEBHOOK
   } else if (isEda) {
     metadata = stepMetadata.edaTrigger
-    iconId = 'trigger-eda'
+    iconId = RegistryStepId.TRIGGER_EDA
   }
   const iconColor = getStepTypeColor(FlowNodeType.TRIGGER)
   const iconNode = renderStepIcon(metadata.icon, iconId, 'canvas', iconColor)

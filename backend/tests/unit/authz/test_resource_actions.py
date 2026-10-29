@@ -85,6 +85,15 @@ def _collect_openapi_permission_pairs() -> list[tuple[str, str, str]]:
 class TestResourceActionsRegistry:
     """Verify structural invariants of the dynamically built registry."""
 
+    def test_step_type_is_write_only_and_project_eligible(self) -> None:
+        from syntara.authz.resource_actions import get_project_eligible_resource_types, validate_project_statements
+
+        assert get_resource_actions()["step_type"] == ["write"]
+        assert "workflow_node" not in get_resource_actions()
+        assert "step_type" in get_project_eligible_resource_types()
+        assert validate_statements([{"actions": ["step_type:execute"]}]) == ["step_type:execute"]
+        assert validate_project_statements([{"actions": ["step_type:write"], "scope": "project"}]) is None
+
     def test_resource_types_sorted(self) -> None:
         registry = get_resource_actions()
         keys = list(registry.keys())

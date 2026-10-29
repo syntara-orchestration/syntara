@@ -74,13 +74,17 @@ class PolicyService(BaseService):
 
     @staticmethod
     def _validate_resource_actions(statements: list[dict[str, Any]]) -> None:
-        """Reject statements that reference unregistered resource:action pairs."""
+        """Reject unregistered resource:action pairs and invalid step-type labels."""
         from syntara.authz.resource_actions import validate_statements  # noqa: PLC0415
+        from syntara.workflows.node_kinds import validate_node_kind_statements  # noqa: PLC0415
 
         invalid = validate_statements(statements)
         if invalid:
             msg = f"Unregistered resource:action pairs: {', '.join(invalid)}"
             raise InvalidResourceActionError(msg)
+        error = validate_node_kind_statements(statements)
+        if error:
+            raise InvalidResourceActionError(error)
 
     @staticmethod
     def _validate_no_deny_effect(statements: list[dict[str, Any]]) -> None:

@@ -1038,13 +1038,18 @@ async def what_can_i(
     dependencies=[NO_PERMISSION],
     operation_id="get_resource_actions",
     summary="List available resource types and actions",
-    description="Returns the catalog of all resource types and the actions that can be performed on each.",
+    description=(
+        "Returns the catalog of all resource types and the actions that can be "
+        "performed on each. Built from route dependency introspection, built-in "
+        "policies, and explicit non-routed pairs such as step_type:write."
+    ),
     response_description="Map of resource types to their valid actions",
 )
 async def get_resource_actions(request: Request) -> ResourceActionsResponse:
     """Return the canonical resource-type -> actions catalog.
 
-    Built dynamically at startup from route dependencies and built-in policies.
+    Built dynamically at startup from route dependencies, built-in policies,
+    and explicit non-routed pairs such as ``step_type:write``.
     """
     return ResourceActionsResponse(resource_actions=request.app.state.resource_actions)
 

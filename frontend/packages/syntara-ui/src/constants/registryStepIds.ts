@@ -1,40 +1,6 @@
-import type { ValueOf } from './types'
+import { RegistryStepId, type RegistryStepIdUnion } from '@syntara/contracts'
 
-/**
- * Step type and subtype identifiers for the builder StepRegistry (Add step panel).
- * Use these constants instead of string literals when comparing or registering registry ids.
- *
- * @example
- * import { RegistryStepId } from '@/constants/registryStepIds'
- *
- * if (stepTypeId === RegistryStepId.TRIGGER) { ... }
- * StepRegistry.register({ id: RegistryStepId.ACTION, ... })
- */
-export const RegistryStepId = {
-  TRIGGER: 'trigger',
-  TRIGGER_MANUAL: 'trigger-manual',
-  TRIGGER_SCHEDULED: 'trigger-scheduled',
-  TRIGGER_WEBHOOK: 'trigger-webhook',
-  TRIGGER_EDA: 'trigger-eda',
-  ACTION: 'action',
-  ACTION_SCRIPT: 'action-script',
-  ACTION_API: 'action-api',
-  APPROVAL: 'approval',
-  LOGIC: 'logic',
-  LOGIC_CONDITION: 'logic-condition',
-  LOGIC_CONVERGE: 'logic-converge',
-  LOGIC_LOOP: 'logic-loop',
-  LOGIC_SWITCH: 'logic-switch',
-  LOGIC_WAIT: 'logic-wait',
-  AGENT: 'agent',
-  AAP_EXECUTION: 'aap-execution',
-  AAP_JOB_TEMPLATE: 'aap-job-template',
-  AAP_WORKFLOW_TEMPLATE: 'aap-workflow-template',
-  GENERIC: 'generic',
-} as const
-
-/** Union of registry step id values */
-export type RegistryStepIdUnion = ValueOf<typeof RegistryStepId>
+export { RegistryStepId, type RegistryStepIdUnion } from '@syntara/contracts'
 
 /**
  * Set of all AAP (Ansible Automation Platform) step type IDs.
