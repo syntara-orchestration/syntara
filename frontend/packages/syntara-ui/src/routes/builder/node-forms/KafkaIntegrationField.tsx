@@ -1,70 +1,80 @@
 import {
   Content,
   ContentVariants,
-  MenuToggle,
   SelectList,
   SelectOption,
   Stack,
   StackItem,
+  type MenuToggleElement,
 } from '@patternfly/react-core'
-import { IntegrationTypeEnum } from '@syntara/contracts'
-import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useCallback, useState, type Ref } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
-import { integrationsFetchClient } from '../../../client'
 import { FormFieldError } from '../../../components/FormFieldError'
 import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
-import { fetchAllPages, MAX_PAGE_SIZE } from '../../../utils/fetchAllPages'
-import { projectIdParam } from '../../../utils/queryParams'
+import { IntegrationRequiredHelper } from '../components/IntegrationRequiredHelper'
+import { TypeaheadMenuToggle } from '../components/TypeaheadMenuToggle'
 
 import type { TriggerFormData } from './triggerFormSchema'
+import { kafkaResourceErrors, type KafkaSubscribeResources } from './useKafkaSubscribeResources'
 
-/** Lists visible, enabled Kafka Integrations; Integration health is not runtime access. */
+/** Integration health describes the management connection, not runtime credential access. */
 export function KafkaIntegrationField({
-  projectId,
   isDisabled,
-}: Readonly<{ projectId?: string; isDisabled: boolean }>) {
+  resources,
+}: Readonly<{ isDisabled: boolean; resources: KafkaSubscribeResources }>) {
   const [isOpen, setIsOpen] = useState(false)
-  const {
-    control,
-    setValue,
-    clearErrors,
-    formState: { errors },
-  } = useFormContext<TriggerFormData>()
+  const [filterText, setFilterText] = useState('')
+  const { control, setValue } = useFormContext<TriggerFormData>()
   const integrationId = useWatch({ control, name: 'integrationId' })
-  const query = useQuery({
-    queryKey: ['kafka-subscribe-integrations', projectId],
-    queryFn: () =>
-      fetchAllPages((cursor) =>
-        integrationsFetchClient.GET('/kafka_integrations', {
-          params: {
-            query: {
-              enabled: true,
-              limit: MAX_PAGE_SIZE,
-              cursor,
-              ...projectIdParam(projectId),
-            },
-          },
-        })
-      ),
-  })
-  const integrations = useMemo(
-    () => query.data?.filter((item) => item.integration_type === IntegrationTypeEnum.KAFKA && item.enabled) ?? [],
-    [query.data]
-  )
+  const { integrations: query, visibleIntegrations: integrations } = resources
   const selected = integrations.find((item) => item.id === integrationId)
-  const staleSelection = Boolean(integrationId && !query.isPending && !query.isError && !selected)
-
-  const integrationError = staleSelection ? 'Select an available Kafka Integration' : errors.integrationId?.message
+  const resourceError = kafkaResourceErrors({ triggerType: '', integrationId }, resources).integrationId
+  const visible = integrations.filter((item) => item.name.toLowerCase().includes(filterText.trim().toLowerCase()))
   const errorId = 'kafka-integration-error'
-
-  const selectionLabel =
-    selected?.name ?? (integrationId ? 'Selected Integration unavailable' : 'Select a Kafka Integration')
-  const toggleLabel = query.isPending ? 'Loading Kafka Integrations…' : selectionLabel
+  const changeIntegration = useCallback(
+    (value: string) => {
+      setValue('integrationId', value, { shouldDirty: true, shouldValidate: true })
+      setValue('runtimeCredentialId', '', { shouldDirty: true, shouldValidate: true })
+    },
+    [setValue]
+  )
+  const renderToggle = useCallback(
+    (ref: Ref<MenuToggleElement>) => (
+      <TypeaheadMenuToggle
+        toggleRef={ref}
+        displayText={selected?.name ?? (integrationId ? 'Selected Integration unavailable' : '')}
+        ariaLabel="Kafka Integration"
+        fieldId="kafka-integration"
+        isOpen={isOpen}
+        isDisabled={isDisabled || query.isError}
+        isPending={query.isPending}
+        hasSelection={Boolean(integrationId)}
+        filterText={filterText}
+        placeholder="Select a Kafka Integration"
+        loadingPlaceholder="Loading Kafka Integrations…"
+        onFilterChange={setFilterText}
+        onClear={() => changeIntegration('')}
+        onToggle={() => setIsOpen(!isOpen)}
+        isInvalid={Boolean(resourceError)}
+        describedBy={resourceError ? errorId : undefined}
+      />
+    ),
+    [
+      selected?.name,
+      integrationId,
+      isOpen,
+      isDisabled,
+      query.isError,
+      query.isPending,
+      filterText,
+      changeIntegration,
+      resourceError,
+    ]
+  )
 
   return (
     <Stack hasGutter>
@@ -81,46 +91,35 @@ export function KafkaIntegrationField({
               id="kafka-integration"
               isOpen={isOpen}
               selected={field.value}
-              onOpenChange={setIsOpen}
+              toggle={renderToggle}
               shouldFocusToggleOnSelect
+              onOpenChange={(open) => {
+                setIsOpen(open)
+                if (!open) setFilterText('')
+              }}
               onSelect={(_event, value) => {
-                if (typeof value !== 'string') return
-                field.onChange(value)
-                setValue('runtimeCredentialId', '', { shouldDirty: true })
-                clearErrors('runtimeCredentialId')
+                if (typeof value !== 'string' || !integrations.some((item) => item.id === value)) return
+                changeIntegration(value)
+                setFilterText('')
                 setIsOpen(false)
               }}
-              toggle={(ref) => (
-                <MenuToggle
-                  ref={ref}
-                  aria-label="Kafka Integration"
-                  aria-invalid={Boolean(integrationError)}
-                  aria-describedby={integrationError ? errorId : undefined}
-                  isFullWidth
-                  isDisabled={isDisabled || query.isPending || query.isError}
-                  isExpanded={isOpen}
-                  onClick={() => setIsOpen(!isOpen)}
-                >
-                  {toggleLabel}
-                </MenuToggle>
-              )}
             >
               <SelectList aria-label="Kafka Integrations">
-                {integrations.map((item) => (
+                {visible.map((item) => (
                   <SelectOption key={item.id} value={item.id} isSelected={item.id === field.value}>
                     {item.name}
                   </SelectOption>
                 ))}
-                {!integrations.length && (
+                {!query.isPending && !query.isError && !visible.length && (
                   <SelectOption value="__empty__" isDisabled>
-                    No Kafka Integrations available
+                    {filterText ? 'No matching Kafka Integrations' : 'No Kafka Integrations available'}
                   </SelectOption>
                 )}
               </SelectList>
             </SynSelect>
           )}
         </SynFormField>
-        <FormFieldError id={errorId} message={integrationError} />
+        <FormFieldError id={errorId} message={resourceError} />
       </StackItem>
       {query.isError && (
         <StackItem>
@@ -131,13 +130,18 @@ export function KafkaIntegrationField({
           />
         </StackItem>
       )}
+      {!query.isPending && !query.isError && !integrations.length && (
+        <StackItem>
+          <IntegrationRequiredHelper
+            integrationLabel="a Kafka Integration"
+            actionLabel="a Kafka Integration can be selected"
+          />
+        </StackItem>
+      )}
       <StackItem>
         <Content component={ContentVariants.p}>
-          Integration validation:{' '}
-          {staleSelection
-            ? 'Selected Integration is unavailable. Select another Integration.'
-            : (selected?.validation_status ?? 'Unknown')}
-          . This describes the managed connection, not the selected runtime credential’s access.
+          Integration validation: {selected?.validation_status ?? 'Unknown'}. This describes the managed connection, not
+          the selected runtime credential’s access.
         </Content>
       </StackItem>
     </Stack>

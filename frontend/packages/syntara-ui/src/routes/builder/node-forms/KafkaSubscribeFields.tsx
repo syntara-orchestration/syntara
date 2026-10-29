@@ -5,6 +5,7 @@ import { useFormContext, useWatch } from 'react-hook-form'
 import { FormLabelWithHelp } from '../../../components/FormLabelWithHelp'
 import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynTextField } from '../../../components/forms/SynTextField'
+import { useCredentialPermissions } from '../../configuration/credentials/useCredentialPermissions'
 import { CredentialSelector } from '../components/CredentialSelector'
 import { useIsVersionView } from '../VersionViewContext'
 
@@ -24,6 +25,7 @@ export function KafkaSubscribeFields({
   projectId,
 }: Readonly<{ workflowId?: string | null; projectId?: string }>) {
   const isReadOnly = useIsVersionView()
+  const { canCreate } = useCredentialPermissions({ resourceProject: projectId })
   const resources = use(KafkaSubscribeResourceContext)
   const { control, setValue } = useFormContext<TriggerFormData>()
   const values = useWatch({ control })
@@ -61,7 +63,7 @@ export function KafkaSubscribeFields({
         <fieldset disabled={isReadOnly} className={nodeFormStyles.disabledFieldset}>
           <Stack hasGutter>
             <StackItem>
-              <KafkaIntegrationField projectId={projectId} isDisabled={isReadOnly} />
+              {resources && <KafkaIntegrationField resources={resources} isDisabled={isReadOnly} />}
             </StackItem>
             <StackItem>
               <SynFormField<TriggerFormData, 'runtimeCredentialId'>
@@ -81,7 +83,8 @@ export function KafkaSubscribeFields({
                     label="Kafka runtime credential"
                     fieldId="kafka-runtime-credential"
                     isRequired
-                    allowCreate={false}
+                    isSearchable
+                    allowCreate={canCreate && !isReadOnly}
                     isDisabled={isReadOnly || !values.integrationId}
                     errorMessage={resourceErrors.runtimeCredentialId ?? fieldState.error?.message}
                     helpText="Used to authenticate this subscription to Kafka. Select a Kafka credential explicitly; the Integration management credential is not substituted. This does not select the workflow execution identity."
