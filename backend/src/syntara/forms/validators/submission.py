@@ -1,7 +1,8 @@
 """Form submission validation and coercion.
 
 Validates submitted form data against a FormDefinition, applying type coercion
-and enforcing required fields and option membership constraints.
+and enforcing required fields and option membership constraints while
+normalizing explicit empty values to the field's output type.
 """
 
 from __future__ import annotations
@@ -90,7 +91,8 @@ def validate_form_submission(
         submitted: Raw submitted data (never mutated)
 
     Returns:
-        Cleaned and coerced data ready for the workflow namespace
+        Cleaned and coerced data ready for the workflow namespace. Explicitly
+        submitted empty values are normalized to the field's output type.
 
     Raises:
         FormDataValidationError: If validation fails (carries all field errors)
@@ -103,16 +105,14 @@ def validate_form_submission(
     for field in form.fields:
         raw = submitted.get(field.value_name, _MISSING)
 
-        # Step 2: Empty normalization (except checkbox - False is real)
-        if not isinstance(field, CheckboxField) and _is_empty(raw):
-            raw = _MISSING
-
-        # Step 3: Apply default if absent
+        # Step 2: Apply defaults only when the key is absent. An explicitly
+        # submitted empty value clears the field instead of selecting its default.
         if raw is _MISSING and field.default is not None:
             raw = field.default
 
-        # Step 4: Check required
-        if raw is _MISSING:
+        # Step 3: Required fields must resolve to a non-empty value. Optional
+        # absent or explicitly empty fields get a type-compatible empty output.
+        if raw is _MISSING or _is_empty(raw):
             if field.required:
                 errors.append(
                     FormFieldError(
@@ -122,10 +122,11 @@ def validate_form_submission(
                         message="This field is required",
                     )
                 )
-            # Optional and absent → omit key entirely (not None)
+            else:
+                cleaned[field.value_name] = _empty_value_for_field(field)
             continue
 
-        # Step 5: Coerce to correct type
+        # Step 4: Coerce to correct type
         try:
             coerced = coerce_field(field, raw)
         except (TypeError, ValueError) as exc:
@@ -139,7 +140,7 @@ def validate_form_submission(
             )
             continue
 
-        # Step 5b: A required checkbox must be checked (terms-of-service pattern).
+        # Step 4b: A required checkbox must be checked (terms-of-service pattern).
         # Distinct from "required": CheckboxField.default is a concrete False, so
         # the default always fills an absent value and the required check above
         # never fires for a checkbox. An unticked box is reported here instead.
@@ -154,7 +155,7 @@ def validate_form_submission(
             )
             continue
 
-        # Step 6: Check option membership for dropdowns/multi-selects
+        # Step 5: Check option membership for dropdowns/multi-selects
         option_error = _check_option_membership(field, coerced)
         if option_error is not None:
             errors.append(option_error)
@@ -182,12 +183,27 @@ def validate_form_submission(
 
 
 def _is_empty(value: Any) -> bool:  # noqa: ANN401
-    """Check if a value should be treated as absent.
+    """Check if a value is empty for required-field validation.
 
-    Empty string, empty list, and None are all treated as absent.
-    This matches HTML form behavior where empty text inputs post as "".
+    Empty string, empty list, and None are empty. Optional fields normalize
+    them to a field-compatible output value; required fields reject them.
     """
     return value in ("", [], None)
+
+
+def _empty_value_for_field(field: FormField) -> Any:  # noqa: ANN401
+    """Return the canonical empty output compatible with a form field type."""
+    match field:
+        case TextField() | TextAreaField() | MaskedTextField() | EmailField() | DateField():
+            return ""
+        case NumberField() | DropdownField():
+            return None
+        case CheckboxField():
+            return False
+        case MultiSelectField():
+            return []
+        case _:
+            assert_never(field)
 
 
 def coerce_field(field: FormField, raw: Any) -> Any:  # noqa: ANN401

@@ -127,6 +127,63 @@ class TestFormPromptSubmitAPI:
         assert data["responded_at"] is not None
         assert data["signal_delivery_error"] is None
 
+    async def test_submit_includes_typed_empty_outputs_for_omitted_optional_fields(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_project_id: UUID,
+    ) -> None:
+        prompt = await _create_prompt(
+            test_db_session,
+            test_project_id,
+            form_definition={
+                "fields": [
+                    {"value_name": "name", "type": "text", "label": "Name"},
+                    {"value_name": "count", "type": "number", "label": "Count"},
+                    {"value_name": "start", "type": "date", "label": "Start"},
+                    {
+                        "value_name": "region",
+                        "type": "dropdown",
+                        "label": "Region",
+                        "options": {
+                            "source": "static",
+                            "values": [{"display_label": "US", "value": "us"}],
+                        },
+                    },
+                    {
+                        "value_name": "tags",
+                        "type": "multi_select",
+                        "label": "Tags",
+                        "options": {
+                            "source": "static",
+                            "values": [{"display_label": "Blue", "value": "blue"}],
+                        },
+                    },
+                    {"value_name": "agree", "type": "checkbox", "label": "Agree"},
+                ]
+            },
+        )
+
+        with patch("syntara.forms.clients.workflow_client.WorkflowApiClient") as client_class:
+            client = client_class.return_value.__aenter__.return_value
+            client.send_form_signal = AsyncMock()
+            response = await auth_client.post(
+                f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
+                json={"response_data": {}},
+            )
+
+        expected_response: dict[str, Any] = {
+            "name": "",
+            "count": None,
+            "start": "",
+            "region": None,
+            "tags": [],
+            "agree": False,
+        }
+        assert response.status_code == 200
+        assert response.json()["response_data"] == expected_response
+        assert client.send_form_signal.await_args.kwargs["form_response"]["response_data"] == expected_response
+
     async def test_submit_persists_response(
         self,
         auth_client: AsyncClient,

@@ -157,7 +157,7 @@ def test_required_field_errors_allow_valid_submission(
     final = wait_for_activity_outputs(syntara_api, execution_id, {"prompt"})
     activities = {activity.activity_id: activity for activity in (final.activities or [])}
     prompt_output = activity_output(activities["prompt"])
-    assert prompt_output["response_data"] == {"required_text": "provided"}
+    assert prompt_output["response_data"] == {"required_text": "provided", "optional_number": None}
 
 
 def test_invalid_field_values_are_rejected(
