@@ -74,6 +74,6 @@ Test executions always use `Workflow.current_version` (the latest canvas state),
 |------|-------------|
 | `workflows/services/execution_service.py` | `create_execution()`, `create_test_execution()`, `_start_temporal_and_create_execution()` |
 | `workflows/models/execution.py` | `ExecutionCreate`, `TestExecutionCreate`, `PreResolvedNodeOutput` models |
-| `workflows/workflow_engine/models/workflow_definition.py` | `resolve_trigger_node()` |
+| `workflow_core/models.py` | `resolve_trigger_node()` |
 | `workflows/router.py` | `test_workflow_node()` endpoint (POST /workflows/{id}/test) |
 | `workflows/executions_router.py` | `create_execution()` endpoint (POST /executions) |

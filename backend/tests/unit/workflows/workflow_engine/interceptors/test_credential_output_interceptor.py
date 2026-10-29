@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine.interceptors.credential_output_interceptor import (
+from syntara.workflow_runtime.engines.temporal.interceptors.credential_output_interceptor import (
     _CredentialOutputActivityInterceptor,
     _input_has_credentials,
 )

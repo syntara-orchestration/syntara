@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine.activities.common import ActivityExecutionError
-from syntara.workflows.workflow_engine.activities.http_request_activity import (
+from syntara.workflow_runtime.engines.temporal.activities.common import ActivityExecutionError
+from syntara.workflow_runtime.engines.temporal.activities.http_request_activity import (
     _add_credential_auth_headers,
     _resolve_httpx_params,
     execute_http_request_activity,

@@ -23,7 +23,7 @@ from syntara.audit.models.audit_event import (
 )
 from syntara.audit.models.structured_data import AuditContextData
 from syntara.core.models.principal import PrincipalType
-from syntara.workflows.workflow_engine.activities.aap_common import AAP_JOB_TERMINAL_STATUSES
+from syntara.workflow_runtime.activity_metadata import AAP_JOB_TERMINAL_STATUSES
 
 if TYPE_CHECKING:
     from uuid import UUID

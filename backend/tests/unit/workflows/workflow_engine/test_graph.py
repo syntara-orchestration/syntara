@@ -13,8 +13,8 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph, _parse_node_settings
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph, _parse_node_settings
+from syntara.workflow_core.models import (
     NodeSettingsBase,
     NodeSettingsCof,
     NodeSettingsCofDisabled,

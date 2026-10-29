@@ -10,7 +10,7 @@ import pytest
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
-from syntara.workflows.workflow_engine.activities.script_activity import (
+from syntara.workflow_runtime.engines.temporal.activities.script_activity import (
     SAFE_ENV_ALLOWLIST,
     ScriptExecutionError,
     _communicate_limited,
@@ -23,7 +23,7 @@ from syntara.workflows.workflow_engine.activities.script_activity import (
     execute_script_activity,
 )
 
-ACTIVITY_INFO_PATH = "syntara.workflows.workflow_engine.activities.script_activity.activity.info"
+ACTIVITY_INFO_PATH = "syntara.workflow_runtime.engines.temporal.activities.script_activity.activity.info"
 
 
 @pytest.fixture(autouse=True)
@@ -747,7 +747,7 @@ class TestSanitizeEnvValue:
 
     def test_exceeds_max_length_raises(self) -> None:
         from syntara.core.exceptions import SafeValueError
-        from syntara.workflows.workflow_engine import constants
+        from syntara.workflow_runtime.engines.temporal import constants
 
         with pytest.raises(SafeValueError, match="maximum length"):
             _sanitize_env_value("x" * (constants.MAX_ENV_VAR_LENGTH + 1))
@@ -797,7 +797,7 @@ class TestGenericExceptionHandler:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.script_activity.asyncio.create_subprocess_exec",
+                "syntara.workflow_runtime.engines.temporal.activities.script_activity.asyncio.create_subprocess_exec",
                 side_effect=subprocess.SubprocessError("spawn failed"),
             ),
             pytest.raises(ApplicationError) as exc_info,
@@ -818,12 +818,12 @@ class TestScriptActivityTimeoutAndInputs:
         mock_process._transport = None
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.script_activity.asyncio.create_subprocess_exec",
+                "syntara.workflow_runtime.engines.temporal.activities.script_activity.asyncio.create_subprocess_exec",
                 new_callable=AsyncMock,
                 return_value=mock_process,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.script_activity._communicate_limited",
+                "syntara.workflow_runtime.engines.temporal.activities.script_activity._communicate_limited",
                 new_callable=AsyncMock,
                 side_effect=TimeoutError(),
             ),
@@ -1103,21 +1103,21 @@ class TestCgroupMemoryLimit:
 
     def test_returns_none_when_no_cgroup_files(self) -> None:
         """Returns None when cgroup files don't exist."""
-        with patch("syntara.workflows.workflow_engine.activities.script_activity.Path") as mock_path:
+        with patch("syntara.workflow_runtime.engines.temporal.activities.script_activity.Path") as mock_path:
             mock_path.return_value.read_text.side_effect = FileNotFoundError
             result = _get_cgroup_memory_limit()
         assert result is None
 
     def test_returns_none_for_max_value(self) -> None:
         """Returns None when cgroup reports 'max' (no limit)."""
-        with patch("syntara.workflows.workflow_engine.activities.script_activity.Path") as mock_path:
+        with patch("syntara.workflow_runtime.engines.temporal.activities.script_activity.Path") as mock_path:
             mock_path.return_value.read_text.return_value = "max\n"
             result = _get_cgroup_memory_limit()
         assert result is None
 
     def test_returns_integer_limit(self) -> None:
         """Returns the parsed integer limit."""
-        with patch("syntara.workflows.workflow_engine.activities.script_activity.Path") as mock_path:
+        with patch("syntara.workflow_runtime.engines.temporal.activities.script_activity.Path") as mock_path:
             mock_path.return_value.read_text.return_value = "1073741824\n"
             result = _get_cgroup_memory_limit()
         assert result == 1073741824
@@ -1147,7 +1147,7 @@ class TestMemoryLimitIntegration:
     async def test_cgroup_limit_injects_preamble(self) -> None:
         """When cgroup limit exists, script runs with memory limit and still works."""
         with patch(
-            "syntara.workflows.workflow_engine.activities.script_activity._get_cgroup_memory_limit",
+            "syntara.workflow_runtime.engines.temporal.activities.script_activity._get_cgroup_memory_limit",
             return_value=1_073_741_824,
         ):
             result = await execute_script_activity(
@@ -1199,7 +1199,7 @@ class TestScriptNodesGate:
         try:
             with (
                 patch(
-                    "syntara.workflows.workflow_engine.activities.script_activity.asyncio.create_subprocess_exec",
+                    "syntara.workflow_runtime.engines.temporal.activities.script_activity.asyncio.create_subprocess_exec",
                 ) as mock_exec,
                 pytest.raises(ApplicationError),
             ):

@@ -30,7 +30,7 @@ import pytest
 from syntara.core.config.base import get_settings
 
 if TYPE_CHECKING:
-    from syntara.workflows.workflow_engine.services.temporal_worker import TemporalWorkerService
+    from syntara.workflow_runtime.engines.temporal.services.temporal_worker import TemporalWorkerService
 
 
 def _free_port() -> int:
@@ -105,7 +105,7 @@ class TestWorkerMetricsServer:
         """
         import asyncio
 
-        from syntara.workflows.worker_lifecycle import run_worker
+        from syntara.workflow_runtime.workers.worker_lifecycle import run_worker
 
         captured_port: list[int] = []
 
@@ -120,16 +120,16 @@ class TestWorkerMetricsServer:
 
         with (
             patch(
-                "syntara.workflows.worker_lifecycle.prometheus_client.start_http_server",
+                "syntara.workflow_runtime.workers.worker_lifecycle.prometheus_client.start_http_server",
                 side_effect=_fake_start_http_server,
             ),
-            patch("syntara.workflows.worker_lifecycle.set_runtime_settings"),
-            patch("syntara.workflows.worker_lifecycle.apply_runtime_log_level", new_callable=AsyncMock),
+            patch("syntara.workflow_runtime.workers.worker_lifecycle.set_runtime_settings"),
+            patch("syntara.workflow_runtime.workers.worker_lifecycle.apply_runtime_log_level", new_callable=AsyncMock),
             patch(
-                "syntara.workflows.worker_lifecycle.get_runtime_settings",
+                "syntara.workflow_runtime.workers.worker_lifecycle.get_runtime_settings",
                 return_value=AsyncMock(stop_watching=AsyncMock(), start_watching=AsyncMock()),
             ),
-            patch("syntara.workflows.worker_lifecycle.discover_and_register_all_handlers"),
+            patch("syntara.workflow_runtime.workers.worker_lifecycle.discover_and_register_all_handlers"),
         ):
             # Create the coroutine outside pytest.raises so only asyncio.run
             # (the single raising call) is inside the block — satisfies S5778.
