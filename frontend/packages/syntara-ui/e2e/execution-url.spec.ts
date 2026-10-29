@@ -21,7 +21,7 @@ test.describe('Execution URL unification', () => {
         .catch(() => false)
       expect(didNavigate, 'Workflow execution failed — execution engine may not be running').toBeTruthy()
 
-      await expect(app.getByRole('button', { name: 'Back to editor' })).toBeVisible()
+      await expect(app.getByRole('link', { name: 'Back to editor' })).toBeVisible()
     } finally {
       await deleteWorkflow(app, workflowName)
     }

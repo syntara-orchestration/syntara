@@ -21,6 +21,7 @@ import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynListPanel, SynListPanelTabs } from '../../../components/panels/list/SynListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynLink } from '../../../components/SynLink'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
@@ -106,7 +107,6 @@ function UserDetailsTab({
   user: User
   identities: Pick<UserIdentity, 'provider_name' | 'identity_provider_id'>[]
 }) {
-  const navigate = useNavigate()
   const { first_name, last_name } = user
 
   const isLocal = user.auth_type === AUTH_TYPE_LOCAL
@@ -156,21 +156,15 @@ function UserDetailsTab({
                 [...uniqueProviders.entries()]
                   .sort(([, a], [, b]) => a.localeCompare(b))
                   .map(([id, name]) => (
-                    <Label
-                      key={id}
-                      isCompact
-                      onClick={() =>
-                        detachPromise(
-                          navigate({
-                            to: AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
-                              ':providerId',
-                              id
-                            ).replace('/:tab?', ''),
-                          })
-                        )
-                      }
-                    >
-                      {name}
+                    <Label key={id} isCompact>
+                      <SynLink
+                        to={AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
+                          ':providerId',
+                          id
+                        ).replace('/:tab?', '')}
+                      >
+                        {name}
+                      </SynLink>
                     </Label>
                   ))}
             </LabelGroup>
@@ -383,8 +377,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
 
   const navigateBack = () =>
     detachPromise(navigate({ to: isMyProfile ? AppRoute.Workflows.Root : AppRoute.AccessManagement.Users }))
-  const navigateEdit = () =>
-    detachPromise(navigate({ to: AppRoute.AccessManagement.EditUser.replace(':userId', userId ?? '') }))
+  const editPath = AppRoute.AccessManagement.EditUser.replace(':userId', userId ?? '')
 
   const handleDelete = useDeleteAction({
     deleteFn: deleteUser,
@@ -408,7 +401,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
     isMeQueryPending: meQuery.isPending,
     hasUserQueryError: !!userQuery.error,
     queryState,
-    navigateBack,
+    backTo: isMyProfile ? AppRoute.Workflows.Root : AppRoute.AccessManagement.Users,
     refetchUser,
   })
   if (earlyShell) return earlyShell
@@ -438,7 +431,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
           <UserDetailToolbar
             permissions={userPermissions}
             showKebabMenu={!userData.is_builtin}
-            onEdit={navigateEdit}
+            editTo={editPath}
             onRevoke={() => revokeDialog.open(userData)}
             onDelete={() => deleteDialog.open(userData)}
           />

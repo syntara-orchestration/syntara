@@ -335,6 +335,7 @@ export default tseslint.config(
           allowedFiles: ['**/useFileUploadWithProgress.ts', '**/useFileStorageStatus.ts', '**/e2e/global-setup.ts'],
         },
       ],
+      'syntara/no-route-navigation-callbacks': 'error',
       'syntara/prefer-pf-list-components': 'error',
       'syntara/prefer-pf-text-components': 'error',
       'syntara/use-design-tokens-not-hardcoded': 'error',

@@ -20,8 +20,10 @@ vi.mock('../../hooks/routing/useLocation', () => ({
 }))
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router')
+  const { MockLink } = await import('../../test/setup')
   return {
     ...actual,
+    Link: MockLink,
     useNavigate: () => mockNavigate,
     useParams: vi.fn(() => ({ executionId: 'exec-123' })),
     useRouterState: vi.fn(() => ''),
@@ -476,8 +478,7 @@ describe('ExecutionDetail', () => {
     )
   })
 
-  it('navigates to workflow builder when Back to editor button is clicked', async () => {
-    const user = userEvent.setup()
+  it('links to the workflow builder from Back to editor', () => {
     const queryClient = new QueryClient()
     render(
       <QueryClientProvider client={queryClient}>
@@ -485,10 +486,7 @@ describe('ExecutionDetail', () => {
       </QueryClientProvider>
     )
 
-    const backButton = screen.getByRole('button', { name: 'Back to editor' })
-    await user.click(backButton)
-
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/workflow-builder/$workflowId', params: { workflowId: 'wf-456' } })
+    expect(screen.getByRole('link', { name: 'Back to editor' })).toHaveAttribute('href', '/workflow-builder/wf-456')
   })
 
   it('preserves history panel state when navigating to different execution', async () => {

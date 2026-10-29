@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { AlertProvider } from '../../../providers/alerts'
-import { routerTestState } from '../../../test/setup'
 import { accessClient, accessFetchClient } from '../../access/accessClient'
 import { useProjectPermissions } from '../useProjectPermissions'
 
@@ -61,12 +60,10 @@ vi.mock('./ProjectWorkflowsTab', () => ({
 }))
 
 vi.mock('./ProjectNotFoundState', () => ({
-  ProjectNotFoundState: ({ onBack, onRetry }: { onBack: () => void; onRetry: () => void }) => (
+  ProjectNotFoundState: ({ backTo, onRetry }: { backTo: string; onRetry: () => void }) => (
     <div>
       <span>Project not found</span>
-      <button type="button" onClick={onBack}>
-        Back to projects
-      </button>
+      <a href={backTo}>Back to projects</a>
       <button type="button" onClick={onRetry}>
         Retry
       </button>
@@ -260,7 +257,10 @@ describe('ProjectDetail', () => {
     render(<ProjectDetail />, { wrapper })
 
     expect(screen.getByText('Project not found')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Back to projects' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to projects' })).toHaveAttribute(
+      'href',
+      '/system-administration/access-management/projects'
+    )
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
 
@@ -327,8 +327,7 @@ describe('ProjectDetail', () => {
     expect(mockRefetch).toHaveBeenCalled()
   })
 
-  it('calls navigate when back button is clicked in not-found state', async () => {
-    const user = userEvent.setup()
+  it('links back to the projects list from the not-found state', () => {
     vi.mocked(accessClient.useQuery).mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -339,9 +338,10 @@ describe('ProjectDetail', () => {
 
     render(<ProjectDetail />, { wrapper })
 
-    await user.click(screen.getByRole('button', { name: 'Back to projects' }))
-
-    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/system-administration/access-management/projects' })
+    expect(screen.getByRole('link', { name: 'Back to projects' })).toHaveAttribute(
+      'href',
+      '/system-administration/access-management/projects'
+    )
   })
 
   it('renders "-" for description when project has no description', () => {

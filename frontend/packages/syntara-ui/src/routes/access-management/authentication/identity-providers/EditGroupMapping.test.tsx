@@ -387,7 +387,7 @@ describe('EditGroupMapping', () => {
     })
   })
 
-  it('navigates back to authentication from not-found empty state', async () => {
+  it('links back to authentication from not-found empty state', async () => {
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -397,15 +397,13 @@ describe('EditGroupMapping', () => {
       refetch: vi.fn(),
     })
 
-    const user = userEvent.setup()
     render(<EditGroupMapping />, { wrapper })
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Back to identity providers' })).toBeInTheDocument()
-    })
-    await user.click(screen.getByRole('button', { name: 'Back to identity providers' }))
-    expect(routerTestState.navigate).toHaveBeenCalledWith({
-      to: '/system-administration/authentication',
+      expect(screen.getByRole('link', { name: 'Back to identity providers' })).toHaveAttribute(
+        'href',
+        '/system-administration/authentication'
+      )
     })
   })
 

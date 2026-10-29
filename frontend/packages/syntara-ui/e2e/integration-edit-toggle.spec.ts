@@ -37,8 +37,8 @@ test.describe('Integration Edit, Delete & Enable/Disable', () => {
       await row.getByRole('link', { name: originalName }).click()
       await expect(app.getByRole('heading', { name: originalName })).toBeVisible({ timeout: 15_000 })
 
-      // Open the edit form via the Edit button
-      await app.getByRole('button', { name: /Edit/i }).click()
+      // Open the edit form via the Edit integration link
+      await app.getByRole('link', { name: 'Edit integration' }).click()
 
       // Verify the name field is pre-populated
       const nameInput = app.getByRole('textbox', { name: /name/i })

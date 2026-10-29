@@ -29,6 +29,7 @@ import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynLink } from '../../../components/SynLink'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
 import { useSynForm } from '../../../hooks/useSynForm'
@@ -195,7 +196,7 @@ function EditIntegrationFormFields({
   )
 }
 
-function EditFormFooter({ isSaving, onCancel }: Readonly<{ isSaving: boolean; onCancel: () => void }>) {
+function EditFormFooter({ isSaving, cancelTo }: Readonly<{ isSaving: boolean; cancelTo: string }>) {
   return (
     <ActionGroup>
       <Button
@@ -207,9 +208,13 @@ function EditFormFooter({ isSaving, onCancel }: Readonly<{ isSaving: boolean; on
       >
         Save integration
       </Button>
-      <Button variant="link" onClick={isSaving ? undefined : onCancel} isAriaDisabled={isSaving}>
-        Cancel
-      </Button>
+      {isSaving ? (
+        <Button variant="link" isAriaDisabled>
+          Cancel
+        </Button>
+      ) : (
+        <SynLink to={cancelTo}>Cancel</SynLink>
+      )}
     </ActionGroup>
   )
 }
@@ -398,7 +403,7 @@ export function EditIntegrationForm() {
           isFullHeight
           isScrollable
           panelMainBodyProps={{ className: styles.panelBody }}
-          footer={<EditFormFooter isSaving={isSaving} onCancel={() => detachPromise(navigate({ to: detailPath }))} />}
+          footer={<EditFormFooter isSaving={isSaving} cancelTo={detailPath} />}
         >
           <Form
             id="edit-integration-form"
