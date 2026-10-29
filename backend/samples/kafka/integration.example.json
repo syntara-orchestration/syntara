@@ -1,0 +1,12 @@
+{
+  "name": "Disposable local Kafka",
+  "integration_type": "kafka",
+  "configuration": {
+    "integration_type": "kafka",
+    "bootstrap_servers": ["kafka:9092"],
+    "sasl_mechanism": "PLAIN",
+    "allow_http": false,
+    "insecure_skip_tls_verify": false,
+    "ca_certificate": null
+  }
+}

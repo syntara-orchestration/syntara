@@ -1482,6 +1482,11 @@ class EventStreamSettings(BaseSettings):
     that complete workflow start arguments fit downstream transport limits.
     """
 
+    eventstream_enabled: bool = Field(
+        default=False,
+        description="Enable the standalone control-plane event subscription worker",
+    )
+
     event_worker_heartbeat_interval_seconds: int = Field(
         default=EventPlacementDefaults.HEARTBEAT_INTERVAL_SECONDS,
         gt=0,
@@ -1531,7 +1536,7 @@ class EventStreamSettings(BaseSettings):
     event_processing_concurrency: int = Field(
         default=EventRunnerDefaults.PROCESSING_CONCURRENCY,
         gt=0,
-        description="Maximum concurrent downstream processing operations per subscription",
+        description="Maximum concurrent downstream processing operations shared by consumers and recovery per worker",
     )
     event_fetch_timeout_ms: int = Field(
         default=EventRunnerDefaults.FETCH_TIMEOUT_MS,

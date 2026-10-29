@@ -39,7 +39,12 @@ class SubscriptionSupervisor:
     """
 
     def __init__(
-        self, subscription_id: UUID, runner_factory: SubscriptionRunnerFactory, *, placement: PlacementAuthority
+        self,
+        subscription_id: UUID,
+        runner_factory: SubscriptionRunnerFactory,
+        *,
+        placement: PlacementAuthority,
+        startup_timeout_seconds: float | None = None,
     ) -> None:
         """Keep retry/circuit state local and reuse the existing drain deadline."""
         if placement.subscription_id != subscription_id:
@@ -49,6 +54,7 @@ class SubscriptionSupervisor:
         self._factory = runner_factory
         self._placement = placement
         self._placement_task: asyncio.Task[None] | None = None
+        self._startup_timeout = startup_timeout_seconds
         self._drain_timeout = get_settings().event_drain_timeout_seconds
         self._lock = asyncio.Lock()
         self._desired: SubscriptionSnapshot | None = None
@@ -68,6 +74,7 @@ class SubscriptionSupervisor:
         self._failure_count = 0
         self._retry_at: datetime | None = None
         self._stop_retry_at: datetime | None = None
+        self._retained_content_gate = False
 
     @staticmethod
     def _active(snapshot: SubscriptionSnapshot) -> bool:
@@ -76,7 +83,7 @@ class SubscriptionSupervisor:
     @property
     def status(self) -> SubscriptionRuntimeStatus:
         """Distinguish requested state, applied binding, and unfinished convergence."""
-        state, reason, permanent = RuntimeState.STOPPED, None, False
+        state, reason, permanent = RuntimeState.STOPPED, None, self._retained_content_gate
         circuit = (
             self._failure is not None
             and self._failure.transient
@@ -86,7 +93,9 @@ class SubscriptionSupervisor:
             state = RuntimeState.DRAINING
             reason = RuntimeFailureCode.STOP_INCOMPLETE.value if self._stop_retry_at is not None else None
         elif not self._closed:
-            if self._desired is not None and self._active(self._desired) and not self._placement.is_current():
+            if self._retained_content_gate:
+                state, reason = RuntimeState.BLOCKED, "activity_log_unavailable"
+            elif self._desired is not None and self._active(self._desired) and not self._placement.is_current():
                 state = RuntimeState.DRAINING if self._placement.local_in_use else RuntimeState.BLOCKED
                 reason = RuntimeFailureCode.PLACEMENT_LOST.value
             elif self._local_contention and self._desired is not None and self._active(self._desired):
@@ -99,7 +108,11 @@ class SubscriptionSupervisor:
                 state = RuntimeState.STARTING
             elif self._runner is not None:
                 observed = self._runner.status
-                state, reason, permanent = observed.state, observed.reason, observed.permanent_content_error
+                state, reason, permanent = (
+                    observed.state,
+                    observed.reason,
+                    observed.permanent_content_error or self._retained_content_gate,
+                )
         return SubscriptionRuntimeStatus(
             subscription_id=self._subscription_id,
             desired_revision=RuntimeRevision.from_snapshot(self._desired) if self._desired is not None else None,
@@ -238,9 +251,13 @@ class SubscriptionSupervisor:
                 if not await self._stop_current(deadline=deadline):
                     return
                 continue
-            if not active or (
-                self._failure is not None
-                and (not self._failure.transient or (self._retry_at is not None and _utc_now() < self._retry_at))
+            if (
+                not active
+                or self._retained_content_gate
+                or (
+                    self._failure is not None
+                    and (not self._failure.transient or (self._retry_at is not None and _utc_now() < self._retry_at))
+                )
             ):
                 return
             await self._start_runner(snapshot, revision)
@@ -278,19 +295,20 @@ class SubscriptionSupervisor:
             self._starting = False
 
     async def _open_runner(self, snapshot: SubscriptionSnapshot, revision: RuntimeRevision) -> None:
-        runner = await self._factory(snapshot)
-        self._runner, self._runner_revision = runner, revision
-        if runner.snapshot != snapshot:
-            raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE)
-        runner.bind_placement(self._placement.is_current)
-        if self._closed or self._desired != snapshot or not self._placement.is_current():
-            return
-        await runner.start()
-        if self._closed or self._desired != snapshot or not self._placement.is_current():
-            return
-        if not runner.open_admission():
-            raise SubscriptionRuntimeError(RuntimeFailureCode.PLACEMENT_LOST)
-        self._applied = revision
+        async with asyncio.timeout(self._startup_timeout):
+            runner = await self._factory(snapshot)
+            self._runner, self._runner_revision = runner, revision
+            if runner.snapshot != snapshot:
+                raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE)
+            runner.bind_placement(self._placement.is_current)
+            if self._closed or self._desired != snapshot or not self._placement.is_current():
+                return
+            await runner.start()
+            if self._closed or self._desired != snapshot or not self._placement.is_current():
+                return
+            if not runner.open_admission():
+                raise SubscriptionRuntimeError(RuntimeFailureCode.PLACEMENT_LOST)
+            self._applied = revision
 
     async def _serve(self, runner: SubscriptionRunner) -> None:
         try:
@@ -314,6 +332,7 @@ class SubscriptionSupervisor:
             self._stop_retry_at = None
             self._placement.local_stopped(self)
             return True
+        self._retained_content_gate |= runner.status.permanent_content_error
         if (
             not force
             and self._stop_retry_at is not None
@@ -376,7 +395,11 @@ class SubscriptionSupervisor:
             # Always attempt client stop, even if drain exhausted its budget or
             # delays cancellation. The observer remains bounded, and this task
             # retains the local reservation until BOTH operations have settled.
-            await runner.stop()
+            self._retained_content_gate |= runner.status.permanent_content_error
+            try:
+                await runner.stop()
+            finally:
+                self._retained_content_gate |= runner.status.permanent_content_error
         finally:
             await asyncio.gather(draining, return_exceptions=True)
         if serving is not None:
