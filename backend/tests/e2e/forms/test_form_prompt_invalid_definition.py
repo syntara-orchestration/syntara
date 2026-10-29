@@ -28,7 +28,7 @@ from syntara_api_client.models.workflow_validate_request_workflow_definition imp
 )
 
 from ._helpers import (
-    assert_and_get_with_502_skip,
+    assert_and_get_response,
     assert_definition_invalid,
     assert_problem_response,
 )
@@ -96,7 +96,7 @@ def _create_workflow(
             project_id=first_project_id,
         )
     )
-    workflow = assert_and_get_with_502_skip(response)
+    workflow = assert_and_get_response(response)
     assert response.status_code == HTTPStatus.CREATED
     assert isinstance(workflow, WorkflowRead)
     cleanup_workflows.append(workflow.id)
@@ -140,7 +140,7 @@ def test_create_saves_invalid_form_definition_and_persists_issue_flag(
     assert "validation failed" not in finding.message.lower()
     assert ".fields.0" in (finding.field_path or "")
 
-    saved = assert_and_get_with_502_skip(syntara_api.workflows.get(workflow_id=workflow.id))
+    saved = assert_and_get_response(syntara_api.workflows.get(workflow_id=workflow.id))
     assert saved.has_validation_issues is True
 
 
@@ -161,7 +161,7 @@ def test_validate_returns_rfc9457_details_and_accepts_a_valid_form(
     assert any(finding["node_id"] == "prompt" for finding in problem["validation_result"]["findings"])
 
     valid = _validate_definition(syntara_api, unique_name(_NAME_PREFIX), [_VALID_TEXT_FIELD])
-    validation_result = assert_and_get_with_502_skip(valid)
+    validation_result = assert_and_get_response(valid)
     assert valid.status_code == HTTPStatus.OK
     assert isinstance(validation_result, ValidationResult)
     assert validation_result.is_valid is True
@@ -197,7 +197,7 @@ def test_publish_rejects_invalid_form_definition_and_it_cannot_run_as_published(
     assert problem["title"] == "Workflow Publish Blocked"
     assert any(finding["category"] == "form_prompt_configuration" for finding in _prompt_findings(problem))
 
-    saved = assert_and_get_with_502_skip(syntara_api.workflows.get(workflow_id=workflow.id))
+    saved = assert_and_get_response(syntara_api.workflows.get(workflow_id=workflow.id))
     assert saved.published_version_id is None
     assert saved.has_validation_issues is True
 
@@ -447,8 +447,9 @@ def test_validate_collects_multiple_form_field_defects_in_field_order(
             "type": "date",
             "value_name": "when",
             "label": "When",
-            "include_time": True,
-            "include_timezone": False,
+            "include_date": True,
+            "include_time": False,
+            "include_timezone": True,
         },
         {
             "type": "dropdown",
@@ -502,7 +503,7 @@ def test_update_to_invalid_form_definition_flips_durable_issue_flag(
         workflow_id=workflow.id,
         body=WorkflowUpdate(workflow_definition=invalid_definition),
     )
-    updated = assert_and_get_with_502_skip(update)
+    updated = assert_and_get_response(update)
     assert update.status_code == HTTPStatus.OK
     assert isinstance(updated, WorkflowReadWithVersion)
     assert updated.has_validation_issues is True
@@ -514,7 +515,7 @@ def test_update_to_invalid_form_definition_flips_durable_issue_flag(
     assert update_findings[0].category.value == "form_prompt_configuration"
     assert update_findings[0].message
 
-    saved = assert_and_get_with_502_skip(syntara_api.workflows.get(workflow_id=workflow.id))
+    saved = assert_and_get_response(syntara_api.workflows.get(workflow_id=workflow.id))
     assert saved.has_validation_issues is True
 
     publish = syntara_api.workflows.publish_version(
@@ -546,7 +547,7 @@ def test_valid_multi_field_form_definition_can_be_published(
     assert workflow.has_validation_issues is False
 
     valid_response = _validate_definition(syntara_api, name, ALL_SUPPORTED_FORM_FIELDS)
-    valid_result = assert_and_get_with_502_skip(valid_response)
+    valid_result = assert_and_get_response(valid_response)
     assert valid_response.status_code == HTTPStatus.OK
     assert isinstance(valid_result, ValidationResult)
     assert valid_result.is_valid is True
@@ -558,6 +559,6 @@ def test_valid_multi_field_form_definition_can_be_published(
         version=1,
         body=PublishVersionRequest(),
     )
-    published = assert_and_get_with_502_skip(publish)
+    published = assert_and_get_response(publish)
     assert publish.status_code == HTTPStatus.OK
     assert published is not None

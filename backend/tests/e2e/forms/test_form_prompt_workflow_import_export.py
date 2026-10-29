@@ -315,7 +315,7 @@ def _assert_prompt_and_execution_outputs(
 def test_form_prompt_workflow_export_import_round_trip_executes(
     syntara_api: SyntaraApiRegistry,
     cleanup_workflows: list[UUID],
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
     form_prompt_responder: dict[str, str],
     first_project_id: UUID,
 ) -> None:
@@ -389,7 +389,7 @@ def test_form_prompt_workflow_export_import_round_trip_executes(
     execution_id, prompt_row = _start_imported_workflow(
         syntara_api,
         UUID(str(imported.id)),
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
     )
     prompt_id = UUID(str(prompt_row.id))
     response = submit_form_prompt(syntara_api, prompt_id, _SUBMITTED_VALUES)
@@ -605,7 +605,7 @@ def test_import_renamed_form_prompt_node_preserves_configuration_and_edges(
 def test_import_handcrafted_form_prompt_workflow_executes(
     syntara_api: SyntaraApiRegistry,
     cleanup_workflows: list[UUID],
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
     form_prompt_responder: dict[str, str],
     first_project_id: UUID,
 ) -> None:
@@ -648,7 +648,7 @@ def test_import_handcrafted_form_prompt_workflow_executes(
     execution_id, prompt_row = _start_imported_workflow(
         syntara_api,
         UUID(str(workflow.id)),
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
     )
     prompt_id = UUID(str(prompt_row.id))
     response = submit_form_prompt(syntara_api, prompt_id, _SUBMITTED_VALUES)

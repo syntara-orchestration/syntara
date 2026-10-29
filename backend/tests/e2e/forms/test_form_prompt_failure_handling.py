@@ -22,7 +22,7 @@ from syntara.core.constants import FieldLimits
 
 from ._helpers import (
     EXECUTION_POLL_TIMEOUT,
-    assert_and_get_with_502_skip,
+    assert_and_get_response,
     create_form_prompt_execution,
     get_form_prompt,
     start_pending_form_prompt,
@@ -199,7 +199,7 @@ def _assert_default_is_configured(prompt: FormPromptRead) -> None:
 
 def _assert_no_prompt_row(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> None:
     """Verify a pre-creation form prompt failure did not persist a form prompt."""
-    listed = assert_and_get_with_502_skip(syntara_api.form_prompts.list(execution_id=exec_id, limit=5))
+    listed = assert_and_get_response(syntara_api.form_prompts.list(execution_id=exec_id, limit=5))
     assert not listed.resources, f"Expected no form prompt row, found {len(listed.resources)}"
 
 
@@ -278,7 +278,7 @@ def test_form_prompt_failures_follow_continue_on_failure_routing(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
     *,
     failure_kind: Literal["timeout", "invalid_dynamic_options", "form_api_validation"],
     continue_on_failure: bool,
@@ -300,7 +300,7 @@ def test_form_prompt_failures_follow_continue_on_failure_routing(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
         failure_kind=failure_kind,
         continue_on_failure=continue_on_failure,
         fallback_decision=fallback_decision,

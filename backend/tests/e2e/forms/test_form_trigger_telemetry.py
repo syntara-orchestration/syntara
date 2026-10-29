@@ -37,7 +37,7 @@ def _require_segment_server_url() -> str:
 
 _SEGMENT_SERVER_URL = _require_segment_server_url()
 
-from ._helpers import assert_and_get_with_502_skip  # noqa: E402
+from ._helpers import assert_and_get_response  # noqa: E402
 from ._workflows import form_trigger_consumer_workflow  # noqa: E402
 
 pytestmark = [pytest.mark.e2e]
@@ -79,7 +79,7 @@ class TestFormTriggerTelemetry:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         first_project_id: UUID,
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """A real form-trigger submission emits its field metadata and omits PII and values."""
         name = unique_name("e2e-form-trigger-telemetry")
@@ -107,7 +107,7 @@ class TestFormTriggerTelemetry:
                 ),
             )
         )
-        execution = assert_and_get_with_502_skip(
+        execution = assert_and_get_response(
             syntara_api.executions.create(
                 body=ExecutionCreate.from_dict(
                     {
@@ -119,7 +119,7 @@ class TestFormTriggerTelemetry:
             )
         )
         execution_id = UUID(str(execution.id))
-        form_prompt_execution_cleanup(execution_id)
+        form_execution_cleanup(execution_id)
 
         message = _wait_for_form_trigger_segment_event(execution_id)
         properties = message["properties"]
