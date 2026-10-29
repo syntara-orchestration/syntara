@@ -1144,18 +1144,20 @@ describe('InputPanel', () => {
       expect(screen.getByText('mocked_value')).toBeInTheDocument()
     })
 
-    // For a previously-run (existing) node, pinning new mock data on an
-    // upstream node must immediately be reflected in this node's Input panel, taking
-    // precedence over the upstream's last actual execution output.
-    it('shows upstream currently pinned outputMock instead of stale execution data for existing nodes', () => {
+    it('updates existing node inputs when an upstream output mock changes', () => {
       mockUseUpstreamNodes.mockReturnValue(upstreamNodes)
+      const staleExecutionData = { 'upstream-1': { mocked_field: 'stale-execution-value' } }
+
+      const { rerender } = render(<InputPanel nodeId="node-1" executionData={staleExecutionData} />)
+
+      expect(screen.getByText('stale-execution-value')).toBeInTheDocument()
+
       mockPinnedData = {
         'upstream-1': {
           outputMock: { mocked_field: 'freshly-pinned-value' },
         },
       }
-
-      render(<InputPanel nodeId="node-1" executionData={{ 'upstream-1': { mocked_field: 'stale-execution-value' } }} />)
+      rerender(<InputPanel nodeId="node-1" executionData={staleExecutionData} />)
 
       expect(screen.getByText('freshly-pinned-value')).toBeInTheDocument()
       expect(screen.queryByText('stale-execution-value')).not.toBeInTheDocument()
