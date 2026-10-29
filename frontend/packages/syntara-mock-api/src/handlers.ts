@@ -166,6 +166,80 @@ function getOrCreateVersionStore(workflowId: string, workflow: WorkflowWithVersi
   return workflowVersionStore.get(workflowId)!
 }
 
+type MockExecutionWorkflowDefinition = {
+  nodes?: Array<{ id?: string; type?: string; name?: string; parameters?: Record<string, unknown> }>
+  triggers?: Array<{ id?: string; type?: string; name?: string; parameters?: Record<string, unknown> }>
+}
+
+function resolveMockExecutionCreateContext(
+  body: ExecutionsAPI.components['schemas']['ExecutionCreate']
+):
+  | { workflow: WorkflowWithVersion; versionNum: number; definition: MockExecutionWorkflowDefinition | undefined }
+  | HttpResponse {
+  const workflow = workflows.find((w) => w.id === body.workflow_id)
+  if (!workflow) {
+    return HttpResponse.json(
+      {
+        type: 'https://api.example.com/errors/workflow-not-found',
+        title: 'Workflow Not Found',
+        detail: `Workflow with id '${body.workflow_id}' not found`,
+        code: 'WORKFLOW_NOT_FOUND',
+        retryable: false,
+        instance: '/api/v1/executions',
+      },
+      { status: 404 }
+    )
+  }
+
+  const usePublished = body.use_published === true
+  const publishedVersionNumber = (workflow as { published_version_number?: number | null }).published_version_number
+  if (usePublished && (workflow.published_version_id == null || publishedVersionNumber == null)) {
+    return HttpResponse.json(
+      {
+        type: 'https://api.example.com/errors/workflow-not-published',
+        title: 'Workflow Not Published',
+        detail: `Workflow '${body.workflow_id}' has no published version`,
+        code: 'WORKFLOW_NOT_PUBLISHED',
+        retryable: false,
+        instance: '/api/v1/executions',
+      },
+      { status: 400 }
+    )
+  }
+
+  const versionNum =
+    usePublished && typeof publishedVersionNumber === 'number'
+      ? publishedVersionNumber
+      : (workflow.current_version ?? workflow.version?.version ?? 1)
+
+  const versions = getOrCreateVersionStore(String(body.workflow_id), workflow)
+  const versionRecord = versions.find((v) => v.version === versionNum)
+  const definition = (versionRecord?.workflow_definition ?? workflow.version?.workflow_definition) as
+    | MockExecutionWorkflowDefinition
+    | undefined
+
+  const triggerNodeId = body.trigger_node_id
+  if (triggerNodeId) {
+    const triggers = definition?.triggers ?? []
+    const triggerExists = triggers.some((trigger) => trigger.id === triggerNodeId)
+    if (!triggerExists) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/validation-error',
+          title: 'Validation Error',
+          detail: `Specified trigger_node_id '${triggerNodeId}' not found in workflow triggers`,
+          code: 'VALIDATION_ERROR',
+          retryable: false,
+          instance: '/api/v1/executions',
+        },
+        { status: 422 }
+      )
+    }
+  }
+
+  return { workflow, versionNum, definition }
+}
+
 /** Mock seed data may use camelCase timestamps; API uses snake_case */
 type ApprovalTimestamps = Approval & { createdAt?: string; updatedAt?: string }
 
@@ -1769,17 +1843,13 @@ export const handlers = [
       /** Mock-only: optional status override for self-contained E2E seeding. */
       status?: 'completed' | 'failed' | 'running' | 'cancelled' | 'pending' | 'paused'
     }
+    const createContext = resolveMockExecutionCreateContext(body)
+    if (createContext instanceof HttpResponse) {
+      return createContext
+    }
+    const { workflow, versionNum, definition } = createContext
     const executionId = uuidv4()
-    const workflow = workflows.find((w) => w.id === body.workflow_id)
-    const versionNum = mockWorkflowVersionNumber(workflow)
     const existingCount = executions.filter((e) => e.workflow_id === body.workflow_id).length
-
-    const definition = workflow?.version?.workflow_definition as
-      | {
-          nodes?: Array<{ id?: string; type?: string; name?: string; parameters?: Record<string, unknown> }>
-          triggers?: Array<{ id?: string; type?: string; name?: string; parameters?: Record<string, unknown> }>
-        }
-      | undefined
     const formPromptParametersByNodeId = new Map<string, Record<string, unknown>>()
     for (const authoredNode of definition?.nodes ?? []) {
       if (typeof authoredNode.id !== 'string') continue
