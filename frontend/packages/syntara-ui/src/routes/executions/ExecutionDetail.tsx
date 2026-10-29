@@ -38,8 +38,8 @@ import { executionDetailHasTitleRowExtras, executionDetailPageHeading } from './
 import { executionRefetchInterval } from './executionPolling'
 import { useApprovalNavigation } from './hooks/useApprovalNavigation'
 import { useExecutionApprovalPanel } from './hooks/useExecutionApprovalPanel'
+import { useExecutionNodeClick } from './hooks/useExecutionNodeClick'
 import { useExecutionRunHistory } from './hooks/useExecutionRunHistory'
-import { useExecutionStepClick } from './hooks/useExecutionStepClick'
 import { useExecutionStreaming, useSyncActivityStore } from './hooks/useExecutionStreaming'
 import { useExecutionWorkflow } from './hooks/useExecutionWorkflow'
 import { useForkWorkflow } from './hooks/useForkWorkflow'
@@ -110,9 +110,9 @@ function ExecutionDetailContent({
   onFilterChange,
   paginationFooterProps,
   onNodeClick,
-  selectedStepId,
-  selectedStepName,
-  onStepSelect,
+  selectedNodeId,
+  selectedNodeName,
+  onNodeSelect,
   currentApprovalNodeId,
 }: Readonly<{
   historyCardOpen: boolean
@@ -132,9 +132,9 @@ function ExecutionDetailContent({
   onFilterChange: (filters: FilterConfig[]) => void
   paginationFooterProps: PaginationFooterProps
   onNodeClick?: (event: React.MouseEvent, node: { id: string; type?: string; data: Record<string, unknown> }) => void
-  selectedStepId: string | null
-  selectedStepName: string | null
-  onStepSelect: (stepId: string, stepName: string) => void
+  selectedNodeId: string | null
+  selectedNodeName: string | null
+  onNodeSelect: (nodeId: string, nodeName: string) => void
   currentApprovalNodeId?: string | null
 }>) {
   const isStale = useExecutionStore((state) => state.isStale)
@@ -219,7 +219,7 @@ function ExecutionDetailContent({
               executionActivities={activities}
               executionId={executionId}
               onNodeClick={onNodeClick}
-              selectedActivityId={currentApprovalNodeId ?? selectedStepId}
+              selectedActivityId={currentApprovalNodeId ?? selectedNodeId}
             />
           </SynPanelStackItem>
 
@@ -229,9 +229,9 @@ function ExecutionDetailContent({
             <ExecutionDetailsPanel
               executionId={executionId}
               workflowDefinition={workflow?.version.workflow_definition}
-              selectedNodeId={selectedStepId}
-              selectedNodeName={selectedStepName}
-              onNodeSelect={onStepSelect}
+              selectedNodeId={selectedNodeId}
+              selectedNodeName={selectedNodeName}
+              onNodeSelect={onNodeSelect}
             />
           </SynPanelStackItem>
         </SynPanelStack>
@@ -280,6 +280,8 @@ export default function ExecutionDetail() {
 
   useResetOnExecutionChange(executionId)
 
+  const isStreamStale = useExecutionStore((state) => state.isStale)
+
   const executionQuery = executionsClient.useQuery(
     'get',
     '/executions/{execution_id}',
@@ -292,10 +294,11 @@ export default function ExecutionDetail() {
       },
       enabled: !!executionId,
     },
-    { refetchInterval: executionRefetchInterval }
+    { refetchInterval: (query) => executionRefetchInterval(query, isStreamStale) }
   )
 
-  const execution = useExecutionWithLiveStatus(executionQuery.data)
+  const executionWithLiveStatus = useExecutionWithLiveStatus(executionQuery.data)
+  const execution = isStreamStale ? executionQuery.data : executionWithLiveStatus
 
   useExecutionStreaming(executionId, execution)
 
@@ -313,13 +316,13 @@ export default function ExecutionDetail() {
 
   const activityNameMap = useActivityNamesForExecution(execution?.workflow_definition, activities)
 
-  const stepClick = useExecutionStepClick(executionId)
-  const { approvals, currentIndex, currentApproval, isApprovalLoading, handleNodeClick, navigateToIndex } = stepClick
-  const { selectedStepId, selectedStepName, selectStep } = stepClick
+  const nodeClick = useExecutionNodeClick(executionId)
+  const { approvals, currentIndex, currentApproval, isApprovalLoading, handleNodeClick, navigateToIndex } = nodeClick
+  const { selectedNodeId, selectedNodeName, selectNode } = nodeClick
   const approval = useExecutionApprovalPanel(
     executionId,
     searchParams,
-    stepClick,
+    nodeClick,
     execution?.workflow_definition ?? undefined
   )
   const approvalNavigation = useApprovalNavigation(currentIndex, navigateToIndex, approvals)
@@ -422,9 +425,9 @@ export default function ExecutionDetail() {
             onFilterChange={handleExecutionFilterChange}
             paginationFooterProps={executionPaginationFooterProps}
             onNodeClick={handleNodeClick}
-            selectedStepId={selectedStepId}
-            selectedStepName={selectedStepName}
-            onStepSelect={selectStep}
+            selectedNodeId={selectedNodeId}
+            selectedNodeName={selectedNodeName}
+            onNodeSelect={selectNode}
             currentApprovalNodeId={
               currentApproval ? canvasNodeIdFromApprovalNodeId(currentApproval.approval_node_id) : undefined
             }

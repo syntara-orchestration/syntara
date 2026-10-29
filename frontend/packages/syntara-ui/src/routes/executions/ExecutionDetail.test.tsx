@@ -1,16 +1,21 @@
+// AAP-95581: approval-paused executions must not stay stale after live updates stop.
+import type { ExecutionsAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useParams, useRouterState } from '@tanstack/react-router'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import createFetchClient from 'openapi-fetch'
+import createClient from 'openapi-react-query'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { executionsClient } from '../../client'
 import { capitalize } from '../../utils/capitalize'
+import { useExecutionWebSocket } from '../workflows/hooks/useExecutionWebSocket'
 import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
 import ExecutionDetail from './ExecutionDetail'
-import { useExecutionStepClick } from './hooks/useExecutionStepClick'
+import { useExecutionNodeClick } from './hooks/useExecutionNodeClick'
 
 // Create mock functions
 const mockNavigate = vi.fn()
@@ -267,10 +272,10 @@ vi.mock('../../providers/alerts', () => ({
   })),
 }))
 
-// Mock useExecutionStepClick hook
+// Mock useExecutionNodeClick hook
 const mockHandleNodeClick = vi.fn()
-const mockSelectStep = vi.fn()
-const mockDeselectStep = vi.fn()
+const mockSelectNode = vi.fn()
+const mockDeselectNode = vi.fn()
 const mockPendingApproval = {
   id: 'approval-1',
   name: 'Test Approval',
@@ -282,10 +287,10 @@ const mockPendingApproval = {
 
 const mockClearPendingApproval = vi.fn()
 const mockSetPendingApproval = vi.fn()
-const mockFetchForStep = vi.fn()
+const mockFetchForNode = vi.fn()
 
-vi.mock('./hooks/useExecutionStepClick', () => ({
-  useExecutionStepClick: vi.fn(() => ({
+vi.mock('./hooks/useExecutionNodeClick', () => ({
+  useExecutionNodeClick: vi.fn(() => ({
     approvals: [],
     currentIndex: 0,
     currentApproval: null,
@@ -293,11 +298,11 @@ vi.mock('./hooks/useExecutionStepClick', () => ({
     navigateToIndex: vi.fn(),
     clearApprovals: mockClearPendingApproval,
     setApprovalsAndIndex: mockSetPendingApproval,
-    fetchApprovals: mockFetchForStep,
-    selectedStepId: null,
-    selectedStepName: null,
-    selectStep: mockSelectStep,
-    deselectStep: mockDeselectStep,
+    fetchApprovals: mockFetchForNode,
+    selectedNodeId: null,
+    selectedNodeName: null,
+    selectNode: mockSelectNode,
+    deselectNode: mockDeselectNode,
     handleNodeClick: mockHandleNodeClick,
   })),
 }))
@@ -738,7 +743,7 @@ describe('ExecutionDetail', () => {
 
   describe('Approval Review Side Panel', () => {
     it('opens approval side panel when Review approval is clicked', async () => {
-      vi.mocked(useExecutionStepClick).mockReturnValue({
+      vi.mocked(useExecutionNodeClick).mockReturnValue({
         approvals: [mockPendingApproval] as never,
         currentIndex: 0,
         currentApproval: mockPendingApproval as never,
@@ -746,11 +751,11 @@ describe('ExecutionDetail', () => {
         navigateToIndex: vi.fn(),
         clearApprovals: mockClearPendingApproval,
         setApprovalsAndIndex: mockSetPendingApproval,
-        fetchApprovals: mockFetchForStep,
-        selectedStepId: null,
-        selectedStepName: null,
-        selectStep: mockSelectStep,
-        deselectStep: mockDeselectStep,
+        fetchApprovals: mockFetchForNode,
+        selectedNodeId: null,
+        selectedNodeName: null,
+        selectNode: mockSelectNode,
+        deselectNode: mockDeselectNode,
         handleNodeClick: mockHandleNodeClick,
       })
 
@@ -769,7 +774,7 @@ describe('ExecutionDetail', () => {
     })
 
     it('closes approval side panel when Close is clicked', async () => {
-      vi.mocked(useExecutionStepClick).mockReturnValue({
+      vi.mocked(useExecutionNodeClick).mockReturnValue({
         approvals: [mockPendingApproval] as never,
         currentIndex: 0,
         currentApproval: mockPendingApproval as never,
@@ -777,11 +782,11 @@ describe('ExecutionDetail', () => {
         navigateToIndex: vi.fn(),
         clearApprovals: mockClearPendingApproval,
         setApprovalsAndIndex: mockSetPendingApproval,
-        fetchApprovals: mockFetchForStep,
-        selectedStepId: null,
-        selectedStepName: null,
-        selectStep: mockSelectStep,
-        deselectStep: mockDeselectStep,
+        fetchApprovals: mockFetchForNode,
+        selectedNodeId: null,
+        selectedNodeName: null,
+        selectNode: mockSelectNode,
+        deselectNode: mockDeselectNode,
         handleNodeClick: mockHandleNodeClick,
       })
 
@@ -1131,6 +1136,64 @@ describe('ExecutionDetail', () => {
   })
 
   describe('Connection Banner', () => {
+    it.each(['running', 'paused'])(
+      'updates a %s execution without a page refresh after live updates stop',
+      async (initialStatus) => {
+        let serverStatus = initialStatus
+        const fetchClient = createFetchClient<ExecutionsAPI.paths>({
+          baseUrl: 'http://localhost/api/v1/',
+          fetch: (request) =>
+            Promise.resolve(
+              Response.json(
+                new URL(request.url).pathname === '/api/v1/executions/exec-123'
+                  ? { ...mockExecutionQuery.data, status: serverStatus }
+                  : mockExecutionsQuery.data
+              )
+            ),
+        })
+        const testClient = createClient(fetchClient)
+        vi.mocked(executionsClient.useQuery).mockImplementation(testClient.useQuery)
+        vi.mocked(useExecutionWebSocket).mockReturnValue({
+          isConnected: false,
+          isStale: true,
+          isComplete: false,
+          error: 'WebSocket connection failed',
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+        })
+
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+        const { unmount } = render(
+          <QueryClientProvider client={queryClient}>
+            <ExecutionDetail />
+          </QueryClientProvider>
+        )
+
+        try {
+          expect(await screen.findByText(`Execution Status: ${initialStatus}`)).toBeInTheDocument()
+
+          act(() => {
+            useExecutionStore.setState({ isConnected: false, isStale: true, isComplete: false })
+          })
+          expect(screen.getByText('Live updates paused')).toBeInTheDocument()
+
+          serverStatus = 'completed'
+
+          await waitFor(
+            () => {
+              expect(screen.getByText(/^Execution Status:/)).toHaveTextContent('Execution Status: completed')
+            },
+            { timeout: 7000 }
+          )
+        } finally {
+          unmount()
+          queryClient.clear()
+          useExecutionStore.getState().reset()
+        }
+      },
+      10000
+    )
+
     it('shows connection banner when execution store reports stale state', () => {
       const queryClient = new QueryClient()
       render(
@@ -1207,7 +1270,7 @@ describe('ExecutionDetail', () => {
     })
 
     it('renders approval side panel when approval is open with current approval', async () => {
-      vi.mocked(useExecutionStepClick).mockReturnValue({
+      vi.mocked(useExecutionNodeClick).mockReturnValue({
         approvals: [mockPendingApproval] as never,
         currentIndex: 0,
         currentApproval: mockPendingApproval as never,
@@ -1215,11 +1278,11 @@ describe('ExecutionDetail', () => {
         navigateToIndex: vi.fn(),
         clearApprovals: mockClearPendingApproval,
         setApprovalsAndIndex: mockSetPendingApproval,
-        fetchApprovals: mockFetchForStep,
-        selectedStepId: null,
-        selectedStepName: null,
-        selectStep: mockSelectStep,
-        deselectStep: mockDeselectStep,
+        fetchApprovals: mockFetchForNode,
+        selectedNodeId: null,
+        selectedNodeName: null,
+        selectNode: mockSelectNode,
+        deselectNode: mockDeselectNode,
         handleNodeClick: mockHandleNodeClick,
       })
 
