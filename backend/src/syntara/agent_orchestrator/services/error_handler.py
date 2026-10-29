@@ -4,6 +4,8 @@ Provides structured error classification for LLM streaming failures following
 RFC 9457 Problem Details format for WebSocket error events.
 """
 
+from collections.abc import Callable
+from typing import NamedTuple
 from uuid import UUID
 
 from syntara.agent_orchestrator.exceptions import AgentTimeoutError, ToolDiscoveryError, ToolSelectionUnavailableError
@@ -41,6 +43,11 @@ def _is_server_error(error_msg: str) -> bool:
 def _is_network_error(error_msg: str) -> bool:
     """Check if error indicates network connectivity issue."""
     return _contains_any(error_msg, ["connection", "network", "unreachable"])
+
+
+def _is_tool_result_serialization_error(error_msg: str) -> bool:
+    """Check if error indicates a tool result could not be checkpoint-serialized."""
+    return _contains_any(error_msg, ["msgpack serializable", "not serializable"])
 
 
 def _classify_by_exception_type(exception: Exception, instance: str | None) -> ErrorData | None:
@@ -96,6 +103,62 @@ def _classify_by_exception_type(exception: Exception, instance: str | None) -> E
     return None
 
 
+class _MessageClassifier(NamedTuple):
+    """Message-keyword-based classifier entry evaluated in order."""
+
+    predicate: Callable[[str], bool]
+    type_suffix: str
+    title: str
+    detail: str
+    code: str
+    retryable: bool
+
+
+_MESSAGE_CLASSIFIERS = [
+    _MessageClassifier(
+        _is_rate_limit_error,
+        "llm-error",
+        "LLM Rate Limit Exceeded",
+        "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+        "RATE_LIMIT_EXCEEDED",
+        retryable=True,
+    ),
+    _MessageClassifier(
+        _is_auth_error,
+        "llm-error",
+        "LLM Authentication Failed",
+        "Failed to authenticate with LLM provider. Please check your API configuration.",
+        "AUTHENTICATION_FAILED",
+        retryable=False,
+    ),
+    _MessageClassifier(
+        _is_server_error,
+        "network-error",
+        "Upstream Service Error",
+        "LLM provider is experiencing issues. Please try again later.",
+        "UPSTREAM_ERROR",
+        retryable=True,
+    ),
+    _MessageClassifier(
+        _is_network_error,
+        "network-error",
+        "Network Connection Error",
+        "Failed to connect to LLM provider. Please check your network connection.",
+        "CONNECTION_ERROR",
+        retryable=True,
+    ),
+    _MessageClassifier(
+        _is_tool_result_serialization_error,
+        "tool-result-serialization-error",
+        "Tool Result Serialization Failed",
+        "A tool call succeeded, but its result could not be serialized for checkpointing."
+        " Please try again or contact support with the invocation ID.",
+        "TOOL_RESULT_SERIALIZATION_FAILED",
+        retryable=False,
+    ),
+]
+
+
 def classify_streaming_error(exception: Exception, invocation_id: UUID | None = None) -> ErrorData:
     """Classify streaming exception into RFC 9457 Problem Details format.
 
@@ -122,49 +185,16 @@ def classify_streaming_error(exception: Exception, invocation_id: UUID | None = 
 
     error_msg = str(exception).lower()
 
-    # Rate limiting (429 status)
-    if _is_rate_limit_error(error_msg):
-        return ErrorData(
-            type=f"{ERROR_TYPE_BASE_URI}/llm-error",
-            title="LLM Rate Limit Exceeded",
-            detail="OpenRouter API rate limit exceeded. Please try again in a few moments.",
-            code="RATE_LIMIT_EXCEEDED",
-            retryable=True,
-            instance=instance,
-        )
-
-    # Authentication errors (401/403)
-    if _is_auth_error(error_msg):
-        return ErrorData(
-            type=f"{ERROR_TYPE_BASE_URI}/llm-error",
-            title="LLM Authentication Failed",
-            detail="Failed to authenticate with LLM provider. Please check your API configuration.",
-            code="AUTHENTICATION_FAILED",
-            retryable=False,
-            instance=instance,
-        )
-
-    # Server errors (5xx)
-    if _is_server_error(error_msg):
-        return ErrorData(
-            type=f"{ERROR_TYPE_BASE_URI}/network-error",
-            title="Upstream Service Error",
-            detail="LLM provider is experiencing issues. Please try again later.",
-            code="UPSTREAM_ERROR",
-            retryable=True,
-            instance=instance,
-        )
-
-    # Connection/network errors
-    if _is_network_error(error_msg):
-        return ErrorData(
-            type=f"{ERROR_TYPE_BASE_URI}/network-error",
-            title="Network Connection Error",
-            detail="Failed to connect to LLM provider. Please check your network connection.",
-            code="CONNECTION_ERROR",
-            retryable=True,
-            instance=instance,
-        )
+    for classifier in _MESSAGE_CLASSIFIERS:
+        if classifier.predicate(error_msg):
+            return ErrorData(
+                type=f"{ERROR_TYPE_BASE_URI}/{classifier.type_suffix}",
+                title=classifier.title,
+                detail=classifier.detail,
+                code=classifier.code,
+                retryable=classifier.retryable,
+                instance=instance,
+            )
 
     # Default to non-retryable LLM error
     return ErrorData(
