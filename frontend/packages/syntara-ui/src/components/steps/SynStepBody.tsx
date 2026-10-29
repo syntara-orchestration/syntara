@@ -1,8 +1,8 @@
 import { StackItem } from '@patternfly/react-core'
 import { use, type ReactNode } from 'react'
 
-import { SynStepExpandedContext } from './SynStepExpandedContext'
 import bodyStyles from './SynStepBody.module.css'
+import { SynStepExpandedContext } from './SynStepExpandedContext'
 
 export type SynStepBodyProps = {
   children: ReactNode
