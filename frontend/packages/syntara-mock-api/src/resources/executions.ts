@@ -279,7 +279,7 @@ export const executions: Execution[] = [
     }
   }),
 
-  // Manual QA fixture for retry-from-failure (AAP-92822): a sequential run where
+  // Manual QA fixture for retry-from-failure: a sequential run where
   // step1 completed, step2 failed, and step3 never dispatched. Exercises the
   // "Retry from failure" button on a FAILED execution with real eligible points.
   {
