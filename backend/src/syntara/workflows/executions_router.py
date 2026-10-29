@@ -5,7 +5,7 @@ from uuid import UUID
 
 import structlog
 from fastapi import Depends, Query, Request, Response, status
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.service import RPCError
 
@@ -364,8 +364,8 @@ async def retry_from_failure(
     if any(body.input_parameter_overrides.values()):
         workflow_context_result = await db.exec(
             select(Execution.workflow_id, Workflow.labels, Project.name)
-            .join(Workflow, Workflow.id == Execution.workflow_id)
-            .outerjoin(Project, Project.id == Workflow.project_id)
+            .join(Workflow, col(Workflow.id) == col(Execution.workflow_id))
+            .outerjoin(Project, col(Project.id) == col(Workflow.project_id))
             .where(Execution.id == execution_id)
         )
         workflow_context = workflow_context_result.first()
@@ -380,7 +380,7 @@ async def retry_from_failure(
                     resource_type="workflow",
                     resource_id=str(workflow_id),
                     resource_project=resource_project or "",
-                    resource_labels=workflow_labels,
+                    resource_labels=dict(workflow_labels),
                     user_labels=current_user.labels,
                     user_metadata=current_user.authz_metadata,
                 ),
