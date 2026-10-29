@@ -868,7 +868,9 @@ async def test_replacement_rejects_stale_request_without_changing_hold(
 async def test_cleanup_cannot_enter_during_replacement_hold_transfer(
     delivery_context: DeliveryContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario = Scenario(delivery_context)
+    scenario = Scenario(delivery_context, ends={0: 0, 1: 120})
+    assert (await scenario.service.initialize(scenario.request())).status == PositionStatus.READY
+    scenario.ends[0] = 100
     claim = await delivery_context.claim(50)
     async with delivery_context.session_factory() as session, session.begin():
         await delivery_context.store(session).finalize_without_execution(claim, DeliveryState.FILTERED)

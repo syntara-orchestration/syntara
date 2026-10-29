@@ -9,14 +9,28 @@ class EventStreamError(SyntaraError):
     """Base exception for all event stream subscription errors."""
 
 
+@fastapi_exception(handler="syntara.eventstreams.error_handlers.event_subscription_control_conflict_handler")
+class EventSubscriptionControlConflictError(EventStreamError):
+    """A stale revision or missing safety evidence prevents a control action."""
+
+
+@fastapi_exception(handler="syntara.eventstreams.error_handlers.event_subscription_not_found_handler")
+class EventSubscriptionNotFoundError(EventStreamError):
+    """No current subscription exists within the requested workflow/project."""
+
+    def __init__(self) -> None:
+        """Use the same safe response for absent, retired and unrelated IDs."""
+        super().__init__("Event subscription not found")
+
+
 @fastapi_exception(handler="syntara.eventstreams.error_handlers.event_subscription_in_use_error_handler")
 class EventSubscriptionInUseError(EventStreamError):
     """Raised when deleting a resource still bound by event-subscription evidence.
 
     Deletion is blocked conservatively while a non-retired subscription or source
     still references the workflow, Integration or credential. Retirement alone
-    does not authorize deletion; recovery-aware evidence release is coordinated by
-    a later story, so the caller must resolve the bound subscriptions first.
+    does not authorize deletion; recovery-aware evidence release must establish
+    eligibility before the caller can remove bound resources.
     """
 
     def __init__(self, resource_kind: str, resource_name: str, total_count: int) -> None:

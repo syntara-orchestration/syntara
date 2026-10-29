@@ -30,7 +30,9 @@ from syntara.eventstreams.core.deduplication import (
     DeliveryState,
     RecoveryReservation,
 )
+from syntara.eventstreams.core.processing import CONTENT_INSPECTION_PENDING
 from syntara.eventstreams.core.results import EventFailureCode
+from syntara.eventstreams.models.control import EventSubscriptionRecovery
 from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
 from syntara.eventstreams.models.source import EventSubscriptionSource
@@ -380,6 +382,19 @@ class KafkaInitialPositionStore:
             raise KafkaPositionError(msg, PositionStatus.REVISION_CHANGED)
         return row
 
+    @staticmethod
+    async def _authorized_recovery(session: AsyncSession, request: RecoveryRequest) -> None:
+        """Revalidate control authority while the lifecycle and position remain locked."""
+        authorized = await session.get(
+            EventSubscriptionRecovery,
+            (request.source_id, request.partition),
+            with_for_update=True,
+            populate_existing=True,
+        )
+        if authorized is not None and (authorized.completed or not authorized.matches_request(request)):
+            msg = "recovery_request_changed"
+            raise KafkaPositionError(msg, PositionStatus.REVISION_CHANGED)
+
     async def begin_recovery(self, request: RecoveryRequest) -> KafkaPartitionInitialPosition:
         """Close admission/cleanup atomically before drain or any evidence inspection."""
         async with self._session_factory() as session, session.begin():
@@ -387,6 +402,9 @@ class KafkaInitialPositionStore:
             if row is None or row.gap_detected_at is None:
                 msg = "no_recorded_recovery_gap"
                 raise KafkaPositionError(msg)
+            # Replacing an undispatched request must also fence detached workers
+            # before they create a hold with the previous acknowledgement.
+            await self._authorized_recovery(session, request)
             if row.recovery_token is not None:
                 if (
                     request.expected_recovery_revision == row.recovery_revision
@@ -529,6 +547,9 @@ class KafkaInitialPositionStore:
         if any(row.state == DeliveryState.REJECTED or row.last_error_code in content_codes for row in rows):
             msg = "permanent_content_error"
             raise KafkaPositionError(msg)
+        if any(row.last_error_code == CONTENT_INSPECTION_PENDING for row in rows):
+            msg = "content_inspection_pending"
+            raise KafkaPositionError(msg)
 
     async def reconcile_claims(
         self, request: RecoveryRequest, token: UUID, owner_worker_id: str
@@ -547,6 +568,11 @@ class KafkaInitialPositionStore:
                 raise KafkaPositionError(msg)
             rows = await self._deliveries(session, request, row.pending_boundary)
             self._content_gate(rows)
+            # A worker's in-memory request can be weaker than a replacement the
+            # control plane already persisted (e.g. a de-escalated disposition
+            # authority) while this token's hold stayed active. Revalidate
+            # against the stored decision before cancelling any delivery.
+            await self._authorized_recovery(session, request)
             now = cast("datetime", (await session.exec(select(func.clock_timestamp()))).one())
             claims: list[DeliveryClaim] = []
             for delivery in rows:
@@ -564,7 +590,9 @@ class KafkaInitialPositionStore:
                     ):
                         msg = "unreconciled_start_evidence"
                         raise KafkaPositionError(msg)
-                    if delivery.record_identity.offset < row.pending_boundary:
+                    below_boundary = delivery.record_identity.offset < row.pending_boundary
+                    self._check_disposition(request, below_boundary=below_boundary)
+                    if below_boundary:
                         delivery.state = DeliveryState.CANCELLED
                         delivery.resolved_at = now
                         delivery.last_error_code = "cancelled_by_gap_recovery"
@@ -595,6 +623,12 @@ class KafkaInitialPositionStore:
                 claims.append(claimed)
         return claims
 
+    @staticmethod
+    def _check_disposition(request: RecoveryRequest, *, below_boundary: bool) -> None:
+        if below_boundary and not request.allow_unscheduled_disposition:
+            msg = "retirement_authority_required"
+            raise KafkaPositionError(msg)
+
     async def stage_recovery(
         self, request: RecoveryRequest, token: UUID, boundary: int
     ) -> KafkaPartitionInitialPosition:
@@ -623,6 +657,10 @@ class KafkaInitialPositionStore:
             if row.pending_boundary != boundary or any(d.state == DeliveryState.IN_PROGRESS for d in rows):
                 msg = "claims_unresolved"
                 raise KafkaPositionError(msg)
+            # /recover replaces requests under the same lifecycle/position locks.
+            # A detached attempt may finish broker I/O after replacement, but it
+            # cannot clear the gap before the replacement authority is applied.
+            await self._authorized_recovery(session, request)
             if not await release_recovery_locked(
                 session, source, RecoveryReservation(source_id=source.id, token=token)
             ):

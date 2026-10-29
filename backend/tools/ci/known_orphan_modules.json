@@ -34,6 +34,8 @@
     "syntara/eventstreams/services/execution_preparation_service.py": "Injectable deterministic Execution preparation service, imported by unit and integration tests; production caller wiring belongs to downstream delivery-recovery and scheduling stories",
     "syntara/eventstreams/handlers/workflow_launcher.py": "Injectable signed Temporal launcher, exercised by scheduling unit tests; production construction and injection belong to downstream Kafka worker process composition (#988)",
     "syntara/eventstreams/services/recovery_service.py": "Bounded prepared-delivery recovery operations, exercised by PostgreSQL scheduling/recovery tests; production invocation belongs to downstream recovery-controller (AAP-97619) and worker process wiring (#988)",
+    "syntara/eventstreams/services/placement_service.py": "Injectable worker membership and placement provider using #931 persistence; isolated contract tests cover its operations, and production process composition and independent heartbeat/renewal loops belong to #988",
+    "syntara/eventstreams/services/subscription_supervisor.py": "Injectable local placement-authorized runner supervisor using #972 admission/drain ports; production construction and target reconciliation belong to process manager composition in #988",
     "syntara/integrations/lib/credential_resolver.py": "Statically imported by integration_service.py and invocation_executor.py; pyan3 does not trace through session-factory closures into background tasks",
     "syntara/core/tls/protocol.py": "Loaded by uvicorn via --http string import at runtime, not via Python import",
     "syntara/core/tls/certs.py": "Imported by scripts/generate_local_certs.py and tests/helpers/tls.py — both outside src/",

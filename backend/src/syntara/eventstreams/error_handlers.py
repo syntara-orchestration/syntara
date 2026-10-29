@@ -17,6 +17,32 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 
+def event_subscription_control_conflict_handler(request: Request, exc: "EventStreamError") -> JSONResponse:
+    """Return bounded, service-owned reasons without underlying broker/secret errors."""
+    return create_problem_details_response(
+        status_code=status.HTTP_409_CONFLICT,
+        problem_type=PROBLEM_TYPES["resource_conflict"],
+        title="Event Subscription Control Conflict",
+        detail=exc.message,
+        code="EVENT_SUBSCRIPTION_CONTROL_CONFLICT",
+        retryable=False,
+        instance=str(request.url),
+    )
+
+
+def event_subscription_not_found_handler(request: Request, exc: "EventStreamError") -> JSONResponse:
+    """Do not disclose whether a subscription exists in another workflow."""
+    return create_problem_details_response(
+        status_code=status.HTTP_404_NOT_FOUND,
+        problem_type=PROBLEM_TYPES["resource_not_found"],
+        title="Event Subscription Not Found",
+        detail=exc.message,
+        code="EVENT_SUBSCRIPTION_NOT_FOUND",
+        retryable=False,
+        instance=str(request.url),
+    )
+
+
 def event_subscription_in_use_error_handler(request: Request, exc: "EventSubscriptionInUseError") -> JSONResponse:
     """Handle EventSubscriptionInUseError with RFC 9457 format."""
     logger.warning(

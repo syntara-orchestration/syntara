@@ -15,11 +15,14 @@ from syntara.eventstreams.core.deduplication import (
     DeliveryExpectation,
     DeliveryState,
     FrozenDeliveryBinding,
+    RevisionChanged,
     StorageBackpressure,
     TemporalAcceptance,
     TerminalDelivery,
     input_fingerprint,
 )
+from syntara.eventstreams.core.processing import CONTENT_INSPECTION_PENDING, CONTENT_VALIDATED
+from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCode
 from syntara.eventstreams.core.scheduling_metadata import EVENT_DELIVERY_METADATA_KEY
 from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.models.source import EventSubscriptionSource
@@ -71,6 +74,210 @@ def store(session: AsyncSession | None = None) -> EventDeliveryStore:
         MagicMock(spec=AsyncSession) if session is None else session,
         execution_principal_id=PRINCIPAL,
     )
+
+
+def inspection_lifecycle() -> tuple[EventSubscription, EventSubscriptionSource]:
+    value = identity()
+    subscription = EventSubscription(
+        id=value.subscription_id,
+        workflow_id=value.workflow_id,
+        project_id=UUID(int=6),
+        trigger_node_id="incoming",
+        published_version_id=UUID(int=7),
+        active_source_generation=1,
+        configuration_revision=2,
+        created_by=PRINCIPAL,
+    )
+    source = EventSubscriptionSource(
+        id=value.source_id,
+        subscription_id=value.subscription_id,
+        deployment_id=value.deployment_id,
+        integration_identity=value.integration_identity,
+        integration_id=value.integration_identity,
+        generation=1,
+        transport="kafka",
+        configuration=KafkaSourceConfiguration(topic="orders", group_id="syntara.test"),
+    )
+    return subscription, source
+
+
+async def test_inspection_marker_is_allowed_behind_admission_holds_and_survives_lease_expiry(monkeypatch) -> None:
+    subscription, source = inspection_lifecycle()
+    subscription.paused = True
+    row = delivery()
+    row.last_error_code = CONTENT_INSPECTION_PENDING
+    row.lease_until = NOW - timedelta(seconds=1)
+    row.next_attempt_at = datetime.max.replace(tzinfo=UTC)
+    repository = store()
+    monkeypatch.setattr(deduplication_store, "lock_source_lifecycle", AsyncMock(return_value=(subscription, source)))
+    monkeypatch.setattr(repository, "_delivery", AsyncMock(return_value=row))
+    monkeypatch.setattr(repository, "_now", AsyncMock(return_value=NOW))
+    monkeypatch.setattr(repository, "_recovery_held", AsyncMock(side_effect=AssertionError("new admission")))
+    previous = row.claim_token
+
+    async def takeover(current, owner) -> DeliveryClaim:
+        assert current.next_attempt_at == NOW
+        current.claim_token = uuid4()
+        current.owner_worker_id = owner
+        current.lease_until = NOW + timedelta(seconds=60)
+        return repository._claim(current)
+
+    async def change(_claim, **values: object) -> EventDelivery:
+        for name, value in values.items():
+            setattr(row, name, value)
+        return row
+
+    monkeypatch.setattr(repository, "_takeover", takeover)
+    monkeypatch.setattr(repository, "_change", change)
+    result = await repository.acquire_inspection(
+        row.delivery_identity(),
+        DeliveryExpectation(published_version_id=UUID(int=7), configuration_revision=2),
+        "new-worker",
+    )
+    assert isinstance(result, DeliveryClaim)
+    assert result.token != previous
+    assert row.last_error_code == CONTENT_INSPECTION_PENDING
+    assert row.next_attempt_at == datetime.max.replace(tzinfo=UTC)
+    assert source.delivery_evidence_revision == 1
+
+
+@pytest.mark.parametrize("invalid", ["token", "owner", "expired", "permanent", "frozen"])
+async def test_inspection_finish_cannot_clear_stale_or_replaced_evidence(monkeypatch, invalid) -> None:
+    row = delivery()
+    row.last_error_code = CONTENT_INSPECTION_PENDING
+    claim = EventDeliveryStore._claim(row)
+    if invalid == "token":
+        row.claim_token = uuid4()
+    elif invalid == "owner":
+        row.owner_worker_id = "new-worker"
+    elif invalid == "expired":
+        row.lease_until = NOW
+    elif invalid == "permanent":
+        row.last_error_code = EventFailureCode.invalid_json.value
+    else:
+        row.frozen_binding = binding()
+    repository = store()
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=row))
+    monkeypatch.setattr(repository, "_now", AsyncMock(return_value=NOW))
+    defer = AsyncMock()
+    monkeypatch.setattr(repository, "defer", defer)
+    assert isinstance(await repository.finish_inspection(claim, None), ClaimLost)
+    defer.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("failure", "keep_pending", "expected_code"),
+    [
+        (None, False, CONTENT_VALIDATED),
+        (None, True, CONTENT_INSPECTION_PENDING),
+        (EventDecodeFailure(code=EventFailureCode.invalid_json), False, EventFailureCode.invalid_json.value),
+        (EventDecodeFailure(code=EventFailureCode.invalid_json), True, EventFailureCode.invalid_json.value),
+    ],
+)
+async def test_inspection_finish_retains_unresolved_safe_evidence_and_changes_revision(
+    monkeypatch, failure, keep_pending, expected_code
+) -> None:
+    row = delivery()
+    row.last_error_code = CONTENT_INSPECTION_PENDING
+    _, source = inspection_lifecycle()
+    session = MagicMock(spec=AsyncSession)
+    session.get.return_value = source
+    repository = store(session)
+    monkeypatch.setattr(repository, "_current", AsyncMock(return_value=row))
+    monkeypatch.setattr(repository, "_now", AsyncMock(return_value=NOW))
+    defer = AsyncMock(return_value=None)
+    monkeypatch.setattr(repository, "defer", defer)
+    claim = repository._claim(row)
+    assert await repository.finish_inspection(claim, failure, keep_pending=keep_pending) is None
+    defer.assert_awaited_once_with(
+        claim,
+        next_attempt_at=datetime.max.replace(tzinfo=UTC) if failure is not None else NOW,
+        error_code=expected_code,
+    )
+    assert source.delivery_evidence_revision == 1
+    assert row.state == DeliveryState.IN_PROGRESS
+
+
+async def test_freeze_validates_pending_inspection_with_prepared_execution(monkeypatch: pytest.MonkeyPatch) -> None:
+    row = delivery()
+    row.last_error_code = CONTENT_INSPECTION_PENDING
+    frozen = binding()
+    subscription, source = inspection_lifecycle()
+    subscription.desired_enabled = True
+    subscription.configuration_revision = frozen.configuration_revision
+    subscription.runtime_credential_id = frozen.runtime_credential_id
+    subscription.enabled_by = frozen.enabled_by
+    value = row.delivery_identity()
+    execution = Execution(
+        id=value.execution_id,
+        workflow_id=value.workflow_id,
+        workflow_version_id=frozen.workflow_version_id,
+        temporal_workflow_id=value.temporal_workflow_id,
+        project_id=subscription.project_id,
+        trigger_node_id=subscription.trigger_node_id,
+        created_by=PRINCIPAL,
+        input_data={"value": 1},
+    )
+    session = MagicMock(spec=AsyncSession)
+    session.get.side_effect = [subscription, source, None]
+    repository = store(session)
+    monkeypatch.setattr(repository, "_current", AsyncMock(return_value=row))
+    monkeypatch.setattr(repository, "_recovery_held", AsyncMock(return_value=False))
+    change = AsyncMock(
+        return_value=row.model_copy(
+            update={
+                "frozen_binding": frozen,
+                "execution_id": execution.id,
+                "last_error_code": CONTENT_VALIDATED,
+            }
+        )
+    )
+    monkeypatch.setattr(repository, "_change", change)
+    claim = repository._claim(row)
+
+    result = await repository.freeze(claim, frozen, execution)
+
+    assert isinstance(result, DeliveryClaim)
+    assert result.binding == frozen
+    change.assert_awaited_once_with(
+        claim,
+        frozen_binding=frozen,
+        execution_id=execution.id,
+        last_error_code=CONTENT_VALIDATED,
+    )
+    session.add.assert_called_once_with(execution)
+    session.flush.assert_awaited_once()
+    assert row.state == DeliveryState.IN_PROGRESS
+
+
+async def test_inspection_storage_refusal_does_not_insert_a_production_stub(monkeypatch) -> None:
+    subscription, source = inspection_lifecycle()
+    session = MagicMock(spec=AsyncSession)
+    repository = store(session)
+    monkeypatch.setattr(deduplication_store, "lock_source_lifecycle", AsyncMock(return_value=(subscription, source)))
+    monkeypatch.setattr(repository, "_delivery", AsyncMock(return_value=None))
+    repository.capacity_check = MagicMock(spec=DeliveryCapacityCheck)
+    repository.capacity_check.permits_new_delivery.return_value = False
+    assert isinstance(
+        await repository.acquire_inspection(
+            identity(), DeliveryExpectation(published_version_id=UUID(int=7), configuration_revision=2), "worker"
+        ),
+        StorageBackpressure,
+    )
+    session.execute.assert_not_awaited()
+
+
+async def test_inspection_rejects_changed_schema_revision_before_delivery_access(monkeypatch) -> None:
+    subscription, source = inspection_lifecycle()
+    repository = store()
+    monkeypatch.setattr(deduplication_store, "lock_source_lifecycle", AsyncMock(return_value=(subscription, source)))
+    read = AsyncMock()
+    monkeypatch.setattr(repository, "_delivery", read)
+    result = await repository.acquire_inspection(
+        identity(), DeliveryExpectation(published_version_id=UUID(int=7), configuration_revision=1), "worker"
+    )
+    assert isinstance(result, RevisionChanged)
+    read.assert_not_awaited()
 
 
 @pytest.mark.parametrize("invalid", ["token", "owner", "expired", "terminal"])

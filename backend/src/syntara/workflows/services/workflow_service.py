@@ -424,6 +424,19 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     cred_ids.add(cred_id)
         return cred_ids
 
+    async def validate_event_subscribe_access(self, parameters: dict[str, Any], project_id: UUID) -> None:
+        """Authorize unsaved Subscribe references without saving or publishing.
+
+        Every test checks credential use, even when the same credential already
+        appears in a saved definition. This grants no execution permission.
+        """
+        definition = {
+            "triggers": [{"id": "preflight", "type": NodeType.EVENT_SUBSCRIBE_TRIGGER, "parameters": parameters}],
+            "nodes": [],
+        }
+        await validate_workflow_references(self.session, definition, project_id)
+        await self._validate_credential_project_scope(definition, project_id)
+
     async def _validate_credential_project_scope(
         self,
         workflow_definition: dict[str, Any],
@@ -1871,9 +1884,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if non_terminal_count:
             raise WorkflowHasActiveExecutionsError(non_terminal_count, workflow_id=workflow_id)
 
-        # Conservatively block deletion while event-subscription evidence is still
-        # bound; the RESTRICT FK is the DB backstop. Recovery-aware release is a
-        # later story.
+        # Serialize against admission and release only closed sources with no
+        # retained evidence or recovery dependencies. RESTRICT remains the backstop.
         subscription_service = EventSubscriptionService(self.session, self.user)
         await subscription_service.assert_workflow_not_bound(workflow_id, workflow.name)
 
