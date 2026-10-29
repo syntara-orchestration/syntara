@@ -12,11 +12,11 @@ import { detachPromise } from '../../utils/detachPromise'
 import { ExecutionDetailsPanel, type WorkflowDefShape } from '../builder/ExecutionDetailsPanel'
 import { ExecutionViewContent } from '../builder/ExecutionViewContent'
 import { WorkflowHistoryCard } from '../builder/WorkflowHistoryCard'
-import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
 import { ConnectionBanner } from './ConnectionBanner'
 import styles from './ExecutionDetail.module.css'
+import { getRetryDetailSelection } from './retryDetailSelection'
 import { RetryFromFailureSidePanel } from './RetryFromFailureSidePanel'
 import { useRetryInputOverrides } from './useRetryInputOverrides'
 
@@ -268,18 +268,13 @@ export function ExecutionDetailContent(props: ExecutionDetailContentProps) {
     onRetryPanelClose()
   }, [onRetryPanelClose, resetRetryInputOverrides])
   const firstRetryPointId = retryPreviewPointIds[0]
-  const selectedRetryPointId = selectedStepId
-    ? retryPreviewPointIds.find(
-        (pointId) => parseCompositeKey(pointId).baseId === parseCompositeKey(selectedStepId).baseId
-      )
-    : undefined
-  const retryDetailPointId = selectedRetryPointId ?? firstRetryPointId
-  const retryDetailNodeId = retryPanelOpen ? (retryDetailPointId ?? selectedStepId) : selectedStepId
-  const retryDetailNodeBaseId = retryDetailPointId ? parseCompositeKey(retryDetailPointId).baseId : null
-  const retryDetailNodeName =
-    retryPanelOpen && retryDetailNodeBaseId
-      ? (activityNameMap.get(retryDetailNodeBaseId) ?? selectedStepName ?? retryDetailNodeBaseId)
-      : selectedStepName
+  const { nodeId: retryDetailNodeId, nodeName: retryDetailNodeName } = getRetryDetailSelection({
+    retryPanelOpen,
+    selectedStepId,
+    selectedStepName,
+    firstRetryPointId,
+    activityNameMap,
+  })
   const retryPanel = retryPanelOpen ? (
     <RetryFromFailureSidePanel
       executionId={executionId}

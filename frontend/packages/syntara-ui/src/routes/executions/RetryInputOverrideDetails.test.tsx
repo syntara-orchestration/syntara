@@ -27,7 +27,6 @@ function RetryInputOverrideHarness({
   return (
     <RetryInputOverrideDetails
       target={target}
-      resolvedInputs={{ url: 'https://original.example', retries: 1 }}
       canEdit={canEdit}
       isDisabled={false}
       savedOverride={savedOverride}
@@ -74,29 +73,27 @@ function renderEditor(props?: Partial<RetryInputOverrideDetailsProps>) {
 }
 
 describe('RetryInputOverrideDetails', () => {
-  it('shows the original resolved inputs and explains the workflow edit permission', async () => {
+  it('explains the workflow edit permission and hides edit controls when permission is missing', async () => {
     const { container } = renderEditor({ canEdit: false })
 
-    expect(screen.getByText('Resolved parameters from the original run')).toBeInTheDocument()
-    expect(screen.getByText(/"url": "https:\/\/original\.example"/, { selector: 'pre' })).toBeInTheDocument()
     expect(screen.getByText('Workflow edit permission is required to override retry inputs.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit inputs' })).not.toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('saves a valid retry-only override and marks the inputs edited for retry', async () => {
+  it('saves a valid retry-only override and returns to the edit control', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
     renderEditor({ onSave })
 
     await user.click(screen.getByRole('button', { name: 'Edit inputs' }))
+    expect(screen.getByText(/Enter only the parameter keys to change/)).toBeInTheDocument()
     const editor = screen.getByRole('textbox', { name: 'Input overrides for Deploy step' })
     await user.clear(editor)
     await user.paste('{"url":"https://retry.example"}')
     await user.click(screen.getByRole('button', { name: 'Save inputs' }))
 
     expect(onSave).toHaveBeenCalledWith('step-a', { url: 'https://retry.example' })
-    expect(screen.getByText('Edited for retry')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit inputs' })).toBeInTheDocument()
   })
 

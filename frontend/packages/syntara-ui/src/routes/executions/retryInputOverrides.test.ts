@@ -2,7 +2,29 @@ import { describe, expect, it } from 'vitest'
 
 import type { WorkflowDefShape } from '../builder/useActivityNameMap'
 
-import { getRetryInputOverrideTargets, type ExecutionActivity } from './retryInputOverrides'
+import { getEffectiveRetryInputs, getRetryInputOverrideTargets, type ExecutionActivity } from './retryInputOverrides'
+
+describe('getEffectiveRetryInputs', () => {
+  it('applies saved overrides to resolved values without mutating the original inputs', () => {
+    const resolvedInputs = { host: 'original.example', retries: 2 }
+
+    expect(getEffectiveRetryInputs(resolvedInputs, { host: 'retry.example' })).toEqual({
+      host: 'retry.example',
+      retries: 2,
+    })
+    expect(resolvedInputs).toEqual({ host: 'original.example', retries: 2 })
+  })
+
+  it('keeps resolved values when there are no saved overrides', () => {
+    expect(getEffectiveRetryInputs({ host: 'original.example' }, undefined)).toEqual({
+      host: 'original.example',
+    })
+  })
+
+  it('returns null until either resolved inputs or overrides are available', () => {
+    expect(getEffectiveRetryInputs(null, undefined)).toBeNull()
+  })
+})
 
 function activityData(
   activity_id: string,

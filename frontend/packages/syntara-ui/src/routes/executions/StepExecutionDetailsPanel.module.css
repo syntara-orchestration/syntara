@@ -70,3 +70,27 @@
   min-width: 0;
   overflow: hidden;
 }
+
+.retryParametersPane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.retryParametersViewer {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.contentContainer.retryParametersViewer {
+  height: auto;
+}
+
+.retryOverrideEditor {
+  flex: 0 1 auto;
+  max-height: 45%;
+  min-height: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--pf-t--global--border--color--default);
+}

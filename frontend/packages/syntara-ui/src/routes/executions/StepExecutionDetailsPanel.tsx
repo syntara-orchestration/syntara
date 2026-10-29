@@ -22,7 +22,7 @@ import {
   RhUiWarningFillIcon,
 } from '@patternfly/react-icons'
 import { ActivityTypeEnum } from '@syntara/contracts'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { SynLabel } from '../../components/labels/SynLabel'
@@ -45,6 +45,7 @@ import { extractAgentTrace } from './agentTraceTypes'
 import { AgentTraceView } from './AgentTraceView'
 import { useStepExecutionDetails } from './hooks/useStepExecutionDetails'
 import { RetryInputOverrideDetails, type RetryInputOverrideDetailsProps } from './RetryInputOverrideDetails'
+import { getEffectiveRetryInputs } from './retryInputOverrides'
 import styles from './StepExecutionDetailsPanel.module.css'
 import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
 
@@ -56,7 +57,7 @@ type StepExecutionDetailsPanelProps = {
   stepState?: ActivityState
   /** Step type from workflow definition (e.g. 'aap_job_template'). */
   stepType?: string
-  retryInputOverride?: Omit<RetryInputOverrideDetailsProps, 'resolvedInputs'>
+  retryInputOverride?: RetryInputOverrideDetailsProps
 }
 
 function NoDataState({ label }: Readonly<{ label: string }>) {
@@ -73,10 +74,21 @@ type DataPaneProps = {
   data: Record<string, unknown> | null
   view: PanelView
   onViewChange: (view: PanelView) => void
+  titleAddon?: ReactNode
+  className?: string
   isErrorState?: boolean
 }
 
-function DataPane({ title, stepId, data, view, onViewChange, isErrorState = false }: Readonly<DataPaneProps>) {
+function DataPane({
+  title,
+  stepId,
+  data,
+  view,
+  onViewChange,
+  titleAddon,
+  className,
+  isErrorState = false,
+}: Readonly<DataPaneProps>) {
   const [searchTerm, setSearchTerm] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -119,11 +131,18 @@ function DataPane({ title, stepId, data, view, onViewChange, isErrorState = fals
   }
 
   return (
-    <Stack className={styles.contentContainer}>
+    <Stack className={`${styles.contentContainer}${className ? ` ${className}` : ''}`}>
       <StackItem className={styles.dataPaneHeaderRow}>
         <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }} flexWrap={{ default: 'wrap' }}>
           <FlexItem flex={{ default: 'flexNone' }} className={styles.dataPaneTitle}>
-            {title}
+            <Flex
+              alignItems={{ default: 'alignItemsCenter' }}
+              gap={{ default: 'gapSm' }}
+              flexWrap={{ default: 'wrap' }}
+            >
+              <FlexItem>{title}</FlexItem>
+              {titleAddon && <FlexItem>{titleAddon}</FlexItem>}
+            </Flex>
           </FlexItem>
           <FlexItem className={styles.dataPaneControlsWrap}>
             <Flex
@@ -313,7 +332,7 @@ type StepContentAreaProps = Readonly<{
   stepIsFailed: boolean
   isAgenticStep: boolean
   activeTab: 'io' | 'agent-steps'
-  retryInputOverride?: Omit<RetryInputOverrideDetailsProps, 'resolvedInputs'>
+  retryInputOverride?: RetryInputOverrideDetailsProps
 }>
 
 function StepContentArea({
@@ -330,6 +349,10 @@ function StepContentArea({
 }: StepContentAreaProps) {
   const [inputView, setInputView] = useState<PanelView>('json')
   const [outputView, setOutputView] = useState<PanelView>('json')
+  const effectiveInputData = useMemo(
+    () => getEffectiveRetryInputs(inputData, retryInputOverride?.savedOverride),
+    [inputData, retryInputOverride?.savedOverride]
+  )
 
   if (error) {
     return (
@@ -350,7 +373,24 @@ function StepContentArea({
     >
       <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
         {retryInputOverride ? (
-          <RetryInputOverrideDetails {...retryInputOverride} resolvedInputs={inputData} />
+          <div className={styles.retryParametersPane}>
+            <DataPane
+              title="Parameters"
+              stepId={stepId}
+              data={effectiveInputData}
+              view={inputView}
+              onViewChange={setInputView}
+              className={styles.retryParametersViewer}
+              titleAddon={
+                retryInputOverride.savedOverride && Object.keys(retryInputOverride.savedOverride).length > 0 ? (
+                  <SynLabel color="blue">Effective inputs for retry</SynLabel>
+                ) : undefined
+              }
+            />
+            <div className={styles.retryOverrideEditor}>
+              <RetryInputOverrideDetails {...retryInputOverride} />
+            </div>
+          </div>
         ) : (
           <DataPane title="Parameters" stepId={stepId} data={inputData} view={inputView} onViewChange={setInputView} />
         )}

@@ -20,6 +20,15 @@ export type RetryInputOverrideDraftResult = Readonly<{
   error: string | undefined
 }>
 
+/** Returns the resolved values that will be sent for retry, with saved overrides applied by parameter key. */
+export function getEffectiveRetryInputs(
+  resolvedInputs: Record<string, unknown> | null,
+  savedOverride: Record<string, unknown> | undefined
+): Record<string, unknown> | null {
+  if (!resolvedInputs && !savedOverride) return null
+  return { ...resolvedInputs, ...savedOverride }
+}
+
 export type RetryInputOverridesState = Readonly<{
   targets: RetryInputOverrideTarget[]
   canEdit: boolean

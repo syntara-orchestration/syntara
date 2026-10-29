@@ -14,14 +14,11 @@ import {
 } from '@patternfly/react-core'
 import type { ChangeEvent } from 'react'
 
-import { SynLabel } from '../../components/labels/SynLabel'
-
 import styles from './RetryInputOverrideDetails.module.css'
 import { parseRetryInputOverrideDraft, type RetryInputOverrideTarget } from './retryInputOverrides'
 
 export type RetryInputOverrideDetailsProps = Readonly<{
   target: RetryInputOverrideTarget
-  resolvedInputs: Record<string, unknown> | null
   canEdit: boolean
   isDisabled: boolean
   savedOverride: Record<string, unknown> | undefined
@@ -39,10 +36,9 @@ export type RetryInputOverrideDetailsProps = Readonly<{
   ) => void
 }>
 
-/** Shows the resolved inputs from the original run and edits retry-only overrides in Run details. */
+/** Edits retry-only overrides in Run details. The Parameters pane previews the effective input values. */
 export function RetryInputOverrideDetails({
   target,
-  resolvedInputs,
   canEdit,
   isDisabled,
   savedOverride,
@@ -69,27 +65,6 @@ export function RetryInputOverrideDetails({
 
   return (
     <Stack hasGutter className={styles.container}>
-      <StackItem className={styles.resolvedHeader}>
-        <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }} flexWrap={{ default: 'wrap' }}>
-          <FlexItem>
-            <Content component={ContentVariants.small}>Resolved parameters from the original run</Content>
-          </FlexItem>
-          {savedOverride && (
-            <FlexItem>
-              <SynLabel color="blue">Edited for retry</SynLabel>
-            </FlexItem>
-          )}
-        </Flex>
-      </StackItem>
-
-      <StackItem>
-        {resolvedInputs && Object.keys(resolvedInputs).length > 0 ? (
-          <pre className={styles.inputPreview}>{JSON.stringify(resolvedInputs, null, 2)}</pre>
-        ) : (
-          <Content component={ContentVariants.small}>No resolved input values are available for this step.</Content>
-        )}
-      </StackItem>
-
       {!canEdit && (
         <StackItem>
           <HelperText>
@@ -113,7 +88,8 @@ export function RetryInputOverrideDetails({
           <Stack hasGutter>
             <StackItem>
               <Content component={ContentVariants.small}>
-                Enter only the parameter keys to change. The original resolved values remain unchanged for this retry.
+                Enter only the parameter keys to change. Overrides apply to this retry only; the original run and saved
+                workflow definition remain unchanged.
               </Content>
             </StackItem>
             <StackItem>

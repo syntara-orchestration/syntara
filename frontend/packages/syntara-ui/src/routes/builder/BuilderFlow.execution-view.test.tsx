@@ -42,6 +42,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
           position?: string
           align?: string
           offset?: number
+          children?: ReactNode
           'data-testid'?: string
         }>(child) && typeof child.props.nodeId === 'string'
           ? [child.props]
@@ -49,14 +50,16 @@ vi.mock('@xyflow/react', async (importOriginal) => {
       )
       return (
         <div data-testid="reactflow">
-          {previewMarkers.map(({ nodeId, position, align, offset, 'data-testid': testId }) => (
+          {previewMarkers.map(({ nodeId, position, align, offset, children, 'data-testid': testId }) => (
             <div
               key={nodeId}
               data-testid={testId ?? `retry-preview-${nodeId}`}
               data-position={position}
               data-align={align}
               data-offset={offset}
-            />
+            >
+              {children}
+            </div>
           ))}
         </div>
       )
@@ -310,6 +313,12 @@ describe('BuilderFlow execution view', () => {
     expect(retryOrigin).toHaveAttribute('data-position', 'top')
     expect(retryOrigin).toHaveAttribute('data-align', 'end')
     expect(retryOrigin).toHaveAttribute('data-offset', '8')
+    expect(screen.getByTestId('retry-origin-label-step-a')).toHaveAttribute('aria-hidden', 'true')
+    const nodes = (latestReactFlowProps as Record<string, unknown>).nodes as Array<{
+      id: string
+      ariaLabel?: string
+    }>
+    expect(nodes.find((node) => node.id === 'step-a')?.ariaLabel).toBe('Step A, retry origin')
     expect(screen.queryByTestId('retry-origin-step-b')).not.toBeInTheDocument()
   })
 

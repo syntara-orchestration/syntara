@@ -18,7 +18,7 @@ import {
   useStore,
   useUpdateNodeInternals,
 } from '@xyflow/react'
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 
 import { SynLabel } from '../../components/labels/SynLabel'
 import { FlowNodeType } from '../../constants'
@@ -132,6 +132,18 @@ export function BuilderFlowCanvas({
   disableSpacePanning,
   onLayout,
 }: Readonly<BuilderFlowCanvasProps>) {
+  const retryPreviewNodeIdSet = useMemo(() => new Set(retryPreviewNodeIds), [retryPreviewNodeIds])
+  const accessibleNodes = useMemo(
+    () =>
+      nodes.map((node) => {
+        if (!retryPreviewNodeIdSet.has(node.id)) return node
+
+        const nodeName = 'name' in node.data && typeof node.data.name === 'string' ? node.data.name : node.id
+        return { ...node, ariaLabel: `${node.ariaLabel ?? nodeName}, retry origin` }
+      }),
+    [nodes, retryPreviewNodeIdSet]
+  )
+
   return (
     <div
       ref={containerRef}
@@ -145,7 +157,7 @@ export function BuilderFlowCanvas({
         </div>
       )}
       <ReactFlow<NodeType, EdgeType>
-        nodes={nodes}
+        nodes={accessibleNodes}
         edges={edges}
         nodeTypes={builderNodeTypes}
         edgeTypes={builderEdgeTypes}
@@ -186,7 +198,9 @@ export function BuilderFlowCanvas({
             offset={8}
             data-testid={`retry-origin-${nodeId}`}
           >
-            <SynLabel color="blue">Retry origin</SynLabel>
+            <span data-testid={`retry-origin-label-${nodeId}`} aria-hidden="true">
+              <SynLabel color="blue">Retry origin</SynLabel>
+            </span>
           </NodeToolbar>
         ))}
         {!isReadOnly && <Background variant={BackgroundVariant.Dots} gap={20} size={1} />}
