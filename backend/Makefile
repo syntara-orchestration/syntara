@@ -203,6 +203,13 @@ endef
 # Default to empty so it runs all tests if not provided
 E2E_TARGET ?=
 E2E_ARGS :=
+# Set to 1 to run the e2e suite with the Execution Plane up (see test-e2e-ep)
+E2E_EP ?=
+export E2E_EP
+
+.PHONY: test-e2e-ep
+test-e2e-ep: ## Run E2E tests with the Execution Plane up (local kind cluster dispatch)
+	@E2E_EP=1 $(MAKE) test-e2e
 
 .PHONY: test-e2e
 test-e2e: check-deps ## Run E2E tests (Usage: make test-e2e [E2E_TARGET=path] [PHASE=pr-check | EXCLUDE=pr-check])
