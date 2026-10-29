@@ -279,13 +279,17 @@ class EventSubscriptionService(BaseService):
             or not subscription.desired_enabled
         )
 
+        # The published-version pointer advances on every successful republish, even
+        # when nothing about the projected configuration changed, so the subscription
+        # always reflects the version that last activated it.
         subscription.published_version_id = version.id
-        subscription.runtime_credential_id = parameters.credential_id
-        subscription.input_schema = parameters.input_schema
-        subscription.desired_enabled = True
-        subscription.enabled_by = self.user.id
-        subscription.updated_by = self.user.id
+
         if config_changed:
+            subscription.runtime_credential_id = parameters.credential_id
+            subscription.input_schema = parameters.input_schema
+            subscription.desired_enabled = True
+            subscription.enabled_by = self.user.id
+            subscription.updated_by = self.user.id
             subscription.configuration_revision += 1
 
         await self.session.flush()

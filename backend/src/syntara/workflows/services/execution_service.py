@@ -25,6 +25,8 @@ from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
+from syntara.eventstreams.core.envelope import WorkflowEventEnvelope
+from syntara.eventstreams.core.serialization import validate_payload
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
@@ -40,7 +42,7 @@ from syntara.workflows.exceptions import (
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
 )
-from syntara.workflows.json_schema_validation import NO_REF_REGISTRY, apply_schema_defaults
+from syntara.workflows.json_schema_validation import apply_schema_defaults
 from syntara.workflows.models.activity_execution import (
     ActivityExecution,
     ActivityExecutionListResponse,
@@ -254,15 +256,26 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         trigger_type = trigger_node.get("type", "")
         trigger_node_id = trigger_node.get("id")
 
+        if trigger_type == NodeType.EVENT_SUBSCRIBE_TRIGGER:
+            if "payload" not in input_data:
+                msg = "Event Subscribe input must contain a payload"
+                raise TriggerValidationError(msg)
+            # model_construct skips full envelope validation — only .payload is read
+            # below, and the event decoder already validated the envelope upstream.
+            envelope = WorkflowEventEnvelope.model_construct(payload=input_data["payload"])
+            failure = validate_payload(envelope, input_schema)
+            if failure is not None:
+                logger.warning(
+                    "Trigger input validation failed",
+                    trigger_node_id=trigger_node_id,
+                    trigger_type=trigger_type,
+                    failure_code=failure.code,
+                )
+                raise TriggerValidationError(failure.message)
+            return
+
         try:
-            if trigger_type == NodeType.EVENT_SUBSCRIBE_TRIGGER:
-                if "payload" not in input_data:
-                    msg = "Event Subscribe input must contain a payload"
-                    raise TriggerValidationError(msg)
-                jsonschema.Draft7Validator.check_schema(input_schema)
-                jsonschema.Draft7Validator(input_schema, registry=NO_REF_REGISTRY).validate(input_data["payload"])
-            else:
-                apply_schema_defaults(input_data, input_schema)
+            apply_schema_defaults(input_data, input_schema)
         except jsonschema.ValidationError as e:
             logger.warning(
                 "Trigger input validation failed",
