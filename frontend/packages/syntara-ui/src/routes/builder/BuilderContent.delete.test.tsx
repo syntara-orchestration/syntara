@@ -1,13 +1,15 @@
-import type { WorkflowWithVersion } from '@syntara/contracts'
+/** AAP-97771: deleting a workflow step must require confirmation and preserve configuration on cancel. */
+import { ActivityTypeEnum, type Activity, type WorkflowWithVersion } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ReactFlowProvider } from '@xyflow/react'
 import type { ComponentProps, ReactNode } from 'react'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
 import { approvalsClient, executionsClient, workflowClient } from '../../client'
 import { AlertProvider } from '../../providers/alerts'
+import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { routerTestState } from '../../test/setup'
 
 // Mock dependencies
@@ -30,6 +32,16 @@ vi.mock('../../client', () => ({
 
 vi.mock('../../hooks/routing/useLocation', () => ({
   useLocation: () => '/workflow-builder/workflow-1',
+}))
+
+vi.mock('../../hooks/useProjectSelector', () => ({
+  useProjectSelector: () => ({
+    selectedProject: { id: 'project-1', name: 'Test Project' },
+    stableProjectId: 'project-1',
+    isAllProjects: false,
+    projects: [{ id: 'project-1', name: 'Test Project' }],
+    ProjectSelector: null,
+  }),
 }))
 
 vi.mock('../../app/useUnsavedChanges', () => ({
@@ -166,6 +178,11 @@ describe('BuilderContent - Delete Workflow', () => {
 
     vi.mocked(workflowClient.useMutation).mockReturnValue(createMockMutation())
     vi.mocked(executionsClient.useMutation).mockReturnValue(createMockMutation())
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('shows delete button in kebab menu for existing workflows', async () => {
@@ -321,5 +338,68 @@ describe('BuilderContent - Delete Workflow', () => {
     await waitFor(() => {
       expect(screen.queryByText('Delete workflow?')).not.toBeInTheDocument()
     })
+  })
+
+  it('preserves a configured workflow step when its delete confirmation is cancelled', async () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(300)
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(120)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 300, 120))
+    vi.stubGlobal(
+      'DOMMatrixReadOnly',
+      class {
+        readonly m22 = 1
+      }
+    )
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        readonly callback: ResizeObserverCallback
+        constructor(callback: ResizeObserverCallback) {
+          this.callback = callback
+        }
+        observe(target: Element) {
+          setTimeout(
+            () => this.callback([{ target, contentRect: new DOMRect(0, 0, 300, 120) } as ResizeObserverEntry], this),
+            0
+          )
+        }
+        unobserve = vi.fn()
+        disconnect = vi.fn()
+      }
+    )
+    const user = userEvent.setup()
+    const activity = {
+      id: 'script-1',
+      name: 'Configured script',
+      type: ActivityTypeEnum.SCRIPT,
+      parameters: { language: 'python', code: 'print("keep this configuration")' },
+    } satisfies Activity
+    const version = mockWorkflow.version
+    if (!version) throw new Error('Expected a versioned test workflow')
+    const workflow: WorkflowWithVersion = {
+      ...mockWorkflow,
+      version: {
+        ...version,
+        workflow_definition: {
+          ...version.workflow_definition,
+          nodes: [activity],
+        },
+      },
+    }
+
+    await renderBuilder({ workflow, isNew: false, workflowId: 'workflow-1' })
+    const stepMenu = await screen.findByRole('button', { name: 'Step actions menu' })
+    expect(useWorkflowStore.getState().currentWorkflow?.workflow.activities).toEqual([activity])
+
+    await user.click(stepMenu)
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+
+    expect.soft(useWorkflowStore.getState().currentWorkflow?.workflow.activities).toEqual([activity])
+    const confirmationDialog = await screen.findByRole('dialog')
+    await user.click(within(confirmationDialog).getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText(activity.name)).toBeInTheDocument()
+    expect(useWorkflowStore.getState().currentWorkflow?.workflow.activities).toEqual([activity])
   })
 })
