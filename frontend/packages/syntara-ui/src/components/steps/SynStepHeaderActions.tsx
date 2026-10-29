@@ -19,8 +19,9 @@ export function SynStepHeaderActions(
 ) {
   const menuActions = props.menuActions ?? []
   const editAction = menuActions.find((action) => action.id === 'view-details')
-  const showMenu = props.showMenuActions && menuActions.length > 0
   const showEdit = props.showMenuActions && editAction !== undefined
+  const kebabActions = showEdit ? menuActions.filter((action) => action.id !== 'view-details') : menuActions
+  const showMenu = props.showMenuActions && kebabActions.length > 0
   const showExpand = props.expandable === true
 
   if (!showEdit && !showExpand && !showMenu) {
@@ -41,7 +42,7 @@ export function SynStepHeaderActions(
       ) : null}
       {showMenu ? (
         <FlexItem>
-          <SynStepMenu menuActions={menuActions} className={props.menuClassName} popperProps={props.menuPopperProps} />
+          <SynStepMenu menuActions={kebabActions} className={props.menuClassName} popperProps={props.menuPopperProps} />
         </FlexItem>
       ) : null}
     </Flex>
