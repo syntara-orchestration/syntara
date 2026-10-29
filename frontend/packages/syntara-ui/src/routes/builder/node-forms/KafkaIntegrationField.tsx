@@ -15,6 +15,7 @@ import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
+import { StatusLabel } from '../../configuration/integrations/StatusLabel'
 import { IntegrationRequiredHelper } from '../components/IntegrationRequiredHelper'
 import { TypeaheadMenuToggle } from '../components/TypeaheadMenuToggle'
 
@@ -138,12 +139,15 @@ export function KafkaIntegrationField({
           />
         </StackItem>
       )}
-      <StackItem>
-        <Content component={ContentVariants.p}>
-          Integration validation: {selected?.validation_status ?? 'Unknown'}. This describes the managed connection, not
-          the selected runtime credential’s access.
-        </Content>
-      </StackItem>
+      {selected && (
+        <StackItem>
+          <Content component={ContentVariants.p}>
+            Integration validation:{' '}
+            <StatusLabel status={selected.validation_status ?? 'unknown'} errorMessage={selected.validation_error} />.
+            This describes the managed connection, not the selected runtime credential’s access.
+          </Content>
+        </StackItem>
+      )}
     </Stack>
   )
 }
