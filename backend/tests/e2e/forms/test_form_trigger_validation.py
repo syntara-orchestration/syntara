@@ -203,7 +203,7 @@ def test_required_field_errors_allow_valid_submission(
     form_trigger_workflow: FormTriggerWorkflowBuilder,
     form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
-    """Missing required values fail together; optional fields may be omitted.
+    """Missing required values fail together; omitted optional numeric fields resolve to null.
 
     Procedure:
     1. Submit empty values for the required text and email fields.
@@ -212,7 +212,7 @@ def test_required_field_errors_allow_valid_submission(
 
     Expected:
     - The invalid request returns 422 with both required fields identified.
-    - The valid request completes with no optional_number key in response_data.
+    - The valid request completes with ``optional_number`` set to ``None`` in response_data.
     """
     workflow = form_trigger_workflow(REQUIRED_AND_OPTIONAL_FIELDS)
 
@@ -241,6 +241,7 @@ def test_required_field_errors_allow_valid_submission(
     assert activity_output(activities["form"])["response_data"] == {
         "required_text": "provided",
         "required_email": "tester@example.com",
+        "optional_number": None,
     }
 
 
