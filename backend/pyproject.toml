@@ -82,7 +82,7 @@ dev = [
     "pytest-asyncio>=1.3.0",
     "pytest-xdist>=3.8.0",
     "ruff>=0.1.0,<0.14.4",
-    "mypy>=1.6.0,<1.19",
+    "mypy>=1.14,<1.19",
     "pyrefly>=1.3.0,<1.4.0",
     "httpx>=0.25.0",  # for testing FastAPI
     "respx>=0.20.0",  # for mocking httpx requests
@@ -251,6 +251,13 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
+# aiokafka has no typing marker or stubs. Follow its source for class identity,
+# allowing unannotated calls only at this external-library boundary.
+untyped_calls_exclude = ["aiokafka"]
+
+[[tool.mypy.overrides]]
+module = ["aiokafka", "aiokafka.*"]
+follow_untyped_imports = true
 
 [[tool.mypy.overrides]]
 module = "tests.*"

@@ -23,6 +23,24 @@ from syntara.workflows.validators.workflow_integrations import (
 SERVICE = "syntara.workflows.services.workflow_service"
 
 
+async def test_unsaved_preflight_rechecks_existing_resource_permissions(
+    service: WorkflowService, definition: dict[str, Any]
+) -> None:
+    """No saved-reference diff can bypass credential:use on an unsaved test."""
+    params = definition["triggers"][0]["parameters"]
+    project_id = uuid4()
+    with (
+        patch(f"{SERVICE}.validate_workflow_references", new_callable=AsyncMock) as references,
+        patch.object(service, "_validate_credential_project_scope", new_callable=AsyncMock) as credentials,
+    ):
+        await service.validate_event_subscribe_access(params, project_id)
+    references.assert_awaited_once()
+    definition_arg = references.call_args.args[1]
+    assert definition_arg["triggers"][0]["parameters"] == params
+    assert references.call_args.args[2] == project_id
+    credentials.assert_awaited_once_with(definition_arg, project_id)
+
+
 @pytest.fixture
 def definition() -> dict[str, Any]:
     return {

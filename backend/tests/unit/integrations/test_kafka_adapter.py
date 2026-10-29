@@ -12,7 +12,7 @@ import pytest
 from aiokafka import client as aiokafka_client
 from aiokafka.errors import AuthenticationFailedError, KafkaConnectionError, KafkaError, KafkaTimeoutError
 
-from syntara.integrations.adapters.kafka import KafkaAdapter
+from syntara.integrations.adapters.kafka import KafkaAdapter, KafkaAuthenticationConfigurationError
 from syntara.integrations.adapters.protocol import HealthCheckErrorType, IntegrationAdapter
 from syntara.integrations.lib.kafka_connection import KafkaHealthClient
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
@@ -137,6 +137,8 @@ class TestKafkaValidateAuth:
             {"kafka_username": "user", "kafka_password": ""},
             {"kafka_username": "user", "kafka_password": "   "},
             {"kafka_username": "  ", "kafka_password": "secret"},
+            {"kafka_username": "user", "kafka_password": " \t"},
+            {"kafka_username": None, "kafka_password": "secret"},
         ],
     )
     async def test_missing_credentials_are_auth_failure(
@@ -149,6 +151,18 @@ class TestKafkaValidateAuth:
         constructor.assert_not_called()
         assert result.success is False
         assert result.error_type == HealthCheckErrorType.AUTH_FAILURE
+
+    def test_connection_options_reject_blank_credentials_before_tls_setup(
+        self, kafka_config: KafkaConfiguration
+    ) -> None:
+        """Direct helper callers receive the same validation before resource setup."""
+        adapter = KafkaAdapter(kafka_config)
+        with patch.object(adapter, "_ssl_context") as tls:
+            with pytest.raises(
+                KafkaAuthenticationConfigurationError, match="Authentication configuration is incomplete"
+            ):
+                adapter.connection_options({"kafka_username": "user", "kafka_password": " \t"}, 10)
+        tls.assert_not_called()
 
 
 class TestKafkaValidateErrors:
@@ -306,7 +320,7 @@ class TestKafkaConcurrentValidation:
             msg = "password rejected"
             raise AuthenticationFailedError(msg)
 
-        original_factory = aiokafka_client.create_conn
+        original_factory = vars(aiokafka_client)["create_conn"]
         with patch("syntara.integrations.lib.kafka_connection._PinnedKafkaConnection.connect", fail_connection):
             first = asyncio.create_task(KafkaAdapter(kafka_config).validate(resolved_credential, 5))
             await entered.wait()
@@ -314,10 +328,10 @@ class TestKafkaConcurrentValidation:
             await asyncio.sleep(0)
             release.set()
             results = await asyncio.gather(first, second)
-            assert aiokafka_client.create_conn is original_factory
+            assert vars(aiokafka_client)["create_conn"] is original_factory
 
             third = await KafkaAdapter(kafka_config).validate(resolved_credential, 5)
-            assert aiokafka_client.create_conn is original_factory
+            assert vars(aiokafka_client)["create_conn"] is original_factory
 
         assert attempts == 3
         assert all(result.error_type == HealthCheckErrorType.AUTH_FAILURE for result in [*results, third])
@@ -344,7 +358,7 @@ class TestKafkaConcurrentValidation:
             closed.append(client)
             await original_close(client)
 
-        original_factory = aiokafka_client.create_conn
+        original_factory = vars(aiokafka_client)["create_conn"]
         with (
             patch("syntara.integrations.lib.kafka_connection._PinnedKafkaConnection.connect", wait_for_release),
             patch.object(KafkaHealthClient, "close", close_client),
@@ -362,7 +376,7 @@ class TestKafkaConcurrentValidation:
             finally:
                 release.set()
                 await first
-            assert aiokafka_client.create_conn is original_factory
+            assert vars(aiokafka_client)["create_conn"] is original_factory
 
         assert len(closed) == 2
 

@@ -4498,7 +4498,7 @@ requires-dist = [
     { name = "langsmith", specifier = ">=0.8.18" },
     { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "msgraph-sdk", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.6.0,<1.19" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.14,<1.19" },
     { name = "nh3", specifier = ">=0.2.21" },
     { name = "openapi-python-client", marker = "extra == 'dev'", specifier = ">=0.28.3,<0.29.0" },
     { name = "opentelemetry-api", specifier = ">=1.39.1" },
@@ -4568,7 +4568,7 @@ dev = [
 
 [[package]]
 name = "syntara-api-client"
-version = "1.4.0"
+version = "1.6.0"
 source = { editable = "src/api_client" }
 dependencies = [
     { name = "attrs" },

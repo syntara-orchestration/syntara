@@ -9,14 +9,28 @@ class EventStreamError(SyntaraError):
     """Base exception for all event stream subscription errors."""
 
 
+@fastapi_exception(handler="syntara.eventstreams.error_handlers.event_subscription_control_conflict_handler")
+class EventSubscriptionControlConflictError(EventStreamError):
+    """A stale revision or missing safety evidence prevents a control action."""
+
+
+@fastapi_exception(handler="syntara.eventstreams.error_handlers.event_subscription_not_found_handler")
+class EventSubscriptionNotFoundError(EventStreamError):
+    """No current subscription exists within the requested workflow/project."""
+
+    def __init__(self) -> None:
+        """Use the same safe response for absent, retired and unrelated IDs."""
+        super().__init__("Event subscription not found")
+
+
 @fastapi_exception(handler="syntara.eventstreams.error_handlers.event_subscription_in_use_error_handler")
 class EventSubscriptionInUseError(EventStreamError):
     """Raised when deleting a resource still bound by event-subscription evidence.
 
     Deletion is blocked conservatively while a non-retired subscription or source
     still references the workflow, Integration or credential. Retirement alone
-    does not authorize deletion; recovery-aware evidence release is coordinated by
-    a later story, so the caller must resolve the bound subscriptions first.
+    does not authorize deletion; recovery-aware evidence release must establish
+    eligibility before the caller can remove bound resources.
     """
 
     def __init__(self, resource_kind: str, resource_name: str, total_count: int) -> None:
@@ -39,3 +53,34 @@ class EventSubscriptionInUseError(EventStreamError):
             "Bound subscription evidence blocks deletion until it is released by a "
             "recovery-aware operation; retirement alone does not unblock it."
         )
+
+
+class StaleEpochError(EventStreamError):
+    """Operation rejected because the local assignment epoch was superseded."""
+
+    def __init__(self, *, expected: int, current: int) -> None:
+        """Record expected and current epoch values."""
+        self.expected_epoch = expected
+        self.current_epoch = current
+        super().__init__(f"Stale assignment epoch: expected {expected}, current {current}")
+
+
+class OwnershipRevokedError(EventStreamError):
+    """Partition is not in the current assignment."""
+
+    def __init__(self, partition: int) -> None:
+        """Record the unassigned partition number."""
+        self.partition = partition
+        super().__init__(f"Partition {partition} is not currently assigned")
+
+
+class ConsumerNotRunningError(EventStreamError):
+    """Operation attempted on a consumer that is not started or already stopped."""
+
+    def __init__(self) -> None:
+        """Initialize with a fixed message."""
+        super().__init__("Consumer is not running")
+
+
+class KafkaTransportError(EventStreamError):
+    """Sanitized wrapper around an aiokafka error; credentials are never included."""
