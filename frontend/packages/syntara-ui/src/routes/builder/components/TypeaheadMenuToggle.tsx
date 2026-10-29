@@ -92,7 +92,15 @@ export function TypeaheadMenuToggle({
         />
         {showClearFilter && (
           <TextInputGroupUtilities>
-            <Button variant="plain" onClick={() => onFilterChange('')} aria-label="Clear filter">
+            <Button
+              variant="plain"
+              onClick={(event) => {
+                event.stopPropagation()
+                onFilterChange('')
+                inputRef.current?.focus()
+              }}
+              aria-label="Clear filter"
+            >
               <RhUiCloseIcon />
             </Button>
           </TextInputGroupUtilities>

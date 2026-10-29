@@ -346,6 +346,21 @@ describe('Kafka Subscribe form', () => {
     expect(screen.queryByRole('option', { name: 'Orders Kafka' })).not.toBeInTheDocument()
   })
 
+  it('keeps the Integration menu open and restores options after clearing its filter', async () => {
+    const user = userEvent.setup()
+    renderKafka()
+    const input = screen.getByRole('textbox', { name: 'Kafka Integration' })
+    await waitFor(() => expect(input).toHaveValue('Orders Kafka'))
+    await user.click(input)
+    await user.type(input, 'not found')
+    await user.click(screen.getByRole('button', { name: 'Clear filter' }))
+
+    expect(screen.getByRole('listbox', { name: 'Kafka Integrations' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Orders Kafka' })).toBeInTheDocument()
+    expect(input).toHaveValue('')
+    expect(input).toHaveFocus()
+  })
+
   it('has no accessibility violations, including the expanded Integration selector', async () => {
     const user = userEvent.setup()
     const { container } = renderKafka()
