@@ -376,6 +376,70 @@ class TestOrchestrationServiceErrorHandling:
             assert len(error_calls) == 1
 
     @pytest.mark.asyncio
+    async def test_streaming_failure_is_logged_once_with_traceback_and_context(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A streaming failure is logged exactly once, with traceback and context (AAP-97930).
+
+        The orchestration service's streaming ``except`` block owns the single
+        traceback log entry; ``_handle_streaming_error`` must only classify and
+        publish the error event, not log the same exception again.
+        """
+        caplog.set_level(logging.ERROR)
+
+        mock_llm = AsyncMock()
+        mock_llm.model_name = "test-model"
+
+        mock_context_manager = MagicMock()
+        mock_context_manager.plan_request = AsyncMock(return_value=ContextPackage(payload={}, grounding_score=0.0))
+
+        service = OrchestrationService(mock_llm, mock_context_manager)
+        invocation_id = uuid4()
+
+        async def error_generator(*, should_yield: bool = False) -> AsyncGenerator[dict[str, Any], None]:
+            msg = "LLM streaming error"
+            if should_yield:  # Never called with True, but makes this a generator
+                yield create_mock_streaming_event("on_chat_model_stream", "")
+            raise RuntimeError(msg)
+
+        mock_graph = AsyncMock()
+        mock_graph.astream_events = lambda *_args, **_kwargs: error_generator()
+
+        with (
+            patch.object(service, "_setup_graph", return_value=mock_graph),
+            patch("syntara.agent_orchestrator.services.orchestration_service.StreamClient") as mock_stream_client,
+        ):
+            mock_client_instance = AsyncMock()
+            mock_stream_client.return_value.__aenter__.return_value = mock_client_instance
+
+            with pytest.raises(RuntimeError):
+                await service.execute(
+                    prompt="Test",
+                    session_id="test-session",
+                    invocation_id=invocation_id,
+                    actor_context=AuditActorContext(),
+                    ctx=InvocationContextData(),
+                )
+
+        error_records = [
+            record
+            for record in caplog.records
+            if record.name == "syntara.agent_orchestrator.services.orchestration_service"
+            and record.levelno >= logging.ERROR
+        ]
+
+        # The single failure must produce exactly one traceback log entry.
+        assert len(error_records) == 1, [record.getMessage() for record in error_records]
+
+        # structlog's format_exc_info renders the traceback into the event, so the
+        # record carries it even though ``record.exc_info`` itself is consumed.
+        message = error_records[0].getMessage()
+        assert "Traceback (most recent call last)" in message
+        assert "RuntimeError: LLM streaming error" in message
+        assert str(invocation_id) in message
+        assert "Streaming orchestration failed" not in caplog.text
+
+    @pytest.mark.asyncio
     async def test_tool_discovery_failure_publishes_stream_error_and_failure_signal(self) -> None:
         """Discovery/selection failures during setup must use the stream failure path.
 
