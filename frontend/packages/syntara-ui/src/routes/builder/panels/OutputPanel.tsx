@@ -15,12 +15,13 @@ import { useMemo, useState } from 'react'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { useMockDataStore } from '../../../stores/useMockDataStore'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
-import { selectActivities } from '../../../stores/workflowStoreSelectors'
+import { selectActivities, selectTriggers } from '../../../stores/workflowStoreSelectors'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { InlineMockEditor } from './InlineMockEditor'
 import styles from './panels.module.css'
 import { buildMockJsonSkeleton, parseJsonObject } from './utils/mockDataUtils'
+import { getTriggerInputSchemaFields } from './utils/triggerSchemaUtils'
 import { OutputJsonView } from './views/OutputJsonView'
 import { OutputSchemaView } from './views/OutputSchemaView'
 import { OutputTableView } from './views/OutputTableView'
@@ -42,11 +43,14 @@ export function OutputPanel({ outputData, nodeId }: Readonly<OutputPanelProps>) 
   const unpinOutputMock = useMockDataStore((s) => s.unpinOutputMock)
   const outputMock = useMockDataStore((s) => s.getOutputMock(nodeId))
   const activities = useWorkflowStore(selectActivities)
+  const triggers = useWorkflowStore(selectTriggers)
 
   const nodeType = useMemo(() => {
     const activity = activities?.find((a) => a.id === nodeId)
-    return activity?.type ?? null
-  }, [activities, nodeId])
+    if (activity) return activity.type
+    const trigger = triggers?.find((t) => t.id === nodeId)
+    return trigger?.type ?? null
+  }, [activities, triggers, nodeId])
 
   // Priority: real execution data > mock data > empty
   const displayData = outputData ?? outputMock
@@ -57,8 +61,9 @@ export function OutputPanel({ outputData, nodeId }: Readonly<OutputPanelProps>) 
       return JSON.stringify(outputData, null, 2)
     }
 
-    // Fallback: use the node type's output schema
-    const skeleton = buildMockJsonSkeleton(nodeType, null)
+    // Fallback: use the node type's output schema, or the trigger's input schema
+    // (a trigger's "output" to the workflow IS the event payload defined by its input schema)
+    const skeleton = buildMockJsonSkeleton(nodeType, getTriggerInputSchemaFields(nodeId, triggers))
     return skeleton !== '{}' ? skeleton : '{\n\n}'
   }
 
