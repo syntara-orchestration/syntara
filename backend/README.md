@@ -87,6 +87,38 @@ This project uses `uv` for dependency management and provides a comprehensive Ma
    make install
    ```
 
+### Control-plane Kafka Worker
+
+Run the standalone consumer process from `backend/` after installing dependencies
+and applying database migrations:
+
+```bash
+APP_EVENTSTREAM_ENABLED=true uv run python -m syntara.eventstreams.consumer_entrypoint
+```
+
+Use the existing database, encryption-key, signing-key, and Temporal TLS settings
+in `.env`. Each process registers a fresh UUID and claims a fair share of active
+subscriptions through PostgreSQL placement leases. Redis hints and terminal-proof
+caching are optional; PostgreSQL remains authoritative.
+
+Readiness follows registration and the first successful authoritative
+reconciliation, including when the process owns no subscriptions. Broker
+connections start independently. Prepared-delivery recovery also runs when no
+consumer is owned.
+
+SIGINT/SIGTERM close reconciliation, recovery claims, and admission immediately.
+Cleanup marks membership draining and retains heartbeats and lease renewals through
+bounded consumer drain. Consumers stop before their leases are released. A failed
+draining write is retried best effort; if PostgreSQL stays unavailable, peers must
+wait for membership expiry. Unresolved work is retained, and shared clients close
+after bounded cleanup.
+
+Optional compose profiles run the existing Python worker entrypoint and provide
+a disposable local Kafka fixture; see [local Kafka examples](samples/kafka/README.md)
+and [runtime operating guidance](docs/kafka-worker-operations.md).
+Operator-managed deployment, container launchers and deployment health probes are
+deferred to M2. This local packaging adds no autoscaling or per-subscription deployments.
+
 ### Dependency Management
 
 This project uses `uv` for dependency management with two key files:
@@ -785,3 +817,4 @@ Code quality and coverage are tracked via SonarCloud. SonarCloud analysis runs a
 - 📖 **[Developer Getting Started Guide](docs/developer-getting-started.md)** - Architecture deep dive with examples
 - 📖 **[Development with Worktrees Guide](docs/development-with-worktrees.md)** - Parallel development setup
 - 📖 **[Architecture Decision Records](docs/decision-records.md)** - Design rationale and decisions
+- [Subscription placement and local supervision](docs/subscription-placement.md) - Provider contracts and worker composition boundary

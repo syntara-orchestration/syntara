@@ -27,7 +27,9 @@ from aiokafka.errors import (
 )
 from aiokafka.structs import OffsetAndMetadata
 
+from syntara.core.config.base import get_settings
 from syntara.eventstreams.adapters.kafka_identity import SourceMetadataRequest, decode_source_identity
+from syntara.eventstreams.adapters.kafka_metadata import KafkaSourceMetadata, KafkaTimestampType
 from syntara.eventstreams.core.consumer import (
     MAX_POSITION_OFFSET,
     CommittedPositionResult,
@@ -38,6 +40,7 @@ from syntara.eventstreams.core.consumer import (
     RebalanceCallback,
     SourceIdentityObservation,
 )
+from syntara.eventstreams.core.envelope import RawEvent, RawEventHeader
 from syntara.eventstreams.exceptions import (
     ConsumerNotRunningError,
     KafkaTransportError,
@@ -46,10 +49,11 @@ from syntara.eventstreams.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Coroutine, Iterable
+    from collections.abc import Callable, Coroutine, Iterable, Iterator
 
     from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
     from syntara.eventstreams.core.connection import ResolvedKafkaConnection
+    from syntara.eventstreams.core.source_metadata import EventSourceMetadata
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -112,6 +116,8 @@ class KafkaPartitionConsumer:
         self._assignment: frozenset[int] = frozenset()
         self._epoch: int = 0
         self._running: bool = False
+        self._stop_task: asyncio.Task[None] | None = None
+        self._position_operations: set[int] = set()
 
     @property
     def assignment(self) -> frozenset[int]:
@@ -138,11 +144,37 @@ class KafkaPartitionConsumer:
         """Return the consumer group identifier."""
         return self._source_config.group_id
 
+    def set_rebalance_callback(self, callback: RebalanceCallback) -> None:
+        """Bind a runner before startup without exposing the underlying client."""
+        if self._running:
+            msg = "Rebalance callbacks must be bound before startup"
+            raise ValueError(msg)
+        self._rebalance_callback = callback
+
+    @contextlib.contextmanager
+    def position_operation(self, partition: int, *, expected_epoch: int) -> Iterator[bool]:
+        """Keep finite position changes exclusive across services sharing this client."""
+        self._require_running()
+        self._check_epoch(expected_epoch)
+        self._check_ownership(partition)
+        if partition in self._position_operations:
+            yield False
+            return
+        self._position_operations.add(partition)
+        try:
+            yield True
+        finally:
+            self._position_operations.remove(partition)
+
     async def start(self) -> None:
         """Construct the ``AIOKafkaConsumer``, start it, and subscribe."""
         if self._running:
             return
+        if self._consumer is not None:
+            msg = "Consumer shutdown is incomplete; retry stop before starting"
+            raise KafkaTransportError(msg)
 
+        settings = get_settings()
         consumer = AIOKafkaConsumer(
             bootstrap_servers=list(self._connection.bootstrap_servers),
             client_id=self._client_id or f"syntara-event-{self._source_config.group_id}",
@@ -164,16 +196,21 @@ class KafkaPartitionConsumer:
             auto_offset_reset="none",
             isolation_level="read_committed",
             partition_assignment_strategy=(RoundRobinPartitionAssignor,),
+            max_poll_records=settings.event_fetch_max_records,
+            fetch_max_bytes=settings.event_queue_max_bytes,
+            max_partition_fetch_bytes=settings.event_queue_max_bytes,
         )
 
+        # Startup can be cancelled by a deadline or shutdown; retain ownership
+        # so the runner's cleanup can close a partially started client.
+        self._consumer = consumer
         try:
             await consumer.start()
         except KafkaError as exc:
-            with contextlib.suppress(KafkaError):
-                await consumer.stop()
+            with contextlib.suppress(KafkaTransportError):
+                await self.stop()
             raise KafkaTransportError(_sanitize(str(exc))) from exc
 
-        self._consumer = consumer
         self._running = True
 
         listener = _RebalanceListener(
@@ -182,27 +219,103 @@ class KafkaPartitionConsumer:
         )
         consumer.subscribe([self._source_config.topic], listener=listener)
 
+    async def fetch(
+        self,
+        partitions: Iterable[int],
+        context: EventSourceMetadata,
+        *,
+        expected_epoch: int,
+        max_records: int,
+        timeout_ms: int,
+    ) -> dict[int, list[RawEvent]]:
+        """Fetch only requested owned partitions; returned positions never authorize commits.
+
+        Kafka may return an oversized batch despite byte limits. The runner
+        bounds its retained queues and seeks unqueued records back while owned.
+        No callback lock is held across getmany().
+        """
+        if max_records <= 0 or timeout_ms <= 0:
+            msg = "Fetch limits must be positive"
+            raise ValueError(msg)
+        consumer = self._require_running()
+        self._check_epoch(expected_epoch)
+        requested = tuple(dict.fromkeys(partitions))
+        for partition in requested:
+            self._check_ownership(partition)
+        if not requested:
+            consumer.pause(*(self._tp(partition) for partition in self._assignment))
+        try:
+            batches = await consumer.getmany(
+                *(self._tp(partition) for partition in requested),
+                timeout_ms=timeout_ms,
+                max_records=max_records,
+            )
+        except KafkaError as exc:
+            raise KafkaTransportError(_sanitize(str(exc))) from None
+        self._require_running()
+        self._check_epoch(expected_epoch)
+        result: dict[int, list[RawEvent]] = {}
+        for tp, records in batches.items():
+            self._check_ownership(tp.partition)
+            if tp.topic != self.topic or tp.partition not in requested:
+                msg = "Unexpected partition in fetch response"
+                raise KafkaTransportError(msg)
+            result[tp.partition] = [
+                RawEvent(
+                    value=record.value,
+                    key=record.key,
+                    headers=tuple(RawEventHeader(name=name, value=value) for name, value in record.headers),
+                    source_metadata=KafkaSourceMetadata(
+                        **context.model_dump(),
+                        topic=tp.topic,
+                        partition=tp.partition,
+                        offset=str(record.offset),
+                        timestamp_ms=record.timestamp,
+                        timestamp_type=(
+                            KafkaTimestampType.create_time
+                            if record.timestamp_type == 0
+                            else KafkaTimestampType.log_append_time
+                            if record.timestamp_type == 1
+                            else None
+                        ),
+                    ),
+                )
+                for record in records
+            ]
+        return result
+
     async def stop(self) -> None:
         """Stop the consumer and release resources.
 
         Raises ``KafkaTransportError`` if the client fails to shut down.
-        The client reference is cleared regardless so a failed stop does
-        not leave a stale handle.  Safe to call when already stopped.
+        Retain the client after a failed/cancelled close so stop can retry.
+        Safe to call when already stopped.
         Revoke callbacks can drain using their current ownership/epoch until
-        the client finishes stopping; final cleanup then invalidates that epoch.
+        the stop call exits; final cleanup then invalidates that epoch.
         """
         consumer = self._consumer
+        if consumer is None:
+            return
+        if self._stop_task is None:
+            self._stop_task = asyncio.create_task(consumer.stop())
+            self._stop_task.add_done_callback(self._stop_settled)
         try:
-            if consumer is not None:
-                await consumer.stop()
+            await asyncio.shield(self._stop_task)
         except KafkaError as exc:
             raise KafkaTransportError(_sanitize(str(exc))) from None
+        else:
+            self._consumer = None
+            self._stop_task = None
         finally:
             if self._running:
                 self._epoch += 1
             self._running = False
-            self._consumer = None
             self._assignment = frozenset()
+
+    @staticmethod
+    def _stop_settled(task: asyncio.Task[None]) -> None:
+        if not task.cancelled():
+            task.exception()
 
     async def seek(self, partition: int, offset: int, *, expected_epoch: int) -> None:
         """Seek a partition to an offset; reject stale epochs."""
