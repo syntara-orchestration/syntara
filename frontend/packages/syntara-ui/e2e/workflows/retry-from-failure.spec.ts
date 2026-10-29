@@ -1,6 +1,5 @@
 /**
  * E2E Tests: Retry from failure
- * Jira: AAP-99052 (epic AAP-92814; implementation AAP-92821 / AAP-92822)
  *
  * Objective: Verify the user-visible retry-from-failure flow on the execution
  * detail page — eligibility, the retry review panel, starting a retry, and the
