@@ -1,5 +1,6 @@
 """Integration Service for database operations and business logic."""
 
+import asyncio
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from typing import NoReturn
@@ -418,11 +419,15 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             include_total=include_total,
         )
 
-    def _validate_configuration_ssrf(self, configuration: IntegrationConfigurationInputTypes) -> None:
+    async def _validate_configuration_ssrf(
+        self, configuration: IntegrationConfigurationInputTypes, *, runtime: bool = False
+    ) -> None:
         """Reject an address that resolves to a private, reserved, or cloud metadata address.
 
         Called at write time (create/patch) and again in this service's outbound
         entrypoints (discover/validate/refresh) as defense in depth against DNS re-pointing.
+        Kafka runtime checks instead run at its pinned connection boundary. DNS
+        validation here runs off the event loop, including create/patch checks.
         The same policy is re-run at the runtime outbound boundaries that read the stored
         base_url directly (AAP proxy, workflow AAP resolution, LLM invocation, MCP tool
         connect); all boundaries route through the shared
@@ -432,8 +437,12 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         configuration model validators because those also run when configurations are
         deserialized from the database on every read.
         """
+        # Kafka runtime checks resolve and pin addresses inside the adapter's
+        # timeout. Rechecking here would add an unbounded DNS pass before it.
+        if runtime and isinstance(configuration, KafkaConfiguration):
+            return
         try:
-            validate_integration_configuration_no_ssrf(configuration)
+            await asyncio.to_thread(validate_integration_configuration_no_ssrf, configuration)
         except ValueError as e:
             target = "bootstrap_servers" if getattr(configuration, "bootstrap_servers", None) else "base_url"
             msg = f"{target} must not resolve to a private, reserved, or cloud metadata address."
@@ -454,7 +463,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         elif _credential_required(data.integration_type, data.configuration):
             raise IntegrationCredentialRequiredError(data.integration_type.value)
 
-        self._validate_configuration_ssrf(data.configuration)
+        await self._validate_configuration_ssrf(data.configuration)
 
         integration = Integration(
             name=data.name,
@@ -652,7 +661,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
                     f"does not match integration type '{integration.integration_type.value}'"
                 )
                 raise SafeValueError(msg)
-            self._validate_configuration_ssrf(data.configuration)
+            await self._validate_configuration_ssrf(data.configuration)
 
         if "management_credential_id" in data.model_fields_set and data.management_credential_id is not None:
             await self._validate_credential_type(integration.integration_type, data.management_credential_id)
@@ -927,10 +936,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
 
         try:
-            # Inside the handler that persists ERROR. A broker DNS/SSRF failure
-            # raises, and leaving it here would skip that update and leave the
-            # row in VALIDATING. Build the adapter only after that check.
-            self._validate_configuration_ssrf(integration.configuration)
+            # Keep non-Kafka SSRF errors inside the handler that persists ERROR.
+            # Kafka checks run at its socket boundary under the adapter timeout.
+            await self._validate_configuration_ssrf(integration.configuration, runtime=True)
             adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
             result = await adapter.validate(resolved_credential, timeout_seconds)
 
@@ -980,7 +988,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         """
         # Reject SSRF-prone base_url before any outbound request. discover() bypasses
         # create/patch, so without this the adapter would hit private/metadata targets.
-        self._validate_configuration_ssrf(data.configuration)
+        await self._validate_configuration_ssrf(data.configuration, runtime=True)
 
         if data.credential_id is None and _credential_required(data.integration_type, data.configuration):
             raise IntegrationCredentialRequiredError(data.integration_type.value)
@@ -1080,7 +1088,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         try:
             # Same placement as validate: a DNS/SSRF failure must reach the
             # handler that records refresh ERROR instead of leaving REFRESHING.
-            self._validate_configuration_ssrf(integration.configuration)
+            await self._validate_configuration_ssrf(integration.configuration, runtime=True)
             adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
             discover_result = await adapter.discover(resolved_credential, timeout_seconds)
 

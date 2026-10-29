@@ -483,6 +483,39 @@ describe('IntegrationForm', () => {
       await user.click(screen.getByRole('button', { name: 'Next' }))
     }
 
+    it('keeps the plaintext warning and clears step-one errors as fields are corrected', async () => {
+      const user = userEvent.setup()
+      const { container } = render(<IntegrationForm />, { wrapper })
+      await selectKafka(user)
+      await user.click(screen.getByRole('button', { name: 'Security protocol' }))
+      await user.click(screen.getByRole('option', { name: /^PLAINTEXT/ }))
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+
+      const checkbox = screen.getByRole('checkbox', { name: 'Allow unencrypted, unauthenticated connections' })
+      expect(checkbox).toBeRequired()
+      expect(checkbox).toBeInvalid()
+      expect(checkbox).toHaveAccessibleDescription(/Confirm that unencrypted connections are allowed/)
+      expect(checkbox).toHaveAccessibleDescription(/Anyone with network access may read or modify traffic/)
+      expect(screen.getByText('Server name / ID is required')).toBeInTheDocument()
+      expect(screen.getByText('At least one bootstrap server is required')).toBeInTheDocument()
+      expect(await axe(container)).toHaveNoViolations()
+
+      await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Production Kafka')
+      await waitFor(() => expect(screen.queryByText('Server name / ID is required')).not.toBeInTheDocument())
+      await user.type(screen.getByRole('textbox', { name: 'Bootstrap servers' }), 'broker.example.com:9092')
+      await waitFor(() =>
+        expect(screen.queryByText('At least one bootstrap server is required')).not.toBeInTheDocument()
+      )
+      checkbox.focus()
+      await user.keyboard('[Space]')
+      await waitFor(() => expect(checkbox).toBeValid())
+      expect(checkbox).toBeChecked()
+      expect(screen.queryByText('Confirm that unencrypted connections are allowed')).not.toBeInTheDocument()
+      expect(checkbox).toHaveAccessibleDescription(/Anyone with network access may read or modify traffic/)
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+      expect(screen.getByTestId('credential-selector')).toBeInTheDocument()
+    })
+
     it('saves the broker list from the credential step', async () => {
       const { createAsyncMutate } = mockMutations()
       const user = userEvent.setup()
