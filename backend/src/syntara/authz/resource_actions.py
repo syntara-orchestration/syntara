@@ -2,9 +2,10 @@
 
 Instead of maintaining a static dictionary, this module builds the
 resource-actions catalog at startup by introspecting the FastAPI route
-dependencies (``PermissionChecker``, ``ProjectScopeFilter``) and merging
-with ``BUILTIN_POLICIES``.  The result is stored in a module-level holder
-and on ``app.state.resource_actions`` so both request-scoped code and the
+dependencies (``PermissionChecker``, ``ProjectScopeFilter``), merging
+with ``BUILTIN_POLICIES``, and adding explicit non-routed pairs such as
+``step_type:write``.  The result is stored in a module-level holder and
+on ``app.state.resource_actions`` so both request-scoped code and the
 policy service can access it.
 """
 
@@ -89,10 +90,12 @@ def validate_statements(statements: list[dict[str, Any]]) -> list[str]:
 def get_project_eligible_resource_types() -> frozenset[str]:
     """Return resource types that are valid at project scope.
 
-    Derived at startup from route introspection: a resource type is
+    Mostly derived at startup from route introspection: a resource type is
     project-eligible when its ``PermissionChecker`` references a model
     with a ``project_id`` field, or uses ``project_param`` /
-    ``body_project_field``.
+    ``body_project_field``. Explicit non-routed exceptions are also
+    included (``project`` itself and ``step_type``, which lives inside
+    workflow definitions and has no routes to scan).
 
     Raises:
         RuntimeError: If called before ``build_resource_actions`` has run.

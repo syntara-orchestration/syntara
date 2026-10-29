@@ -1,4 +1,4 @@
-"""The policy kind contract covers every backend step type."""
+"""The policy kind contract covers grantable authoring step types."""
 
 import json
 from pathlib import Path
@@ -9,29 +9,44 @@ import pytest
 from syntara.workflows.node_kinds import NODE_KINDS, node_labels, validate_node_kind_statements
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
+_SYSTEM_ONLY_NODE_TYPES = frozenset({NodeType.INTERNAL_ACTIVITY.value})
+_GRANTABLE_NODE_TYPES = sorted(NODE_KINDS)
 
-def test_registry_and_schema_catalog_match_node_types() -> None:
-    """Frontend mapping tests consume this catalog, so it must match the enum."""
+
+def test_registry_and_schema_catalog_cover_all_node_types() -> None:
+    """Catalog matches the full enum; grantable kinds exclude system-only types."""
     catalog_path = (
         Path(__file__).resolve().parents[3] / "src/syntara/schemas/workflows/v2/catalog/node_type_catalog.json"
     )
     catalog = json.loads(catalog_path.read_text())
-    assert {node_type.value for node_type in NodeType} == NODE_KINDS
-    assert {entry["type"] for entry in catalog["node_types"]} == NODE_KINDS
+    all_node_types = {node_type.value for node_type in NodeType}
+    catalog_types = {entry["type"] for entry in catalog["node_types"]}
+    assert catalog_types == all_node_types
+    assert all_node_types - _SYSTEM_ONLY_NODE_TYPES == NODE_KINDS
+    assert _SYSTEM_ONLY_NODE_TYPES.isdisjoint(NODE_KINDS)
 
 
-@pytest.mark.parametrize("node_type", list(NodeType))
+@pytest.mark.parametrize("kind", _GRANTABLE_NODE_TYPES)
 @pytest.mark.parametrize("condition", ["resource_labels", "resource_labels_not"])
-def test_every_node_type_is_a_valid_kind(node_type: NodeType, condition: str) -> None:
+def test_every_grantable_kind_is_valid(kind: str, condition: str) -> None:
     """Triggers and flow-control types use the same contract as actions."""
-    statements = [{"actions": ["step_type:write"], "conditions": {condition: {"kind": node_type.value}}}]
+    statements = [{"actions": ["step_type:write"], "conditions": {condition: {"kind": kind}}}]
     assert validate_node_kind_statements(statements) is None
 
 
 @pytest.mark.parametrize("action", ["step_type:write", "step_type:*"])
-@pytest.mark.parametrize("labels", [{"kind": "scritp"}, {"kind": "*"}, {"kind": []}, {"kind": None}])
+@pytest.mark.parametrize(
+    "labels",
+    [
+        {"kind": "scritp"},
+        {"kind": "*"},
+        {"kind": []},
+        {"kind": None},
+        {"kind": NodeType.INTERNAL_ACTIVITY.value},
+    ],
+)
 def test_unknown_or_malformed_kind_rejected(action: str, labels: dict[str, Any]) -> None:
-    """Unknown values cannot silently create policies that match nothing."""
+    """Unknown values (including system-only types) cannot create silent no-ops."""
     error = validate_node_kind_statements([{"actions": [action], "conditions": {"resource_labels": labels}}])
     assert error is not None
     assert "Unknown step type" in error
@@ -40,7 +55,7 @@ def test_unknown_or_malformed_kind_rejected(action: str, labels: dict[str, Any])
 
 @pytest.mark.parametrize("conditions", [None, {}, {"resource_labels": {}}, {"resource_labels_not": {}}])
 def test_kind_condition_is_optional(conditions: dict[str, Any] | None) -> None:
-    """A statement without kind targets every step type."""
+    """A statement without kind targets every grantable step type."""
     assert validate_node_kind_statements([{"actions": ["step_type:write"], "conditions": conditions}]) is None
 
 

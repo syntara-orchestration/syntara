@@ -1,6 +1,8 @@
 """Step-type identifiers and labels for authoring policies.
 
-Every NodeType is a valid ``kind`` on the ``step_type:write`` resource.
+Grantable ``kind`` values on the ``step_type:write`` resource are the
+authoring/palette ``NodeType`` values. System-only types such as
+``internal_activity`` are excluded so they cannot be granted via policy.
 Registration does not enforce permissions on workflow writes.
 """
 
@@ -11,7 +13,11 @@ from syntara.workflows.workflow_engine.models.workflow_definition import NodeTyp
 NODE_RESOURCE_TYPE = "step_type"
 NODE_KIND_LABEL = "kind"
 NODE_ACTION_WRITE = "write"
-NODE_KINDS: frozenset[str] = frozenset(node_type.value for node_type in NodeType)
+# System-only node types are not grantable via authoring policies.
+_NON_GRANTABLE_NODE_KINDS: frozenset[str] = frozenset({NodeType.INTERNAL_ACTIVITY.value})
+NODE_KINDS: frozenset[str] = frozenset(
+    node_type.value for node_type in NodeType if node_type.value not in _NON_GRANTABLE_NODE_KINDS
+)
 
 
 def node_labels(node: dict[str, Any]) -> dict[str, str]:
