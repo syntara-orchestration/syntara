@@ -37,6 +37,10 @@ _CLIENT_ID = "syntara-kafka-integration"
 _MS_PER_SECOND = 1000
 
 
+class KafkaAuthenticationConfigurationError(ValueError):
+    """Kafka connection options require usable normalized SASL credentials."""
+
+
 class KafkaAdapter:
     """Adapter for Kafka integrations implementing validate() and discover().
 
@@ -86,6 +90,30 @@ class KafkaAdapter:
             context.load_verify_locations(cadata=self._config.ca_certificate)
         return context
 
+    def connection_options(self, resolved_credential: dict[str, Any], timeout_seconds: int) -> dict[str, Any]:
+        """Validate credentials and build shared management/runtime options.
+
+        Raises KafkaAuthenticationConfigurationError before constructing TLS or
+        network resources when SASL is required and either normalized credential is empty.
+        Password whitespace remains part of the stored credential.
+        """
+        login = _sasl_login(resolved_credential)
+        if login is None and kafka_credential_required(self._config.security_protocol):
+            msg = "Authentication configuration is incomplete"
+            raise KafkaAuthenticationConfigurationError(msg)
+        username, password = login or (None, None)
+        return {
+            "client_id": _CLIENT_ID,
+            "security_protocol": self._config.security_protocol,
+            "sasl_mechanism": self._config.sasl_mechanism,
+            "sasl_plain_username": username,
+            "sasl_plain_password": password,
+            "ssl_context": self._ssl_context()
+            if self._config.security_protocol != KafkaSecurityProtocol.PLAINTEXT
+            else None,
+            "request_timeout_ms": timeout_seconds * _MS_PER_SECOND,
+        }
+
     async def validate(
         self,
         resolved_credential: dict[str, Any],
@@ -101,8 +129,9 @@ class KafkaAdapter:
                 per-attempt budget.
 
         """
-        login = _sasl_login(resolved_credential)
-        if login is None and kafka_credential_required(self._config.security_protocol):
+        try:
+            options = self.connection_options(resolved_credential, timeout_seconds)
+        except KafkaAuthenticationConfigurationError:
             logger.warning("Kafka validate: no usable credentials configured")
             return ValidateResult(
                 success=False,
@@ -110,7 +139,6 @@ class KafkaAdapter:
                 error="Authentication configuration is incomplete",
                 error_type=HealthCheckErrorType.AUTH_FAILURE,
             )
-        username, password = login or (None, None)
         rejected = self._plaintext_rejection()
         if rejected is not None:
             logger.warning("Kafka validate rejected an unsafe transport configuration")
@@ -124,15 +152,7 @@ class KafkaAdapter:
 
         client = KafkaHealthClient(
             bootstrap_servers=list(self._config.bootstrap_servers),
-            client_id=_CLIENT_ID,
-            security_protocol=self._config.security_protocol,
-            sasl_mechanism=self._config.sasl_mechanism,
-            sasl_plain_username=username,
-            sasl_plain_password=password,
-            ssl_context=self._ssl_context()
-            if self._config.security_protocol != KafkaSecurityProtocol.PLAINTEXT
-            else None,
-            request_timeout_ms=timeout_seconds * _MS_PER_SECOND,
+            **options,
         )
 
         success = True

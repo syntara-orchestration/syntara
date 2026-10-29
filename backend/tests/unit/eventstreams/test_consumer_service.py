@@ -823,3 +823,67 @@ async def test_cancelled_shutdown_retains_and_fences_slow_drain_children(manager
         await eventually(lambda: not context.manager._drain_tasks)
     assert context.runners[0].stopped
     assert ("release", key) not in context.pool.trace
+
+
+async def test_consumer_registration_fences_startup_before_factory_runs(manager_context):
+    from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
+
+    context = manager_context
+    controls = AsyncMock(spec=EventRuntimeControlService)
+    controls.register.return_value = False
+    context.manager._controls = controls
+    await context.manager.start()
+    await eventually(lambda: controls.register.await_count > 0)
+    context.factory.assert_not_awaited()
+    controls.acknowledge.assert_not_awaited()
+
+
+async def test_consumer_acknowledges_pause_only_after_verified_stop(manager_context):
+    from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
+
+    context = manager_context
+    controls = AsyncMock(spec=EventRuntimeControlService)
+    controls.register.return_value = True
+    context.manager._controls = controls
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    context.reader.read.return_value = []
+    await context.manager.reconcile()
+    await eventually(lambda: context.runners[0].stopped)
+    await eventually(
+        lambda: any(call.args[1].state == RuntimeState.STOPPED for call in controls.acknowledge.await_args_list)
+    )
+    assert controls.register.await_count == 1
+    assert controls.register.call_args.args[0] == context.snapshot
+    assert controls.register.call_args.args[1].owner == context.placement.worker
+
+
+async def test_source_replacement_acknowledges_old_runtime_before_registering_new_placement(manager_context):
+    from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
+
+    context = manager_context
+    controls = AsyncMock(spec=EventRuntimeControlService)
+    events = []
+
+    async def register(snapshot: SubscriptionSnapshot, _lease) -> bool:
+        events.append(("register", snapshot.source_id))
+        return True
+
+    async def acknowledge(snapshot: SubscriptionSnapshot, status: SubscriptionRuntimeStatus, *, lease=None) -> None:
+        if status.state == RuntimeState.STOPPED:
+            events.append(("stopped", snapshot.source_id))
+
+    controls.register.side_effect = register
+    controls.acknowledge.side_effect = acknowledge
+    context.manager._controls = controls
+    await context.manager.start()
+    await eventually(lambda: bool(context.runners) and context.runners[0].started)
+    replacement = context.snapshot.model_copy(
+        update={"source_id": uuid4(), "source_generation": 2, "configuration_revision": 2}
+    )
+    context.reader.read.return_value = [replacement]
+    await context.manager.reconcile()
+    await eventually(lambda: len(context.runners) == 2 and context.runners[1].started)
+    assert context.runners[0].stopped
+    assert context.runners[1].snapshot.source_id == replacement.source_id
+    assert events.index(("stopped", context.snapshot.source_id)) < events.index(("register", replacement.source_id))

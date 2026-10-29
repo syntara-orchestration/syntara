@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import shutil
 import stat
-import sys
 from datetime import UTC, datetime, timedelta
 from ipaddress import IPv4Address
 from pathlib import Path
@@ -53,11 +52,11 @@ if _cert_cns != _expected:
     raise RuntimeError(msg)
 
 
-def _write_key(path: Path, key: rsa.RSAPrivateKey) -> None:
+def _write_key(path: Path, key: rsa.RSAPrivateKey, *, pkcs8: bool = False) -> None:
     path.write_bytes(
         key.private_bytes(
             serialization.Encoding.PEM,
-            serialization.PrivateFormat.TraditionalOpenSSL,
+            serialization.PrivateFormat.PKCS8 if pkcs8 else serialization.PrivateFormat.TraditionalOpenSSL,
             serialization.NoEncryption(),
         )
     )
@@ -174,13 +173,15 @@ def generate_service_cert(
     _clear_path(cert_path)
     _clear_path(key_path)
     _write_cert(cert_path, cert)
-    _write_key(key_path, key)
+    _write_key(key_path, key, pkcs8=filename == "kafka")
 
 
-def _missing_service_certs() -> list[tuple[str, str, list[str]]]:
-    """Return SERVICE_CERTS entries whose cert or key file is missing or not a file."""
+def _missing_service_certs(
+    services: list[tuple[str, str, list[str]]] = SERVICE_CERTS,
+) -> list[tuple[str, str, list[str]]]:
+    """Return requested services whose cert or key file is missing or not a file."""
     missing: list[tuple[str, str, list[str]]] = []
-    for filename, cn, sans in SERVICE_CERTS:
+    for filename, cn, sans in services:
         cert_path = CERTS_DIR / f"{filename}.crt"
         key_path = CERTS_DIR / f"{filename}.key"
         if not cert_path.is_file() or not key_path.is_file():
@@ -200,7 +201,11 @@ def main() -> None:
     """Generate self-signed CA and per-service TLS certificates for local development."""
     parser = argparse.ArgumentParser(description="Generate TLS certificates for local development")
     parser.add_argument("--force", "-f", action="store_true", help="Regenerate all certificates")
+    parser.add_argument("--kafka", action="store_true", help="Include the disposable local Kafka broker certificate")
     args = parser.parse_args()
+    services = [*SERVICE_CERTS]
+    if args.kafka:
+        services.append(("kafka", "kafka.local", ["kafka"]))
 
     CERTS_DIR.mkdir(parents=True, exist_ok=True)
     CERTS_DIR.chmod(stat.S_IRWXU)  # 700
@@ -212,12 +217,12 @@ def main() -> None:
         print("[INFO] Generating CA certificate...")
         ca_key, ca_cert = generate_ca()
         print(f"  CA cert: {ca_pem}")
-        for filename, cn, sans in SERVICE_CERTS:
+        for filename, cn, sans in services:
             print(f"[INFO] Generating {filename} certificate (CN={cn})...")
             generate_service_cert(ca_key, ca_cert, filename, cn, sans)
             print(f"  Cert: {CERTS_DIR / f'{filename}.crt'}")
     else:
-        missing = _missing_service_certs()
+        missing = _missing_service_certs(services)
         if not missing:
             print("[INFO] Certificates already exist, skipping (use --force to regenerate)")
             return
@@ -237,4 +242,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(main() or 0)
+    main()

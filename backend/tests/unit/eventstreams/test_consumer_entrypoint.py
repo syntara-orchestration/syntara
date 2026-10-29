@@ -54,6 +54,10 @@ async def test_composition_shares_one_client_factory_and_resource_limits(monkeyp
         assert manager._factory._preparation._resources is shared
         assert hints._request == manager.request_reconcile
         assert manager._placement is placement
+        assert manager._controls._worker == placement.worker
+        assert manager._factory._owner == str(placement.worker.worker_id)
+        assert recovery._worker_id == str(placement.worker.worker_id)
+        assert manager._factory._cache_coordination is None
         assert manager._factory._lookup is recovery._admission._cache
         assert manager._factory._lookup.cache is redis
         assert hints._client is redis
