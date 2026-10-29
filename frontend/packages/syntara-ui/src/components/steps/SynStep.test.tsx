@@ -115,6 +115,22 @@ describe('SynStep semantic zoom', () => {
     expect(screen.getByTestId('syn-step-semantic-zoom-tab')).not.toHaveAttribute('tabIndex')
   })
 
+  it('keeps panel tabIndex when the step is clickable at semantic zoom', () => {
+    viewportState.zoom = 0.5
+    renderWithFlow(
+      <SynStep
+        rootTestId="syn-step-semantic-zoom-clickable"
+        nodeProps={baseNodeProps}
+        onClick={vi.fn()}
+        semanticZoomSummary={{ title: 'Analyze', typeLabel: 'Task Agent' }}
+      >
+        <span>Detailed body</span>
+      </SynStep>
+    )
+
+    expect(screen.getByTestId('syn-step-semantic-zoom-clickable')).toHaveAttribute('tabIndex', '0')
+  })
+
   it('semantic zoom layout has no accessibility violations', async () => {
     viewportState.zoom = 0.5
     const { container } = renderWithFlow(
