@@ -99,6 +99,7 @@ export function FormDateValueInputs({
               <div className={styles.dateInput}>
                 <DatePicker
                   value={isoDate ? formatDateMDY(isoYmdToLocalDate(isoDate)) : ''}
+                  placeholder="MM/DD/YYYY"
                   onChange={(_event, displayValue) => {
                     if (displayValue === '') {
                       onChange(mergeComponent(value, 'date', '', included))
