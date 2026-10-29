@@ -21,8 +21,8 @@ export type DateSubmissionValue = {
   timezone?: string
 }
 
-/** Coerced submission payload ready for API / workflow namespace. */
+/** Normalized submission payload ready for API / workflow namespace. */
 export type FormSubmissionData = Record<
   string,
-  string | number | boolean | (string | number | boolean)[] | DateSubmissionValue
+  string | number | boolean | null | (string | number | boolean)[] | DateSubmissionValue
 >

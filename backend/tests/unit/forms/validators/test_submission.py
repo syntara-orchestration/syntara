@@ -1,7 +1,7 @@
 """Unit tests for form submission validation and coercion."""
 
 from datetime import datetime, tzinfo
-from typing import Any, Self, get_args
+from typing import Any, Self, cast, get_args
 
 import pytest
 
@@ -73,18 +73,99 @@ class TestSubmissionFlow:
 
         assert cleaned == {"name": "bob", "age": 30, "subscribe": True, "start": "2026-01-05"}
 
-    def test_absent_optional_key_omitted(self) -> None:
-        """An absent optional field is omitted entirely, not set to None."""
+    def test_absent_optional_text_field_has_empty_output(self) -> None:
+        """An absent optional text field is emitted with its type-compatible empty value."""
         cleaned = validate_form_submission(_form(_field("text", "name")), {})
 
-        assert cleaned == {}
+        assert cleaned == {"name": ""}
+
+    @pytest.mark.parametrize(
+        ("field_type", "overrides", "expected"),
+        [
+            ("text", {}, ""),
+            ("textarea", {}, ""),
+            ("masked_text", {}, ""),
+            ("email", {}, ""),
+            ("date", {}, ""),
+            ("number", {}, None),
+            ("dropdown", {"options": _STATIC_OPTIONS}, None),
+            ("checkbox", {}, False),
+            ("multi_select", {"options": _STATIC_OPTIONS}, []),
+        ],
+    )
+    def test_absent_optional_field_has_type_compatible_empty_output(
+        self,
+        field_type: str,
+        overrides: dict[str, Any],
+        expected: Any,  # noqa: ANN401
+    ) -> None:
+        """Omitted optional fields without defaults still appear in cleaned data."""
+        form = _form(_field(field_type, "answer", **overrides))
+
+        assert validate_form_submission(form, {}) == {"answer": expected}
 
     @pytest.mark.parametrize("empty", ["", [], None])
-    def test_empty_values_treated_as_absent(self, empty: Any) -> None:  # noqa: ANN401
-        """Empty string/list/None normalize to absent."""
-        cleaned = validate_form_submission(_form(_field("text", "name")), {"name": empty})
+    def test_explicit_empty_value_clears_default(self, empty: Any) -> None:  # noqa: ANN401
+        """An explicit empty clears a text default and normalizes to a string."""
+        form = _form(_field("text", "name", default="anon"))
 
-        assert cleaned == {}
+        cleaned = validate_form_submission(form, {"name": empty})
+
+        assert cleaned == {"name": ""}
+
+    @pytest.mark.parametrize(
+        ("field_type", "empty", "overrides", "expected"),
+        [
+            ("text", "", {"default": "prefilled"}, ""),
+            ("textarea", [], {"default": "prefilled"}, ""),
+            ("masked_text", None, {"default": "prefilled"}, ""),
+            ("email", "", {"default": "user@example.com"}, ""),
+            ("date", "", {"default": {"date": "2026-01-05"}}, ""),
+            ("number", "", {"default": 7}, None),
+            ("dropdown", [], {"options": _STATIC_OPTIONS, "default": "a"}, None),
+            ("checkbox", None, {"default": True}, False),
+            ("multi_select", [], {"options": _STATIC_OPTIONS, "default": ["a"]}, []),
+        ],
+    )
+    def test_explicit_empty_normalizes_to_field_output_type(
+        self,
+        field_type: str,
+        empty: Any,  # noqa: ANN401
+        overrides: dict[str, Any],
+        expected: Any,  # noqa: ANN401
+    ) -> None:
+        """Every field type emits its canonical empty without applying its default."""
+        form = _form(_field(field_type, "answer", **overrides))
+
+        assert validate_form_submission(form, {"answer": empty}) == {"answer": expected}
+
+    def test_empty_value_normalization_asserts_for_unknown_field_type(self) -> None:
+        """The exhaustive fallback fails if an unknown field kind reaches normalization."""
+        with pytest.raises(AssertionError, match="Expected code to be unreachable"):
+            submission_module._empty_value_for_field(cast("FormField", object()))
+
+    @pytest.mark.parametrize("empty", ["", [], None])
+    def test_required_explicit_empty_value_does_not_use_default(self, empty: Any) -> None:  # noqa: ANN401
+        """Explicit empties clear defaults but cannot satisfy a required field."""
+        form = _form(_field("text", "name", default="anon", required=True))
+
+        errors = _errors(form, {"name": empty})
+
+        assert [(error.field, error.code) for error in errors] == [("name", "required")]
+
+    def test_required_field_uses_nonempty_default_when_omitted(self) -> None:
+        """An omitted required field can be satisfied by its nonempty default."""
+        form = _form(_field("text", "name", default="anon", required=True))
+
+        assert validate_form_submission(form, {}) == {"name": "anon"}
+
+    def test_required_field_rejects_empty_default(self) -> None:
+        """The selected default must also be nonempty for a required field."""
+        form = _form(_field("text", "name", default="", required=True))
+
+        errors = _errors(form, {})
+
+        assert [(error.field, error.code) for error in errors] == [("name", "required")]
 
     def test_default_applied_when_absent(self) -> None:
         """A default fills in for an absent field."""
@@ -555,9 +636,9 @@ class TestDateFieldSubmission:
 
         assert "Invalid timezone: 'Mars/Olympus'" in errors[0].message
 
-    def test_absent_optional_date_is_omitted(self) -> None:
-        """An unanswered optional date field contributes no key."""
-        assert validate_form_submission(self._date_form(), {}) == {}
+    def test_absent_optional_date_has_empty_output(self) -> None:
+        """An unanswered optional date is emitted as an empty ISO-string value."""
+        assert validate_form_submission(self._date_form(), {}) == {"start": ""}
 
     def test_absent_required_date_reports_required(self) -> None:
         """The inherited required flag governs skipping the field entirely."""

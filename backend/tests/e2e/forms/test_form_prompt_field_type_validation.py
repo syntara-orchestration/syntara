@@ -180,7 +180,7 @@ def test_required_field_error_leaves_prompt_available_for_valid_response(
     final = wait_for_activity_outputs(syntara_api, execution_id, {"prompt"})
     activities = {activity.activity_id: activity for activity in (final.activities or [])}
     prompt_output = _activity_output(activities["prompt"])
-    assert prompt_output["response_data"] == {"required_text": "provided"}
+    assert prompt_output["response_data"] == {"required_text": "provided", "optional_number": None}
 
 
 def test_unparseable_number_string_is_rejected(

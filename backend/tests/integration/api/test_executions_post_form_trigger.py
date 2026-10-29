@@ -81,6 +81,7 @@ def _cleaned_form_input() -> dict[str, Any]:
     """Return the expected normalized Form Trigger values."""
     return {
         "required_text": "submitted",
+        "environment": None,
         "count": 42.0,
         "start": "2026-02-14",
         "contact": "Bob@example.com",
