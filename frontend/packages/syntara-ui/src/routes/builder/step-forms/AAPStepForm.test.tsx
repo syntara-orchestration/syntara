@@ -585,7 +585,7 @@ describe('AAPStepForm', () => {
       )
 
       expect(screen.getByRole('switch', { name: 'Use input variables' })).not.toBeChecked()
-      expect(screen.getByTestId('extra-vars-editor')).toHaveValue(savedExtraVars)
+      expect(screen.getByRole('textbox', { name: 'Extra Variables' })).toHaveValue(savedExtraVars)
     })
 
     it('does not enable the toggle for pretty-printed extra_vars expressions', () => {
@@ -601,7 +601,7 @@ describe('AAPStepForm', () => {
       )
 
       expect(screen.getByRole('switch', { name: 'Use input variables' })).not.toBeChecked()
-      expect(screen.getByTestId('extra-vars-editor')).toBeVisible()
+      expect(screen.getByRole('textbox', { name: 'Extra Variables' })).toBeVisible()
     })
 
     it('enables the toggle from tags expressions', () => {

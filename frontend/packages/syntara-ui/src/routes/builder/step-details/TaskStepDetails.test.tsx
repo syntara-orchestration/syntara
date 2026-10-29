@@ -12,6 +12,7 @@ import { TaskStepDetails } from './TaskStepDetails'
 
 const mockUpdateActivity = vi.fn()
 const mockCreateAAPJobTemplateActivity = vi.fn()
+const realCreateAAPJobTemplateActivity = workflowStore.createAAPJobTemplateActivity
 
 vi.spyOn(workflowStore, 'useWorkflowStore')
 vi.spyOn(workflowStore, 'useWorkflowStoreActions')
@@ -122,12 +123,15 @@ vi.mock('../step-forms/AAPJobTemplateForm', () => ({
           onSubmit({
             name: 'Updated AAP Task',
             job_template_id: 456,
+            organization_name: initialData?.organization_name,
+            job_template_name: initialData?.job_template_name,
             inventory_name: '789',
             extra_vars: '{"key": "value"}',
             limit: 'servers',
             tags: 'install',
             skip_tags: 'debug',
             verbosity: '3',
+            use_input_variables: initialData?.use_input_variables === true,
           })
         }
         data-testid="aap-submit-button"
@@ -375,6 +379,39 @@ describe('TaskStepDetails Component', () => {
     renderTaskStepDetails(taskData, 'task-aap-dragged-var')
 
     expect(screen.getByTestId('aap-node-form')).toHaveAttribute('data-use-input-variables', 'false')
+  })
+
+  it('submits dragged extra_vars with a selected template and omits input-variable mode', async () => {
+    const user = userEvent.setup()
+    const taskData = {
+      type: 'aap_job_template' as const,
+      id: 'task-aap-dragged-var',
+      name: 'AAP Task',
+      parameters: {
+        job_template_id: 123,
+        organization_name: 'Default',
+        job_template_name: 'Deploy App',
+        extra_vars: { message: '${trigger.input_value}' },
+      },
+    }
+
+    vi.mocked(workflowStore.createAAPJobTemplateActivity).mockImplementation(realCreateAAPJobTemplateActivity)
+    renderTaskStepDetails(taskData, 'task-aap-dragged-var')
+
+    await user.click(screen.getByTestId('aap-submit-button'))
+
+    expect(mockUpdateActivity).toHaveBeenCalledWith(
+      'task-aap-dragged-var',
+      expect.objectContaining({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        parameters: expect.objectContaining({
+          job_template_id: 456,
+          extra_vars: { key: 'value' },
+        }),
+      })
+    )
+    const [, submittedActivity] = mockUpdateActivity.mock.calls[0] as [string, { parameters: Record<string, unknown> }]
+    expect(submittedActivity.parameters).not.toHaveProperty('use_input_variables')
   })
 
   it('renders AIAgentNodeDetails for agentic task', () => {

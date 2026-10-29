@@ -32,9 +32,9 @@ import {
   buildAAPWorkflowTemplateConfig,
   buildExpressionModeActivity,
   buildWorkflowExpressionModeActivity,
-  hasExpressionValue,
   isJobTemplateInputVariablesMode,
   isWorkflowTemplateInputVariablesMode,
+  resolveJobTemplateUseInputVariables,
   resolveWorkflowUseInputVariables,
   validateJobTemplateId,
   validateWorkflowTemplateId,
@@ -228,30 +228,6 @@ function getStringField(config: Record<string, unknown>, ...keys: string[]): str
   return undefined
 }
 
-function resolveUseInputVariables(params: {
-  c: StoredAAPConfig
-  organizationName: string
-  jobTemplateName: string
-  inventoryName: string
-}): boolean {
-  const { c, organizationName, jobTemplateName, inventoryName } = params
-  return (
-    c.use_input_variables === true ||
-    c.useInputVariables === true ||
-    // extra_vars is excluded: its code editor supports dragging an input variable
-    // into it while the template is still selected normally (by job_template_id),
-    // so its contents alone must not flip the node into full expression mode.
-    hasExpressionValue(
-      organizationName,
-      jobTemplateName,
-      inventoryName,
-      c.limit ?? '',
-      c.tags ?? '',
-      c.skip_tags ?? c.skipTags ?? ''
-    )
-  )
-}
-
 function buildAAPInitialData(taskName: string, config: Record<string, unknown>): Partial<AAPJobTemplateFormData> {
   if (!hasJobTemplateConfig(config)) {
     return { name: taskName }
@@ -286,12 +262,7 @@ function buildAAPInitialData(taskName: string, config: Record<string, unknown>):
     instance_group: getField(c.instance_group_name, c.instanceGroupName, ''),
     instance_group_id: c.instance_group_id ?? c.instanceGroupId,
     labels: c.labels ?? [],
-    use_input_variables: resolveUseInputVariables({
-      c,
-      organizationName,
-      jobTemplateName,
-      inventoryName,
-    }),
+    use_input_variables: resolveJobTemplateUseInputVariables(c),
   }
 }
 
