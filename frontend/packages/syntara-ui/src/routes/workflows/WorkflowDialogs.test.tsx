@@ -192,7 +192,9 @@ describe('WorkflowDialogs', () => {
       runDialog: createDialogState(mockWorkflow(), true),
     })
 
-    await screen.findByRole('button', { name: 'Run now' })
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Run now' })).toBeEnabled()
+    })
     expect(await axe(container)).toHaveNoViolations()
   })
 
