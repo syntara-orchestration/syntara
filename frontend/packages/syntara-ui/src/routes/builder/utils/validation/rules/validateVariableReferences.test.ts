@@ -30,9 +30,10 @@ describe('validateVariableReferences', () => {
       parameters: {
         input_schema: {
           type: 'object',
+          additionalProperties: false,
           properties: {
             order_id: { type: 'string' },
-            customer: { type: 'object', properties: { name: { type: 'string' } } },
+            customer: { type: 'object', additionalProperties: false, properties: { name: { type: 'string' } } },
           },
         },
       },
@@ -51,6 +52,44 @@ describe('validateVariableReferences', () => {
     it('allows an unconstrained payload when schema is omitted', () => {
       const step = makeActivity({ id: 'step', type: 'script', parameters: { code: '${trigger.payload.anything}' } })
       expect(validateVariableReferences([step], [], { triggers: [{ ...kafka, parameters: {} }] })).toEqual([])
+    })
+    it.each([
+      { schema: { properties: {} }, path: 'other', allowed: true },
+      { schema: { properties: {}, additionalProperties: true }, path: 'other', allowed: true },
+      { schema: { properties: {}, additionalProperties: false }, path: 'other', allowed: false },
+      { schema: { additionalProperties: false }, path: 'other', allowed: false },
+      { schema: { additionalProperties: true }, path: 'other.nested', allowed: true },
+      { schema: { additionalProperties: {} }, path: 'other.nested', allowed: true },
+      {
+        schema: {
+          properties: {},
+          additionalProperties: { properties: { name: { type: 'string' } }, additionalProperties: false },
+        },
+        path: 'other.name',
+        allowed: true,
+      },
+      {
+        schema: {
+          properties: {},
+          additionalProperties: { properties: { name: { type: 'string' } }, additionalProperties: false },
+        },
+        path: 'other.missing',
+        allowed: false,
+      },
+      {
+        schema: { properties: { customer: { properties: { name: { type: 'string' } } } } },
+        path: 'customer.other',
+        allowed: true,
+      },
+      { schema: { properties: { forbidden: false } }, path: 'forbidden', allowed: false },
+    ])('validates payload.$path against additional properties ($allowed)', ({ schema, path, allowed }) => {
+      const step = makeActivity({
+        id: 'step',
+        type: 'script',
+        parameters: { code: `echo \${trigger.payload.${path}}` },
+      })
+      const trigger = { ...kafka, parameters: { input_schema: { type: 'object', ...schema } } }
+      expect(validateVariableReferences([step], [], { triggers: [trigger] })).toHaveLength(allowed ? 0 : 1)
     })
     it('keeps manual fields available in mixed-trigger workflows', () => {
       const step = makeActivity({ id: 'step', type: 'script', parameters: { code: '${trigger.order_id}' } })

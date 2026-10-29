@@ -48,6 +48,15 @@ function getWorkflowInputNames(triggers: Activity[] | undefined): Set<string> {
   return names
 }
 
+function getPayloadPropertySchema(schema: unknown, property: string): unknown {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return schema
+  const properties = 'properties' in schema ? schema.properties : undefined
+  if (properties && typeof properties === 'object' && Object.hasOwn(properties, property)) {
+    return Reflect.get(properties, property)
+  }
+  return 'additionalProperties' in schema ? schema.additionalProperties : true
+}
+
 function acceptsTriggerPath(trigger: Activity, fieldPath: string): boolean {
   const [first, ...rest] = fieldPath.split('.')
   const fields = getTriggerInputSchemaFields(trigger.id, [trigger]) ?? []
@@ -55,12 +64,10 @@ function acceptsTriggerPath(trigger: Activity, fieldPath: string): boolean {
   if (trigger.type !== TriggerTypeEnum.EVENT_SUBSCRIBE || first !== 'payload' || !rest.length) return true
   let schema: unknown = trigger.parameters?.input_schema
   for (const part of rest) {
-    if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return true
-    if (!('properties' in schema) || !schema.properties || typeof schema.properties !== 'object') return true
-    if (!(part in schema.properties)) return 'additionalProperties' in schema && schema.additionalProperties === true
-    schema = Reflect.get(schema.properties, part)
+    if (schema === false) return false
+    schema = getPayloadPropertySchema(schema, part)
   }
-  return true
+  return schema !== false
 }
 
 function checkSchemaFieldReference(params: {
