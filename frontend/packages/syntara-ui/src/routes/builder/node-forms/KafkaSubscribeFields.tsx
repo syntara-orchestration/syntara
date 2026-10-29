@@ -54,8 +54,8 @@ export function KafkaSubscribeFields({
       <StackItem>
         <Alert variant="info" isInline title="Kafka Subscribe activation" component="h4">
           <Content component={ContentVariants.p}>
-            Publishing activates this subscription. The runtime credential authenticates to Kafka. The platform supplies
-            the workflow execution identity automatically.
+            Publishing activates this subscription. Configuration changes apply on the next publish. The runtime
+            credential authenticates to Kafka. The platform supplies the workflow execution identity automatically.
           </Content>
         </Alert>
       </StackItem>

@@ -3,7 +3,7 @@
 The builder offers Kafka Subscribe in **Add step → Triggers**. Select a visible,
 enabled Kafka Integration, an explicitly selected Kafka runtime credential, one
 exact topic, and an optional payload JSON Schema. The schema controls validate
-the message payload. Publishing activates the subscription.
+the message payload. Publishing activates the subscription; later changes take effect on the next publish.
 
 Kafka credentials authenticate to the broker. Workflow execution identity is
 provided by the platform. The UI does not offer or serialize an execution-account
@@ -24,8 +24,8 @@ The existing backend accepts credential type **Kafka** and SASL_SSL.
 Two intentional differences from the requested UI requirements:
 
 - `credential_id` is required by this backend, including the preflight contract.
-  The UI therefore requires a runtime credential instead of offering a
-  security-mode-dependent omission.
+  The UI therefore requires a runtime credential for preflight and activation instead of offering a
+  security-mode-dependent omission. Drafts may omit it while the workflow is being designed.
 - Transport is inferred from the Integration. `transport: kafka` is not serialized
   because the backend forbids extra fields.
 
@@ -92,3 +92,27 @@ acceptance prerequisites for this frontend story.
   preflight, saving, reloading, reopening, and keyboard navigation. Integration,
   runtime credential, topic, and optional schema omission were preserved.
 - Live Kafka/runtime verification requires a running deployment with Kafka configured.
+
+## Drafts and review corrections
+
+Create and Update can retain an incomplete Kafka trigger. Missing fields are
+omitted from draft parameters instead of being replaced with empty strings or
+placeholder IDs. Backend advisory saves retain these drafts with readiness
+findings; preflight, publish and runtime validation still require the complete
+contract. Supplied references must remain literal, visible, enabled and usable;
+an unavailable Integration or incompatible saved credential blocks form submission
+and runtime preflight until corrected or cleared.
+
+The Integration and runtime credential selectors support search and clearing.
+Credential creation is available when permitted. Loading supporting credential
+types is not displayed as an empty result. Selector and bootstrap-server errors
+are programmatically associated with their controls. Integration health is shown
+using the existing status label only after selection, separately from runtime
+access. Sanitized preflight error codes are displayed for diagnosis.
+
+Delivery defaults are available under **Show message delivery details**; preflight
+scope is available in contextual help. Trigger output references use the Kafka
+envelope: `trigger.payload.order_id` reads an `order_id` payload property, while
+`trigger.metadata`, `trigger.original` and `trigger.envelope_version` remain
+top-level envelope fields. Payload schema properties are never flattened onto
+`trigger`.

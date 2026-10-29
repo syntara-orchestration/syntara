@@ -4,8 +4,9 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { integrationsFetchClient, workflowClient } from '../../../client'
+import { credentialsClient, integrationsFetchClient, workflowClient } from '../../../client'
 import { submitForm } from '../../../test/submit-form'
+import { useAllCredentials } from '../components/useAllCredentials'
 import { useBuilderPermissions } from '../useBuilderPermissions'
 import { VersionViewContext } from '../VersionViewContext'
 
@@ -18,6 +19,14 @@ vi.mock('../../../client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../client')>()),
   integrationsFetchClient: { GET: vi.fn() },
   workflowClient: { useMutation: vi.fn() },
+  credentialsClient: { useQuery: vi.fn() },
+}))
+vi.mock('../../configuration/integrations/useIntegrationPermissions', () => ({
+  useIntegrationPermissions: () => ({ canCreate: true }),
+}))
+vi.mock('../components/useAllCredentials', () => ({ useAllCredentials: vi.fn() }))
+vi.mock('../../configuration/credentials/useCredentialPermissions', () => ({
+  useCredentialPermissions: () => ({ canCreate: true }),
 }))
 vi.mock('../useBuilderPermissions', () => ({ useBuilderPermissions: vi.fn() }))
 vi.mock('../../../hooks/useMutationErrorHandler', () => ({ useMutationErrorHandler: () => () => vi.fn() }))
@@ -86,12 +95,28 @@ beforeEach(() => {
     canEdit: true,
     tooltips: { edit: 'Edit permission required' },
   } as never)
+  vi.mocked(useAllCredentials).mockReturnValue({
+    credentials: [
+      { id: credentialId, project_id: 'project-1', name: 'Runtime', credential_type_id: 'kafka-type', enabled: true },
+    ],
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  })
+  vi.mocked(credentialsClient.useQuery).mockReturnValue({
+    data: { resources: [{ id: 'kafka-type', name: 'Kafka' }] },
+    isPending: false,
+    isError: false,
+  })
   setupMutation()
 })
 
 describe('Kafka Subscribe form', () => {
-  it('explains fixed first-activation, added-partition, resumption, and commit policies', () => {
+  it('discloses fixed delivery policies and explains the next publish', async () => {
+    const user = userEvent.setup()
     renderKafka()
+    expect(screen.getByText(/Configuration changes apply on the next publish/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show message delivery details' }))
 
     expect(
       screen.getByText(
@@ -108,9 +133,7 @@ describe('Kafka Subscribe form', () => {
   it('loads visible Kafka Integrations scoped to the workflow project and separates identity from authentication', async () => {
     renderKafka()
     expect(await screen.findByRole('button', { name: 'Kafka Integration' })).toBeInTheDocument()
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Kafka Integration' })).toHaveTextContent('Orders Kafka')
-    )
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveValue('Orders Kafka'))
     expect(integrationsFetchClient.GET).toHaveBeenCalledWith(
       '/kafka_integrations',
       expect.objectContaining({
@@ -121,12 +144,13 @@ describe('Kafka Subscribe form', () => {
     )
     expect(screen.getByText(/platform supplies the workflow execution identity automatically/)).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: /service account|execution account/i })).not.toBeInTheDocument()
-    expect(screen.getByText(/Integration validation: available/)).toBeInTheDocument()
+    expect(screen.getByText('Available')).toBeInTheDocument()
   })
 
   it('submits Kafka fields without webhook authorization or schedule settings', async () => {
     const onSubmit = vi.fn<(data: TriggerFormData) => void>()
     renderKafka(onSubmit)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
     await submitForm()
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining(initialData))
     expect(onSubmit.mock.calls[0]?.[0].authorizedServiceAccountIds).toBeUndefined()
@@ -136,6 +160,9 @@ describe('Kafka Subscribe form', () => {
   it('tests the unsaved configuration with the generated flat request contract', async () => {
     const user = userEvent.setup()
     renderKafka()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Test runtime access' })).not.toHaveAttribute('aria-disabled', 'true')
+    )
     await user.click(screen.getByRole('button', { name: 'Test runtime access' }))
     expect(mutate).toHaveBeenCalledWith(
       {
@@ -150,6 +177,7 @@ describe('Kafka Subscribe form', () => {
     const user = userEvent.setup()
     renderKafka(vi.fn(), null)
     expect(screen.getByText('Save the workflow before testing runtime access.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Test runtime access' }))
     expect(mutate).not.toHaveBeenCalled()
   })
@@ -167,7 +195,7 @@ describe('Kafka Subscribe form', () => {
     await user.keyboard('{Enter}')
     await user.click(screen.getByRole('option', { name: 'Other Kafka' }))
     expect(screen.getByRole('textbox', { name: 'Kafka runtime credential' })).toHaveValue('')
-    expect(toggle).toHaveFocus()
+    expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveFocus()
   })
 
   it('prevents requests without workflow update permission', async () => {
@@ -177,6 +205,7 @@ describe('Kafka Subscribe form', () => {
     } as never)
     const user = userEvent.setup()
     renderKafka()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Test runtime access' }))
     expect(mutate).not.toHaveBeenCalled()
   })
@@ -191,10 +220,10 @@ describe('Kafka Subscribe form', () => {
   })
 
   it('shows a safe failed check without rendering broker error text', () => {
-    setupMutation({ data: { success: false, connection: 'failed', error_code: 'private-broker-error' } })
+    setupMutation({ data: { success: false, connection: 'failed', error_code: 'timeout' } })
     renderKafka()
     expect(screen.getByText('Runtime access check failed')).toBeInTheDocument()
-    expect(screen.queryByText('private-broker-error')).not.toBeInTheDocument()
+    expect(screen.getByText('Error code: timeout')).toBeInTheDocument()
   })
 
   it('keeps version views read-only', () => {
@@ -212,10 +241,13 @@ describe('Kafka Subscribe form', () => {
     renderKafka()
     await user.clear(screen.getByRole('textbox', { name: 'Topic' }))
     await user.type(screen.getByRole('textbox', { name: 'Topic' }), 'orders.*')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Test runtime access' }))
     expect(mutate).not.toHaveBeenCalled()
     expect(
-      screen.getByText('Select an Integration, runtime credential, and valid topic and schema before testing.')
+      screen.getByText(
+        'Select an available Kafka Integration, a compatible runtime credential, and one exact topic before testing. Payload schema is optional; if supplied, it must be valid.'
+      )
     ).toBeInTheDocument()
   })
 
@@ -234,16 +266,84 @@ describe('Kafka Subscribe form', () => {
       .mockResolvedValueOnce({ data: { resources: [], next: 'next-page' }, response: new Response() })
       .mockResolvedValueOnce({ data: { resources: [integration] }, response: new Response() })
     renderKafka()
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Kafka Integration' })).toHaveTextContent('Orders Kafka')
-    )
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveValue('Orders Kafka'))
     expect(integrationsFetchClient.GET).toHaveBeenCalledTimes(2)
   })
 
   it('presents a missing Integration without replacing its saved reference', async () => {
     vi.mocked(integrationsFetchClient.GET).mockResolvedValue({ data: { resources: [] }, response: new Response() })
     renderKafka()
-    expect(await screen.findByText(/Selected Integration is unavailable/)).toBeInTheDocument()
+    expect(await screen.findByText(/Select an available Kafka Integration/)).toBeInTheDocument()
+  })
+
+  it('uses the Integration status presentation and exposes failure detail', async () => {
+    vi.mocked(integrationsFetchClient.GET).mockResolvedValue({
+      data: {
+        resources: [{ ...integration, validation_status: 'error', validation_error: 'Connection check failed' }],
+      },
+      response: new Response(),
+    })
+    const user = userEvent.setup()
+    renderKafka()
+    await user.hover(await screen.findByText('Error'))
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Connection check failed')
+  })
+
+  it('blocks submitting and preflight for an unavailable saved Integration', async () => {
+    vi.mocked(integrationsFetchClient.GET).mockResolvedValue({ data: { resources: [] }, response: new Response() })
+    const onSubmit = vi.fn()
+    renderKafka(onSubmit)
+    await screen.findByText('Select an available Kafka Integration')
+    expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveAccessibleDescription(
+      /Select an available Kafka Integration/
+    )
+    await submitForm()
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Test runtime access' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('blocks a saved non-Kafka credential even when its ID is valid', async () => {
+    vi.mocked(useAllCredentials).mockReturnValue({
+      credentials: [
+        { id: credentialId, project_id: 'project-1', name: 'Other', enabled: true, credential_type_id: 'http-type' },
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+    const onSubmit = vi.fn()
+    renderKafka(onSubmit)
+    await screen.findByText('Available')
+    await submitForm()
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Test runtime access' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('creates an incomplete trigger and allows clearing an existing trigger', async () => {
+    const onSubmit = vi.fn()
+    const user = userEvent.setup()
+    renderKafka(onSubmit)
+    await screen.findByText('Available')
+    await user.clear(screen.getByRole('textbox', { name: 'Topic' }))
+    await user.clear(screen.getByRole('textbox', { name: 'Kafka runtime credential' }))
+    await user.click(screen.getByRole('button', { name: 'Clear selection' }))
+    await submitForm()
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ integrationId: '', runtimeCredentialId: '', topic: '' })
+    )
+    expect(screen.getByRole('button', { name: 'Test runtime access' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('searches Kafka Integrations without changing the saved selection', async () => {
+    const user = userEvent.setup()
+    renderKafka()
+    const input = screen.getByRole('textbox', { name: 'Kafka Integration' })
+    await waitFor(() => expect(input).toHaveValue('Orders Kafka'))
+    await user.click(input)
+    await user.type(input, 'not found')
+    expect(screen.getByRole('option', { name: 'No matching Kafka Integrations' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Orders Kafka' })).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations, including the expanded Integration selector', async () => {
