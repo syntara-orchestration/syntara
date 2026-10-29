@@ -711,12 +711,21 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             edge_port = edge.get("from_port")
             if edge_port and edge_port != taken_port:
                 skipped_successor = edge["to"]
-                if skipped_successor not in self.skipped_nodes:
-                    self.skipped_nodes.add(skipped_successor)
-                    workflow.logger.info(
-                        f"Node {skipped_successor} marked as skipped (on non-taken port '{edge_port}')"
-                    )
-                    self._mark_downstream_as_skipped(skipped_successor, graph)
+                if skipped_successor in self.skipped_nodes:
+                    continue
+                # A successor with another still-live incoming edge (e.g. a
+                # pending Approval on the taken branch that also rejoins
+                # here) must not be skipped — it can still be reached.
+                other_preds = [
+                    pred_id for pred_id in graph.get_predecessors(skipped_successor) if pred_id != condition_node_id
+                ]
+                if other_preds and not all(
+                    pred_id in self.skipped_nodes or pred_id in self.failed_nodes for pred_id in other_preds
+                ):
+                    continue
+                self.skipped_nodes.add(skipped_successor)
+                workflow.logger.info(f"Node {skipped_successor} marked as skipped (on non-taken port '{edge_port}')")
+                self._mark_downstream_as_skipped(skipped_successor, graph)
 
     def _setup_loop_namespace(self, loop_node_id: str) -> None:
         """Set up the loop namespace with current iteration data."""
