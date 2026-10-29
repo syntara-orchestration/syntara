@@ -420,7 +420,7 @@ ESLint enforces readability, type safety, and code quality rules at `error` leve
 
 - **New files**: Zero warnings. Follow the rule as documented.
 - **Modified files**: Do not increase the warning count. When practical, fix nearby warnings as part of the change.
-- **Never suppress without a reason**: If you must add `eslint-disable`, document why.
+- **Use only documented ESLint exceptions**: Add `eslint-disable` only when the matching rule's configuration explicitly permits it, and include the required justification. The only current exception is `Math.random()` for strictly non-security values such as visual jitter; it does not permit suppressing other `no-restricted-syntax` findings or any other rule. See §28.
 
 Rules currently at `warn` that must still be followed in new code include: `testing-library/no-container`, `react-you-might-not-need-an-effect/*`, and `no-restricted-imports` (icon migration). These will be promoted to `error` once existing violations are resolved.
 
@@ -1291,11 +1291,18 @@ return groups.map(([id, { credentials }]) => {
 
 ---
 
-## 28. Never Use `eslint-disable` -- Fix the Code Instead
+## 28. Prefer Fixing Lint Issues to Suppressing Them
 
-**Do not add `eslint-disable`, `eslint-disable-next-line`, or `eslint-disable-line` comments to new or modified code.** Every lint rule exists to catch a real problem. The correct response to a lint violation is to fix the code so the rule passes, not to silence the rule.
+Fix lint violations where possible. Add `eslint-disable`, `eslint-disable-next-line`, or `eslint-disable-line` comments only when the matching rule's configuration explicitly documents a suppression exception.
 
-This applies to **all** rules without exception: `jsx-a11y/*`, `react-hooks/*`, `testing-library/*`, `@typescript-eslint/*`, `sonarjs/*`, and every other configured rule.
+The only current exception is the `Math.random()` restriction in `frontend/packages/syntara-ui/eslint.config.js`: a strictly non-security value (for example, visual jitter) may use a next-line suppression with a short justification.
+
+```typescript
+// eslint-disable-next-line no-restricted-syntax -- Non-security visual jitter.
+const jitter = Math.random()
+```
+
+This exception applies only to strictly non-security uses of `Math.random()`. It does not permit suppressing accessibility, type-safety, test-quality, or other lint findings, including other `no-restricted-syntax` violations.
 
 ```typescript
 // ❌ BAD — suppressing instead of fixing
@@ -1321,8 +1328,9 @@ return mockStore() as ReturnType<typeof createStore>
 1. **Understand what the rule protects** (accessibility, type safety, testing quality, code complexity)
 2. **Fix the code**: restructure markup, use semantic HTML, add proper types, extract functions, use PatternFly components
 3. **If the violation is in a third-party component** (e.g., PatternFly renders no accessible role), file an upstream issue and find a workaround that does not suppress the rule (e.g., use a different query, wrap in a labeled container)
+4. **Use a suppression only for a configured exception**: meet the exact condition documented by that rule and include its required justification.
 
-**Pre-existing suppressions** in the codebase are technical debt being cleaned up. Do not add new ones. When modifying a file that already has suppressions, remove them if the fix is straightforward.
+**Pre-existing suppressions** in the codebase are technical debt being cleaned up. Do not add new ones unless a configured exception above applies. When modifying a file that already has suppressions, remove them if the fix is straightforward.
 
 ---
 
