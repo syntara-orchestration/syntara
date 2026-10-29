@@ -53,7 +53,7 @@ async function findLlmCredentialForProject(
 }
 
 const LLM_CREDENTIAL_CREATE_MAX_ATTEMPTS = 4
-const LLM_CREDENTIAL_RETRYABLE_STATUSES = new Set([409, 429, 500, 502, 503])
+const LLM_CREDENTIAL_RETRYABLE_STATUSES = new Set([409, 429, 500, 502, 503, 504])
 
 async function getLlmProviderCredentialTypeId(page: Page): Promise<string> {
   const typesResp = await apiRequest(page, 'get', '/credential_types')
