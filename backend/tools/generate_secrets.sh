@@ -151,6 +151,17 @@ main() {
         generate_key_pair "jwt-backup"
     fi
 
+    # Write the encryption key before the admin password so a later Settings
+    # import during complexity checks does not fail on a missing key file.
+    if [[ -f "$SECRETS_DIR/encryption-key" ]] && [[ "$force" != true ]]; then
+        info "Encryption key already exists, skipping (use --force to regenerate)"
+    else
+        info "Generating encryption key..."
+        openssl rand -hex 32 > "$SECRETS_DIR/encryption-key"
+        chmod 600 "$SECRETS_DIR/encryption-key"
+        info "  Encryption key: $SECRETS_DIR/encryption-key"
+    fi
+
     # Generate admin password file
     if [[ -f "$SECRETS_DIR/admin-password" ]] && [[ "$force" != true ]]; then
         info "Admin password file already exists, skipping (use --force to regenerate)"
@@ -165,16 +176,6 @@ main() {
         fi
         chmod 600 "$SECRETS_DIR/admin-password"
         info "  Password file: $SECRETS_DIR/admin-password"
-    fi
-
-    # Generate encryption key file
-    if [[ -f "$SECRETS_DIR/encryption-key" ]] && [[ "$force" != true ]]; then
-        info "Encryption key already exists, skipping (use --force to regenerate)"
-    else
-        info "Generating encryption key..."
-        openssl rand -hex 32 > "$SECRETS_DIR/encryption-key"
-        chmod 600 "$SECRETS_DIR/encryption-key"
-        info "  Encryption key: $SECRETS_DIR/encryption-key"
     fi
 
     # Prevent permissions issues once secrets are mounted to syntara containers
