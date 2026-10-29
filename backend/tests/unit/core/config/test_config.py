@@ -843,3 +843,21 @@ class TestEventDeliveryRetentionSettings:
         monkeypatch.setenv("APP_EVENT_DELIVERY_RETENTION_SECONDS", value)
         with pytest.raises(ValidationError):
             Settings()
+
+
+class TestEventTemporalHistoryRetentionSettings:
+    """The retry safety bound is separate from delivery-row retention."""
+
+    def test_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("APP_EVENT_TEMPORAL_HISTORY_RETENTION_SECONDS", raising=False)
+        assert Settings().event_temporal_history_retention_seconds == 86400
+
+    def test_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APP_EVENT_TEMPORAL_HISTORY_RETENTION_SECONDS", "172800")
+        assert Settings().event_temporal_history_retention_seconds == 172800
+
+    @pytest.mark.parametrize("value", ["0", "-1", "300", "1.5", "invalid"])
+    def test_invalid(self, value: str, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APP_EVENT_TEMPORAL_HISTORY_RETENTION_SECONDS", value)
+        with pytest.raises(ValidationError):
+            Settings()
