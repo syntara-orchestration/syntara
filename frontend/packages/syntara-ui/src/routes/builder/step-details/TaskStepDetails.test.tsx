@@ -400,17 +400,16 @@ describe('TaskStepDetails Component', () => {
 
     await user.click(screen.getByTestId('aap-submit-button'))
 
-    expect(mockUpdateActivity).toHaveBeenCalledWith(
-      'task-aap-dragged-var',
-      expect.objectContaining({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        parameters: expect.objectContaining({
-          job_template_id: 456,
-          extra_vars: { key: 'value' },
-        }),
-      })
-    )
-    const [, submittedActivity] = mockUpdateActivity.mock.calls[0] as [string, { parameters: Record<string, unknown> }]
+    expect(mockUpdateActivity).toHaveBeenCalledTimes(1)
+    const [updatedNodeId, submittedActivity] = mockUpdateActivity.mock.calls[0] as [
+      string,
+      { parameters: Record<string, unknown> },
+    ]
+    expect(updatedNodeId).toBe('task-aap-dragged-var')
+    expect(submittedActivity.parameters).toMatchObject({
+      job_template_id: 456,
+      extra_vars: { key: 'value' },
+    })
     expect(submittedActivity.parameters).not.toHaveProperty('use_input_variables')
   })
 
