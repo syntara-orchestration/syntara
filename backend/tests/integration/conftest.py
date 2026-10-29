@@ -242,6 +242,10 @@ def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
         }
     )
 
+    # Keep direct app-state lookups consistent with Depends(get_authz_evaluator).
+    # Some request dependencies retrieve the evaluator from request.app.state.
+    monkeypatch.setattr(app.state, "authz_evaluator", mock_evaluator, raising=False)
+
     def _mock_getter(request: Any = None) -> AsyncMock:  # noqa: ANN401
         return mock_evaluator
 
