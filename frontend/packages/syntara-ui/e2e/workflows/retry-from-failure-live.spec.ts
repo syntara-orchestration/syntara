@@ -118,7 +118,9 @@ async function createRun(
 
 async function openExecutionDetail(app: Page, executionId: string): Promise<void> {
   await app.goto(toAppUrl(`/executions/${executionId}`))
+  await expect(app).toHaveURL(new RegExp(`/executions/${executionId}`))
   await expect(app.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(app.getByTestId('execution-status-badge')).toBeVisible()
 }
 
 async function openRetryPanel(app: Page): Promise<void> {
@@ -282,16 +284,25 @@ test.describe('Retry from failure — real backend', () => {
     const run = requireRun(completedRun, 'Completed run')
     await openExecutionDetail(app, run.executionId)
 
-    const fullRetryButton = app.getByRole('button', { name: 'Retry run' })
-    await expect(fullRetryButton).toBeVisible()
+    // The header "Retry run" button and the confirmation dialog's confirm
+    // button share the same accessible name. Wait for the dialog to close
+    // before querying that name again, or Playwright strict mode fails.
+    await expect(app.getByTestId('execution-status-badge').getByText('Completed', { exact: true })).toBeVisible()
+    await expect(app.getByTestId('retry-run-menu-toggle')).toHaveCount(0)
     await expect(app.getByTestId('retry-from-failure-button')).toHaveCount(0)
 
+    const fullRetryButton = app.getByRole('button', { name: 'Retry run', exact: true })
+    await expect(fullRetryButton).toBeVisible()
     await fullRetryButton.click()
-    await expect(app.getByRole('dialog')).toBeVisible()
-    await app.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click()
 
-    await expect(fullRetryButton).toBeVisible()
+    const dialog = app.getByRole('dialog')
+    await expect(dialog.getByText('Retry run?')).toBeVisible()
+    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(dialog).not.toBeVisible()
+
+    await expect(app.getByTestId('retry-run-menu-toggle')).toHaveCount(0)
     await expect(app.getByTestId('retry-from-failure-button')).toHaveCount(0)
+    await expect(app.getByRole('button', { name: 'Retry run', exact: true })).toBeVisible()
   })
 
   test('canvas selection does not narrow real failed points or move the retry origin marker', async ({ app }) => {
@@ -332,7 +343,6 @@ test.describe('Retry from failure — real backend', () => {
     await app.getByRole('row', { name: /Second Step/ }).click()
     await openRetryPanel(app)
 
-    await expect(app.getByText('Resolved parameters from the original run')).toBeVisible()
     await expect(app.getByText(/"code": "exit 1"/, { exact: false })).toBeVisible()
     await app.getByRole('button', { name: 'Edit inputs' }).click()
 
@@ -341,7 +351,8 @@ test.describe('Retry from failure — real backend', () => {
     const retryButton = app.getByRole('button', { name: 'Retry 2 steps' })
     await expect(retryButton).toBeDisabled()
     await app.getByRole('button', { name: 'Save inputs' }).click()
-    await expect(app.getByText('Edited for retry')).toBeVisible()
+    await expect(app.getByText('Effective inputs for retry')).toBeVisible()
+    await expect(app.getByText(/"code": "echo retry-recovered"/, { exact: false })).toBeVisible()
     await expect(retryButton).toBeEnabled()
 
     const retryResponsePromise = app.waitForResponse(

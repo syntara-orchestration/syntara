@@ -231,7 +231,6 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await app.getByTestId('retry-from-failure-button').click()
 
       await expect(app.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
-      await expect(app.getByText('Resolved parameters from the original run')).toBeVisible()
       await expect(app.getByText(/"language": "bash"/, { exact: false })).toBeVisible()
       await app.getByRole('button', { name: 'Edit inputs' }).click()
 
@@ -243,7 +242,8 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await expect(retryButton).toBeDisabled()
       await app.getByRole('button', { name: 'Save inputs' }).click()
 
-      await expect(app.getByText('Edited for retry')).toBeInViewport()
+      await expect(app.getByText('Effective inputs for retry')).toBeInViewport()
+      await expect(app.getByText(/"code": "echo retry"/, { exact: false })).toBeVisible()
       await expect(retryButton).toBeEnabled()
       await app.screenshot({ path: testInfo.outputPath('retry-input-overrides-saved.png') })
 
