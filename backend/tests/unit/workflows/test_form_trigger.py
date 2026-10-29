@@ -46,12 +46,12 @@ class TestFormTriggerSubmissionCleaning:
         assert cleaned_input == {"count": 42.0, "contact": "Bob@example.com"}
         assert form_definition_metadata.field_types == ["email", "number"]
 
-    def test_optional_absent_field_is_omitted(self) -> None:
+    def test_optional_absent_field_has_typed_empty_output(self) -> None:
         trigger = _form_trigger(_field("text", "required", required=True), _field("text", "optional"))
 
         cleaned_input, form_definition_metadata = validate_form_trigger_submission(trigger, {"required": "value"})
 
-        assert cleaned_input == {"required": "value"}
+        assert cleaned_input == {"required": "value", "optional": ""}
         assert form_definition_metadata.field_types == ["text"]
         assert form_definition_metadata.field_count == 2
 
@@ -64,7 +64,10 @@ class TestFormTriggerSubmissionCleaning:
 
         cleaned_input, form_definition_metadata = validate_form_trigger_submission(trigger, {"required": "value"})
 
-        assert len(cleaned_input) == 1
+        assert cleaned_input == {
+            "required": "value",
+            **{f"optional_{index}": "" for index in range(9)},
+        }
         assert form_definition_metadata.field_count == 10
         assert form_definition_metadata.field_types == ["text"]
 
