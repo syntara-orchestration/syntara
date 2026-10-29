@@ -66,7 +66,9 @@ export function WaitStepComponent(props: NodeProps<WaitNode>) {
         typeLabel: metadata.label,
       }}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
+      semanticZoomExpandable={false}
     >
       <StandardStepHeader
         icon={iconNode}

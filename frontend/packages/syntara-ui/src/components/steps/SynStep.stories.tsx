@@ -41,12 +41,19 @@ function SemanticZoomNode(props: NodeProps<SemanticZoomFlowNode>) {
     'semanticZoom',
     iconColor
   )
+  const semanticZoomPreviewIcon = renderStepIcon(
+    stepMetadata.condition.icon,
+    RegistryStepId.LOGIC_CONDITION,
+    'canvas',
+    iconColor
+  )
   return (
     <SynStep
       nodeProps={props}
       topBarColor={STEP_TYPE_COLORS.logic}
       semanticZoomSummary={{ title: props.data.name, typeLabel: 'Condition' }}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={semanticZoomPreviewIcon}
       semanticZoomMenuActions={MENU_ACTIONS}
       semanticZoomBranchSources={[
         { id: 'true', ariaLabel: 'True branch' },
@@ -287,7 +294,7 @@ export const SemanticZoom: Story = {
 export const WidthsAndTypes: Story = {
   render: () => (
     <div className={styles.comparisonGrid}>
-      <StepExample label="Default task (240 px)">
+      <StepExample label="Default task (300 px)">
         <SynStep nodeProps={createNodeProps({ id: 'default-width' })} topBarColor={STEP_TYPE_COLORS.actionScript}>
           <SynStepHeader>
             <SynStepTitle title="Default task" subTitle="Script" />

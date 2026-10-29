@@ -57,7 +57,9 @@ export function ConditionStepComponent(props: NodeProps<ConditionNode>) {
         { id: 'false', ariaLabel: 'False branch output' },
       ]}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
+      semanticZoomExpandable={metadata.expandable}
     >
       <ConditionStepDetails conditionActivity={props.data} icon={iconNode} menuActions={menuActions}>
         <BranchHandles>

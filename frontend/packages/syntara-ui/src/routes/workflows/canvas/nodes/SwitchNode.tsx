@@ -95,7 +95,9 @@ export function SwitchStepComponent(props: NodeProps<SwitchNode>) {
       }}
       semanticZoomBranchSources={branchSources}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
+      semanticZoomExpandable={metadata.expandable}
     >
       <SwitchStepDetails switchActivity={props.data} icon={iconNode} menuActions={menuActions}>
         <BranchHandles>
