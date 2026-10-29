@@ -55,7 +55,8 @@ export function KafkaSubscribePreflight({
       {workflowId && !parameters && (
         <StackItem>
           <Content component={ContentVariants.p}>
-            Select an Integration, runtime credential, and valid topic and schema before testing.
+            Select an available Kafka Integration, a compatible runtime credential, and one exact topic before testing.
+            Payload schema is optional; if supplied, it must be valid.
           </Content>
         </StackItem>
       )}
@@ -85,6 +86,9 @@ function KafkaPreflightResult({ result }: Readonly<{ result: PreflightResult }>)
       component="h4"
     >
       <Content>
+        {!result.success && result.error_code && (
+          <Content component={ContentVariants.p}>Error code: {result.error_code}</Content>
+        )}
         <Content component={ContentVariants.p}>
           Connection: {result.connection ?? 'unverified'}. Topic metadata: {result.topic_metadata ?? 'unverified'}.
         </Content>
