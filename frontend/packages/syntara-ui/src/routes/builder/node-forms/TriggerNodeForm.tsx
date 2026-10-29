@@ -34,12 +34,15 @@ import { useIsVersionView } from '../VersionViewContext'
 
 import { EdaFields } from './EdaTriggerFields'
 import { KafkaSubscribeFields } from './KafkaSubscribeFields'
+import { KafkaSubscribeFormProvider } from './KafkaSubscribeFormProvider'
+import { KafkaSubscribeResourceContext } from './kafkaSubscribeResourceContext'
 import { ManualTriggerFields } from './ManualTriggerFields'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
 import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
 import { normalizeWebhookPath, triggerFormSchema, type TriggerFormData } from './triggerFormSchema'
+import { kafkaResourceErrors } from './useKafkaSubscribeResources'
 import { WebhookFields } from './WebhookTriggerFields'
 
 const executionConflictLabelHelp = (
@@ -437,10 +440,26 @@ function TriggerFormFields({
 }
 
 export function TriggerNodeForm(props: TriggerNodeFormProps) {
+  const content = <TriggerNodeFormContent {...props} />
+  return props.initialData?.triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE ? (
+    <KafkaSubscribeFormProvider projectId={props.projectId}>{content}</KafkaSubscribeFormProvider>
+  ) : (
+    content
+  )
+}
+
+function TriggerNodeFormContent(props: TriggerNodeFormProps) {
+  const resources = use(KafkaSubscribeResourceContext)
+  const schema = triggerFormSchema.superRefine((data, ctx) => {
+    if (!resources) return
+    for (const [field, message] of Object.entries(kafkaResourceErrors(data, resources))) {
+      ctx.addIssue({ code: 'custom', path: [field], message })
+    }
+  })
   const [defaultValues] = useState<TriggerFormData>(() => buildTriggerFormDefaults(props.initialData))
 
   const form = useSynForm({
-    schema: triggerFormSchema,
+    schema,
     defaultValues,
   })
 

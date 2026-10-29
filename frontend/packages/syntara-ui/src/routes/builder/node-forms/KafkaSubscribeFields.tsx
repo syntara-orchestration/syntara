@@ -1,4 +1,5 @@
 import { Alert, Content, ContentVariants, Stack, StackItem } from '@patternfly/react-core'
+import { use } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { FormLabelWithHelp } from '../../../components/FormLabelWithHelp'
@@ -10,9 +11,11 @@ import { useIsVersionView } from '../VersionViewContext'
 import { KafkaIntegrationField } from './KafkaIntegrationField'
 import { kafkaSubscribeParameters } from './kafkaSubscribeMapping'
 import { KafkaSubscribePreflight } from './KafkaSubscribePreflight'
+import { KafkaSubscribeResourceContext } from './kafkaSubscribeResourceContext'
 import { PayloadValidationSection } from './PayloadValidationSection'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
 import { DEFAULT_JSON_SCHEMA, EXAMPLE_JSON_SCHEMA, triggerFormSchema, type TriggerFormData } from './triggerFormSchema'
+import { kafkaResourceErrors } from './useKafkaSubscribeResources'
 
 const KAFKA_CREDENTIAL_TYPES = ['Kafka']
 
@@ -21,11 +24,17 @@ export function KafkaSubscribeFields({
   projectId,
 }: Readonly<{ workflowId?: string | null; projectId?: string }>) {
   const isReadOnly = useIsVersionView()
+  const resources = use(KafkaSubscribeResourceContext)
   const { control, setValue } = useFormContext<TriggerFormData>()
   const values = useWatch({ control })
   const parsed = triggerFormSchema.safeParse(values)
+  const resourceErrors = resources ? kafkaResourceErrors(values, resources) : {}
   const parameters =
-    parsed.success && values.integrationId && values.runtimeCredentialId && values.topic
+    parsed.success &&
+    values.integrationId &&
+    values.runtimeCredentialId &&
+    values.topic &&
+    !Object.keys(resourceErrors).length
       ? kafkaSubscribeParameters(parsed.data)
       : undefined
   const preflightKey = JSON.stringify([
@@ -35,6 +44,7 @@ export function KafkaSubscribeFields({
     values.runtimeCredentialId,
     values.topic,
     values.inputSchema,
+    resourceErrors,
   ])
 
   return (
