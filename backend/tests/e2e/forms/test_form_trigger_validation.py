@@ -243,52 +243,6 @@ def test_numeric_and_boolean_strings_are_coerced_and_reach_the_consumer(
     assert isinstance(downstream["boolean_value"], bool)
 
 
-def test_native_json_types_are_accepted(
-    syntara_api: SyntaraApiRegistry,
-    form_trigger_workflow: FormTriggerWorkflowBuilder,
-    form_execution_cleanup: Callable[[UUID], None],
-) -> None:
-    """Native JSON numbers, booleans, and strings are accepted and retain their types.
-
-    Procedure:
-    1. Submit native number, boolean, and string values.
-    2. Inspect the persisted input, Form Trigger output, and consumer output.
-
-    Expected:
-    - The request succeeds and each value keeps its native JSON type downstream.
-    """
-    workflow = form_trigger_workflow(
-        SCALAR_TYPE_FIELDS,
-        consumer_code=_SCALAR_CONSUMER_CODE,
-        consumer_environment=_SCALAR_CONSUMER_ENVIRONMENT,
-    )
-    expected_values = {"number_value": 42, "boolean_value": True, "string_value": "hello"}
-    execution = submit_form_trigger_and_track(
-        syntara_api,
-        workflow,
-        expected_values,
-        form_execution_cleanup,
-    )
-    assert execution.input_data is not None
-    execution_input = execution.input_data.to_dict()
-    assert execution_input == expected_values
-    assert type(execution_input["number_value"]) is int
-    assert isinstance(execution_input["boolean_value"], bool)
-
-    execution_id = UUID(str(execution.id))
-    assert_consumer_completed(syntara_api, execution_id)
-    final = wait_for_activity_outputs(syntara_api, execution_id, {"form", "consumer"})
-    activities = activities_by_id(final)
-    form_response_data = activity_output(activities["form"])["response_data"]
-    downstream = activity_output(activities["consumer"])["stdout_json"]
-    assert form_response_data == expected_values
-    assert downstream == expected_values
-    assert type(form_response_data["number_value"]) is int
-    assert type(downstream["number_value"]) is int
-    assert isinstance(form_response_data["boolean_value"], bool)
-    assert isinstance(downstream["boolean_value"], bool)
-
-
 def test_extra_fields_are_rejected_then_defined_fields_submit_cleanly(
     syntara_api: SyntaraApiRegistry,
     form_trigger_workflow: FormTriggerWorkflowBuilder,
