@@ -70,21 +70,22 @@ async def test_openshift_crud_and_project_assignments_submit_cluster_commands(
     await service.delete_integration(integration.id)
 
     assert await test_db_session.get(Integration, integration.id) is None
+    # Create, update, assign and unassign each reconcile the EP cluster with an
+    # idempotent upsert (register); only deletion sends a delete. There is no
+    # configuration revision, namespace or project list on the cluster command.
     assert [message.command.command_type for message in ep_cluster_commands] == [
         "cluster.register",
-        "cluster.update",
-        "cluster.update",
-        "cluster.update",
+        "cluster.register",
+        "cluster.register",
+        "cluster.register",
         "cluster.delete",
     ]
     payloads = [message.command.payload for message in ep_cluster_commands]
-    assert [payload["desired_revision"] for payload in payloads] == [1, 2, 3, 4, 5]
-    assert all(payload["resource_key"] == str(integration.id) for payload in payloads)
-    assert payloads[0]["namespace"] == "syntara-workers"
+    # Every command is addressed by the shared resource_id (= integration id).
+    assert all(payload["resource_id"] == str(integration.id) for payload in payloads)
+    assert payloads[0]["endpoint"] == "https://openshift.example.com:6443"
     assert payloads[0]["credential_ref"] == str(http_bearer_token_credential_id)
     assert payloads[1]["enabled"] is False
-    assert payloads[2]["project_ids"] == [str(project.id)]
-    assert payloads[3]["project_ids"] == []
 
 
 @pytest.mark.asyncio
@@ -123,5 +124,9 @@ async def test_manual_reconciliation_recovers_missing_cluster_and_reuses_it(
     for _ in range(2):
         result = await reconcile_integration_clusters(test_db_session_factory, integration.id)
         assert result == {"synced": 1, "failed": 0, "skipped": 0}
-    assert [message.command.command_type for message in ep_cluster_commands] == ["cluster.register", "cluster.update"]
-    assert all(message.command.payload["resource_key"] == str(integration.id) for message in ep_cluster_commands)
+    # Each reconciliation re-sends an idempotent register addressed by the shared id.
+    assert [message.command.command_type for message in ep_cluster_commands] == [
+        "cluster.register",
+        "cluster.register",
+    ]
+    assert all(message.command.payload["resource_id"] == str(integration.id) for message in ep_cluster_commands)

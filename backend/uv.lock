@@ -973,14 +973,10 @@ wheels = [
 
 [[package]]
 name = "execution-plane-client"
-version = "0.1.8"
-source = { registry = "https://pypi.org/simple" }
+version = "0.1.8.dev7+gd64c3561d"
+source = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&branch=refactor%2Fremove-cluster-namespace-and-correlation#d64c3561df0afa981fc8457b6dbfc24b34ae0e45" }
 dependencies = [
     { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/be/9a/fbb2dd22e3b3032257afcdc32776b2ddd03ccc320100960fb87c6fa12bd2/execution_plane_client-0.1.8.tar.gz", hash = "sha256:92e107711a55dc1a828074c5a25fb0c614e395b2c9b88bb50c0b6c78fbdb790f", size = 13653, upload-time = "2026-10-30T16:07:51.327Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f1/1e/413e22e25cf15b915e417ad11eb950e3573c4cd0eed0c50153cadf75ddf3/execution_plane_client-0.1.8-py3-none-any.whl", hash = "sha256:530f66f0c891408599560a2fbd2aae3dc6bff4cdd9ed0a3b1cf94db8f87554ff", size = 19759, upload-time = "2026-10-30T16:07:50.057Z" },
 ]
 
 [[package]]
@@ -4448,7 +4444,7 @@ requires-dist = [
     { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.35.0" },
     { name = "cachetools", specifier = ">=5.0" },
     { name = "cryptography", specifier = ">=48.0.1" },
-    { name = "execution-plane-client", specifier = ">=0.1.8" },
+    { name = "execution-plane-client", git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&branch=refactor%2Fremove-cluster-namespace-and-correlation" },
     { name = "fastapi", specifier = ">=0.135.0" },
     { name = "fastmcp", marker = "extra == 'dev'", specifier = ">=3.2.0,<4.0.0" },
     { name = "filelock", specifier = ">=4.2.1" },
