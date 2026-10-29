@@ -305,5 +305,57 @@ async def test_import_create_uses_destination_reference_checks(
         pytest.raises(SafeValueError, match="not accessible"),
     ):
         await service.create_workflow("Imported", None, {}, definition, destination, is_import=True)
-    credentials.assert_awaited_once_with(definition, destination)
-    references.assert_awaited_once_with(service.session, definition, destination, is_import=True)
+    credentials.assert_awaited_once_with(definition, destination, allow_incomplete_subscriptions=True)
+    references.assert_awaited_once_with(
+        service.session, definition, destination, is_import=True, allow_incomplete_subscriptions=True
+    )
+
+
+async def test_draft_with_only_integration_still_checks_visibility_and_transport(
+    service: WorkflowService, definition: dict[str, Any]
+) -> None:
+    params = definition["triggers"][0]["parameters"]
+    definition["triggers"][0]["parameters"] = {"integration_id": params["integration_id"]}
+    cast("AsyncMock", service.session).get.return_value = SimpleNamespace(integration_type="kafka", enabled=True)
+    with (
+        patch.object(service, "_resolve_visible_integration_ids", return_value=[]),
+        pytest.raises(SafeValueError, match="not visible"),
+    ):
+        await service._validate_event_subscribe_bindings(definition, allow_incomplete=True)
+
+
+async def test_empty_draft_does_not_bypass_strict_preflight(
+    service: WorkflowService, definition: dict[str, Any]
+) -> None:
+    definition["triggers"][0]["parameters"] = {}
+    with patch.object(service, "_resolve_visible_integration_ids", return_value=None):
+        await service._validate_credential_project_scope(definition, uuid4(), allow_incomplete_subscriptions=True)
+    with pytest.raises(SafeValueError, match="Invalid Event Subscribe"):
+        await service._validate_credential_project_scope(definition, uuid4())
+
+
+async def test_draft_with_wrong_credential_type_is_rejected(
+    service: WorkflowService, definition: dict[str, Any]
+) -> None:
+    definition["triggers"][0]["parameters"].pop("topic")
+    cast("AsyncMock", service.session).get.side_effect = [
+        SimpleNamespace(integration_type="kafka", enabled=True),
+        SimpleNamespace(enabled=True),
+    ]
+    with (
+        patch.object(service, "_resolve_visible_integration_ids", return_value=None),
+        patch(
+            f"{SERVICE}.IntegrationService._validate_credential_type",
+            side_effect=IntegrationCredentialTypeMismatchError("kafka", "wrong", frozenset({"Kafka"})),
+        ),
+        pytest.raises(IntegrationCredentialTypeMismatchError),
+    ):
+        await service._validate_event_subscribe_bindings(definition, allow_incomplete=True)
+
+
+async def test_draft_reference_validation_allows_omissions_only_on_advisory_save(definition: dict[str, Any]) -> None:
+    definition["triggers"][0]["parameters"] = {}
+    session = AsyncMock()
+    assert await validate_workflow_references(session, definition, uuid4(), allow_incomplete_subscriptions=True) == []
+    with pytest.raises(SafeValueError, match="Invalid Event Subscribe"):
+        await validate_workflow_references(session, definition, uuid4())

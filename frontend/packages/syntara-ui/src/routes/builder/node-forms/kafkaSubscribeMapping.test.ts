@@ -1,7 +1,11 @@
 import { TriggerTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
-import { buildKafkaSubscribeTrigger, kafkaSubscribeFormDefaults } from './kafkaSubscribeMapping'
+import {
+  buildKafkaSubscribeTrigger,
+  kafkaSubscribeFormDefaults,
+  kafkaSubscribeParameters,
+} from './kafkaSubscribeMapping'
 import { triggerFormSchema } from './triggerFormSchema'
 
 const integrationId = '11111111-1111-4111-8111-111111111111'
@@ -14,6 +18,15 @@ const data = {
 }
 
 describe('Kafka Subscribe configuration', () => {
+  it('round-trips an incomplete draft without inserting empty strings or runtime-only fields', () => {
+    const trigger = buildKafkaSubscribeTrigger('draft', 'Draft', {
+      triggerType: TriggerTypeEnum.EVENT_SUBSCRIBE,
+      topic: '',
+    })
+    expect(trigger.parameters).toEqual({})
+    expect(buildKafkaSubscribeTrigger('draft', 'Draft', kafkaSubscribeFormDefaults(trigger))).toEqual(trigger)
+    expect(() => kafkaSubscribeParameters(kafkaSubscribeFormDefaults(trigger))).toThrow()
+  })
   it('round-trips the exact topic, literal references and optional payload schema', () => {
     const configured = { ...data, runtimeCredentialId: credentialId, inputSchema: '{"type":"object"}' }
     const trigger = buildKafkaSubscribeTrigger('subscribe', 'Orders', configured)
@@ -42,13 +55,14 @@ describe('Kafka Subscribe configuration', () => {
     expect(kafkaSubscribeFormDefaults(trigger).inputSchema).toBeUndefined()
   })
 
-  it('requires a runtime credential and rejects expression references', () => {
-    expect(triggerFormSchema.safeParse({ ...data, runtimeCredentialId: undefined }).success).toBe(false)
+  it('allows an omitted draft credential but requires it for runtime and rejects expressions', () => {
+    expect(triggerFormSchema.safeParse({ ...data, runtimeCredentialId: undefined }).success).toBe(true)
+    expect(() => kafkaSubscribeParameters({ ...data, runtimeCredentialId: undefined })).toThrow()
     expect(triggerFormSchema.safeParse({ ...data, runtimeCredentialId: '${trigger.credential}' }).success).toBe(false)
     expect(buildKafkaSubscribeTrigger('subscribe', 'Orders', data).parameters).not.toHaveProperty('transport')
   })
 
-  it.each(['', '.', '..', 'orders.*', 'orders,other', '${trigger.topic}', 'has space', 'a'.repeat(250)])(
+  it.each(['.', '..', 'orders.*', 'orders,other', '${trigger.topic}', 'has space', 'a'.repeat(250)])(
     'rejects a non-exact topic: %s',
     (topic) => {
       expect(triggerFormSchema.safeParse({ ...data, topic }).success).toBe(false)
@@ -59,7 +73,7 @@ describe('Kafka Subscribe configuration', () => {
     expect(triggerFormSchema.safeParse({ ...data, topic }).success).toBe(true)
   })
 
-  it.each(['${trigger.integration}', '', 'not-a-uuid'])('rejects non-literal Integration references: %s', (value) => {
+  it.each(['${trigger.integration}', 'not-a-uuid'])('rejects non-literal Integration references: %s', (value) => {
     expect(triggerFormSchema.safeParse({ ...data, integrationId: value }).success).toBe(false)
   })
 

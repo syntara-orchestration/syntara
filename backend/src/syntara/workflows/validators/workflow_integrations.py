@@ -8,7 +8,10 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.exceptions import SafeValueError
-from syntara.eventstreams.adapters.subscribe_parameters import validate_event_subscribe_parameters
+from syntara.eventstreams.adapters.subscribe_parameters import (
+    validate_event_subscribe_draft_parameters,
+    validate_event_subscribe_parameters,
+)
 from syntara.integrations.models.integration import (
     Integration,
     IntegrationProjectAssignment,
@@ -386,6 +389,7 @@ async def validate_workflow_references(
     project_id: UUID,
     *,
     is_import: bool = False,
+    allow_incomplete_subscriptions: bool = False,
 ) -> list[ValidationFinding]:
     """Validate all external references in a workflow definition.
 
@@ -411,19 +415,26 @@ async def validate_workflow_references(
     for trigger in workflow_definition.get("triggers", []):
         if trigger.get("type") != NodeType.EVENT_SUBSCRIBE_TRIGGER:
             continue
+        validate_parameters = (
+            validate_event_subscribe_draft_parameters
+            if allow_incomplete_subscriptions
+            else validate_event_subscribe_parameters
+        )
         try:
-            config = validate_event_subscribe_parameters(trigger.get("parameters", {}))
+            config = validate_parameters(trigger.get("parameters", {}))
         except (TypeError, ValueError) as exc:
             msg = "Invalid Event Subscribe parameters or Integration type"
             raise SafeValueError(msg) from exc
         # Existence/enablement is already enforced by _validate_integration_scope above;
         # this guard is defensive and narrows the type before the type-aware re-validation.
+        if config.integration_id is None:
+            continue
         integration = await session.get(Integration, config.integration_id)
         if integration is None:
             msg = "One or more selected integrations are no longer available"
             raise SafeValueError(msg)
         try:
-            validate_event_subscribe_parameters(trigger["parameters"], integration_type=integration.integration_type)
+            validate_parameters(trigger["parameters"], integration_type=integration.integration_type)
         except (TypeError, ValueError) as exc:
             msg = "Invalid Event Subscribe parameters or Integration type"
             raise SafeValueError(msg) from exc

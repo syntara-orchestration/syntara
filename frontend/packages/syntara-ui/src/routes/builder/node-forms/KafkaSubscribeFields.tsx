@@ -24,7 +24,10 @@ export function KafkaSubscribeFields({
   const { control, setValue } = useFormContext<TriggerFormData>()
   const values = useWatch({ control })
   const parsed = triggerFormSchema.safeParse(values)
-  const parameters = parsed.success ? kafkaSubscribeParameters(parsed.data) : undefined
+  const parameters =
+    parsed.success && values.integrationId && values.runtimeCredentialId && values.topic
+      ? kafkaSubscribeParameters(parsed.data)
+      : undefined
   const preflightKey = JSON.stringify([
     workflowId,
     projectId,

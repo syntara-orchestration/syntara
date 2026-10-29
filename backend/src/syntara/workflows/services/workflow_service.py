@@ -32,7 +32,10 @@ from syntara.core.services.user_reference_resolution import UserReferenceResolve
 from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
-from syntara.eventstreams.adapters.subscribe_parameters import validate_event_subscribe_parameters
+from syntara.eventstreams.adapters.subscribe_parameters import (
+    validate_event_subscribe_draft_parameters,
+    validate_event_subscribe_parameters,
+)
 from syntara.eventstreams.audit.subscription_lifecycle import EventSubscriptionLifecycleEvent
 from syntara.eventstreams.services.subscription_service import EventSubscriptionService
 from syntara.integrations.models.integration import Integration
@@ -442,6 +445,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         workflow_definition: dict[str, Any],
         project_id: UUID,
         previous_credential_ids: set[str] | None = None,
+        *,
+        allow_incomplete_subscriptions: bool = False,
     ) -> None:
         """Validate credential references: project scope and credential:use authorization.
 
@@ -453,6 +458,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         Args:
             workflow_definition: The workflow definition containing node parameters.
             project_id: The project the workflow belongs to.
+            allow_incomplete_subscriptions: Permit omitted fields only on advisory draft saves.
             previous_credential_ids: Credential IDs from the previous version
                 (None for new workflows — all credentials treated as new).
 
@@ -461,7 +467,9 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             AuthorizationDeniedError: If the user lacks credential:use on a new credential.
 
         """
-        findings = collect_event_subscribe_config_findings(workflow_definition)
+        findings = collect_event_subscribe_config_findings(
+            workflow_definition, allow_incomplete=allow_incomplete_subscriptions
+        )
         if findings:
             raise SafeValueError(findings[0].message)
         credential_ids = self._extract_credential_ids(workflow_definition)
@@ -487,12 +495,19 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         # credentials, so run it unconditionally rather than behind the credential
         # early-return — it would otherwise be silently skipped if a trigger ever
         # carried no credential. It self-guards when no such trigger exists.
-        await self._validate_event_subscribe_bindings(workflow_definition)
+        await self._validate_event_subscribe_bindings(
+            workflow_definition, allow_incomplete=allow_incomplete_subscriptions
+        )
 
-    async def _validate_event_subscribe_bindings(self, workflow_definition: dict[str, Any]) -> None:
+    async def _validate_event_subscribe_bindings(
+        self, workflow_definition: dict[str, Any], *, allow_incomplete: bool = False
+    ) -> None:
         """Apply actor-facing Integration visibility and runtime credential compatibility."""
+        validate_parameters = (
+            validate_event_subscribe_draft_parameters if allow_incomplete else validate_event_subscribe_parameters
+        )
         configs = [
-            validate_event_subscribe_parameters(trigger["parameters"])
+            validate_parameters(trigger["parameters"])
             for trigger in workflow_definition.get("triggers", [])
             if trigger.get("type") == NodeType.EVENT_SUBSCRIBE_TRIGGER
         ]
@@ -502,27 +517,41 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         # (ProjectScopeFilter/VisibilityFilter return unrestricted). Honor the same
         # bypass here so a principal that can list every Integration is not denied
         # at bind time. Runtime credential/type compatibility below still applies.
-        visible_ids = None if self.is_cert_authenticated else await self._resolve_visible_integration_ids()
+        needs_visibility = any(config.integration_id is not None for config in configs)
+        visible_ids = (
+            await self._resolve_visible_integration_ids()
+            if needs_visibility and not self.is_cert_authenticated
+            else None
+        )
         integration_service = IntegrationService(self.session, self.user)
         for config in configs:
-            if visible_ids is not None and config.integration_id not in visible_ids:
+            if (
+                config.integration_id is not None
+                and visible_ids is not None
+                and config.integration_id not in visible_ids
+            ):
                 msg = "One or more selected Integrations are not visible to the current user"
                 raise SafeValueError(msg)
-            integration = await self.session.get(Integration, config.integration_id)
-            credential = await self.session.get(Credential, config.credential_id)
-            if integration is None or credential is None or not credential.enabled or not integration.enabled:
+            integration = await self.session.get(Integration, config.integration_id) if config.integration_id else None
+            credential = await self.session.get(Credential, config.credential_id) if config.credential_id else None
+            if (config.integration_id and (integration is None or not integration.enabled)) or (
+                config.credential_id and (credential is None or not credential.enabled)
+            ):
                 msg = "One or more Event Subscribe resource references are unavailable"
                 raise SafeValueError(msg)
+            if integration is None:
+                continue
             try:
-                validate_event_subscribe_parameters(
-                    config.model_dump(mode="json"), integration_type=integration.integration_type
+                validate_parameters(
+                    config.model_dump(mode="json", exclude_none=True), integration_type=integration.integration_type
                 )
             except ValueError as exc:
                 msg = "Event Subscribe transport does not match the selected Integration type"
                 raise SafeValueError(msg) from exc
-            await integration_service._validate_credential_type(  # noqa: SLF001 -- reuse Integration compatibility rules
-                integration.integration_type, config.credential_id
-            )
+            if config.credential_id is not None:
+                await integration_service._validate_credential_type(  # noqa: SLF001 -- reuse Integration compatibility rules
+                    integration.integration_type, config.credential_id
+                )
 
     async def _resolve_visible_integration_ids(self) -> list[UUID] | None:
         """Resolve the Integration IDs visible to the current user (None = unrestricted)."""
@@ -761,10 +790,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             msg = f"Cannot create workflows in built-in project '{project.name}'"
             raise BuiltinProtectionError(msg)
 
-        await self._validate_credential_project_scope(workflow_definition, project_id)
+        await self._validate_credential_project_scope(
+            workflow_definition, project_id, allow_incomplete_subscriptions=True
+        )
         await self._validate_no_secret_url_conflicts(workflow_definition)
         ref_findings = await validate_workflow_references(
-            self.session, workflow_definition, project_id, is_import=is_import
+            self.session, workflow_definition, project_id, is_import=is_import, allow_incomplete_subscriptions=True
         )
         if ref_findings:
             result = ValidationResult.from_findings([*result.findings, *ref_findings])
@@ -1336,9 +1367,13 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 prev_version = await self._get_version_or_none(workflow.id, workflow.current_version)
                 if prev_version and prev_version.workflow_definition:
                     previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
-            await self._validate_credential_project_scope(workflow_definition, workflow.project_id, previous_cred_ids)
+            await self._validate_credential_project_scope(
+                workflow_definition, workflow.project_id, previous_cred_ids, allow_incomplete_subscriptions=True
+            )
             await self._validate_no_secret_url_conflicts(workflow_definition)
-            ref_findings = await validate_workflow_references(self.session, workflow_definition, workflow.project_id)
+            ref_findings = await validate_workflow_references(
+                self.session, workflow_definition, workflow.project_id, allow_incomplete_subscriptions=True
+            )
             if ref_findings:
                 result = ValidationResult.from_findings([*result.findings, *ref_findings])
                 workflow.has_validation_issues = True

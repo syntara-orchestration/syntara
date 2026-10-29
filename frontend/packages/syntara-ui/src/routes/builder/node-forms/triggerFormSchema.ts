@@ -115,10 +115,10 @@ function validateCronFormat(cron: string | undefined, ctx: z.RefinementCtx) {
 }
 
 function validateKafkaSubscribe(data: z.infer<typeof triggerFormSchemaBase>, ctx: z.RefinementCtx) {
-  if (!z.string().uuid().safeParse(data.integrationId).success) {
+  if (data.integrationId && !z.string().uuid().safeParse(data.integrationId).success) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Select a Kafka Integration', path: ['integrationId'] })
   }
-  if (!z.string().uuid().safeParse(data.runtimeCredentialId).success) {
+  if (data.runtimeCredentialId && !z.string().uuid().safeParse(data.runtimeCredentialId).success) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: 'Select a valid runtime credential',
@@ -126,10 +126,8 @@ function validateKafkaSubscribe(data: z.infer<typeof triggerFormSchemaBase>, ctx
     })
   }
   if (
-    !data.topic ||
-    data.topic.length > 249 ||
-    !/^[a-zA-Z0-9._-]+$/.test(data.topic) ||
-    ['.', '..'].includes(data.topic)
+    data.topic &&
+    (data.topic.length > 249 || !/^[a-zA-Z0-9._-]+$/.test(data.topic) || ['.', '..'].includes(data.topic))
   ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
