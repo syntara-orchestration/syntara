@@ -13,6 +13,7 @@ import { useMemo, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { integrationsFetchClient } from '../../../client'
+import { FormFieldError } from '../../../components/FormFieldError'
 import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { SynSelect } from '../../../components/SynSelect'
@@ -28,7 +29,12 @@ export function KafkaIntegrationField({
   isDisabled,
 }: Readonly<{ projectId?: string; isDisabled: boolean }>) {
   const [isOpen, setIsOpen] = useState(false)
-  const { control, setValue, clearErrors } = useFormContext<TriggerFormData>()
+  const {
+    control,
+    setValue,
+    clearErrors,
+    formState: { errors },
+  } = useFormContext<TriggerFormData>()
   const integrationId = useWatch({ control, name: 'integrationId' })
   const query = useQuery({
     queryKey: ['kafka-subscribe-integrations', projectId],
@@ -53,6 +59,9 @@ export function KafkaIntegrationField({
   const selected = integrations.find((item) => item.id === integrationId)
   const staleSelection = Boolean(integrationId && !query.isPending && !query.isError && !selected)
 
+  const integrationError = staleSelection ? 'Select an available Kafka Integration' : errors.integrationId?.message
+  const errorId = 'kafka-integration-error'
+
   const selectionLabel =
     selected?.name ?? (integrationId ? 'Selected Integration unavailable' : 'Select a Kafka Integration')
   const toggleLabel = query.isPending ? 'Loading Kafka Integrations…' : selectionLabel
@@ -65,6 +74,7 @@ export function KafkaIntegrationField({
           label="Kafka Integration"
           fieldId="kafka-integration"
           isRequired
+          hideFooter
         >
           {({ field }) => (
             <SynSelect
@@ -84,6 +94,8 @@ export function KafkaIntegrationField({
                 <MenuToggle
                   ref={ref}
                   aria-label="Kafka Integration"
+                  aria-invalid={Boolean(integrationError)}
+                  aria-describedby={integrationError ? errorId : undefined}
                   isFullWidth
                   isDisabled={isDisabled || query.isPending || query.isError}
                   isExpanded={isOpen}
@@ -108,6 +120,7 @@ export function KafkaIntegrationField({
             </SynSelect>
           )}
         </SynFormField>
+        <FormFieldError id={errorId} message={integrationError} />
       </StackItem>
       {query.isError && (
         <StackItem>

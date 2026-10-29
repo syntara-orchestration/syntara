@@ -4,19 +4,20 @@ import type { FieldError } from 'react-hook-form'
 
 type FormFieldErrorProps = Readonly<{
   /** Error message text. Takes precedence over `error` when both are provided. */
+  id?: string
   message?: string
   /** react-hook-form field error — `message` is read from `error.message`. */
   error?: FieldError
 }>
 
 /** Displays a validation error message below a form field. */
-export function FormFieldError({ message, error }: FormFieldErrorProps) {
+export function FormFieldError({ message, error, id }: FormFieldErrorProps) {
   const resolvedMessage = message ?? error?.message
   if (!resolvedMessage) return null
   return (
     <FormHelperText>
       <HelperText>
-        <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
+        <HelperTextItem id={id} icon={<RhUiErrorIcon />} variant="error">
           {resolvedMessage}
         </HelperTextItem>
       </HelperText>

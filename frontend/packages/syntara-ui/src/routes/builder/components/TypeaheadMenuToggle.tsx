@@ -7,7 +7,7 @@ import {
   TextInputGroupUtilities,
 } from '@patternfly/react-core'
 import { RhUiCloseIcon } from '@patternfly/react-icons'
-import React from 'react'
+import React, { useRef } from 'react'
 
 export type TypeaheadMenuToggleProps = Readonly<{
   toggleRef: React.Ref<MenuToggleElement>
@@ -21,6 +21,8 @@ export type TypeaheadMenuToggleProps = Readonly<{
   filterText: string
   placeholder: string
   loadingPlaceholder?: string
+  isInvalid?: boolean
+  describedBy?: string
   onFilterChange: (val: string) => void
   onClear: () => void
   onToggle: () => void
@@ -38,10 +40,13 @@ export function TypeaheadMenuToggle({
   filterText,
   placeholder,
   loadingPlaceholder = 'Loading...',
+  isInvalid,
+  describedBy,
   onFilterChange,
   onClear,
   onToggle,
 }: TypeaheadMenuToggleProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
   const showClearFilter = isOpen && filterText
   const showClearSelection = !isOpen && hasSelection && !isDisabled && !isPending
 
@@ -53,7 +58,13 @@ export function TypeaheadMenuToggle({
       isDisabled={isDisabled || isPending}
       isFullWidth
       aria-label={ariaLabel}
+      aria-invalid={isInvalid || undefined}
+      aria-describedby={describedBy}
+      status={isInvalid ? 'danger' : undefined}
       onClick={onToggle}
+      onFocus={(event) => {
+        if (event.target === event.currentTarget) inputRef.current?.focus()
+      }}
     >
       <TextInputGroup isPlain isDisabled={isDisabled || isPending}>
         <TextInputGroupMain
@@ -61,11 +72,22 @@ export function TypeaheadMenuToggle({
           placeholder={isPending ? loadingPlaceholder : placeholder}
           onClick={(e) => {
             e.stopPropagation()
-            onToggle()
+            if (!isOpen) onToggle()
           }}
           onChange={(_event, val) => onFilterChange(val)}
-          autoComplete="off"
-          id={`${fieldId}-filter`}
+          inputId={`${fieldId}-filter`}
+          innerRef={inputRef}
+          inputProps={{
+            autoComplete: 'off',
+            'aria-invalid': isInvalid || undefined,
+            'aria-describedby': describedBy,
+            onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => {
+              if (event.key === 'Enter' || event.key === 'ArrowDown') {
+                event.preventDefault()
+                if (!isOpen) onToggle()
+              }
+            },
+          }}
           aria-label={ariaLabel}
         />
         {showClearFilter && (

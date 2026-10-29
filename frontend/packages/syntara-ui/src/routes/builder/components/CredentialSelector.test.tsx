@@ -200,6 +200,8 @@ describe('CredentialSelector', () => {
     await user.click(screen.getByRole('button', { name: 'Credential' }))
     expect(screen.queryByRole('option', { name: 'Production API Key' })).not.toBeInTheDocument()
     expect(screen.queryByRole('option', { name: 'Staging Token' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Credential' })).toBeDisabled()
+    expect(screen.queryByText('No credentials available')).not.toBeInTheDocument()
   })
 
   beforeEach(() => {
@@ -678,6 +680,14 @@ describe('CredentialSelector', () => {
     })
   })
 
+  it('associates validation errors with the credential toggle', () => {
+    mockUseQuery()
+    renderSelector({ errorMessage: 'Select a compatible credential' })
+    const toggle = screen.getByRole('button', { name: 'Credential' })
+    expect(toggle).toHaveAttribute('aria-invalid', 'true')
+    expect(toggle).toHaveAccessibleDescription(/Select a compatible credential/)
+  })
+
   describe('read-only credential (credential:use denied)', () => {
     const readOnlyCred = {
       id: 'cred-readonly',
@@ -710,7 +720,24 @@ describe('CredentialSelector', () => {
 
       expect(screen.getByRole('button', { name: 'Credential' })).toHaveAttribute(
         'aria-describedby',
-        'credential-readonly-warning'
+        'credential-selector-readonly-warning'
+      )
+    })
+
+    it('preserves the warning association when a validation error is also present', () => {
+      mockReadOnlyState()
+      renderSelector({ value: 'cred-readonly', errorMessage: 'Credential unavailable' })
+      expect(screen.getByRole('button', { name: 'Credential' })).toHaveAttribute(
+        'aria-describedby',
+        'credential-selector-error credential-selector-readonly-warning'
+      )
+    })
+
+    it('preserves the saved credential label in a searchable read-only selector', () => {
+      mockReadOnlyState()
+      renderSelector({ value: 'cred-readonly', isSearchable: true })
+      expect(screen.getByRole('textbox', { name: 'Credential' })).toHaveValue(
+        'Restricted Prod Cred (no permission to use)'
       )
     })
 
