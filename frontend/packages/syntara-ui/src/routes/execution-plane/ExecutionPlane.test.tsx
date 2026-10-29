@@ -16,6 +16,7 @@ import ExecutionPlane from './ExecutionPlane'
 vi.mock('../../client', () => ({
   executionPlaneClient: {
     useQuery: vi.fn(),
+    useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   },
   authMiddleware: { onRequest: vi.fn(({ request }: { request: unknown }) => request) },
   interfaceTagMiddleware: { onRequest: vi.fn() },
@@ -110,7 +111,7 @@ describe('ExecutionPlane', () => {
     mockFacadeQuery()
   })
 
-  it('lists execution targets with required columns', async () => {
+  it('lists execution targets with required columns and row actions', async () => {
     render(<ExecutionPlane />, { wrapper })
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Execution Plane' })).toBeInTheDocument()
@@ -123,6 +124,21 @@ describe('ExecutionPlane', () => {
     expect(screen.queryByText('region=us-west')).not.toBeInTheDocument()
     expect(screen.getByRole('row', { name: /Prod OpenShift West.*Enabled/ })).toBeInTheDocument()
     expect(screen.getByRole('row', { name: /Staging OpenShift.*Disabled/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Actions for Prod OpenShift West' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Actions for Staging OpenShift' })).toBeInTheDocument()
+  })
+
+  it('opens delete confirmation from the row actions menu', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Staging OpenShift' }))
+    await user.click(screen.getByRole('menuitem', { name: /Delete execution target/i }))
+
+    expect(await screen.findByText('Delete execution target?')).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/Staging OpenShift/)).toBeInTheDocument()
+    expect(within(dialog).getByRole('checkbox', { name: /permanently deleted/i })).toBeInTheDocument()
   })
 
   it('requests execution targets from the facade endpoint with cursor query params', () => {
@@ -173,7 +189,7 @@ describe('ExecutionPlane', () => {
     expect(screen.getByRole('button', { name: 'Configure integration' })).toBeInTheDocument()
   })
 
-  it('hides configure action in empty state when user cannot create integrations', async () => {
+  it('hides configure action in empty state when user cannot create execution targets', async () => {
     vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
     mockFacadeQuery({ data: { resources: [], next: null, prev: null, total: 0 } })
 

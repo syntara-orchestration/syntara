@@ -1,23 +1,31 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useParams } from '@tanstack/react-router'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { executionPlaneClient } from '../../client'
+import { useCanI } from '../../hooks/useCanI'
 import { AlertProvider } from '../../providers/alerts'
 import { expectPageTitle } from '../../test/pageTitle'
 
 import ExecutionTargetDetail from './ExecutionTargetDetail'
 
+const mockDeleteMutate = vi.fn()
+
 vi.mock('../../client', () => ({
   executionPlaneClient: {
     useQuery: vi.fn(),
+    useMutation: vi.fn(() => ({ mutate: mockDeleteMutate, isPending: false })),
   },
   authMiddleware: { onRequest: vi.fn(({ request }: { request: unknown }) => request) },
   interfaceTagMiddleware: { onRequest: vi.fn() },
+}))
+
+vi.mock('../../hooks/useCanI', () => ({
+  useCanI: vi.fn(() => ({ allowed: true, isChecking: false, isError: false })),
 }))
 
 const mockNavigate = vi.fn()
@@ -88,6 +96,7 @@ describe('ExecutionTargetDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(useParams).mockReturnValue({ executionTargetId: 'et-001' })
+    vi.mocked(useCanI).mockReturnValue({ allowed: true, isChecking: false, isError: false })
     mockFacadeQuery()
   })
 
@@ -191,6 +200,43 @@ describe('ExecutionTargetDetail', () => {
 
     expect(await screen.findByTestId('error-state')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Error loading execution target' })).toBeInTheDocument()
+  })
+
+  it('opens delete confirmation from the header actions menu', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionTargetDetail />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Prod OpenShift West' }))
+    await user.click(screen.getByRole('menuitem', { name: /Delete execution target/i }))
+
+    expect(await screen.findByText('Delete execution target?')).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/Prod OpenShift West/)).toBeInTheDocument()
+  })
+
+  it('navigates to the Execution Plane list after a successful delete', async () => {
+    const user = userEvent.setup()
+    mockDeleteMutate.mockImplementation(
+      (_params: unknown, callbacks?: { onSuccess?: (data: unknown) => void; onSettled?: () => void }) => {
+        callbacks?.onSuccess?.({ id: 'et-001', accepted: true })
+        callbacks?.onSettled?.()
+      }
+    )
+
+    render(<ExecutionTargetDetail />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Prod OpenShift West' }))
+    await user.click(screen.getByRole('menuitem', { name: /Delete execution target/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('checkbox', { name: /permanently deleted/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+    expect(mockDeleteMutate).toHaveBeenCalledWith(
+      { params: { path: { target_id: 'et-001' } } },
+      expect.objectContaining({ onSuccess: expect.any(Function) as unknown as () => void })
+    )
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/execution-plane' })
   })
 
   it('has no accessibility violations on the details view', async () => {
