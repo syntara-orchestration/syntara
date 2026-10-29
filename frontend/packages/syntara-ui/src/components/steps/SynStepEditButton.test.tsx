@@ -6,21 +6,31 @@ import { axe } from 'vitest-axe'
 import { SynStepEditButton } from './SynStepEditButton'
 
 describe('SynStepEditButton', () => {
-  it('has no axe violations', async () => {
-    const { container } = render(<SynStepEditButton stepTitle="Deploy app" onClick={vi.fn()} />)
-    expect(await axe(container)).toHaveNoViolations()
+  it('calls onClick and stops click propagation', async () => {
+    const user = userEvent.setup()
+    const onEdit = vi.fn()
+    const onPanelClick = vi.fn()
+
+    render(
+      <div onClick={onPanelClick} onKeyDown={() => undefined} role="presentation">
+        <SynStepEditButton stepTitle="Deploy" onClick={onEdit} />
+      </div>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Edit Deploy' }))
+    expect(onEdit).toHaveBeenCalledTimes(1)
+    expect(onPanelClick).not.toHaveBeenCalled()
   })
 
-  it('calls onClick with an accessible edit label', async () => {
-    const user = userEvent.setup()
-    const onClick = vi.fn()
+  it('merges optional className onto the button', () => {
+    render(<SynStepEditButton stepTitle="Deploy" onClick={vi.fn()} className="custom-edit" />)
 
-    render(<SynStepEditButton stepTitle="Deploy app" onClick={onClick} />)
+    expect(screen.getByRole('button', { name: 'Edit Deploy' })).toHaveClass('custom-edit')
+  })
 
-    const button = screen.getByRole('button', { name: 'Edit Deploy app' })
-    expect(button).toHaveTextContent('Edit')
-    await user.click(button)
+  it('has no axe violations', async () => {
+    const { container } = render(<SynStepEditButton stepTitle="Deploy" onClick={vi.fn()} />)
 
-    expect(onClick).toHaveBeenCalledTimes(1)
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

@@ -7,6 +7,17 @@ import { SynStepExpandedContext } from './SynStepExpandedContext'
 import { SynStepHeaderActions } from './SynStepHeaderActions'
 
 describe('SynStepHeaderActions', () => {
+  it('renders expand toggle only when expandable without menu actions', () => {
+    render(
+      <SynStepExpandedContext.Provider value={[false, vi.fn()]}>
+        <SynStepHeaderActions stepTitle="Deploy" showMenuActions={false} expandable />
+      </SynStepExpandedContext.Provider>
+    )
+
+    expect(screen.getByRole('button', { name: 'Expand details for Deploy' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit Deploy' })).not.toBeInTheDocument()
+  })
+
   it('returns null when there are no header actions to show', () => {
     const { container } = render(
       <SynStepHeaderActions stepTitle="Deploy" showMenuActions={false} menuActions={[]} expandable={false} />
