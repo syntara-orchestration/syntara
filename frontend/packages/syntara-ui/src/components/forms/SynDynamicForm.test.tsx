@@ -99,6 +99,30 @@ describe('SynDynamicForm', () => {
     })
   })
 
+  it('rejects a cleared required field instead of restoring its default', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [
+        { type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name', required: true, default: 'Prefilled' },
+      ],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    expect(name).toHaveValue('Prefilled')
+
+    await user.clear(name)
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).not.toHaveBeenCalled()
+      expect(screen.getByText('This field is required')).toBeInTheDocument()
+    })
+  })
+
   it('submits number, date, textarea, and static select fields', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
