@@ -29,6 +29,7 @@
     "syntara/eventstreams/core/serialization.py": "Shared JSON decoder contract; consumer and execution-preparation wiring is deferred to downstream stories",
     "syntara/eventstreams/services/delivery_cache.py": "Injectable terminal-proof lookup/population provider and process-owned Redis client, exercised by delivery tests; production imports belong to downstream scheduling (#961), record lookup (#972) and process composition (#988) stories",
     "syntara/eventstreams/services/delivery_retention_service.py": "Injectable retained-evidence cleanup and recovery-reservation provider, exercised by delivery tests; production imports and committed-position verifier wiring belong to downstream recovery and record-runner stories (AAP-97625, AAP-97622 and AAP-97624)",
+    "syntara/eventstreams/services/execution_preparation_service.py": "Injectable deterministic Execution preparation service, imported by unit and integration tests; production caller wiring belongs to downstream delivery-recovery and scheduling stories",
     "syntara/integrations/lib/credential_resolver.py": "Statically imported by integration_service.py and invocation_executor.py; pyan3 does not trace through session-factory closures into background tasks",
     "syntara/core/tls/protocol.py": "Loaded by uvicorn via --http string import at runtime, not via Python import",
     "syntara/core/tls/certs.py": "Imported by scripts/generate_local_certs.py and tests/helpers/tls.py — both outside src/",

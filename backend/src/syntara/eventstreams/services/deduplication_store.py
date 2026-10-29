@@ -35,14 +35,18 @@ from syntara.eventstreams.core.deduplication import (
     TerminalDelivery,
     input_fingerprint,
 )
+from syntara.eventstreams.core.scheduling_metadata import (
+    EVENT_DELIVERY_METADATA_KEY,
+    SCHEDULING_STATE_CONFIRMED,
+    SCHEDULING_STATE_KEY,
+    SCHEDULING_STATE_PREPARED,
+)
 from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.services.delivery_capacity_service import PostgreSQLDeliveryCapacityCheck
 from syntara.eventstreams.services.subscription_service import lock_source_lifecycle
 from syntara.workflows.models.execution import Execution, ExecutionStatus
-
-_METADATA_KEY = "event_delivery"
 
 
 class _ClaimExpiredError(Exception):
@@ -276,7 +280,11 @@ class EventDeliveryStore:
 
     @staticmethod
     def _fingerprint(execution: Execution) -> str:
-        context = {key: value for key, value in (execution.execution_metadata or {}).items() if key != _METADATA_KEY}
+        context = {
+            key: value
+            for key, value in (execution.execution_metadata or {}).items()
+            if key != EVENT_DELIVERY_METADATA_KEY
+        }
         return input_fingerprint(execution.input_data, context)
 
     def _validate_execution(
@@ -339,9 +347,9 @@ class EventDeliveryStore:
                     raise ValueError(msg)
                 prepared.execution_metadata = {
                     **(prepared.execution_metadata or {}),
-                    _METADATA_KEY: {
+                    EVENT_DELIVERY_METADATA_KEY: {
                         "identity_digest": claim.identity.digest,
-                        "scheduling_state": "prepared",
+                        SCHEDULING_STATE_KEY: SCHEDULING_STATE_PREPARED,
                         "input_fingerprint": binding.input_fingerprint,
                         "temporal_workflow_id": claim.identity.temporal_workflow_id,
                     },
@@ -431,9 +439,9 @@ class EventDeliveryStore:
             return ClaimLost()
         execution.execution_metadata = {
             **(execution.execution_metadata or {}),
-            _METADATA_KEY: {
-                **(execution.execution_metadata or {}).get(_METADATA_KEY, {}),
-                "scheduling_state": "confirmed",
+            EVENT_DELIVERY_METADATA_KEY: {
+                **(execution.execution_metadata or {}).get(EVENT_DELIVERY_METADATA_KEY, {}),
+                SCHEDULING_STATE_KEY: SCHEDULING_STATE_CONFIRMED,
                 "temporal_run_id": acceptance.temporal_run_id,
                 "confirmed_at": changed.execution_confirmed_at.isoformat() if changed.execution_confirmed_at else None,
             },
