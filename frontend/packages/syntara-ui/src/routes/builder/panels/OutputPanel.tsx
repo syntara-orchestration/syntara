@@ -133,8 +133,8 @@ export function OutputPanel({ outputData, nodeId }: Readonly<OutputPanelProps>) 
           </Flex>
         </StackItem>
 
-        {/* Row 2: Mock data controls — Set mock data first, Unpin data second (hidden in version view) */}
-        {!isVersionView && !isEditing && (
+        {/* Row 2: Keep the pinned mock label visible in version view; hide edit actions there */}
+        {!isEditing && (Boolean(outputMock) || !isVersionView) && (
           <StackItem>
             <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }}>
               {outputMock && (
@@ -144,12 +144,19 @@ export function OutputPanel({ outputData, nodeId }: Readonly<OutputPanelProps>) 
                   </Label>
                 </FlexItem>
               )}
-              <FlexItem>
-                <Button variant="link" icon={<RhUiAddIcon />} onClick={handleSetMockData} className={styles.linkToggle}>
-                  Set mock data
-                </Button>
-              </FlexItem>
-              {outputMock && (
+              {!isVersionView && (
+                <FlexItem>
+                  <Button
+                    variant="link"
+                    icon={<RhUiAddIcon />}
+                    onClick={handleSetMockData}
+                    className={styles.linkToggle}
+                  >
+                    Set mock data
+                  </Button>
+                </FlexItem>
+              )}
+              {!isVersionView && outputMock && (
                 <FlexItem>
                   <Button variant="link" isDanger onClick={handleUnpinData} className={styles.dangerToggle}>
                     <RhUiCloseIcon /> Unpin data
