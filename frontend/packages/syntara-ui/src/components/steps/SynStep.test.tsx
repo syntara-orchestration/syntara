@@ -85,6 +85,36 @@ describe('SynStep semantic zoom', () => {
     expect(screen.getByTestId('semantic-zoom-icon')).toBeInTheDocument()
   })
 
+  it('uses tabIndex 0 on the step panel at full zoom for keyboard focus', () => {
+    viewportState.zoom = 0.75
+    renderWithFlow(
+      <SynStep
+        rootTestId="syn-step-full-zoom"
+        nodeProps={baseNodeProps}
+        semanticZoomSummary={{ title: 'Analyze', typeLabel: 'Task Agent' }}
+      >
+        <span>Detailed body</span>
+      </SynStep>
+    )
+
+    expect(screen.getByTestId('syn-step-full-zoom')).toHaveAttribute('tabIndex', '0')
+  })
+
+  it('omits panel tabIndex in semantic zoom so focus stays on the compact tile', () => {
+    viewportState.zoom = 0.5
+    renderWithFlow(
+      <SynStep
+        rootTestId="syn-step-semantic-zoom-tab"
+        nodeProps={baseNodeProps}
+        semanticZoomSummary={{ title: 'Analyze', typeLabel: 'Task Agent' }}
+      >
+        <span>Detailed body</span>
+      </SynStep>
+    )
+
+    expect(screen.getByTestId('syn-step-semantic-zoom-tab')).not.toHaveAttribute('tabIndex')
+  })
+
   it('semantic zoom layout has no accessibility violations', async () => {
     viewportState.zoom = 0.5
     const { container } = renderWithFlow(
