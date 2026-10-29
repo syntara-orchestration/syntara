@@ -116,3 +116,10 @@ the marker, or advancing Kafka offsets are not safe substitutes for evidence.
 
 Queue, concurrency and drain defaults are configured through the documented
 `APP_EVENT_*` settings in `.env.example`. Changes apply on runner restart.
+
+See [event subscription controls](event-subscription-controls.md) for revision-checked
+operator actions, durable shutdown acknowledgements, retirement guards and the
+additional control-coordination migration.
+
+See [Kafka worker operations](kafka-worker-operations.md) for runtime defaults,
+local compose configuration, sizing and recovery/rollout ordering.

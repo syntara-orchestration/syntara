@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from aiokafka.errors import AuthenticationFailedError, KafkaConnectionError, KafkaTimeoutError
 from sqlalchemy.exc import SQLAlchemyError
 
 from syntara.core.config.base import get_settings
@@ -34,6 +35,7 @@ from syntara.eventstreams.core.envelope import RawEvent, RawEventHeader
 from syntara.eventstreams.core.handler import ResolvedDelivery
 from syntara.eventstreams.core.processing import CONTENT_INSPECTION_PENDING, HeldRecord, InspectedRecord
 from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCode
+from syntara.eventstreams.core.runtime import RuntimeState, SubscriptionRuntimeError
 from syntara.eventstreams.core.serialization import JsonEventDecoder
 from syntara.eventstreams.exceptions import KafkaTransportError
 from syntara.eventstreams.models.delivery import EventDelivery
@@ -1100,3 +1102,261 @@ async def test_overlapping_stop_calls_share_successful_client_shutdown(harness) 
     await asyncio.gather(first, second)
     assert runner._stopped
     assert harness.client.stop.await_count == 1
+
+
+async def test_public_status_waits_for_first_assignment_before_reporting_active(
+    harness: SimpleNamespace,
+) -> None:
+    snapshot = harness.runner.snapshot
+    client = MagicMock(spec=KafkaPartitionConsumer)
+    client.topic, client.group_id = snapshot.configuration.topic, snapshot.configuration.group_id
+    client.epoch, client.assignment = 0, frozenset()
+    client.fetch.return_value = {}
+    runner: KafkaRecordRunner = KafkaRecordRunner(
+        snapshot,
+        client,
+        MagicMock(),
+        MagicMock(spec=EventExecutionPreparationService),
+        MagicMock(spec=EventAdmissionService),
+        owner_worker_id="assignment-review",
+        processing=harness.processing,
+        positions=harness.positions,
+        deliveries=harness.deliveries,
+    )
+
+    try:
+        await runner.start()
+        startup_status = runner.status
+        assert startup_status.state == RuntimeState.STARTING
+        harness.positions.initialize.assert_not_awaited()
+        await runner.on_partitions_assigned(frozenset(), client.epoch)
+        empty_assignment_status = runner.status
+        assert empty_assignment_status.state == RuntimeState.ACTIVE
+        harness.positions.initialize.assert_not_awaited()
+        client.epoch, client.assignment = 1, frozenset({0})
+        await runner.on_partitions_assigned(client.assignment, client.epoch)
+        assigned_status = runner.status
+        assert assigned_status.state == RuntimeState.STARTING
+        await runner._advance(runner._partitions[0])
+        harness.positions.initialize.assert_awaited_once()
+        ready_status = runner.status
+        assert ready_status.state == RuntimeState.ACTIVE
+    finally:
+        await runner.stop()
+
+
+async def test_assignment_status_waits_after_revocation_and_ignores_stale_callbacks(harness):
+    runner, client = harness.runner, harness.client
+    assert runner.status.state == RuntimeState.ACTIVE
+    await runner.on_partitions_revoked(client.assignment, client.epoch)
+    assert runner.status.state == RuntimeState.STARTING
+    client.epoch, client.assignment = 8, frozenset()
+    await runner.on_partitions_assigned(client.assignment, client.epoch)
+    assert runner.status.state == RuntimeState.ACTIVE
+    await runner.on_partitions_assigned(frozenset(), 7)
+    await runner.on_partitions_revoked(frozenset(), 7)
+    assert runner.status.state == RuntimeState.ACTIVE
+
+
+@pytest.mark.parametrize(
+    ("position_status", "reason", "observed"),
+    [
+        (PositionStatus.RECOVERY_GAP, "missing_commit", "recovery_gap"),
+        (PositionStatus.RECOVERY_GAP, "Storage Unavailable", "recovery_gap"),
+        (PositionStatus.BLOCKED, "storage_unavailable", "storage_unavailable"),
+        (PositionStatus.BLOCKED, "a" * 100, "a" * 100),
+        (PositionStatus.BLOCKED, None, "initialization_unresolved"),
+        (PositionStatus.BLOCKED, "", "initialization_unresolved"),
+        (PositionStatus.BLOCKED, "Storage Unavailable", "initialization_unresolved"),
+        (PositionStatus.BLOCKED, "storage-unavailable", "initialization_unresolved"),
+        (PositionStatus.BLOCKED, "storage_unavailable\n", "initialization_unresolved"),
+        (PositionStatus.BLOCKED, "échec", "initialization_unresolved"),
+        (PositionStatus.BLOCKED, "a" * 101, "initialization_unresolved"),
+    ],
+)
+async def test_public_status_exposes_initialization_holds(harness, position_status, reason, observed):
+    runner = harness.runner
+    for state in runner._partitions.values():
+        state.ready = state.eligible = False
+    assert runner.status.state == RuntimeState.STARTING
+    harness.positions.initialize.side_effect = None
+    harness.positions.initialize.return_value = PositionResult(
+        status=position_status, assignment_epoch=7, reason=reason
+    )
+    await runner._advance(runner._partitions[0])
+    assert runner.status.state == RuntimeState.BLOCKED
+    assert runner.status.reason == observed
+    assert not runner.status.permanent_content_error
+    harness.client.commit.assert_not_awaited()
+    harness.processing.process.assert_not_awaited()
+
+
+async def test_public_status_prioritizes_permanent_content_and_reports_teardown(harness):
+    runner = harness.runner
+    runner._partitions[0].held = HeldRecord(reason="broker_unavailable")
+    runner._partitions[1].held = HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+    observed = runner.status
+    assert observed.state == RuntimeState.BLOCKED
+    assert observed.reason == "activity_log_unavailable"
+    assert observed.permanent_content_error
+    await runner.drain()
+    assert runner.status.state == RuntimeState.DRAINING
+    await runner.stop()
+    assert runner.status.state == RuntimeState.STOPPED
+    assert observed.permanent_content_error  # Prior immutable observations cannot be cleared by stop.
+    harness.client.commit.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("cause", "transient"),
+    [
+        (AuthenticationFailedError("PRIVATE"), False),
+        (KafkaConnectionError("PRIVATE"), True),
+        (KafkaTimeoutError("PRIVATE"), True),
+        (None, False),
+    ],
+)
+async def test_startup_errors_leave_adapter_with_safe_retry_classification(harness, cause, transient):
+    harness.runner._started = False
+    failure = KafkaTransportError("PRIVATE credential contents")
+    failure.__cause__ = cause
+    harness.client.start.side_effect = failure
+    with pytest.raises(SubscriptionRuntimeError) as caught:
+        await harness.runner.start()
+    assert caught.value.transient is transient
+    assert str(caught.value) == "connection_unavailable"
+    harness.client.stop.assert_awaited_once()
+
+
+async def test_supervised_startup_keeps_admission_closed_until_explicit_authorization(harness):
+    runner = harness.runner
+    permitted = [True]
+    runner._started = False
+    runner.bind_placement(lambda: permitted[0])
+    await runner.start()
+    await runner._enqueue({0: [event(harness, 41)]}, 7)
+    assert runner.queued_records == 0
+    assert runner.open_admission()
+    await runner._enqueue({0: [event(harness, 41)]}, 7)
+    assert runner.queued_records == 1
+    permitted[0] = False
+    await runner._advance(runner._partitions[0])
+    harness.processing.process.assert_not_awaited()
+    assert not runner.open_admission()
+
+
+async def test_placement_loss_preserves_admitted_handoff_and_assignment_checked_drain_commit(harness):
+    runner = harness.runner
+    permitted = [True]
+    runner._started = False
+    runner.bind_placement(lambda: permitted[0])
+    await runner.start()
+    assert runner.open_admission()
+    entered, release = asyncio.Event(), asyncio.Event()
+    admitted = []
+
+    async def complete(_snapshot, identity, _record, _owner, *, admission_guard) -> ResolvedDelivery:
+        assert admission_guard()
+        admitted.append(identity)
+        entered.set()
+        await release.wait()
+        return terminal(identity)
+
+    harness.processing.process.side_effect = complete
+    await runner._enqueue({0: [event(harness, 41)]}, 7)
+    state = runner._partitions[0]
+    state.task = asyncio.create_task(runner._advance(state))
+    await entered.wait()
+    permitted[0] = False
+    closing = asyncio.create_task(runner.close_admission())
+    release.set()
+    await asyncio.gather(closing, state.task)
+    assert admitted == [runner._identity(event(harness, 41))]
+    harness.client.commit.assert_awaited_with({0: 42}, expected_epoch=7)
+    harness.client.pause.assert_awaited()
+    assert not runner._accepting_work()
+    assert runner._drain_deadline is not None
+
+
+@pytest.mark.parametrize("reason", ["assignment", "deadline"])
+async def test_placement_loss_never_bypasses_assignment_or_drain_deadline(harness, monkeypatch, reason):
+    runner = harness.runner
+    state = runner._partitions[0]
+    state.resolved_next_offset = 42
+    monkeypatch.setattr(runner, "_placement_authority", lambda: False)
+    if reason == "assignment":
+        harness.client.epoch += 1
+    else:
+        runner._drain_deadline = asyncio.get_running_loop().time() - 1
+    await runner._commit_positions((state,))
+    harness.client.commit.assert_not_awaited()
+    assert state.resolved_next_offset == 42
+
+
+async def test_persisted_recovery_dispatch_does_not_drain_its_own_shielded_caller(harness, monkeypatch) -> None:
+    from unittest.mock import AsyncMock
+
+    from syntara.eventstreams.services.recovery_request_service import EventRecoveryRequestService
+
+    runner = harness.runner
+    state = runner._partitions[0]
+    requests = MagicMock(spec=EventRecoveryRequestService)
+    request = RecoveryRequest(
+        **runner._request(state).model_dump(),
+        expected_recovery_revision=0,
+        policy=RecoveryPolicy.CURRENT_END,
+        reason="offset_expired",
+    )
+    requests.read.return_value = request
+    runner._recovery_requests = requests
+    observations = []
+
+    async def recover(value, *, owner_worker_id) -> PositionResult:
+        assert value.assignment_epoch == harness.client.epoch
+        assert owner_worker_id == "worker"
+
+        async def shielded_operation() -> PositionResult:
+            evidence = await runner.close_and_drain(value, token=uuid4(), boundary=0)
+            observations.append(evidence)
+            return PositionResult(status=PositionStatus.READY, assignment_epoch=value.assignment_epoch)
+
+        return await asyncio.shield(asyncio.create_task(shielded_operation()))
+
+    harness.positions.recover.side_effect = recover
+    monkeypatch.setattr(runner, "resume_after_recovery", AsyncMock(return_value=True))
+    state.control_task = asyncio.create_task(runner._recover_requested(state))
+    await asyncio.wait_for(state.control_task, timeout=1)
+    assert observations[0].quiescent
+    requests.record.assert_awaited_once()
+    assert requests.record.call_args.args[1].status == PositionStatus.READY
+
+
+async def test_recovery_request_cannot_dispatch_after_assignment_loss(harness) -> None:
+    from syntara.eventstreams.services.recovery_request_service import EventRecoveryRequestService
+
+    runner = harness.runner
+    state = runner._partitions[0]
+    requests = MagicMock(spec=EventRecoveryRequestService)
+    requests.read.return_value = RecoveryRequest(
+        **runner._request(state).model_dump(),
+        expected_recovery_revision=0,
+        policy=RecoveryPolicy.CURRENT_END,
+        reason="offset_expired",
+    )
+    runner._recovery_requests = requests
+    harness.client.epoch += 1
+    await runner._recover_requested(state)
+    harness.positions.recover.assert_not_awaited()
+    requests.record.assert_not_awaited()
+
+
+async def test_revocation_preserves_known_content_gate_after_partition_state_is_removed(harness) -> None:
+    runner = harness.runner
+    state = runner._partitions[0]
+    state.held = HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+    await runner.on_partitions_revoked(frozenset({0}), state.epoch)
+    assert 0 not in runner._partitions
+    assert runner.status.permanent_content_error
+    assert not runner._accepting_work()
+    await runner.stop()
+    assert runner.status.permanent_content_error

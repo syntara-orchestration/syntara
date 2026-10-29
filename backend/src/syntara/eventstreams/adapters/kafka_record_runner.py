@@ -1,13 +1,16 @@
 """Single-subscription Kafka runner; durable services own scheduling decisions."""
 
 import asyncio
+import re
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
+from typing import TypedDict
 from uuid import UUID
 
 import structlog
+from aiokafka.errors import KafkaError, KafkaTimeoutError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -16,10 +19,10 @@ from syntara.core.constants import EventDeliveryDefaults, EventSchedulingDefault
 from syntara.eventstreams.adapters.kafka_committed_position import KafkaCommittedPositionVerifier
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
 from syntara.eventstreams.adapters.kafka_delivery_reader import KafkaDeliveryReader
-from syntara.eventstreams.adapters.kafka_initial_position import PositionRequest, PositionStatus
+from syntara.eventstreams.adapters.kafka_initial_position import PositionRequest, PositionResult, PositionStatus
 from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaInitialPositionService
 from syntara.eventstreams.adapters.kafka_metadata import KafkaSourceMetadata
-from syntara.eventstreams.adapters.kafka_position_control import DrainEvidence
+from syntara.eventstreams.adapters.kafka_position_control import DrainEvidence, RecoveryCacheCoordination
 from syntara.eventstreams.adapters.kafka_position_store import KafkaInitialPositionStore
 from syntara.eventstreams.adapters.kafka_record_identity import KafkaRecordIdentity
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
@@ -34,6 +37,7 @@ from syntara.eventstreams.core.processing import (
     PendingContentFailure,
     RecordProcessingGate,
 )
+from syntara.eventstreams.core.runtime import RunnerStatus, RuntimeFailureCode, RuntimeState, SubscriptionRuntimeError
 from syntara.eventstreams.core.source_metadata import EventSourceMetadata
 from syntara.eventstreams.exceptions import (
     ConsumerNotRunningError,
@@ -46,9 +50,14 @@ from syntara.eventstreams.services.admission_service import EventAdmissionServic
 from syntara.eventstreams.services.delivery_retention_service import EventDeliveryRetentionService
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
+from syntara.eventstreams.services.recovery_request_service import EventRecoveryRequestService
 
 logger = structlog.stdlib.get_logger(__name__)
 _TRANSPORT_ERRORS = (ConsumerNotRunningError, KafkaTransportError, OwnershipRevokedError, StaleEpochError)
+
+
+class _ProcessingGuardArguments(TypedDict, total=False):
+    admission_guard: Callable[[], bool]
 
 
 @dataclass
@@ -72,6 +81,9 @@ class _Partition:
     inspection_end_offset: int | None = None
     fence: UUID | None = None
     reconciled_until: float = 0
+    initialization: PositionResult | None = None
+    control_task: asyncio.Task[None] | None = None
+    control_due: float = 0
 
 
 def raw_event_size(event: RawEvent) -> int:
@@ -104,6 +116,8 @@ class KafkaRecordRunner:
         work_semaphore: asyncio.Semaphore | None = None,
         lookup: TerminalDeliveryCache | None = None,
         gate: RecordProcessingGate | None = None,
+        recovery_requests: EventRecoveryRequestService | None = None,
+        cache_coordination: RecoveryCacheCoordination | None = None,
     ) -> None:
         """Compose completed services; callers may share a downstream concurrency bound."""
         if not isinstance(snapshot.configuration, KafkaSourceConfiguration) or (
@@ -114,6 +128,7 @@ class KafkaRecordRunner:
         self.snapshot = snapshot
         self._client = client
         self._owner = owner_worker_id
+        self._recovery_requests = recovery_requests
         self._settings = get_settings()
         self._lookup = lookup
         self._gate = gate
@@ -126,7 +141,13 @@ class KafkaRecordRunner:
         self._positions = (
             positions
             if positions is not None
-            else KafkaInitialPositionService(KafkaInitialPositionStore(session_factory), client, admission, self)
+            else KafkaInitialPositionService(
+                KafkaInitialPositionStore(session_factory),
+                client,
+                admission,
+                self,
+                cache_coordination=cache_coordination,
+            )
         )
         self.retention = EventDeliveryRetentionService(
             session_factory, verifier=KafkaCommittedPositionVerifier(client, snapshot, self._deliveries)
@@ -137,12 +158,16 @@ class KafkaRecordRunner:
             else asyncio.Semaphore(self._settings.event_processing_concurrency)
         )
         self._partitions: dict[int, _Partition] = {}
+        self._assignment_epoch: int | None = None
         self._commit_lock = asyncio.Lock()
         self._fetch_lock = asyncio.Lock()
         self._stop_lock = asyncio.Lock()
         self._closing = False
         self._started = False
+        self._placement_authority: Callable[[], bool] | None = None
+        self._placement_enabled = True
         self._stopped = False
+        self._retained_content_gate = False
         self._drain_deadline: float | None = None
         self._fetching: frozenset[int] = frozenset()
         self._fetch_idle = asyncio.Event()
@@ -168,7 +193,25 @@ class KafkaRecordRunner:
         return self._gate is None or self._gate.resolution_open(self.snapshot) is True
 
     def _admission_open(self) -> bool:
-        return self._gate is None or self._gate.admission_open(self.snapshot) is True
+        return self._placement_open() and (self._gate is None or self._gate.admission_open(self.snapshot) is True)
+
+    def bind_placement(self, permits_admission: Callable[[], bool]) -> None:
+        """Hold admission closed throughout supervised factory/client startup."""
+        if self._started:
+            msg = "Placement must be bound before runner startup"
+            raise ValueError(msg)
+        self._placement_authority = permits_admission
+        self._placement_enabled = False
+
+    def _placement_open(self) -> bool:
+        return self._placement_enabled and (self._placement_authority is None or self._placement_authority() is True)
+
+    def open_admission(self) -> bool:
+        """Open intake after the supervisor checks a confirmed current lease."""
+        if self._closing or self._stopped or self._placement_authority is None or not self._placement_authority():
+            return False
+        self._placement_enabled = True
+        return True
 
     def _invalidate_gate(self) -> None:
         if self._gate is not None:
@@ -198,6 +241,51 @@ class KafkaRecordRunner:
             and state.fence is None
             and self._resolution_open()
             and (self._drain_deadline is None or asyncio.get_running_loop().time() < self._drain_deadline)
+        )
+
+    @property
+    def status(self) -> RunnerStatus:
+        """Observe local convergence without granting admission or position authority."""
+        if self._stopped:
+            return RunnerStatus(
+                state=RuntimeState.STOPPED,
+                permanent_content_error=self._retained_content_gate
+                or any(
+                    state.content_gate_unknown
+                    or state.pending_failure is not None
+                    or (state.held is not None and state.held.permanent_content_error)
+                    for state in self._partitions.values()
+                ),
+            )
+        if self._closing:
+            return RunnerStatus(state=RuntimeState.DRAINING, permanent_content_error=self._retained_content_gate)
+        if self._retained_content_gate:
+            return RunnerStatus(
+                state=RuntimeState.BLOCKED, reason="activity_log_unavailable", permanent_content_error=True
+            )
+        if not self._started or self._assignment_epoch != self._client.epoch:
+            return RunnerStatus(state=RuntimeState.STARTING)
+        states = [state for state in self._partitions.values() if self._owned(state)]
+        # A permanent content hold must remain visible even if another partition
+        # is only waiting for initialization or a transient dependency.
+        states.sort(key=lambda state: (not bool(state.held and state.held.permanent_content_error), state.partition))
+        for state in states:
+            if state.held is None:
+                continue
+            reason = state.held.reason
+            if reason == "initialization_unresolved" and state.initialization is not None:
+                initialization_reason = state.initialization.reason
+                if state.initialization.status == PositionStatus.RECOVERY_GAP:
+                    reason = "recovery_gap"
+                elif initialization_reason is not None and re.fullmatch(r"[a-z][a-z0-9_]{0,99}", initialization_reason):
+                    reason = initialization_reason
+            return RunnerStatus(
+                state=RuntimeState.BLOCKED,
+                reason=reason,
+                permanent_content_error=state.held.permanent_content_error,
+            )
+        return RunnerStatus(
+            state=RuntimeState.STARTING if any(not state.ready for state in states) else RuntimeState.ACTIVE
         )
 
     def _owned(self, state: _Partition) -> bool:
@@ -249,8 +337,15 @@ class KafkaRecordRunner:
         try:
             await self._client.start()
             self._started = True
-        except BaseException:
+        except BaseException as exc:
             await self._client.stop()
+            if isinstance(exc, KafkaTransportError):
+                cause = exc.__cause__
+                raise SubscriptionRuntimeError(
+                    RuntimeFailureCode.CONNECTION_UNAVAILABLE,
+                    transient=isinstance(cause, KafkaError)
+                    and (cause.retriable or isinstance(cause, KafkaTimeoutError)),
+                ) from None
             raise
 
     async def run(self) -> None:
@@ -270,7 +365,14 @@ class KafkaRecordRunner:
         for partition in partitions:
             previous = self._partitions.get(partition)
             if previous is None:
-                self._partitions[partition] = _Partition(partition=partition, epoch=epoch, closing=self._closing)
+                self._partitions[partition] = _Partition(
+                    partition=partition,
+                    epoch=epoch,
+                    closing=self._closing,
+                    held=HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+                    if self._retained_content_gate
+                    else None,
+                )
                 continue
             if previous.epoch == epoch:
                 previous.paused = True
@@ -285,13 +387,19 @@ class KafkaRecordRunner:
                 epoch=epoch,
                 records=deque(previous.records),
                 task=None,
+                control_task=None,
+                control_due=0,
                 closing=self._closing,
                 paused=True,
                 reconciled_until=0,
             )
+        if epoch == self._client.epoch:
+            self._assignment_epoch = epoch
 
     async def on_partitions_revoked(self, partitions: frozenset[int], epoch: int) -> None:
         """Close admission and bound drain without waiting for the fetch loop."""
+        if self._assignment_epoch == epoch:
+            self._assignment_epoch = None
         states = [state for p, state in self._partitions.items() if p in partitions and state.epoch == epoch]
         for state in states:
             state.closing = True
@@ -302,6 +410,11 @@ class KafkaRecordRunner:
         await self._flush_pending_content(states, deadline)
         for state in states:
             if self._partitions.get(state.partition) is state:
+                self._retained_content_gate |= (
+                    state.content_gate_unknown
+                    or state.pending_failure is not None
+                    or (state.held is not None and state.held.permanent_content_error)
+                )
                 del self._partitions[state.partition]
 
     async def _advance(self, state: _Partition) -> None:
@@ -353,6 +466,7 @@ class KafkaRecordRunner:
             return False
         if not state.ready:
             position = await self._positions.initialize(self._request(state))
+            state.initialization = position
             if position.status != PositionStatus.READY or position.assignment_epoch != state.epoch:
                 if position.reason in {
                     "storage_unavailable",
@@ -394,7 +508,12 @@ class KafkaRecordRunner:
         return self._owned(state) and state.fence is None and not state.closing and self._accepting_work()
 
     def _accepting_work(self) -> bool:
-        return not self._closing and not self._stopped
+        return not self._closing and not self._stopped and not self._retained_content_gate and self._placement_open()
+
+    def _processing_guard(self) -> _ProcessingGuardArguments:
+        # Keep the guard scoped to this invocation, including injected/shared
+        # processing providers. Prepared recovery never requires this guard.
+        return {} if self._placement_authority is None else {"admission_guard": self._accepting_work}
 
     async def _recover_pending(self, state: _Partition) -> bool:
         for _ in range(FieldLimits.MAX_ITEMS_PER_PAGE):
@@ -421,9 +540,13 @@ class KafkaRecordRunner:
         identity = self._identity(event)
         epoch = state.epoch
         if self._cache_admitted(state):
-            result = await self._processing.process(self.snapshot, identity, event, self._owner, cache_admitted=True)
+            result = await self._processing.process(
+                self.snapshot, identity, event, self._owner, cache_admitted=True, **self._processing_guard()
+            )
         else:
-            result = await self._processing.process(self.snapshot, identity, event, self._owner)
+            result = await self._processing.process(
+                self.snapshot, identity, event, self._owner, **self._processing_guard()
+            )
         if not self._owned(state) or state.epoch != epoch:
             return
         if not state.records or self._identity(state.records[0]) != identity:
@@ -456,7 +579,7 @@ class KafkaRecordRunner:
             await self._processing.process(self.snapshot, pending.identity, None, self._owner)
             if pending.failure is None
             else await self._processing.hold_content_failure(
-                self.snapshot, pending.identity, pending.failure, self._owner
+                self.snapshot, pending.identity, pending.failure, self._owner, **self._processing_guard()
             )
         )
         await self._apply_pending_result(state, result)
@@ -523,8 +646,41 @@ class KafkaRecordRunner:
     def _due(state: _Partition) -> bool:
         return state.held is None or (state.held.retry_at is not None and datetime.now(UTC) >= state.held.retry_at)
 
+    async def _recover_requested(self, state: _Partition) -> None:
+        """Only the assigned runner constructs the internal epoch-bearing request."""
+        if self._recovery_requests is None:
+            return
+        try:
+            request = await self._recovery_requests.read(self.snapshot, state.partition, state.epoch)
+            if request is None or not self._owned(state) or self._closing:
+                return
+            result = await self._positions.recover(request, owner_worker_id=self._owner)
+            if (
+                result.status == PositionStatus.READY
+                and state.fence is not None
+                and not await self.resume_after_recovery(request, token=state.fence)
+            ):
+                result = PositionResult(
+                    status=PositionStatus.BLOCKED, assignment_epoch=state.epoch, reason="recovery_resume_pending"
+                )
+            await self._recovery_requests.record(request, result)
+        except (SQLAlchemyError, OSError, TimeoutError, ValueError):
+            state.held = self._retry("recovery_control_unavailable")
+
+    def _poll_control(self, state: _Partition) -> None:
+        if self._recovery_requests is None or not self._owned(state) or state.closing:
+            return
+        if state.control_task is not None and state.control_task.done():
+            if not state.control_task.cancelled():
+                state.control_task.result()
+            state.control_task = None
+        if state.control_task is None and asyncio.get_running_loop().time() >= state.control_due:
+            state.control_due = asyncio.get_running_loop().time() + 5
+            state.control_task = asyncio.create_task(self._recover_requested(state))
+
     def _start_due_tasks(self) -> None:
         for state in tuple(self._partitions.values()):
+            self._poll_control(state)
             if state.task is not None and state.task.done():
                 if not state.task.cancelled():
                     state.task.result()
@@ -534,6 +690,7 @@ class KafkaRecordRunner:
                 and state.task is None
                 and not state.closing
                 and state.fence is None
+                and (state.control_task is None or state.control_task.done())
                 and self._due(state)
             ):
                 state.held = None
@@ -674,9 +831,13 @@ class KafkaRecordRunner:
                 if state.task is not None and state.task is not asyncio.current_task() and not state.task.done():
                     await asyncio.shield(state.task)
                 if work_held:
-                    return await self._processing.inspect_only(self.snapshot, self._identity(event), event, self._owner)
+                    return await self._processing.inspect_only(
+                        self.snapshot, self._identity(event), event, self._owner, **self._processing_guard()
+                    )
                 async with self._work:
-                    return await self._processing.inspect_only(self.snapshot, self._identity(event), event, self._owner)
+                    return await self._processing.inspect_only(
+                        self.snapshot, self._identity(event), event, self._owner, **self._processing_guard()
+                    )
         except TimeoutError:
             return self._retry("inspection_unavailable")
 
@@ -831,10 +992,17 @@ class KafkaRecordRunner:
         if not task.cancelled():
             task.exception()
 
-    async def _drain_states(self, states: list[_Partition], deadline: float, *, commit: bool) -> bool:
+    async def _drain_states(
+        self, states: list[_Partition], deadline: float, *, commit: bool, include_controls: bool = True
+    ) -> bool:
         for state in states:
             await self._pause(state, paused=True)
-        tasks = {state.task for state in states if state.task is not None and not state.task.done()}
+        tasks = {
+            task
+            for state in states
+            for task in ((state.task, state.control_task) if include_controls else (state.task,))
+            if task is not None and not task.done() and task is not asyncio.current_task()
+        }
         remaining = max(0.0, deadline - asyncio.get_running_loop().time())
         pending: set[asyncio.Task[None]] = set()
         if tasks:
@@ -901,7 +1069,9 @@ class KafkaRecordRunner:
             finally:
                 async with asyncio.timeout(self._settings.event_drain_timeout_seconds):
                     await self._client.stop()
-                self._stopped = True
+            if not await self._positions.settle_operations(self._settings.event_drain_timeout_seconds):
+                raise SubscriptionRuntimeError(RuntimeFailureCode.STOP_INCOMPLETE)
+            self._stopped = True
 
     async def close_and_drain(self, request: PositionRequest, *, token: UUID, boundary: int) -> DrainEvidence:
         """Fence local tasks/commits for the upstream explicit gap-recovery service."""
@@ -923,7 +1093,10 @@ class KafkaRecordRunner:
                     await self._fetch_idle.wait()
                 async with self._commit_lock:
                     pass  # Previously issued commits must settle before the boundary changes.
-                quiescent = await self._drain_states([state], deadline, commit=False)
+                # The upstream position service shields an inner operation from
+                # its caller. Waiting for the parent control task here would
+                # make that operation wait on its own completion.
+                quiescent = await self._drain_states([state], deadline, commit=False, include_controls=False)
                 if quiescent:
                     self._remember_inspection(state, list(state.records))
                     if state.pending_failure is not None:

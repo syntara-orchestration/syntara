@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -32,6 +33,9 @@ from syntara.eventstreams.services import record_processing_service as module
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
 from tests.unit.eventstreams.test_execution_preparation_service import preparation_context
+
+if TYPE_CHECKING:
+    from syntara.eventstreams.core.serialization import EventDecodeSuccess, JsonEventDecoder
 
 
 def terminal(identity: DeliveryIdentity, state: DeliveryState = DeliveryState.SCHEDULED) -> ResolvedDelivery:
@@ -129,6 +133,69 @@ async def test_evidence_then_decode_prepare_commit_and_schedule(monkeypatch) -> 
     assert isinstance(await service.process(context.snapshot, context.identity, event, "worker"), ResolvedDelivery)
     assert context.events.index("lookup") < context.events.index("acquire") < context.events.index("freeze")
     assert context.events[-2:] == ["commit", "schedule"]
+
+
+@pytest.mark.parametrize("stage", ["lookup", "eligibility", "inspection"])
+async def test_placement_loss_during_slow_processing_never_opens_new_admission(monkeypatch, stage):
+    context, service, admission, event = processing_context(monkeypatch)
+    permitted = [True]
+
+    if stage == "lookup":
+
+        async def lookup(_identity) -> None:
+            permitted[0] = False
+
+        context.store.lookup_terminal.side_effect = lookup
+    elif stage == "eligibility":
+
+        async def eligibility(_snapshot) -> bool:
+            permitted[0] = False
+            return True
+
+        monkeypatch.setattr(service, "admission_eligible", eligibility)
+    else:
+
+        async def inspect(*_args: object, **_kwargs: object) -> "EventDecodeSuccess | EventDecodeFailure":
+            permitted[0] = False
+            decoder: JsonEventDecoder = service._decoder
+            return decoder.decode(event)
+
+        monkeypatch.setattr(service, "_inspect_content", inspect)
+
+    result = await service.process(
+        context.snapshot, context.identity, event, "worker", admission_guard=lambda: permitted[0]
+    )
+    assert isinstance(result, HeldRecord)
+    assert result.reason == "admission_closed"
+    context.store.acquire.assert_not_awaited()
+    context.store.freeze.assert_not_awaited()
+    admission.schedule.assert_not_awaited()
+    if stage != "inspection":
+        context.store.acquire_inspection.assert_not_awaited()
+
+
+async def test_placement_guard_never_revokes_a_frozen_delivery_recovery(monkeypatch):
+    context, service, admission, _ = processing_context(monkeypatch)
+    prepared = await context.prepare()
+    assert isinstance(prepared, PreparedExecution)
+    context.rows[EventDelivery] = retained(context.identity, frozen_binding=prepared.claim.binding)
+    context.store.acquire.side_effect = None
+    context.store.acquire.return_value = prepared.claim
+    result = await service.process(context.snapshot, context.identity, None, "worker", admission_guard=lambda: False)
+    assert isinstance(result, ResolvedDelivery)
+    admission.schedule.assert_awaited_once()
+    assert context.events.count("freeze") == 1
+
+
+async def test_placement_loss_blocks_new_inspection_in_the_session_that_would_acquire_it(monkeypatch):
+    context, service, admission, event = processing_context(monkeypatch)
+    result = await service.inspect_only(
+        context.snapshot, context.identity, event, "worker", admission_guard=lambda: False
+    )
+    assert isinstance(result, HeldRecord)
+    assert result.reason == "admission_closed"
+    context.store.acquire_inspection.assert_not_awaited()
+    admission.schedule.assert_not_awaited()
 
 
 @pytest.mark.parametrize("state", [DeliveryState.SCHEDULED, DeliveryState.FILTERED, DeliveryState.CANCELLED])

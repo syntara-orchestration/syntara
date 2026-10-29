@@ -87,6 +87,30 @@ class EventRunnerDefaults:
     DRAIN_TIMEOUT_SECONDS = 20
 
 
+class EventPlacementDefaults:
+    """Unvalidated placement tuning; independent of delivery claim leases."""
+
+    HEARTBEAT_INTERVAL_SECONDS = 20
+    WORKER_LIVENESS_SECONDS = 60
+    SUBSCRIPTION_LEASE_SECONDS = 60
+    MAX_CLAIM_BATCH = 100
+
+
+class EventWorkerDefaults:
+    """Fixed M1 control-plane process bounds; not subscription tuning."""
+
+    RECONCILE_INTERVAL_SECONDS = 30
+    RECONCILE_JITTER = 0.1
+    STARTUP_CONCURRENCY = 8
+    STARTUP_TIMEOUT_SECONDS = 30
+    PLACEMENT_CONCURRENCY = 4
+    PLACEMENT_TIMEOUT_SECONDS = 5
+    PREPARATION_CONCURRENCY = 8
+    FINALIZATION_CONCURRENCY = 8
+    HINT_TIMEOUT_SECONDS = 1
+    HINT_CHANNEL = "syntara:eventstreams:subscription_changes"
+
+
 class EventDeliveryDefaults:
     """Delivery ownership and minimum evidence retention; independent lifetimes."""
 
