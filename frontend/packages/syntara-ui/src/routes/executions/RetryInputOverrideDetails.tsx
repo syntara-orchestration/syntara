@@ -4,15 +4,16 @@ import {
   ContentVariants,
   Flex,
   FlexItem,
-  FormGroup,
   FormHelperText,
   HelperText,
   HelperTextItem,
   Stack,
   StackItem,
-  TextArea,
+  Title,
+  TitleSizes,
 } from '@patternfly/react-core'
-import type { ChangeEvent } from 'react'
+
+import { ExpandableCodeEditor } from '../builder/components/ExpandableCodeEditor'
 
 import styles from './RetryInputOverrideDetails.module.css'
 import {
@@ -61,7 +62,7 @@ export function RetryInputOverrideDetails({
   const helperTextId = `retry-input-override-help-${target.id}`
   const hasSavedOverride = Boolean(savedOverride && Object.keys(savedOverride).length > 0)
 
-  const handleDraftChange = (_event: ChangeEvent<HTMLTextAreaElement>, value: string) => {
+  const handleDraftChange = (value: string) => {
     const result = parseRetryInputOverrideDraft(value, target.parameterNames)
     onDraftChange(target.id, value, result.parsed, result.error)
   }
@@ -91,36 +92,43 @@ export function RetryInputOverrideDetails({
 
   return (
     <Stack hasGutter className={styles.container}>
-      <StackItem>
+      <StackItem className={styles.header}>
+        <Title headingLevel="h3" size={TitleSizes.md} className={styles.title}>
+          Input parameters
+        </Title>
         <Content component={ContentVariants.small}>
-          Edits apply to this retry only. The original run and saved workflow definition remain unchanged.
+          These parameters are used only by this retry. The workflow definition and saved node parameters stay
+          unchanged.
         </Content>
       </StackItem>
       <StackItem isFilled className={styles.editorItem} data-testid="retry-input-override-scroll-area">
-        <FormGroup label="Input parameters (JSON)" fieldId={`retry-input-override-${target.id}`}>
-          <TextArea
-            id={`retry-input-override-${target.id}`}
-            className={styles.editor}
-            aria-label={`Input parameters for ${target.name}`}
-            aria-describedby={helperTextId}
-            value={visibleDraft}
-            onChange={handleDraftChange}
-            isDisabled={isDisabled}
-            resizeOrientation="vertical"
-            rows={16}
-            validated={error ? 'error' : 'default'}
+        <div className={styles.editor}>
+          <ExpandableCodeEditor
+            code={visibleDraft}
+            onCodeChange={handleDraftChange}
+            language="json"
+            height="100%"
+            modalTitle={`Input parameters for retry — ${target.name}`}
+            ariaLabel={`Input parameters for ${target.name}`}
+            isReadOnly={isDisabled}
           />
+        </div>
+        {error && (
           <FormHelperText>
             <HelperText isLiveRegion>
-              <HelperTextItem id={helperTextId} variant={error ? 'error' : 'default'}>
-                {error ?? `Allowed parameters: ${target.parameterNames.join(', ')}. Values must be valid JSON.`}
+              <HelperTextItem id={helperTextId} variant="error">
+                {error}
               </HelperTextItem>
             </HelperText>
           </FormHelperText>
-        </FormGroup>
+        )}
       </StackItem>
       <StackItem className={styles.actions}>
-        <Flex gap={{ default: 'gapSm' }} flexWrap={{ default: 'wrap' }}>
+        <Flex
+          gap={{ default: 'gapSm' }}
+          flexWrap={{ default: 'wrap' }}
+          justifyContent={{ default: 'justifyContentFlexEnd' }}
+        >
           <FlexItem>
             <Button
               variant="primary"

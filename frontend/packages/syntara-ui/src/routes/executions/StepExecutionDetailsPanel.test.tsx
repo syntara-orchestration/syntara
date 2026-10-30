@@ -7,6 +7,14 @@ import { axe } from 'vitest-axe'
 
 import { StepExecutionDetailsPanel } from './StepExecutionDetailsPanel'
 
+vi.mock('../../providers/theme/useColorScheme', () => ({
+  useColorScheme: () => ({
+    colorScheme: 'dark',
+    setColorScheme: vi.fn(),
+    toggleColorScheme: vi.fn(),
+  }),
+}))
+
 const mockActivityData = {
   resources: [
     {

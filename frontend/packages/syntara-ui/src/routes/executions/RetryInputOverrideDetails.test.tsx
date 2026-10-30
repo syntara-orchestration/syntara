@@ -8,6 +8,14 @@ import { RetryInputOverrideDetails } from './RetryInputOverrideDetails'
 import type { RetryInputOverrideDetailsProps } from './RetryInputOverrideDetails'
 import type { RetryInputOverrideTarget } from './retryInputOverrides'
 
+vi.mock('../../providers/theme/useColorScheme', () => ({
+  useColorScheme: () => ({
+    colorScheme: 'dark',
+    setColorScheme: vi.fn(),
+    toggleColorScheme: vi.fn(),
+  }),
+}))
+
 const target: RetryInputOverrideTarget = {
   id: 'step-a',
   name: 'Deploy step',
@@ -90,10 +98,24 @@ describe('RetryInputOverrideDetails', () => {
   it('prefills the editor with the full effective input JSON', () => {
     renderEditor({ startEditing: true })
 
+    expect(screen.getByRole('heading', { name: 'Input parameters' })).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'These parameters are used only by this retry. The workflow definition and saved node parameters stay unchanged.'
+      )
+    ).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Input parameters for Deploy step' })).toHaveValue(
       JSON.stringify({ url: 'https://original.example', retries: 1 }, null, 2)
     )
+    expect(screen.getByRole('button', { name: 'Open in new window' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reset parameters' })).not.toBeInTheDocument()
+  })
+
+  it('keeps save and cancel actions visible in the editor footer', () => {
+    renderEditor({ startEditing: true })
+
+    expect(screen.getByRole('button', { name: 'Save parameters for retry' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
   })
 
   it('saves only the changed keys from the prefilled effective JSON', async () => {
@@ -113,7 +135,7 @@ describe('RetryInputOverrideDetails', () => {
     expect(onSave).toHaveBeenCalledWith('step-a', { url: 'https://retry.example' })
   })
 
-  it('restores original resolved values in the editor without saving yet', async () => {
+  it('restores resolved inputs while keeping reset after save and cancel', async () => {
     const user = userEvent.setup()
     const onDraftChange = vi.fn()
     renderEditor({
@@ -123,6 +145,15 @@ describe('RetryInputOverrideDetails', () => {
       draft: JSON.stringify({ url: 'https://retry.example', retries: 1 }, null, 2),
     })
 
+    const buttonLabels = screen.getAllByRole('button').map((button) => button.textContent?.trim())
+    const saveIndex = buttonLabels.indexOf('Save parameters for retry')
+    const cancelIndex = buttonLabels.indexOf('Cancel')
+    const resetIndex = buttonLabels.indexOf('Reset parameters')
+
+    expect(saveIndex).toBeGreaterThanOrEqual(0)
+    expect(cancelIndex).toBeGreaterThan(saveIndex)
+    expect(resetIndex).toBeGreaterThan(cancelIndex)
+
     await user.click(screen.getByRole('button', { name: 'Reset parameters' }))
 
     expect(onDraftChange).toHaveBeenCalledWith(
@@ -131,7 +162,6 @@ describe('RetryInputOverrideDetails', () => {
       { url: 'https://original.example', retries: 1 },
       undefined
     )
-    expect(screen.getByRole('button', { name: 'Save parameters for retry' })).toBeInTheDocument()
   })
 
   it('blocks saving unknown input keys and provides a validation message', async () => {

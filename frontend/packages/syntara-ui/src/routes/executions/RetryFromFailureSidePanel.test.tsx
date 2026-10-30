@@ -70,13 +70,23 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByTestId('retry-from-failure-panel')).toHaveFocus()
     expect(screen.getByRole('heading', { name: 'How retry works' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Retry plan' })).toBeInTheDocument()
-    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('3 steps will be retried')).toBeInTheDocument()
+    expect(screen.getByText('Includes affected steps and any downstream merge step')).toBeInTheDocument()
     expect(screen.getByText('Second Step')).toBeInTheDocument()
-    expect(screen.getByText('All eligible failure points')).toBeInTheDocument()
     expect(screen.getByText('Script')).toBeInTheDocument()
     expect(screen.getByText('1 completed result retained')).toBeInTheDocument()
-    expect(screen.getByText(/Completed results outside the selected retry paths are reused/)).toBeInTheDocument()
-    expect(screen.getByText('This retry starts at Second Step and reruns 3 steps.')).toBeInTheDocument()
+    expect(
+      screen.getByText(/This retry uses the same workflow version as this run, preserving the definition that ran/)
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Nodes outside the selected retry scope will not re-execute/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/Completed nodes retain their previous result, failed nodes remain failed/)
+    ).toBeInTheDocument()
+    expect(screen.getByText(/nodes that did not run remain skipped/)).toBeInTheDocument()
+    expect(screen.getByText(/may repeat external side effects/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/To change the parameters for this retry, select the failed node in Run details/)
+    ).toBeInTheDocument()
   })
 
   it('defaults the retry scope to all eligible failure points', async () => {
@@ -109,7 +119,7 @@ describe('RetryFromFailureSidePanel', () => {
     renderPanel()
 
     expect(screen.getByRole('radio', { name: 'All eligible failure points' })).toBeChecked()
-    expect(screen.getByText('5')).toBeInTheDocument()
+    expect(screen.getByText('5 steps will be retried')).toBeInTheDocument()
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
 
     expect(mockHandleRetry).toHaveBeenCalledWith(undefined, {})
@@ -163,8 +173,7 @@ describe('RetryFromFailureSidePanel', () => {
     await user.click(screen.getByRole('checkbox', { name: 'First Step' }))
     await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith(['step-1']))
 
-    expect(screen.getByText('1 selected failure point')).toBeInTheDocument()
-    expect(screen.getByText('4')).toBeInTheDocument()
+    expect(screen.getByText('4 steps will be retried')).toBeInTheDocument()
     expect(screen.getByText('3 completed results retained')).toBeInTheDocument()
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Retry plan updated. 1 selected failure point. 4 steps to retry. Retry starts at First Step. 3 completed results retained.'
@@ -175,8 +184,7 @@ describe('RetryFromFailureSidePanel', () => {
 
     await user.click(screen.getByRole('checkbox', { name: 'Second Step' }))
     await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith(allPoints))
-    expect(screen.getByText('2 selected failure points')).toBeInTheDocument()
-    expect(screen.getByText('5')).toBeInTheDocument()
+    expect(screen.getByText('5 steps will be retried')).toBeInTheDocument()
     expect(screen.getByText('2 completed results retained')).toBeInTheDocument()
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Retry plan updated. 2 selected failure points. 5 steps to retry. Retry starts at First Step, Second Step. 2 completed results retained.'
@@ -272,7 +280,8 @@ describe('RetryFromFailureSidePanel', () => {
     })
     renderPanel()
 
-    expect(screen.getAllByText('—')).toHaveLength(2)
+    expect(screen.getByText('The number of steps to retry is unavailable.')).toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument()
     expect(screen.getByText('Second Step')).toBeInTheDocument()
   })
 
@@ -290,7 +299,7 @@ describe('RetryFromFailureSidePanel', () => {
     })
     renderPanel()
 
-    expect(screen.getByText('This retry starts at Second Step and reruns 1 step.')).toBeInTheDocument()
+    expect(screen.getByText('1 step will be retried')).toBeInTheDocument()
   })
 
   it('keeps auto-included points in the all-points retry plan', async () => {

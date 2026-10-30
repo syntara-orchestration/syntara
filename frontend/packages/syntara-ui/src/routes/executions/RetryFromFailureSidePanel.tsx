@@ -188,7 +188,7 @@ export function RetryFromFailureSidePanel({
                 <StackItem>
                   <HowRetryWorks />
                 </StackItem>
-                <StackItem>
+                <StackItem className={styles.retryPlanSection}>
                   <Title headingLevel="h3" size={TitleSizes.md}>
                     Retry plan
                   </Title>

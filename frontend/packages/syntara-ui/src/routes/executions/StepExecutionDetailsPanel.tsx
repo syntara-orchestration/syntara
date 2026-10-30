@@ -22,6 +22,7 @@ import {
   RhUiDislikeFillIcon,
   RhUiEditIcon,
   RhUiExternalLinkIcon,
+  RhUiInformationIcon,
   RhUiLikeFillIcon,
   RhUiWarningFillIcon,
 } from '@patternfly/react-icons'
@@ -188,6 +189,12 @@ const decisionIconMap: Record<string, React.ComponentType<{ className?: string }
   rejected: RhUiDislikeFillIcon,
   expired: RhUiWarningFillIcon,
 }
+
+const RETRY_EDIT_BADGE = (
+  <SynLabel variant="outline" color="purple" icon={<RhUiInformationIcon />}>
+    Edited for retry
+  </SynLabel>
+)
 
 function ApprovalAuditSection({ audit }: Readonly<{ audit: ApprovalAudit }>) {
   const status = decisionStatusMap[audit.decision] ?? 'info'
@@ -400,7 +407,7 @@ function StepContentArea({
               onViewChange={setInputView}
               stackControls
               className={styles.retryParametersViewer}
-              titleAddon={hasSavedRetryOverride ? <SynLabel color="blue">Edited for retry</SynLabel> : undefined}
+              titleAddon={hasSavedRetryOverride ? RETRY_EDIT_BADGE : undefined}
               titleAction={
                 retryEditorProps.canEdit ? (
                   <Tooltip content="Edit parameters for retry">

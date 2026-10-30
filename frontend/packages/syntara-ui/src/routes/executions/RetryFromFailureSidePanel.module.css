@@ -34,6 +34,12 @@
   border-radius: var(--pf-t--global--border--radius--small);
 }
 
+.retryPlanSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--sm);
+}
+
 .retryPoint {
   display: flex;
   flex-direction: column;

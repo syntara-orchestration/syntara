@@ -32,6 +32,7 @@ import AxeBuilder from '@axe-core/playwright'
 
 import { test, expect, toAppUrl, type Page } from '../fixtures'
 import { WCAG_TAGS } from '../fixtures/accessibility'
+import { fillCodeEditor } from '../helpers/workflows'
 import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
 
 const isRealBackend = isSkipWebServerForPlaywrightTests()
@@ -138,8 +139,9 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
   })
 
   test.describe('Retry review panel', () => {
-    test('opens the retry plan and cancel closes it without retrying', async ({ app }) => {
+    test('opens the retry plan and cancel closes it without retrying', async ({ app }, testInfo) => {
       await stubWorkflowEditPermission(app, true)
+      await app.setViewportSize({ width: 1600, height: 1000 })
       await openExecutionDetail(app, FAILED_EXECUTION_ID)
 
       await openRetryActionsMenu(app)
@@ -149,9 +151,24 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await expect(panel).toBeVisible()
       await expect(panel.getByRole('heading', { name: 'Retry run from failure' })).toBeVisible()
       await expect(panel.getByRole('heading', { name: 'How retry works' })).toBeVisible()
+      await expect(
+        panel.getByText(/This retry uses the same workflow version as this run, preserving the definition that ran/)
+      ).toBeVisible()
+      await expect(panel.getByText(/Nodes outside the selected retry scope will not re-execute/)).toBeVisible()
+      await expect(panel.getByText(/may repeat external side effects/)).toBeVisible()
+      await expect(panel.getByText(/To change the parameters for this retry, select the failed node/)).toBeVisible()
       await expect(panel.getByRole('heading', { name: 'Retry plan' })).toBeVisible()
       const retryPlanCard = panel.getByTestId('retry-plan-card')
       await expect(retryPlanCard).toBeVisible()
+      const retryPlanHeadingBounds = await panel.getByRole('heading', { name: 'Retry plan' }).evaluate((element) => {
+        return element.getBoundingClientRect()
+      })
+      const retryPlanCardBounds = await retryPlanCard.evaluate((element) => element.getBoundingClientRect())
+      expect(retryPlanCardBounds.top - retryPlanHeadingBounds.bottom).toBeGreaterThan(4)
+      await expect(retryPlanCard.getByText('2 steps will be retried')).toBeVisible()
+      await expect(retryPlanCard.getByText('Includes affected steps and any downstream merge step')).toBeVisible()
+      await expect(retryPlanCard.getByText('Retry starts at')).toBeVisible()
+      await expect(retryPlanCard.getByText('Retained results')).toBeVisible()
       const retryPlanCardBorderWidth = await retryPlanCard.evaluate((element) =>
         Number.parseFloat(window.getComputedStyle(element).borderTopWidth)
       )
@@ -161,6 +178,7 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await expect(app.getByRole('button', { name: 'Copy to editor' })).toHaveCount(0)
       await expect(app.getByRole('button', { name: 'Back to editor' })).toHaveCount(0)
       await expect(app.getByRole('button', { name: 'Run history' })).toHaveCount(0)
+      await app.screenshot({ path: testInfo.outputPath('retry-plan-prototype-copy.png') })
 
       await panel.getByRole('button', { name: 'Cancel' }).click()
       await expect(panel).not.toBeVisible()
@@ -231,8 +249,17 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
 
     test('edits resolved inputs in Run details and labels them for retry', async ({ app }, testInfo) => {
       await stubWorkflowEditPermission(app, true)
+      await app.setViewportSize({ width: 1600, height: 1000 })
       await openExecutionDetail(app, FAILED_EXECUTION_ID)
       await app.getByRole('tab', { name: 'Details' }).click()
+
+      // Give the code editor the same vertical space shown in the retry prototype.
+      const detailsPanelSplitter = app.getByRole('separator', { name: 'Resize canvas and details panel' })
+      for (let resizeStep = 0; resizeStep < 12; resizeStep += 1) {
+        await detailsPanelSplitter.press('ArrowUp')
+      }
+      await expect(detailsPanelSplitter).toHaveAttribute('aria-valuenow', '88')
+
       await app.getByRole('row', { name: /Second Step/ }).click()
       await openRetryActionsMenu(app)
       await app.getByTestId('retry-from-failure-button').click()
@@ -241,7 +268,6 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await expect(app.getByText(/"language": "bash"/, { exact: false })).toBeVisible()
       await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
 
-      const editor = app.getByRole('textbox', { name: /Input parameters for/ })
       const saveButton = app.getByRole('button', { name: 'Save parameters for retry' })
       await expect(saveButton).toBeVisible()
       const saveButtonFitsEditorPane = await saveButton.evaluate((button) => {
@@ -253,8 +279,8 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
         return buttonRect.top >= paneRect.top && buttonRect.bottom <= paneRect.bottom
       })
       expect(saveButtonFitsEditorPane).toBe(true)
-      await editor.fill('{"code":"echo retry"}')
-      await expect(editor).toBeInViewport()
+      await fillCodeEditor(app, { value: '{"code":"echo retry"}', label: 'Input parameters for Second Step' })
+      await expect(app.getByTestId('inline-code-editor')).toBeInViewport()
       await app.screenshot({ path: testInfo.outputPath('retry-input-overrides-editing.png') })
       const retryButton = app.getByRole('button', { name: 'Retry 2 steps' })
       await expect(retryButton).toBeDisabled()
@@ -263,6 +289,7 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await expect(app.getByText('Edited for retry')).toBeInViewport()
       await expect(app.getByText(/"code": "echo retry"/, { exact: false })).toBeVisible()
       await expect(retryButton).toBeEnabled()
+      await app.screenshot({ path: testInfo.outputPath('retry-input-overrides-saved.png') })
 
       const inputTitle = app.getByText('Input parameters', { exact: true })
       const inputTitleBounds = await inputTitle.evaluate((element) => {
@@ -309,19 +336,39 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       expect(outputSearchBounds.top).toBeLessThan(searchBounds.top)
 
       await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
-      await expect(app.getByRole('textbox', { name: /Input parameters for/ })).toHaveValue(/echo retry/)
+      await expect(app.getByTestId('inline-code-editor').locator('.view-lines')).toContainText('echo retry')
       await expect(app.getByRole('button', { name: 'Reset parameters' })).toBeVisible()
-      const editorScrollArea = app.getByTestId('retry-input-override-scroll-area')
-      const editorCanScroll = await editorScrollArea.evaluate((element) => element.scrollHeight > element.clientHeight)
-      expect(editorCanScroll).toBe(true)
-      await editorScrollArea.evaluate((element) => {
-        element.scrollTop = element.scrollHeight
+      await fillCodeEditor(app, {
+        value: `${JSON.stringify({ code: 'echo retry' }, null, 2)}${'\n'.repeat(80)}`,
+        label: 'Input parameters for Second Step',
       })
-      await expect.poll(() => editorScrollArea.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+      const monacoScrollTop = await app.getByTestId('inline-code-editor').evaluate((container) => {
+        type ScrollableEditor = {
+          getDomNode: () => HTMLElement | null
+          getLayoutInfo: () => { height: number }
+          getScrollHeight: () => number
+          getScrollTop: () => number
+          setScrollTop: (scrollTop: number) => void
+        }
+        const monacoWindow = window as Window & {
+          monaco?: { editor: { getEditors: () => ScrollableEditor[] } }
+        }
+        const editor = monacoWindow.monaco?.editor.getEditors().find((candidate) => {
+          const editorElement = candidate.getDomNode()
+          return editorElement !== null && container.contains(editorElement)
+        })
+        if (!editor) throw new Error('Retry input Monaco editor was not found')
+        const scrollHeight = editor.getScrollHeight()
+        const viewportHeight = editor.getLayoutInfo().height
+        editor.setScrollTop(editor.getScrollHeight())
+        return { scrollHeight, viewportHeight, scrollTop: editor.getScrollTop() }
+      })
+      expect(monacoScrollTop.scrollHeight).toBeGreaterThan(monacoScrollTop.viewportHeight)
+      expect(monacoScrollTop.scrollTop).toBeGreaterThan(0)
       await expect(app.getByRole('button', { name: 'Save parameters for retry' })).toBeInViewport()
+      await app.screenshot({ path: testInfo.outputPath('retry-input-overrides-editing-scrolled.png') })
       await app.getByTestId('retry-input-override-editor').getByRole('button', { name: 'Cancel' }).click()
       await expect(app.getByText('Edited for retry')).toBeVisible()
-      await app.screenshot({ path: testInfo.outputPath('retry-input-overrides-saved.png') })
 
       const retryRequestPromise = app.waitForRequest(
         (request) =>
