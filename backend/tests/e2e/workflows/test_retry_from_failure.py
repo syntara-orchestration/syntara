@@ -57,6 +57,25 @@ def _workflow_definition(
     }
 
 
+def _parallel_failure_definition(name: str) -> dict[str, Any]:
+    """Build two independent failure branches with work that follows each one."""
+    return _workflow_definition(
+        name,
+        [
+            _script_node("failure_a", "raise SystemExit(1)"),
+            _script_node("failure_b", "raise SystemExit(1)"),
+            _script_node("after_a", "print('after-a')"),
+            _script_node("after_b", "print('after-b')"),
+        ],
+        [
+            {"from": "trigger", "to": "failure_a"},
+            {"from": "trigger", "to": "failure_b"},
+            {"from": "failure_a", "to": "after_a"},
+            {"from": "failure_b", "to": "after_b"},
+        ],
+    )
+
+
 def _activities_by_id(execution: ExecutionRead) -> dict[str, ActivityData]:
     activities = execution.activities
     assert isinstance(activities, list), "Execution response must include activities"
@@ -97,11 +116,13 @@ def _timestamp(activity: ActivityData, field: str) -> datetime:
 def _start_retry(
     syntara_api: SyntaraApiRegistry,
     execution_id: UUID,
-    retry_point_id: str,
+    retry_point_ids: list[str] | None = None,
     *,
     overrides: dict[str, dict[str, Any]] | None = None,
 ) -> ExecutionRead:
-    request: dict[str, Any] = {"retry_point_ids": [retry_point_id]}
+    request: dict[str, Any] = {}
+    if retry_point_ids is not None:
+        request["retry_point_ids"] = retry_point_ids
     if overrides is not None:
         request["input_parameter_overrides"] = overrides
     response = syntara_api.executions.retry_from_failure(
@@ -161,7 +182,7 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
     retried = _start_retry(
         syntara_api,
         source.id,
-        "repair",
+        ["repair"],
         overrides={
             "repair": {
                 "code": "import os; print(os.environ['MESSAGE'])",
@@ -276,7 +297,7 @@ def test_retry_handles_an_unselected_branch_without_replay_output(
     retried = _start_retry(
         syntara_api,
         source.id,
-        "taken_branch",
+        ["taken_branch"],
         overrides={"taken_branch": {"code": "print('recovered')"}},
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
@@ -327,7 +348,7 @@ def test_retry_replays_converge_when_branch_state_matches_source(
     retried = _start_retry(
         syntara_api,
         source.id,
-        "repair",
+        ["repair"],
         overrides={"repair": {"code": "print('repaired')"}},
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
@@ -386,7 +407,7 @@ def test_retry_reexecutes_converge_after_repaired_branch_changes_gate_state(
     retried = _start_retry(
         syntara_api,
         source.id,
-        "repair_branch",
+        ["repair_branch"],
         overrides={"repair_branch": {"code": 'print(\'{"value": "repaired-branch"}\')'}},
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
@@ -448,7 +469,7 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
     retried = _start_retry(
         syntara_api,
         source.id,
-        "loop_body",
+        ["loop_body"],
         overrides={"loop_body": {"code": "import os; print(os.environ['ITEM'])"}},
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
@@ -466,6 +487,126 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
     assert _activity_output(retry_activities["loop_body#iter-1"]).get("stdout", "").strip() == "bravo"
     assert retry_activities["loop_body#iter-2"].status == "completed"
     assert _activity_output(retry_activities["loop_body#iter-2"]).get("stdout", "").strip() == "charlie"
+
+
+def test_retry_defaults_to_all_failed_parallel_branches_when_selection_is_omitted(
+    syntara_api: SyntaraApiRegistry,
+    first_project_id: UUID,
+) -> None:
+    """Omitting retry_point_ids retries every currently failed branch."""
+    name = unique_name("e2e-retry-parallel-default-selection")
+    source = create_and_run_workflow(
+        syntara_api,
+        name,
+        _parallel_failure_definition(name),
+        timeout=60,
+        project_id=first_project_id,
+    )
+    assert source.status == ExecutionStatus.FAILED
+    source_activities = _activities_by_id(source)
+    assert source_activities["failure_a"].status == "failed"
+    assert source_activities["failure_b"].status == "failed"
+
+    preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
+    assert preview.eligible is True
+    assert preview.eligible_point_ids == ["failure_a", "failure_b"]
+
+    # No retry_point_ids key is sent; both failed points are repaired by this request.
+    retried = _start_retry(
+        syntara_api,
+        source.id,
+        overrides={
+            "failure_a": {"code": "print('fixed-a')"},
+            "failure_b": {"code": "print('fixed-b')"},
+        },
+    )
+    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
+    assert final.status == ExecutionStatus.COMPLETED, final.error_details
+    retry_activities = _activities_by_id(final)
+    assert retry_activities["failure_a"].status == "completed"
+    assert retry_activities["failure_b"].status == "completed"
+    assert _activity_output(retry_activities["failure_a"]).get("stdout", "").strip() == "fixed-a"
+    assert _activity_output(retry_activities["failure_b"]).get("stdout", "").strip() == "fixed-b"
+    assert _activity_output(retry_activities["after_a"]).get("stdout", "").strip() == "after-a"
+    assert _activity_output(retry_activities["after_b"]).get("stdout", "").strip() == "after-b"
+
+
+def test_retry_can_select_a_subset_of_parallel_failed_branches(
+    syntara_api: SyntaraApiRegistry,
+    first_project_id: UUID,
+) -> None:
+    """A selected failure and its downstream work rerun while the other failure is retained."""
+    name = unique_name("e2e-retry-parallel-subset-selection")
+    source = create_and_run_workflow(
+        syntara_api,
+        name,
+        _parallel_failure_definition(name),
+        timeout=60,
+        project_id=first_project_id,
+    )
+    assert source.status == ExecutionStatus.FAILED
+    source_activities = _activities_by_id(source)
+    assert source_activities["failure_a"].status == "failed"
+    assert source_activities["failure_b"].status == "failed"
+
+    preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
+    assert preview.eligible is True
+    assert preview.eligible_point_ids == ["failure_a", "failure_b"]
+
+    retried = _start_retry(
+        syntara_api,
+        source.id,
+        ["failure_a"],
+        overrides={"failure_a": {"code": "print('fixed-a')"}},
+    )
+    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
+    assert final.status == ExecutionStatus.FAILED
+    retry_activities = _activities_by_id(final)
+    assert retry_activities["failure_a"].status == "completed"
+    assert retry_activities["after_a"].status == "completed"
+    assert _activity_output(retry_activities["after_a"]).get("stdout", "").strip() == "after-a"
+    assert retry_activities["failure_b"].status == "failed"
+    assert _timestamp(retry_activities["failure_b"], "started_at") == _timestamp(
+        source_activities["failure_b"], "started_at"
+    )
+    after_b = retry_activities.get("after_b")
+    assert after_b is None or after_b.status == "skipped"
+
+
+def test_retry_accepts_multiple_selected_parallel_failure_points(
+    syntara_api: SyntaraApiRegistry,
+    first_project_id: UUID,
+) -> None:
+    """Explicitly selecting multiple eligible failures reruns both parallel paths."""
+    name = unique_name("e2e-retry-parallel-multiple-selection")
+    source = create_and_run_workflow(
+        syntara_api,
+        name,
+        _parallel_failure_definition(name),
+        timeout=60,
+        project_id=first_project_id,
+    )
+    assert source.status == ExecutionStatus.FAILED
+    source_activities = _activities_by_id(source)
+    assert source_activities["failure_a"].status == "failed"
+    assert source_activities["failure_b"].status == "failed"
+
+    retried = _start_retry(
+        syntara_api,
+        source.id,
+        ["failure_b", "failure_a"],
+        overrides={
+            "failure_a": {"code": "print('fixed-a')"},
+            "failure_b": {"code": "print('fixed-b')"},
+        },
+    )
+    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
+    assert final.status == ExecutionStatus.COMPLETED, final.error_details
+    retry_activities = _activities_by_id(final)
+    assert retry_activities["failure_a"].status == "completed"
+    assert retry_activities["failure_b"].status == "completed"
+    assert retry_activities["after_a"].status == "completed"
+    assert retry_activities["after_b"].status == "completed"
 
 
 def test_retry_input_overrides_require_workflow_update_permission(
@@ -510,7 +651,7 @@ def test_retry_input_overrides_require_workflow_update_permission(
     assert denied_override.status_code == HTTPStatus.FORBIDDEN
 
     # AC-14 only adds workflow edit permission for overrides; ordinary retries still need run.
-    ordinary_retry = _start_retry(run_only_api, source.id, "failure")
+    ordinary_retry = _start_retry(run_only_api, source.id, ["failure"])
     ordinary_retry_final = poll_execution_until_complete(syntara_api, ordinary_retry.id, max_polls=60, poll_interval=1)
     assert ordinary_retry_final.status == ExecutionStatus.FAILED
 
@@ -539,7 +680,7 @@ def test_retry_input_overrides_require_workflow_update_permission(
     authorized_retry = _start_retry(
         editor_api,
         source.id,
-        "failure",
+        ["failure"],
         overrides={"failure": {"code": "print('repaired')"}},
     )
     assert authorized_retry.retried_from_execution_id == source.id
