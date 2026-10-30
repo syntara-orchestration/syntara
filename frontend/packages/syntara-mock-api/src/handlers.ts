@@ -14,7 +14,7 @@ import {
   WorkflowVersionStatusEnum,
 } from '@syntara/contracts'
 import { credentials, credentialTypes, credentialWorkflows } from './resources/credentials'
-import { executionTargets } from './resources/executionTargets'
+import { executionTargets, MOCK_DELETE_CONFLICT_LABEL } from './resources/executionTargets'
 import { integrations } from './resources/integrations'
 import { models } from './resources/models'
 import { workflows } from './resources/workflows'
@@ -566,6 +566,143 @@ export const handlers = [
       )
     }
     return HttpResponse.json(target)
+  }),
+
+  /**
+   * Minimal POST for E2E self-containment (create-then-delete). The Create PR owns
+   * the full form-oriented handler; merge should keep the richer create validation.
+   */
+  http.post('/api/execution_plane/v1/execution_targets', async ({ request }) => {
+    const username = getUsernameFromRequest(request)
+    if (username !== 'admin') {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:create',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const body = (await request.json()) as {
+      name?: string
+      placement?: { namespace?: string; node_selectors?: string[]; tolerations?: string[] }
+      labels?: Record<string, string>
+      is_default?: boolean
+    }
+    const name = body.name?.trim() ?? ''
+    const namespace = body.placement?.namespace?.trim() ?? ''
+    if (!name || !namespace) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/validation-error',
+          title: 'Validation Error',
+          detail: 'name and placement.namespace are required',
+          code: 'VALIDATION_ERROR',
+          retryable: false,
+        },
+        { status: 422 }
+      )
+    }
+
+    const seedClusterId = executionTargets[0]?.cluster_id ?? 'b1000000-0000-4000-8000-000000000001'
+    const seedEndpoint = executionTargets[0]?.endpoint ?? 'https://api.openshift.example.com:6443'
+    const id = uuidv4()
+    const created = {
+      id,
+      cluster_id: seedClusterId,
+      name,
+      backend_type: 'kubernetes',
+      endpoint: seedEndpoint,
+      placement: {
+        type: 'kubernetes' as const,
+        namespace,
+        node_selectors: body.placement?.node_selectors ?? [],
+        tolerations: body.placement?.tolerations ?? [],
+      },
+      status: 'registering',
+      enabled: true,
+      is_default: body.is_default ?? false,
+      status_message: null,
+      labels: body.labels ?? {},
+      created_at: mockDate.now,
+      last_ran_at: null,
+    }
+    executionTargets.unshift(created)
+    return HttpResponse.json(created, {
+      status: 201,
+      headers: { Location: `/api/execution_plane/v1/execution_targets/${id}` },
+    })
+  }),
+
+  /**
+   * DELETE execution target — 202 Accepted (draining continues independently).
+   * 409 when the target is the current default or marked with the mock in-use label.
+   * Mock removes the row on success for deterministic list/pagination tests; the UI
+   * must still treat 202 as success without requiring immediate absence from the list.
+   */
+  http.delete('/api/execution_plane/v1/execution_targets/:target_id', ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (username !== 'admin') {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:delete',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const targetId = params.target_id as string
+    const index = executionTargets.findIndex((item) => item.id === targetId)
+    if (index === -1) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: `Execution target ${targetId} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+
+    const target = executionTargets[index]
+    if (target?.is_default) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Cannot delete the default execution target; promote another target first',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    if (target?.labels?.[MOCK_DELETE_CONFLICT_LABEL]) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Execution target is in use and cannot be deleted',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    executionTargets.splice(index, 1)
+    return HttpResponse.json({ id: targetId, accepted: true as const }, { status: 202 })
   }),
 
   http.get('/api/v1/integrations', ({ request }) => {
