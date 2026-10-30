@@ -1115,6 +1115,11 @@ components:
           title: Total Step Count
           default: 0
           description: Deduplicated total of steps that will re-run across the eligible points.
+        retained_result_count:
+          type: integer
+          title: Retained Result Count
+          default: 0
+          description: Number of completed activity results outside the selected retry paths that will be retained.
 
     # WebSocket-specific schemas
     WebSocketMessage:
