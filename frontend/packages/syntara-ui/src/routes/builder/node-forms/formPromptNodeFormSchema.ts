@@ -1,6 +1,7 @@
+import type { FormDefinition } from '@syntara/contracts'
 import { z } from 'zod'
 
-import { formDefinitionSchema } from '../../../forms'
+import { formDefinitionBuilderSchema } from '../../../forms'
 
 import { optionalNumber } from './shared/formSchemaUtils'
 import { nodeSettingsSchema } from './shared/nodeSettingsSchema'
@@ -11,7 +12,7 @@ const MAX_RESPONDER_GROUPS = 50
 export const formPromptFormSchema = z.object({
   name: z.string(),
   message: z.string().max(2000).nullable().optional(),
-  form_definition: formDefinitionSchema,
+  form_definition: formDefinitionBuilderSchema,
   responder_users: z
     .array(z.string())
     .max(MAX_RESPONDER_USERS, `Cannot select more than ${MAX_RESPONDER_USERS} users`)
@@ -28,7 +29,11 @@ export const formPromptFormSchema = z.object({
   settings: nodeSettingsSchema.optional(),
 })
 
-export type FormPromptFormData = z.infer<typeof formPromptFormSchema>
+export type FormPromptFormData = Omit<z.infer<typeof formPromptFormSchema>, 'form_definition'> & {
+  form_definition: FormDefinition
+}
+
+export const formPromptFormSchemaTyped = formPromptFormSchema as unknown as z.ZodType<FormPromptFormData>
 
 /** Parsed shape for `Activity.parameters` on form_prompt nodes (load/edit path). */
 export const formPromptStoredParametersSchema = formPromptFormSchema

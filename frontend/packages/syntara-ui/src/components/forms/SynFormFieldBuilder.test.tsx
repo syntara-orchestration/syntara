@@ -436,6 +436,26 @@ describe('SynFormFieldBuilder', () => {
     })
   })
 
+  it('propagates draft field edits to the parent in design-only mode', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'valid_name', label: 'Title' }],
+    })
+
+    renderBuilder(<SynFormFieldBuilder designOnly value={definition} onChange={onChange} />)
+    onChange.mockClear()
+
+    const valueNameInput = screen.getByRole('textbox', { name: 'Value name' })
+    await user.clear(valueNameInput)
+    await user.type(valueNameInput, '1bad')
+
+    expect(
+      screen.queryByText('Fix validation errors before changes are saved to the parent form.')
+    ).not.toBeInTheDocument()
+    expect(onChange).toHaveBeenCalled()
+  })
+
   it('shows validation alert when value name is invalid and does not persist to parent', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()

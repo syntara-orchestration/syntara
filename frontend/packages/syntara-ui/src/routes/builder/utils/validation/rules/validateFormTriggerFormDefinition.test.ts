@@ -58,4 +58,30 @@ describe('validateFormTriggerFormDefinition', () => {
     expect(errors[0].rule).toBe('form-trigger-type-mismatch')
     expect(errors[0].message).toContain('manual_trigger')
   })
+
+  it('flags dynamic options on form triggers during canvas validation', () => {
+    const dropdown = {
+      type: 'dropdown' as const,
+      value_name: 'choice',
+      label: 'Choice',
+      options: {
+        source: 'dynamic' as const,
+        expression: 'steps.items',
+        label_key: 'name',
+        value_key: 'id',
+      },
+    }
+    const errors = validateFormTriggerFormDefinition([], [], {
+      triggers: [
+        {
+          id: 'form',
+          type: TriggerTypeEnum.FORM_TRIGGER,
+          name: 'Intake',
+          parameters: { form_definition: { fields: [dropdown] } },
+        },
+      ],
+    })
+    expect(errors).toHaveLength(1)
+    expect(errors[0].rule).toBe('form-trigger-dynamic-options')
+  })
 })

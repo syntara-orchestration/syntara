@@ -278,6 +278,13 @@ function validateOptionDefaults(fields: ReadonlyArray<z.infer<typeof formFieldSc
   }
 }
 
+/** Permissive schema for workflow builder node editors (draft definitions allowed). */
+export const formDefinitionBuilderFieldSchema = z.object({}).passthrough()
+
+export const formDefinitionBuilderSchema = z.object({
+  fields: z.array(formDefinitionBuilderFieldSchema).max(FORM_DEFINITION_MAX_FIELDS),
+})
+
 export const formDefinitionSchema = z
   .object({
     fields: z.array(formFieldSchema).min(FORM_DEFINITION_MIN_FIELDS).max(FORM_DEFINITION_MAX_FIELDS),
@@ -340,4 +347,5 @@ export function safeParseFormDefinition(
 }
 
 export type FormDefinitionSchemaInput = z.input<typeof formDefinitionSchema>
+export type FormDefinitionBuilderSchemaInput = z.input<typeof formDefinitionBuilderSchema>
 export type FormFieldSchemaInput = z.input<typeof formFieldSchema>

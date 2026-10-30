@@ -11,7 +11,12 @@ import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { BuilderAction } from '../builderReducer'
 import { DEFAULT_MAX_WAIT_SECONDS, fetchMaxWaitDuration } from '../node-forms/useMaxWaitDuration'
+import type { ValidationError as UtilsValidationError } from '../utils/validation'
 import { validateWorkflow } from '../utils/validation'
+import {
+  countBlockingValidationErrors,
+  mapUtilsValidationErrorsToBanner,
+} from '../utils/validation/mapFrontendValidationErrorsToBanner'
 import { validateMinimumWorkflow } from '../utils/validation/rules/validateMinimumWorkflow'
 import type { ConflictInfo } from '../VersionConflictDialog'
 
@@ -51,6 +56,14 @@ async function checkVersionConflictBeforeRun({
     return true
   }
   return false
+}
+
+function applyRunValidationFailures(dispatch: Dispatch<BuilderAction>, errors: UtilsValidationError[]): void {
+  // Run uses validateMinimumWorkflow + validateWorkflow `errors` only (warnings are in a separate list).
+  const bannerErrors = mapUtilsValidationErrorsToBanner(errors, { activityIdFallback: true })
+  if (bannerErrors.length === 0) return
+  dispatch({ type: 'SET_VALIDATION_ERRORS', payload: bannerErrors, source: 'verify' })
+  useWorkflowStore.getState().setValidationErrorCount(countBlockingValidationErrors(bannerErrors))
 }
 
 type ExecuteWorkflowMutate = (
@@ -165,6 +178,7 @@ export function useBuilderToolbarHandlers({
       // Check minimum workflow requirements (trigger + node + connection)
       const minimumValidation = validateMinimumWorkflow(activities, edges, triggers)
       if (minimumValidation.length > 0) {
+        applyRunValidationFailures(dispatch, minimumValidation)
         const errorMessages = minimumValidation.map((error) => error.message).join('\n• ')
         showError({ title: 'Cannot run workflow', description: `${errorMessages}` })
         dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
@@ -177,6 +191,7 @@ export function useBuilderToolbarHandlers({
         systemContinueOnFailure: defaults?.continueOnFailure ?? false,
       })
       if (!validationResult.valid) {
+        applyRunValidationFailures(dispatch, validationResult.errors)
         const errorMessages = validationResult.errors.map((error) => error.message).join('\n• ')
         showError({ title: 'Cannot run workflow', description: `Workflow validation failed:\n• ${errorMessages}` })
         dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })

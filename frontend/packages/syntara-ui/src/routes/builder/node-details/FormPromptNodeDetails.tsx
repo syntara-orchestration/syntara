@@ -1,6 +1,7 @@
-import type { Activity } from '@syntara/contracts'
+import type { Activity, FormDefinition } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
+import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { FormPromptFormSubmitData } from '../node-forms/FormPromptNodeForm'
@@ -32,7 +33,10 @@ export function FormPromptNodeDetails({
   const rawParameters = taskData.parameters ?? {}
   const parsedParameters = formPromptStoredParametersSchema.safeParse(rawParameters)
   const parameters = parsedParameters.success ? parsedParameters.data : {}
-  const storedFormDefinition = parameters.form_definition ?? readStoredFormDefinition(rawParameters)
+  const storedFormDefinition: FormDefinition =
+    (parameters.form_definition as FormDefinition | undefined) ??
+    readStoredFormDefinition(rawParameters) ??
+    createEmptyFormDefinition()
 
   const initialData: Partial<FormPromptFormSubmitData> = {
     name: taskData.name,

@@ -11,35 +11,18 @@ import type { BuilderAction, ValidationError, ValidationSeverity } from './build
 import { useWorkflowEngineDefaults } from './hooks/useWorkflowEngineDefaults'
 import { validateWorkflow } from './utils/validation'
 import { formatValidationFindingMessage } from './utils/validation/formatValidationFindingMessage'
+import { lookupValidationNodeName, mapUtilsValidationErrorsToBanner } from './utils/validation/mapFrontendValidationErrorsToBanner'
 import { validateMinimumWorkflow } from './utils/validation/rules/validateMinimumWorkflow'
 import { buildWorkflowDefinition } from './utils/workflowDefinitionBuilder'
 
 type ValidationFinding = { message: string; node_id?: string | null; severity?: string; field_path?: string | null }
-
-type LookupNodeNameOptions = Readonly<{
-  activityIdFallback?: boolean
-}>
-
-function lookupNodeName(nodeId: string | null, options?: LookupNodeNameOptions): string | undefined {
-  if (!nodeId) return undefined
-  const currentWorkflow = useWorkflowStore.getState().currentWorkflow
-  const activity = currentWorkflow?.workflow?.activities?.find((item) => item.id === nodeId)
-  if (activity) {
-    return activity.name ?? (options?.activityIdFallback ? nodeId : undefined)
-  }
-  const trigger = currentWorkflow?.triggers?.find((item) => item.id === nodeId)
-  if (trigger) {
-    return trigger.name ?? nodeId
-  }
-  return undefined
-}
 
 function mapFindings(findings: ValidationFinding[] | undefined): ValidationError[] {
   if (!findings?.length) return []
   return findings.map((f) => {
     const severity: ValidationSeverity = f.severity === 'warning' ? 'warning' : 'error'
     const nodeId = f.node_id ?? null
-    const nodeName = lookupNodeName(nodeId)
+    const nodeName = lookupValidationNodeName(nodeId)
     return {
       message: formatValidationFindingMessage(f.message, nodeId, nodeName),
       nodeId,
@@ -223,12 +206,10 @@ export function useWorkflowVerification({ dispatch, beforeVerify }: UseWorkflowV
           systemContinueOnFailure: defaults?.continueOnFailure ?? false,
         })
         const minimumErrors = validateMinimumWorkflow(activities, edges, triggers)
-        const allFrontendErrors: ValidationError[] = [...frontendResult.errors, ...minimumErrors].map((e) => ({
-          message: e.message,
-          nodeId: e.nodeId ?? null,
-          nodeName: lookupNodeName(e.nodeId ?? null, { activityIdFallback: true }),
-          severity: (e.severity ?? 'error') as ValidationSeverity,
-        }))
+        const allFrontendErrors = mapUtilsValidationErrorsToBanner(
+          [...frontendResult.errors, ...minimumErrors],
+          { activityIdFallback: true }
+        )
 
         setIsVerifying(true)
         try {

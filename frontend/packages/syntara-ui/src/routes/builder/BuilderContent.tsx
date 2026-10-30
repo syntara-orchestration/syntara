@@ -777,7 +777,6 @@ export function BuilderContent(props: BuilderContentProps) {
                       projectId={builderProjectId}
                       workflowMetadata={workflowMetadata}
                       onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
-                      validationErrors={state.validationErrors}
                     />
                   </NodeEditorAutoSubmitContext.Provider>
                 </Flex>

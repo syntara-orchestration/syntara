@@ -24,11 +24,7 @@ vi.mock('./FormPresentationOptionsSection', () => ({
   FormPresentationOptionsSection: () => <div data-testid="presentation-options" />,
 }))
 
-type RenderFieldsOptions = {
-  formDefinitionError?: { message?: string }
-}
-
-function renderFields(options: RenderFieldsOptions = {}) {
+function renderFields() {
   function Wrapper() {
     const methods = useForm<TriggerFormData>({
       defaultValues: {
@@ -43,7 +39,7 @@ function renderFields(options: RenderFieldsOptions = {}) {
     return (
       <VersionViewContext value={false}>
         <FormProvider {...methods}>
-          <FormTriggerConfigurationFields formDefinitionError={options.formDefinitionError} />
+          <FormTriggerConfigurationFields />
         </FormProvider>
       </VersionViewContext>
     )
@@ -67,11 +63,5 @@ describe('FormTriggerConfigurationFields', () => {
 
     await user.click(screen.getByRole('button', { name: 'Preview form' }))
     expect(screen.getByTestId('form-preview-modal')).toBeInTheDocument()
-  })
-
-  it('shows form definition validation error from publish', () => {
-    renderFields({ formDefinitionError: { message: 'Add at least one form field.' } })
-
-    expect(screen.getByText('Add at least one form field.')).toBeInTheDocument()
   })
 })

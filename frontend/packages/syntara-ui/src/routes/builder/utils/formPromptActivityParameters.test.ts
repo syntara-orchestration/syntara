@@ -37,7 +37,7 @@ describe('buildFormPromptActivityParameters', () => {
     })
   })
 
-  it('throws when form definition fails validation', () => {
+  it('persists invalid draft form definitions for advisory workflow save', () => {
     const invalid: FormDefinition = {
       fields: [
         {
@@ -48,7 +48,8 @@ describe('buildFormPromptActivityParameters', () => {
       ],
     }
 
-    expect(() => buildFormPromptActivityParameters({ form_definition: invalid })).toThrow()
+    const params = buildFormPromptActivityParameters({ form_definition: invalid })
+    expect((params.form_definition as FormDefinition).fields[0]?.value_name).toBe('not-a-valid-name!')
   })
 
   it('preserves date fields with time but no timezone before building parameters', () => {
