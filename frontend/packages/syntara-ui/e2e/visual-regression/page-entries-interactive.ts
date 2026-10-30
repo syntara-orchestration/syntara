@@ -9,6 +9,7 @@ import { expect, type Page } from '@playwright/test'
 
 import { AppRoute } from '../../src/app/AppRoute'
 import { toAppUrl } from '../fixtures'
+import { clickCanvasStepToOpenEditor } from '../helpers/canvas-interaction'
 
 import { MOCK_IDENTITY_PROVIDER_ID } from './mock-ids'
 import type { CanvasPageEntry, PageEntry } from './page-registry'
@@ -78,9 +79,9 @@ async function enterBuilderVersionViewHeaderState(page: Page, workflowId: string
 }
 
 /**
- * Opens the step editor side panel by clicking the canvas card title (PatternFly `Title` h2).
- * Prefer this over `getByTestId('rf__node-…')` + `force: true`, which often selects the card
- * without opening the editor (seed workflows may lack `name`, so the h2 shows the executor label).
+ * Opens the step editor side panel via the canvas step header Edit control.
+ * Seed workflows may show an executor label in the title h2 when `name` is empty;
+ * pass that visible title string when opening by name.
  */
 async function openStepEditorFromCanvasTitle(page: Page, title: string | RegExp) {
   const canvas = page.locator('.react-flow')
@@ -90,7 +91,17 @@ async function openStepEditorFromCanvasTitle(page: Page, title: string | RegExp)
   // timeout. Explicitly fit the whole graph into view first so every node — including
   // ones far from the trigger — is guaranteed to be on-screen and clickable.
   await page.getByRole('button', { name: 'Fit view' }).click()
-  await canvas.getByRole('heading', { name: title, level: 2 }).first().click()
+  const heading = canvas.getByRole('heading', { name: title, level: 2 }).first()
+  await expect(heading).toBeVisible({ timeout: 15_000 })
+  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ has: heading })
+  if (typeof title === 'string') {
+    await clickCanvasStepToOpenEditor(node, title)
+  } else {
+    await node
+      .getByRole('button', { name: /^Edit / })
+      .first()
+      .click({ timeout: 5_000 })
+  }
   // Do not key off the header Name field alone — with onHeaderContentChange the
   // toolbar can show a Name input without the three-panel step editor mounting,
   // which previously let --update-snapshots commit empty masked-canvas baselines.

@@ -27,7 +27,7 @@ export function ApprovalStepComponent(props: NodeProps<ApprovalNode>) {
   })
 
   const iconColor = getStepTypeColor(ActivityTypeEnum.APPROVAL)
-  const iconNode = renderStepIcon(metadata.icon, 'approval', 'canvas', iconColor)
+  const iconNode = renderStepIcon(metadata.icon, 'approval', 'header', iconColor)
   const semanticZoomIcon = renderStepIcon(metadata.icon, 'approval', 'semanticZoom', iconColor)
   const taskExecutor = metadata.label
 
@@ -67,6 +67,7 @@ export function ApprovalStepComponent(props: NodeProps<ApprovalNode>) {
         { id: 'rejected', ariaLabel: 'Rejected branch output' },
       ]}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
     >
       <>

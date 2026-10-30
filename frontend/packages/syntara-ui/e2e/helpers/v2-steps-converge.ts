@@ -5,6 +5,7 @@
 
 import { expect, type Page, toAppUrl } from '../fixtures'
 
+import { canvasStepNode, clickCanvasStepToOpenEditor } from './canvas-interaction'
 import { addConditionStepWithBranch, addManualTrigger, openAddStepPanel, selectCategoryAndStepType } from './v2-steps'
 import { buildUniqueName, closeStepEditorPanel, triggerLayout } from './workflows'
 
@@ -19,11 +20,11 @@ const convergeStrategySelect = (page: Page) => page.getByRole('button', { name: 
  */
 export async function openConvergeStepForEditing(page: Page, stepName: string) {
   await triggerLayout(page)
-  const stepElement = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
+  const stepElement = canvasStepNode(page, stepName)
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(async () => {
     await expect(stepElement).toBeVisible({ timeout: 5_000 })
-    await stepElement.click({ timeout: 5_000 })
+    await clickCanvasStepToOpenEditor(stepElement, stepName)
     await expect(nameInput).toHaveValue(stepName, { timeout: 5_000 })
     await expect(convergeStrategySelect(page)).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })

@@ -55,8 +55,18 @@ function buildBuilderActions(
   disabled: boolean,
   handlers: BuilderActionHandlers
 ): StepMenuAction[] {
+  const viewDetailsAction: StepMenuAction = {
+    id: 'view-details',
+    label: 'View step details',
+    onClick: handlers.onViewDetails,
+    icon: createElement(RhUiInformationIcon),
+  }
+
   if (stepCategory === StepMenuCategory.CONTROL_FLOW) {
-    return [{ id: 'replace', label: 'Replace', onClick: handlers.onReplace, icon: createElement(RhUiSyncIcon) }]
+    return [
+      viewDetailsAction,
+      { id: 'replace', label: 'Replace', onClick: handlers.onReplace, icon: createElement(RhUiSyncIcon) },
+    ]
   }
 
   const activityActions: StepMenuAction[] =
@@ -79,15 +89,7 @@ function buildBuilderActions(
         ]
       : []
 
-  return [
-    {
-      id: 'view-details',
-      label: 'View step details',
-      onClick: handlers.onViewDetails,
-      icon: createElement(RhUiInformationIcon),
-    },
-    ...activityActions,
-  ]
+  return [viewDetailsAction, ...activityActions]
 }
 
 function appendDeleteAction(actions: StepMenuAction[], deleteAction: StepMenuAction): StepMenuAction[] {

@@ -1,0 +1,15 @@
+.detailsRegion :global(.pf-v6-c-description-list__group) {
+  margin-bottom: var(--pf-t--global--spacer--xs);
+}
+
+.detailsRegion :global(.pf-v6-c-description-list__term) {
+  padding-bottom: var(--pf-t--global--spacer--xs);
+}
+
+.detailsRegion :global(.pf-v6-c-code-block) {
+  font-size: var(--pf-t--global--font--size--body--sm);
+}
+
+.detailsRegion :global(.pf-v6-c-code-block__content) {
+  max-height: 4.5rem;
+}

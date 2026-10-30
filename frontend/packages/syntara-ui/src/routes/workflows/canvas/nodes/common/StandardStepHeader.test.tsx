@@ -50,6 +50,37 @@ describe('StandardStepHeader', () => {
     expect(screen.getByRole('button', { name: /step actions menu/i })).toBeInTheDocument()
   })
 
+  it('renders dedicated edit button when view-details action is present', async () => {
+    const user = userEvent.setup()
+    const onEdit = vi.fn()
+    const menuActions = [
+      { id: 'view-details', label: 'Edit', onClick: onEdit },
+      { id: 'delete', label: 'Delete', onClick: vi.fn(), variant: 'danger' as const },
+    ]
+
+    render(<StandardStepHeader title="Test Step" subtitle="Task" menuActions={menuActions} />)
+
+    await user.click(screen.getByRole('button', { name: 'Edit Test Step' }))
+    expect(onEdit).toHaveBeenCalledTimes(1)
+  })
+
+  it('omits view-details from kebab when header edit is shown', async () => {
+    const user = userEvent.setup()
+    const menuActions = [
+      { id: 'view-details', label: 'View step details', onClick: vi.fn() },
+      { id: 'delete', label: 'Delete', onClick: vi.fn(), variant: 'danger' as const },
+    ]
+
+    render(<StandardStepHeader title="Test Step" subtitle="Task" menuActions={menuActions} />)
+
+    await user.click(screen.getByRole('button', { name: /step actions menu/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('menuitem', { name: 'View step details' })).not.toBeInTheDocument()
+  })
+
   it('opens menu dropdown when kebab button is clicked', async () => {
     const user = userEvent.setup()
     const menuActions = [{ id: 'delete', label: 'Delete', onClick: vi.fn(), variant: 'danger' as const }]

@@ -12,6 +12,7 @@ import { STEP_TYPE_COLORS } from '../../routes/workflows/canvas/stepTypeColors'
 import type { ActivityStatus } from '../../routes/workflows/execution/types'
 import { SynPanel } from '../layout/SynPanel'
 
+import stepStyles from './SynStep.module.css'
 import { SynStepConnectionHandles } from './SynStepConnectionHandles'
 import { SynStepExpandedAllContext } from './SynStepExpandedAllContext'
 import { SynStepExpandedContext } from './SynStepExpandedContext'
@@ -78,6 +79,7 @@ function ValidationErrorBadge() {
 // eslint-disable-next-line complexity
 export function SynStep(props: {
   children: React.ReactNode
+  nodeProps: NodeProps
   disableSource?: boolean
   disableTarget?: boolean
   enableStart?: boolean
@@ -86,8 +88,6 @@ export function SynStep(props: {
   className?: string
   style?: React.CSSProperties
   hasDashedBorder?: boolean
-  onClick?: (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => void
-  nodeProps: NodeProps
   collapsible?: boolean
   executionState?: ExecutionState
   showExecutionBadge?: boolean
@@ -95,8 +95,10 @@ export function SynStep(props: {
   topBarColor?: string
   /** When zoomed out, title and type label for the semantic zoom label panel */
   semanticZoomSummary?: { title: string; typeLabel: string }
-  /** Step icon shown in the semantic zoom tile (same as the detailed header icon). */
+  /** Step icon shown in the semantic zoom tile (large, centered). */
   semanticZoomIcon?: React.ReactNode
+  /** Icon in the semantic zoom hover/focus preview header (full-zoom header size). */
+  semanticZoomPreviewIcon?: React.ReactNode
   /** Kebab menu actions for semantic zoom (Edit uses the view-details action when present). */
   semanticZoomMenuActions?: readonly StepMenuAction[]
   /** Branch source handles at semantic zoom (no labels; stacked on the tile edge) */
@@ -125,7 +127,6 @@ export function SynStep(props: {
 
   const semanticZoomTileStyle = useMemo(() => {
     if (!barRadiusStyle) return undefined
-    if (barRadiusStyle.borderTopLeftRadius === '75px') return undefined
     return barRadiusStyle
   }, [barRadiusStyle])
 
@@ -147,7 +148,7 @@ export function SynStep(props: {
   }, [expandAllEvent, collapseAllEvent, expandedContext, isCollapsible])
 
   const isSelected = props.nodeProps.selected
-  const nodeWidth = getSynStepNodeWidth(isSemanticZoom, props.nodeProps)
+  const nodeWidth = getSynStepNodeWidth()
 
   const semanticZoomHandleTop = SEMANTIC_ZOOM_TILE_HANDLE_TOP_PX
   const summary = props.semanticZoomSummary
@@ -158,7 +159,7 @@ export function SynStep(props: {
 
   const panelStyle: React.CSSProperties = {
     overflow: 'visible', // Allow execution badge to overflow outside node
-    cursor: props.onClick || props.hasDashedBorder ? 'pointer' : undefined,
+    cursor: props.hasDashedBorder ? 'pointer' : undefined,
     width: `${nodeWidth}px`, // Fixed width for consistent node sizing
     minWidth: `${nodeWidth}px`,
     maxWidth: `${nodeWidth}px`,
@@ -223,23 +224,18 @@ export function SynStep(props: {
         }),
   }
 
+  const panelClassName = [props.className, stepStyles.stepRoot].filter(Boolean).join(' ')
+
   return (
     <SynStepExpandedContext.Provider value={expandedContext}>
       <SynPanel
         hasNoPadding
         variant="raised"
-        className={props.className}
+        className={panelClassName || undefined}
         data-testid={props.rootTestId}
-        onClick={props.onClick}
+        data-syn-step-root=""
         style={panelStyle}
-        onKeyDown={(e: React.KeyboardEvent) => {
-          if (props.onClick && (e.key === 'Enter' || e.key === ' ')) {
-            e.preventDefault()
-            props.onClick(e as unknown as React.MouseEvent<HTMLDivElement, MouseEvent>)
-          }
-        }}
-        role={props.onClick ? 'button' : undefined}
-        tabIndex={props.onClick ? 0 : undefined}
+        tabIndex={isSemanticZoom ? undefined : 0}
       >
         {isSemanticZoom && summary ? (
           <SynStepSemanticZoomBody
@@ -247,6 +243,7 @@ export function SynStep(props: {
             typeLabel={summary.typeLabel}
             accentColor={semanticFillColor}
             icon={props.semanticZoomIcon}
+            previewIcon={props.semanticZoomPreviewIcon}
             menuActions={props.semanticZoomMenuActions}
             branchSources={props.semanticZoomBranchSources}
             selected={isSelected}

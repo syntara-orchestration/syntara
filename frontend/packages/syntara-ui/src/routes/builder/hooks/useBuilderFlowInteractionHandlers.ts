@@ -36,7 +36,10 @@ export function useBuilderFlowInteractionHandlers({
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node<NodeType['data']>) => {
       const isGeneric = getActivityMetadata(node.data)?.__isGeneric === true
-      dispatch({ type: 'NODE_CLICK', payload: { node, isGeneric } })
+      if (!isGeneric) {
+        return
+      }
+      dispatch({ type: 'NODE_CLICK', payload: { node, isGeneric: true } })
     },
     [dispatch]
   )

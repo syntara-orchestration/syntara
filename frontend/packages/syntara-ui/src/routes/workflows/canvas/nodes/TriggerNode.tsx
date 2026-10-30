@@ -1,21 +1,17 @@
-import { FlexItem, Content, ContentVariants, Title, TitleSizes } from '@patternfly/react-core'
+import { Content, ContentVariants } from '@patternfly/react-core'
 import { TriggerTypeEnum } from '@syntara/contracts'
-import { type Node, type NodeProps, useStore } from '@xyflow/react'
+import { type Node, type NodeProps } from '@xyflow/react'
 import type { CSSProperties } from 'react'
 
 import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { SynStepHeader } from '../../../../components/steps/SynStepHeader'
-import { SynStepMenu } from '../../../../components/steps/SynStepMenu'
 import { FlowNodeType } from '../../../../constants'
 import { parseTriggerIndex } from '../../../../utils/triggerNodeIds'
-import { useIsActiveExecution } from '../../../builder/ActiveExecutionContext'
-import { useIsExecutionView } from '../../../builder/ExecutionViewContext'
-import { useIsVersionView } from '../../../builder/VersionViewContext'
 import type { ActivityStatus } from '../../execution/types'
 import { semanticZoomActivityTitle } from '../semanticZoom'
 import { getStepTypeColor } from '../stepTypeColors'
 
+import { StandardStepHeader } from './common/StandardStepHeader'
 import { StepMenuCategory, useStepMenuActions } from './hooks/useStepMenuActions'
 import { renderStepIcon } from './renderStepIcon'
 import { stepMetadata } from './stepMetadata'
@@ -48,16 +44,16 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
     iconId = 'trigger-eda'
   }
   const iconColor = getStepTypeColor(FlowNodeType.TRIGGER)
-  const iconNode = renderStepIcon(metadata.icon, iconId, 'canvas', iconColor)
+  const iconNode = renderStepIcon(metadata.icon, iconId, 'header', iconColor)
   const semanticZoomIcon = renderStepIcon(metadata.icon, iconId, 'semanticZoom', iconColor)
-  // 75px border-radius is a layout constraint (pill shape), not a spacing value — no semantic token applies
   const triggerStyle: CSSProperties = {
-    borderTopLeftRadius: '75px',
-    borderBottomLeftRadius: '75px',
+    borderTopLeftRadius: '45px',
+    borderBottomLeftRadius: '45px',
+    borderTopRightRadius: 'var(--pf-t--global--border--radius--medium)',
+    borderBottomRightRadius: 'var(--pf-t--global--border--radius--medium)',
     paddingLeft: 'var(--pf-t--global--spacer--lg)',
   }
 
-  // Extract trigger index from node id (format: trigger-0, trigger-1, etc.)
   const triggerIndex = parseTriggerIndex(props.id) ?? 0
   const menuActions = useStepMenuActions({
     nodeId: props.id,
@@ -65,7 +61,6 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
     triggerIndex,
   })
 
-  // Extract execution state if present
   const executionState = (props.data as Record<string, unknown>).__executionState as
     | {
         status: ActivityStatus
@@ -104,10 +99,10 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
         typeLabel: triggerTypeLabel,
       }}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
     >
       <TriggerStepDetails
-        node={props.data}
         icon={iconNode}
         menuActions={menuActions}
         triggerName={triggerName}
@@ -120,11 +115,6 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
 
 function TriggerStepDetails(
   props: Readonly<{
-    node: {
-      name: string
-      details: string | null
-      config?: Record<string, unknown>
-    }
     icon?: React.ReactNode
     menuActions?: ReturnType<typeof useStepMenuActions>
     triggerName: string
@@ -132,53 +122,39 @@ function TriggerStepDetails(
     triggerKind?: string
   }>
 ) {
-  const isExecutionView = useIsExecutionView()
-  const isActiveExecution = useIsActiveExecution()
-  const nodesConnectable = useStore((s) => s.nodesConnectable)
-  const isVersionView = useIsVersionView()
-  const isManualTrigger = props.triggerKind === TriggerTypeEnum.MANUAL_TRIGGER
   const isScheduledTrigger = props.triggerKind === TriggerTypeEnum.SCHEDULED
   const isWebhookTrigger = props.triggerKind === TriggerTypeEnum.WEBHOOK_TRIGGER
   const isEdaTrigger = props.triggerKind === TriggerTypeEnum.EDA_TRIGGER
   const normalizedDetails = props.triggerDetails ?? null
+
+  let triggerTypeLabel = 'Manual trigger'
+  if (isScheduledTrigger) {
+    triggerTypeLabel = 'Scheduled trigger'
+  } else if (isWebhookTrigger) {
+    triggerTypeLabel = 'Webhook trigger'
+  } else if (isEdaTrigger) {
+    triggerTypeLabel = 'Event-Driven Ansible trigger'
+  }
+
+  const isManualTrigger = props.triggerKind == null || props.triggerKind === TriggerTypeEnum.MANUAL_TRIGGER
+  const showTriggerDetails = !isManualTrigger && normalizedDetails != null && normalizedDetails !== ''
+
   return (
     <>
-      <SynStepHeader>
-        <FlexItem>{props.icon}</FlexItem>
-        <FlexItem grow={{ default: 'grow' }} />
-        {props.menuActions &&
-          props.menuActions.length > 0 &&
-          !isExecutionView &&
-          !isActiveExecution &&
-          !isVersionView &&
-          nodesConnectable && (
-            <FlexItem>
-              <SynStepMenu menuActions={props.menuActions} />
-            </FlexItem>
-          )}
-      </SynStepHeader>
-      <SynStepBody>
-        <div>
-          <Title headingLevel="h3" size={TitleSizes.md} style={{ overflowWrap: 'anywhere' }}>
-            {props.triggerName}
-          </Title>
-          {isScheduledTrigger && normalizedDetails && (
-            <Content component={ContentVariants.small}>Scheduled trigger</Content>
-          )}
-          {isWebhookTrigger && !normalizedDetails && (
-            <Content component={ContentVariants.small}>Webhook trigger</Content>
-          )}
-          {isEdaTrigger && !normalizedDetails && (
-            <Content component={ContentVariants.small}>Event-Driven Ansible trigger</Content>
-          )}
-          {normalizedDetails && (
-            <Content component={ContentVariants.small} style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>
-              {normalizedDetails}
-            </Content>
-          )}
-          {isManualTrigger && !normalizedDetails && <Content component={ContentVariants.small}>Manual trigger</Content>}
-        </div>
-      </SynStepBody>
+      <StandardStepHeader
+        icon={props.icon}
+        title={props.triggerName}
+        subtitle={triggerTypeLabel}
+        menuActions={props.menuActions}
+        expandable={false}
+      />
+      {showTriggerDetails ? (
+        <SynStepBody>
+          <Content component={ContentVariants.small} style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>
+            {normalizedDetails}
+          </Content>
+        </SynStepBody>
+      ) : null}
     </>
   )
 }
