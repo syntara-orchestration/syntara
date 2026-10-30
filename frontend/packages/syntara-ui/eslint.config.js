@@ -87,6 +87,16 @@ export default tseslint.config(
       'eslint-plugin-syntara/**',
     ],
   },
+  {
+    languageOptions: {
+      parserOptions: {
+        tsconfigRootDir: __dirname,
+      },
+    },
+  },
+  {
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
+  },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   ...pluginQuery.configs['flat/recommended'],
