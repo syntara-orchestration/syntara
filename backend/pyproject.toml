@@ -139,7 +139,7 @@ constraint-dependencies = [
 syntara-api-client = { path = "src/api_client", editable = true }
 orchestrator-cli = { path = "src/cli", editable = true }
 orchestrator-test-sdk = { path = "test-sdk", editable = true }
-execution-plane-client = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git", subdirectory = "src/execution_plane_client", branch = "refactor/sdk-workload-protocol" }
+execution-plane-client = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git", subdirectory = "src/execution_plane_client", rev = "732b7c90e3c71fc1709cf3eded2cca06e387349c" }
 
 [project.scripts]
 orchestrator-admin = "syntara.orchestrator_admin:app"
