@@ -1,27 +1,47 @@
 <!doctype html>
-<!-- Default classes limit FOUC before the inline script runs. pf-v6-theme-glass applies to both light and dark; only pf-v6-theme-dark is toggled below (matches applyDocumentColorScheme in src/theme/colorScheme.ts). -->
+<!-- Default classes limit FOUC before the inline script runs. The script below matches resolveColorScheme in colorScheme.ts and resolveContrastMode in contrastMode.ts. -->
 <html lang="en" class="pf-v6-theme-dark pf-v6-theme-glass">
   <head>
     <meta charset="UTF-8" />
-    <!-- Sync theme resolution with `src/theme/colorScheme.ts` (`resolveColorScheme`). The storage key literal must match `COLOR_SCHEME_STORAGE_KEY` there (HTML cannot import TS without a build step). -->
+    <!-- HTML cannot import TS. Storage key literals must match COLOR_SCHEME_STORAGE_KEY and CONTRAST_MODE_STORAGE_KEY. -->
     <script>
       ;(function () {
-        function resolveColorScheme() {
+        function mediaMatches(query) {
           try {
-            var key = 'syntara-ui-color-scheme'
-            var stored = localStorage.getItem(key)
-            if (stored === 'light' || stored === 'dark') {
-              return stored
-            }
-          } catch {}
-          try {
-            if (window.matchMedia('(prefers-color-scheme: light)').matches) return 'light'
-            if (window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark'
-          } catch {}
-          return 'dark'
+            return window.matchMedia(query).matches
+          } catch {
+            return false
+          }
         }
-        var scheme = resolveColorScheme()
-        document.documentElement.classList.toggle('pf-v6-theme-dark', scheme === 'dark')
+        function stored(key) {
+          try {
+            return localStorage.getItem(key)
+          } catch {
+            return null
+          }
+        }
+        var scheme = stored('syntara-ui-color-scheme')
+        var resolvedScheme = 'dark'
+        if (scheme === 'light' || scheme === 'dark') {
+          resolvedScheme = scheme
+        } else if (mediaMatches('(prefers-color-scheme: light)')) {
+          resolvedScheme = 'light'
+        } else if (mediaMatches('(prefers-color-scheme: dark)')) {
+          resolvedScheme = 'dark'
+        }
+        document.documentElement.classList.toggle('pf-v6-theme-dark', resolvedScheme === 'dark')
+
+        var contrast = stored('syntara-ui-contrast-mode')
+        var resolvedContrast = 'glass'
+        if (contrast === 'default' || contrast === 'high-contrast' || contrast === 'glass') {
+          resolvedContrast = contrast
+        } else if (mediaMatches('(prefers-contrast: more)') || mediaMatches('(forced-colors: active)')) {
+          resolvedContrast = 'high-contrast'
+        } else if (mediaMatches('(prefers-reduced-transparency: reduce)')) {
+          resolvedContrast = 'default'
+        }
+        document.documentElement.classList.toggle('pf-v6-theme-high-contrast', resolvedContrast === 'high-contrast')
+        document.documentElement.classList.toggle('pf-v6-theme-glass', resolvedContrast === 'glass')
       })()
     </script>
     <link rel="icon" type="image/svg+xml" href="/src/assets/icon.svg" />
