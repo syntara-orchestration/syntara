@@ -21,6 +21,8 @@ from syntara.eventstreams.core.deduplication import (
     TemporalAcceptance,
     TerminalDelivery,
 )
+from syntara.eventstreams.core.processing import CONTENT_INSPECTION_PENDING, CONTENT_VALIDATED
+from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCode
 from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
 from syntara.eventstreams.services.subscription_service import lock_source_lifecycle
@@ -62,6 +64,33 @@ async def test_unique_acquisition_busy_and_renewal(delivery_context: DeliveryCon
         assert renewed.token == claim.token
         assert renewed.lease_until >= claim.lease_until
         assert (await session.exec(select(func.count()).select_from(EventDelivery))).one() == 1
+
+
+@pytest.mark.parametrize("invalid_payload", [False, True])
+async def test_inspection_claim_keeps_aware_timestamps_after_persistence(
+    delivery_context: DeliveryContext, *, invalid_payload: bool
+) -> None:
+    context = delivery_context
+    identity = context.identity()
+    async with context.session_factory() as session, session.begin():
+        claim = await EventDeliveryStore(session).acquire_inspection(identity, context.expectation(), "inspector")
+        assert isinstance(claim, DeliveryClaim)
+        assert claim.next_attempt_at is not None
+        assert claim.next_attempt_at.tzinfo is not None
+
+    async with context.session_factory() as session, session.begin():
+        row = await session.get(EventDelivery, identity.digest)
+        assert row is not None
+        assert row.last_error_code == CONTENT_INSPECTION_PENDING
+        assert row.next_attempt_at.tzinfo is not None
+        failure = EventDecodeFailure(code=EventFailureCode.invalid_json) if invalid_payload else None
+        assert await EventDeliveryStore(session).finish_inspection(claim, failure) is None
+
+    async with context.session_factory() as session:
+        row = await session.get(EventDelivery, identity.digest)
+        assert row is not None
+        assert row.next_attempt_at.tzinfo is not None
+        assert row.last_error_code == (EventFailureCode.invalid_json.value if invalid_payload else CONTENT_VALIDATED)
 
 
 async def test_preparation_freezes_real_platform_execution(delivery_context: DeliveryContext) -> None:

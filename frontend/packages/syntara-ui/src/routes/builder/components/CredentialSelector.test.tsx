@@ -1,13 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { credentialsClient } from '../../../client'
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
 import type { Credential } from '../../configuration/credentials/credentialConstants'
+import { KafkaCredentialConnection } from '../node-forms/KafkaCredentialConnection'
 
 import { CredentialSelector, type CredentialSelectorProps } from './CredentialSelector'
 import { useAllCredentials } from './useAllCredentials'
@@ -192,7 +193,42 @@ function renderSelector(props: Partial<CredentialSelectorProps> = {}) {
   return render(<CredentialSelector {...defaultProps} />, { wrapper })
 }
 
+function StagedCredentialSelector() {
+  const [value, setValue] = useState<string>()
+  return (
+    <KafkaCredentialConnection
+      credentialName={value ? 'Production API Key' : undefined}
+      isPending={false}
+      isDisabled={false}
+    >
+      {(onSelected) => (
+        <CredentialSelector
+          value={value}
+          isSearchable
+          isRequired
+          allowCreate={false}
+          onChange={(id) => {
+            setValue(id)
+            if (id) onSelected()
+          }}
+        />
+      )}
+    </KafkaCredentialConnection>
+  )
+}
+
 describe('CredentialSelector', () => {
+  it('does not offer unrelated credentials before compatible credential types are known', async () => {
+    mockUseQuery({ credentialTypes: { data: undefined, isPending: true } })
+    const user = userEvent.setup()
+    render(<CredentialSelector onChange={vi.fn()} compatibleTypeNames={['Kafka']} allowCreate={false} />, { wrapper })
+    await user.click(screen.getByRole('button', { name: 'Credential' }))
+    expect(screen.queryByRole('option', { name: 'Production API Key' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Staging Token' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Credential' })).toBeDisabled()
+    expect(screen.queryByText('No credentials available')).not.toBeInTheDocument()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -216,6 +252,32 @@ describe('CredentialSelector', () => {
     renderSelector({ value: 'cred-1' })
 
     expect(screen.getByRole('button', { name: 'Credential' })).toHaveTextContent('Production API Key')
+  })
+
+  it('restores input focus after selecting a searchable credential with Enter', async () => {
+    mockUseQuery()
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    renderSelector({ isSearchable: true, isRequired: true, allowCreate: false, onChange })
+    const input = screen.getByRole('textbox', { name: 'Credential' })
+    await user.click(input)
+    await user.type(input, 'Production')
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(onChange).toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
+    expect(input).toHaveFocus()
+  })
+
+  it('restores focus to Change when Enter selection closes the staged picker', async () => {
+    mockUseQuery()
+    const user = userEvent.setup()
+    render(<StagedCredentialSelector />, { wrapper })
+    await user.click(screen.getByRole('button', { name: 'Set up connection' }))
+    await user.click(screen.getByRole('textbox', { name: 'Credential' }))
+    await user.type(screen.getByRole('textbox', { name: 'Credential' }), 'Production')
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(screen.queryByRole('textbox', { name: 'Credential' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Change' })).toHaveFocus()
   })
 
   it('renders the form group label', () => {
@@ -669,6 +731,14 @@ describe('CredentialSelector', () => {
     })
   })
 
+  it('associates validation errors with the credential toggle', () => {
+    mockUseQuery()
+    renderSelector({ errorMessage: 'Select a compatible credential' })
+    const toggle = screen.getByRole('button', { name: 'Credential' })
+    expect(toggle).toHaveAttribute('aria-invalid', 'true')
+    expect(toggle).toHaveAccessibleDescription(/Select a compatible credential/)
+  })
+
   describe('read-only credential (credential:use denied)', () => {
     const readOnlyCred = {
       id: 'cred-readonly',
@@ -701,7 +771,24 @@ describe('CredentialSelector', () => {
 
       expect(screen.getByRole('button', { name: 'Credential' })).toHaveAttribute(
         'aria-describedby',
-        'credential-readonly-warning'
+        'credential-selector-readonly-warning'
+      )
+    })
+
+    it('preserves the warning association when a validation error is also present', () => {
+      mockReadOnlyState()
+      renderSelector({ value: 'cred-readonly', errorMessage: 'Credential unavailable' })
+      expect(screen.getByRole('button', { name: 'Credential' })).toHaveAttribute(
+        'aria-describedby',
+        'credential-selector-error credential-selector-readonly-warning'
+      )
+    })
+
+    it('preserves the saved credential label in a searchable read-only selector', () => {
+      mockReadOnlyState()
+      renderSelector({ value: 'cred-readonly', isSearchable: true })
+      expect(screen.getByRole('textbox', { name: 'Credential' })).toHaveValue(
+        'Restricted Prod Cred (no permission to use)'
       )
     })
 

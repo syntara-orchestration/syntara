@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.core.constants import EventDeliveryDefaults
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
 from syntara.eventstreams.core.deduplication import (
     ClaimLost,
@@ -107,7 +108,7 @@ async def test_inspection_marker_is_allowed_behind_admission_holds_and_survives_
     row = delivery()
     row.last_error_code = CONTENT_INSPECTION_PENDING
     row.lease_until = NOW - timedelta(seconds=1)
-    row.next_attempt_at = datetime.max.replace(tzinfo=UTC)
+    row.next_attempt_at = EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT
     repository = store()
     monkeypatch.setattr(deduplication_store, "lock_source_lifecycle", AsyncMock(return_value=(subscription, source)))
     monkeypatch.setattr(repository, "_delivery", AsyncMock(return_value=row))
@@ -137,7 +138,7 @@ async def test_inspection_marker_is_allowed_behind_admission_holds_and_survives_
     assert isinstance(result, DeliveryClaim)
     assert result.token != previous
     assert row.last_error_code == CONTENT_INSPECTION_PENDING
-    assert row.next_attempt_at == datetime.max.replace(tzinfo=UTC)
+    assert row.next_attempt_at == EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT
     assert source.delivery_evidence_revision == 1
 
 
@@ -191,7 +192,7 @@ async def test_inspection_finish_retains_unresolved_safe_evidence_and_changes_re
     assert await repository.finish_inspection(claim, failure, keep_pending=keep_pending) is None
     defer.assert_awaited_once_with(
         claim,
-        next_attempt_at=datetime.max.replace(tzinfo=UTC) if failure is not None else NOW,
+        next_attempt_at=EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT if failure is not None else NOW,
         error_code=expected_code,
     )
     assert source.delivery_evidence_revision == 1

@@ -1,5 +1,6 @@
-import type { Activity } from '@syntara/contracts'
+import { TriggerTypeEnum, type Activity } from '@syntara/contracts'
 
+import { getTriggerInputSchemaFields } from '../../../panels/utils/triggerSchemaUtils'
 import type { EdgeConnection } from '../../../types/edge'
 import { getUpstreamNodeIds } from '../../edgeHelpers'
 import type { ValidationContext, ValidationError } from '../types'
@@ -42,16 +43,31 @@ function getWorkflowInputNames(triggers: Activity[] | undefined): Set<string> {
   const names = new Set<string>()
   if (!triggers) return names
   for (const trigger of triggers) {
-    const params = trigger.parameters as Record<string, unknown> | undefined
-    const inputSchema = params?.input_schema as Record<string, unknown> | undefined
-    const properties = inputSchema?.properties as Record<string, unknown> | undefined
-    if (properties) {
-      for (const key of Object.keys(properties)) {
-        names.add(key)
-      }
-    }
+    for (const field of getTriggerInputSchemaFields(trigger.id, [trigger]) ?? []) names.add(field.name)
   }
   return names
+}
+
+function getPayloadPropertySchema(schema: unknown, property: string): unknown {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return schema
+  const properties = 'properties' in schema ? schema.properties : undefined
+  if (properties && typeof properties === 'object' && Object.hasOwn(properties, property)) {
+    return Reflect.get(properties, property)
+  }
+  return 'additionalProperties' in schema ? schema.additionalProperties : true
+}
+
+function acceptsTriggerPath(trigger: Activity, fieldPath: string): boolean {
+  const [first, ...rest] = fieldPath.split('.')
+  const fields = getTriggerInputSchemaFields(trigger.id, [trigger]) ?? []
+  if (!fields.some((field) => field.name === first)) return false
+  if (trigger.type !== TriggerTypeEnum.EVENT_SUBSCRIBE || first !== 'payload' || !rest.length) return true
+  let schema: unknown = trigger.parameters?.input_schema
+  for (const part of rest) {
+    if (schema === false) return false
+    schema = getPayloadPropertySchema(schema, part)
+  }
+  return schema !== false
 }
 
 function checkSchemaFieldReference(params: {
@@ -60,12 +76,14 @@ function checkSchemaFieldReference(params: {
   fields: Set<string>
   namespace: string
   suggestionText: string
+  triggers?: Activity[]
 }): ValidationError | null {
   const { ref, activity, fields, namespace, suggestionText } = params
   const fieldPath = ref.fullRef.substring(ref.namespace.length + 1)
   if (!fieldPath) return null
   const topLevelField = fieldPath.split('.')[0]
-  if (fields.has(topLevelField)) return null
+  if (fields.has(topLevelField) && params.triggers?.some((trigger) => acceptsTriggerPath(trigger, fieldPath)))
+    return null
 
   return {
     id: `var-ref-${namespace}-${activity.id}-${fieldPath}`,
@@ -109,6 +127,7 @@ function checkNodeReference(
 
 type RefContext = {
   schemaFields: Set<string>
+  triggers?: Activity[]
   schemaSuggestion: string
   referenceTargetIds: Set<string>
   upstreamIds: Set<string>
@@ -122,6 +141,7 @@ function validateRef(ref: VariableReference, activity: Activity, ctx: RefContext
       fields: ctx.schemaFields,
       namespace: ref.namespace,
       suggestionText: ctx.schemaSuggestion,
+      triggers: ctx.triggers,
     })
   if (KNOWN_NAMESPACES.has(ref.namespace)) return null
   return checkNodeReference(ref, activity, ctx.referenceTargetIds, ctx.upstreamIds)
@@ -148,7 +168,13 @@ export function validateVariableReferences(
 
     const needsUpstream = refs.some((ref) => !KNOWN_NAMESPACES.has(ref.namespace))
     const upstreamIds = needsUpstream ? getUpstreamNodeIds(activity.id, edges) : new Set<string>()
-    const ctx: RefContext = { schemaFields, schemaSuggestion, referenceTargetIds, upstreamIds }
+    const ctx: RefContext = {
+      schemaFields,
+      schemaSuggestion,
+      referenceTargetIds,
+      upstreamIds,
+      triggers: context?.triggers,
+    }
 
     for (const ref of refs) {
       const error = validateRef(ref, activity, ctx)

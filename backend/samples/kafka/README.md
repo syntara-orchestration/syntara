@@ -85,6 +85,11 @@ deferred to M2. The profiles are separate so
 using the worker never provisions a customer broker. Compose's worker grace is
 60 seconds; keep it longer than any overridden drain deadline.
 
+Like the other local workers, the compose consumer mounts `backend/src` from the
+checkout. Restart `eventstream-consumer` after Python source changes; rebuild the
+backend image after dependency changes. This keeps local Kafka tests on the same
+source revision as the API and Temporal workers.
+
 Compose passes through the existing placement heartbeat/liveness/lease settings
 and proof-cache options. Terminal caching remains disabled by default. Its epoch
 and clock-error bound have no generated defaults: if caching is explicitly

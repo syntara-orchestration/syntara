@@ -6,7 +6,7 @@ Temporal, Kafka or Redis I/O, or commits on behalf of an admission caller.
 """
 
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import cast
 from uuid import UUID, uuid4
 
@@ -369,7 +369,9 @@ class EventDeliveryStore:
         if isinstance(claim, ClaimBusy):
             return claim
         changed = await self._change(
-            claim, last_error_code=CONTENT_INSPECTION_PENDING, next_attempt_at=datetime.max.replace(tzinfo=UTC)
+            claim,
+            last_error_code=CONTENT_INSPECTION_PENDING,
+            next_attempt_at=EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT,
         )
         return ClaimLost() if changed is None else self._claim(changed)
 
@@ -385,7 +387,7 @@ class EventDeliveryStore:
             return ClaimLost()
         result = await self.defer(
             claim,
-            next_attempt_at=datetime.max.replace(tzinfo=UTC) if failure is not None else await self._now(),
+            next_attempt_at=EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT if failure is not None else await self._now(),
             error_code=(
                 failure.code.value
                 if failure is not None
