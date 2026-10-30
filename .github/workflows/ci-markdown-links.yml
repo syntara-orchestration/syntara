@@ -53,5 +53,17 @@ jobs:
         working-directory: .tools/ui-packages
 
       - name: Check local Markdown links
-        # Do not lint the nested checkout; scan Syntara's Markdown files.
-        run: node .tools/ui-packages/packages/md-link-lint/dist/cli.js --exclude '.tools/**'
+        # Save the exit code so the report still appears when links fail.
+        # Keep the nested checkout out of the Syntara scan.
+        run: |
+          report="$RUNNER_TEMP/md-link-lint-report.json"
+          if node .tools/ui-packages/packages/md-link-lint/dist/cli.js --exclude '.tools/**' --json > "$report"; then
+            status=0
+          else
+            status=$?
+          fi
+
+          node .github/scripts/format-markdown-link-report.mjs "$report"
+
+          # Return the link-check result after formatting the report.
+          exit "$status"

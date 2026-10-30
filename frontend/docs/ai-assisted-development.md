@@ -11,7 +11,7 @@ Invocation syntax depends on the agent: in Codex, use `$skill-name` or choose a 
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start-copy-this-prompt)
+1. [Quick Start](#quick-start--copy-this-prompt)
 2. [Mental Model](#1-mental-model)
 3. [Bring Your Screenshots (Optional)](#2-bring-your-screenshots-optional)
 4. [Implement a Feature](#3-implement-a-feature)
@@ -323,7 +323,7 @@ Shortest path from "I need to build this page" to an open PR:
 2. **Identify the API endpoint** and response fields
 3. **Find the API client** in `src/client.tsx` (e.g. `credentialsClient`, `workflowClient`)
 4. **Ask the agent to plan** before writing code
-5. **Paste the [Quick Start prompt](#quick-start-copy-this-prompt)**, fill placeholders, drag in the screenshot
+5. **Paste the [Quick Start prompt](#quick-start--copy-this-prompt)**, fill placeholders, drag in the screenshot
 6. **Review the plan** — correct anything that looks wrong
 7. **Let the agent implement** — it writes code + tests
 8. **Review locally** — `npm start`, open http://localhost:5173, walk through every state ([§4](#4-review-your-changes-locally))
