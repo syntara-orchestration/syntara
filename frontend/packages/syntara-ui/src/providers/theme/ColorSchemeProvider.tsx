@@ -41,11 +41,11 @@ function contrastPreferenceOrSystem(preference: ContrastPreference | null): Cont
  * is `system` (or unset).
  */
 export function ColorSchemeProvider(props: Readonly<{ children: ReactNode }>) {
-  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(() => getColorSchemeFromDocument())
+  const [colorScheme, setColorScheme] = useState<ColorScheme>(() => getColorSchemeFromDocument())
   const [colorSchemePreference, setColorSchemePreference] = useState<ColorSchemePreference>(() =>
     preferenceOrSystem(readStoredColorSchemePreference())
   )
-  const [contrastMode, setContrastModeState] = useState<ContrastMode>(() => getContrastModeFromDocument())
+  const [contrastMode, setContrastMode] = useState<ContrastMode>(() => getContrastModeFromDocument())
   const [contrastPreference, setContrastPreference] = useState<ContrastPreference>(() =>
     contrastPreferenceOrSystem(readStoredContrastPreference())
   )
@@ -55,7 +55,7 @@ export function ColorSchemeProvider(props: Readonly<{ children: ReactNode }>) {
     const resolved = resolveColorScheme()
     applyDocumentColorScheme(resolved)
     setColorSchemePreference(preference)
-    setColorSchemeState(resolved)
+    setColorScheme(resolved)
   }, [])
 
   const commitContrastMode = useCallback((preference: ContrastPreference) => {
@@ -63,7 +63,7 @@ export function ColorSchemeProvider(props: Readonly<{ children: ReactNode }>) {
     const resolved = resolveContrastMode()
     applyDocumentContrast(resolved)
     setContrastPreference(preference)
-    setContrastModeState(resolved)
+    setContrastMode(resolved)
   }, [])
 
   const toggleColorScheme = useCallback(() => {
@@ -76,7 +76,7 @@ export function ColorSchemeProvider(props: Readonly<{ children: ReactNode }>) {
       const resolved = resolveColorScheme()
       applyDocumentColorScheme(resolved)
       setColorSchemePreference(preference)
-      setColorSchemeState(resolved)
+      setColorScheme(resolved)
     }
 
     const syncContrast = () => {
@@ -84,7 +84,7 @@ export function ColorSchemeProvider(props: Readonly<{ children: ReactNode }>) {
       const resolved = resolveContrastMode()
       applyDocumentContrast(resolved)
       setContrastPreference(preference)
-      setContrastModeState(resolved)
+      setContrastMode(resolved)
     }
 
     const onStorage = (event: StorageEvent) => {
@@ -103,12 +103,12 @@ export function ColorSchemeProvider(props: Readonly<{ children: ReactNode }>) {
       if (colorSchemeFollowsSystem()) {
         const resolved = resolveColorScheme()
         applyDocumentColorScheme(resolved)
-        setColorSchemeState(resolved)
+        setColorScheme(resolved)
       }
       if (contrastFollowsSystem()) {
         const resolved = resolveContrastMode()
         applyDocumentContrast(resolved)
-        setContrastModeState(resolved)
+        setContrastMode(resolved)
       }
     }
 
