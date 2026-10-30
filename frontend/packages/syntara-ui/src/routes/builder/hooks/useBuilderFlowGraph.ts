@@ -36,6 +36,8 @@ type UseBuilderFlowGraphParams = {
   workflowVersion: number
   preResolvedNodes?: Set<string>
   skipInferenceActivityIds?: ReadonlySet<string> | null
+  /** Timestamp replayed steps predate; set only for retry executions. */
+  replayBaselineAt?: string | null
 }
 
 export { executionStateEnricher }
@@ -51,6 +53,7 @@ export function useBuilderFlowGraph({
   workflowVersion,
   preResolvedNodes,
   skipInferenceActivityIds,
+  replayBaselineAt,
 }: UseBuilderFlowGraphParams) {
   return useMemo(() => {
     if (!currentWorkflow) {
@@ -114,6 +117,7 @@ export function useBuilderFlowGraph({
         options: {
           preResolvedNodes,
           skipInferenceActivityIds: inferenceAllowlist,
+          replayBaselineAt,
         },
       })
       nodes.push({
@@ -196,6 +200,7 @@ export function useBuilderFlowGraph({
         options: {
           preResolvedNodes,
           skipInferenceActivityIds: inferenceAllowlist,
+          replayBaselineAt,
         },
       })
 
@@ -225,5 +230,6 @@ export function useBuilderFlowGraph({
     executionStatus,
     preResolvedNodes,
     skipInferenceActivityIds,
+    replayBaselineAt,
   ])
 }

@@ -6,7 +6,7 @@ import type * as ApprovalsAPI from '@syntara/contracts/src/approvals-api.js'
 import type * as ExecutionsAPI from '@syntara/contracts/src/executions-api.js'
 import type * as ToolManagerAPI from '@syntara/contracts/src/tool-manager.js'
 import type * as WorkflowAPI from '@syntara/contracts/src/workflow-api.js'
-import type { Approval, Tool, WorkflowWithVersion, WorkflowsResponse } from '@syntara/contracts'
+import type { Approval, Execution, Tool, WorkflowWithVersion, WorkflowsResponse } from '@syntara/contracts'
 import {
   ExecutionStatusEnum,
   IntegrationStatusEnum,
@@ -28,6 +28,20 @@ import { identityProviders, type IdentityProvider } from './resources/identityPr
 import { validateGroupJmespathExpression } from './utils/jmespathValidation'
 import { users, userIdentities, type UserRead, type UserIdentityRead } from './resources/users'
 import { groups, userGroupMemberships, type GroupRead } from './resources/groups'
+
+/** Activity statuses used by retry-from-failure handlers. */
+const MOCK_ACTIVITY_STATUS = { COMPLETED: 'completed', FAILED: 'failed' } as const
+
+/** Terminal states the real retry-from-failure endpoint accepts. */
+const RETRY_FROM_FAILURE_STATUSES: ReadonlySet<string> = new Set([
+  ExecutionStatusEnum.FAILED,
+  ExecutionStatusEnum.COMPLETED_WITH_ERRORS,
+])
+
+/** Mirrors the backend guard: failed/completed-with-errors, and never a test run. */
+function isRetryFromFailureRejected(execution: Execution): boolean {
+  return execution.mode === 'test' || !RETRY_FROM_FAILURE_STATUSES.has(execution.status)
+}
 import {
   mockProjects,
   mockPolicies,
@@ -1896,6 +1910,152 @@ export const handlers = [
       retried_from_execution_id: execution.id,
       current_activities: [],
     }
+    executions.unshift(newExecution)
+    return HttpResponse.json(newExecution, { status: 201 })
+  }),
+
+  http.get('/api/v1/executions/:executionId/retry_from_failure_preview', ({ params, request }) => {
+    const executionId = params.executionId as string
+    const execution = executions.find((e) => e.id === executionId)
+    if (!execution) {
+      return createExecutionNotFoundResponse(executionId, 'retry_from_failure_preview')
+    }
+
+    if (isRetryFromFailureRejected(execution)) {
+      return HttpResponse.json({
+        eligible: false,
+        reason: `Cannot retry from failure: execution is in '${execution.status}' state.`,
+        eligible_point_ids: [],
+        sanitized_node_ids: [],
+        auto_included_node_ids: [],
+        sanitized_replacements: {},
+        step_count_by_eligible_point: {},
+        total_step_count: 0,
+        retained_result_count: 0,
+      })
+    }
+
+    // Report the run's failed steps as the retry points, mirroring how the real
+    // endpoint derives them from failed activity records.
+    const failedActivityNames = (activityExecutions[executionId] ?? [])
+      .filter((activity) => activity.status === MOCK_ACTIVITY_STATUS.FAILED)
+      .map((activity) => activity.activity_name)
+
+    const eligiblePointIds = [...new Set(failedActivityNames)].sort()
+
+    if (eligiblePointIds.length === 0) {
+      return HttpResponse.json({
+        eligible: false,
+        reason: 'No failed steps were found to retry from.',
+        eligible_point_ids: [],
+        sanitized_node_ids: [],
+        auto_included_node_ids: [],
+        sanitized_replacements: {},
+        step_count_by_eligible_point: {},
+        total_step_count: 0,
+        retained_result_count: 0,
+      })
+    }
+
+    const requestedPointIds = new URL(request.url).searchParams.getAll('retry_point_ids')
+    const selectedPointIds = requestedPointIds.length > 0 ? [...new Set(requestedPointIds)].sort() : eligiblePointIds
+    const unknownPointIds = selectedPointIds.filter((id) => !eligiblePointIds.includes(id))
+    if (unknownPointIds.length > 0) {
+      return HttpResponse.json({
+        eligible: false,
+        reason: `Not failed nodes in this execution: ${unknownPointIds.join(', ')}`,
+        eligible_point_ids: selectedPointIds,
+        sanitized_node_ids: [],
+        auto_included_node_ids: [],
+        sanitized_replacements: {},
+        step_count_by_eligible_point: {},
+        total_step_count: 0,
+        retained_result_count: 0,
+      })
+    }
+
+    const retryPointSet = new Set(selectedPointIds)
+    const retainedResultCount = (activityExecutions[executionId] ?? []).filter(
+      (activity) => activity.status === MOCK_ACTIVITY_STATUS.COMPLETED && !retryPointSet.has(activity.activity_name)
+    ).length
+
+    return HttpResponse.json({
+      eligible: true,
+      reason: null,
+      eligible_point_ids: selectedPointIds,
+      sanitized_node_ids: [],
+      auto_included_node_ids: [],
+      sanitized_replacements: {},
+      step_count_by_eligible_point: Object.fromEntries(selectedPointIds.map((id) => [id, 1])),
+      total_step_count: selectedPointIds.length,
+      retained_result_count: retainedResultCount,
+    })
+  }),
+
+  http.post('/api/v1/executions/:executionId/retry_from_failure', async ({ params, request }) => {
+    const executionId = params.executionId as string
+    const execution = executions.find((e) => e.id === executionId)
+    if (!execution) {
+      return createExecutionNotFoundResponse(executionId, 'retry_from_failure')
+    }
+
+    if (isRetryFromFailureRejected(execution)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/resource-conflict',
+          title: 'Execution Not Retryable From Failure',
+          detail: `Cannot retry from failure: execution is in '${execution.status}' state.`,
+          code: 'EXECUTION_NOT_RETRYABLE_FROM_FAILURE',
+          retryable: false,
+          instance: `/api/v1/executions/${executionId}/retry_from_failure`,
+        },
+        { status: 409 }
+      )
+    }
+
+    let body: { retry_point_ids?: string[]; input_parameter_overrides?: Record<string, Record<string, unknown>> }
+    try {
+      body = (await request.json()) as typeof body
+    } catch {
+      body = {}
+    }
+
+    const retryPointIds = body.retry_point_ids ?? []
+
+    const newExecution: Execution = {
+      ...execution,
+      id: uuidv4(),
+      status: ExecutionStatusEnum.PENDING,
+      temporal_workflow_id: `exec-${uuidv4()}`,
+      created_at: mockDate.now,
+      updated_at: mockDate.now,
+      completed_at: null,
+      error_details: null,
+      retried_from_execution_id: execution.id,
+      // Steps that already completed keep the source run's timestamps, which is
+      // what the canvas uses to tell a replayed step from a fresh one.
+      execution_metadata: {
+        ...execution.execution_metadata,
+        retry: { retry_from_execution_id: execution.id, eligible_point_ids: retryPointIds },
+      },
+      current_activities: [],
+    }
+
+    // Only successful outputs can be replayed. Failed source activities must
+    // run again in the retry, so carrying them over would incorrectly mark
+    // their failure state as reused output in the new execution.
+    activityExecutions[newExecution.id] = (activityExecutions[executionId] ?? [])
+      .filter(
+        (activity) =>
+          activity.status === MOCK_ACTIVITY_STATUS.COMPLETED && !retryPointIds.includes(activity.activity_name)
+      )
+      .map((activity) => ({
+        ...activity,
+        id: uuidv4(),
+        execution_id: newExecution.id,
+        completed_at: activity.completed_at,
+      }))
+
     executions.unshift(newExecution)
     return HttpResponse.json(newExecution, { status: 201 })
   }),
