@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
+import { FORM_PREVIEW_INCOMPLETE_TOOLTIP, FormFieldTypeEnum } from '../../../forms'
 
 import { FormPromptNodeForm } from './FormPromptNodeForm'
 import { FORM_PROMPT_FALLBACK_ENABLE_LINK, FORM_PROMPT_FALLBACK_ENABLED_HELPER } from './shared/nodeFieldHelpText'
@@ -62,6 +63,11 @@ vi.mock('../hooks/useWorkflowEngineDefaults', () => ({
 vi.mock('../../../stores/useWorkflowStore', () => ({
   useWorkflowStore: (selector: (state: { projectId: string | undefined }) => unknown) =>
     selector({ projectId: mockWorkflowProjectId.current }),
+}))
+
+vi.mock('./FormPromptPreviewModal', () => ({
+  FormPromptPreviewModal: ({ isOpen }: { isOpen: boolean }) =>
+    isOpen ? <div data-testid="form-preview-modal" /> : null,
 }))
 
 vi.mock('../../../components/forms/SynFormFieldBuilder', () => ({
@@ -198,6 +204,31 @@ describe('FormPromptNodeForm', () => {
       renderFormPrompt(<FormPromptNodeForm onSubmit={mockOnSubmit} projectId="test-project-123" />)
 
       expect(mockUseFormPromptSubmitUsers).toHaveBeenCalledWith('test-project-123')
+    })
+
+    it('keeps preview control focusable with tooltip when the form definition is incomplete', async () => {
+      const user = userEvent.setup()
+      renderFormPrompt(
+        <FormPromptNodeForm
+          onSubmit={mockOnSubmit}
+          initialData={{
+            name: 'Form step',
+            form_definition: {
+              fields: [{ type: FormFieldTypeEnum.TEXT, value_name: '', label: '' }],
+            },
+          }}
+        />
+      )
+
+      const previewButton = screen.getByRole('button', { name: 'Preview form' })
+      expect(previewButton).toHaveAttribute('aria-disabled', 'true')
+      expect(previewButton).not.toBeDisabled()
+
+      await user.hover(previewButton)
+      expect(await screen.findByText(FORM_PREVIEW_INCOMPLETE_TOOLTIP)).toBeInTheDocument()
+
+      await user.click(previewButton)
+      expect(screen.queryByTestId('form-preview-modal')).not.toBeInTheDocument()
     })
   })
 

@@ -37,12 +37,21 @@ describe('parseFormTriggerFormDefinitionFieldPath', () => {
 describe('partitionFormTriggerServerValidationErrors', () => {
   it('routes nested form paths to form field errors and top-level paths to trigger fields', () => {
     const result = partitionFormTriggerServerValidationErrors([
-      { fieldPath: 'parameters.form_definition.fields.0.label', message: 'Label error' },
+      {
+        fieldPath: 'parameters.form_definition.fields.0.label',
+        message: 'String must contain at least 1 character(s)',
+      },
       { fieldPath: 'parameters.message', message: 'Message error' },
       { fieldPath: 'parameters.form_definition', message: 'Definition error' },
     ])
 
-    expect(result.formFieldErrors).toEqual([{ fieldIndex: 0, subPath: 'label', message: 'Label error' }])
+    expect(result.formFieldErrors).toEqual([
+      {
+        fieldIndex: 0,
+        subPath: 'label',
+        message: 'Field label is required',
+      },
+    ])
     expect(result.triggerFieldErrors).toEqual([
       { field: 'message', message: 'Message error' },
       { field: 'form_definition', message: 'Definition error' },

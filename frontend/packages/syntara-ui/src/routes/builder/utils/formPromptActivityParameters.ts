@@ -1,6 +1,6 @@
 import type { FormDefinition } from '@syntara/contracts'
 
-import { prepareFormDefinitionForCommit, safeParseFormDefinition } from '../../../forms'
+import { serializeFormDefinitionForStorage } from '../../../forms'
 
 export type FormPromptActivityParameterInput = {
   form_definition: FormDefinition
@@ -76,15 +76,8 @@ function appendOptionalFormPromptFields(
 }
 
 export function buildFormPromptActivityParameters(input: FormPromptActivityParameterInput): Record<string, unknown> {
-  const preparedDefinition = prepareFormDefinitionForCommit(input.form_definition)
-  const parsedDefinition = safeParseFormDefinition(preparedDefinition)
-  if (!parsedDefinition.success) {
-    const detail = parsedDefinition.errors[0]?.message ?? 'Form definition is invalid'
-    throw new Error(detail)
-  }
-
   const result: Record<string, unknown> = {
-    form_definition: parsedDefinition.data,
+    form_definition: serializeFormDefinitionForStorage(input.form_definition),
   }
   appendOptionalFormPromptFields(result, input)
   return result

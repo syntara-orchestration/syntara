@@ -1,3 +1,4 @@
+import { humanizeFormDefinitionIssueMessage } from '../../../../forms'
 import { AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE } from '../../node-forms/triggerFormSchema'
 
 const KEY_PREFIX_PATTERN = /^(\w+(?:\.\w+)*): /
@@ -23,6 +24,7 @@ const ID_PATTERN = /^'([^']+)' does not match '\^/
 const REQUIRED_PROPERTY_PATTERN = /^'([^']+)' is a required property$/
 const NON_EMPTY_PATTERN = /^(?:''|\[\]) (?:should be non-empty|is too short)$/
 const HUMANIZED_MISSING_FIELD = /^Missing required field "([^"]+)"$/
+const VALUE_NAME_MESSAGE_PREFIX = 'String should match pattern'
 
 const EMPTY_FIELD_MESSAGES: Record<string, string> = {
   authorized_service_account_ids: AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE,
@@ -34,7 +36,31 @@ function extractFieldName(fieldPath: string | null | undefined): string | null {
   return segments.at(-1) || null
 }
 
+function humanizeNonEmptyMessage(fieldPath?: string | null): string {
+  const fieldName = extractFieldName(fieldPath)
+  if (fieldName === 'display_label') {
+    return 'Option label is required'
+  }
+  if (fieldName === 'value_name') {
+    return 'Value name is required'
+  }
+  if (fieldName === 'label') {
+    return 'Field label is required'
+  }
+  if (fieldName) {
+    return EMPTY_FIELD_MESSAGES[fieldName] ?? `"${fieldName}" must not be empty`
+  }
+  return 'This field must not be empty'
+}
+
 export function humanizeValidationMessage(raw: string, fieldPath?: string | null): string {
+  if (
+    fieldPath &&
+    (fieldPath.includes('form_definition.fields') || fieldPath.startsWith('fields[') || fieldPath.startsWith('fields.'))
+  ) {
+    return humanizeFormDefinitionIssueMessage(raw, fieldPath)
+  }
+
   const idMatch = ID_PATTERN.exec(raw)
   if (idMatch) {
     return `"${idMatch[1]}" is not a valid ID. Use letters, numbers, and underscores only (e.g., "my_node_1")`
@@ -46,11 +72,15 @@ export function humanizeValidationMessage(raw: string, fieldPath?: string | null
   }
 
   if (NON_EMPTY_PATTERN.test(raw)) {
-    const fieldName = extractFieldName(fieldPath)
-    if (fieldName) {
-      return EMPTY_FIELD_MESSAGES[fieldName] ?? `"${fieldName}" must not be empty`
-    }
-    return 'This field must not be empty'
+    return humanizeNonEmptyMessage(fieldPath)
+  }
+
+  if (raw.startsWith(VALUE_NAME_MESSAGE_PREFIX)) {
+    return 'Value name must start with a letter or underscore, then use letters, numbers, or underscores only'
+  }
+
+  if (raw.includes('display_label') && raw.includes('empty')) {
+    return 'Option label is required'
   }
 
   return raw

@@ -28,7 +28,15 @@ describe('buildFormTriggerActivityParameters', () => {
     expect(result.form_definition).toBeDefined()
   })
 
-  it('rejects dynamic dropdown options', () => {
+  it('persists draft form definitions that fail strict validation', () => {
+    const result = buildFormTriggerActivityParameters({
+      form_definition: { fields: [] },
+    })
+
+    expect(result.form_definition).toEqual({ fields: [] })
+  })
+
+  it('persists dynamic dropdown options for canvas validation to report', () => {
     const dropdown = {
       ...createDefaultField(FormFieldTypeEnum.DROPDOWN),
       options: {
@@ -39,18 +47,10 @@ describe('buildFormTriggerActivityParameters', () => {
       },
     }
 
-    expect(() =>
-      buildFormTriggerActivityParameters({
-        form_definition: { fields: [dropdown] },
-      })
-    ).toThrow(/dynamic options are not supported/)
-  })
+    const result = buildFormTriggerActivityParameters({
+      form_definition: { fields: [dropdown] },
+    })
 
-  it('throws when form definition fails validation', () => {
-    expect(() =>
-      buildFormTriggerActivityParameters({
-        form_definition: { fields: [] },
-      })
-    ).toThrow()
+    expect((result.form_definition as { fields: unknown[] }).fields).toHaveLength(1)
   })
 })

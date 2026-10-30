@@ -192,7 +192,14 @@ describe('WorkflowDialogs', () => {
       runDialog: createDialogState(mockWorkflow(), true),
     })
 
+    await waitFor(() => {
+      expect(vi.mocked(workflowFetchClient.GET)).toHaveBeenCalled()
+    })
     await screen.findByRole('button', { name: 'Run now' })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, WORKFLOW_LIST_RUN_PREPARING_DELAY_MS))
+      await Promise.resolve()
+    })
     expect(await axe(container)).toHaveNoViolations()
   })
 

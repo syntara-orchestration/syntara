@@ -3,15 +3,36 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
+import { FormFieldTypeEnum } from '../../../forms'
+import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 
 import { FormPromptNodeDetails } from './FormPromptNodeDetails'
 
 const mockUpdateActivity = vi.fn()
+
+const validStoredDefinition = {
+  fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name' }],
+}
+
+function buildStoreState(activityParameters?: Record<string, unknown>) {
+  return {
+    updateActivity: mockUpdateActivity,
+    currentWorkflow: {
+      workflow: {
+        activities: [
+          {
+            id: 'form-1',
+            parameters: activityParameters ?? { form_definition: createEmptyFormDefinition() },
+          },
+        ],
+      },
+    },
+  }
+}
+
 vi.mock('../../../stores/useWorkflowStore', () => ({
-  useWorkflowStore: vi.fn((selector?: (store: { updateActivity: typeof mockUpdateActivity }) => unknown) => {
-    const store = {
-      updateActivity: mockUpdateActivity,
-    }
+  useWorkflowStore: vi.fn((selector?: (state: ReturnType<typeof useWorkflowStore.getState>) => unknown) => {
+    const store = buildStoreState() as unknown as ReturnType<typeof useWorkflowStore.getState>
     return selector ? selector(store) : store
   }),
 }))
@@ -25,6 +46,7 @@ vi.mock('../../../providers/alerts', () => ({
 }))
 
 let mockOnSubmitHandler: ((data: Record<string, unknown>) => void) | null = null
+let mockInitialData: Record<string, unknown> | undefined
 
 vi.mock('../node-forms/FormPromptNodeForm', () => ({
   FormPromptNodeForm: ({
@@ -35,6 +57,7 @@ vi.mock('../node-forms/FormPromptNodeForm', () => ({
     initialData?: Record<string, unknown>
   }) => {
     mockOnSubmitHandler = onSubmit
+    mockInitialData = initialData
     return (
       <div data-testid="form-prompt-node-form">
         <span data-testid="initial-name">{initialData?.name as string}</span>
@@ -57,6 +80,11 @@ describe('FormPromptNodeDetails Component', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockOnSubmitHandler = null
+    mockInitialData = undefined
+    vi.mocked(useWorkflowStore).mockImplementation((selector) => {
+      const store = buildStoreState() as unknown as ReturnType<typeof useWorkflowStore.getState>
+      return selector ? selector(store) : store
+    })
   })
 
   it('renders FormPromptNodeForm', () => {
@@ -71,10 +99,39 @@ describe('FormPromptNodeDetails Component', () => {
     expect(screen.getByTestId('initial-name')).toHaveTextContent('Survey')
   })
 
-  it('calls updateActivity when form submits', () => {
-    render(<FormPromptNodeDetails taskData={createTaskData()} nodeId="form-1" onClose={mockOnClose} />)
+  it('calls onFormDefinitionCommitted when opening with a valid stored definition', () => {
+    const onFormDefinitionCommitted = vi.fn()
+    vi.mocked(useWorkflowStore).mockImplementation((selector) => {
+      const store = buildStoreState({ form_definition: validStoredDefinition }) as unknown as ReturnType<
+        typeof useWorkflowStore.getState
+      >
+      return selector ? selector(store) : store
+    })
 
-    const form_definition = createEmptyFormDefinition()
+    render(
+      <FormPromptNodeDetails
+        taskData={createTaskData({ parameters: { form_definition: createEmptyFormDefinition() } })}
+        nodeId="form-1"
+        onClose={mockOnClose}
+        onFormDefinitionCommitted={onFormDefinitionCommitted}
+      />
+    )
+
+    expect(onFormDefinitionCommitted).toHaveBeenCalledWith('form-1', validStoredDefinition)
+  })
+
+  it('calls updateActivity and onFormDefinitionCommitted when form submits', () => {
+    const onFormDefinitionCommitted = vi.fn()
+    render(
+      <FormPromptNodeDetails
+        taskData={createTaskData()}
+        nodeId="form-1"
+        onClose={mockOnClose}
+        onFormDefinitionCommitted={onFormDefinitionCommitted}
+      />
+    )
+
+    const form_definition = validStoredDefinition
     mockOnSubmitHandler?.({
       name: 'Updated survey',
       form_definition,
@@ -94,6 +151,7 @@ describe('FormPromptNodeDetails Component', () => {
         }),
       })
     )
+    expect(onFormDefinitionCommitted).toHaveBeenCalledWith('form-1', form_definition)
     expect(mockOnClose).toHaveBeenCalledTimes(1)
   })
 
@@ -107,6 +165,26 @@ describe('FormPromptNodeDetails Component', () => {
     )
 
     expect(screen.getByTestId('form-prompt-node-form')).toBeInTheDocument()
+  })
+
+  it('loads draft form_definition when strict validation would fail', () => {
+    const draftDefinition = {
+      fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'draft_field', label: '' }],
+    }
+    vi.mocked(useWorkflowStore).mockImplementation((selector) => {
+      const store = buildStoreState({ form_definition: draftDefinition }) as unknown as ReturnType<
+        typeof useWorkflowStore.getState
+      >
+      return selector ? selector(store) : store
+    })
+
+    render(<FormPromptNodeDetails taskData={createTaskData()} nodeId="form-1" onClose={mockOnClose} />)
+
+    expect(mockInitialData?.form_definition).toEqual(
+      expect.objectContaining({
+        fields: [expect.objectContaining({ value_name: 'draft_field', label: '' })],
+      })
+    )
   })
 
   it('shows error when updateActivity throws', () => {

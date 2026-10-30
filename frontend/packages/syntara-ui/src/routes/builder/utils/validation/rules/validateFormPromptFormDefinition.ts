@@ -1,6 +1,6 @@
 import { ActivityTypeEnum, type Activity } from '@syntara/contracts'
 
-import { safeParseFormDefinition } from '../../../../../forms'
+import { humanizeFormDefinitionValidationError, safeParseFormDefinition } from '../../../../../forms'
 import type { EdgeConnection } from '../../../types/edge'
 import type { ValidationContext, ValidationError } from '../types'
 
@@ -22,14 +22,15 @@ export function validateFormPromptFormDefinition(
     if (parsed.success) continue
 
     const nodeName = activity.name ?? activity.id
-    const detail = parsed.errors[0]?.message ?? 'Form definition is invalid'
-    errors.push({
-      id: `form-prompt-definition-${activity.id}`,
-      severity: 'error',
-      rule: 'form-prompt-form-definition',
-      message: `Form "${nodeName}" has an invalid form definition: ${detail}`,
-      nodeId: activity.id,
-    })
+    for (const [index, finding] of parsed.errors.entries()) {
+      errors.push({
+        id: `form-prompt-definition-${activity.id}-${index}`,
+        severity: 'error',
+        rule: 'form-prompt-form-definition',
+        message: `Form "${nodeName}": ${humanizeFormDefinitionValidationError(finding)}`,
+        nodeId: activity.id,
+      })
+    }
   }
 
   return errors
