@@ -293,7 +293,7 @@ export function useActivityNameMap(
     return sortActivityOrder(unsorted, workflowDefinition?.edges, activityStates)
   }, [activityStates, nameMap, typeMap, workflowDefinition])
 
-  return { nameMap, activityOrder }
+  return { nameMap, typeMap, activityOrder }
 }
 
 export function resolveStepName(nameMap: Map<string, string>, nodeId?: string | null): string | undefined {

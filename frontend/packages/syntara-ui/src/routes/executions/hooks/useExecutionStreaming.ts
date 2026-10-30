@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import { detachPromise } from '../../../utils/detachPromise'
+import { resolveRetryReplayBaseline } from '../../builder/utils/replayedNodes'
 import { useExecutionWebSocket } from '../../workflows/hooks/useExecutionWebSocket'
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
 
@@ -43,7 +44,17 @@ export function useSyncActivityStore(
   execution: Execution | undefined,
   activities: (ActivityData | ActivityExecution)[]
 ) {
-  const { setActivityExecutions, injectPendingStates } = useExecutionStore.getState()
+  const { setActivityExecutions, injectPendingStates, setRetryReplayBaseline } = useExecutionStore.getState()
+
+  // Terminal retried runs never stream, so `visualization` (and the replay
+  // baseline it carries) is never populated. Resolve the baseline from REST so
+  // replay indicators render on the detail page for completed/failed retries.
+  const retriedFrom = execution?.retried_from_execution_id ?? null
+  const createdAt = execution?.created_at
+  useEffect(() => {
+    setRetryReplayBaseline(resolveRetryReplayBaseline(createdAt, retriedFrom))
+  }, [createdAt, retriedFrom, setRetryReplayBaseline])
+
   useEffect(() => {
     if (activities.length > 0) {
       setActivityExecutions(activities)

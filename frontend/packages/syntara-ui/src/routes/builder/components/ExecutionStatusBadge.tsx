@@ -19,6 +19,8 @@ type ExecutionStatusBadgeProps = {
   status: ActivityStatus
   retryCount?: number
   nodeType?: string
+  /** True when this step reused a previous run's output instead of executing. */
+  replayed?: boolean
 }
 
 type VisualStatus = 'pending' | 'running' | 'waiting' | 'success' | 'error' | 'skipped' | 'cancelled'
@@ -93,11 +95,23 @@ function normalizeStatus(status: ActivityStatus, nodeType?: string): { visualSta
 /**
  * Visual indicator for activity execution status on workflow steps (canvas).
  * Renders as a circular badge positioned in the bottom-right corner of the step.
+ *
+ * A replayed step keeps its terminal status but gets a dashed ring and a
+ * "reused" suffix, so a retried run does not read as though every step ran
+ * again. The text carries the meaning rather than the ring alone.
  */
-export function ExecutionStatusBadge({ status, retryCount, nodeType }: Readonly<ExecutionStatusBadgeProps>) {
+export function ExecutionStatusBadge({
+  status,
+  retryCount,
+  nodeType,
+  replayed = false,
+}: Readonly<ExecutionStatusBadgeProps>) {
   const normalized = normalizeStatus(status, nodeType)
   const config = visualStatusConfig[normalized.visualStatus]
-  const title = retryCount ? `${normalized.label} (${retryCount} retries)` : normalized.label
+
+  const baseTitle = retryCount ? `${normalized.label} (${retryCount} retries)` : normalized.label
+  const title = replayed ? `${baseTitle} — reused output from a previous run` : baseTitle
+  const borderStyle = replayed ? 'dashed' : (config.borderStyle ?? 'solid')
 
   return (
     <div
@@ -110,7 +124,7 @@ export function ExecutionStatusBadge({ status, retryCount, nodeType }: Readonly<
         borderRadius: '50%',
         backgroundColor: 'var(--pf-t--global--background--color--primary--default)',
         borderColor: config.color,
-        borderStyle: config.borderStyle ?? 'solid',
+        borderStyle,
         borderWidth: '2px',
         display: 'flex',
         alignItems: 'center',
@@ -118,6 +132,7 @@ export function ExecutionStatusBadge({ status, retryCount, nodeType }: Readonly<
         zIndex: 10,
       }}
       data-execution-badge=""
+      data-replayed={replayed ? '' : undefined}
       title={title}
       role="img"
       aria-label={title}

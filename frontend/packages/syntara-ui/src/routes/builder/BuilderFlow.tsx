@@ -9,7 +9,7 @@ import {
   selectTriggers,
   selectActivities,
 } from '../../stores/useWorkflowStore'
-import { useExecutionStore } from '../workflows/stores/useExecutionStore'
+import { useExecutionStore, selectRetryReplayBaseline } from '../workflows/stores/useExecutionStore'
 
 import { ActiveExecutionContext } from './ActiveExecutionContext'
 import { BuilderFlowCanvas } from './BuilderFlowCanvas'
@@ -51,6 +51,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
   const triggers = useWorkflowStore(selectTriggers)
   const activities = useWorkflowStore(selectActivities)
   const activityStates = useExecutionStore((state) => state.activityStates)
+  const replayBaselineAt = useExecutionStore(selectRetryReplayBaseline)
   const reactFlowInstance = useReactFlow()
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -74,6 +75,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
     workflowVersion,
     preResolvedNodes,
     skipInferenceActivityIds: copiedRunActivityIds,
+    replayBaselineAt,
   })
 
   const { nodes, edges, setNodes, setEdges, isDeletingRef } = useWorkflowGraphInit({
@@ -154,6 +156,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
       activityStates,
       preResolvedNodes,
       copiedRunActivityIds,
+      replayBaselineAt,
       validationErrors,
       buttonEdgeExecutionStatus,
     },

@@ -21,6 +21,7 @@ import {
   selectLastEventId,
   selectError,
   selectIsLoaded,
+  selectRetryReplayBaseline,
   useExecutionWithLiveStatus,
 } from './useExecutionStore'
 
@@ -497,6 +498,35 @@ describe('useExecutionStore', () => {
 
       const isLoaded = selectIsLoaded(useExecutionStore.getState())
       expect(isLoaded).toBe(false)
+    })
+
+    it('selectRetryReplayBaseline falls back to the REST baseline for terminal runs', () => {
+      // No streaming visualization (as on a terminal retried run's detail page),
+      // but the ExecutionDetail page supplied a baseline from REST.
+      useExecutionStore.getState().reset()
+      useExecutionStore.getState().setRetryReplayBaseline('2025-12-10T15:00:00Z')
+
+      const baseline = selectRetryReplayBaseline(useExecutionStore.getState())
+      expect(baseline).toBe('2025-12-10T15:00:00Z')
+    })
+
+    it('selectRetryReplayBaseline prefers streaming visualization over the REST baseline', () => {
+      const execution = createMockExecution({
+        created_at: '2025-12-10T15:00:00Z',
+        retried_from_execution_id: 'exec-source',
+      })
+      useExecutionStore.getState().setExecution(execution)
+      useExecutionStore.getState().setRetryReplayBaseline('1999-01-01T00:00:00Z')
+
+      const baseline = selectRetryReplayBaseline(useExecutionStore.getState())
+      expect(baseline).toBe('2025-12-10T15:00:00Z')
+    })
+
+    it('selectRetryReplayBaseline is null for a run that is not a retry', () => {
+      useExecutionStore.getState().reset()
+
+      const baseline = selectRetryReplayBaseline(useExecutionStore.getState())
+      expect(baseline).toBeNull()
     })
   })
 

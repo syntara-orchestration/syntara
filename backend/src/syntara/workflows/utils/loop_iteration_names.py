@@ -22,6 +22,16 @@ def strip_iteration_suffix(activity_name: str) -> str:
     return base or activity_name
 
 
+def strip_all_iteration_suffixes(activity_name: str) -> str:
+    """Normalize a nested loop-iteration activity name to its base node id."""
+    while LOOP_ITERATION_SEP in activity_name:
+        base = strip_iteration_suffix(activity_name)
+        if base == activity_name:
+            break
+        activity_name = base
+    return activity_name
+
+
 def has_iteration_suffix(activity_name: str) -> bool:
     """Whether an activity name carries a loop-iteration suffix."""
     return LOOP_ITERATION_SEP in activity_name

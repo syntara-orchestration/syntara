@@ -79,6 +79,15 @@ describe('useActivityNameMap', () => {
     expect(result.current.nameMap.get('task-1')).toBe('Store Name')
   })
 
+  it('returns the workflow node type map for execution labels', () => {
+    vi.mocked(useActivities).mockReturnValue([{ id: 'task-1', name: 'Store Name', type: 'script' }] as never)
+    vi.mocked(useTriggers).mockReturnValue([])
+
+    const { result } = renderHook(() => useActivityNameMap(null, activityStates))
+
+    expect(result.current.typeMap.get('task-1')).toBe('script')
+  })
+
   it('includes triggers from store in name map', () => {
     vi.mocked(useActivities).mockReturnValue([])
     vi.mocked(useTriggers).mockReturnValue([
