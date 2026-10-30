@@ -279,14 +279,21 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
         return (bounds.top + bounds.bottom) / 2
       })
       expect(Math.abs(outputSearchCenter - outputViewToggleCenter)).toBeLessThan(2)
+      expect(Math.abs(searchCenter - outputSearchCenter)).toBeLessThan(2)
+      expect(Math.abs(viewToggleCenter - outputViewToggleCenter)).toBeLessThan(2)
 
       await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
       await expect(app.getByRole('textbox', { name: /Input parameters for/ })).toHaveValue(/echo retry/)
       await expect(app.getByRole('button', { name: 'Reset parameters' })).toBeVisible()
-      await app
-        .getByTestId('retry-input-override-editor')
-        .getByRole('button', { name: 'Cancel' })
-        .click()
+      const editorScrollArea = app.getByTestId('retry-input-override-scroll-area')
+      const editorCanScroll = await editorScrollArea.evaluate((element) => element.scrollHeight > element.clientHeight)
+      expect(editorCanScroll).toBe(true)
+      await editorScrollArea.evaluate((element) => {
+        element.scrollTop = element.scrollHeight
+      })
+      await expect.poll(() => editorScrollArea.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+      await expect(app.getByRole('button', { name: 'Save parameters for retry' })).toBeInViewport()
+      await app.getByTestId('retry-input-override-editor').getByRole('button', { name: 'Cancel' }).click()
       await expect(app.getByText('Edited for retry')).toBeVisible()
       await app.screenshot({ path: testInfo.outputPath('retry-input-overrides-saved.png') })
 

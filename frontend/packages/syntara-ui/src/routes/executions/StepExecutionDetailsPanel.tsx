@@ -79,6 +79,7 @@ type DataPaneProps = {
   view: PanelView
   onViewChange: (view: PanelView) => void
   titleAddon?: ReactNode
+  reserveTitleAddonSpace?: boolean
   className?: string
   isErrorState?: boolean
 }
@@ -90,6 +91,7 @@ function DataPane({
   view,
   onViewChange,
   titleAddon,
+  reserveTitleAddonSpace = false,
   className,
   isErrorState = false,
 }: Readonly<DataPaneProps>) {
@@ -137,18 +139,12 @@ function DataPane({
   return (
     <Stack className={`${styles.contentContainer}${className ? ` ${className}` : ''}`}>
       <StackItem className={styles.dataPaneHeaderRow}>
-        <Flex alignItems={{ default: 'alignItemsFlexStart' }} gap={{ default: 'gapSm' }} flexWrap={{ default: 'wrap' }}>
-          <FlexItem flex={{ default: 'flexNone' }} className={styles.dataPaneTitle}>
-            <Flex
-              alignItems={{ default: 'alignItemsCenter' }}
-              gap={{ default: 'gapSm' }}
-              flexWrap={{ default: 'wrap' }}
-            >
-              <FlexItem>{title}</FlexItem>
-              {titleAddon && <FlexItem>{titleAddon}</FlexItem>}
-            </Flex>
-          </FlexItem>
-          <FlexItem className={styles.dataPaneControlsWrap}>
+        <div className={styles.dataPaneHeader}>
+          <div className={styles.dataPaneTitleRow}>
+            <span className={styles.dataPaneTitle}>{title}</span>
+          </div>
+          {(titleAddon || reserveTitleAddonSpace) && <div className={styles.dataPaneTitleAddonRow}>{titleAddon}</div>}
+          <div className={styles.dataPaneControlsWrap}>
             <Flex
               alignItems={{ default: 'alignItemsCenter' }}
               gap={{ default: 'gapSm' }}
@@ -167,8 +163,8 @@ function DataPane({
                 <ViewToggle activeView={view} onChange={onViewChange} ariaLabel={`${title} view selection`} />
               </FlexItem>
             </Flex>
-          </FlexItem>
-        </Flex>
+          </div>
+        </div>
       </StackItem>
       <StackItem isFilled className={styles.scrollPane}>
         <div ref={scrollContainerRef}>{renderContent()}</div>
@@ -398,9 +394,14 @@ function StepContentArea({
               data={effectiveInputData}
               view={inputView}
               onViewChange={setInputView}
+              reserveTitleAddonSpace
               className={styles.retryParametersViewer}
               titleAddon={
-                <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
+                <Flex
+                  alignItems={{ default: 'alignItemsCenter' }}
+                  gap={{ default: 'gapSm' }}
+                  flexWrap={{ default: 'nowrap' }}
+                >
                   {hasSavedRetryOverride && (
                     <FlexItem>
                       <SynLabel color="blue">Edited for retry</SynLabel>
@@ -448,6 +449,7 @@ function StepContentArea({
           data={outputData}
           view={outputView}
           onViewChange={setOutputView}
+          reserveTitleAddonSpace={Boolean(retryEditorProps)}
           isErrorState={stepIsFailed}
         />
       </FlexItem>

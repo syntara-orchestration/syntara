@@ -1,7 +1,6 @@
 .dataPaneTitle {
+  display: block;
   font-weight: var(--pf-t--global--font--weight--body--bold);
-  /* Keep both pane titles aligned when the input pane has a badge and edit action. */
-  min-width: 5.5rem;
 }
 
 .auditStrip {
@@ -25,8 +24,24 @@
   padding-bottom: var(--pf-t--global--spacer--sm);
 }
 
+.dataPaneHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--xs);
+}
+
+.dataPaneTitleRow {
+  min-height: 1.5rem;
+}
+
+.dataPaneTitleAddonRow {
+  display: flex;
+  align-items: center;
+  min-height: 2.25rem;
+}
+
 .dataPaneControlsWrap {
-  flex: 1 0 100%;
+  width: 100%;
   min-width: 0;
 }
 

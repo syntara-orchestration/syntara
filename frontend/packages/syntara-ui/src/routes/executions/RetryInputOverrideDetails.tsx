@@ -96,7 +96,7 @@ export function RetryInputOverrideDetails({
           Edits apply to this retry only. The original run and saved workflow definition remain unchanged.
         </Content>
       </StackItem>
-      <StackItem isFilled className={styles.editorItem}>
+      <StackItem isFilled className={styles.editorItem} data-testid="retry-input-override-scroll-area">
         <FormGroup label="Input parameters (JSON)" fieldId={`retry-input-override-${target.id}`}>
           <TextArea
             id={`retry-input-override-${target.id}`}
