@@ -50,8 +50,12 @@ vi.mock('./useAuthProviders', () => ({
 function renderWithAlerts(ui: React.ReactNode, colorScheme: ColorSchemeContextValue['colorScheme'] = 'light') {
   const schemeCtx: ColorSchemeContextValue = {
     colorScheme,
+    colorSchemePreference: colorScheme,
     setColorScheme: vi.fn(),
     toggleColorScheme: vi.fn(),
+    contrastMode: 'glass',
+    contrastPreference: 'system',
+    setContrastMode: vi.fn(),
   }
   return render(
     <BrandProvider>
