@@ -23,7 +23,15 @@ EP_IMAGE="${EP_IMAGE:-localhost/execution-plane:latest}"
 EP_REPOSITORY="${EP_REPOSITORY:-../../syntara-execution-plane}"
 EP_API_PORT="${EP_API_PORT:-8001}"
 EP_KIND_CLUSTER="${EP_KIND_CLUSTER:-ep-kind}"
-NODE_IMAGE="${NODE_IMAGE:-quay.io/ahetheri/syntara-node-script:migration-test}"
+# Node image dispatched by the EP worker. The default is the SDK script image
+# built from the Execution Plane checkout (tests/fixtures/sdk_script); it must
+# match the workload protocol the EP build speaks.
+NODE_IMAGE="${NODE_IMAGE:-localhost/syntara-sdk-script:dev}"
+# Set for the compose up so AO dispatches script nodes to NODE_IMAGE.
+EP_NODE_IMAGES_ENV=""
+if [[ "${E2E_EP}" == "1" ]]; then
+    EP_NODE_IMAGES_ENV="{\"script\":\"${NODE_IMAGE}\"}"
+fi
 # Must match the EP API's EP_AO_JWT_ISSUER, which follows AO's jwt_issuer:
 # APP_SERVER_PUBLIC_URL when set (backend/.env wins over the compose default)
 # or the https://0.0.0.0:8000 fallback.
@@ -75,6 +83,7 @@ APP_SEGMENT_MAX_RETRIES=2 \
 APP_SEGMENT_TIMEOUT=5 \
 APP_COLLECTION_INTERVAL_SECONDS=10 \
 APP_INTEGRATION_URL_ALLOWED_HOSTS='["mcp-server"]' \
+APP_NODE_CONTAINER_IMAGES="${EP_NODE_IMAGES_ENV}" \
 ${COMPOSE_CMD} --profile telemetry-e2e --profile mcp-scenarios up -d --force-recreate temporal temporal-worker temporal-background-worker mock-segment mcp-server mcp-server-scenarios syntara ${EP_SERVICES[*]+"${EP_SERVICES[@]}"} \
     >> /tmp/syntara-e2e-infra.log 2>&1
 
@@ -151,6 +160,8 @@ if [[ "${E2E_EP}" == "1" ]]; then
         echo "❌ 'kind' is required for the Execution Plane e2e mode (install it or add it to PATH)" >&2
         exit 1
     }
+    # kind defaults to the Docker daemon; use podman when Docker is absent.
+    export KIND_EXPERIMENTAL_PROVIDER="${KIND_EXPERIMENTAL_PROVIDER:-$([[ -z "$(command -v docker)" ]] && echo podman)}"
 
     echo "🛫 Bringing up the Execution Plane..."
     if ! podman image exists "${EP_IMAGE}"; then
@@ -189,12 +200,19 @@ if [[ "${E2E_EP}" == "1" ]]; then
             --wait-for-api 60
     )
 
-    echo "📦 Pre-pulling ${NODE_IMAGE} on the ${EP_KIND_CLUSTER} node..."
-    if podman exec "${EP_KIND_CLUSTER}-control-plane" crictl pull "${NODE_IMAGE}"; then
-        echo "✅ Node image pre-pulled"
-    else
-        echo "⚠️  Pre-pull failed; the Job will pull ${NODE_IMAGE} itself at dispatch time"
+    echo "📦 Preparing the ${NODE_IMAGE} node image on the ${EP_KIND_CLUSTER} node..."
+    if ! podman image exists "${NODE_IMAGE}"; then
+        echo "📦 Building ${NODE_IMAGE} from ${EP_REPOSITORY}/tests/fixtures/sdk_script..."
+        podman build -t "${NODE_IMAGE}" "${EP_REPOSITORY}/tests/fixtures/sdk_script"
     fi
+    NODE_ARCHIVE=$(mktemp --suffix=.tar)
+    if podman save --output "${NODE_ARCHIVE}" "${NODE_IMAGE}" \
+        && kind load image-archive "${NODE_ARCHIVE}" --name "${EP_KIND_CLUSTER}"; then
+        echo "✅ Node image loaded into ${EP_KIND_CLUSTER}"
+    else
+        echo "⚠️  Could not load ${NODE_IMAGE} into ${EP_KIND_CLUSTER}; the Job will pull it itself at dispatch time" >&2
+    fi
+    rm -f "${NODE_ARCHIVE}"
 fi
 
 API="https://localhost:8000/api/v1"
