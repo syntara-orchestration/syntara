@@ -93,9 +93,8 @@ export function TaskStepComponent(props: NodeProps<TaskNode>) {
       topBarColor={iconColor}
       semanticZoomSummary={getTaskSemanticLabels(props.data)}
       semanticZoomIcon={getTaskCanvasIcon(props.data, iconColor, 'semanticZoom')}
-      semanticZoomPreviewIcon={getTaskCanvasIcon(props.data, iconColor, 'canvas')}
+      semanticZoomPreviewIcon={getTaskCanvasIcon(props.data, iconColor, 'header')}
       semanticZoomMenuActions={menuActions}
-      semanticZoomExpandable
     >
       <TaskActivityDetails
         data={props.data}
@@ -122,7 +121,7 @@ export function TaskActivityDetails(
 
   const executorMeta = executorMetadata[actualExecutor] ?? executorMetadata[props.data.type ?? '']
   const { id: iconId } = getTaskIconDescriptor(props.data)
-  const iconNode = renderStepIcon(executorMeta?.icon, iconId, 'canvas', props.iconColor)
+  const iconNode = renderStepIcon(executorMeta?.icon, iconId, 'header', props.iconColor)
   const taskExecutorLabel = executorMeta?.label ?? 'Task'
   const taskExecutor = actualExecutor || (props.data.type ?? '')
   const config = props.data.parameters ?? {}

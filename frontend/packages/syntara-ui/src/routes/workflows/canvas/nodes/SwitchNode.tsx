@@ -54,7 +54,7 @@ export type SwitchNode = { type: 'switch' } & Node<SwitchActivity>
 export function SwitchStepComponent(props: NodeProps<SwitchNode>) {
   const metadata = stepMetadata.switch
   const iconColor = getStepTypeColor('switch')
-  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_SWITCH, 'canvas', iconColor)
+  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_SWITCH, 'header', iconColor)
   const semanticZoomIcon = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_SWITCH, 'semanticZoom', iconColor)
   const menuActions = useStepMenuActions({
     nodeId: props.data.id,
@@ -97,7 +97,6 @@ export function SwitchStepComponent(props: NodeProps<SwitchNode>) {
       semanticZoomIcon={semanticZoomIcon}
       semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
-      semanticZoomExpandable={metadata.expandable}
     >
       <SwitchStepDetails switchActivity={props.data} icon={iconNode} menuActions={menuActions}>
         <BranchHandles>

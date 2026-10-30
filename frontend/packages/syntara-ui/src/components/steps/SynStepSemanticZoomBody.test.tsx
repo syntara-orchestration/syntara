@@ -112,6 +112,7 @@ describe('SynStepSemanticZoomBody', () => {
     expect(screen.getByText('Task Agent')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Edit Analyze Data' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Step actions menu' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /expand|collapse/i })).not.toBeInTheDocument()
   })
 
   it('shows full preview when compact tile receives keyboard focus', async () => {

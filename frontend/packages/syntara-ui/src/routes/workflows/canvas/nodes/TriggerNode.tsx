@@ -44,7 +44,7 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
     iconId = 'trigger-eda'
   }
   const iconColor = getStepTypeColor(FlowNodeType.TRIGGER)
-  const iconNode = renderStepIcon(metadata.icon, iconId, 'canvas', iconColor)
+  const iconNode = renderStepIcon(metadata.icon, iconId, 'header', iconColor)
   const semanticZoomIcon = renderStepIcon(metadata.icon, iconId, 'semanticZoom', iconColor)
   // 75px is a layout constraint for the left pill shape. No semantic token applies.
   // High contrast draws the panel edge on ::before from --pf-v6-c-panel--BorderRadius.
@@ -105,7 +105,6 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
       semanticZoomIcon={semanticZoomIcon}
       semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
-      semanticZoomExpandable={metadata.expandable}
     >
       <TriggerStepDetails
         icon={iconNode}
@@ -141,6 +140,9 @@ function TriggerStepDetails(
     triggerTypeLabel = 'Event-Driven Ansible trigger'
   }
 
+  const isManualTrigger = props.triggerKind == null || props.triggerKind === TriggerTypeEnum.MANUAL_TRIGGER
+  const showTriggerDetails = !isManualTrigger && normalizedDetails != null && normalizedDetails !== ''
+
   return (
     <>
       <StandardStepHeader
@@ -150,13 +152,13 @@ function TriggerStepDetails(
         menuActions={props.menuActions}
         expandable={false}
       />
-      <SynStepBody>
-        {normalizedDetails ? (
+      {showTriggerDetails ? (
+        <SynStepBody>
           <Content component={ContentVariants.small} style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>
             {normalizedDetails}
           </Content>
-        ) : null}
-      </SynStepBody>
+        </SynStepBody>
+      ) : null}
     </>
   )
 }

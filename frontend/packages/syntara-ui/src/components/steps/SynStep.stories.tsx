@@ -44,7 +44,7 @@ function SemanticZoomNode(props: NodeProps<SemanticZoomFlowNode>) {
   const semanticZoomPreviewIcon = renderStepIcon(
     stepMetadata.condition.icon,
     RegistryStepId.LOGIC_CONDITION,
-    'canvas',
+    'header',
     iconColor
   )
   return (

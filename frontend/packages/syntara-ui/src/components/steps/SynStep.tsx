@@ -101,8 +101,6 @@ export function SynStep(props: {
   semanticZoomPreviewIcon?: React.ReactNode
   /** Kebab menu actions for semantic zoom (Edit uses the view-details action when present). */
   semanticZoomMenuActions?: readonly StepMenuAction[]
-  /** When true, semantic zoom preview shows the expand/collapse control. */
-  semanticZoomExpandable?: boolean
   /** Branch source handles at semantic zoom (no labels; stacked on the tile edge) */
   semanticZoomBranchSources?: readonly SemanticZoomBranchSource[]
   /** Optional stable hook for tests (e.g. canvas node root) */
@@ -150,7 +148,7 @@ export function SynStep(props: {
   }, [expandAllEvent, collapseAllEvent, expandedContext, isCollapsible])
 
   const isSelected = props.nodeProps.selected
-  const nodeWidth = getSynStepNodeWidth(isSemanticZoom, props.nodeProps)
+  const nodeWidth = getSynStepNodeWidth()
 
   const semanticZoomHandleTop = SEMANTIC_ZOOM_TILE_HANDLE_TOP_PX
   const summary = props.semanticZoomSummary
@@ -235,6 +233,7 @@ export function SynStep(props: {
         variant="raised"
         className={panelClassName || undefined}
         data-testid={props.rootTestId}
+        data-syn-step-root=""
         style={panelStyle}
         tabIndex={isSemanticZoom ? undefined : 0}
       >
@@ -246,7 +245,6 @@ export function SynStep(props: {
             icon={props.semanticZoomIcon}
             previewIcon={props.semanticZoomPreviewIcon}
             menuActions={props.semanticZoomMenuActions}
-            expandable={props.semanticZoomExpandable}
             branchSources={props.semanticZoomBranchSources}
             selected={isSelected}
             hasDashedBorder={props.hasDashedBorder ?? false}
