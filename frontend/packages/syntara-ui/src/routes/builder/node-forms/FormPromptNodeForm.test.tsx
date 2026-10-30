@@ -135,7 +135,8 @@ describe('FormPromptNodeForm', () => {
 
       await user.click(screen.getByRole('tab', { name: 'Settings' }))
 
-      expect(screen.getByText('Expected duration (seconds)')).toBeInTheDocument()
+      expect(screen.queryByText('Expected duration (seconds)')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'On failure behavior' })).toBeInTheDocument()
     })
 
     it('enables continue on failure from the fallback guidance link', async () => {
@@ -220,7 +221,6 @@ describe('FormPromptNodeForm', () => {
             fallback_decision: 'fallback',
             submit_label: 'Send',
             success_message: 'Thanks',
-            timezone: 'America/New_York',
           }}
         />
       )
@@ -242,7 +242,6 @@ describe('FormPromptNodeForm', () => {
           fallback_decision: 'fallback',
           submit_label: 'Send',
           success_message: 'Thanks',
-          timezone: 'America/New_York',
         })
       )
     })

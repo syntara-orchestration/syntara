@@ -777,13 +777,19 @@ export function BuilderContent(props: BuilderContentProps) {
                       projectId={builderProjectId}
                       workflowMetadata={workflowMetadata}
                       onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
+                      validationErrors={state.validationErrors}
                     />
                   </NodeEditorAutoSubmitContext.Provider>
                 </Flex>
               </StackItem>
             </SynReactFlowViewportGuard>
 
-            <BuilderDialogs {...dialogProps} conflictDialogProps={conflictDialogProps} />
+            <BuilderDialogs
+              {...dialogProps}
+              canRun={builderPermissions.canRun}
+              runTooltip={builderPermissions.tooltips.run}
+              conflictDialogProps={conflictDialogProps}
+            />
             <UnsavedStepEditorDialog
               isOpen={unsavedStepEditorDialogOpen}
               onClose={() => dispatch({ type: 'SET_UNSAVED_STEP_EDITOR_DIALOG', payload: false })}

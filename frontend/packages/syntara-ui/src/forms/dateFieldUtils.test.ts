@@ -44,7 +44,7 @@ describe('dateFieldUtils', () => {
     })
   })
 
-  it('prepareFormDefinitionForCommit repairs time without timezone for API validation', () => {
+  it('prepareFormDefinitionForCommit preserves date and time without timezone', () => {
     const prepared = prepareFormDefinitionForCommit({
       fields: [
         {
@@ -63,7 +63,7 @@ describe('dateFieldUtils', () => {
       const field = parsed.data.fields[0]
       expect(field.type).toBe('date')
       if (field.type === 'date') {
-        expect(field.include_timezone).toBe(true)
+        expect(field.include_timezone).toBe(false)
       }
     }
   })

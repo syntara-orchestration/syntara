@@ -147,7 +147,7 @@ class DateValue(BaseModel):
 # the field may be skipped entirely is the inherited `required` flag, exactly as
 # for every other field type.
 class DateField(FormFieldBase):
-    """Date field collecting any combination of date, time, and timezone."""
+    """Date field collecting a valid combination of date, time, and timezone."""
 
     type: Literal["date"]
     include_date: bool = Field(
@@ -156,7 +156,7 @@ class DateField(FormFieldBase):
     )
     include_time: bool = Field(
         default=False,
-        description="Collect a 24-hour time. Requires include_timezone.",
+        description="Collect a 24-hour time in HH:MM format.",
     )
     include_timezone: bool = Field(
         default=False,
@@ -183,7 +183,7 @@ class DateField(FormFieldBase):
 
     @model_validator(mode="after")
     def _check_included_components(self) -> DateField:
-        """Require at least one component, and a timezone alongside any time."""
+        """Require at least one component. Disallow date + timezone combo."""
         if not self.included_components():
             msg = (
                 f"Field '{self.value_name}': at least one of include_date, "
@@ -191,9 +191,9 @@ class DateField(FormFieldBase):
             )
             raise SafeValueError(msg)
 
-        # A bare wall-clock time is ambiguous without the zone it is read in.
-        if self.include_time and not self.include_timezone:
-            msg = f"Field '{self.value_name}': include_timezone is required when include_time is true"
+        # Disallow date + timezone combination.
+        if self.include_date and self.include_timezone and not self.include_time:
+            msg = f"Field '{self.value_name}': Select a time when both a date and timezone are included."
             raise SafeValueError(msg)
         return self
 
@@ -343,18 +343,9 @@ class MultiSelectField(FormFieldBase):
         return defaults
 
 
-FormField = Annotated[
-    TextField
-    | TextAreaField
-    | MaskedTextField
-    | EmailField
-    | NumberField
-    | CheckboxField
-    | DateField
-    | DropdownField
-    | MultiSelectField,
-    Discriminator("type"),
-]
+CommonFormField = TextField | TextAreaField | MaskedTextField | EmailField | NumberField | CheckboxField | DateField
+
+FormField = Annotated[CommonFormField | DropdownField | MultiSelectField, Discriminator("type")]
 
 # Discriminator values for FormField and OptionsSource unions.
 # Used by validators to normalize Pydantic error paths by stripping union tags.
@@ -397,3 +388,55 @@ class FormDefinition(BaseModel):
             msg = f"Duplicate field names are not allowed: {', '.join(sorted(duplicates))}"
             raise SafeValueError(msg)
         return self
+
+
+AuthoredOptionsSource = Annotated[StaticOptions | DynamicOptions, Discriminator("source")]
+"""Option sources a user may author on a form prompt. Excludes engine-produced snapshots."""
+
+
+class FormTriggerDropdownField(DropdownField):
+    """Dropdown field on a form trigger. Static options only."""
+
+    options: StaticOptions
+
+
+class FormTriggerMultiSelectField(MultiSelectField):
+    """Multi-select field on a form trigger. Static options only."""
+
+    options: StaticOptions
+
+
+class FormPromptDropdownField(DropdownField):
+    """Dropdown field on a form prompt. Static or dynamic options; not engine-resolved."""
+
+    options: AuthoredOptionsSource
+
+
+class FormPromptMultiSelectField(MultiSelectField):
+    """Multi-select field on a form prompt. Static or dynamic options; not engine-resolved."""
+
+    options: AuthoredOptionsSource
+
+
+FormTriggerField = Annotated[
+    CommonFormField | FormTriggerDropdownField | FormTriggerMultiSelectField,
+    Discriminator("type"),
+]
+
+FormPromptField = Annotated[
+    CommonFormField | FormPromptDropdownField | FormPromptMultiSelectField,
+    Discriminator("type"),
+]
+
+
+# Override the runtime field union with authored unions; list invariance requires these assignment ignores.
+class FormTriggerDefinition(FormDefinition):
+    """Authored form definition for a form trigger; options must be static."""
+
+    fields: list[FormTriggerField] = Field(min_length=1, max_length=100)  # type: ignore[assignment]
+
+
+class FormPromptDefinition(FormDefinition):
+    """Authored form definition for a form prompt; resolved snapshots are engine-only."""
+
+    fields: list[FormPromptField] = Field(min_length=1, max_length=100)  # type: ignore[assignment]

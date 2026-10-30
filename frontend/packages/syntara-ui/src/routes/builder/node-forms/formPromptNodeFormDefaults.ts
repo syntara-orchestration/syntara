@@ -18,7 +18,6 @@ export function getFormPromptNodeFormDefaultValues(
     fallback_behavior,
     submit_label = 'Submit',
     success_message = 'Response submitted successfully.',
-    timezone,
     css_override = '',
     settings = {},
   } = initialData ?? {}
@@ -33,7 +32,6 @@ export function getFormPromptNodeFormDefaultValues(
     fallback_decision: fallback_decision ?? formPromptFallbackDecisionFromBehavior(fallback_behavior),
     submit_label: submit_label ?? undefined,
     success_message: success_message ?? undefined,
-    timezone: timezone ?? undefined,
     css_override: css_override ?? '',
     settings,
   }

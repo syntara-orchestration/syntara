@@ -32,6 +32,7 @@ import {
 import type { NodeType } from '../workflows/canvas/nodes/NodeType'
 import { renderNodeIcon } from '../workflows/canvas/nodes/renderNodeIcon'
 
+import type { ValidationError } from './builderReducer'
 import {
   ApprovalNodeDetails,
   FormPromptNodeDetails,
@@ -199,18 +200,21 @@ function renderEditModeContent(params: {
   onClose: () => void
   onHeaderContentChange: (content: ReactNode | null) => void
   projectId?: string
+  validationErrors?: ValidationError[]
 }): ReactNode {
-  const { node, currentWorkflow, onClose, onHeaderContentChange, projectId } = params
+  const { node, currentWorkflow, onClose, onHeaderContentChange, projectId, validationErrors } = params
   if (node.type === FlowNodeType.TRIGGER) {
     const triggerIdx = parseTriggerIndex(node.id) ?? 0
     const trigger = currentWorkflow?.triggers?.[triggerIdx]
     if (trigger) {
+      const triggerValidationErrors = validationErrors?.filter((err) => err.nodeId === trigger.id)
       return (
         <TriggerNodeDetails
           trigger={trigger}
           triggerIndex={triggerIdx}
           onClose={onClose}
           onHeaderContentChange={onHeaderContentChange}
+          serverValidationErrors={triggerValidationErrors}
         />
       )
     }
@@ -329,6 +333,7 @@ type NodeDetailsPanelProps = {
   onRunStep?: () => void
   readOnly?: boolean
   onNodeAdded?: () => void
+  validationErrors?: ValidationError[]
 }
 
 function createAddStepHandler(
@@ -357,6 +362,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
     onRunStep,
     readOnly,
     onNodeAdded,
+    validationErrors,
   } = props
   const { showError } = useAlerts()
   // Use typed selector for optimized subscription
@@ -509,6 +515,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
           onClose,
           onHeaderContentChange: setHeaderContent,
           projectId,
+          validationErrors,
         })}
       </Flex>
     )

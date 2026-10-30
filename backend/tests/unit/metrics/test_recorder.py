@@ -695,6 +695,25 @@ class TestRecorderPrometheus:
         records = list(recorder.query(metric_types={MetricType.FORM_PROMPT_SUBMISSION_HANDOFF}))
         assert len(records) == 1
 
+    def test_form_trigger_submission_start_updates_histogram(self, recorder: MetricsRecorder) -> None:
+        """The form-trigger submission span is observed in seconds with the execution-service label."""
+        recorder.record(
+            MetricType.FORM_TRIGGER_SUBMISSION_START,
+            250.0,
+            unit="ms",
+            component=ComponentLabel.EXECUTION_SERVICE,
+        )
+
+        sample = recorder.prometheus.form_trigger_submission_start_seconds.labels(
+            component=ComponentLabel.EXECUTION_SERVICE.value,
+        )
+        assert sample._sum.get() == pytest.approx(0.25)
+        records = list(recorder.query(metric_types={MetricType.FORM_TRIGGER_SUBMISSION_START}))
+        assert len(records) == 1
+        assert records[0].value == pytest.approx(250.0)
+        assert records[0].unit == "ms"
+        assert records[0].labels == {"component": ComponentLabel.EXECUTION_SERVICE.value}
+
     def test_form_prompt_resume_dispatch_updates_histogram(self, recorder: MetricsRecorder) -> None:
         """The form resume dispatch is observed in seconds with the workflow-engine label."""
         recorder.record(

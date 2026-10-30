@@ -17,6 +17,8 @@ from syntara.forms.models.form_fields import (
     DynamicOptions,
     EmailField,
     FormDefinition,
+    FormPromptDefinition,
+    FormTriggerDefinition,
     MaskedTextField,
     MultiSelectField,
     NumberField,
@@ -235,6 +237,98 @@ class TestFormDefinition:
         assert len(_form(_text(), _text(value_name="other")).fields) == 2
 
 
+class TestAuthoredFormDefinitions:
+    """Authored prompt/trigger models narrow the shared runtime form model."""
+
+    def test_prompt_and_trigger_keep_shared_non_selection_field_types(self) -> None:
+        fields = [
+            _text(type="text", value_name="text_value"),
+            _text(type="textarea", value_name="textarea_value"),
+            _text(type="masked_text", value_name="masked_value"),
+            _text(type="email", value_name="email_value"),
+            _text(type="number", value_name="number_value"),
+            _text(type="checkbox", value_name="checkbox_value"),
+            {"type": "date", "value_name": "date_value", "label": "Date"},
+        ]
+        runtime_definition = FormDefinition.model_validate({"fields": fields})
+        expected_field_types = [(field.type, type(field)) for field in runtime_definition.fields]
+
+        for definition_model in (FormPromptDefinition, FormTriggerDefinition):
+            authored_definition = definition_model.model_validate({"fields": fields})
+
+            assert [(field.type, type(field)) for field in authored_definition.fields] == expected_field_types
+
+    def test_prompt_allows_dynamic_options_but_rejects_resolved_options(self) -> None:
+        dynamic = FormPromptDefinition.model_validate(
+            {
+                "fields": [
+                    _text(
+                        type="dropdown",
+                        options={
+                            "source": "dynamic",
+                            "expression": "${upstream.options}",
+                            "label_key": "label",
+                            "value_key": "value",
+                        },
+                    )
+                ]
+            }
+        )
+
+        field = dynamic.fields[0]
+        assert isinstance(field, DropdownField)
+        assert isinstance(field.options, DynamicOptions)
+
+        with pytest.raises(ValidationError, match="Input tag 'dynamic_resolved'") as exc_info:
+            FormPromptDefinition.model_validate(
+                {
+                    "fields": [
+                        _text(
+                            type="dropdown",
+                            options={
+                                "source": "dynamic_resolved",
+                                "values": [{"display_label": "East", "value": "east"}],
+                            },
+                        )
+                    ]
+                }
+            )
+        assert len(exc_info.value.errors()) == 1
+
+    def test_trigger_allows_static_options_but_rejects_non_static_options(self) -> None:
+        static = FormTriggerDefinition.model_validate(
+            {
+                "fields": [
+                    _text(
+                        type="dropdown",
+                        options={"source": "static", "values": [{"display_label": "East", "value": "east"}]},
+                    )
+                ]
+            }
+        )
+
+        field = static.fields[0]
+        assert isinstance(field, DropdownField)
+        assert isinstance(field.options, StaticOptions)
+
+        for options in (
+            {
+                "source": "dynamic",
+                "expression": "${upstream.options}",
+                "label_key": "label",
+                "value_key": "value",
+            },
+            {"source": "dynamic_resolved", "values": [{"display_label": "East", "value": "east"}]},
+        ):
+            with pytest.raises(ValidationError) as exc_info:
+                FormTriggerDefinition.model_validate({"fields": [_text(type="dropdown", options=options)]})
+
+            errors = exc_info.value.errors()
+            expected_count = 5 if options["source"] == "dynamic" else 1
+            assert len(errors) == expected_count
+            assert any(error["type"] == "literal_error" and error["loc"][-1] == "source" for error in errors)
+
+
 class TestStaticOptionDefaults:
     """Defaults on dropdown/multi-select must be in the static option list."""
 
@@ -333,37 +427,53 @@ class TestDateFieldComponents:
         assert field.included_components() == ("date",)
 
     @pytest.mark.parametrize(
-        ("toggles", "expected"),
+        ("components", "expected"),
         [
-            ({}, ("date",)),
-            ({"include_timezone": True}, ("date", "timezone")),
-            ({"include_time": True, "include_timezone": True}, ("date", "time", "timezone")),
-            ({"include_date": False, "include_time": True, "include_timezone": True}, ("time", "timezone")),
-            ({"include_date": False, "include_timezone": True}, ("timezone",)),
+            ((True, False, False), ("date",)),
+            ((False, True, False), ("time",)),
+            ((False, False, True), ("timezone",)),
+            ((True, True, False), ("date", "time")),
+            ((False, True, True), ("time", "timezone")),
+            ((True, True, True), ("date", "time", "timezone")),
         ],
     )
-    def test_valid_combinations(self, toggles: dict[str, bool], expected: tuple[str, ...]) -> None:
-        """Every combination that pairs a time with a timezone is accepted."""
-        field = DateField.model_validate(_date(**toggles))
+    def test_valid_combinations(self, components: tuple[bool, bool, bool], expected: tuple[str, ...]) -> None:
+        """Each valid combination of included components is accepted."""
+        include_date, include_time, include_timezone = components
+        field = DateField.model_validate(
+            _date(
+                include_date=include_date,
+                include_time=include_time,
+                include_timezone=include_timezone,
+            )
+        )
 
         assert field.included_components() == expected
 
     @pytest.mark.parametrize(
-        "toggles",
+        ("components", "message"),
         [
-            {"include_time": True},
-            {"include_date": False, "include_time": True},
+            (
+                (False, False, False),
+                r"at least one of include_date, include_time, or include_timezone must be true",
+            ),
+            (
+                (True, False, True),
+                r"Select a time when both a date and timezone are included\.",
+            ),
         ],
     )
-    def test_time_requires_timezone(self, toggles: dict[str, bool]) -> None:
-        """A wall-clock time is ambiguous without the zone it is read in."""
-        with pytest.raises(ValidationError, match=r"include_timezone is required when include_time is true"):
-            DateField.model_validate(_date(**toggles))
-
-    def test_at_least_one_component_required(self) -> None:
-        """A field that collects nothing cannot be answered at all."""
-        with pytest.raises(ValidationError, match=r"at least one of include_date"):
-            DateField.model_validate(_date(include_date=False))
+    def test_invalid_combinations(self, components: tuple[bool, bool, bool], message: str) -> None:
+        """Empty selections and date plus timezone without time are rejected."""
+        include_date, include_time, include_timezone = components
+        with pytest.raises(ValidationError, match=message):
+            DateField.model_validate(
+                _date(
+                    include_date=include_date,
+                    include_time=include_time,
+                    include_timezone=include_timezone,
+                )
+            )
 
 
 class TestDateFieldDefault:
@@ -392,7 +502,7 @@ class TestDateFieldDefault:
     def test_partial_default_rejected(self) -> None:
         """A default is substituted wholesale, so an incomplete one is useless."""
         with pytest.raises(ValidationError, match=r"default is missing timezone"):
-            DateField.model_validate(_date(include_timezone=True, default={"date": "2026-01-05"}))
+            DateField.model_validate(_date(include_date=False, include_timezone=True, default={}))
 
     def test_default_for_uncollected_component_rejected(self) -> None:
         """Defaulting a component the field never asks for is an authoring mistake."""

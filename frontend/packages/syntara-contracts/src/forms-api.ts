@@ -469,7 +469,7 @@ export interface components {
     }
     /**
      * DateField
-     * @description Date field collecting any combination of date, time, and timezone.
+     * @description Date field collecting a valid combination of date, time, and timezone.
      */
     DateField: {
       /** Value Name */
@@ -498,7 +498,7 @@ export interface components {
       include_date?: boolean
       /**
        * Include Time
-       * @description Collect a 24-hour time. Requires include_timezone.
+       * @description Collect a 24-hour time in HH:MM format.
        * @default false
        */
       include_time?: boolean

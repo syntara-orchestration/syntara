@@ -589,7 +589,12 @@ jobs:
   test-compose-e2e:
     name: (Backend) Test Podman Compose E2E
     needs: changes
-    if: needs.changes.outputs.backend == 'true' && github.event_name == 'merge_group'
+    if: >-
+      needs.changes.outputs.backend == 'true' &&
+      (
+        github.event_name == 'merge_group' ||
+        (github.event_name == 'pull_request' && startsWith(github.base_ref, 'feature/'))
+      )
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -687,12 +692,8 @@ jobs:
           echo "All services are healthy"
 
       - name: Run E2E tests (excluding global revocation)
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
-        with:
-          timeout_minutes: 20
-          max_attempts: 3
-          retry_wait_seconds: 30
-          command: cd backend && make test-e2e
+        timeout-minutes: 60
+        run: cd backend && make test-e2e
         env:
           APP_SCRIPT_NODES_ENABLED: "true"
           APP_BASE_URL: https://localhost:8000

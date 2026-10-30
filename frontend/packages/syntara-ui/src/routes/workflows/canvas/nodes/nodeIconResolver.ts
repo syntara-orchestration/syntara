@@ -36,6 +36,22 @@ export function getTaskIconDescriptor(taskData: TaskActivity): IconDescriptor {
   return { icon: executorMeta?.icon, id: iconId }
 }
 
+function resolveTriggerIconDescriptor(triggerType?: string): IconDescriptor {
+  if (triggerType === TriggerTypeEnum.SCHEDULED) {
+    return { icon: nodeMetadata.scheduledTrigger.icon, id: RegistryNodeId.TRIGGER_SCHEDULED }
+  }
+  if (triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER) {
+    return { icon: nodeMetadata.webhookTrigger.icon, id: RegistryNodeId.TRIGGER_WEBHOOK }
+  }
+  if (triggerType === TriggerTypeEnum.EDA_TRIGGER) {
+    return { icon: nodeMetadata.edaTrigger.icon, id: RegistryNodeId.TRIGGER_EDA }
+  }
+  if (triggerType === TriggerTypeEnum.FORM_TRIGGER) {
+    return { icon: nodeMetadata.formTrigger.icon, id: RegistryNodeId.TRIGGER_FORM }
+  }
+  return { icon: nodeMetadata.trigger.icon, id: RegistryNodeId.TRIGGER_MANUAL }
+}
+
 export function getCanvasNodeIconDescriptor(
   node: Pick<Node<NodeType['data']>, 'id' | 'type' | 'data'>,
   currentWorkflow?: { triggers?: Array<{ type?: string }> } | null
@@ -44,16 +60,7 @@ export function getCanvasNodeIconDescriptor(
     const triggerIndex = parseTriggerIndex(node.id) ?? 0
     const triggerType =
       currentWorkflow?.triggers?.[triggerIndex]?.type ?? (node.data as { triggerType?: string }).triggerType
-    if (triggerType === TriggerTypeEnum.SCHEDULED) {
-      return { icon: nodeMetadata.scheduledTrigger.icon, id: RegistryNodeId.TRIGGER_SCHEDULED }
-    }
-    if (triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER) {
-      return { icon: nodeMetadata.webhookTrigger.icon, id: RegistryNodeId.TRIGGER_WEBHOOK }
-    }
-    if (triggerType === TriggerTypeEnum.EDA_TRIGGER) {
-      return { icon: nodeMetadata.edaTrigger.icon, id: RegistryNodeId.TRIGGER_EDA }
-    }
-    return { icon: nodeMetadata.trigger.icon, id: RegistryNodeId.TRIGGER_MANUAL }
+    return resolveTriggerIconDescriptor(triggerType)
   }
 
   if (node.type === 'condition') {

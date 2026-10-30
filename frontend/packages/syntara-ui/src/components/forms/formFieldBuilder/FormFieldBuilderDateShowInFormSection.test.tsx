@@ -4,7 +4,7 @@ import { FormProvider, useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE, FormFieldTypeEnum, parseFormDefinition } from '../../../forms'
+import { FormFieldTypeEnum, parseFormDefinition } from '../../../forms'
 
 import { FormFieldBuilderCommitContext } from './formFieldBuilderCommitContext'
 import { FormFieldBuilderDateShowInFormSection } from './FormFieldBuilderDateShowInFormSection'
@@ -44,19 +44,19 @@ describe('FormFieldBuilderDateShowInFormSection', () => {
     expect(screen.getByRole('checkbox', { name: 'Timezone' })).not.toBeChecked()
   })
 
-  it('shows how to fix time without timezone', async () => {
+  it('shows how to fix date and timezone without time', async () => {
     const user = userEvent.setup()
     const definition = parseFormDefinition({
       fields: [{ type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due' }],
     })
     renderSection(definition)
 
-    await user.click(screen.getByRole('checkbox', { name: 'Time' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Timezone' }))
 
-    expect(screen.getByText(DATE_FIELD_TIME_REQUIRES_TIMEZONE_MESSAGE)).toBeInTheDocument()
+    expect(screen.getByText('Select a time when both a date and timezone are included.')).toBeInTheDocument()
   })
 
-  it('enables time without selecting timezone', async () => {
+  it('allows time without timezone after date is unchecked', async () => {
     const user = userEvent.setup()
     const definition = parseFormDefinition({
       fields: [{ type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due' }],
@@ -64,7 +64,9 @@ describe('FormFieldBuilderDateShowInFormSection', () => {
     renderSection(definition)
 
     await user.click(screen.getByRole('checkbox', { name: 'Time' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Date' }))
 
+    expect(screen.getByRole('checkbox', { name: 'Date' })).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Time' })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Timezone' })).not.toBeChecked()
   })
@@ -105,7 +107,15 @@ describe('FormFieldBuilderDateShowInFormSection', () => {
   it('allows timezone only without time', async () => {
     const user = userEvent.setup()
     const definition = parseFormDefinition({
-      fields: [{ type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due' }],
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'due',
+          label: 'Due',
+          include_date: false,
+          include_timezone: true,
+        },
+      ],
     })
     renderSection(definition)
 

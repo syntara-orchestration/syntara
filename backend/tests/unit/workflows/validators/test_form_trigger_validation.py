@@ -196,16 +196,16 @@ def test_date_component_rules_are_reported_on_the_field() -> None:
         "type": "date",
         "value_name": "start_time",
         "label": "Start time",
-        "include_date": False,
-        "include_time": True,
-        "include_timezone": False,
+        "include_date": True,
+        "include_time": False,
+        "include_timezone": True,
     }
 
     finding = _single_finding(_parameters(field))
 
     assert finding.category == ValidationCategory.form_trigger_configuration
     assert finding.field_path == "parameters.form_definition.fields.0"
-    assert "include_timezone is required" in finding.message
+    assert "Select a time when both a date and timezone are included." in finding.message
 
 
 def test_default_that_fails_submission_coercion_is_reported_at_default() -> None:
@@ -219,60 +219,41 @@ def test_default_that_fails_submission_coercion_is_reported_at_default() -> None
 
 
 @pytest.mark.parametrize(
-    ("options", "source"),
+    ("options", "expected_findings"),
     [
         pytest.param(
             {"source": "dynamic", "expression": "regions", "label_key": "name", "value_key": "id"},
-            "dynamic",
+            [
+                ("options.source", "'dynamic' is not one of ['static']"),
+                ("options.values", "Field required"),
+                ("options.expression", "Extra inputs are not permitted"),
+                ("options.label_key", "Extra inputs are not permitted"),
+                ("options.value_key", "Extra inputs are not permitted"),
+            ],
             id="dynamic",
         ),
         pytest.param(
             {"source": "dynamic_resolved", "values": [{"display_label": "East", "value": "east"}]},
-            "dynamic_resolved",
+            [("options.source", "'dynamic_resolved' is not one of ['static']")],
             id="dynamic-resolved",
         ),
     ],
 )
-def test_non_static_options_are_reported_once_with_option_path(
+@pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
+def test_non_static_options_report_schema_findings(
     options: dict[str, Any],
-    source: str,
+    expected_findings: list[tuple[str, str]],
+    field_type: str,
 ) -> None:
-    field = {"type": "dropdown", "value_name": "region", "label": "Region", "options": options}
+    field = {"type": field_type, "value_name": "region", "label": "Region", "options": options}
 
     findings = _findings(_parameters(field))
 
-    assert len(findings) == 1, findings
-    assert findings[0].category == ValidationCategory.form_trigger_configuration
-    assert findings[0].field_path == "parameters.form_definition.fields.0.options"
-    assert f"options source '{source}'" in findings[0].message
-
-
-def test_unsupported_options_do_not_hide_invalid_default() -> None:
-    parameters = _parameters(
-        {
-            "type": "dropdown",
-            "value_name": "region",
-            "label": "Region",
-            "options": {
-                "source": "dynamic",
-                "expression": "regions",
-                "label_key": "name",
-                "value_key": "id",
-            },
-        },
-        {"type": "email", "value_name": "contact", "label": "Contact", "default": "not-an-email"},
-    )
-
-    findings = _findings(parameters)
-
-    assert len(findings) == 2, findings
-    assert {finding.field_path for finding in findings} == {
-        "parameters.form_definition.fields.0.options",
-        "parameters.form_definition.fields.1.default",
+    expected_paths_and_messages = {
+        (f"parameters.form_definition.fields.0.{path}", message) for path, message in expected_findings
     }
-    assert all(finding.category == ValidationCategory.form_trigger_configuration for finding in findings)
-    assert any("options source 'dynamic'" in finding.message for finding in findings)
-    assert any("Default value is not valid" in finding.message for finding in findings)
+    assert {(finding.field_path, finding.message) for finding in findings} == expected_paths_and_messages
+    assert all(finding.category == ValidationCategory.schema_violation for finding in findings)
 
 
 def test_unsafe_css_is_reported_on_css_override() -> None:

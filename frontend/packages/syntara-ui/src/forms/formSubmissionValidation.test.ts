@@ -75,14 +75,54 @@ describe('validateFormSubmission', () => {
     })
   })
 
-  it('omits absent optional fields rather than setting null', () => {
+  it('includes absent optional fields with a type-compatible empty value', () => {
     const cleaned = validateFormSubmission(form(field(FormFieldTypeEnum.TEXT, 'name')), {})
-    expect(cleaned).toEqual({})
+    expect(cleaned).toEqual({ name: '' })
   })
 
-  it.each(['', [], null] as const)('treats empty values as absent for non-checkbox fields', (empty) => {
-    const cleaned = validateFormSubmission(form(field(FormFieldTypeEnum.TEXT, 'name')), { name: empty })
-    expect(cleaned).toEqual({})
+  it.each(['', [], null] as const)('normalizes explicit empty values without applying defaults', (empty) => {
+    const definition = form(field(FormFieldTypeEnum.TEXT, 'name', { default: 'anon' }))
+    const cleaned = validateFormSubmission(definition, { name: empty })
+    expect(cleaned).toEqual({ name: '' })
+  })
+
+  it.each([
+    [FormFieldTypeEnum.TEXT, {} as const, ''],
+    [FormFieldTypeEnum.TEXTAREA, {} as const, ''],
+    [FormFieldTypeEnum.MASKED_TEXT, {} as const, ''],
+    [FormFieldTypeEnum.EMAIL, {} as const, ''],
+    [FormFieldTypeEnum.DATE, {} as const, ''],
+    [FormFieldTypeEnum.NUMBER, {} as const, null],
+    [FormFieldTypeEnum.DROPDOWN, { options: staticOptions } as const, null],
+    [FormFieldTypeEnum.CHECKBOX, {} as const, false],
+    [FormFieldTypeEnum.MULTI_SELECT, { options: staticOptions } as const, []],
+  ] as const)('includes an omitted optional %s field with its typed empty value', (fieldType, overrides, expected) => {
+    const definition = form(field(fieldType, 'answer', overrides))
+    expect(validateFormSubmission(definition, {})).toEqual({ answer: expected })
+  })
+
+  it.each([
+    [FormFieldTypeEnum.TEXT, '', { default: 'prefilled' }, ''],
+    [FormFieldTypeEnum.TEXTAREA, [], { default: 'prefilled' }, ''],
+    [FormFieldTypeEnum.MASKED_TEXT, null, { default: 'prefilled' }, ''],
+    [FormFieldTypeEnum.EMAIL, '', { default: 'user@example.com' }, ''],
+    [FormFieldTypeEnum.DATE, '', { default: { date: '2026-01-05' } }, ''],
+    [FormFieldTypeEnum.NUMBER, '', { default: 7 }, null],
+    [FormFieldTypeEnum.DROPDOWN, [], { options: staticOptions, default: 'a' }, null],
+    [FormFieldTypeEnum.CHECKBOX, null, { default: true }, false],
+    [FormFieldTypeEnum.MULTI_SELECT, [], { options: staticOptions, default: ['a'] }, []],
+  ] as const)('normalizes an empty %s value to its field output type', (fieldType, empty, overrides, expected) => {
+    const definition = form(field(fieldType, 'answer', overrides))
+
+    expect(validateFormSubmission(definition, { answer: empty })).toEqual({ answer: expected })
+  })
+
+  it('throws if an unsupported runtime field type reaches empty-value normalization', () => {
+    const invalidDefinition = {
+      fields: [{ type: 'unsupported', value_name: 'answer', label: 'Answer' }],
+    } as unknown as ReturnType<typeof form>
+
+    expect(() => validateFormSubmission(invalidDefinition, { answer: '' })).toThrow('Unsupported form field type')
   })
 
   it('applies defaults when a field is absent', () => {
@@ -223,7 +263,7 @@ describe('validateFormSubmission', () => {
   it('rejects non-finite numbers and non-boolean checkbox payloads', () => {
     const definition = form(field(FormFieldTypeEnum.NUMBER, 'n'), field(FormFieldTypeEnum.CHECKBOX, 'c'))
 
-    expectValidationErrors(definition, { n: Number.NaN, c: null }, [
+    expectValidationErrors(definition, { n: Number.NaN, c: {} }, [
       ['n', 'type'],
       ['c', 'type'],
     ])
@@ -331,15 +371,8 @@ describe('date field submission', () => {
 
   it.each([
     [{}, { date: '2026-01-05' }],
-    [{ include_timezone: true }, { date: '2026-01-05', timezone: 'America/New_York' }],
-    [
-      { include_time: true, include_timezone: true },
-      { date: '2026-01-05', time: '14:30', timezone: 'America/New_York' },
-    ],
-    [
-      { include_date: false, include_time: true, include_timezone: true },
-      { time: '14:30', timezone: 'America/New_York' },
-    ],
+    [{ include_time: true }, { date: '2026-01-05', time: '14:30' }],
+    [{ include_date: false, include_time: true }, { time: '14:30' }],
     [{ include_date: false, include_timezone: true }, { timezone: 'America/New_York' }],
   ])('round-trips a complete submission for %o', (toggles, submitted) => {
     expect(validateFormSubmission(dateForm(toggles), { start: submitted })).toEqual({ start: submitted })

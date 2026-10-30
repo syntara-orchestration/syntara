@@ -24,9 +24,11 @@ import { StaticOptionRow } from './StaticOptionRow'
 type StaticOptionsEditorProps = {
   fieldIndex: number
   isDisabled?: boolean
+  /** When true, omit the in-section heading (parent supplies a FormGroup label). */
+  hideTitle?: boolean
 }
 
-export function StaticOptionsEditor({ fieldIndex, isDisabled }: Readonly<StaticOptionsEditorProps>) {
+export function StaticOptionsEditor({ fieldIndex, isDisabled, hideTitle = false }: Readonly<StaticOptionsEditorProps>) {
   const commit = useFormFieldBuilderCommit()
   const { control, getValues, setValue } = useFormContext<FormDefinition>()
   const fieldLabel = useWatch({ control, name: `fields.${fieldIndex}.label` }) ?? `Field ${fieldIndex + 1}`
@@ -52,9 +54,11 @@ export function StaticOptionsEditor({ fieldIndex, isDisabled }: Readonly<StaticO
 
   return (
     <div className={styles.staticOptionsSection}>
-      <Title headingLevel="h4" size="md" className={styles.staticOptionsHeading}>
-        Static options
-      </Title>
+      {hideTitle ? null : (
+        <Title headingLevel="h4" size="md" className={styles.staticOptionsHeading}>
+          Static options
+        </Title>
+      )}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

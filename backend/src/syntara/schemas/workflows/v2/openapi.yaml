@@ -45,7 +45,7 @@ info:
     Available node types and their configuration schemas are defined in the
     [Node Type Catalog](./catalog/node_type_catalog.json). Individual node schemas
     (config and result) are in the `executors/`, `control-nodes/`, and `triggers/` directories.
-  version: 2.0.0
+  version: 2.0.2
   contact:
     name: Syntara Team
 servers:
@@ -1066,6 +1066,12 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/ApprovalNodeParameters
     FormPromptNodeParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/FormPromptNodeParameters
+    FormPromptDefinition:
+      $ref: ./shared-schemas.yaml#/components/schemas/FormPromptDefinition
+    FormPromptDropdownField:
+      $ref: ./shared-schemas.yaml#/components/schemas/FormPromptDropdownField
+    FormPromptMultiSelectField:
+      $ref: ./shared-schemas.yaml#/components/schemas/FormPromptMultiSelectField
     ConditionNodeParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/ConditionNodeParameters
     SwitchNodeParameters:

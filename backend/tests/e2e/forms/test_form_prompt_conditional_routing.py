@@ -12,7 +12,7 @@ from syntara_api_client.models import ExecutionCreate, WorkflowCreate, WorkflowD
 from syntara_api_client.models.activity_data_output_data_type_0 import ActivityDataOutputDataType0
 from syntara_api_client.models.execution_status import ExecutionStatus
 
-from ._helpers import assert_and_get_with_502_skip, submit_form_prompt
+from ._helpers import assert_and_get_response, submit_form_prompt
 
 pytestmark = [pytest.mark.e2e]
 
@@ -97,7 +97,7 @@ def test_form_prompt_response_routes_to_selected_executor(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
     color: str,
     selected_executor: str,
     other_executor: str,
@@ -112,11 +112,11 @@ def test_form_prompt_response_routes_to_selected_executor(
             workflow_definition=_conditional_form_prompt_workflow_definition(workflow_name),
         )
     )
-    execution = assert_and_get_with_502_skip(
+    execution = assert_and_get_response(
         syntara_api.executions.create(body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger"))
     )
     execution_id = UUID(str(execution.id))
-    form_prompt_execution_cleanup(execution_id)
+    form_execution_cleanup(execution_id)
 
     pending_prompt = poll_for_pending_form_prompt(syntara_api, execution_id, timeout=60)
     response = submit_form_prompt(syntara_api, UUID(str(pending_prompt.id)), {"color": color})

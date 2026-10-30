@@ -14,7 +14,7 @@ from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.models import ExecutionRead, WorkflowCreate, WorkflowRead
 from syntara_api_client.models.execution_status import ExecutionStatus
 
-from ._helpers import EXECUTION_POLL_TIMEOUT, assert_and_get_with_502_skip, create_form_prompt_execution
+from ._helpers import EXECUTION_POLL_TIMEOUT, assert_and_get_response, create_form_prompt_execution
 from ._workflows import dynamic_option_field
 
 if TYPE_CHECKING:
@@ -87,7 +87,7 @@ def _start(
 
 def _assert_no_prompt_row(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> None:
     """Verify failed template resolution did not persist a form prompt."""
-    listed = assert_and_get_with_502_skip(syntara_api.form_prompts.list(execution_id=exec_id, limit=5))
+    listed = assert_and_get_response(syntara_api.form_prompts.list(execution_id=exec_id, limit=5))
     assert not listed.resources, (
         f"No form prompt row should be persisted when template resolution fails; found {len(listed.resources)}"
     )
@@ -133,7 +133,7 @@ def test_invalid_dynamic_options_fail_before_prompt_creation(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
     producer_output: dict[str, object],
     expression: str,
     expect_in_error: str,
@@ -154,7 +154,7 @@ def test_invalid_dynamic_options_fail_before_prompt_creation(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
         producer_output=producer_output,
         form_fields=[dynamic_option_field("environment", expression)],
     )
@@ -175,7 +175,7 @@ def test_invalid_dynamic_options_continue_on_failure_routes_to_fallback(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
     producer_output: dict[str, object],
     expression: str,
     expect_in_error: str,
@@ -196,7 +196,7 @@ def test_invalid_dynamic_options_continue_on_failure_routes_to_fallback(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
         producer_output=producer_output,
         form_fields=[dynamic_option_field("environment", expression)],
         continue_on_failure=True,
@@ -219,7 +219,7 @@ def test_array_default_on_text_field_fails_definition_validation(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
-    form_prompt_execution_cleanup: Callable[[UUID], None],
+    form_execution_cleanup: Callable[[UUID], None],
 ) -> None:
     """An array resolved into a text default fails final form validation.
 
@@ -236,7 +236,7 @@ def test_array_default_on_text_field_fails_definition_validation(
         syntara_api,
         workflow_factory,
         first_project_id,
-        form_prompt_execution_cleanup,
+        form_execution_cleanup,
         producer_output={"env": ["dev", "prod"]},
         form_fields=[
             {

@@ -7,7 +7,6 @@ registry retrieve callback and cached for the lifetime of the process.
 """
 
 import json
-import re
 from collections import defaultdict, deque
 from collections.abc import Mapping
 from functools import lru_cache
@@ -454,11 +453,6 @@ def _collect_form_model_findings(
         parameter_model=FormPromptNodeParameters,
         category=ValidationCategory.form_prompt_configuration,
         element_label="form prompt",
-        unsupported_option_messages={
-            "dynamic_resolved": (
-                "is produced by the workflow engine at run time and cannot be authored. Use 'static' or 'dynamic'."
-            )
-        },
         schema_locations=schema_locations,
     )
     findings.extend(
@@ -468,10 +462,6 @@ def _collect_form_model_findings(
             parameter_model=FormTriggerParameters,
             category=ValidationCategory.form_trigger_configuration,
             element_label="form trigger",
-            unsupported_option_messages={
-                "dynamic": "is not supported on a form trigger. Use 'static'.",
-                "dynamic_resolved": "is not supported on a form trigger. Use 'static'.",
-            },
             schema_locations=schema_locations,
         )
     )
@@ -485,7 +475,6 @@ def _collect_form_model_findings_for_elements(
     parameter_model: type[BaseModel],
     category: ValidationCategory,
     element_label: str,
-    unsupported_option_messages: Mapping[str, str],
     schema_locations: set[tuple[str | None, str | None]],
 ) -> list[ValidationFinding]:
     """Validate one collection of form elements using shared form-model logic."""
@@ -500,14 +489,6 @@ def _collect_form_model_findings_for_elements(
         if not isinstance(parameters, dict):
             continue
 
-        findings.extend(
-            _collect_authored_option_findings(
-                parameters,
-                node_id,
-                category=category,
-                unsupported_option_messages=unsupported_option_messages,
-            )
-        )
         try:
             parameter_model.model_validate(parameters)
         except ValidationError as exc:
@@ -519,9 +500,6 @@ def _collect_form_model_findings_for_elements(
                     schema_locations,
                     configuration_category=category,
                     element_label=element_label,
-                    ignored_safe_error_fragments=tuple(
-                        f"options source '{source}'" for source in unsupported_option_messages
-                    ),
                 )
             )
         except FormDefinitionError as exc:
@@ -537,45 +515,6 @@ def _collect_form_model_findings_for_elements(
     return findings
 
 
-def _collect_authored_option_findings(
-    parameters: dict[str, Any],
-    node_id: str | None,
-    *,
-    category: ValidationCategory,
-    unsupported_option_messages: Mapping[str, str],
-) -> list[ValidationFinding]:
-    """Report option sources not allowed on this authored form type."""
-    form_definition = parameters.get("form_definition")
-    fields = form_definition.get("fields", []) if isinstance(form_definition, dict) else []
-    if not isinstance(fields, list):
-        return []
-
-    findings: list[ValidationFinding] = []
-    for index, field in enumerate(fields):
-        if not isinstance(field, dict):
-            continue
-        field_type = field.get("type")
-        if not isinstance(field_type, str) or field_type not in {"dropdown", "multi_select"}:
-            continue
-        options = field.get("options")
-        source = options.get("source") if isinstance(options, dict) else None
-        if not isinstance(source, str) or source not in unsupported_option_messages:
-            continue
-
-        value_name = field.get("value_name")
-        field_name = value_name if isinstance(value_name, str) else f"at index {index}"
-        findings.append(
-            ValidationFinding(
-                severity=ValidationSeverity.error,
-                category=category,
-                message=(f"Field '{field_name}': options source '{source}' {unsupported_option_messages[source]}"),
-                node_id=node_id,
-                field_path=f"parameters.form_definition.fields.{index}.options",
-            )
-        )
-    return findings
-
-
 def _form_configuration_schema_finding_is_redundant(
     schema_finding: ValidationFinding,
     form_finding: ValidationFinding,
@@ -588,17 +527,6 @@ def _form_configuration_schema_finding_is_redundant(
         or form_finding.field_path is None
     ):
         return False
-
-    # Unsupported authored option sources violate the schema enum and the
-    # corresponding form model's more specific option-source rule.
-    if (
-        form_finding.category
-        in {ValidationCategory.form_prompt_configuration, ValidationCategory.form_trigger_configuration}
-        and form_finding.message.startswith("Field '")
-        and "options source '" in form_finding.message
-        and schema_finding.field_path == f"{form_finding.field_path}.source"
-    ):
-        return True
 
     # Missing form_definition is reported at the parameters object by JSON
     # Schema and at the missing property by Pydantic.
@@ -659,9 +587,8 @@ def _collect_form_parameter_validation_findings(
     *,
     configuration_category: ValidationCategory,
     element_label: str,
-    ignored_safe_error_fragments: tuple[str, ...],
 ) -> list[ValidationFinding]:
-    """Convert typed form-model errors into safe findings and suppress raw duplicate option errors."""
+    """Convert typed form-model errors into safe workflow findings."""
     findings: list[ValidationFinding] = []
     for error in exc.errors():
         field_type_finding = _form_field_type_finding(
@@ -679,9 +606,6 @@ def _collect_form_parameter_validation_findings(
         safe_error = context.get("error") if isinstance(context, dict) else None
         is_safe_configuration_error = isinstance(safe_error, SafeValueError)
         message = str(safe_error) if is_safe_configuration_error else str(error["msg"])
-        if is_safe_configuration_error and any(fragment in message for fragment in ignored_safe_error_fragments):
-            # The raw-definition pass reports unsupported option sources with field indices.
-            continue
         field_path = _form_validation_field_path(error.get("loc", ()))
 
         # JSON Schema already reports ordinary structural errors at this exact
@@ -828,40 +752,9 @@ def _collect_form_definition_error_findings(
     return findings
 
 
-_TYPE_CONST_MESSAGE = re.compile(r"^'([^']+)' was expected$")
-
-
-_SCHEMA_ELEMENT_TYPES = frozenset(member.value for member in NodeType)
-
-
-def _declared_type_for_element_id(workflow_definition: dict[str, Any], element_id: str | None) -> str | None:
-    """Return the authored ``type`` for a node or trigger with ``element_id``, if present."""
-    if not element_id:
-        return None
-    for collection in ("nodes", "triggers"):
-        elements = workflow_definition.get(collection, [])
-        if not isinstance(elements, list):
-            continue
-        for element in elements:
-            if isinstance(element, dict) and element.get("id") == element_id:
-                declared = element.get("type")
-                return declared if isinstance(declared, str) and declared else None
-    return None
-
-
-def _is_misleading_schema_message(message: str, declared_type: str | None) -> bool:
-    """Drop oneOf noise from non-matching executor branches (e.g. agentic ``prompt`` on form_prompt nodes)."""
-    if not declared_type:
-        return False
-    if declared_type == NodeType.FORM_PROMPT and message == "'prompt' is a required property":
-        return True
-    const_match = _TYPE_CONST_MESSAGE.match(message)
-    if const_match is None:
-        return False
-    # Unrecognized authored types: every branch fails the type ``const`` — keep discriminator hints.
-    if declared_type not in _SCHEMA_ELEMENT_TYPES:
-        return False
-    return const_match.group(1) != declared_type
+def _is_type_discriminator_error(error: jsonschema.ValidationError) -> bool:
+    """Identify a failed node ``type`` const without relying on rendered error text."""
+    return error.validator == "const" and list(error.relative_path) == ["type"]
 
 
 def _select_best_branch(
@@ -873,6 +766,12 @@ def _select_best_branch(
     without type-discriminator ``const`` errors, and picks the one with
     fewest total errors.
 
+    When the authored ``type`` matches an executor, the chosen branch is by
+    construction free of discriminator errors, so callers never see ``'agentic'
+    was expected`` noise from the branches that did not match.  When no branch
+    matches, every candidate carries a discriminator error and those are kept
+    deliberately — they tell the user which executor types the schema accepts.
+
     Returns ``(best_branch_index, branches_dict)``.  The caller decides
     how to handle the ``branch_all_type_const`` fallback.
     """
@@ -881,7 +780,7 @@ def _select_best_branch(
     for ctx in context_errors:
         branch_idx = ctx.schema_path[0]
         branches[branch_idx].append(ctx)
-        if ctx.validator == "const" and list(ctx.relative_path) == ["type"]:
+        if _is_type_discriminator_error(ctx):
             branch_has_type_const[branch_idx] = True
 
     no_type_const = [k for k in branches if not branch_has_type_const[k]]
@@ -910,7 +809,7 @@ def _best_branch_messages(
         return [(error.message, list(error.absolute_path))]
     best_idx, branches = _select_best_branch(error.context)
     best_errors = branches[best_idx]
-    if len(best_errors) == 1 and best_errors[0].validator == "const" and list(best_errors[0].relative_path) == ["type"]:
+    if len(best_errors) == 1 and _is_type_discriminator_error(best_errors[0]):
         return [(error.message, list(error.absolute_path))]
     return [(ctx.message, list(ctx.absolute_path)) for ctx in best_errors]
 
@@ -1245,9 +1144,6 @@ class WorkflowValidator:
                 best.extend(_get_nested_parameter_errors(error, workflow_definition, best))
                 for leaf_msg, leaf_path in best:
                     node_id, field_path = _extract_node_id_and_field(leaf_path, workflow_definition)
-                    declared_type = _declared_type_for_element_id(workflow_definition, node_id)
-                    if _is_misleading_schema_message(leaf_msg, declared_type):
-                        continue
                     findings.append(
                         ValidationFinding(
                             severity=ValidationSeverity.error,

@@ -152,7 +152,7 @@ class TestResponderUsers:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """A named responder with submit permission can submit successfully.
 
@@ -169,7 +169,7 @@ class TestResponderUsers:
             syntara_api,
             workflow_factory,
             responder_env,
-            form_prompt_execution_cleanup,
+            form_execution_cleanup,
             prefix="responder-user-submit",
             responder_users=[responder_env["user_a_name"]],
         )
@@ -188,7 +188,7 @@ class TestResponderUsers:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """A submit-capable user outside the responder list is rejected.
 
@@ -205,7 +205,7 @@ class TestResponderUsers:
             syntara_api,
             workflow_factory,
             responder_env,
-            form_prompt_execution_cleanup,
+            form_execution_cleanup,
             prefix="non-responder-user",
             responder_users=[responder_env["user_a_name"]],
         )
@@ -222,7 +222,7 @@ class TestResponderUsers:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """A listed responder without the submit permission is rejected by RBAC.
 
@@ -239,7 +239,7 @@ class TestResponderUsers:
             syntara_api,
             workflow_factory,
             responder_env,
-            form_prompt_execution_cleanup,
+            form_execution_cleanup,
             prefix="responder-user-no-permission",
             responder_users=[responder_env["user_a_name"], responder_env["user_c_name"]],
         )
@@ -260,7 +260,7 @@ class TestResponderGroups:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """A member of the configured responder group can submit.
 
@@ -276,7 +276,7 @@ class TestResponderGroups:
             syntara_api,
             workflow_factory,
             responder_env,
-            form_prompt_execution_cleanup,
+            form_execution_cleanup,
             prefix="responder-group-submit",
             responder_groups=[responder_env["group_x_name"]],
         )
@@ -289,7 +289,7 @@ class TestResponderGroups:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """A submit-capable member of another group is not an allowed responder.
 
@@ -306,7 +306,7 @@ class TestResponderGroups:
             syntara_api,
             workflow_factory,
             responder_env,
-            form_prompt_execution_cleanup,
+            form_execution_cleanup,
             prefix="other-responder-group",
             responder_groups=[responder_env["group_x_name"]],
         )
@@ -323,7 +323,7 @@ class TestResponderGroups:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """Group membership does not bypass the submit permission check.
 
@@ -340,7 +340,7 @@ class TestResponderGroups:
             syntara_api,
             workflow_factory,
             responder_env,
-            form_prompt_execution_cleanup,
+            form_execution_cleanup,
             prefix="responder-group-no-permission",
             responder_groups=[responder_env["group_x_name"]],
         )
@@ -361,7 +361,7 @@ class TestCombinedResponderLists:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """A named user can submit even when outside the configured group.
 
@@ -378,7 +378,7 @@ class TestCombinedResponderLists:
             syntara_api,
             workflow_factory,
             responder_env,
-            form_prompt_execution_cleanup,
+            form_execution_cleanup,
             prefix="combined-responders-direct-user",
             responder_users=[responder_env["user_b_name"]],
             responder_groups=[responder_env["group_x_name"]],
@@ -392,7 +392,7 @@ class TestCombinedResponderLists:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """A listed group member can submit without a direct user entry.
 
@@ -409,7 +409,7 @@ class TestCombinedResponderLists:
             syntara_api,
             workflow_factory,
             responder_env,
-            form_prompt_execution_cleanup,
+            form_execution_cleanup,
             prefix="combined-responders-group-member",
             responder_users=[responder_env["user_b_name"]],
             responder_groups=[responder_env["group_x_name"]],
@@ -423,7 +423,7 @@ class TestCombinedResponderLists:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """A submit-capable user matching neither list is rejected.
 
@@ -440,7 +440,7 @@ class TestCombinedResponderLists:
             syntara_api,
             workflow_factory,
             responder_env,
-            form_prompt_execution_cleanup,
+            form_execution_cleanup,
             prefix="combined-responders-outsider",
             responder_users=[responder_env["user_b_name"]],
             responder_groups=[responder_env["group_x_name"]],
@@ -462,7 +462,7 @@ class TestEmptyResponderLists:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """A user with submit permission can submit when responder lists are empty.
 
@@ -479,7 +479,7 @@ class TestEmptyResponderLists:
             syntara_api,
             workflow_factory,
             responder_env,
-            form_prompt_execution_cleanup,
+            form_execution_cleanup,
             prefix="empty-responders-user-a",
         )
         response = submit_form_prompt(responder_env["user_a_api"], prompt_id, _RESPONSE)
@@ -491,7 +491,7 @@ class TestEmptyResponderLists:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """Submit permission assigned to another project does not authorize this prompt.
 
@@ -508,7 +508,7 @@ class TestEmptyResponderLists:
             syntara_api,
             workflow_factory,
             responder_env,
-            form_prompt_execution_cleanup,
+            form_execution_cleanup,
             prefix="empty-responders-other-project-role",
         )
         response = submit_form_prompt(responder_env["user_c_api"], prompt_id, _RESPONSE)
@@ -524,7 +524,7 @@ class TestEmptyResponderLists:
         syntara_api: SyntaraApiRegistry,
         workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
         responder_env: dict[str, Any],
-        form_prompt_execution_cleanup: Callable[[UUID], None],
+        form_execution_cleanup: Callable[[UUID], None],
     ) -> None:
         """An empty responder list does not grant submit permission by itself.
 
@@ -541,7 +541,7 @@ class TestEmptyResponderLists:
             syntara_api,
             workflow_factory,
             responder_env,
-            form_prompt_execution_cleanup,
+            form_execution_cleanup,
             prefix="empty-responders-no-permission",
         )
         response = submit_form_prompt(responder_env["user_c_api"], prompt_id, _RESPONSE)

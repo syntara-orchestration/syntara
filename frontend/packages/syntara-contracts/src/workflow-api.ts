@@ -1876,7 +1876,7 @@ export interface components {
        */
       message?: string | null
       /** @description Form definition describing the fields shown to responders. */
-      form_definition: components['schemas']['FormDefinition']
+      form_definition: components['schemas']['FormPromptDefinition']
       /**
        * Responder Users
        * @description Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.
@@ -1912,6 +1912,80 @@ export interface components {
        * @description Custom CSS applied to the form view.
        */
       css_override?: string | null
+    }
+    /**
+     * FormPromptDefinition
+     * @description Authored form definition for a form prompt; resolved snapshots are engine-only.
+     */
+    FormPromptDefinition: {
+      /** Fields */
+      fields: (
+        | components['schemas']['TextField']
+        | components['schemas']['TextAreaField']
+        | components['schemas']['MaskedTextField']
+        | components['schemas']['EmailField']
+        | components['schemas']['NumberField']
+        | components['schemas']['CheckboxField']
+        | components['schemas']['DateField']
+        | components['schemas']['FormPromptDropdownField']
+        | components['schemas']['FormPromptMultiSelectField']
+      )[]
+    }
+    /**
+     * FormPromptDropdownField
+     * @description Dropdown field on a form prompt. Static or dynamic options; not engine-resolved.
+     */
+    FormPromptDropdownField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'dropdown'
+      /** Options */
+      options: components['schemas']['StaticOptions'] | components['schemas']['DynamicOptions']
+      /** Default */
+      default?: string | number | boolean | null
+    }
+    /**
+     * FormPromptMultiSelectField
+     * @description Multi-select field on a form prompt. Static or dynamic options; not engine-resolved.
+     */
+    FormPromptMultiSelectField: {
+      /** Value Name */
+      value_name: string
+      /** Label */
+      label: string
+      /** Placeholder */
+      placeholder?: string | null
+      /** Help Text */
+      help_text?: string | null
+      /**
+       * Required
+       * @default false
+       */
+      required?: boolean
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'multi_select'
+      /** Options */
+      options: components['schemas']['StaticOptions'] | components['schemas']['DynamicOptions']
+      /** Default */
+      default?: (string | number | boolean)[] | null
     }
     /**
      * ConditionNodeParameters
@@ -2553,7 +2627,7 @@ export interface components {
     }
     /**
      * DateField
-     * @description Date field collecting any combination of date, time, and timezone.
+     * @description Date field collecting a valid combination of date, time, and timezone.
      */
     DateField: {
       /** Value Name */
@@ -2582,7 +2656,7 @@ export interface components {
       include_date?: boolean
       /**
        * Include Time
-       * @description Collect a 24-hour time. Requires include_timezone.
+       * @description Collect a 24-hour time in HH:MM format.
        * @default false
        */
       include_time?: boolean
@@ -2646,117 +2720,6 @@ export interface components {
        * @description Required object key containing the option label.
        */
       label_key: string
-    }
-    /**
-     * ResolvedOption
-     * @description An option materialized from upstream output while preserving its scalar type.
-     *
-     *     Python set membership considers ``1``, ``1.0``, and ``True`` equal. That
-     *     behavior is used by the backend's de-duplication and membership checks.
-     *     Static options remain strings because they are authored by a user.
-     */
-    ResolvedOption: {
-      /** Display Label */
-      display_label: string
-      /** Value */
-      value: string | number | boolean
-    }
-    /**
-     * ResolvedOptions
-     * @description Dynamic options materialized into a concrete list at prompt creation.
-     *
-     *     Produced only by the workflow engine, never authored. A form prompt is
-     *     persisted with this shape so the responder view and submission membership
-     *     validation operate on the same snapshot.
-     */
-    ResolvedOptions: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      source: 'dynamic_resolved'
-      /** Values */
-      values: components['schemas']['ResolvedOption'][]
-    }
-    /**
-     * DropdownField
-     * @description Dropdown field.
-     */
-    DropdownField: {
-      /** Value Name */
-      value_name: string
-      /** Label */
-      label: string
-      /** Placeholder */
-      placeholder?: string | null
-      /** Help Text */
-      help_text?: string | null
-      /**
-       * Required
-       * @default false
-       */
-      required?: boolean
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: 'dropdown'
-      /** Options */
-      options:
-        | components['schemas']['StaticOptions']
-        | components['schemas']['DynamicOptions']
-        | components['schemas']['ResolvedOptions']
-      /** Default */
-      default?: string | number | boolean | null
-    }
-    /**
-     * MultiSelectField
-     * @description Multi-select field.
-     */
-    MultiSelectField: {
-      /** Value Name */
-      value_name: string
-      /** Label */
-      label: string
-      /** Placeholder */
-      placeholder?: string | null
-      /** Help Text */
-      help_text?: string | null
-      /**
-       * Required
-       * @default false
-       */
-      required?: boolean
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: 'multi_select'
-      /** Options */
-      options:
-        | components['schemas']['StaticOptions']
-        | components['schemas']['DynamicOptions']
-        | components['schemas']['ResolvedOptions']
-      /** Default */
-      default?: (string | number | boolean)[] | null
-    }
-    /**
-     * FormDefinition
-     * @description Complete form definition with fields and metadata.
-     */
-    FormDefinition: {
-      /** Fields */
-      fields: (
-        | components['schemas']['TextField']
-        | components['schemas']['TextAreaField']
-        | components['schemas']['MaskedTextField']
-        | components['schemas']['EmailField']
-        | components['schemas']['NumberField']
-        | components['schemas']['CheckboxField']
-        | components['schemas']['DateField']
-        | components['schemas']['DropdownField']
-        | components['schemas']['MultiSelectField']
-      )[]
     }
     /**
      * ExecutionStatus

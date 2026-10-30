@@ -2,14 +2,19 @@
  * E2E: Form step timeout, waiting indicators, and fallback continuation.
  *
  * Covered in this file (forms interactive-prompt Playwright plan):
- * - UI-16 (fail path): expired response window — panel closed, no submit, execution Failed (test 1);
- *   running-long / deadline warning while still waiting (test 2).
+ * - UI-16 (fail path): expired response window - panel closed, no submit, execution Failed (test 1);
+ *   waiting elapsed time in the respond panel while still waiting (test 2).
  * - UI-17 (continue with defaults): after expiry, execution stays Running on the fallback step (test 4).
- * - UI-13 follow-ups: “Waiting for input” on the activity table + elapsed on the canvas badge (test 3).
+ * - UI-13 follow-ups: "Waiting for input" on the activity table + elapsed on the canvas badge (test 3).
  */
 
 import { test, expect } from '../fixtures'
-import { activityTableRowByActivityName } from '../helpers/formPromptPanel'
+import {
+  activityTableRowByActivityName,
+  formPromptRespondPanelRegion,
+  formPromptRespondSubmitButton,
+  formPromptWaitingElapsedInPanel,
+} from '../helpers/formPromptPanel'
 import {
   disposeTimeoutScenario,
   ensureTimeoutExpiredFailScenario,
@@ -54,15 +59,18 @@ test.describe('Form step timeout and waiting indicators', { tag: '@pr-check' }, 
     }
   })
 
-  test('shows waiting elapsed time and running long warning while the form step panel is open', async ({ app }) => {
+  test('shows waiting elapsed time while the form step panel is open', async ({ app }) => {
     const scenario = await ensureTimeoutWaitingScenario(app)
 
     try {
       await openFormPromptRespondPanel(app, scenario.executionId, scenario.promptId)
 
-      await expect(app.getByText('Running long')).toBeVisible()
-      await expect(app.getByText('This prompt is approaching its response deadline.')).toBeVisible()
-      await expect(app.getByRole('button', { name: 'Submit response' })).toBeVisible()
+      const respondPanel = formPromptRespondPanelRegion(app)
+
+      await expect(respondPanel.getByText('Waiting', { exact: true })).toBeVisible()
+      await expect(formPromptWaitingElapsedInPanel(respondPanel)).toBeVisible()
+      await expect(respondPanel.getByText('Running long')).toHaveCount(0)
+      await expect(formPromptRespondSubmitButton(app)).toBeVisible()
     } finally {
       await disposeTimeoutScenario(app, scenario)
     }

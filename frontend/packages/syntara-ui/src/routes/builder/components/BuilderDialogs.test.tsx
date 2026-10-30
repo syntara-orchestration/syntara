@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { approvalsClient } from '../../../client'
+import { parseFormDefinition } from '../../../forms'
 import { ColorSchemeProvider } from '../../../providers/theme/ColorSchemeProvider'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 
@@ -52,6 +53,8 @@ function renderDialogs(overrides: Partial<React.ComponentProps<typeof BuilderDia
     handleDeleteWorkflow: vi.fn(),
     isDeleting: false,
     triggerName: 'Manual Trigger',
+    canRun: true,
+    runTooltip: '',
     runStepDialog: {
       isOpen: false,
       item: null,
@@ -86,6 +89,22 @@ describe('BuilderDialogs', () => {
     expect(screen.queryByText('Set mock output data for Manual Trigger')).not.toBeInTheDocument()
     expect(screen.queryByText('Delete workflow?')).not.toBeInTheDocument()
     expect(screen.queryByText('Review approval')).not.toBeInTheDocument()
+  })
+
+  it('opens the form trigger dialog directly without the run confirmation step', () => {
+    renderDialogs({
+      confirmDialogOpen: true,
+      triggerNodeId: 'form',
+      triggerName: 'Intake',
+      formTrigger: {
+        definition: parseFormDefinition({
+          fields: [{ type: 'text', value_name: 'reason', label: 'Reason', required: true }],
+        }),
+      },
+    })
+
+    expect(screen.queryByRole('heading', { name: 'Run workflow?' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Run Intake form' })).toBeInTheDocument()
   })
 
   it('shows the run confirmation dialog when confirmDialogOpen is true', () => {
@@ -183,6 +202,8 @@ describe('BuilderDialogs', () => {
       isDeleting: false,
       triggerName: 'Manual Trigger',
       triggerInputSchema: { type: 'object', properties: { name: { type: 'string' } } },
+      canRun: true,
+      runTooltip: '',
       runStepDialog: {
         isOpen: false,
         item: null,

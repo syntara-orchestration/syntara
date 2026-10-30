@@ -1,11 +1,13 @@
 """Unit tests for form submission validation and coercion."""
 
-from typing import Any, get_args
+from datetime import datetime, tzinfo
+from typing import Any, Self, cast, get_args
 
 import pytest
 
+import syntara.forms.validators.submission as submission_module
 from syntara.forms.exceptions import FormDataValidationError
-from syntara.forms.models.form_fields import FormDefinition, FormField
+from syntara.forms.models.form_fields import DateValue, FormDefinition, FormField
 from syntara.forms.validators.submission import validate_form_submission
 
 _STATIC_OPTIONS: dict[str, Any] = {
@@ -69,20 +71,101 @@ class TestSubmissionFlow:
             form, {"name": "bob", "age": 30, "subscribe": True, "start": {"date": "2026-01-05"}}
         )
 
-        assert cleaned == {"name": "bob", "age": 30, "subscribe": True, "start": {"date": "2026-01-05"}}
+        assert cleaned == {"name": "bob", "age": 30, "subscribe": True, "start": "2026-01-05"}
 
-    def test_absent_optional_key_omitted(self) -> None:
-        """An absent optional field is omitted entirely, not set to None."""
+    def test_absent_optional_text_field_has_empty_output(self) -> None:
+        """An absent optional text field is emitted with its type-compatible empty value."""
         cleaned = validate_form_submission(_form(_field("text", "name")), {})
 
-        assert cleaned == {}
+        assert cleaned == {"name": ""}
+
+    @pytest.mark.parametrize(
+        ("field_type", "overrides", "expected"),
+        [
+            ("text", {}, ""),
+            ("textarea", {}, ""),
+            ("masked_text", {}, ""),
+            ("email", {}, ""),
+            ("date", {}, ""),
+            ("number", {}, None),
+            ("dropdown", {"options": _STATIC_OPTIONS}, None),
+            ("checkbox", {}, False),
+            ("multi_select", {"options": _STATIC_OPTIONS}, []),
+        ],
+    )
+    def test_absent_optional_field_has_type_compatible_empty_output(
+        self,
+        field_type: str,
+        overrides: dict[str, Any],
+        expected: Any,  # noqa: ANN401
+    ) -> None:
+        """Omitted optional fields without defaults still appear in cleaned data."""
+        form = _form(_field(field_type, "answer", **overrides))
+
+        assert validate_form_submission(form, {}) == {"answer": expected}
 
     @pytest.mark.parametrize("empty", ["", [], None])
-    def test_empty_values_treated_as_absent(self, empty: Any) -> None:  # noqa: ANN401
-        """Empty string/list/None normalize to absent."""
-        cleaned = validate_form_submission(_form(_field("text", "name")), {"name": empty})
+    def test_explicit_empty_value_clears_default(self, empty: Any) -> None:  # noqa: ANN401
+        """An explicit empty clears a text default and normalizes to a string."""
+        form = _form(_field("text", "name", default="anon"))
 
-        assert cleaned == {}
+        cleaned = validate_form_submission(form, {"name": empty})
+
+        assert cleaned == {"name": ""}
+
+    @pytest.mark.parametrize(
+        ("field_type", "empty", "overrides", "expected"),
+        [
+            ("text", "", {"default": "prefilled"}, ""),
+            ("textarea", [], {"default": "prefilled"}, ""),
+            ("masked_text", None, {"default": "prefilled"}, ""),
+            ("email", "", {"default": "user@example.com"}, ""),
+            ("date", "", {"default": {"date": "2026-01-05"}}, ""),
+            ("number", "", {"default": 7}, None),
+            ("dropdown", [], {"options": _STATIC_OPTIONS, "default": "a"}, None),
+            ("checkbox", None, {"default": True}, False),
+            ("multi_select", [], {"options": _STATIC_OPTIONS, "default": ["a"]}, []),
+        ],
+    )
+    def test_explicit_empty_normalizes_to_field_output_type(
+        self,
+        field_type: str,
+        empty: Any,  # noqa: ANN401
+        overrides: dict[str, Any],
+        expected: Any,  # noqa: ANN401
+    ) -> None:
+        """Every field type emits its canonical empty without applying its default."""
+        form = _form(_field(field_type, "answer", **overrides))
+
+        assert validate_form_submission(form, {"answer": empty}) == {"answer": expected}
+
+    def test_empty_value_normalization_asserts_for_unknown_field_type(self) -> None:
+        """The exhaustive fallback fails if an unknown field kind reaches normalization."""
+        with pytest.raises(AssertionError, match="Expected code to be unreachable"):
+            submission_module._empty_value_for_field(cast("FormField", object()))
+
+    @pytest.mark.parametrize("empty", ["", [], None])
+    def test_required_explicit_empty_value_does_not_use_default(self, empty: Any) -> None:  # noqa: ANN401
+        """Explicit empties clear defaults but cannot satisfy a required field."""
+        form = _form(_field("text", "name", default="anon", required=True))
+
+        errors = _errors(form, {"name": empty})
+
+        assert [(error.field, error.code) for error in errors] == [("name", "required")]
+
+    def test_required_field_uses_nonempty_default_when_omitted(self) -> None:
+        """An omitted required field can be satisfied by its nonempty default."""
+        form = _form(_field("text", "name", default="anon", required=True))
+
+        assert validate_form_submission(form, {}) == {"name": "anon"}
+
+    def test_required_field_rejects_empty_default(self) -> None:
+        """The selected default must also be nonempty for a required field."""
+        form = _form(_field("text", "name", default="", required=True))
+
+        errors = _errors(form, {})
+
+        assert [(error.field, error.code) for error in errors] == [("name", "required")]
 
     def test_default_applied_when_absent(self) -> None:
         """A default fills in for an absent field."""
@@ -417,26 +500,82 @@ class TestDateFieldSubmission:
         return _form(_field("date", "start", **toggles))
 
     @pytest.mark.parametrize(
-        ("toggles", "submitted"),
+        ("toggles", "submitted", "expected"),
         [
-            ({}, {"date": "2026-01-05"}),
-            ({"include_timezone": True}, {"date": "2026-01-05", "timezone": "America/New_York"}),
+            ({}, {"date": "2026-01-05"}, "2026-01-05"),
             (
-                {"include_time": True, "include_timezone": True},
-                {"date": "2026-01-05", "time": "14:30", "timezone": "America/New_York"},
+                {"include_time": True},
+                {"date": "2026-01-05", "time": "14:30"},
+                "2026-01-05T14:30:00",
             ),
             (
-                {"include_date": False, "include_time": True, "include_timezone": True},
-                {"time": "14:30", "timezone": "America/New_York"},
+                {"include_date": False, "include_time": True},
+                {"time": "14:30"},
+                "14:30:00",
             ),
-            ({"include_date": False, "include_timezone": True}, {"timezone": "America/New_York"}),
+            (
+                {"include_date": False, "include_timezone": True},
+                {"timezone": "America/New_York"},
+                "America/New_York",
+            ),
         ],
     )
-    def test_complete_submission_round_trips(self, toggles: dict[str, bool], submitted: dict[str, str]) -> None:
-        """A submission covering every included component is returned verbatim."""
+    def test_complete_submission_uses_output_format(
+        self,
+        toggles: dict[str, bool],
+        submitted: dict[str, str],
+        expected: str,
+    ) -> None:
+        """Every valid date field component combination produces a single string."""
         cleaned = validate_form_submission(self._date_form(**toggles), {"start": submitted})
 
-        assert cleaned["start"] == submitted
+        assert cleaned["start"] == expected
+
+    @pytest.mark.parametrize(
+        ("timezone_name", "expected"),
+        [
+            ("UTC", "14:30:00+00:00"),
+            ("America/New_York", "14:30:00-05:00"),
+            ("Asia/Kolkata", "14:30:00+05:30"),
+        ],
+    )
+    def test_time_without_date_uses_timezone_standard_offset(
+        self,
+        timezone_name: str,
+        expected: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Time-only values use standard offset, even during daylight saving time."""
+
+        class SummerDateTime(datetime):
+            @classmethod
+            def now(cls, tz: tzinfo | None = None) -> Self:
+                return cls(2026, 7, 1, 12, tzinfo=tz)
+
+        monkeypatch.setattr(submission_module, "datetime", SummerDateTime)
+        form = self._date_form(include_date=False, include_time=True, include_timezone=True)
+
+        cleaned = validate_form_submission(
+            form,
+            {"start": {"time": "14:30", "timezone": timezone_name}},
+        )
+
+        assert cleaned["start"] == expected
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            DateValue(time="14:30"),
+            DateValue(timezone="UTC"),
+        ],
+    )
+    def test_time_with_standard_offset_rejects_missing_component(self, value: DateValue) -> None:
+        with pytest.raises(ValueError, match=r"Missing required components: time, timezone"):
+            submission_module._format_time_with_standard_offset(value)
+
+    def test_time_component_formatter_rejects_missing_time(self) -> None:
+        with pytest.raises(ValueError, match=r"Missing required component: time"):
+            submission_module._require_time_component(DateValue())
 
     def test_missing_component_rejected(self) -> None:
         """Every included component is mandatory once the field is answered."""
@@ -497,9 +636,9 @@ class TestDateFieldSubmission:
 
         assert "Invalid timezone: 'Mars/Olympus'" in errors[0].message
 
-    def test_absent_optional_date_is_omitted(self) -> None:
-        """An unanswered optional date field contributes no key."""
-        assert validate_form_submission(self._date_form(), {}) == {}
+    def test_absent_optional_date_has_empty_output(self) -> None:
+        """An unanswered optional date is emitted as an empty ISO-string value."""
+        assert validate_form_submission(self._date_form(), {}) == {"start": ""}
 
     def test_absent_required_date_reports_required(self) -> None:
         """The inherited required flag governs skipping the field entirely."""
@@ -517,7 +656,7 @@ class TestDateFieldSubmission:
 
         cleaned = validate_form_submission(form, {})
 
-        assert cleaned["start"] == {"date": "2026-03-01", "time": "08:00", "timezone": "Europe/Paris"}
+        assert cleaned["start"] == "2026-03-01T08:00:00+01:00"
 
     @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])
     def test_resolved_options_enforce_typed_membership(self, field_type: str) -> None:

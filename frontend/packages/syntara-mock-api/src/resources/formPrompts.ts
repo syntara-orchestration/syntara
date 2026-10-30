@@ -53,6 +53,25 @@ const sampleFormDefinition: FormsAPI.components['schemas']['FormDefinition'] = {
   ],
 }
 
+const textAndTextareaFormDefinition: FormsAPI.components['schemas']['FormDefinition'] = {
+  fields: [
+    {
+      value_name: 'summary',
+      type: 'text',
+      label: 'Summary',
+      required: true,
+      placeholder: 'Describe the change',
+    },
+    {
+      value_name: 'details',
+      type: 'textarea',
+      label: 'Details',
+      required: false,
+      placeholder: 'Additional context',
+    },
+  ],
+}
+
 const dynamicResolvedFormDefinition: FormsAPI.components['schemas']['FormDefinition'] = {
   fields: [
     {
@@ -207,6 +226,27 @@ export const formPrompts: MutableFormPromptRead[] = [
     response_data: { reason: 'Approved for production rollout' },
     responded_at: mockDate.daysAgo1,
     responded_by: { id: 'user-admin', name: 'Admin User', type: 'user' },
+  },
+  {
+    id: 'fp-exec-form-prompt-textarea-layout',
+    created_at: mockDate.minutesAgo10,
+    updated_at: mockDate.minutesAgo10,
+    labels: {},
+    project_id: 'p-001',
+    execution_id: 'exec-form-prompt-textarea-layout',
+    prompt_node_id: 'layout_check',
+    name: 'Textarea layout check',
+    message: 'Summary and details fields for respond-panel layout.',
+    status: 'pending',
+    timeout_at: mockDate.hoursFromNow23,
+    form_definition: textAndTextareaFormDefinition,
+    submit_label: 'Submit response',
+    success_message: 'Thank you — the workflow will continue.',
+    responder_users: [{ id: 'user-admin', username: 'admin' }],
+    responder_groups: [],
+    response_data: null,
+    responded_at: null,
+    responded_by: null,
   },
   {
     id: 'fp-exec-form-prompt-dynamic',

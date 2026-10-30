@@ -6,11 +6,15 @@ import { FormProvider, useForm } from 'react-hook-form'
 import { formDefinitionSchema, safeParseFormDefinition, type FormDefinitionSchemaInput } from '../../forms'
 import { zodResolver } from '../../routes/builder/node-forms/shared/formSchemaUtils'
 
+import type { FormDefinitionFieldServerError } from './formFieldBuilder/formDefinitionFieldServerError'
 import styles from './formFieldBuilder/formFieldBuilder.module.css'
 import { FormFieldBuilderCommitContext } from './formFieldBuilder/formFieldBuilderCommitContext'
 import { FormFieldBuilderDesignTab } from './formFieldBuilder/FormFieldBuilderDesignTab'
 import { FormFieldBuilderJsonSchemaTab } from './formFieldBuilder/FormFieldBuilderJsonSchemaTab'
+import type { FormFieldBuilderOptionsMode } from './formFieldBuilder/formFieldBuilderOptionsModeContext'
+import { FormFieldBuilderOptionsModeProvider } from './formFieldBuilder/FormFieldBuilderOptionsModeProvider'
 import { FormFieldBuilderPreviewTab } from './formFieldBuilder/FormFieldBuilderPreviewTab'
+import { useApplyServerFormFieldErrors } from './formFieldBuilder/useApplyServerFormFieldErrors'
 
 type BuilderTab = 'design' | 'preview' | 'json'
 
@@ -20,6 +24,10 @@ export type SynFormFieldBuilderProps = {
   isDisabled?: boolean
   /** When true, shows only the field cards (no Design / Preview / JSON tabs). */
   designOnly?: boolean
+  /** Restricts dropdown/multi-select fields to static option lists (form triggers). */
+  optionsMode?: FormFieldBuilderOptionsMode
+  /** API validation errors mapped to `fields.{index}.{subPath}` in the builder form. */
+  serverFieldErrors?: ReadonlyArray<FormDefinitionFieldServerError>
 }
 
 /**
@@ -33,6 +41,8 @@ export function SynFormFieldBuilder({
   onChange,
   isDisabled,
   designOnly = false,
+  optionsMode = 'default',
+  serverFieldErrors,
 }: Readonly<SynFormFieldBuilderProps>) {
   const [activeTab, setActiveTab] = useState<BuilderTab>('design')
   const lastEmittedRef = useRef(JSON.stringify(value))
@@ -57,6 +67,8 @@ export function SynFormFieldBuilder({
     methods.reset(JSON.parse(valueKey) as FormDefinitionSchemaInput)
   }, [valueKey, methods])
 
+  useApplyServerFormFieldErrors(methods, serverFieldErrors)
+
   const commit = useCallback(() => {
     const raw = methods.getValues()
     // Keep builder toggles as the user set them (e.g. time on, timezone off). API repair runs on publish via
@@ -73,38 +85,40 @@ export function SynFormFieldBuilder({
   }, [methods, onChange])
 
   const designTab = (
-    <div className={styles.tabPanelBody}>
+    <div className={designOnly ? styles.designOnlyPanel : styles.tabPanelBody}>
       <FormFieldBuilderDesignTab isDisabled={isDisabled} />
     </div>
   )
 
   return (
     <FormProvider {...methods}>
-      <FormFieldBuilderCommitContext value={commit}>
-        {designOnly ? (
-          designTab
-        ) : (
-          <Tabs
-            activeKey={activeTab}
-            onSelect={(_event, tabIndex) => setActiveTab(tabIndex as BuilderTab)}
-            aria-label="Form builder views"
-          >
-            <Tab eventKey="design" title={<TabTitleText>Design</TabTitleText>}>
-              {designTab}
-            </Tab>
-            <Tab eventKey="preview" title={<TabTitleText>Preview</TabTitleText>}>
-              <div className={styles.tabPanelBody}>
-                <FormFieldBuilderPreviewTab />
-              </div>
-            </Tab>
-            <Tab eventKey="json" title={<TabTitleText>JSON Schema</TabTitleText>}>
-              <div className={styles.tabPanelBody}>
-                <FormFieldBuilderJsonSchemaTab isDisabled={isDisabled} />
-              </div>
-            </Tab>
-          </Tabs>
-        )}
-      </FormFieldBuilderCommitContext>
+      <FormFieldBuilderOptionsModeProvider mode={optionsMode}>
+        <FormFieldBuilderCommitContext value={commit}>
+          {designOnly ? (
+            designTab
+          ) : (
+            <Tabs
+              activeKey={activeTab}
+              onSelect={(_event, tabIndex) => setActiveTab(tabIndex as BuilderTab)}
+              aria-label="Form builder views"
+            >
+              <Tab eventKey="design" title={<TabTitleText>Design</TabTitleText>}>
+                {designTab}
+              </Tab>
+              <Tab eventKey="preview" title={<TabTitleText>Preview</TabTitleText>}>
+                <div className={styles.tabPanelBody}>
+                  <FormFieldBuilderPreviewTab />
+                </div>
+              </Tab>
+              <Tab eventKey="json" title={<TabTitleText>JSON Schema</TabTitleText>}>
+                <div className={styles.tabPanelBody}>
+                  <FormFieldBuilderJsonSchemaTab isDisabled={isDisabled} />
+                </div>
+              </Tab>
+            </Tabs>
+          )}
+        </FormFieldBuilderCommitContext>
+      </FormFieldBuilderOptionsModeProvider>
     </FormProvider>
   )
 }

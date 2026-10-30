@@ -63,7 +63,7 @@ Sortable by `created_at`, `updated_at`, `completed_at`, `status`, `deleted_at`, 
 
 ## Signal / Callback
 
-**`POST /executions/{execution_id}/activities/{activity_id}/signal`** — `{signal_data}` delivers external data to a Temporal activity waiting in async-completion (`STARTED`) state, completing it and resuming the workflow. Callers: the Agent Orchestrator (agentic node results), the Approvals service (approve/reject decisions), and any external system driving workflow continuation. See [Workflow Engine Architecture](workflow-engine/workflow-engine-overview.md#why-async-completion-via-signals-approval-agentic-wait) for the full signal chain and why this pattern exists.
+**`POST /executions/{execution_id}/activities/{activity_id}/signal`** — `{signal_data}` delivers external data to a Temporal activity waiting in async-completion (`STARTED`) state, completing it and resuming the workflow. Callers: the Agent Orchestrator (agentic node results), the Approvals service (approve/reject decisions), and any external system driving workflow continuation. See [Workflow Engine Architecture](workflow-engine/workflow-engine-overview.md#why-async-completion-via-signals-approval-form-prompt-agentic-wait) for the full signal chain and why this pattern exists.
 
 ## Related Documentation
 

@@ -55,7 +55,6 @@ export type FormPromptFormSubmitData = {
   fallback_decision?: 'submit' | 'fallback' | null
   submit_label?: string | null
   success_message?: string | null
-  timezone?: string | null
   css_override?: string | null
   settings?: NodeSettings
 }
@@ -304,13 +303,9 @@ function FormPromptFormFields({
   const settingsContent = (
     <NodeSettingsForm
       supportsRetryPolicy={false}
+      supportsTimeout={false}
       continueOnFailureHideFieldLabel
       continueOnFailureHelp="Controls whether the workflow continues after this form expires. When continuing, the fallback decision selects the next path."
-      timeoutFormat="seconds"
-      timeoutSectionTitle=""
-      timeoutLabel="Expected duration (seconds)"
-      timeoutDefaultSeconds={600}
-      timeoutHelp="Show a 'Running long' warning after this duration. Does not stop the run. System default: 10m."
     />
   )
 

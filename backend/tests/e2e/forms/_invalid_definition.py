@@ -16,7 +16,7 @@ from syntara_api_client.models.workflow_validate_request_workflow_definition imp
     WorkflowValidateRequestWorkflowDefinition,
 )
 
-from ._helpers import assert_and_get_with_502_skip
+from ._helpers import assert_and_get_response
 from ._workflows import (
     dynamic_option_field,
     form_trigger_consumer_workflow,
@@ -159,7 +159,7 @@ def create_workflow(
             project_id=first_project_id,
         )
     )
-    workflow = assert_and_get_with_502_skip(response)
+    workflow = assert_and_get_response(response)
     assert response.status_code == HTTPStatus.CREATED
     assert isinstance(workflow, WorkflowRead)
     cleanup_workflows.append(workflow.id)
@@ -249,19 +249,18 @@ _COMMON_CASES: tuple[tuple[str, list[dict[str, Any]], str | None, str, str, int]
         1,
     ),
     (
-        "date_time_requires_timezone",
+        "date_timezone_invalid_combination",
         [
             {
                 "type": "date",
                 "value_name": "when",
                 "label": "When",
-                "include_time": True,
-                "include_timezone": False,
+                "include_timezone": True,
             }
         ],
         _VARIANT_CATEGORY,
         "parameters.form_definition.fields.0",
-        "include_timezone is required when include_time is true",
+        "Select a time when both a date and timezone are included.",
         1,
     ),
     (
@@ -296,8 +295,9 @@ _COMMON_CASES: tuple[tuple[str, list[dict[str, Any]], str | None, str, str, int]
                 "type": "date",
                 "value_name": "when",
                 "label": "When",
+                "include_date": False,
                 "include_timezone": True,
-                "default": {"date": "2026-02-14"},
+                "default": {},
             }
         ],
         _VARIANT_CATEGORY,
@@ -372,29 +372,46 @@ _COMMON_CASES: tuple[tuple[str, list[dict[str, Any]], str | None, str, str, int]
                 },
             }
         ],
-        _VARIANT_CATEGORY,
+        "schema_violation",
         "parameters.form_definition.fields.0.options",
-        "produced by the workflow engine at run time and cannot be authored",
-        1,
+        "dynamic_resolved",
+        2,
     ),
 )
 
 
 def _build_form_field_cases() -> list[Any]:
-    cases = [
-        pytest.param(variant, *case, id=f"{variant.label}-{case[0]}")
-        for variant in FORM_VARIANTS
-        for case in _COMMON_CASES
-    ]
+    cases = []
+    for variant in FORM_VARIANTS:
+        for case_name, fields, expected_category, field_path, message, expected_count in _COMMON_CASES:
+            # The prompt schema/model pair yields two findings; the trigger's static-source schema yields one.
+            variant_expected_count = (
+                1
+                if case_name == "engine_only_dynamic_resolved_options" and variant == TRIGGER_VARIANT
+                else expected_count
+            )
+            cases.append(
+                pytest.param(
+                    variant,
+                    case_name,
+                    fields,
+                    expected_category,
+                    field_path,
+                    message,
+                    variant_expected_count,
+                    id=f"{variant.label}-{case_name}",
+                )
+            )
+    # The trigger schema reports each structural problem with a dynamic source; dynamic_resolved has a separate case.
     cases.append(
         pytest.param(
             TRIGGER_VARIANT,
             "dynamic_options_source",
             [dynamic_option_field("choice", "regions")],
-            TRIGGER_VARIANT.configuration_category,
+            "schema_violation",
             "parameters.form_definition.fields.0.options",
-            "options source 'dynamic'",
-            1,
+            "'dynamic' is not one of ['static']",
+            5,
             id="form_trigger-dynamic_options_source",
         )
     )

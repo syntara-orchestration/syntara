@@ -1,4 +1,4 @@
-"""Shared API and workflow helpers for the form-prompt E2E tests."""
+"""Shared API and workflow helpers for form-prompt and Form Trigger E2E tests."""
 
 import json
 import time
@@ -27,17 +27,125 @@ from syntara_api_client.models import (
     WorkflowCreate,
     WorkflowRead,
 )
+from syntara_api_client.models.activity_data import ActivityData
+from syntara_api_client.models.activity_data_output_data_type_0 import ActivityDataOutputDataType0
 from syntara_api_client.models.error_data import ErrorData
 from syntara_api_client.models.execution_status import ExecutionStatus
-from syntara_api_client.types import Response, UnexpectedResponseException, Unset
+from syntara_api_client.types import Response, Unset
 
-from ._workflows import DEFAULT_CONSUMER_CODE, producer_prompt_consumer_workflow
+from ._workflows import (
+    DEFAULT_CONSUMER_CODE,
+    form_trigger_consumer_workflow,
+    producer_prompt_consumer_workflow,
+)
 
 PROMPT_POLL_TIMEOUT = 60
 EXECUTION_POLL_TIMEOUT = 90
 ACTIVITY_OUTPUT_POLL_TIMEOUT = 30
 # Cancellation is accepted before Temporal and the activity monitor reach terminal state.
 CANCEL_POLL_TIMEOUT = 120
+FORM_TRIGGER_NODE_ID = "form"
+CONSUMER_NODE_ID = "consumer"
+
+
+def activity_output(activity: ActivityData) -> dict[str, Any]:
+    """Return an activity's object-shaped output data."""
+    output_data = activity.output_data
+    assert isinstance(output_data, ActivityDataOutputDataType0)
+    return output_data.to_dict()
+
+
+def activities_by_id(execution: ExecutionRead) -> dict[str, ActivityData]:
+    """Index an execution's activities by activity_id."""
+    return {activity.activity_id: activity for activity in (execution.activities or [])}
+
+
+def create_form_trigger_workflow(
+    workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+    first_project_id: UUID,
+    *,
+    name_prefix: str,
+    description: str,
+    form_fields: list[dict[str, Any]],
+    consumer_code: str = DEFAULT_CONSUMER_CODE,
+    consumer_environment: Mapping[str, str] | None = None,
+) -> WorkflowRead:
+    """Create a uniquely named Form Trigger → script workflow."""
+    name = unique_name(name_prefix)
+    return workflow_factory(
+        WorkflowCreate(
+            name=name,
+            description=description,
+            project_id=first_project_id,
+            workflow_definition=form_trigger_consumer_workflow(
+                name,
+                form_fields=form_fields,
+                consumer_code=consumer_code,
+                consumer_environment=consumer_environment,
+            ),
+        )
+    )
+
+
+def submit_form_trigger(
+    syntara_api: SyntaraApiRegistry,
+    workflow: WorkflowRead,
+    input_data: dict[str, Any],
+) -> Response[Any]:
+    """POST a Form Trigger submission."""
+    return syntara_api.executions.create(
+        body=ExecutionCreate.from_dict(
+            {
+                "workflow_id": str(workflow.id),
+                "trigger_node_id": FORM_TRIGGER_NODE_ID,
+                "input_data": input_data,
+            }
+        )
+    )
+
+
+def submit_form_trigger_and_track(
+    syntara_api: SyntaraApiRegistry,
+    workflow: WorkflowRead,
+    input_data: dict[str, Any],
+    track_execution: Callable[[UUID], None],
+) -> ExecutionRead:
+    """Submit valid data, assert 201, and register the execution for cleanup."""
+    response = submit_form_trigger(syntara_api, workflow, input_data)
+    assert response.status_code == HTTPStatus.CREATED, (
+        f"Expected 201 Created, got {response.status_code}: {response.content!r}"
+    )
+    execution = cast("ExecutionRead", assert_and_get_response(response))
+    track_execution(UUID(str(execution.id)))
+    return execution
+
+
+def assert_form_validation_error(
+    response: Response[Any],
+    *,
+    expected_fields: Collection[str],
+    expected_details: Collection[str] = (),
+) -> dict[str, Any]:
+    """Assert a 422 FORM_VALIDATION_ERROR naming each field, and return the problem."""
+    problem = assert_problem_response(
+        response,
+        expected_status=HTTPStatus.UNPROCESSABLE_ENTITY,
+        expected_code="FORM_VALIDATION_ERROR",
+    )
+    detail = problem["detail"]
+    for field in expected_fields:
+        assert f"{field}: " in detail, f"Expected field {field!r} in validation detail: {detail!r}"
+    for expected_detail in expected_details:
+        assert expected_detail in detail, f"Expected {expected_detail!r} in validation detail: {detail!r}"
+    return problem
+
+
+def assert_no_executions_for_workflow(syntara_api: SyntaraApiRegistry, workflow_id: UUID) -> None:
+    """A rejected Form Trigger submission must leave the workflow with no executions."""
+    executions = assert_and_get_response(
+        syntara_api.executions.list(additional_params={"workflow_id": str(workflow_id)}, limit=100)
+    )
+    assert not executions.resources, f"Rejected submission created executions: {executions.resources!r}"
 
 
 def assert_consumer_completed(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> ExecutionRead:
@@ -46,14 +154,14 @@ def assert_consumer_completed(syntara_api: SyntaraApiRegistry, exec_id: UUID) ->
     assert final.status == ExecutionStatus.COMPLETED, (
         f"Expected COMPLETED after form submission, got {final.status}: {final.error_details}"
     )
-    activities = {activity.activity_id: activity for activity in (final.activities or [])}
-    assert "consumer" in activities, f"Consumer activity missing: {list(activities)}"
-    assert activities["consumer"].status == "completed"
+    activities = activities_by_id(final)
+    assert CONSUMER_NODE_ID in activities, f"Consumer activity missing: {list(activities)}"
+    assert activities[CONSUMER_NODE_ID].status == "completed"
     return final
 
 
-def cancel_form_prompt_execution(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> None:
-    """Cancel a still-active form-prompt execution and wait for its terminal state."""
+def cancel_form_execution(syntara_api: SyntaraApiRegistry, exec_id: UUID) -> None:
+    """Cancel a still-active form execution and wait for its terminal state."""
     execution = _retry_api_call(lambda: syntara_api.executions.get(execution_id=exec_id)).assert_and_get()
     if execution.status in TERMINAL_STATUSES:
         return
@@ -70,14 +178,9 @@ def cancel_form_prompt_execution(syntara_api: SyntaraApiRegistry, exec_id: UUID)
     response.assert_and_get()
 
 
-def assert_and_get_with_502_skip[ResponseT](response: Response[ResponseT]) -> ResponseT:
-    """Parse a response, skipping only on a transient Bad Gateway."""
-    try:
-        return response.assert_and_get()
-    except UnexpectedResponseException as exc:
-        if exc.status_code == HTTPStatus.BAD_GATEWAY:
-            pytest.skip("Backend returned 502 Bad Gateway - transient infrastructure issue")
-        raise
+def assert_and_get_response[ResponseT](response: Response[ResponseT]) -> ResponseT:
+    """Return the parsed response, raising for any unsuccessful status."""
+    return response.assert_and_get()
 
 
 def wait_for_activity_outputs(
@@ -93,7 +196,7 @@ def wait_for_activity_outputs(
     while time.monotonic() < deadline:
         execution = cast(
             "ExecutionRead",
-            assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=exec_id, include="activities")),
+            assert_and_get_response(syntara_api.executions.get(execution_id=exec_id, include="activities")),
         )
         activities = {activity.activity_id: activity for activity in (execution.activities or [])}
         missing = {
@@ -121,9 +224,6 @@ def assert_problem_response(
     Error responses intentionally use the raw body because the generated API
     client parses problem extensions differently across endpoint schemas.
     """
-    if response.status_code == HTTPStatus.BAD_GATEWAY:
-        pytest.skip("Backend returned 502 Bad Gateway - transient infrastructure issue")
-
     assert response.status_code == expected_status, (
         f"Expected {expected_status.value} {expected_status.phrase}, got {response.status_code}: {response.content!r}"
     )
@@ -159,10 +259,10 @@ def assert_definition_invalid(response: Response[Any], *, node_id: str = "prompt
 
 
 def get_form_prompt(syntara_api: SyntaraApiRegistry, prompt_id: UUID) -> FormPromptRead:
-    """GET a form prompt, skipping only on a transient Bad Gateway."""
+    """GET a form prompt."""
     return cast(
         "FormPromptRead",
-        assert_and_get_with_502_skip(syntara_api.form_prompts.get(form_prompt_id=prompt_id)),
+        assert_and_get_response(syntara_api.form_prompts.get(form_prompt_id=prompt_id)),
     )
 
 
@@ -206,14 +306,11 @@ def submit_form_prompt(
     prompt_id: UUID,
     response_data: dict[str, Any],
 ) -> Response[ErrorData | FormPromptRead]:
-    """Submit prompt data, skipping only on a transient Bad Gateway."""
-    response = syntara_api.form_prompts.submit(
+    """Submit prompt data."""
+    return syntara_api.form_prompts.submit(
         form_prompt_id=prompt_id,
         body=FormPromptSubmitRequest(response_data=FormPromptSubmitRequestResponseData.from_dict(response_data)),
     )
-    if response.status_code == HTTPStatus.BAD_GATEWAY:
-        pytest.skip("Backend returned 502 Bad Gateway - transient infrastructure issue")
-    return response
 
 
 def assert_forbidden(response: Response[Any], *, expected_code: str) -> None:
@@ -236,12 +333,12 @@ def assert_prompt_not_consumed(
     assert not prompt.response_data
     assert not prompt.responded_by
 
-    execution = assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=exec_id, include="activities"))
+    execution = assert_and_get_response(syntara_api.executions.get(execution_id=exec_id, include="activities"))
     assert execution.status not in TERMINAL_STATUSES, (
         f"Execution must not advance on a rejected submission; got {execution.status}"
     )
-    activities = {activity.activity_id: activity for activity in (execution.activities or [])}
-    assert activities.get("consumer") is None or activities["consumer"].status != "completed"
+    activities = activities_by_id(execution)
+    assert activities.get(CONSUMER_NODE_ID) is None or activities[CONSUMER_NODE_ID].status != "completed"
 
 
 def wait_for_form_prompt_paused(
@@ -253,7 +350,7 @@ def wait_for_form_prompt_paused(
 ) -> ExecutionRead:
     """Wait until the execution is paused on the form-prompt activity."""
     for _ in range(timeout):
-        execution = assert_and_get_with_502_skip(syntara_api.executions.get(execution_id=exec_id, include="activities"))
+        execution = assert_and_get_response(syntara_api.executions.get(execution_id=exec_id, include="activities"))
         activities = {activity.activity_id: activity for activity in (execution.activities or [])}
         prompt_activity = activities.get(prompt_node_id)
         if execution.status == ExecutionStatus.PAUSED and prompt_activity is not None:
@@ -313,7 +410,7 @@ def create_form_prompt_execution(
     )
     execution = cast(
         "ExecutionRead",
-        assert_and_get_with_502_skip(
+        assert_and_get_response(
             syntara_api.executions.create(body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger"))
         ),
     )

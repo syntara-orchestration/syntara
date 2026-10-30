@@ -1,11 +1,11 @@
 import {
+  ActionGroup,
   Alert,
   Button,
   DescriptionList,
   DescriptionListDescription,
   DescriptionListGroup,
   DescriptionListTerm,
-  Divider,
   Spinner,
   Stack,
   StackItem,
@@ -32,12 +32,11 @@ import {
   resolveFormPromptWaitingStartedAt,
 } from './formPrompt/formPromptNodeId'
 import { FormPromptPendingResponseForm } from './formPrompt/FormPromptPendingResponseForm'
+import { FormPromptRespondPanelFooterSlot } from './formPrompt/FormPromptRespondPanelFooter'
 import { formPromptClosedStatusLabel, isFormPromptResponsePending } from './formPrompt/formPromptResponseState'
 import { FormPromptUnresolvedDynamicOptionsAlert } from './formPrompt/FormPromptUnresolvedDynamicOptionsAlert'
-import type { WorkflowDefinitionLike } from './formPrompt/resolveCanvasNodeType'
-import { resolveFormPromptRunningLongThresholdSeconds } from './formPrompt/resolveFormPromptRunningLongThreshold'
 import styles from './FormPromptResponseContent.module.css'
-import { FormPromptRunningLongAlert, FormPromptWaitingDuration } from './FormPromptTimeoutIndicators'
+import { FormPromptWaitingDuration } from './FormPromptWaitingDuration'
 import { useCanSubmitFormPrompt } from './hooks/useCanSubmitFormPrompt'
 import { useFormPromptPermissions } from './hooks/useFormPromptPermissions'
 
@@ -52,7 +51,6 @@ type FormPromptResponseContentProps = Readonly<{
   formPromptId: string
   activityNameMap?: Map<string, string>
   onSubmitted?: () => void
-  workflowDefinition?: WorkflowDefinitionLike
 }>
 
 function isFormPromptRead(data: unknown): data is FormPromptRead {
@@ -161,7 +159,6 @@ function FormPromptResponseBody({
   submitTooltip,
   submitMutation,
   onSubmit,
-  workflowDefinition,
 }: Readonly<{
   prompt: FormPromptRead
   activityNameMap?: Map<string, string>
@@ -171,7 +168,6 @@ function FormPromptResponseBody({
   submitTooltip: string | undefined
   submitMutation: { isPending: boolean }
   onSubmit: (responseData: Record<string, unknown>) => Promise<void>
-  workflowDefinition?: WorkflowDefinitionLike
 }>) {
   const promptStepLabel = resolvePromptStepLabel(prompt, activityNameMap)
   const responseFormId = formPromptResponseFormId(prompt.id ?? 'form-prompt')
@@ -179,10 +175,6 @@ function FormPromptResponseBody({
   const submitDisabled = !canSubmit || submitMutation.isPending
   const activityStates = useExecutionStore((state) => state.activityStates)
   const waitingStartedAt = resolveFormPromptWaitingStartedAt(prompt, activityStates)
-  const runningLongThresholdSeconds = resolveFormPromptRunningLongThresholdSeconds(
-    prompt.prompt_node_id,
-    workflowDefinition
-  )
   const hasUnresolvedDynamicOptions = formDefinitionHasUnresolvedDynamicOptions(prompt.form_definition)
 
   return (
@@ -197,15 +189,6 @@ function FormPromptResponseBody({
               isPending={isPending}
             />
           </StackItem>
-          {isPending ? (
-            <StackItem>
-              <FormPromptRunningLongAlert
-                waitingStartedAt={waitingStartedAt}
-                runningLongThresholdSeconds={runningLongThresholdSeconds}
-                isPending={isPending}
-              />
-            </StackItem>
-          ) : null}
           {isPending ? (
             <StackItem>
               {hasUnresolvedDynamicOptions ? <FormPromptUnresolvedDynamicOptionsAlert /> : null}
@@ -248,26 +231,21 @@ function FormPromptResponseBody({
       </StackItem>
 
       {isPending && canSubmit ? (
-        <StackItem className={styles.footer}>
-          <Stack hasGutter>
-            <StackItem>
-              <Divider />
-            </StackItem>
-            <StackItem>
-              <DisabledWithTooltip isDisabled={submitDisabled} content={submitTooltip}>
-                <Button
-                  type="submit"
-                  form={responseFormId}
-                  variant="primary"
-                  isDisabled={submitDisabled}
-                  isLoading={submitMutation.isPending}
-                >
-                  {submitLabel}
-                </Button>
-              </DisabledWithTooltip>
-            </StackItem>
-          </Stack>
-        </StackItem>
+        <FormPromptRespondPanelFooterSlot>
+          <ActionGroup>
+            <DisabledWithTooltip isDisabled={submitDisabled} content={submitTooltip}>
+              <Button
+                type="submit"
+                form={responseFormId}
+                variant="primary"
+                isDisabled={submitDisabled}
+                isLoading={submitMutation.isPending}
+              >
+                {submitLabel}
+              </Button>
+            </DisabledWithTooltip>
+          </ActionGroup>
+        </FormPromptRespondPanelFooterSlot>
       ) : null}
     </Stack>
   )
@@ -302,7 +280,6 @@ function FormPromptResponseReady({
   prompt,
   formPromptId,
   activityNameMap,
-  workflowDefinition,
   permissions,
   canSubmitAsResponder,
   submitMutation,
@@ -315,7 +292,6 @@ function FormPromptResponseReady({
   prompt: FormPromptRead
   formPromptId: string
   activityNameMap?: Map<string, string>
-  workflowDefinition?: WorkflowDefinitionLike
   permissions: ReturnType<typeof useFormPromptPermissions>
   canSubmitAsResponder: boolean
   submitMutation: {
@@ -374,7 +350,6 @@ function FormPromptResponseReady({
       submitTooltip={submitTooltip}
       submitMutation={submitMutation}
       onSubmit={handleSubmit}
-      workflowDefinition={workflowDefinition}
     />
   )
 }
@@ -384,7 +359,6 @@ export function FormPromptResponseContent({
   formPromptId,
   activityNameMap,
   onSubmitted,
-  workflowDefinition,
 }: FormPromptResponseContentProps) {
   const queryClient = useQueryClient()
   const { showSuccess } = useAlerts()
@@ -454,7 +428,6 @@ export function FormPromptResponseContent({
       prompt={prompt}
       formPromptId={formPromptId}
       activityNameMap={activityNameMap}
-      workflowDefinition={workflowDefinition}
       permissions={permissions}
       canSubmitAsResponder={canSubmitAsResponder}
       submitMutation={submitMutation}

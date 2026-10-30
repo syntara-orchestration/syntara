@@ -19,7 +19,6 @@ type FormDateValueInputsProps = Readonly<{
   dateAriaLabel?: string
   timeAriaLabel?: string
   timezoneAriaLabel?: string
-  allowEmptyTimezone?: boolean
 }>
 
 function readComponent(value: DateValueShape | null | undefined, name: DateComponentName): string {
@@ -66,7 +65,6 @@ export function FormDateValueInputs({
   dateAriaLabel = 'Date',
   timeAriaLabel = 'Time',
   timezoneAriaLabel = 'Time zone',
-  allowEmptyTimezone = false,
 }: FormDateValueInputsProps) {
   const showDate = included.includes('date')
   const showTime = included.includes('time')
@@ -77,7 +75,11 @@ export function FormDateValueInputs({
 
   const handleTimeChange = useCallback<NonNullable<TimePickerProps['onChange']>>(
     (...args) => {
-      const [, , hour, minute, , isValid] = args
+      const [, time, hour, minute, , isValid] = args
+      if (time.trim() === '') {
+        onChange(mergeComponent(value, 'time', '', included))
+        return
+      }
       if (!isValid || hour == null || minute == null) {
         return
       }
@@ -97,6 +99,7 @@ export function FormDateValueInputs({
               <div className={styles.dateInput}>
                 <DatePicker
                   value={isoDate ? formatDateMDY(isoYmdToLocalDate(isoDate)) : ''}
+                  placeholder="MM/DD/YYYY"
                   onChange={(_event, displayValue) => {
                     if (displayValue === '') {
                       onChange(mergeComponent(value, 'date', '', included))
@@ -144,7 +147,6 @@ export function FormDateValueInputs({
             onChange={(tz) => onChange(mergeComponent(value, 'timezone', tz, included))}
             isDisabled={isDisabled}
             ariaLabel={timezoneAriaLabel}
-            allowEmpty={allowEmptyTimezone}
           />
         </StackItem>
       )}
