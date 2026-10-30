@@ -20,16 +20,19 @@ vi.mock('../../workflows/hooks/useExecutionWebSocket', () => ({
 vi.mock('../../workflows/stores/useExecutionStore', () => {
   const mockSetActivityExecutions = vi.fn()
   const mockInjectPendingStates = vi.fn()
+  const mockSetRetryReplayBaseline = vi.fn()
   const mockActivityStates = new Map()
   return {
     useExecutionStore: Object.assign(vi.fn(), {
       getState: () => ({
         setActivityExecutions: mockSetActivityExecutions,
         injectPendingStates: mockInjectPendingStates,
+        setRetryReplayBaseline: mockSetRetryReplayBaseline,
         activityStates: mockActivityStates,
       }),
       __mockSet: mockSetActivityExecutions,
       __mockInject: mockInjectPendingStates,
+      __mockSetRetryReplayBaseline: mockSetRetryReplayBaseline,
       __mockActivityStates: mockActivityStates,
     }),
   }
@@ -40,6 +43,9 @@ const mockInjectPendingStates = (useExecutionStore as unknown as { __mockInject:
   .__mockInject
 const mockActivityStates = (useExecutionStore as unknown as { __mockActivityStates: Map<string, unknown> })
   .__mockActivityStates
+const mockSetRetryReplayBaseline = (
+  useExecutionStore as unknown as { __mockSetRetryReplayBaseline: ReturnType<typeof vi.fn> }
+).__mockSetRetryReplayBaseline
 
 function getInjectedNodeIds(): string[] {
   return mockInjectPendingStates.mock.calls[0][0] as string[]
@@ -122,6 +128,24 @@ describe('useSyncActivityStore', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockActivityStates.clear()
+  })
+
+  it('sets the retry replay baseline from a retried run so terminal runs show replay indicators', () => {
+    const execution = {
+      ...baseExecution,
+      created_at: '2026-01-01T00:00:00Z',
+      retried_from_execution_id: 'exec-source',
+    } as Execution
+
+    renderHook(() => useSyncActivityStore(execution, []))
+
+    expect(mockSetRetryReplayBaseline).toHaveBeenCalledWith('2026-01-01T00:00:00Z')
+  })
+
+  it('clears the retry replay baseline for a run that is not a retry', () => {
+    renderHook(() => useSyncActivityStore(baseExecution, []))
+
+    expect(mockSetRetryReplayBaseline).toHaveBeenCalledWith(null)
   })
 
   it('sets activity executions when activities are provided', () => {

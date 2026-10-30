@@ -13,6 +13,7 @@ import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
+import { isReplayedStep } from './utils/replayedNodes'
 
 function parseTimeMs(value: string | null | undefined): number | null {
   if (value == null) return null
@@ -47,6 +48,8 @@ type ExecutionActivityTableProps = {
   onRowClick?: (nodeId: string, nodeName: string) => void
   /** Currently selected node ID for row highlighting. */
   selectedNodeId?: string | null
+  /** Timestamp replayed steps predate; set only for retry executions. */
+  replayBaselineAt?: string | null
 }
 
 const DASH = (
@@ -89,6 +92,7 @@ function ActivityRow({
   onRowClick,
   isSelected,
   hasAAPColumn,
+  replayBaselineAt,
 }: Readonly<{
   id: string
   name?: string
@@ -99,11 +103,13 @@ function ActivityRow({
   onRowClick?: (nodeId: string, nodeName: string) => void
   isSelected?: boolean
   hasAAPColumn: boolean
+  replayBaselineAt?: string | null
 }>) {
   const elapsedMs = computeActivityDurationMs(state, now) ?? undefined
   const displayName = name ?? id
   const jobUrl = isAAPNodeType(type) ? extractAAPJobUrl(state?.outputData) : null
   const columnCount = hasAAPColumn ? 6 : 5
+  const replayed = isReplayedStep(state?.startedAt, replayBaselineAt)
 
   return (
     <Fragment>
@@ -117,7 +123,7 @@ function ActivityRow({
         <Td dataLabel="Ended">{state?.completedAt ? <ExecutionTimestamp dateString={state.completedAt} /> : DASH}</Td>
         <Td dataLabel="Elapsed time">{elapsedMs === undefined ? DASH : formatElapsedTime(elapsedMs)}</Td>
         <Td dataLabel="Status" modifier="nowrap">
-          <ActivityStatusLabel status={state?.status ?? 'pending'} nodeType={type} />
+          <ActivityStatusLabel status={state?.status ?? 'pending'} nodeType={type} replayed={replayed} />
         </Td>
         {hasAAPColumn && <Td dataLabel="AAP Job">{jobUrl ? <AAPJobLink url={jobUrl} /> : null}</Td>}
       </Tr>
@@ -141,6 +147,7 @@ export function ExecutionActivityTable({
   executionError,
   onRowClick,
   selectedNodeId,
+  replayBaselineAt,
 }: ExecutionActivityTableProps) {
   const hasAAPColumn = useMemo(() => activityOrder.some((a) => isAAPNodeType(a.type)), [activityOrder])
 
@@ -169,6 +176,7 @@ export function ExecutionActivityTable({
             onRowClick={onRowClick}
             isSelected={parseCompositeKey(id).baseId === selectedNodeId}
             hasAAPColumn={hasAAPColumn}
+            replayBaselineAt={replayBaselineAt}
           />
         ))}
       </Tbody>
