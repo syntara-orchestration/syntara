@@ -86,7 +86,6 @@ export function SynStepSemanticZoomBody(props: {
   const ariaLabel = `${props.title}, ${props.typeLabel}`
 
   return (
-    // eslint-disable-next-line syntara/prefer-pf-text-components -- layout shell; children are controls and the icon tile, not text content
     <div
       className={styles.root}
       style={
