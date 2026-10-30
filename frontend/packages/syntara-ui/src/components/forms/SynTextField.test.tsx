@@ -22,7 +22,9 @@ describe('SynTextField', () => {
     ))
 
     expect(screen.getByText('Group name')).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Group name' })).toBeInTheDocument()
+    const input = screen.getByRole('textbox', { name: 'Group name' })
+    expect(input).toBeInTheDocument()
+    expect(input).not.toHaveAttribute('aria-describedby')
   })
 
   it('shows placeholder text', () => {
@@ -56,7 +58,11 @@ describe('SynTextField', () => {
       <SynTextField name="name" control={control} label="Group name" hint="Lowercase letters and hyphens only" />
     ))
 
+    const input = screen.getByRole('textbox', { name: 'Group name' })
     expect(screen.getByText('Lowercase letters and hyphens only')).toBeInTheDocument()
+    const describedBy = input.getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    expect(input).toHaveAccessibleDescription('Lowercase letters and hyphens only')
   })
 
   it('shows validation error on submit and hides hint', async () => {
@@ -70,9 +76,34 @@ describe('SynTextField', () => {
       </>
     ))
 
+    const input = screen.getByRole('textbox', { name: 'Group name' })
+    expect(screen.getByText('Enter a name')).toBeInTheDocument()
+    const describedBy = input.getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+
     await user.click(screen.getByRole('button', { name: 'Submit' }))
 
     expect(await screen.findByText('Name is required')).toBeInTheDocument()
+    expect(input).toHaveAttribute('aria-describedby', describedBy)
+    expect(input).toHaveAccessibleDescription(/Name is required/)
+    expect(screen.queryByText('Enter a name')).not.toBeInTheDocument()
+  })
+
+  it('omits aria-describedby when an error has no rendered message', async () => {
+    const user = userEvent.setup()
+    renderWithForm<FormData>({ schema, defaultValues: { name: '', email: '' } }, ({ control, setError }) => (
+      <>
+        <SynTextField name="name" control={control} label="Group name" hint="Enter a name" />
+        <button type="button" onClick={() => setError('name', { type: 'manual' })}>
+          Set error without a message
+        </button>
+      </>
+    ))
+
+    const input = screen.getByRole('textbox', { name: 'Group name' })
+    await user.click(screen.getByRole('button', { name: 'Set error without a message' }))
+
+    expect(input).not.toHaveAttribute('aria-describedby')
     expect(screen.queryByText('Enter a name')).not.toBeInTheDocument()
   })
 
@@ -172,10 +203,10 @@ describe('SynTextField', () => {
     expect(screen.getByRole('textbox', { name: 'Group name' })).toHaveAttribute('autocomplete', 'off')
   })
 
-  it('has no accessibility violations in default state', async () => {
+  it('has no accessibility violations with helper text', async () => {
     const { container } = renderWithForm<FormData>(
       { schema, defaultValues: { name: '', email: '' } },
-      ({ control }) => <SynTextField name="name" control={control} label="Group name" isRequired />
+      ({ control }) => <SynTextField name="name" control={control} label="Group name" hint="Enter a name" isRequired />
     )
 
     expect(await axe(container)).toHaveNoViolations()
