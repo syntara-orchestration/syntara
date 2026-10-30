@@ -8,13 +8,14 @@ import {
 } from '../utils/api'
 
 import { clickAddConnectedStep } from './add-connected-step'
-import { canvasStepNode, clickCanvasStepToOpenEditor } from './canvas-interaction'
+import { canvasStepNode, clickCanvasStepToOpenEditor, expectCanvasStepTitleVisible } from './canvas-interaction'
 import { clickSaveAndWait } from './workflow-save'
 
 export { createBasicWorkflowViaApi, publishWorkflowViaApi }
 export { clickAddConnectedStep }
 export { clickSaveAndWait, isWorkflowSaveResponse } from './workflow-save'
 export { buildUniqueName } from './workflowNames'
+export { expectCanvasStepTitleVisible } from './canvas-interaction'
 
 export const addStepPanel = (page: Page) =>
   page.getByRole('region', {
@@ -599,7 +600,7 @@ export async function createWorkflowWithTrigger(page: Page, workflowName: string
   await nameInput.fill(workflowName)
   await clickSaveAndWait(page)
 
-  await expect(page.getByText('Manual trigger')).toBeVisible()
+  await expectCanvasStepTitleVisible(page, 'Manual trigger')
   await expect(page.getByRole('button', { name: 'Reset layout', exact: true })).toBeVisible()
 
   // Wait for canvas to be fully ready

@@ -12,7 +12,7 @@
  */
 
 import { test, expect, toAppUrl, type Page } from '../fixtures'
-import { buildUniqueName, openBuilderById } from '../helpers/workflows'
+import { buildUniqueName, openBuilderById, expectCanvasStepTitleVisible } from '../helpers/workflows'
 import {
   apiRequest,
   createWorkflowViaApi,
@@ -171,7 +171,7 @@ test.describe('Retry Execution', () => {
       expect(workflowId, 'workflowId must be set by beforeAll').not.toBeNull()
 
       await openBuilderById(app, workflowId!)
-      await expect(app.getByText('Manual trigger')).toBeVisible({ timeout: 30_000 })
+      await expectCanvasStepTitleVisible(app, 'Manual trigger', { timeout: 30_000 })
 
       // Open run history via the builder kebab menu → "Run history" item
       const workflowKebab = app.getByRole('button', { name: 'Workflow actions' })
