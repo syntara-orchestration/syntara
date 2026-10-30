@@ -397,7 +397,7 @@ describe('BuilderFlow execution view', () => {
       currentWorkflow: {
         id: 'workflow-retry',
         inputs: {},
-        triggers: [{ type: 'manual', name: 'Manual Trigger' }],
+        triggers: [{ id: 'trigger-manual', type: 'manual', name: 'Manual Trigger' }],
         workflow: {
           activities: [
             {
@@ -419,13 +419,14 @@ describe('BuilderFlow execution view', () => {
         { id: 'edge-trigger-replayed', source: 'trigger-0', target: 'task-replayed' },
         { id: 'edge-replayed-fresh', source: 'task-replayed', target: 'task-fresh' },
       ],
-      triggers: [{ type: 'manual', name: 'Manual Trigger' }],
+      triggers: [{ id: 'trigger-manual', type: 'manual', name: 'Manual Trigger' }],
     })
-    // Retry created at noon. The first step carries the source run's 11:00 start,
-    // the second actually ran inside the retry at 12:00:05.
+    // Retry created at noon. The trigger and first step carry the source run's
+    // 11:00 start; the second actually ran inside the retry at 12:00:05.
     setRetryReplayBaseline('2026-10-09T12:00:00Z')
     setExecutionState(
       new Map([
+        ['trigger-manual', { status: 'completed', startedAt: '2026-10-09T11:00:00Z' } as never],
         ['task-replayed', { status: 'completed', startedAt: '2026-10-09T11:00:00Z' } as never],
         ['task-fresh', { status: 'running', startedAt: '2026-10-09T12:00:05Z' } as never],
       ])
@@ -445,6 +446,7 @@ describe('BuilderFlow execution view', () => {
         unknown
       >
 
+    expect(stateOf('trigger-0').replayed).toBe(true)
     expect(stateOf('task-replayed').replayed).toBe(true)
     expect(stateOf('task-fresh').replayed).toBe(false)
   })

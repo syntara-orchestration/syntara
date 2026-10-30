@@ -107,7 +107,8 @@ export function useExecutionStateEnrichment({
             triggerRealId,
             node.data,
             effectiveExecutionStatus,
-            activityStates
+            activityStates,
+            replayBaselineAt
           )
           return applyEnrichedDataStable(node, enriched, anyChangedRef)
         }

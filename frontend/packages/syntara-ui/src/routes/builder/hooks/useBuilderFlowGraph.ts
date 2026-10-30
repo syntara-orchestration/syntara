@@ -82,7 +82,8 @@ export function useBuilderFlowGraph({
         trigger.id,
         triggerData,
         executionStatus,
-        activityStates
+        activityStates,
+        replayBaselineAt
       )
       nodes.push({
         id: triggerId,
