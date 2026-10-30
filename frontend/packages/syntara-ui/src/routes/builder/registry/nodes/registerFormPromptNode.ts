@@ -9,7 +9,7 @@ import { getDefaultNodeBaseName } from '../../utils/nodeNaming'
 import { NodeRegistry } from '../NodeRegistry'
 
 /**
- * Register the Form (interactive prompt) step type.
+ * Register the Form (form step) step type.
  */
 export default function registerFormPromptNode() {
   NodeRegistry.register<FormPromptFormSubmitData>({

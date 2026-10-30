@@ -376,7 +376,7 @@ export type CreateFormPromptActivityOptions = {
 }
 
 /**
- * Create a form_prompt (interactive prompt) node (v2).
+ * Create a form_prompt (form step) node (v2).
  */
 export function createFormPromptActivity(options: CreateFormPromptActivityOptions): Activity {
   const { id, name, settings, ...parameterInput } = options

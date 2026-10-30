@@ -12,7 +12,7 @@ const meta: Meta<typeof SynFormFieldBuilder> = {
     docs: {
       description: {
         component:
-          'Visual editor for interactive prompt form definitions. ' +
+          'Visual editor for form step form definitions. ' +
           'File upload is not available in the builder until it is added to the FormDefinition schema.',
       },
     },
