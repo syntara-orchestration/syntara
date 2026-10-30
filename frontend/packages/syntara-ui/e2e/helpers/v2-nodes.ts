@@ -105,6 +105,16 @@ export async function addManualTrigger(page: Page, name = 'Manual trigger') {
   // Panel auto-closes after adding trigger - no manual close needed
 }
 
+/** Add a form trigger. Must be called on a fresh /workflow-builder/new page. */
+export async function addFormTrigger(page: Page, name = 'Form trigger') {
+  await expect(page.getByRole('progressbar', { name: 'Loading' })).not.toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('button', { name: 'Form trigger' }).click()
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 10_000 })
+}
+
 /** Select a service account in the trigger form's "Authorized service accounts" dropdown. */
 async function selectServiceAccount(page: Page, serviceAccountName: string) {
   // Two buttons match /authorized service accounts/i: the toggle (has text "Select service
