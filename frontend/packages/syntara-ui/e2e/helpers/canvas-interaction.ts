@@ -27,6 +27,22 @@ export function canvasStepNode(page: Page, stepName: string) {
   return page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
 }
 
+/** Primary title on a canvas step node (subtitle may repeat the name under StandardStepHeader). */
+export function canvasStepTitleHeading(stepNode: Locator, stepName: string) {
+  return stepNode.getByRole('heading', { name: stepName, exact: true })
+}
+
+/** Assert a step's canvas title is visible without Playwright strict-mode ambiguity. */
+export async function expectCanvasStepTitleVisible(
+  page: Page,
+  stepName: string,
+  options?: { timeout?: number },
+) {
+  const node = canvasStepNode(page, stepName)
+  await expect(node).toBeVisible(options)
+  await expect(canvasStepTitleHeading(node, stepName)).toBeVisible(options)
+}
+
 /**
  * Open the three-panel step editor from the canvas. SynStep nodes use the header Edit
  * control; generic placeholder nodes still open on body click.

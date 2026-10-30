@@ -17,6 +17,7 @@ import {
   addScriptStep,
   verifyStepVisible,
   triggerLayout,
+  expectCanvasStepTitleVisible,
 } from '../helpers/workflows'
 
 test('delete a middle step removes the step and its connected edges', async ({ app }) => {
@@ -25,7 +26,7 @@ test('delete a middle step removes the step and its connected edges', async ({ a
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add three connected steps: Manual trigger → Step A → Step B → Step C
     await addScriptStep(app, 'Step A', 'print("A")')
@@ -105,7 +106,7 @@ for (const { position, steps, deleteStep, remainingSteps } of deletePositionCase
 
     try {
       await closeStepEditorPanel(app)
-      await expect(app.getByText('Manual trigger')).toBeVisible()
+      await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
       // Add steps
       for (const stepName of steps) {
