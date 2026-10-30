@@ -30,7 +30,11 @@ export function SynStepHeaderActions(
   }
 
   return (
-    <Flex alignItems={{ default: 'alignItemsCenter' }} className={`nodrag nopan ${actionsStyles.actionsRow}`}>
+    <Flex
+      alignItems={{ default: 'alignItemsCenter' }}
+      className={`nodrag nopan ${actionsStyles.actionsRow}`}
+      data-syn-step-actions=""
+    >
       {showExpand ? (
         <FlexItem>
           <SynStepExpandToggle stepLabel={props.stepTitle} />

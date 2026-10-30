@@ -82,6 +82,14 @@ describe('TriggerStepComponent', () => {
     expect(screen.queryByLabelText('Step actions menu')).not.toBeInTheDocument()
   })
 
+  it('does not render the manual details line under the type label', () => {
+    render(<TriggerStepComponent {...createNodeProps()} />)
+
+    expect(screen.getByRole('heading', { name: 'Trigger' })).toBeInTheDocument()
+    expect(screen.getByText('Manual trigger')).toBeInTheDocument()
+    expect(screen.queryByText('Manual')).not.toBeInTheDocument()
+  })
+
   it('renders "Manual trigger" when the manual trigger details are shown', () => {
     render(
       <TriggerStepComponent

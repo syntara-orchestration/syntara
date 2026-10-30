@@ -20,7 +20,7 @@ export type LoopNode = { type: 'loop' } & Node<LoopActivity>
 export function LoopStepComponent(props: NodeProps<LoopNode>) {
   const metadata = stepMetadata.loop
   const iconColor = getStepTypeColor('loop')
-  const iconNode = renderStepIcon(metadata.icon, 'logic-loop', 'canvas', iconColor)
+  const iconNode = renderStepIcon(metadata.icon, 'logic-loop', 'header', iconColor)
   const semanticZoomIcon = renderStepIcon(metadata.icon, 'logic-loop', 'semanticZoom', iconColor)
   const menuActions = useStepMenuActions({
     nodeId: props.data.id,
@@ -59,7 +59,6 @@ export function LoopStepComponent(props: NodeProps<LoopNode>) {
       semanticZoomIcon={semanticZoomIcon}
       semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
-      semanticZoomExpandable={metadata.expandable}
     >
       <StandardStepHeader
         icon={iconNode}

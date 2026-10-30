@@ -1,4 +1,4 @@
-import { Flex } from '@patternfly/react-core'
+import { Flex, FlexItem } from '@patternfly/react-core'
 import { useNodeId, useStore, useUpdateNodeInternals } from '@xyflow/react'
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
@@ -32,7 +32,6 @@ export function SynStepSemanticZoomBody(props: {
   icon?: ReactNode
   previewIcon?: ReactNode
   menuActions?: readonly StepMenuAction[]
-  expandable?: boolean
   branchSources?: readonly SemanticZoomBranchSource[]
   selected: boolean
   hasDashedBorder: boolean
@@ -113,18 +112,14 @@ export function SynStepSemanticZoomBody(props: {
             }
           }}
         >
-          {/* eslint-disable-next-line syntara/prefer-pf-text-components -- semantic zoom tile shell; icon uses Flex, no text content */}
-          <div className={tileClassName} style={tileRadiusStyle}>
-            {props.icon ? (
-              <Flex
-                className={styles.iconSlot}
-                alignItems={{ default: 'alignItemsCenter' }}
-                justifyContent={{ default: 'justifyContentCenter' }}
-              >
-                {props.icon}
-              </Flex>
-            ) : null}
-          </div>
+          <Flex
+            className={tileClassName}
+            style={tileRadiusStyle}
+            alignItems={{ default: 'alignItemsCenter' }}
+            justifyContent={{ default: 'justifyContentCenter' }}
+          >
+            {props.icon ? <FlexItem className={styles.iconSlot}>{props.icon}</FlexItem> : null}
+          </Flex>
         </button>
 
         {showPreview ? (
@@ -139,7 +134,6 @@ export function SynStepSemanticZoomBody(props: {
                 title={props.title}
                 subtitle={props.typeLabel}
                 menuActions={[...menuActions]}
-                expandable={props.expandable}
                 menuPopperProps={{ position: 'right' }}
               />
             </div>

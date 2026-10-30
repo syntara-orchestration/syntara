@@ -44,7 +44,7 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
     iconId = 'trigger-eda'
   }
   const iconColor = getStepTypeColor(FlowNodeType.TRIGGER)
-  const iconNode = renderStepIcon(metadata.icon, iconId, 'canvas', iconColor)
+  const iconNode = renderStepIcon(metadata.icon, iconId, 'header', iconColor)
   const semanticZoomIcon = renderStepIcon(metadata.icon, iconId, 'semanticZoom', iconColor)
   const triggerStyle: CSSProperties = {
     borderTopLeftRadius: '45px',
@@ -101,7 +101,6 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
       semanticZoomIcon={semanticZoomIcon}
       semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
-      semanticZoomExpandable={metadata.expandable}
     >
       <TriggerStepDetails
         icon={iconNode}
@@ -137,6 +136,9 @@ function TriggerStepDetails(
     triggerTypeLabel = 'Event-Driven Ansible trigger'
   }
 
+  const isManualTrigger = props.triggerKind == null || props.triggerKind === TriggerTypeEnum.MANUAL_TRIGGER
+  const showTriggerDetails = !isManualTrigger && normalizedDetails != null && normalizedDetails !== ''
+
   return (
     <>
       <StandardStepHeader
@@ -146,13 +148,13 @@ function TriggerStepDetails(
         menuActions={props.menuActions}
         expandable={false}
       />
-      <SynStepBody>
-        {normalizedDetails ? (
+      {showTriggerDetails ? (
+        <SynStepBody>
           <Content component={ContentVariants.small} style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>
             {normalizedDetails}
           </Content>
-        ) : null}
-      </SynStepBody>
+        </SynStepBody>
+      ) : null}
     </>
   )
 }

@@ -22,7 +22,7 @@ export type ConditionNode = { type: 'condition' } & Node<ConditionActivity>
 export function ConditionStepComponent(props: NodeProps<ConditionNode>) {
   const metadata = stepMetadata.condition
   const iconColor = getStepTypeColor('condition')
-  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_CONDITION, 'canvas', iconColor)
+  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_CONDITION, 'header', iconColor)
   const semanticZoomIcon = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_CONDITION, 'semanticZoom', iconColor)
   const menuActions = useStepMenuActions({
     nodeId: props.data.id,
@@ -59,7 +59,6 @@ export function ConditionStepComponent(props: NodeProps<ConditionNode>) {
       semanticZoomIcon={semanticZoomIcon}
       semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
-      semanticZoomExpandable={metadata.expandable}
     >
       <ConditionStepDetails conditionActivity={props.data} icon={iconNode} menuActions={menuActions}>
         <BranchHandles>

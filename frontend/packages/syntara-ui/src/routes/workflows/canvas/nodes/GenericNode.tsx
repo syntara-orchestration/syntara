@@ -28,7 +28,7 @@ export function GenericStepComponent(props: NodeProps<GenericNode>) {
 
   const showTitle = !customMessage
   const iconColor = getStepTypeColor(FlowNodeType.GENERIC)
-  const iconNode = renderStepIcon(RhUiSettingsIcon, FlowNodeType.GENERIC, 'canvas', iconColor)
+  const iconNode = renderStepIcon(RhUiSettingsIcon, FlowNodeType.GENERIC, 'header', iconColor)
   const semanticZoomIcon = renderStepIcon(RhUiSettingsIcon, FlowNodeType.GENERIC, 'semanticZoom', iconColor)
 
   const reverseHandles = typeof metadata?.__reverseHandles === 'boolean' ? metadata.__reverseHandles : undefined

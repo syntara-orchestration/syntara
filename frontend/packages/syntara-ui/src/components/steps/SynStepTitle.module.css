@@ -3,14 +3,20 @@
   width: 100%;
 }
 
-.titleText {
-  margin-bottom: var(--pf-t--global--spacer--xs);
+.titleText,
+.subtitleText {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
+.titleText {
+  margin-bottom: var(--pf-t--global--spacer--xs);
+}
+
 .subtitleText {
   margin-bottom: var(--pf-t--global--spacer--sm);
-  overflow-wrap: anywhere;
-  word-break: break-word;
 }

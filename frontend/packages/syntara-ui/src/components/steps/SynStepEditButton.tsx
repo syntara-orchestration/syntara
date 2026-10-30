@@ -9,14 +9,14 @@ export function SynStepEditButton(
     className?: string
   }>
 ) {
-  const label = `Edit ${props.stepTitle}`
+  const accessibleName = `Edit ${props.stepTitle}`
 
   return (
-    <Tooltip content={label}>
+    <Tooltip content="Edit step">
       <Button
         variant="secondary"
         size="sm"
-        aria-label={label}
+        aria-label={accessibleName}
         className={`nodrag nopan ${styles.editButton} ${props.className ?? ''}`}
         onClick={(event) => {
           event.stopPropagation()
