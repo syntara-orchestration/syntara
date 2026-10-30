@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
 import type { useAlerts } from '../../providers/alerts'
+import { useProjectStore } from '../../stores/useProjectStore'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { accessClient } from '../access/accessClient'
@@ -34,6 +35,11 @@ export function useProjectActions({ showSuccess, showError, onRefetch, onDeleteS
               description: `Project "${project.name}" has been deleted successfully.`,
             })
             detachPromise(queryClient.invalidateQueries({ queryKey: ['all-projects'] }))
+            // Deleting the currently selected project would otherwise leave the page
+            // querying a now-nonexistent project_id, surfacing a "project not found" error.
+            if (useProjectStore.getState().selectedProjectId === project.id) {
+              useProjectStore.getState().setSelectedProjectId(null)
+            }
             onRefetch()
           },
           onError: (error: unknown) => {
