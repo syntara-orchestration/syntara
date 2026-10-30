@@ -146,7 +146,6 @@ function ThreePanelLayout({
           isRunning={isRunning}
           viewMode={viewMode}
           onViewModeChange={onViewModeChange}
-          retryMode={retryMode}
           headerLabel={headerLabel}
           onClosePanel={onClosePanel}
         />
@@ -361,6 +360,7 @@ export function ExecutionDetailsPanel({
   const { setActivityExecutions } = useExecutionStoreActions()
   const activityStates = useExecutionStore((s) => s.activityStates)
   const replayBaselineAt = useExecutionStore(selectRetryReplayBaseline)
+  const [retryModeViewMode, setRetryModeViewMode] = useState<ViewMode>('details')
   const [viewMode, setViewMode] = useState<ViewMode>('overview')
 
   const executionQuery = executionsClient.useQuery('get', '/executions/{execution_id}', {
@@ -419,12 +419,15 @@ export function ExecutionDetailsPanel({
       onNodeSelect,
     })
 
-  const effectiveViewMode: ViewMode = retryMode ? 'details' : viewMode
+  const effectiveViewMode: ViewMode = retryMode ? retryModeViewMode : viewMode
 
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
-      if (retryMode && mode !== 'details') return
-      setViewMode(mode)
+      if (retryMode) {
+        setRetryModeViewMode(mode)
+      } else {
+        setViewMode(mode)
+      }
       if (mode === 'details' && effectiveKey === null && filteredActivityOrder.length > 0) {
         const first = filteredActivityOrder[0]
         handleRowClick(first.id, first.name ?? first.id)

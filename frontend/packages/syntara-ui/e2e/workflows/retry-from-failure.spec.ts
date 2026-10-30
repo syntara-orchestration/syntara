@@ -265,6 +265,7 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await app.getByTestId('retry-from-failure-button').click()
 
       await expect(app.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+      await expect(app.getByText(/^Elapsed time:/)).toHaveCount(1)
       await expect(app.getByText(/"language": "bash"/, { exact: false })).toBeVisible()
       await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
 
@@ -294,17 +295,21 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       const inputTitle = app.getByText('Input parameters', { exact: true })
       const inputTitleBounds = await inputTitle.evaluate((element) => {
         const bounds = element.getBoundingClientRect()
-        return { left: bounds.left, top: bounds.top }
+        return { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom }
       })
       const editedBadgeBounds = await app.getByText('Edited for retry').evaluate((element) => {
         const bounds = element.getBoundingClientRect()
         return { left: bounds.left, top: bounds.top }
       })
-      expect(Math.abs(inputTitleBounds.top - editedBadgeBounds.top)).toBeLessThanOrEqual(2)
+      expect(Math.abs(inputTitleBounds.top - editedBadgeBounds.top)).toBeLessThanOrEqual(4)
 
-      const editIcon = app.getByRole('button', { name: 'Edit parameters for retry' }).locator('svg')
-      const editIconLeft = await editIcon.evaluate((element) => element.getBoundingClientRect().left)
-      expect(Math.abs(editIconLeft - inputTitleBounds.left)).toBeLessThan(3)
+      const editButtonBounds = await app.getByRole('button', { name: 'Edit parameters for retry' }).evaluate((element) => {
+          const bounds = element.getBoundingClientRect()
+          return { left: bounds.left, top: bounds.top, bottom: bounds.bottom }
+        })
+      expect(editButtonBounds.top).toBeLessThan(inputTitleBounds.bottom)
+      expect(editButtonBounds.bottom).toBeGreaterThan(inputTitleBounds.top)
+      expect(editButtonBounds.left).toBeGreaterThan(inputTitleBounds.right)
 
       const searchInput = app.getByRole('textbox', { name: 'Search input parameters data' })
       const viewToggle = app.getByRole('group', { name: 'Input parameters view selection' })
@@ -333,7 +338,8 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       expect(outputViewToggleBounds.top).toBeGreaterThan(outputSearchBounds.bottom)
       expect(Math.abs(outputSearchBounds.left - outputViewToggleBounds.left)).toBeLessThan(2)
       expect(Math.abs(outputSearchBounds.width - outputViewToggleBounds.width)).toBeLessThan(3)
-      expect(outputSearchBounds.top).toBeLessThan(searchBounds.top)
+      expect(Math.abs(outputSearchBounds.top - searchBounds.top)).toBeLessThanOrEqual(2)
+      expect(Math.abs(outputViewToggleBounds.top - viewToggleBounds.top)).toBeLessThanOrEqual(2)
 
       await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
       await expect(app.getByTestId('inline-code-editor').locator('.view-lines')).toContainText('echo retry')

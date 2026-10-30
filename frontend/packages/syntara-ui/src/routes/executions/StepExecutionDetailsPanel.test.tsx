@@ -326,7 +326,7 @@ describe('StepExecutionDetailsPanel', () => {
     expect(searchInputs[0]).toHaveValue('')
   })
 
-  it('renders running status with elapsed time updating', () => {
+  it('renders running status without a separate step elapsed time', () => {
     const propsWithRunning = {
       ...defaultProps,
       stepState: {
@@ -339,7 +339,7 @@ describe('StepExecutionDetailsPanel', () => {
     render(<StepExecutionDetailsPanel {...propsWithRunning} />, { wrapper })
 
     expect(screen.getByText('Running')).toBeInTheDocument()
-    expect(screen.getByText(/Elapsed time:/)).toBeInTheDocument()
+    expect(screen.queryByText(/Elapsed time:/)).not.toBeInTheDocument()
   })
 
   it('renders failed status with error styling on output', () => {
@@ -357,13 +357,12 @@ describe('StepExecutionDetailsPanel', () => {
     expect(screen.getByText('Failed')).toBeInTheDocument()
   })
 
-  it('renders timestamp range when step has both start and end times', () => {
+  it('renders only the completion timestamp when step has both start and end times', () => {
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
-    // Start and end render as two separate <time> elements (via PatternFly Timestamp)
-    // joined by " - ". Timestamps render in local timezone, so just verify the date
-    // appears twice rather than asserting an exact combined string.
-    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(2)
+    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(1)
+    expect(screen.queryByText(/ - /)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Elapsed time:/)).not.toBeInTheDocument()
   })
 
   it('renders only start timestamp when completion time is missing', () => {

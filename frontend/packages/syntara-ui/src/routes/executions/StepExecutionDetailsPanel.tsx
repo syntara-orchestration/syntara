@@ -33,10 +33,8 @@ import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynErrorState } from '../../components/states/SynErrorState'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
-import { useElapsedTime } from '../../hooks/useElapsedTime'
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
 import { capitalize } from '../../utils/capitalize'
-import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { highlightTextLines } from '../../utils/highlightText'
 import { ActivityStatusLabel } from '../builder/ExecutionStatus'
@@ -146,8 +144,8 @@ function DataPane({
           <div className={styles.dataPaneTitleRow}>
             <span className={styles.dataPaneTitle}>{title}</span>
             {titleAddon && <span className={styles.dataPaneTitleAddon}>{titleAddon}</span>}
+            {titleAction}
           </div>
-          {titleAction && <div className={styles.dataPaneTitleActionRow}>{titleAction}</div>}
           <div className={styles.dataPaneControlsWrap}>
             <Flex
               alignItems={{ default: stackControls ? 'alignItemsStretch' : 'alignItemsCenter' }}
@@ -278,15 +276,11 @@ function UsedToolsSection({ tools }: Readonly<{ tools: UsedTool[] }>) {
 
 function StepDetailsHeader({
   stepName,
-  stepStarted,
-  stepCompleted,
-  stepElapsedLabel,
+  stepTimestamp,
   status,
 }: Readonly<{
   stepName: string
-  stepStarted: string | null
-  stepCompleted: string | null
-  stepElapsedLabel?: string
+  stepTimestamp: string | null
   status?: ActivityState['status']
 }>) {
   return (
@@ -299,26 +293,12 @@ function StepDetailsHeader({
         </FlexItem>
         <FlexItem>
           <Flex gap={{ default: 'gapMd' }} alignItems={{ default: 'alignItemsCenter' }}>
-            {stepStarted && (
+            {stepTimestamp && (
               <Content
                 component={ContentVariants.small}
                 style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
               >
-                <ExecutionTimestamp dateString={stepStarted} />
-                {stepCompleted && (
-                  <>
-                    {' - '}
-                    <ExecutionTimestamp dateString={stepCompleted} />
-                  </>
-                )}
-              </Content>
-            )}
-            {stepElapsedLabel && (
-              <Content
-                component={ContentVariants.small}
-                style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
-              >
-                Elapsed time: {stepElapsedLabel}
+                <ExecutionTimestamp dateString={stepTimestamp} />
               </Content>
             )}
             {status && (
@@ -413,7 +393,6 @@ function StepContentArea({
                   <Tooltip content="Edit parameters for retry">
                     <Button
                       variant="plain"
-                      className={styles.retryInputEditButton}
                       aria-label="Edit parameters for retry"
                       isDisabled={retryEditorProps.isDisabled}
                       onClick={() =>
@@ -476,20 +455,14 @@ export function StepExecutionDetailsPanel({
   const approvalAudit = useMemo(() => extractApprovalAudit(outputData), [outputData])
   const usedTools = useMemo(() => extractUsedTools(outputData), [outputData])
 
-  const stepStarted = stepState?.startedAt ?? null
-  const stepCompleted = stepState?.completedAt ?? null
-  const stepIsRunning = stepState?.status === 'running'
+  const stepTimestamp = stepState?.completedAt ?? stepState?.startedAt ?? null
   const stepIsFailed = stepState?.status === 'failed'
-  const { elapsedMs } = useElapsedTime(stepStarted, stepCompleted, stepIsRunning)
-  const stepElapsedLabel = elapsedMs === undefined ? undefined : formatElapsedTime(elapsedMs)
 
   return (
     <Stack className={styles.contentContainer}>
       <StepDetailsHeader
         stepName={stepName}
-        stepStarted={stepStarted}
-        stepCompleted={stepCompleted}
-        stepElapsedLabel={stepElapsedLabel}
+        stepTimestamp={stepTimestamp}
         status={stepState?.status}
       />
 

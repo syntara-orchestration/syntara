@@ -35,21 +35,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: var(--pf-t--global--spacer--sm);
-  min-height: 1.5rem;
-}
-
-.dataPaneTitleActionRow {
-  display: flex;
-  align-items: center;
-  min-height: 1.5rem;
-}
-
-.retryInputEditButton {
-  padding-inline-start: 0;
-}
-
-.retryInputEditButton :global(svg) {
-  transform: translateX(-0.5rem);
+  min-height: 2.25rem;
 }
 
 .dataPaneControlsWrap {

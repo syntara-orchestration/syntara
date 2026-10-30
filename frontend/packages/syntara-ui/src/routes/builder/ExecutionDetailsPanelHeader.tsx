@@ -38,7 +38,6 @@ type HeaderMetadataProps = {
   isRunning: boolean
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
-  retryMode?: boolean
   headerLabel?: string
   onClosePanel?: () => void
 }
@@ -49,7 +48,6 @@ export function HeaderMetadata({
   isRunning,
   viewMode,
   onViewModeChange,
-  retryMode = false,
   headerLabel,
   onClosePanel,
 }: Readonly<HeaderMetadataProps>) {
@@ -68,7 +66,7 @@ export function HeaderMetadata({
           </FlexItem>
           <FlexItem>
             <Tabs activeKey={viewMode} onSelect={(_e, key) => onViewModeChange(key as ViewMode)} variant="secondary">
-              {!retryMode && <Tab eventKey="overview" title={<TabTitleText>Overview</TabTitleText>} />}
+              <Tab eventKey="overview" title={<TabTitleText>Overview</TabTitleText>} />
               <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
             </Tabs>
           </FlexItem>

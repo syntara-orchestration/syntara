@@ -302,7 +302,8 @@ describe('ExecutionDetailsPanel', () => {
       expect(screen.getByText('Process data')).toBeInTheDocument()
     })
 
-    it('keeps Run details in Details mode while retry mode is active', () => {
+    it('keeps Overview and Details available and defaults to Details in retry mode', async () => {
+      const user = userEvent.setup()
       render(
         <ExecutionDetailsPanel
           executionId="exec-123"
@@ -312,8 +313,13 @@ describe('ExecutionDetailsPanel', () => {
         />
       )
 
+      expect(screen.getByRole('tab', { name: 'Overview' })).toBeInTheDocument()
       expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
-      expect(screen.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('tab', { name: 'Overview' }))
+
+      expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'false')
     })
 
     it('selects the first activity by default when switching to Details mode', async () => {
