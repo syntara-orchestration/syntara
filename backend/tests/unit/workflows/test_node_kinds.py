@@ -6,11 +6,37 @@ from typing import Any
 
 import pytest
 
-from syntara.workflows.node_kinds import NODE_KINDS, node_labels, validate_node_kind_statements
+from syntara.workflows.node_kinds import (
+    NODE_KIND_DISPLAY_LABELS,
+    NODE_KINDS,
+    node_kind_display_label,
+    node_labels,
+    validate_node_kind_statements,
+)
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 _SYSTEM_ONLY_NODE_TYPES = frozenset({NodeType.INTERNAL_ACTIVITY.value})
 _GRANTABLE_NODE_TYPES = sorted(NODE_KINDS)
+
+
+def test_display_labels_cover_every_grantable_kind() -> None:
+    """Adding a grantable step type requires an explicit display label."""
+    assert set(NODE_KIND_DISPLAY_LABELS) == NODE_KINDS
+
+
+@pytest.mark.parametrize(
+    ("kind", "label"),
+    [
+        ("manual_trigger", "Manual trigger"),
+        ("eda_trigger", "Event-Driven Ansible trigger"),
+        ("agentic", "Task Agent"),
+        ("http_request", "REST API"),
+        ("future_step_type", "Future Step Type"),
+    ],
+)
+def test_node_kind_display_label(kind: str, label: str) -> None:
+    """Use builder terminology, with readable labels for unrecognized kinds."""
+    assert node_kind_display_label(kind) == label
 
 
 def test_registry_and_schema_catalog_cover_all_node_types() -> None:

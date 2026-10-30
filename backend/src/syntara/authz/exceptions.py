@@ -155,6 +155,11 @@ class InvalidResourceActionError(SyntaraError):
     """Raised when a policy statement references an unregistered resource:action pair."""
 
 
-@fastapi_exception(handler=_invalid_action_handler)
-class DenyEffectNotSupportedError(SyntaraError):
-    """Raised when a policy statement uses effect='deny', which is not yet supported."""
+@fastapi_exception(handler="syntara.authz.exceptions._invalid_action_handler")
+class DenyEffectNotAllowedError(SyntaraError):
+    """Raised when a deny statement targets an ineligible action or scope."""
+
+
+@fastapi_exception(handler="syntara.authz.exceptions._invalid_action_handler")
+class InvalidNodeKindError(InvalidResourceActionError):
+    """Raised when step-type policy selectors are invalid."""
