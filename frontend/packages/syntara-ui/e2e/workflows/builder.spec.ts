@@ -17,7 +17,6 @@ import {
   createWorkflowWithTrigger,
   addScriptStep,
   verifyStepVisible,
-  verifyNodeVisible,
   expectCanvasStepTitleVisible,
   waitForUIReady,
   triggerLayout,
