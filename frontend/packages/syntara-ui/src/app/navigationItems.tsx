@@ -73,6 +73,12 @@ export const NAV_ITEMS: TNavigationItem[] = [
     requiredPermissions: [{ action: 'read', resourceType: 'execution_target' }],
   },
   {
+    label: 'Configure Execution Target',
+    path: AppRoute.ExecutionPlane.Create,
+    hidden: true,
+    routePermission: { action: 'create', resourceType: 'execution_target' },
+  },
+  {
     label: 'Execution Target Detail',
     path: AppRoute.ExecutionPlane.Detail,
     hidden: true,

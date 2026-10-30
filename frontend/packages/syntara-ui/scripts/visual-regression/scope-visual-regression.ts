@@ -67,6 +67,7 @@ const SCOPE_RULES: Array<{ prefix: string; sections: string[] }> = [
   { prefix: 'src/routes/builder/', sections: ['workflows'] },
   { prefix: 'src/routes/approvals/', sections: ['approvals'] },
   { prefix: 'src/routes/executions/', sections: ['executions'] },
+  { prefix: 'src/routes/execution-plane/', sections: ['execution-plane'] },
   { prefix: 'src/routes/configuration/credentials/', sections: ['configuration/credentials'] },
   { prefix: 'src/routes/configuration/integrations/', sections: ['configuration/integrations'] },
   { prefix: 'src/routes/configuration/settings/', sections: ['settings'] },

@@ -1,0 +1,17 @@
+/*
+ * FormSection adds --pf-v6-c-form__section--MarginBlockStart (xl) on top of the
+ * form's grid gap for every section after the first. Prefer a single form-level gap.
+ */
+.formSection {
+  --pf-v6-c-form__section--MarginBlockStart: 0;
+}
+
+/*
+ * Section intro copy is a grid child of FormSection, which already applies
+ * --pf-v6-c-form__section--Gap (~lg) after the title (title itself only offsets
+ * by -sm). Pull the description up so title→caption sits closer (~sm).
+ */
+.sectionDescription {
+  margin-block-end: 0;
+  margin-block-start: calc(-1 * var(--pf-t--global--spacer--sm));
+}

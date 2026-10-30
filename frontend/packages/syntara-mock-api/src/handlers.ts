@@ -200,6 +200,16 @@ function getUsernameFromRequest(request: Request): string {
   return 'admin'
 }
 
+/** Matches can_i: admin/demo (and other default-allow personas) may write; auditor is read-only. */
+function canWriteExecutionTarget(username: string): boolean {
+  return username === 'admin' || username === 'demo'
+}
+
+/** Matches can_i: admin/demo/auditor may read. */
+function canReadExecutionTarget(username: string): boolean {
+  return username === 'admin' || username === 'demo' || username === 'auditor'
+}
+
 const randomCharacters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const randomCharactersLowercase = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
@@ -427,9 +437,8 @@ export const handlers = [
 
   http.get('/api/execution_plane/v1/execution_targets', ({ request }) => {
     const username = getUsernameFromRequest(request)
-    // Match backend role conventions: only admin/auditor have execution_target:read
-    // (project-admin / padmin are denied — same as can_i without a project grant).
-    if (username !== 'admin' && username !== 'auditor') {
+    // Align with can_i: admin/demo/auditor may read (viewer/user/project personas denied).
+    if (!canReadExecutionTarget(username)) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/forbidden',
@@ -539,7 +548,7 @@ export const handlers = [
 
   http.get('/api/execution_plane/v1/execution_targets/:target_id', ({ request, params }) => {
     const username = getUsernameFromRequest(request)
-    if (username !== 'admin' && username !== 'auditor') {
+    if (!canReadExecutionTarget(username)) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/forbidden',
@@ -566,6 +575,151 @@ export const handlers = [
       )
     }
     return HttpResponse.json(target)
+  }),
+
+  http.post('/api/execution_plane/v1/execution_targets', async ({ request }) => {
+    const username = getUsernameFromRequest(request)
+    // Align with can_i (admin/demo allowed); otherwise create form is reachable then POST 403s.
+    if (!canWriteExecutionTarget(username)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:create',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const body = (await request.json()) as {
+      name?: string
+      placement?: {
+        type?: 'kubernetes'
+        namespace?: string
+        node_selectors?: string[]
+        tolerations?: string[]
+      }
+      labels?: Record<string, string>
+      is_default?: boolean
+    }
+
+    const name = body.name?.trim() ?? ''
+    const namespace = body.placement?.namespace?.trim() ?? ''
+
+    if (!name || !namespace) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/validation-error',
+          title: 'Validation Error',
+          detail: 'name and placement.namespace are required',
+          code: 'VALIDATION_ERROR',
+          retryable: false,
+        },
+        { status: 422 }
+      )
+    }
+
+    if (executionTargets.some((target) => target.name.toLowerCase() === name.toLowerCase())) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: `An execution target named "${name}" already exists`,
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    const openshiftIntegrations = integrations.filter((item) => item.integration_type === IntegrationTypeEnum.OPENSHIFT)
+    if (openshiftIntegrations.length !== 1) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Expected exactly one installed Execution Plane cluster',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    // length === 1 was asserted above
+    const openshiftIntegration = openshiftIntegrations[0]!
+    const id = uuidv4()
+    const created = {
+      id,
+      cluster_id: openshiftIntegration.id,
+      name,
+      backend_type: 'kubernetes',
+      endpoint:
+        openshiftIntegration.configuration && 'base_url' in openshiftIntegration.configuration
+          ? String(openshiftIntegration.configuration.base_url)
+          : 'https://api.openshift.example.com:6443',
+      placement: {
+        type: 'kubernetes' as const,
+        namespace,
+        node_selectors: body.placement?.node_selectors ?? [],
+        tolerations: body.placement?.tolerations ?? [],
+      },
+      status: 'registering',
+      enabled: true,
+      is_default: body.is_default ?? false,
+      status_message: null,
+      labels: {
+        ...(body.labels ?? {}),
+        integration_id: openshiftIntegration.id,
+      },
+      created_at: mockDate.now,
+      last_ran_at: null,
+    }
+
+    executionTargets.unshift(created)
+
+    return HttpResponse.json(created, {
+      status: 201,
+      headers: {
+        Location: `/api/execution_plane/v1/execution_targets/${id}`,
+      },
+    })
+  }),
+
+  http.delete('/api/execution_plane/v1/execution_targets/:target_id', ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (!canWriteExecutionTarget(username)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:delete',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const targetId = params.target_id as string
+    const index = executionTargets.findIndex((item) => item.id === targetId)
+    if (index === -1) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: `Execution target ${targetId} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+
+    executionTargets.splice(index, 1)
+    return HttpResponse.json({ id: targetId }, { status: 202 })
   }),
 
   http.get('/api/v1/integrations', ({ request }) => {

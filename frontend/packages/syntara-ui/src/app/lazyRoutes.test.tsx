@@ -12,6 +12,7 @@ import {
   BuilderNew,
   EditIdentityProvider,
   ExecutionDetail,
+  CreateExecutionTarget,
   ExecutionPlane,
   ExecutionTargetDetail,
   Executions,
@@ -40,6 +41,9 @@ vi.mock('../routes/configuration/settings/SettingsCategoryRoute', () => ({
 vi.mock('../routes/documentation/glossary/Glossary', () => ({ default: () => <div>Glossary</div> }))
 vi.mock('../routes/approvals/Approvals', () => ({ default: () => <div>Approvals</div> }))
 vi.mock('../routes/execution-plane/ExecutionPlane', () => ({ default: () => <div>ExecutionPlane</div> }))
+vi.mock('../routes/execution-plane/CreateExecutionTarget', () => ({
+  CreateExecutionTarget: () => <div>CreateExecutionTarget</div>,
+}))
 vi.mock('../routes/execution-plane/ExecutionTargetDetail', () => ({
   default: () => <div>ExecutionTargetDetail</div>,
 }))
@@ -70,6 +74,7 @@ describe('lazyRoutes', () => {
       Glossary,
       Approvals,
       ExecutionPlane,
+      CreateExecutionTarget,
       ExecutionTargetDetail,
       AccessManagement,
       Authentication,
@@ -94,6 +99,7 @@ describe('lazyRoutes', () => {
       ['Glossary', Glossary, 'Glossary'],
       ['Approvals', Approvals, 'Approvals'],
       ['ExecutionPlane', ExecutionPlane, 'ExecutionPlane'],
+      ['CreateExecutionTarget', CreateExecutionTarget, 'CreateExecutionTarget'],
       ['ExecutionTargetDetail', ExecutionTargetDetail, 'ExecutionTargetDetail'],
       ['AccessManagement', AccessManagement, 'AccessManagement'],
       ['Authentication', Authentication, 'Authentication'],

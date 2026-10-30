@@ -4,6 +4,13 @@ import { mockDate } from './mockDates'
 
 type ExecutionTargetFacadeRead = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
 
+/**
+ * Single installed OpenShift / Execution Plane cluster (matches the OpenShift
+ * integration seeded in `integrations.ts`). Target create requires exactly one.
+ */
+export const INSTALLED_EXECUTION_PLANE_CLUSTER_ID = 'b1000000-0000-4000-8000-000000000001'
+const INSTALLED_CLUSTER_ENDPOINT = 'https://api.west.openshift.example.com:6443'
+
 /** EP `TargetStatus` values used by the seeded mock dataset. */
 const STATUSES = ['active', 'bootstrapping', 'degraded', 'registering', 'failed', 'validating', 'draining'] as const
 const REGIONS = ['us-west', 'us-east', 'eu-central', 'ap-south'] as const
@@ -18,10 +25,10 @@ function buildExtraTargets(count: number): ExecutionTargetFacadeRead[] {
     const region = REGIONS[index % REGIONS.length]
     return {
       id: `a1000000-0000-4000-8000-${idSuffix}`,
-      cluster_id: `b1000000-0000-4000-8000-${idSuffix}`,
+      cluster_id: INSTALLED_EXECUTION_PLANE_CLUSTER_ID,
       name: `Worker Pool ${padded}`,
       backend_type: 'kubernetes',
-      endpoint: `https://api.pool-${padded}.openshift.example.com:6443`,
+      endpoint: INSTALLED_CLUSTER_ENDPOINT,
       placement: {
         type: 'kubernetes' as const,
         namespace: `syntara-pool-${padded}`,
@@ -36,6 +43,7 @@ function buildExtraTargets(count: number): ExecutionTargetFacadeRead[] {
         region,
         env: index % 2 === 0 ? 'prod' : 'dev',
         pool: `pool-${padded}`,
+        integration_id: INSTALLED_EXECUTION_PLANE_CLUSTER_ID,
       },
       created_at: mockDate.daysAgo1,
       last_ran_at: index % 4 === 0 ? mockDate.hoursAgo2 : null,
@@ -47,10 +55,10 @@ function buildExtraTargets(count: number): ExecutionTargetFacadeRead[] {
 export const executionTargets: ExecutionTargetFacadeRead[] = [
   {
     id: 'a1000000-0000-4000-8000-000000000001',
-    cluster_id: 'b1000000-0000-4000-8000-000000000001',
+    cluster_id: INSTALLED_EXECUTION_PLANE_CLUSTER_ID,
     name: 'Prod OpenShift West',
     backend_type: 'kubernetes',
-    endpoint: 'https://api.west.openshift.example.com:6443',
+    endpoint: INSTALLED_CLUSTER_ENDPOINT,
     placement: {
       type: 'kubernetes',
       namespace: 'syntara-workers',
@@ -64,17 +72,17 @@ export const executionTargets: ExecutionTargetFacadeRead[] = [
     labels: {
       region: 'us-west',
       env: 'prod',
-      integration_id: 'b1000000-0000-4000-8000-000000000001',
+      integration_id: INSTALLED_EXECUTION_PLANE_CLUSTER_ID,
     },
     created_at: mockDate.daysAgo7,
     last_ran_at: mockDate.minutesAgo30,
   },
   {
     id: 'a1000000-0000-4000-8000-000000000002',
-    cluster_id: 'b1000000-0000-4000-8000-000000000002',
+    cluster_id: INSTALLED_EXECUTION_PLANE_CLUSTER_ID,
     name: 'Staging OpenShift',
     backend_type: 'kubernetes',
-    endpoint: 'https://api.staging.openshift.example.com:6443',
+    endpoint: INSTALLED_CLUSTER_ENDPOINT,
     placement: {
       type: 'kubernetes',
       namespace: 'syntara-staging',
@@ -88,6 +96,7 @@ export const executionTargets: ExecutionTargetFacadeRead[] = [
     labels: {
       region: 'us-east',
       env: 'staging',
+      integration_id: INSTALLED_EXECUTION_PLANE_CLUSTER_ID,
     },
     created_at: mockDate.daysAgo2,
     last_ran_at: null,
