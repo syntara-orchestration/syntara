@@ -24,6 +24,7 @@ import {
   deleteWorkflow,
   fillCodeEditor,
   selectProjectIfRequired,
+  expectCanvasStepTitleVisible,
 } from './helpers/workflows'
 import { createServiceAccountViaApi, deleteServiceAccountViaApi, ensureProject } from './utils/api'
 
@@ -129,7 +130,7 @@ test.describe('Webhook Trigger', () => {
 
       // Trigger is created and appears on the canvas (form closes)
       await expect(app.getByRole('button', { name: 'Create' })).not.toBeAttached({ timeout: 10_000 })
-      await expect(app.getByText('Webhook')).toBeVisible()
+      await expectCanvasStepTitleVisible(app, 'Webhook Trigger')
     } finally {
       await deleteServiceAccountViaApi(app, sa.id)
     }
