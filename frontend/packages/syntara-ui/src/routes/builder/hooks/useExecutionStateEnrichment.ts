@@ -11,6 +11,7 @@ type ExecutionStateSnapshot = {
   status?: string
   started_at?: string
   completed_at?: string
+  replayed?: boolean
 }
 
 type UseExecutionStateEnrichmentParams = {
@@ -20,6 +21,8 @@ type UseExecutionStateEnrichmentParams = {
   activityStates: Map<string, ActivityState>
   preResolvedNodes: Set<string>
   copiedRunActivityIds?: ReadonlySet<string> | null
+  /** Timestamp replayed steps predate; set only for retry executions. */
+  replayBaselineAt?: string | null
   setNodes: React.Dispatch<React.SetStateAction<NodeType[]>>
 }
 
@@ -31,7 +34,8 @@ function hasExecutionStateChanged(
     currentState !== newState &&
     (currentState?.status !== newState?.status ||
       currentState?.started_at !== newState?.started_at ||
-      currentState?.completed_at !== newState?.completed_at)
+      currentState?.completed_at !== newState?.completed_at ||
+      currentState?.replayed !== newState?.replayed)
   )
 }
 
@@ -60,6 +64,7 @@ export function useExecutionStateEnrichment({
   activityStates,
   preResolvedNodes,
   copiedRunActivityIds,
+  replayBaselineAt,
   setNodes,
 }: UseExecutionStateEnrichmentParams): void {
   const applyEnrichedDataStable = useCallback(
@@ -113,7 +118,11 @@ export function useExecutionStateEnrichment({
           executionStatus: effectiveExecutionStatus,
           activityStates,
           edges: edgeSnapshot,
-          options: { preResolvedNodes, skipInferenceActivityIds: copiedRunActivityIds ?? undefined },
+          options: {
+            preResolvedNodes,
+            skipInferenceActivityIds: copiedRunActivityIds ?? undefined,
+            replayBaselineAt,
+          },
         })
         return applyEnrichedDataStable(node, enriched, anyChangedRef)
       })
@@ -128,6 +137,7 @@ export function useExecutionStateEnrichment({
     applyEnrichedDataStable,
     preResolvedNodes,
     copiedRunActivityIds,
+    replayBaselineAt,
     setNodes,
   ])
 }

@@ -35252,7 +35252,7 @@
     "/executions/{execution_id}/retry_from_failure_preview": {
       "get": {
         "summary": "Preview retry from failure",
-        "description": "Report whether an execution can be retried from its failure points, and what would re-run. Returns the eligible retry points, the re-run step count for each of them, and the deduplicated total across all of them. Purely informational: the failure-point selection and any input parameter overrides are supplied to the retry endpoint, which re-validates them independently and rejects anything unusable. Never mutates any state.",
+        "description": "Report whether an execution can be retried from its failure points, and what would re-run. An optional retry_point_ids query parameter previews a selected subset; when omitted, the preview uses all currently failed nodes. Returns the eligible retry points, the re-run step count for each, the deduplicated total, and completed results retained outside the retry paths. Purely informational: the retry endpoint independently re-validates the selection and any input parameter overrides. Never mutates any state.",
         "operationId": "retry_from_failure_preview",
         "tags": [
           "Executions"
@@ -35275,6 +35275,26 @@
               "type": "string",
               "format": "uuid",
               "title": "Execution Id"
+            }
+          },
+          {
+            "name": "retry_point_ids",
+            "in": "query",
+            "required": false,
+            "description": "Optional failure points to preview. Repeat the parameter to preview a subset; omitting it previews all currently failed points.",
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Retry Point Ids"
             }
           }
         ],
@@ -50596,6 +50616,12 @@
             "title": "Total Step Count",
             "default": 0,
             "description": "Deduplicated total of steps that will re-run across the eligible points."
+          },
+          "retained_result_count": {
+            "type": "integer",
+            "title": "Retained Result Count",
+            "default": 0,
+            "description": "Number of completed activity results outside the selected retry paths that will be retained."
           }
         }
       },

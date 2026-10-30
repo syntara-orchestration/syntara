@@ -477,6 +477,10 @@ class RetryFromFailureValidationResponse(SQLModel):
         default=0,
         description="Deduplicated total of steps that will re-run across the eligible points.",
     )
+    retained_result_count: int = Field(
+        default=0,
+        description="Number of completed activity results outside the selected retry paths that will be retained.",
+    )
 
 
 class CurrentActivity(SQLModel):

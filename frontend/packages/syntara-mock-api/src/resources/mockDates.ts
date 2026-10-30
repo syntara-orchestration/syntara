@@ -117,6 +117,11 @@ export const mockDate = {
 
   hoursAgo2Plus1s: iso(-2 * HOUR + 1000),
 
+  hoursAgo3Plus1s: iso(-3 * HOUR + 1000),
+  hoursAgo3Plus2s: iso(-3 * HOUR + 2000),
+  hoursAgo3Plus3s: iso(-3 * HOUR + 3000),
+  hoursAgo3Plus4s: iso(-3 * HOUR + 4000),
+
   hoursAgo12Plus1s: iso(-12 * HOUR + 1000),
 
   hoursAgo1Plus1s: iso(-1 * HOUR + 1000),
