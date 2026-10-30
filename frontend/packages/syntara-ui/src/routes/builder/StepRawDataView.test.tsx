@@ -1,10 +1,14 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import type { Node } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 
 import type { NodeType } from '../workflows/canvas/nodes/NodeType'
 
 import { StepRawDataView } from './StepRawDataView'
+
+async function expectNodeDataCodeToContain(content: string): Promise<void> {
+  await waitFor(() => expect(screen.getAllByRole('code')[1]).toHaveTextContent(content))
+}
 
 describe('StepRawDataView Component', () => {
   it('renders step type correctly', () => {
@@ -39,7 +43,7 @@ describe('StepRawDataView Component', () => {
     expect(screen.getByText('my-custom-id')).toBeInTheDocument()
   })
 
-  it('renders Node data as formatted JSON', () => {
+  it('renders Node data as formatted JSON', async () => {
     const node: Node<NodeType['data']> = {
       id: 'data-test',
       type: 'converge',
@@ -56,12 +60,9 @@ describe('StepRawDataView Component', () => {
 
     expect(screen.getByText('Node data')).toBeInTheDocument()
 
-    // Check that the JSON is displayed
-    const preElement = screen.getByText(/Test Data/)
-    expect(preElement).toBeInTheDocument()
-    expect(preElement.textContent).toContain('"type": "converge"')
-    expect(preElement.textContent).toContain('"name": "Test Data"')
-    expect(preElement.textContent).toContain('"customField": "custom value"')
+    await expectNodeDataCodeToContain('"type": "converge"')
+    await expectNodeDataCodeToContain('"name": "Test Data"')
+    await expectNodeDataCodeToContain('"customField": "custom value"')
   })
 
   it('capitalizes React Flow node type string in display', () => {
@@ -94,7 +95,7 @@ describe('StepRawDataView Component', () => {
     expect(stepIdCode.tagName).toBe('CODE')
   })
 
-  it('handles empty step data', () => {
+  it('handles empty step data', async () => {
     const node: Node<NodeType['data']> = {
       id: 'empty-data',
       type: 'converge',
@@ -105,11 +106,10 @@ describe('StepRawDataView Component', () => {
     render(<StepRawDataView node={node} />)
 
     expect(screen.getByText('Node data')).toBeInTheDocument()
-    const preElement = screen.getByText('{}')
-    expect(preElement).toBeInTheDocument()
+    await expectNodeDataCodeToContain('{}')
   })
 
-  it('handles complex nested data structures', () => {
+  it('handles complex nested data structures', async () => {
     const node: Node<NodeType['data']> = {
       id: 'complex-node',
       type: 'condition',
@@ -139,10 +139,10 @@ describe('StepRawDataView Component', () => {
 
     render(<StepRawDataView node={node} />)
 
-    const preElement = screen.getByText(/Complex Condition/)
-    expect(preElement.textContent).toContain('"condition": "input.value > 10"')
-    expect(preElement.textContent).toContain('"then"')
-    expect(preElement.textContent).toContain('"executor": "script"')
+    await expectNodeDataCodeToContain('Complex Condition')
+    await expectNodeDataCodeToContain('"condition": "input.value > 10"')
+    await expectNodeDataCodeToContain('"then"')
+    await expectNodeDataCodeToContain('"executor": "script"')
   })
 
   it('applies correct styling classes', () => {

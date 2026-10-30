@@ -58,6 +58,16 @@ export default defineConfig(({ mode }) => {
         external: ['graphql', 'headers-polyfill'],
       },
     },
+    optimizeDeps: {
+      include: [
+        '@shikijs/colorized-brackets',
+        '@shikijs/langs/json',
+        '@shikijs/themes/github-dark-high-contrast',
+        '@shikijs/themes/github-light-high-contrast',
+        'shiki/core',
+        'shiki/engine/javascript',
+      ],
+    },
     server: {
       host: true,
       port: 5173,

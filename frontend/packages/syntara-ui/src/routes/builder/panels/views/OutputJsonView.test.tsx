@@ -5,6 +5,10 @@ import { axe } from 'vitest-axe'
 
 import { OutputJsonView } from './OutputJsonView'
 
+async function expectCodeBlockToContain(content: string): Promise<void> {
+  await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent(content))
+}
+
 describe('OutputJsonView', () => {
   const originalClipboard = navigator.clipboard
   let mockWriteText: ReturnType<typeof vi.fn>
@@ -27,12 +31,12 @@ describe('OutputJsonView', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders pretty-printed JSON from data prop', () => {
+  it('renders pretty-printed JSON from data prop', async () => {
     const data = { name: 'test', value: 42 }
     render(<OutputJsonView data={data} />)
 
-    expect(screen.getByText(/"name": "test"/)).toBeInTheDocument()
-    expect(screen.getByText(/"value": 42/)).toBeInTheDocument()
+    await expectCodeBlockToContain('"name": "test"')
+    await expectCodeBlockToContain('"value": 42')
   })
 
   it('copies JSON to clipboard when copy button is clicked', async () => {
@@ -75,16 +79,15 @@ describe('OutputJsonView', () => {
     const searchInput = screen.getByRole('textbox', { name: 'Search json output' })
     await user.type(searchInput, 'greeting')
 
-    await waitFor(() => {
-      expect(screen.getByText(/greeting/)).toBeInTheDocument()
-      expect(screen.queryByText(/farewell/)).not.toBeInTheDocument()
-    })
+    await expectCodeBlockToContain('"greeting"')
+    expect(screen.getByRole('code')).not.toHaveTextContent('"farewell"')
   })
 
   it('has no accessibility violations', async () => {
     const data = { name: 'test', value: 42 }
     const { container } = render(<OutputJsonView data={data} />)
 
+    await expectCodeBlockToContain('"name": "test"')
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })

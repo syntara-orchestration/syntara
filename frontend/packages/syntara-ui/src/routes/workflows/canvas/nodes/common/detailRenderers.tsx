@@ -55,7 +55,7 @@ export function renderJson(data: unknown, show?: boolean, label = 'JSON') {
   const jsonObject = typeof data === 'object' ? data : { value: data }
   return (
     <SynDetail label={label}>
-      <SynCodeBlock jsonObject={jsonObject} {...nodeCodeBlockProps} />
+      <SynCodeBlock jsonObject={jsonObject} language="json" {...nodeCodeBlockProps} />
     </SynDetail>
   )
 }
@@ -67,7 +67,7 @@ export function renderObject(label: string, data?: Record<string, unknown>) {
   if (!data) return null
   return (
     <SynDetail label={label}>
-      <SynCodeBlock jsonObject={data} {...nodeCodeBlockProps} />
+      <SynCodeBlock jsonObject={data} language="json" {...nodeCodeBlockProps} />
     </SynDetail>
   )
 }
