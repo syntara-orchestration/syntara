@@ -5,8 +5,8 @@
 
 import { expect, type Page, toAppUrl } from '../fixtures'
 
-import { addConditionStepWithBranch, addManualTrigger, openAddStepPanel, selectCategoryAndStepType } from './v2-steps'
 import { canvasStepNode, clickCanvasStepToOpenEditor } from './canvas-interaction'
+import { addConditionStepWithBranch, addManualTrigger, openAddStepPanel, selectCategoryAndStepType } from './v2-steps'
 import { buildUniqueName, closeStepEditorPanel, triggerLayout } from './workflows'
 
 const convergeStrategySelect = (page: Page) => page.getByRole('button', { name: 'Continue when criteria', exact: true })

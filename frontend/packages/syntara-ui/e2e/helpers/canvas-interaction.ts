@@ -1,4 +1,6 @@
-import { type Locator, type Page, expect } from '../fixtures'
+import type { Locator } from '@playwright/test'
+
+import { type Page, expect } from '../fixtures'
 
 /**
  * Reset layout and fit view so all nodes are in the viewport (required in CI).
