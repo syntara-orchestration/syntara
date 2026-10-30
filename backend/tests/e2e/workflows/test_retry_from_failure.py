@@ -186,10 +186,9 @@ def _wait_for_loop_stdouts(
         if required_stdouts <= present:
             return rows
         time.sleep(poll_interval)
-    present = sorted({_listed_stdout(activity) for activity in rows.values()})
+    found = sorted({_listed_stdout(activity) for activity in rows.values()})
     msg = (
-        f"Execution {execution_id} loop body rows {sorted(rows)} have stdout {present}, "
-        f"wanted {sorted(required_stdouts)}"
+        f"Execution {execution_id} loop body rows {sorted(rows)} have stdout {found}, wanted {sorted(required_stdouts)}"
     )
     raise AssertionError(msg)
 
