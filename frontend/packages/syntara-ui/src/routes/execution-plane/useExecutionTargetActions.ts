@@ -45,6 +45,8 @@ export function useExecutionTargetActions({ onSuccess }: UseExecutionTargetActio
     entityLabel: 'execution target',
     getItemName,
     successTitle: 'Deletion accepted',
+    successDescription: (itemName) =>
+      `Execution target "${itemName}" deletion was accepted; it may remain listed briefly while draining completes.`,
     onSuccess,
     onSettled: () => deleteDialog.close(),
   })

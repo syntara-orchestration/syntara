@@ -9,7 +9,7 @@ import type { ExecutionTargetPermissions } from './useExecutionTargetPermissions
 type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
 
 export function buildExecutionTargetDeleteAction(
-  target: ExecutionTarget | undefined,
+  target: ExecutionTarget,
   deleteDialog: { open: (item: ExecutionTarget) => void },
   permissions: ExecutionTargetPermissions
 ): KebabAction {
@@ -19,11 +19,10 @@ export function buildExecutionTargetDeleteAction(
     isDanger: true,
     isAriaDisabled: !permissions.canDelete,
     tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
-    onClick:
-      permissions.canDelete && target
-        ? () => {
-            deleteDialog.open(target)
-          }
-        : undefined,
+    onClick: permissions.canDelete
+      ? () => {
+          deleteDialog.open(target)
+        }
+      : undefined,
   }
 }

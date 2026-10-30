@@ -26,6 +26,8 @@ type UseDeleteActionOptions<T, P = unknown> = {
   onSettled?: () => void
   /** Override default success alert title */
   successTitle?: string
+  /** Override default success alert description. Receives the item display name. */
+  successDescription?: (itemName: string) => string
   /** Override default error alert title */
   errorTitle?: string
 }
@@ -65,6 +67,7 @@ export function useDeleteAction<T, P = unknown>({
   onSuccess,
   onSettled,
   successTitle,
+  successDescription,
   errorTitle,
 }: UseDeleteActionOptions<T, P>): (item: T | null) => void {
   const { showAlert } = useAlerts()
@@ -81,7 +84,9 @@ export function useDeleteAction<T, P = unknown>({
         onSuccess: () => {
           showAlert({
             title: successTitle ?? `${capitalizedEntityLabel} deleted`,
-            description: `${capitalizedEntityLabel} "${itemName}" has been deleted successfully.`,
+            description:
+              successDescription?.(itemName) ??
+              `${capitalizedEntityLabel} "${itemName}" has been deleted successfully.`,
             variant: 'success',
             autoDismiss: true,
           })
@@ -100,6 +105,17 @@ export function useDeleteAction<T, P = unknown>({
         },
       })
     },
-    [deleteFn, buildParams, entityLabel, getItemName, onSuccess, onSettled, successTitle, errorTitle, showAlert]
+    [
+      deleteFn,
+      buildParams,
+      entityLabel,
+      getItemName,
+      onSuccess,
+      onSettled,
+      successTitle,
+      successDescription,
+      errorTitle,
+      showAlert,
+    ]
   )
 }
