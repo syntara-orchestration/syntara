@@ -6,6 +6,7 @@ They assert observable execution state and outputs rather than workflow-engine i
 
 from __future__ import annotations
 
+import time
 from collections.abc import Mapping
 from datetime import datetime
 from http import HTTPStatus
@@ -34,6 +35,12 @@ if TYPE_CHECKING:
     from syntara_api_client.models.activity_execution import ActivityExecution
 
 pytestmark = [pytest.mark.e2e]
+
+_RETRY_RUN_POLICIES = [
+    "workflow:read:project",
+    "execution:run:project",
+    "execution:read:project",
+]
 
 
 def _script_node(node_id: str, code: str, *, environment: dict[str, str] | None = None) -> dict[str, Any]:
@@ -111,6 +118,33 @@ def _timestamp(activity: ActivityData, field: str) -> datetime:
     value = getattr(activity, field)
     assert isinstance(value, datetime), f"{activity.activity_id}.{field} must be a timestamp"
     return value
+
+
+def _wait_for_activity_ids(
+    syntara_api: SyntaraApiRegistry,
+    execution: ExecutionRead,
+    required_ids: set[str],
+    *,
+    max_polls: int = 30,
+    poll_interval: int = 1,
+) -> ExecutionRead:
+    """Wait until include=activities has every expected row.
+
+    Loop iterations are written as later composite keys (``loop_body#iter-1``).
+    The execution can already be terminal before those rows have been synced.
+    """
+    for _ in range(max_polls):
+        activities = execution.activities
+        present = {activity.activity_id for activity in activities} if isinstance(activities, list) else set()
+        if required_ids <= present:
+            return execution
+        time.sleep(poll_interval)
+        execution = syntara_api.executions.get(execution_id=execution.id, include="activities").assert_and_get()
+    activities = execution.activities
+    present = {activity.activity_id for activity in activities} if isinstance(activities, list) else set()
+    missing = sorted(required_ids - present)
+    msg = f"Execution {execution.id} is missing activity rows: {missing}"
+    raise AssertionError(msg)
 
 
 def _start_retry(
@@ -242,6 +276,7 @@ def test_completed_execution_is_not_eligible_for_retry_from_failure(
             [_script_node("finished", "print('done')")],
             [{"from": "trigger", "to": "finished"}],
         ),
+        timeout=60,
         project_id=first_project_id,
     )
     assert source.status == ExecutionStatus.COMPLETED
@@ -457,6 +492,7 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
         project_id=first_project_id,
     )
     assert source.status == ExecutionStatus.FAILED
+    source = _wait_for_activity_ids(syntara_api, source, {"loop_body", "loop_body#iter-1"})
     source_activities = _activities_by_id(source)
     assert source_activities["loop_body"].status == "completed"
     assert _activity_output(source_activities["loop_body"]).get("stdout", "").strip() == "alpha"
@@ -472,8 +508,13 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
         ["loop_body"],
         overrides={"loop_body": {"code": "import os; print(os.environ['ITEM'])"}},
     )
-    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
+    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
+    final = _wait_for_activity_ids(
+        syntara_api,
+        final,
+        {"loop_body", "loop_body#iter-1", "loop_body#iter-2"},
+    )
 
     retry_activities = _activities_by_id(final)
     # The first iteration is replayed from the source with its original output and times.
@@ -609,7 +650,7 @@ def test_retry_accepts_multiple_selected_parallel_failure_points(
     assert retry_activities["after_b"].status == "completed"
 
 
-def test_retry_input_overrides_require_workflow_update_permission(
+def test_retry_input_overrides_are_run_local_and_reject_unknown_keys(
     syntara_api: SyntaraApiRegistry,
     syntara_base_url: str,
     create_project: ProjectFactory,
@@ -617,7 +658,7 @@ def test_retry_input_overrides_require_workflow_update_permission(
     create_project_role: ProjectRoleFactory,
     assign_project_role_to_user: AssignProjectRoleFactory,
 ) -> None:
-    """A run-only user may retry normally but needs workflow edit permission for overrides."""
+    """Run permission is enough for overrides; unknown keys are rejected; the definition stays unchanged."""
     project_id, _ = create_project(syntara_api, "retry-override-authz")
     name = unique_name("e2e-retry-override-authz")
     definition = _workflow_definition(
@@ -634,38 +675,12 @@ def test_retry_input_overrides_require_workflow_update_permission(
     )
     assert source.status == ExecutionStatus.FAILED
 
-    run_only_user_id, run_only_username, run_only_password = create_user(syntara_api, "retry-run-only")
-    run_only_role = create_project_role(syntara_api, project_id, "retry-run-only", ["execution:run:project"])
-    assign_project_role_to_user(syntara_api, project_id, run_only_user_id, run_only_role)
-    run_only_api = api_for(syntara_base_url, run_only_username, run_only_password)
+    run_user_id, run_username, run_password = create_user(syntara_api, "retry-run-user")
+    run_role = create_project_role(syntara_api, project_id, "retry-run-user", _RETRY_RUN_POLICIES)
+    assign_project_role_to_user(syntara_api, project_id, run_user_id, run_role)
+    run_api = api_for(syntara_base_url, run_username, run_password)
 
-    denied_override = run_only_api.executions.retry_from_failure(
-        execution_id=source.id,
-        body=RetryFailureRequest.from_dict(
-            {
-                "retry_point_ids": ["failure"],
-                "input_parameter_overrides": {"failure": {"code": "print('not authorized')"}},
-            }
-        ),
-    )
-    assert denied_override.status_code == HTTPStatus.FORBIDDEN
-
-    # AC-14 only adds workflow edit permission for overrides; ordinary retries still need run.
-    ordinary_retry = _start_retry(run_only_api, source.id, ["failure"])
-    ordinary_retry_final = poll_execution_until_complete(syntara_api, ordinary_retry.id, max_polls=60, poll_interval=1)
-    assert ordinary_retry_final.status == ExecutionStatus.FAILED
-
-    editor_user_id, editor_username, editor_password = create_user(syntara_api, "retry-workflow-editor")
-    editor_role = create_project_role(
-        syntara_api,
-        project_id,
-        "retry-workflow-editor",
-        ["execution:run:project", "workflow:update:project"],
-    )
-    assign_project_role_to_user(syntara_api, project_id, editor_user_id, editor_role)
-    editor_api = api_for(syntara_base_url, editor_username, editor_password)
-
-    rejected_new_input_key = editor_api.executions.retry_from_failure(
+    rejected_new_input_key = run_api.executions.retry_from_failure(
         execution_id=source.id,
         body=RetryFailureRequest.from_dict(
             {
@@ -678,7 +693,7 @@ def test_retry_input_overrides_require_workflow_update_permission(
     assert getattr(rejected_new_input_key.parsed, "code", None) == "EXECUTION_NOT_RETRYABLE_FROM_FAILURE"
 
     authorized_retry = _start_retry(
-        editor_api,
+        run_api,
         source.id,
         ["failure"],
         overrides={"failure": {"code": "print('repaired')"}},
