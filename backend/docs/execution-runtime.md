@@ -1,6 +1,6 @@
 # Execution Runtime
 
-This covers the API surface for starting, testing, and observing workflow executions. For how status actually gets from Temporal to a browser, see [Workflow Engine Architecture — Three-Tier Live Status Sync](workflow-engine/workflow-engine-overview.md#three-tier-live-status-sync-temporal-db-redis-websocket).
+This covers the API surface for starting, testing, and observing workflow executions. For how status actually gets from Temporal to a browser, see [Workflow Engine Architecture — Three-Tier Live Status Sync](workflow-engine/workflow-engine-overview.md#three-tier-live-status-sync-temporal-db-redis-and-websocket).
 
 ## Manual Runs
 

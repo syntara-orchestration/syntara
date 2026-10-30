@@ -10,7 +10,7 @@
 2. [How Data Flows](#how-data-flows)
 3. [Store Architecture](#store-architecture)
 4. [Using the Store](#using-the-store)
-5. [Common Pitfalls & Solutions](#common-pitfalls-solutions)
+5. [Common Pitfalls & Solutions](#common-pitfalls-and-solutions)
 6. [Testing Components with Store](#testing-components-with-store)
 
 ---
@@ -440,7 +440,7 @@ it('adds activity', () => {
 
 ---
 
-## Common Pitfalls & Solutions
+## Common Pitfalls and Solutions
 
 This architecture addresses the most common failure modes in workflow builder state:
 

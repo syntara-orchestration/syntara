@@ -714,7 +714,7 @@ API helpers are in `e2e/utils/api.ts`. Use them for setup and teardown; reserve 
 
 ---
 
-### Data-Dependent Tests — Fail When Expected Data Is Missing
+### Data-Dependent Tests: Fail When Expected Data Is Missing
 
 Tests that depend on pre-existing data (filtering, pagination, approvals) must **fail loudly** when that data isn't available. Use `expect()` with a descriptive message:
 

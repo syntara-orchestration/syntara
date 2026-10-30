@@ -18,7 +18,7 @@ This guide covers:
 2. [Config Reference](#config-reference)
 3. [Accessing Branch Results](#accessing-branch-results)
 4. [Examples](#examples)
-   - [Fan-out / Fan-in (Wait for All)](#fan-out-fan-in-wait-for-all)
+   - [Fan-out / Fan-in (Wait for All)](#fan-out-and-fan-in-wait-for-all)
    - [Fastest N of M (Wait for Any)](#fastest-n-of-m-wait-for-any)
    - [Timeout with Continue](#timeout-with-continue)
 5. [Interaction with Condition Nodes](#interaction-with-condition-nodes)
@@ -113,7 +113,7 @@ nodes:
 
 ## Examples
 
-### Fan-out / Fan-in (Wait for All)
+### Fan-out and Fan-in: Wait for All
 
 **Use case**: Multiple data sources need to be fetched in parallel, then combined in a summary step.
 
