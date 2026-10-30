@@ -194,7 +194,8 @@ describe('Kafka Subscribe form', () => {
     toggle.focus()
     await user.keyboard('{Enter}')
     await user.click(screen.getByRole('option', { name: 'Other Kafka' }))
-    expect(screen.getByRole('textbox', { name: 'Kafka runtime credential' })).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Set up connection' })).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Kafka runtime credential' })).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveFocus()
   })
 
@@ -328,6 +329,7 @@ describe('Kafka Subscribe form', () => {
     renderKafka(onSubmit)
     await screen.findByText('Available')
     await user.clear(screen.getByRole('textbox', { name: 'Topic' }))
+    await user.click(screen.getByRole('button', { name: 'Change' }))
     await user.clear(screen.getByRole('textbox', { name: 'Kafka runtime credential' }))
     await user.click(screen.getByRole('button', { name: 'Clear selection' }))
     await submitForm()
@@ -335,6 +337,8 @@ describe('Kafka Subscribe form', () => {
       expect.objectContaining({ integrationId: '', runtimeCredentialId: '', topic: '' })
     )
     expect(screen.getByRole('button', { name: 'Test runtime access' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.queryByRole('textbox', { name: 'Kafka runtime credential' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Set up connection' })).not.toBeInTheDocument()
   })
 
   it('searches Kafka Integrations without changing the saved selection', async () => {

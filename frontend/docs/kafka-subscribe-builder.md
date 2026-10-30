@@ -103,6 +103,13 @@ contract. Supplied references must remain literal, visible, enabled and usable;
 an unavailable Integration or incompatible saved credential blocks form submission
 and runtime preflight until corrected or cleared.
 
+Credential setup is hidden until an Integration is selected. **Set up connection**
+opens the searchable runtime credential picker. Selecting a credential shows its
+configured name with **Change**; this does not imply verified broker access.
+Changing the Integration clears the credential and returns to setup. Keyboard
+selection returns focus to the selector input, or to **Change** when the staged
+picker closes.
+
 The Integration and runtime credential selectors support search and clearing.
 Credential creation is available when permitted. Loading supporting credential
 types is not displayed as an empty result. Selector and bootstrap-server errors

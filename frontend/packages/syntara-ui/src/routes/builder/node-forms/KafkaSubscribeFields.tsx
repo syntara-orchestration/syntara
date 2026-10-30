@@ -9,6 +9,7 @@ import { useCredentialPermissions } from '../../configuration/credentials/useCre
 import { CredentialSelector } from '../components/CredentialSelector'
 import { useIsVersionView } from '../VersionViewContext'
 
+import { KafkaCredentialConnection } from './KafkaCredentialConnection'
 import { KafkaIntegrationField } from './KafkaIntegrationField'
 import { kafkaSubscribeParameters } from './kafkaSubscribeMapping'
 import { KafkaSubscribePreflight } from './KafkaSubscribePreflight'
@@ -65,33 +66,46 @@ export function KafkaSubscribeFields({
             <StackItem>
               {resources && <KafkaIntegrationField resources={resources} isDisabled={isReadOnly} />}
             </StackItem>
-            <StackItem>
-              <SynFormField<TriggerFormData, 'runtimeCredentialId'>
-                name="runtimeCredentialId"
-                label=""
-                hideFormGroupLabel
-                hideFooter
-              >
-                {({ field, fieldState }) => (
-                  <CredentialSelector
-                    value={field.value}
-                    onChange={(value) =>
-                      setValue('runtimeCredentialId', value ?? '', { shouldDirty: true, shouldValidate: true })
-                    }
-                    projectId={projectId}
-                    compatibleTypeNames={KAFKA_CREDENTIAL_TYPES}
-                    label="Kafka runtime credential"
-                    fieldId="kafka-runtime-credential"
-                    isRequired
-                    isSearchable
-                    allowCreate={canCreate && !isReadOnly}
-                    isDisabled={isReadOnly || !values.integrationId}
-                    errorMessage={resourceErrors.runtimeCredentialId ?? fieldState.error?.message}
-                    helpText="Used to authenticate this subscription to Kafka. Select a Kafka credential explicitly; the Integration management credential is not substituted. This does not select the workflow execution identity."
-                  />
-                )}
-              </SynFormField>
-            </StackItem>
+            {values.integrationId && (
+              <StackItem>
+                <SynFormField<TriggerFormData, 'runtimeCredentialId'>
+                  name="runtimeCredentialId"
+                  label=""
+                  hideFormGroupLabel
+                  hideFooter
+                >
+                  {({ field, fieldState }) => (
+                    <KafkaCredentialConnection
+                      key={values.integrationId}
+                      credentialName={resources?.credentials.credentials.find((item) => item.id === field.value)?.name}
+                      isPending={Boolean(resources?.credentials.isLoading || resources?.types.isPending)}
+                      errorMessage={resourceErrors.runtimeCredentialId ?? fieldState.error?.message}
+                      isDisabled={isReadOnly}
+                    >
+                      {(onSelected) => (
+                        <CredentialSelector
+                          value={field.value}
+                          onChange={(value) => {
+                            setValue('runtimeCredentialId', value ?? '', { shouldDirty: true, shouldValidate: true })
+                            if (value) onSelected()
+                          }}
+                          projectId={projectId}
+                          compatibleTypeNames={KAFKA_CREDENTIAL_TYPES}
+                          label="Kafka runtime credential"
+                          fieldId="kafka-runtime-credential"
+                          isRequired
+                          isSearchable
+                          allowCreate={canCreate && !isReadOnly}
+                          isDisabled={isReadOnly || !values.integrationId}
+                          errorMessage={resourceErrors.runtimeCredentialId ?? fieldState.error?.message}
+                          helpText="Used to authenticate this subscription to Kafka. Select a Kafka credential explicitly; the Integration management credential is not substituted. This does not select the workflow execution identity."
+                        />
+                      )}
+                    </KafkaCredentialConnection>
+                  )}
+                </SynFormField>
+              </StackItem>
+            )}
             <StackItem>
               <SynTextField
                 name="topic"
