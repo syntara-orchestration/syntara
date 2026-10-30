@@ -33,11 +33,7 @@ export function canvasStepTitleHeading(stepNode: Locator, stepName: string) {
 }
 
 /** Assert a step's canvas title is visible without Playwright strict-mode ambiguity. */
-export async function expectCanvasStepTitleVisible(
-  page: Page,
-  stepName: string,
-  options?: { timeout?: number },
-) {
+export async function expectCanvasStepTitleVisible(page: Page, stepName: string, options?: { timeout?: number }) {
   const node = canvasStepNode(page, stepName)
   await expect(node).toBeVisible(options)
   await expect(canvasStepTitleHeading(node, stepName)).toBeVisible(options)
