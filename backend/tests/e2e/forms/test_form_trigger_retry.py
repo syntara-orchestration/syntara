@@ -1,4 +1,4 @@
-"""E2E coverage for Form Trigger retries and deleted workflows."""
+"""E2E coverage for Form Trigger retries, repeated submissions, and deleted workflows."""
 
 import json
 from collections.abc import Callable
@@ -13,6 +13,7 @@ from syntara_api_client.models import ExecutionRead, WorkflowCreate, WorkflowRea
 from ._helpers import (
     activities_by_id,
     activity_output,
+    assert_and_get_with_502_skip,
     assert_consumer_completed,
     assert_no_executions_for_workflow,
     assert_problem_response,
@@ -105,6 +106,48 @@ def test_retry_reuses_original_form_trigger_inputs(
     assert str(retried_final.status) == "completed"
     assert retried_form_response == original_form_response == _FORM_INPUTS
     assert retried_consumer_output == original_consumer_output == _FORM_INPUTS
+
+
+def test_repeated_submission_creates_distinct_completed_executions(
+    syntara_api: SyntaraApiRegistry,
+    workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+    first_project_id: UUID,
+    form_execution_cleanup: Callable[[UUID], None],
+) -> None:
+    """Posting the same valid Form Trigger submission twice starts two executions."""
+    workflow = create_form_trigger_workflow(
+        workflow_factory,
+        first_project_id,
+        name_prefix="e2e-form-trigger-repeat-submission",
+        description="E2E: repeated Form Trigger submissions create separate executions",
+        form_fields=_FORM_FIELDS,
+        consumer_code=_CONSUMER_CODE,
+        consumer_environment=_CONSUMER_ENVIRONMENT,
+    )
+    workflow_id = UUID(str(workflow.id))
+
+    first = submit_form_trigger_and_track(syntara_api, workflow, _FORM_INPUTS, form_execution_cleanup)
+    second = submit_form_trigger_and_track(syntara_api, workflow, _FORM_INPUTS, form_execution_cleanup)
+    first_id = UUID(str(first.id))
+    second_id = UUID(str(second.id))
+
+    assert first_id != second_id
+    assert _execution_input(first) == _FORM_INPUTS
+    assert _execution_input(second) == _FORM_INPUTS
+
+    for execution_id in (first_id, second_id):
+        completed = assert_consumer_completed(syntara_api, execution_id)
+        assert _execution_input(completed) == _FORM_INPUTS
+        final = wait_for_activity_outputs(syntara_api, execution_id, {"form", "consumer"})
+        activities = activities_by_id(final)
+        assert activity_output(activities["form"])["response_data"] == _FORM_INPUTS
+        assert activity_output(activities["consumer"])["stdout_json"] == _FORM_INPUTS
+
+    executions = assert_and_get_with_502_skip(
+        syntara_api.executions.list(additional_params={"workflow_id": str(workflow_id)}, limit=100)
+    )
+    assert executions.resources is not None
+    assert {UUID(str(execution.id)) for execution in executions.resources} == {first_id, second_id}
 
 
 def test_submission_after_workflow_deletion_returns_workflow_not_found(
