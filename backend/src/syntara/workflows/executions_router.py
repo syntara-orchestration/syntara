@@ -380,7 +380,7 @@ async def retry_from_failure(
                     resource_type="workflow",
                     resource_id=str(workflow_id),
                     resource_project=resource_project or "",
-                    resource_labels=dict(workflow_labels),
+                    resource_labels=dict(workflow_labels or {}),
                     user_labels=current_user.labels,
                     user_metadata=current_user.authz_metadata,
                 ),
