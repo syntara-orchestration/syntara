@@ -6,6 +6,8 @@ authoring/palette ``NodeType`` values. System-only types such as
 Registration does not enforce permissions on workflow writes.
 """
 
+import json
+from importlib.resources import files
 from typing import Any
 
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
@@ -18,6 +20,18 @@ _NON_GRANTABLE_NODE_KINDS: frozenset[str] = frozenset({NodeType.INTERNAL_ACTIVIT
 NODE_KINDS: frozenset[str] = frozenset(
     node_type.value for node_type in NodeType if node_type.value not in _NON_GRANTABLE_NODE_KINDS
 )
+_NODE_KIND_LABELS: dict[str, str] = {
+    entry["type"]: entry["name"]
+    for entry in json.loads(
+        files("syntara").joinpath("schemas/workflows/v2/catalog/node_type_catalog.json").read_text(encoding="utf-8")
+    )["node_types"]
+    if entry["type"] in NODE_KINDS
+}
+
+
+def node_kind_label(kind: str) -> str:
+    """Return the existing catalog display name for a grantable kind."""
+    return _NODE_KIND_LABELS[kind]
 
 
 def node_labels(node: dict[str, Any]) -> dict[str, str]:

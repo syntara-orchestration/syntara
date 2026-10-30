@@ -14,7 +14,7 @@
 openapi: 3.1.0
 info:
   title: Syntara API
-  version: 1.3.2
+  version: 1.3.3
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -28460,7 +28460,7 @@ components:
         effect:
           type: string
           title: Effect
-          description: allow or deny
+          description: allow or deny; deny requires step_type:write and scope any or project
         actions:
           type: array
           items:

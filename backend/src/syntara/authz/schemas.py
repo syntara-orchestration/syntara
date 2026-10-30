@@ -1,13 +1,14 @@
 """Request/response schemas for the policies and roles API."""
 
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Self
 from uuid import UUID
 
 from pydantic import Field as PydanticField
-from pydantic import computed_field, field_validator
+from pydantic import computed_field, field_validator, model_validator
 from sqlmodel import Field, SQLModel
 
+from syntara.authz.deny_eligibility import validate_deny_statements
 from syntara.core.constants import NAME_PATTERN
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models.base import BaseListParams
@@ -23,13 +24,13 @@ OptionalNameField = Annotated[
 # ---------------------------------------------------------------------------
 
 VALID_SCOPES = {"any", "self", "project", "own"}
-VALID_EFFECTS = {"allow"}
+VALID_EFFECTS = {"allow", "deny"}
 
 
 class PolicyStatementSchema(SQLModel):
     """A single policy statement."""
 
-    effect: str = Field(description="allow or deny")
+    effect: str = Field(description="allow or deny; deny requires step_type:write and scope any or project")
     actions: list[str] = Field(description="List of resource_type:action strings")
     scope: str = Field(description="any, self, or project")
     conditions: dict[str, Any] | None = Field(default=None, description="Optional attribute-based conditions")
@@ -39,9 +40,17 @@ class PolicyStatementSchema(SQLModel):
     def validate_effect(cls, v: str) -> str:
         """Validate that effect is one of the allowed values."""
         if v not in VALID_EFFECTS:
-            msg = f"Invalid effect '{v}'. Only 'allow' is currently supported."
+            msg = f"Invalid effect '{v}'. Must be one of {sorted(VALID_EFFECTS)}."
             raise SafeValueError(msg)
         return v
+
+    @model_validator(mode="after")
+    def validate_deny_eligibility(self) -> Self:
+        """Keep recovery permissions outside the deny allowlist (AAP-74620)."""
+        error = validate_deny_statements([self.model_dump()])
+        if error:
+            raise SafeValueError(error)
+        return self
 
     @field_validator("scope")
     @classmethod

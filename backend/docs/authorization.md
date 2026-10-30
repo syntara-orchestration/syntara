@@ -335,6 +335,83 @@ The evaluator response includes:
 - `denial_reason` — `"policy_deny"` if explicitly denied
 - `allowed_projects` — set of project names the user can access (for list filtering)
 
+### Step-type deny policies
+
+The policy API accepts `deny` only for the literal action `step_type:write`
+with scope `any` or `project`. Wildcard deny actions (`step_type:*`) and denies
+on other resources are rejected with HTTP 422. Keeping policy, role, and
+role-assignment recovery actions outside this allowlist prevents lockout.
+Existing allow statements retain their wildcard and scope behavior.
+
+```json
+{
+  "effect": "deny",
+  "actions": ["step_type:write"],
+  "scope": "any",
+  "conditions": {"resource_labels": {"kind": "script"}}
+}
+```
+
+The `kind` selector uses the grantable authoring types registered in
+`workflows/node_kinds.py`, including triggers and control-flow steps. Unknown
+kinds, system-only `internal_activity`, and unsupported step labels are
+rejected. Omitting the kind selector covers every grantable kind.
+
+A globally assigned `any` deny applies in every project. Project role
+assignments narrow a statement to that project, even if its original scope
+was `any`. Denies override matching allows for every principal, including
+admins. Creating a policy alone does not attach it to a principal: a role and
+role assignment must make it effective.
+
+`can_i` accepts `resource_type: "step_type"`, `action: "write"`,
+`resource_labels: {"kind": "script"}`, and a project name or UUID in
+`resource_project`. Its response fields are unchanged. `denied_by` and
+`matched_policy` show original policy names, never internal statement IDs.
+`what_can_i` lists effective deny statements under their original policy names;
+`who_can` excludes users blocked for the requested kind/project and retains
+its existing query authorization gate.
+
+The shared `NodeKindDenial` result from `workflows/node_permissions.py` is the
+contract for the workflow-save and palette-permission stories. It has exactly
+six fields:
+
+```json
+{
+  "kind": "script",
+  "label": "Script",
+  "reason": "explicit_deny",
+  "policy": "no-scripts-in-prod",
+  "scope": "project",
+  "project": "payments"
+}
+```
+
+When multiple statements deny the same kind, Rego chooses the first sorted
+effective statement identifier. That same statement supplies the original
+policy name and effective scope/project in the shared helper. A global deny
+has `scope: "any"` and `project: null`. Internal statement identifiers include
+the statement index and project assignment context so mixed statements and
+assignments cannot be confused.
+
+Without a matching allow, the kind is still blocked even though `denied` is
+false and `denied_by` is empty. The shared result is:
+
+```json
+{
+  "kind": "script",
+  "label": "Script",
+  "reason": "no_matching_allow",
+  "policy": null,
+  "scope": null,
+  "project": "payments"
+}
+```
+
+These helpers do not enforce workflow saves or expose a palette endpoint.
+Default authoring grants are seeded as editable custom records by the
+separate default-policy story; no built-in grant is added here. Save
+enforcement must ship with that seeding so existing authors retain access.
+
 ## Query Endpoints
 
 The `/authz` router provides introspection endpoints:

@@ -2,7 +2,7 @@
 openapi: 3.1.0
 info:
   title: Syntara Policies API
-  version: 1.0.0
+  version: 1.0.1
   description: |
     Policy management endpoints for the Syntara authorization system.
 
@@ -344,7 +344,7 @@ components:
         effect:
           type: string
           title: Effect
-          description: allow or deny
+          description: allow or deny; deny requires step_type:write and scope any or project
         actions:
           type: array
           items:

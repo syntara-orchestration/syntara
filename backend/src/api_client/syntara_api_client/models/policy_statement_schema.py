@@ -20,7 +20,7 @@ class PolicyStatementSchema:
     """A single policy statement.
 
     Attributes:
-        effect (str): allow or deny
+        effect (str): allow or deny; deny requires step_type:write and scope any or project
         actions (list[str]): List of resource_type:action strings
         scope (str): any, self, or project
         conditions (None | PolicyStatementSchemaConditionsType0 | Unset): Optional attribute-based conditions
