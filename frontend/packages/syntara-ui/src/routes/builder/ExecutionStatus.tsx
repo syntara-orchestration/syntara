@@ -13,6 +13,7 @@ import {
 import { ActivityTypeEnum, type ExecutionsAPI } from '@syntara/contracts'
 import type React from 'react'
 
+import { ReplayedOutputBadge } from '../../components/labels/ReplayedOutputBadge'
 import { SynLabel } from '../../components/labels/SynLabel'
 import { capitalize } from '../../utils/capitalize'
 
@@ -73,7 +74,16 @@ const activityStatusIcons: Record<ActivityStatus, React.ComponentType<{ classNam
   cancelled: RhUiStopCircleFillIcon,
 }
 
-export function ActivityStatusLabel({ status, nodeType }: Readonly<{ status: ActivityStatus; nodeType?: string }>) {
+/**
+ * @param replayed True when this activity reused a previous run's output
+ * instead of executing in this retry. Appends `ReplayedOutputBadge` next to
+ * the status label, matching the canvas treatment in `ExecutionStatusBadge`.
+ */
+export function ActivityStatusLabel({
+  status,
+  nodeType,
+  replayed = false,
+}: Readonly<{ status: ActivityStatus; nodeType?: string; replayed?: boolean }>) {
   if (nodeType === ActivityTypeEnum.WAIT && status === 'waiting') {
     return (
       <SynLabel variant="outline" status="custom" icon={<RhUiSyncIcon />}>
@@ -87,8 +97,16 @@ export function ActivityStatusLabel({ status, nodeType }: Readonly<{ status: Act
   const displayLabel = activityStatusDisplayLabels[status] ?? capitalize(status)
 
   return (
-    <SynLabel variant="outline" status={variant} icon={<IconComponent />}>
-      {displayLabel}
-    </SynLabel>
+    <>
+      <SynLabel variant="outline" status={variant} icon={<IconComponent />}>
+        {displayLabel}
+      </SynLabel>
+      {replayed && (
+        <>
+          {' '}
+          <ReplayedOutputBadge />
+        </>
+      )}
+    </>
   )
 }

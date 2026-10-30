@@ -7,7 +7,12 @@ import type { ActivityState } from '../workflows/execution/types'
 import { ExecutionActivityTable, type ActivityOrderItem } from './ExecutionActivityTable'
 
 vi.mock('./ExecutionStatus', () => ({
-  ActivityStatusLabel: ({ status }: { status: string }) => <div data-testid="activity-status-label">{status}</div>,
+  ActivityStatusLabel: ({ status, replayed }: { status: string; replayed?: boolean }) => (
+    <div data-testid="activity-status-label">
+      {status}
+      {replayed && <span data-testid="activity-status-label-replayed" />}
+    </div>
+  ),
 }))
 
 const T0 = '2024-01-01T00:00:00Z'
@@ -22,13 +27,21 @@ function renderTable({
   states = new Map<string, ActivityState>(),
   order = [],
   selectedNodeId,
+  replayBaselineAt,
 }: {
   states?: Map<string, ActivityState>
   order?: ActivityOrderItem[]
   selectedNodeId?: string | null
+  replayBaselineAt?: string | null
 } = {}) {
   return render(
-    <ExecutionActivityTable activityStates={states} activityOrder={order} now={NOW} selectedNodeId={selectedNodeId} />
+    <ExecutionActivityTable
+      activityStates={states}
+      activityOrder={order}
+      now={NOW}
+      selectedNodeId={selectedNodeId}
+      replayBaselineAt={replayBaselineAt}
+    />
   )
 }
 
@@ -102,6 +115,25 @@ describe('ExecutionActivityTable', () => {
       expect(rows[1]).not.toHaveClass('pf-m-selected')
       expect(rows[2]).toHaveClass('pf-m-selected')
       expect(rows[3]).not.toHaveClass('pf-m-selected')
+    })
+
+    it('marks a row replayed when its start predates the retry baseline', () => {
+      renderTable({
+        states: new Map([state('task-1', { status: 'completed', startedAt: T0 })]),
+        order: [{ id: 'task-1', name: 'Task' }],
+        replayBaselineAt: T2,
+      })
+
+      expect(screen.getByTestId('activity-status-label-replayed')).toBeInTheDocument()
+    })
+
+    it('does not mark a row replayed when there is no retry baseline', () => {
+      renderTable({
+        states: new Map([state('task-1', { status: 'completed', startedAt: T0 })]),
+        order: [{ id: 'task-1', name: 'Task' }],
+      })
+
+      expect(screen.queryByTestId('activity-status-label-replayed')).not.toBeInTheDocument()
     })
   })
 

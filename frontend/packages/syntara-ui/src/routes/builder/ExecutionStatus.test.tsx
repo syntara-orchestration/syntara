@@ -92,4 +92,20 @@ describe('ActivityStatusLabel', () => {
     // Should capitalize first letter as fallback
     expect(screen.getByText('Unknown_status')).toBeInTheDocument()
   })
+
+  it('does not show the replayed badge by default', () => {
+    render(<ActivityStatusLabel status="completed" />)
+    expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
+  })
+
+  it('shows the replayed badge alongside the status when replayed', () => {
+    render(<ActivityStatusLabel status="completed" replayed />)
+    expect(screen.getByText('Successful')).toBeInTheDocument()
+    expect(screen.getByTestId('replayed-output-badge')).toBeInTheDocument()
+  })
+
+  it('does not show the replayed badge when replayed is explicitly false', () => {
+    render(<ActivityStatusLabel status="completed" replayed={false} />)
+    expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
+  })
 })
