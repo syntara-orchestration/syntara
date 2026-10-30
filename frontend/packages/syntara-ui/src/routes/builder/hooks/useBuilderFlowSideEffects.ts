@@ -48,6 +48,8 @@ export type BuilderFlowExecutionState = {
   activityStates: Map<string, ActivityState>
   preResolvedNodes: Set<string>
   copiedRunActivityIds?: ReadonlySet<string> | null
+  /** Timestamp replayed steps predate; set only for retry executions. */
+  replayBaselineAt?: string | null
   validationErrors?: ValidationError[]
   buttonEdgeExecutionStatus: string | null
 }
@@ -97,6 +99,7 @@ export function useBuilderFlowSideEffects({
     activityStates,
     preResolvedNodes,
     copiedRunActivityIds,
+    replayBaselineAt,
     validationErrors,
     buttonEdgeExecutionStatus,
   } = execution
@@ -196,6 +199,7 @@ export function useBuilderFlowSideEffects({
     activityStates,
     preResolvedNodes,
     copiedRunActivityIds,
+    replayBaselineAt,
     setNodes,
   })
 
