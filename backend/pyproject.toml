@@ -139,6 +139,12 @@ constraint-dependencies = [
 syntara-api-client = { path = "src/api_client", editable = true }
 orchestrator-cli = { path = "src/cli", editable = true }
 orchestrator-test-sdk = { path = "test-sdk", editable = true }
+# Temporary branch pin for the coupled revisionless-cluster contract
+# (syntara-execution-plane#127). That branch is built on EP devel (which now
+# carries the SDK container service, #81) and adds the shared-id cluster commands,
+# so it supersedes the plain refactor/sdk-workload-protocol pin. Revert to the
+# released version after #127 merges.
+execution-plane-client = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git", subdirectory = "src/execution_plane_client", branch = "refactor/remove-cluster-namespace-and-correlation" }
 
 [project.scripts]
 orchestrator-admin = "syntara.orchestrator_admin:app"
