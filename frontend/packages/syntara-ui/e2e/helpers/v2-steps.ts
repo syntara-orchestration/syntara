@@ -34,6 +34,7 @@ import {
   openStepForEditing,
   triggerLayout,
 } from './workflows'
+import { canvasStepNode, clickCanvasStepToOpenEditor } from './canvas-interaction'
 
 export { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential }
 
@@ -587,11 +588,11 @@ export async function addSwitchStepWithCases(page: Page, name: string, cases: Sw
  */
 async function openSavedStepForEditing(page: Page, stepName: string, editorReady: (p: Page) => Promise<void>) {
   await triggerLayout(page)
-  const stepElement = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
+  const stepElement = canvasStepNode(page, stepName)
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(async () => {
     await expect(stepElement).toBeVisible({ timeout: 5_000 })
-    await stepElement.click({ timeout: 5_000 })
+    await clickCanvasStepToOpenEditor(stepElement, stepName)
     await expect(nameInput).toHaveValue(stepName, { timeout: 5_000 })
     await editorReady(page)
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })

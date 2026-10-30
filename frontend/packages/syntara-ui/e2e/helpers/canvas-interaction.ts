@@ -1,4 +1,4 @@
-import { type Page, expect } from '../fixtures'
+import { type Locator, type Page, expect } from '../fixtures'
 
 /**
  * Reset layout and fit view so all nodes are in the viewport (required in CI).
@@ -6,8 +6,8 @@ import { type Page, expect } from '../fixtures'
  * after fit view — no fixed sleeps.
  *
  * Use {@link triggerLayout} in `workflows.ts` when you only need nodes repositioned after
- * adding steps (reset only, no fit view). Use `layoutCanvas` before clicking nodes or
- * edge controls when the full viewport must be visible under CI.
+ * adding steps (reset only, no fit view). Use `layoutCanvas` when tests must also fit the
+ * viewport (typical in CI) before clicking nodes or edge controls.
  */
 export async function layoutCanvas(page: Page) {
   const layoutButton = page.getByRole('button', { name: 'Reset layout', exact: true })
@@ -21,8 +21,25 @@ export async function layoutCanvas(page: Page) {
   }
 }
 
+export function canvasStepNode(page: Page, stepName: string) {
+  return page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
+}
+
 /**
- * Click a workflow step on the React Flow canvas by its visible label and wait for its editor to open.
+ * Open the three-panel step editor from the canvas. SynStep nodes use the header Edit
+ * control; generic placeholder nodes still open on body click.
+ */
+export async function clickCanvasStepToOpenEditor(stepElement: Locator, stepName: string) {
+  const editButton = stepElement.getByRole('button', { name: `Edit ${stepName}`, exact: true })
+  if ((await editButton.count()) > 0) {
+    await editButton.click({ timeout: 5_000 })
+    return
+  }
+  await stepElement.click({ timeout: 5_000 })
+}
+
+/**
+ * Click a workflow step on the React Flow canvas and wait for its editor to open.
  *
  * Retrying the open matches {@link openStepForEditing} in `workflows.ts`: under CI load
  * the click can land while the viewport is still transforming. The success condition is
@@ -30,11 +47,14 @@ export async function layoutCanvas(page: Page) {
  */
 export async function clickStep(page: Page, stepName: string) {
   await layoutCanvas(page)
-  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
+  const node = canvasStepNode(page, stepName)
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(async () => {
     await expect(node).toBeVisible({ timeout: 5_000 })
-    await node.click({ timeout: 5_000 })
+    await clickCanvasStepToOpenEditor(node, stepName)
     await expect(nameInput).toHaveValue(stepName, { timeout: 5_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
+
+/** @deprecated Prefer `clickStep`; kept for older specs importing `clickNode`. */
+export const clickNode = clickStep
