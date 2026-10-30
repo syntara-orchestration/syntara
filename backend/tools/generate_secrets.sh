@@ -151,23 +151,8 @@ main() {
         generate_key_pair "jwt-backup"
     fi
 
-    # Generate admin password file
-    if [[ -f "$SECRETS_DIR/admin-password" ]] && [[ "$force" != true ]]; then
-        info "Admin password file already exists, skipping (use --force to regenerate)"
-    else
-        info "Generating admin password file..."
-        if [[ -n "${APP_ADMIN_PASSWORD:-}" ]]; then
-            echo -n "$APP_ADMIN_PASSWORD" > "$SECRETS_DIR/admin-password"
-            info "  Using password from APP_ADMIN_PASSWORD env var"
-        else
-            generate_admin_password > "$SECRETS_DIR/admin-password"
-            info "  Generated random password"
-        fi
-        chmod 600 "$SECRETS_DIR/admin-password"
-        info "  Password file: $SECRETS_DIR/admin-password"
-    fi
-
-    # Generate encryption key file
+    # Write encryption keys before the admin password so a later Settings import
+    # during complexity checks does not fail on a missing key file.
     if [[ -f "$SECRETS_DIR/encryption-key" ]] && [[ "$force" != true ]]; then
         info "Encryption key already exists, skipping (use --force to regenerate)"
     else
@@ -184,6 +169,22 @@ main() {
         info "Generating Execution Plane credential encryption key..."
         openssl rand -base64 32 | tr -d '\n' > "$SECRETS_DIR/ep-credential-encryption-key"
         chmod 600 "$SECRETS_DIR/ep-credential-encryption-key"
+    fi
+
+    # Generate admin password file
+    if [[ -f "$SECRETS_DIR/admin-password" ]] && [[ "$force" != true ]]; then
+        info "Admin password file already exists, skipping (use --force to regenerate)"
+    else
+        info "Generating admin password file..."
+        if [[ -n "${APP_ADMIN_PASSWORD:-}" ]]; then
+            echo -n "$APP_ADMIN_PASSWORD" > "$SECRETS_DIR/admin-password"
+            info "  Using password from APP_ADMIN_PASSWORD env var"
+        else
+            generate_admin_password > "$SECRETS_DIR/admin-password"
+            info "  Generated random password"
+        fi
+        chmod 600 "$SECRETS_DIR/admin-password"
+        info "  Password file: $SECRETS_DIR/admin-password"
     fi
 
     # Prevent permissions issues once secrets are mounted to syntara containers
