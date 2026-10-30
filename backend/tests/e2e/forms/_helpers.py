@@ -237,7 +237,7 @@ def assert_problem_response(
     return problem
 
 
-def assert_definition_invalid(response: Response[Any]) -> dict[str, Any]:
+def assert_definition_invalid(response: Response[Any], *, node_id: str = "prompt") -> dict[str, Any]:
     """Assert an RFC 9457 workflow-definition validation problem and return it."""
     problem = assert_problem_response(
         response,
@@ -254,7 +254,7 @@ def assert_definition_invalid(response: Response[Any]) -> dict[str, Any]:
     assert validation_result["is_valid"] is False
     assert validation_result["error_count"] >= 1
     assert validation_result["findings"]
-    assert any(finding.get("node_id") == "prompt" for finding in validation_result["findings"])
+    assert any(finding.get("node_id") == node_id for finding in validation_result["findings"])
     return problem
 
 

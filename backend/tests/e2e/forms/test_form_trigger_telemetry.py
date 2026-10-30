@@ -37,7 +37,7 @@ def _require_segment_server_url() -> str:
 
 _SEGMENT_SERVER_URL = _require_segment_server_url()
 
-from ._helpers import assert_and_get_response  # noqa: E402
+from ._helpers import assert_and_get_response, assert_consumer_completed  # noqa: E402
 from ._workflows import form_trigger_consumer_workflow  # noqa: E402
 
 pytestmark = [pytest.mark.e2e]
@@ -121,6 +121,7 @@ class TestFormTriggerTelemetry:
         execution_id = UUID(str(execution.id))
         form_execution_cleanup(execution_id)
 
+        assert_consumer_completed(syntara_api, execution_id)
         message = _wait_for_form_trigger_segment_event(execution_id)
         properties = message["properties"]
 
