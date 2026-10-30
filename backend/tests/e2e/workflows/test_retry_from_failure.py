@@ -842,8 +842,15 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
     assert source_rows["repair_body_iter_0_iter_0"].status == "completed"
     assert source_rows["repair_body_iter_0_iter_1"].status == "completed"
     assert source_rows["repair_body_iter_1_iter_0"].status == "failed"
+    assert "first:first" in _listed_stdout(source_rows["repair_body_iter_0_iter_0"])
+    assert "first:second" in _listed_stdout(source_rows["repair_body_iter_0_iter_1"])
+    assert "second:first" in _listed_stdout(source_rows["repair_body_iter_1_iter_0"])
     assert _activity_output(source_rows["route_iter_0_iter_0"]).get("evaluated_result") is True
     assert _activity_output(source_rows["route_iter_1_iter_0"]).get("evaluated_result") is True
+
+    for temporal_id in ("unused_branch_iter_0_iter_0", "unused_branch_iter_0_iter_1", "unused_branch_iter_1_iter_0"):
+        unused_branch = source_rows.get(temporal_id)
+        assert unused_branch is None or unused_branch.status == "skipped"
 
     preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
     assert preview.eligible is True
@@ -898,6 +905,8 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
     assert _activity_output(retry_rows["route_iter_1_iter_1"]).get("evaluated_result") is True
     assert retry_rows["repair_body_iter_1_iter_1"].status == "completed"
     assert "recovered:second:second" in _listed_stdout(retry_rows["repair_body_iter_1_iter_1"])
+    unused_final_branch = retry_rows.get("unused_branch_iter_1_iter_1")
+    assert unused_final_branch is None or unused_final_branch.status == "skipped"
 
 
 def test_retry_defaults_to_all_failed_parallel_branches_when_selection_is_omitted(
@@ -1031,7 +1040,7 @@ def test_retry_input_overrides_are_run_local_and_reject_unknown_keys(
     create_project_role: ProjectRoleFactory,
     assign_project_role_to_user: AssignProjectRoleFactory,
 ) -> None:
-    """Run permission is enough for overrides; unknown keys are rejected; the definition stays unchanged."""
+    """Only workflow editors can override retry inputs; retries never change the definition."""
     project_id, _ = create_project(syntara_api, "retry-override-authz")
     name = unique_name("e2e-retry-override-authz")
     definition = _workflow_definition(
@@ -1053,7 +1062,31 @@ def test_retry_input_overrides_are_run_local_and_reject_unknown_keys(
     assign_project_role_to_user(syntara_api, project_id, run_user_id, run_role)
     run_api = api_for(syntara_base_url, run_username, run_password)
 
-    rejected_new_input_key = run_api.executions.retry_from_failure(
+    rejected_override = run_api.executions.retry_from_failure(
+        execution_id=source.id,
+        body=RetryFailureRequest.from_dict(
+            {
+                "retry_point_ids": ["failure"],
+                "input_parameter_overrides": {"failure": {"code": "print('run-only user cannot override')"}},
+            }
+        ),
+    )
+    assert rejected_override.status_code == HTTPStatus.FORBIDDEN
+
+    # AC-14 only gates changing inputs. A user with run permission can retry unchanged inputs.
+    unchanged_retry = _start_retry(run_api, source.id, ["failure"])
+    unchanged_retry_final = poll_execution_until_complete(
+        syntara_api, unchanged_retry.id, max_polls=60, poll_interval=1
+    )
+    assert unchanged_retry_final.status == ExecutionStatus.FAILED
+
+    editor_policies = [*_RETRY_RUN_POLICIES, "workflow:update:project"]
+    editor_user_id, editor_username, editor_password = create_user(syntara_api, "retry-workflow-editor")
+    editor_role = create_project_role(syntara_api, project_id, "retry-workflow-editor", editor_policies)
+    assign_project_role_to_user(syntara_api, project_id, editor_user_id, editor_role)
+    editor_api = api_for(syntara_base_url, editor_username, editor_password)
+
+    rejected_new_input_key = editor_api.executions.retry_from_failure(
         execution_id=source.id,
         body=RetryFailureRequest.from_dict(
             {
@@ -1065,18 +1098,16 @@ def test_retry_input_overrides_are_run_local_and_reject_unknown_keys(
     assert rejected_new_input_key.status_code == HTTPStatus.CONFLICT
     assert getattr(rejected_new_input_key.parsed, "code", None) == "EXECUTION_NOT_RETRYABLE_FROM_FAILURE"
 
-    authorized_retry = _start_retry(
-        run_api,
+    editor_retry = _start_retry(
+        editor_api,
         source.id,
         ["failure"],
         overrides={"failure": {"code": "print('repaired')"}},
     )
-    assert authorized_retry.retried_from_execution_id == source.id
-    assert authorized_retry.workflow_version_id == source.workflow_version_id
-    authorized_retry_final = poll_execution_until_complete(
-        syntara_api, authorized_retry.id, max_polls=60, poll_interval=1
-    )
-    assert authorized_retry_final.status == ExecutionStatus.COMPLETED, authorized_retry_final.error_details
+    assert editor_retry.retried_from_execution_id == source.id
+    assert editor_retry.workflow_version_id == source.workflow_version_id
+    editor_retry_final = poll_execution_until_complete(syntara_api, editor_retry.id, max_polls=60, poll_interval=1)
+    assert editor_retry_final.status == ExecutionStatus.COMPLETED, editor_retry_final.error_details
 
     # The override belongs only to the retry; a later standard run still executes the failing definition.
     later_run = syntara_api.executions.create(
