@@ -1,7 +1,7 @@
 """Add expected_duration and stall_alert_at to activity_execution.
 
 Revision ID: e3a1f5b7d924
-Revises: d5b8c2f04e71
+Revises: e7f4a1b2c3d4
 Create Date: 2026-09-23 12:00:00.000000
 
 Adds two nullable columns to support stall detection (AAP-92824):
@@ -23,7 +23,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "e3a1f5b7d924"
-down_revision: str | Sequence[str] | None = "d5b8c2f04e71"
+down_revision: str | Sequence[str] | None = "e7f4a1b2c3d4"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
