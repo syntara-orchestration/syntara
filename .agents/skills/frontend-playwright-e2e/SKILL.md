@@ -153,7 +153,7 @@ From the existing tests, note:
 - **File naming:** `feature-name.spec.ts` (kebab-case)
 - **Test titles:** Descriptive, user-action-based ("user creates and saves a multi-step workflow")
 - **Scoping:** Some files use `test.describe()` blocks (accessibility, filtering), others use top-level tests
-- **Conditional skipping:** `test.skip(!condition, 'reason')` for environment-dependent tests (see [Data-Dependent Tests](#data-dependent-tests--fail-when-expected-data-is-missing) for when to use `test.skip` vs `expect`)
+- **Conditional skipping:** `test.skip(!condition, 'reason')` for environment-dependent tests (see [Data-Dependent Tests](#data-dependent-tests-fail-when-expected-data-is-missing) for when to use `test.skip` vs `expect`)
 - **Multi-tab testing:** Some tests use `{ app, context }` to test URL sharing across tabs
 
 **CRITICAL:** New tests MUST match existing style. A reviewer should not be able to distinguish new tests from existing ones.
@@ -714,7 +714,7 @@ API helpers are in `e2e/utils/api.ts`. Use them for setup and teardown; reserve 
 
 ---
 
-### Data-Dependent Tests — Fail When Expected Data Is Missing
+### Data-Dependent Tests: Fail When Expected Data Is Missing
 
 Tests that depend on pre-existing data (filtering, pagination, approvals) must **fail loudly** when that data isn't available. Use `expect()` with a descriptive message:
 

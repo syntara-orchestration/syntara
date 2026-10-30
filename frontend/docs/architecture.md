@@ -21,8 +21,8 @@ This document explains **how the Syntara UI is organized**, **how it fetches dat
 9. [App Startup](#app-startup-where-everything-begins)
 10. [Routing](#routing-tanstack-router)
 11. [State Management](#state-management)
-12. [Backend Requests + Data Flow](#backend-requests--data-flow-tanstack-query--openapi-clients)
-13. [Workflow Builder](#workflow-builder-backend-workflow--ui-graph-react-flow)
+12. [Backend Requests + Data Flow](#backend-requests-and-data-flow-tanstack-query-and-openapi-clients)
+13. [Workflow Builder](#workflow-builder-backend-workflow-to-ui-graph-react-flow)
 14. [React Flow Integration](#react-flow-integration-nodes-edges-and-layout)
 15. [Where to Look for Common Changes](#where-to-look-for-common-changes)
 16. [API Filtering Architecture](#api-filtering-architecture)
@@ -534,7 +534,7 @@ function ChatComponent() {
 
 ---
 
-## Backend Requests + Data Flow (TanStack Query + OpenAPI clients)
+## Backend Requests and Data Flow: TanStack Query and OpenAPI Clients
 
 ### Making API calls
 
@@ -575,7 +575,7 @@ mutation.mutate({ body: workflowPayload })
 
 ---
 
-## Workflow Builder: backend workflow → UI graph (React Flow)
+## Workflow Builder: Backend Workflow to UI Graph (React Flow)
 
 > This is the most complex part of the codebase. Take your time here.
 

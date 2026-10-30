@@ -52,12 +52,34 @@ jobs:
         run: npm run build --workspace=packages/md-link-lint
         working-directory: .tools/ui-packages
 
+      - name: Prepare MkDocs documentation paths
+        # MkDocs resolves links through these site-relative paths.
+        run: |
+          if [ "$(readlink docs/backend)" != "../backend/docs" ]; then
+            echo "Unexpected docs/backend link target." >&2
+            exit 1
+          fi
+          if [ "$(readlink docs/frontend)" != "../frontend/docs" ]; then
+            echo "Unexpected docs/frontend link target." >&2
+            exit 1
+          fi
+          if find backend/docs frontend/docs -type l -print -quit | grep -q .; then
+            echo "Nested symlinks are not supported in Markdown docs." >&2
+            exit 1
+          fi
+
+          cp -RL docs/backend "$RUNNER_TEMP/backend-docs"
+          cp -RL docs/frontend "$RUNNER_TEMP/frontend-docs"
+          rm docs/backend docs/frontend
+          mv "$RUNNER_TEMP/backend-docs" docs/backend
+          mv "$RUNNER_TEMP/frontend-docs" docs/frontend
+
       - name: Check local Markdown links
         # Save the exit code so the report still appears when links fail.
-        # Keep the nested checkout out of the Syntara scan.
+        # Check doc paths as MkDocs sees them.
         run: |
           report="$RUNNER_TEMP/md-link-lint-report.json"
-          if node .tools/ui-packages/packages/md-link-lint/dist/cli.js --exclude '.tools/**' --json > "$report"; then
+          if node .tools/ui-packages/packages/md-link-lint/dist/cli.js --exclude '.tools/**' --exclude 'backend/docs/**' --exclude 'frontend/docs/**' --json > "$report"; then
             status=0
           else
             status=$?

@@ -11,7 +11,7 @@
 - [Publish Flow](#publish-flow)
 - [Unpublish Flow](#unpublish-flow)
 - [Restore Flow](#restore-flow)
-- [Export / Import](#export--import)
+- [Export / Import](#export-and-import)
 - [Execution Binding](#execution-binding)
 - [Trigger Sync](#trigger-sync)
 - [Telemetry](#telemetry)
@@ -263,7 +263,7 @@ Steps (`WorkflowService.restore_workflow_version()`):
 
 ---
 
-## Export / Import
+## Export and Import
 
 ### Export
 
