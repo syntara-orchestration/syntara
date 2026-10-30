@@ -10,7 +10,7 @@ import {
 } from '@patternfly/react-core'
 import type { MenuToggleElement } from '@patternfly/react-core'
 import { RhUiAutoLightDarkModeIcon, RhUiDarkModeIcon, RhUiLightModeIcon } from '@patternfly/react-icons'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { SynSelect } from '../components/SynSelect'
 import type { ColorSchemePreference } from '../providers/theme/colorScheme'
@@ -70,11 +70,52 @@ function contrastButtonId(value: ContrastPreference): string {
  * separate toggle groups for color scheme and contrast mode. Theme variant
  * (Default vs Project Felt) stays on the brand config, not this menu.
  */
+function focusStaysInThemeMenu(
+  next: EventTarget | null,
+  menu: HTMLElement | null,
+  toggle: HTMLElement | null
+): boolean {
+  return next instanceof Node && (Boolean(menu?.contains(next)) || Boolean(toggle?.contains(next)))
+}
+
 export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
   const { colorSchemePreference, setColorScheme, contrastPreference, setContrastMode } = useColorScheme()
   const [isOpen, setIsOpen] = useState(false)
   const toggleRef = useRef<HTMLButtonElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const toggleName = themeToggleName(colorSchemePreference, contrastPreference)
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    let closeTimer: ReturnType<typeof setTimeout> | undefined
+    const onFocusOut = (event: FocusEvent) => {
+      if (focusStaysInThemeMenu(event.relatedTarget, menuRef.current, toggleRef.current)) {
+        return
+      }
+      // A click can emit focusout with a null relatedTarget before focus lands on the option.
+      clearTimeout(closeTimer)
+      closeTimer = setTimeout(() => {
+        const active = document.activeElement
+        if (focusStaysInThemeMenu(active, menuRef.current, toggleRef.current)) {
+          return
+        }
+        setIsOpen(false)
+      }, 0)
+    }
+
+    const menu = menuRef.current
+    const toggle = toggleRef.current
+    menu?.addEventListener('focusout', onFocusOut)
+    toggle?.addEventListener('focusout', onFocusOut)
+    return () => {
+      clearTimeout(closeTimer)
+      menu?.removeEventListener('focusout', onFocusOut)
+      toggle?.removeEventListener('focusout', onFocusOut)
+    }
+  }, [isOpen])
 
   const toggle = (dropdownRef: React.Ref<MenuToggleElement>) => (
     <MenuToggle
@@ -101,6 +142,7 @@ export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
     <>
       <SynSelect
         isOpen={isOpen}
+        innerRef={menuRef}
         onOpenChange={setIsOpen}
         onOpenChangeKeys={['Escape']}
         shouldFocusToggleOnSelect

@@ -106,4 +106,24 @@ describe('ThemeMenu', () => {
     expect(document.documentElement.classList.contains('pf-v6-theme-high-contrast')).toBe(true)
     expect(highContrast).toHaveAttribute('aria-pressed', 'true')
   })
+
+  it('stays open while tabbing between groups and closes when tab leaves the menu', async () => {
+    const user = userEvent.setup()
+    renderThemeMenu()
+    const themeButton = screen.getByRole('button', { name: THEME_BUTTON })
+
+    await user.click(themeButton)
+    const glass = screen.getByRole('button', { name: 'Glass' })
+    for (let step = 0; step < 7; step += 1) {
+      await user.tab()
+    }
+    expect(glass).toHaveFocus()
+    expect(screen.getByRole('group', { name: 'Color scheme' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Contrast mode' })).toBeInTheDocument()
+
+    await user.tab()
+    await waitFor(() => {
+      expect(screen.queryByRole('group', { name: 'Contrast mode' })).not.toBeInTheDocument()
+    })
+  })
 })
