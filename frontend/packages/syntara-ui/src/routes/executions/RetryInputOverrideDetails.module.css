@@ -1,0 +1,44 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--sm);
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: var(--pf-t--global--spacer--sm);
+}
+
+.header {
+  flex: 0 0 auto;
+}
+
+.title {
+  margin: 0 0 var(--pf-t--global--spacer--xs);
+}
+
+.editorItem {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.actions {
+  flex: 0 0 auto;
+  padding-top: var(--pf-t--global--spacer--sm);
+  border-top: var(--pf-t--global--border--width--divider--default) solid var(--pf-t--global--border--color--default);
+}
+
+.editor {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor :global([data-testid='inline-code-editor']),
+.editor :global(.pf-v6-c-code-editor) {
+  height: 100%;
+  min-height: 0;
+}

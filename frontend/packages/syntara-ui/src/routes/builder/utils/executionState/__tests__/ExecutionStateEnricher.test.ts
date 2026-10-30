@@ -1232,5 +1232,74 @@ describe('ExecutionStateEnricher', () => {
         __showExecutionBadge: true,
       })
     })
+
+    it('flags a trigger as replayed when it started before the retry baseline', () => {
+      const triggerData = { name: 'Manual trigger', details: 'Manual', triggerType: 'manual' }
+      const activityStates = new Map<string, ActivityState>([
+        [
+          'trigger-real-id',
+          {
+            activityId: 'trigger-real-id',
+            status: 'completed',
+            startedAt: '2024-01-01T00:00:00Z',
+            completedAt: '2024-01-01T00:00:01Z',
+          },
+        ],
+      ])
+
+      const result = enricher.enrichTriggerNode(
+        'trigger-real-id',
+        triggerData,
+        'completed',
+        activityStates,
+        '2024-01-02T00:00:00Z'
+      )
+
+      expect(result.__executionState?.replayed).toBe(true)
+    })
+
+    it('does not flag a trigger that started inside the retry window', () => {
+      const triggerData = { name: 'Manual trigger', details: 'Manual', triggerType: 'manual' }
+      const activityStates = new Map<string, ActivityState>([
+        [
+          'trigger-real-id',
+          {
+            activityId: 'trigger-real-id',
+            status: 'completed',
+            startedAt: '2024-01-02T00:00:05Z',
+            completedAt: '2024-01-02T00:00:06Z',
+          },
+        ],
+      ])
+
+      const result = enricher.enrichTriggerNode(
+        'trigger-real-id',
+        triggerData,
+        'completed',
+        activityStates,
+        '2024-01-02T00:00:00Z'
+      )
+
+      expect(result.__executionState?.replayed).toBe(false)
+    })
+
+    it('never flags a trigger as replayed when the run is not a retry', () => {
+      const triggerData = { name: 'Manual trigger', details: 'Manual', triggerType: 'manual' }
+      const activityStates = new Map<string, ActivityState>([
+        [
+          'trigger-real-id',
+          {
+            activityId: 'trigger-real-id',
+            status: 'completed',
+            startedAt: '2020-01-01T00:00:00Z',
+            completedAt: '2020-01-01T00:00:01Z',
+          },
+        ],
+      ])
+
+      const result = enricher.enrichTriggerNode('trigger-real-id', triggerData, 'completed', activityStates)
+
+      expect(result.__executionState?.replayed).toBe(false)
+    })
   })
 })

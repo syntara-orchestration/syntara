@@ -3,6 +3,8 @@ import {
   Background,
   BackgroundVariant,
   ConnectionLineType,
+  NodeToolbar,
+  Position,
   ReactFlow,
   type Connection,
   type EdgeChange,
@@ -16,8 +18,9 @@ import {
   useStore,
   useUpdateNodeInternals,
 } from '@xyflow/react'
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 
+import { SynLabel } from '../../components/labels/SynLabel'
 import { FlowNodeType } from '../../constants'
 import { CanvasControls } from '../workflows/canvas/CanvasControls'
 import { type NodeType } from '../workflows/canvas/nodes/NodeType'
@@ -37,6 +40,7 @@ type BuilderFlowCanvasProps = {
   effectiveExecutionStatus: string | null
   isReadOnly: boolean
   nodes: NodeType[]
+  retryPreviewNodeIds?: readonly string[]
   edges: EdgeType[]
   onNodesChange: (changes: NodeChange<NodeType>[]) => void
   onNodeDragStart?: OnNodeDrag<NodeType>
@@ -111,6 +115,7 @@ export function BuilderFlowCanvas({
   effectiveExecutionStatus,
   isReadOnly,
   nodes,
+  retryPreviewNodeIds = [],
   edges,
   onNodesChange,
   onNodeDragStart,
@@ -127,6 +132,18 @@ export function BuilderFlowCanvas({
   disableSpacePanning,
   onLayout,
 }: Readonly<BuilderFlowCanvasProps>) {
+  const retryPreviewNodeIdSet = useMemo(() => new Set(retryPreviewNodeIds), [retryPreviewNodeIds])
+  const accessibleNodes = useMemo(
+    () =>
+      nodes.map((node) => {
+        if (!retryPreviewNodeIdSet.has(node.id)) return node
+
+        const nodeName = 'name' in node.data && typeof node.data.name === 'string' ? node.data.name : node.id
+        return { ...node, ariaLabel: `${node.ariaLabel ?? nodeName}, retry origin` }
+      }),
+    [nodes, retryPreviewNodeIdSet]
+  )
+
   return (
     <div
       ref={containerRef}
@@ -140,7 +157,7 @@ export function BuilderFlowCanvas({
         </div>
       )}
       <ReactFlow<NodeType, EdgeType>
-        nodes={nodes}
+        nodes={accessibleNodes}
         edges={edges}
         nodeTypes={builderNodeTypes}
         edgeTypes={builderEdgeTypes}
@@ -171,6 +188,21 @@ export function BuilderFlowCanvas({
       >
         <SemanticZoomNodeInternalsUpdater />
         <EdgeMarkers />
+        {retryPreviewNodeIds.map((nodeId) => (
+          <NodeToolbar
+            key={nodeId}
+            nodeId={nodeId}
+            isVisible
+            position={Position.Top}
+            align="end"
+            offset={8}
+            data-testid={`retry-origin-${nodeId}`}
+          >
+            <span data-testid={`retry-origin-label-${nodeId}`} aria-hidden="true">
+              <SynLabel color="blue">Retry origin</SynLabel>
+            </span>
+          </NodeToolbar>
+        ))}
         {!isReadOnly && <Background variant={BackgroundVariant.Dots} gap={20} size={1} />}
         <CanvasControls onLayout={onLayout} hideLayout={isReadOnly} />
         {!isReadOnly && <UndoRedoControls />}

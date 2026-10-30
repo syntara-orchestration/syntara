@@ -356,7 +356,7 @@ describe('ExecutionDetail', () => {
     expect(await screen.findByTestId('retry-from-failure-panel')).toHaveFocus()
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
-    await waitFor(() => expect(retryTrigger).toHaveFocus())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Retry run' })).toHaveFocus())
     mockExecutionQuery.data.status = originalStatus
   })
 

@@ -23,6 +23,14 @@
   flex-direction: column;
 }
 
+.activityListRetryMode {
+  flex-basis: clamp(20rem, 22vw, var(--syntara-builder-side-panel-width));
+}
+
+.activityListRetryMode .filterBarWrapperInActivityList {
+  padding-inline: 0;
+}
+
 .filterBarWrapper {
   flex-shrink: 0;
   padding-bottom: var(--pf-t--global--spacer--xs);
