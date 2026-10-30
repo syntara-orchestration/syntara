@@ -12,6 +12,12 @@ vi.mock('./ExecutionStatus', () => ({
   ActivityStatusLabel: ({ status }: { status: string }) => <span>{status}</span>,
 }))
 
+const mockNavigate = vi.fn()
+vi.mock('@tanstack/react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-router')>()
+  return { ...actual, useNavigate: () => mockNavigate }
+})
+
 function state(id: string, overrides: Partial<ActivityState> = {}): [string, ActivityState] {
   return [id, { activityId: id, status: 'pending', ...overrides }]
 }
@@ -82,6 +88,29 @@ describe('CompactActivityList', () => {
     render(<CompactActivityList activityStates={emptyStates} activityOrder={[{ id: 'x', name: 'X' }]} />)
 
     expect(screen.getByText('pending')).toBeInTheDocument()
+  })
+
+  it('renders a View sub-workflow run link for a sub_workflow row and navigates', async () => {
+    const user = userEvent.setup()
+    mockNavigate.mockClear()
+    const swOrder: ActivityOrderItem[] = [{ id: 'run_child', name: 'Dispatch', type: 'sub_workflow' }]
+    const swStates = new Map([
+      state('run_child', {
+        status: 'completed',
+        outputData: { child_execution_id: 'child-9', workflow_name: 'Child WF' },
+      }),
+    ])
+    render(<CompactActivityList activityStates={swStates} activityOrder={swOrder} />)
+
+    const link = screen.getByRole('button', { name: /View sub-workflow run: Child WF/i })
+    expect(link).toBeInTheDocument()
+    await user.click(link)
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/executions/$executionId', params: { executionId: 'child-9' } })
+  })
+
+  it('does not render a sub-workflow link for non sub_workflow rows', () => {
+    render(<CompactActivityList activityStates={states} activityOrder={order} />)
+    expect(screen.queryByRole('button', { name: /View sub-workflow run/i })).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

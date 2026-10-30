@@ -39,6 +39,13 @@ function parseManual(inputSchema?: string) {
   })
 }
 
+function parseSubworkflow(inputSchema?: string) {
+  return triggerFormSchema.safeParse({
+    triggerType: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
+    inputSchema,
+  })
+}
+
 function parseScheduled(scheduleType: string, interval?: string, cron?: string) {
   return triggerFormSchema.safeParse({
     triggerType: TriggerTypeEnum.SCHEDULED,
@@ -332,6 +339,32 @@ describe('triggerFormSchema — manual trigger inputSchema (permissive)', () => 
 
   it('rejects non-object JSON inputSchema', () => {
     expect(parseManual('"hello"').success).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Sub-workflow trigger inputSchema validation (same permissive rules as manual)
+// ---------------------------------------------------------------------------
+
+describe('triggerFormSchema — sub-workflow trigger inputSchema (permissive)', () => {
+  it('accepts a valid JSON object', () => {
+    expect(parseSubworkflow('{"type": "object"}').success).toBe(true)
+  })
+
+  it('accepts empty inputSchema (optional field)', () => {
+    expect(parseSubworkflow('').success).toBe(true)
+  })
+
+  it('accepts undefined inputSchema', () => {
+    expect(parseSubworkflow(undefined).success).toBe(true)
+  })
+
+  it('rejects invalid JSON inputSchema', () => {
+    expect(parseSubworkflow('{bad}').success).toBe(false)
+  })
+
+  it('rejects non-object JSON inputSchema', () => {
+    expect(parseSubworkflow('"hello"').success).toBe(false)
   })
 })
 

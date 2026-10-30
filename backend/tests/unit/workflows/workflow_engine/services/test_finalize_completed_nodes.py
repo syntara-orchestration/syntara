@@ -10,6 +10,7 @@ stays PENDING until finalization; completed_node_ids lets it be marked COMPLETED
 """
 
 import json
+from datetime import UTC, datetime
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -17,7 +18,23 @@ from temporalio.api.enums.v1 import EventType
 
 from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.models.execution import Execution
+from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+from syntara.workflows.workflow_engine.services.activity_execution_state import _resolve_finalized_completed_at
 from syntara.workflows.workflow_engine.services.activity_sync_service import ActivitySyncService
+
+
+def _sub_wf_activity(
+    name: str,
+    started_at: datetime | None = None,
+    status: ActivityStatus = ActivityStatus.PENDING,
+) -> Mock:
+    a = Mock()
+    a.status = status
+    a.activity_name = name
+    a.started_at = started_at
+    a.error_details = None
+    a.node_type = NodeType.SUB_WORKFLOW
+    return a
 
 
 def _activity(name: str, status: ActivityStatus = ActivityStatus.PENDING) -> Mock:
@@ -215,3 +232,110 @@ class TestExtractCompletedNodesFromEvent:
         """A payload without completed_nodes (e.g. pre-upgrade) yields an empty set, never a wrong COMPLETED."""
         event = _completed_event({"completed_activities": ["sub_wf_node", "disabled_node"], "failed_activities": {}})
         assert ActivitySyncService._extract_completed_nodes_from_event(event) == set()
+
+
+class TestResolveFinalizedCompletedAt:
+    """Unit tests for the completed_at chosen when finalizing a sub-workflow node.
+
+    The sub-workflow node's completed_at should be when its CHILD finished, not
+    when the parent execution finalized (which also spans downstream parent
+    steps). The helper falls back to ``now`` whenever a child time is absent or
+    out of range, and never alters non-sub-workflow nodes.
+    """
+
+    NOW = datetime(2024, 1, 1, 0, 5, tzinfo=UTC)
+    STARTED = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
+
+    def test_sub_workflow_uses_child_completion(self) -> None:
+        """Child completed at 00:02 → node completed_at is 00:02, not finalization 00:05."""
+        child_done = datetime(2024, 1, 1, 0, 2, tzinfo=UTC)
+        act = _sub_wf_activity("sub_wf_node", started_at=self.STARTED)
+        out = _resolve_finalized_completed_at(act, "sub_wf_node", {"sub_wf_node": child_done}, self.NOW)
+        assert out == child_done
+
+    def test_falls_back_to_now_without_child_time(self) -> None:
+        """No child time (missing key, empty map, or None) → finalization time."""
+        act = _sub_wf_activity("sub_wf_node", started_at=self.STARTED)
+        assert _resolve_finalized_completed_at(act, "sub_wf_node", {}, self.NOW) == self.NOW
+        assert _resolve_finalized_completed_at(act, "sub_wf_node", None, self.NOW) == self.NOW
+        assert _resolve_finalized_completed_at(act, "sub_wf_node", {"other": self.STARTED}, self.NOW) == self.NOW
+
+    def test_non_sub_workflow_node_always_uses_now(self) -> None:
+        """A non-sub-workflow node ignores the map entirely (unchanged behavior)."""
+        a = Mock()
+        a.node_type = NodeType.SCRIPT
+        a.started_at = None
+        child_done = datetime(2024, 1, 1, 0, 2, tzinfo=UTC)
+        assert _resolve_finalized_completed_at(a, "script_node", {"script_node": child_done}, self.NOW) == self.NOW
+
+    def test_candidate_before_started_falls_back_to_now(self) -> None:
+        """A child time earlier than the node's start (clock skew) is rejected."""
+        started = datetime(2024, 1, 1, 0, 3, tzinfo=UTC)
+        child_done = datetime(2024, 1, 1, 0, 1, tzinfo=UTC)
+        act = _sub_wf_activity("n", started_at=started)
+        assert _resolve_finalized_completed_at(act, "n", {"n": child_done}, self.NOW) == self.NOW
+
+    def test_candidate_after_now_falls_back_to_now(self) -> None:
+        """A child time later than finalization is clamped back to now (monotonic)."""
+        future = datetime(2024, 1, 1, 0, 9, tzinfo=UTC)
+        act = _sub_wf_activity("n", started_at=self.STARTED)
+        assert _resolve_finalized_completed_at(act, "n", {"n": future}, self.NOW) == self.NOW
+
+    def test_naive_child_time_is_coerced_to_utc_and_used(self) -> None:
+        """A naive child datetime is made timezone-aware before comparison/use."""
+        child_done_naive = datetime(2024, 1, 1, 0, 2)  # noqa: DTZ001 - deliberately naive
+        act = _sub_wf_activity("n", started_at=self.STARTED)
+        out = _resolve_finalized_completed_at(act, "n", {"n": child_done_naive}, self.NOW)
+        assert out == datetime(2024, 1, 1, 0, 2, tzinfo=UTC)
+
+    def test_started_at_none_still_uses_child_completion(self) -> None:
+        """When started_at was not stamped, a valid child time (<= now) is still used."""
+        child_done = datetime(2024, 1, 1, 0, 2, tzinfo=UTC)
+        act = _sub_wf_activity("n", started_at=None)
+        assert _resolve_finalized_completed_at(act, "n", {"n": child_done}, self.NOW) == child_done
+
+
+class TestFinalizeUsesChildCompletion:
+    """The finalizer wires child completion times through to completed_at."""
+
+    def test_completed_sub_workflow_gets_child_completed_at(self) -> None:
+        """A finalized-COMPLETED sub-workflow row records the child's completion, not now."""
+        execution = Mock(spec=Execution)
+        started = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
+        child_done = datetime(2024, 1, 1, 0, 2, tzinfo=UTC)
+        act = _sub_wf_activity("sub_wf_node", started_at=started)
+        execution.activities = [act]
+
+        ActivitySyncService._finalize_non_terminal_activities(
+            execution, uuid4(), None, {"sub_wf_node"}, {"sub_wf_node": child_done}
+        )
+
+        assert act.status == ActivityStatus.COMPLETED
+        assert act.completed_at == child_done
+
+    def test_for_each_rows_use_child_completion_by_base_node(self) -> None:
+        """Per-iteration composite rows resolve completion via their base node id."""
+        execution = Mock(spec=Execution)
+        started = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
+        child_done = datetime(2024, 1, 1, 0, 3, tzinfo=UTC)
+        i0 = _sub_wf_activity("sub_wf_node#iter-0", started_at=started)
+        i1 = _sub_wf_activity("sub_wf_node#iter-1", started_at=started)
+        execution.activities = [i0, i1]
+
+        ActivitySyncService._finalize_non_terminal_activities(
+            execution, uuid4(), None, {"sub_wf_node"}, {"sub_wf_node": child_done}
+        )
+
+        assert i0.completed_at == child_done
+        assert i1.completed_at == child_done
+
+    def test_without_map_completed_at_is_now_not_none(self) -> None:
+        """Omitting the child map preserves prior behavior: completed_at is set (to now)."""
+        execution = Mock(spec=Execution)
+        act = _sub_wf_activity("sub_wf_node", started_at=datetime(2024, 1, 1, 0, 0, tzinfo=UTC))
+        execution.activities = [act]
+
+        ActivitySyncService._finalize_non_terminal_activities(execution, uuid4(), None, {"sub_wf_node"})
+
+        assert act.status == ActivityStatus.COMPLETED
+        assert act.completed_at is not None

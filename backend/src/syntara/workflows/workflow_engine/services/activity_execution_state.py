@@ -8,7 +8,8 @@ from uuid import UUID
 
 import structlog
 from sqlalchemy.orm import selectinload
-from sqlmodel import select
+from sqlmodel import col, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.history.v1 import HistoryEvent
 
@@ -47,6 +48,37 @@ def _completion_error_type(*, is_workflow_timeout: bool, has_error_details: bool
     if has_error_details:
         return "ActivityExecutionError"
     return None
+
+
+def _resolve_finalized_completed_at(
+    activity: ActivityExecution,
+    base_name: str,
+    child_completed_at: dict[str, datetime] | None,
+    now: datetime,
+) -> datetime:
+    """Choose the completed_at for a non-terminal activity being finalized.
+
+    A sub-workflow node's work ends when its child workflow terminates, not when
+    the parent execution finalizes (which also spans any downstream parent
+    steps). When the child's completion time is known, use it so the node's
+    duration reflects the true invocation lifecycle; for a ``for_each`` node the
+    latest child completion is used. Fall back to ``now`` when no child time is
+    available, or when the candidate falls outside ``[started_at, now]``, so the
+    value stays monotonic and is never fabricated. Non-sub-workflow activities
+    always use ``now`` (unchanged behaviour).
+    """
+    if not child_completed_at or activity.node_type != NodeType.SUB_WORKFLOW:
+        return now
+    candidate = child_completed_at.get(base_name)
+    if candidate is None:
+        return now
+    candidate = ensure_timezone_aware(candidate)
+    started = ensure_timezone_aware(activity.started_at) if activity.started_at else None
+    if started is not None and candidate < started:
+        return now
+    if candidate > now:
+        return now
+    return candidate
 
 
 class ActivityExecutionStateMixin:
@@ -197,6 +229,7 @@ class ActivityExecutionStateMixin:
         execution_id: UUID,
         failed_node_map: dict[str, str] | None = None,
         completed_node_ids: set[str] | None = None,
+        child_completed_at: dict[str, datetime] | None = None,
     ) -> None:
         """Mark any non-terminal activities as skipped when a workflow completes.
 
@@ -232,7 +265,7 @@ class ActivityExecutionStateMixin:
                     activity.status = ActivityStatus.COMPLETED
                 else:
                     activity.status = ActivityStatus.SKIPPED
-                activity.completed_at = now
+                activity.completed_at = _resolve_finalized_completed_at(activity, base_name, child_completed_at, now)
                 activity.updated_at = now
                 finalized_count += 1
         if finalized_count:
@@ -241,6 +274,48 @@ class ActivityExecutionStateMixin:
                 execution_id=execution_id,
                 count=finalized_count,
             )
+
+    async def _child_completion_times(
+        self,
+        session: AsyncSession,
+        execution: Execution,
+    ) -> dict[str, datetime]:
+        """Latest child-execution completion time per sub-workflow node id.
+
+        Read-only. Reuses the parent-child link already persisted in each child
+        execution's ``execution_metadata`` (``parent_execution_id`` /
+        ``parent_node_id``) by the Sub-workflow setup activity; it writes nothing
+        and does not alter the child-execution lookup service. Only non-terminal
+        sub-workflow nodes are considered (the ones the finalizer is about to
+        close). For a ``for_each`` node, which spawns one child per iteration,
+        the maximum completion is kept so the node's duration spans until the
+        last iteration's child finished. Returns an empty map when the execution
+        has no sub-workflow nodes, so the common path adds no query.
+        """
+        sub_wf_nodes = {
+            activity.activity_name.split(_COMPOSITE_ITER_SEP)[0]
+            for activity in (execution.activities or [])
+            if activity.node_type == NodeType.SUB_WORKFLOW and activity.status not in TERMINAL_ACTIVITY_STATUSES
+        }
+        if not sub_wf_nodes:
+            return {}
+        rows = (
+            await session.exec(
+                select(
+                    col(Execution.execution_metadata)["parent_node_id"].astext,
+                    Execution.completed_at,
+                ).where(col(Execution.execution_metadata)["parent_execution_id"].astext == str(execution.id))
+            )
+        ).all()
+        latest: dict[str, datetime] = {}
+        for node_id, completed_at in rows:
+            if node_id is None or completed_at is None or node_id not in sub_wf_nodes:
+                continue
+            aware = ensure_timezone_aware(completed_at)
+            current = latest.get(node_id)
+            if current is None or aware > current:
+                latest[node_id] = aware
+        return latest
 
     async def _update_execution_status_from_event(
         self,
@@ -323,8 +398,9 @@ class ActivityExecutionStateMixin:
                 # Safety net: mid-workflow sync (via _sync_skipped_nodes on converge/condition
                 # completion) handles the fast path. This catches anything still non-terminal
                 # if those earlier syncs missed it (e.g. query failure, race).
+                child_completed_at = await self._child_completion_times(session, execution)
                 self._finalize_non_terminal_activities(
-                    execution, metadata.execution_id, failed_node_map, completed_node_ids
+                    execution, metadata.execution_id, failed_node_map, completed_node_ids, child_completed_at
                 )
 
                 await session.commit()

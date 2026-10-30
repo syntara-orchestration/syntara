@@ -29,6 +29,19 @@ vi.mock('../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
+vi.mock('@tanstack/react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-router')>()
+  return { ...actual, useNavigate: () => vi.fn() }
+})
+
+const mockUseSubWorkflowChildData = vi.fn()
+vi.mock('../builder/panels/hooks/useSubWorkflowChildData', () => ({
+  useSubWorkflowChildData: (...args: unknown[]) =>
+    mockUseSubWorkflowChildData(...args) as ReturnType<
+      typeof import('../builder/panels/hooks/useSubWorkflowChildData').useSubWorkflowChildData
+    >,
+}))
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 })
@@ -53,6 +66,7 @@ describe('NodeExecutionDetailsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUseQuery.mockReturnValue({ data: mockActivityData, isLoading: false, error: null, refetch: vi.fn() })
+    mockUseSubWorkflowChildData.mockReturnValue({ childData: [], isLoading: false, isError: false, isTruncated: false })
   })
 
   it('renders the node name in the header', () => {
@@ -296,7 +310,7 @@ describe('NodeExecutionDetailsPanel', () => {
     // Start and end render as two separate <time> elements (via PatternFly Timestamp)
     // joined by " - ". Timestamps render in local timezone, so just verify the date
     // appears twice rather than asserting an exact combined string.
-    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(2)
+    expect(screen.getAllByText(/Jan.*1.*2024|1.*Jan.*2024/i)).toHaveLength(2)
   })
 
   it('renders only start timestamp when completion time is missing', () => {
@@ -309,7 +323,7 @@ describe('NodeExecutionDetailsPanel', () => {
     }
     render(<NodeExecutionDetailsPanel {...propsWithoutCompletedAt} />, { wrapper })
 
-    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(1)
+    expect(screen.getAllByText(/Jan.*1.*2024|1.*Jan.*2024/i)).toHaveLength(1)
     expect(screen.queryByText(/ - /)).not.toBeInTheDocument()
   })
 
@@ -687,6 +701,147 @@ describe('NodeExecutionDetailsPanel', () => {
 
       expect(screen.getByText('Tools used')).toBeInTheDocument()
       expect(screen.getByText('search (2), fetch (1)')).toBeInTheDocument()
+    })
+  })
+
+  describe('sub-workflow node', () => {
+    const subWorkflowProps = {
+      nodeId: 'run_child',
+      nodeName: 'Run Child',
+      executionId: 'exec-parent-1',
+      nodeState: {
+        activityId: 'run_child',
+        status: 'completed' as const,
+        startedAt: '2024-01-01T10:00:00Z',
+        completedAt: '2024-01-01T10:00:02Z',
+      },
+      nodeType: 'sub_workflow',
+    }
+
+    beforeEach(() => {
+      mockUseSubWorkflowChildData.mockReturnValue({
+        childData: [
+          {
+            child: { id: 'child-1', workflow_name: 'Child WF', workflow_version: 2, status: 'completed' },
+            activities: [
+              {
+                activity_name: 'build_greeting',
+                node_type: 'script',
+                status: 'completed',
+                output_data: { stdout: 'child out' },
+                error_details: null,
+                started_at: null,
+                completed_at: null,
+              },
+            ],
+            isTruncated: false,
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        isTruncated: false,
+      })
+      mockUseQuery.mockImplementation((...args: unknown[]) => {
+        const path = args[1]
+        const opts = args[2] as { params?: { query?: Record<string, unknown> } } | undefined
+        const query = opts?.params?.query ?? {}
+        if (path === '/executions/{execution_id}/children') {
+          return {
+            data: {
+              resources: [{ id: 'child-1', workflow_name: 'Child WF', workflow_version: 2, status: 'completed' }],
+            },
+            isLoading: false,
+            error: null,
+            refetch: vi.fn(),
+          }
+        }
+        if (query.activity_name) {
+          // The sub-workflow node's own persisted output (carries the child reference).
+          return {
+            data: {
+              resources: [
+                {
+                  activity_name: 'run_child',
+                  node_type: 'sub_workflow',
+                  status: 'completed',
+                  output_data: {
+                    workflow_id: 'wf-1',
+                    workflow_name: 'Child WF',
+                    child_execution_id: 'child-1',
+                    child_workflow_version: 1,
+                  },
+                  input_data: { input_parameters: { username: 'rohit' } },
+                },
+              ],
+            },
+            isLoading: false,
+            error: null,
+            refetch: vi.fn(),
+          }
+        }
+        // Child execution's own activities (Child activities tab).
+        return {
+          data: {
+            resources: [
+              {
+                id: 'a1',
+                activity_name: 'build_greeting',
+                node_type: 'script',
+                status: 'completed',
+                output_data: { stdout: 'child out' },
+              },
+            ],
+          },
+          isLoading: false,
+          error: null,
+          refetch: vi.fn(),
+        }
+      })
+    })
+
+    it('defaults to Input/Output with a Composed output view and a contextual header link', () => {
+      render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
+
+      expect(screen.getByRole('tab', { name: 'Input/Output' })).toBeInTheDocument()
+      expect(screen.getByRole('tab', { name: 'Child activities' })).toBeInTheDocument()
+      expect(screen.getByText('Parameters')).toBeInTheDocument()
+      // Child-activities panel (tab content) is not rendered on the default tab.
+      expect(screen.queryByRole('button', { name: /View child execution/i })).not.toBeInTheDocument()
+      // Contextual link to the child run, in the selected-activity header.
+      expect(screen.getByRole('button', { name: /View sub-workflow run: Child WF/i })).toBeInTheDocument()
+      expect(screen.getByText('Output view:')).toBeInTheDocument()
+    })
+
+    it('composes the child activities into the Output panel (Composed view)', () => {
+      render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
+
+      expect(screen.getAllByText(/child_activities/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/child out/).length).toBeGreaterThan(0)
+    })
+
+    it('shows the raw persisted output when toggled to Persisted', async () => {
+      render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Persisted' }))
+
+      expect(screen.getAllByText(/child_execution_id/).length).toBeGreaterThan(0)
+      expect(screen.queryAllByText(/child_activities/)).toHaveLength(0)
+    })
+
+    it('shows the child-activities panel when the Child activities tab is selected', async () => {
+      render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
+
+      await userEvent.click(screen.getByRole('tab', { name: 'Child activities' }))
+
+      expect(screen.getByRole('button', { name: /View child execution/i })).toBeInTheDocument()
+      expect(screen.queryByText('Parameters')).not.toBeInTheDocument()
+    })
+
+    it('does not render a Child activities tab or header link for non sub-workflow nodes', () => {
+      render(<NodeExecutionDetailsPanel {...defaultProps} nodeType="script" />, { wrapper })
+
+      expect(screen.queryByRole('tab', { name: 'Child activities' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /View sub-workflow run/i })).not.toBeInTheDocument()
     })
   })
 })

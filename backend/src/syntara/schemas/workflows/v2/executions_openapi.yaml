@@ -302,6 +302,60 @@ paths:
         '429':
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
 
+  /executions/{execution_id}/children:
+    get:
+      summary: List child executions
+      description: Retrieve child (sub-workflow) executions spawned by a parent execution.
+      operationId: list_child_executions
+      tags:
+        - Executions
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: execution
+        action: read
+      parameters:
+        - name: execution_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Execution Id
+        - name: node_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Node Id
+        - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/limitParam
+        - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
+        - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/sortParam
+        - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionListResponse'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+        '429':
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
   /executions/{execution_id}/activities/{activity_id}/signal:
     post:
       summary: Send signal to activity in workflow

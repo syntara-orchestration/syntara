@@ -37,6 +37,11 @@ vi.mock('../../providers/alerts/AlertContext', () => ({
   }),
 }))
 
+vi.mock('@tanstack/react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-router')>()
+  return { ...actual, useNavigate: () => vi.fn() }
+})
+
 beforeEach(() => {
   vi.stubGlobal(
     'matchMedia',
@@ -198,6 +203,24 @@ describe('ExecutionDetailPageHeaderParts', () => {
     } as never
     render(<ExecutionDetailTitleRowAddons execution={execution} />)
     expect(screen.getByText(/Viewing run:/)).toBeInTheDocument()
+  })
+
+  it('renders a View parent run link when the execution has a parent', () => {
+    const execution = {
+      status: 'completed' as const,
+      execution_metadata: { parent_execution_id: 'exec-parent-001' },
+    } as never
+    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    expect(screen.getByTestId('view-parent-run')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View parent run' })).toBeInTheDocument()
+  })
+
+  it('does not render a View parent run link for a top-level execution', () => {
+    const execution = {
+      status: 'completed' as const,
+    } as never
+    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    expect(screen.queryByTestId('view-parent-run')).not.toBeInTheDocument()
   })
 
   it('renders approval action buttons when showApprovalActionStrip is true', () => {

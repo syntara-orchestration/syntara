@@ -9,9 +9,6 @@ import {
   Spinner,
   Stack,
   StackItem,
-  Tab,
-  Tabs,
-  TabTitleText,
   Title,
   TitleSizes,
 } from '@patternfly/react-core'
@@ -35,9 +32,14 @@ import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { highlightTextLines } from '../../utils/highlightText'
 import { ActivityStatusLabel } from '../builder/ExecutionStatus'
+import { composeSubWorkflowOutput } from '../builder/panels/composeSubWorkflowOutput'
+import { useSubWorkflowChildData } from '../builder/panels/hooks/useSubWorkflowChildData'
+import { SubWorkflowChildActivities } from '../builder/panels/SubWorkflowChildActivities'
 import { InputSchemaView } from '../builder/panels/views/InputSchemaView'
 import { InputTableView } from '../builder/panels/views/InputTableView'
 import { ViewToggle, type PanelView } from '../builder/panels/ViewToggle'
+import { extractSubWorkflowChild } from '../workflows/execution/subWorkflowChild'
+import { SubWorkflowRunLink } from '../workflows/execution/SubWorkflowRunLink'
 import type { ActivityState } from '../workflows/execution/types'
 import { extractApprovalAudit, type ApprovalAudit } from '../workflows/execution/utils/activityState'
 
@@ -45,6 +47,7 @@ import { extractAgentTrace } from './agentTraceTypes'
 import { AgentTraceView } from './AgentTraceView'
 import { useNodeExecutionDetails } from './hooks/useNodeExecutionDetails'
 import styles from './NodeExecutionDetailsPanel.module.css'
+import { NodeDetailTabBar, SubWorkflowOutputView } from './NodeExecutionDetailsViews'
 import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
 
 type NodeExecutionDetailsPanelProps = {
@@ -250,20 +253,34 @@ function NodeDetailsHeader({
   nodeCompleted,
   nodeElapsedLabel,
   status,
+  subWorkflowChild,
 }: Readonly<{
   nodeName: string
   nodeStarted: string | null
   nodeCompleted: string | null
   nodeElapsedLabel?: string
   status?: ActivityState['status']
+  subWorkflowChild?: { childExecutionId: string; childName: string | null } | null
 }>) {
   return (
     <StackItem className={styles.headerRow}>
       <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
         <FlexItem>
-          <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
-            {nodeName}
-          </Title>
+          <Stack>
+            <StackItem>
+              <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
+                {nodeName}
+              </Title>
+            </StackItem>
+            {subWorkflowChild && (
+              <StackItem>
+                <SubWorkflowRunLink
+                  childExecutionId={subWorkflowChild.childExecutionId}
+                  childName={subWorkflowChild.childName}
+                />
+              </StackItem>
+            )}
+          </Stack>
         </FlexItem>
         <FlexItem>
           <Flex gap={{ default: 'gapMd' }} alignItems={{ default: 'alignItemsCenter' }}>
@@ -310,7 +327,7 @@ type NodeContentAreaProps = Readonly<{
   refetch: () => Promise<unknown>
   nodeIsFailed: boolean
   isAgenticNode: boolean
-  activeTab: 'io' | 'agent-steps'
+  activeTab: 'io' | 'agent-steps' | 'child-activities'
 }>
 
 function NodeContentArea({
@@ -361,6 +378,50 @@ function NodeContentArea({
   )
 }
 
+function NodeDetailBody({
+  isSubWorkflowNode,
+  executionId,
+  nodeId,
+  inputData,
+  outputData,
+  isLoading,
+  error,
+  refetch,
+  nodeIsFailed,
+  isAgenticNode,
+  activeTab,
+}: Readonly<NodeContentAreaProps & { isSubWorkflowNode: boolean; executionId?: string }>) {
+  if (isSubWorkflowNode && executionId && activeTab === 'child-activities') {
+    return (
+      <div style={{ height: '100%', overflow: 'auto' }}>
+        <SubWorkflowChildActivities parentExecutionId={executionId} nodeId={nodeId} />
+      </div>
+    )
+  }
+  return (
+    <NodeContentArea
+      nodeId={nodeId}
+      inputData={inputData}
+      outputData={outputData}
+      isLoading={isLoading}
+      error={error}
+      refetch={refetch}
+      nodeIsFailed={nodeIsFailed}
+      isAgenticNode={isAgenticNode}
+      activeTab={activeTab}
+    />
+  )
+}
+
+function resolveOutputPaneData(
+  isSubWorkflowNode: boolean,
+  outputMode: 'composed' | 'persisted',
+  enrichedOutput: Record<string, unknown> | null,
+  outputData: Record<string, unknown> | null
+): Record<string, unknown> | null {
+  return isSubWorkflowNode && outputMode === 'composed' ? enrichedOutput : outputData
+}
+
 export function NodeExecutionDetailsPanel({
   nodeId,
   nodeName,
@@ -368,8 +429,9 @@ export function NodeExecutionDetailsPanel({
   nodeState,
   nodeType,
 }: Readonly<NodeExecutionDetailsPanelProps>) {
-  const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
+  const [activeTab, setActiveTab] = useState<'io' | 'agent-steps' | 'child-activities'>('io')
   const isAgenticNode = nodeType === ActivityTypeEnum.AGENTIC
+  const isSubWorkflowNode = nodeType === ActivityTypeEnum.SUB_WORKFLOW
   const { inputData, outputData, isLoading, error, refetch } = useNodeExecutionDetails(
     nodeId,
     executionId,
@@ -386,6 +448,26 @@ export function NodeExecutionDetailsPanel({
   const { elapsedMs } = useElapsedTime(nodeStarted, nodeCompleted, nodeIsRunning)
   const nodeElapsedLabel = elapsedMs === undefined ? undefined : formatElapsedTime(elapsedMs)
 
+  // Display-time enrichment for sub-workflow nodes: fetch the child execution(s)
+  // and their persisted activities (read-only; shared cache with the Child
+  // activities tab). Disabled for non-sub-workflow nodes via the undefined parent id.
+  const [outputMode, setOutputMode] = useState<'composed' | 'persisted'>('composed')
+  const subWorkflowData = useSubWorkflowChildData(isSubWorkflowNode ? executionId : undefined, nodeId)
+  const enrichedOutput = useMemo(
+    () =>
+      isSubWorkflowNode
+        ? composeSubWorkflowOutput({
+            outputData,
+            inputParameters: inputData?.input_parameters,
+            nodeStatus: nodeState?.status,
+            childData: subWorkflowData.childData,
+          })
+        : null,
+    [isSubWorkflowNode, outputData, inputData, nodeState?.status, subWorkflowData.childData]
+  )
+  const subWorkflowChild = isSubWorkflowNode ? extractSubWorkflowChild(outputData) : null
+  const outputPaneData = resolveOutputPaneData(isSubWorkflowNode, outputMode, enrichedOutput, outputData)
+
   return (
     <Stack className={styles.contentContainer}>
       <NodeDetailsHeader
@@ -394,6 +476,7 @@ export function NodeExecutionDetailsPanel({
         nodeCompleted={nodeCompleted}
         nodeElapsedLabel={nodeElapsedLabel}
         status={nodeState?.status}
+        subWorkflowChild={subWorkflowChild}
       />
 
       {/* Approval audit strip (shown only for decided approval nodes) */}
@@ -407,25 +490,32 @@ export function NodeExecutionDetailsPanel({
 
       <AAPJobLink outputData={outputData} nodeType={nodeType} />
 
-      {/* Tab bar for agentic nodes */}
-      {isAgenticNode && (
-        <StackItem className={styles.tabBar}>
-          <Tabs
-            activeKey={activeTab}
-            onSelect={(_e, key) => setActiveTab(key as 'io' | 'agent-steps')}
-            variant="default"
-          >
-            <Tab eventKey="io" title={<TabTitleText>Input/Output</TabTitleText>} />
-            <Tab eventKey="agent-steps" title={<TabTitleText>Agent steps</TabTitleText>} />
-          </Tabs>
-        </StackItem>
+      {/* Tab bar for agentic nodes (Input/Output | Agent steps) and sub-workflow
+          nodes (Input/Output | Child activities). Input/Output stays the default. */}
+      {(isAgenticNode || isSubWorkflowNode) && (
+        <NodeDetailTabBar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          isAgenticNode={isAgenticNode}
+          isSubWorkflowNode={isSubWorkflowNode}
+        />
+      )}
+
+      {isSubWorkflowNode && activeTab === 'io' && (
+        <SubWorkflowOutputView
+          outputMode={outputMode}
+          onOutputModeChange={setOutputMode}
+          subWorkflowData={subWorkflowData}
+        />
       )}
 
       <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
-        <NodeContentArea
+        <NodeDetailBody
+          isSubWorkflowNode={isSubWorkflowNode}
+          executionId={executionId}
           nodeId={nodeId}
           inputData={inputData}
-          outputData={outputData}
+          outputData={outputPaneData}
           isLoading={isLoading}
           error={error}
           refetch={refetch}
