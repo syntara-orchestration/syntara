@@ -120,19 +120,29 @@ class Policy(BaseResource, table=True):
     def to_statement_dicts(self) -> list[dict[str, Any]]:
         """Convert to flat statement dicts for Rego evaluation.
 
-        Single-statement policies use the policy name as-is.
-        Multi-statement policies derive names: "policyname/0", "policyname/1".
+        Each expanded statement carries two kinds of name:
+
+        - ``name``: the unique evaluation identifier. Single-statement
+          policies use the policy name as-is; multi-statement policies
+          derive ``policyname/0``, ``policyname/1`` (the resolver dedups
+          on this key, so it must stay unique per statement).
+        - ``policy_name`` / ``statement_index``: the originating policy's
+          display name and the statement's 0-based position, so consumers
+          never have to parse the identifier to report the real name.
 
         Returns:
-            List of statement dicts with name, effect, actions, scope, conditions.
+            List of statement dicts with name, policy_name, statement_index,
+            effect, actions, scope, conditions.
 
         """
         stmts: list[dict[str, Any]] = self.statements if isinstance(self.statements, list) else []
-        if len(stmts) == 1:
-            d: dict[str, Any] = {**stmts[0], "name": self.name}
-            return [d]
-        result: list[dict[str, Any]] = []
-        for i, s in enumerate(stmts):
-            d = {**s, "name": f"{self.name}/{i}"}
-            result.append(d)
-        return result
+        single = len(stmts) == 1
+        return [
+            {
+                **s,
+                "name": self.name if single else f"{self.name}/{i}",
+                "policy_name": self.name,
+                "statement_index": i,
+            }
+            for i, s in enumerate(stmts)
+        ]

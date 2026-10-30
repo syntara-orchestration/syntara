@@ -26,7 +26,6 @@ class TestEffectValidator:
     @pytest.mark.parametrize(
         "bad_effect",
         [
-            "deny",
             "Deny",
             "Allow",
             "ALLOW",
@@ -37,3 +36,32 @@ class TestEffectValidator:
     def test_invalid_effect_is_rejected(self, bad_effect: str) -> None:
         with pytest.raises(ValidationError, match="Invalid effect"):
             PolicyStatementSchema(**_make_statement(effect=bad_effect))
+
+
+class TestDenyEligibilityValidator:
+    """Tests for the deny-eligibility model validator on PolicyStatementSchema."""
+
+    def test_deny_on_step_type_write_is_accepted(self) -> None:
+        stmt = PolicyStatementSchema(**_make_statement(effect="deny", actions=["step_type:write"], scope="project"))
+        assert stmt.effect == "deny"
+
+    @pytest.mark.parametrize(
+        "actions",
+        [
+            ["workflow:read"],
+            ["policy:delete"],
+            ["role-assignment:revoke"],
+            ["step_type:*"],
+            ["step_type:read"],
+            ["step_type:write", "workflow:read"],
+            [],
+        ],
+    )
+    def test_deny_outside_step_type_write_is_rejected(self, actions: list[str]) -> None:
+        with pytest.raises(ValidationError, match="Deny effect is only allowed on 'step_type:write'"):
+            PolicyStatementSchema(**_make_statement(effect="deny", actions=actions))
+
+    def test_allow_outside_step_type_write_is_untouched(self) -> None:
+        """The eligibility guard only constrains deny statements."""
+        stmt = PolicyStatementSchema(**_make_statement(effect="allow", actions=["workflow:read"]))
+        assert stmt.effect == "allow"

@@ -114,6 +114,8 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("workflow", "create", roles=("admin",)),
     PolicyInfo("workflow", "update", roles=("admin",)),
     PolicyInfo("workflow", "delete", roles=("admin",)),
+    # step types (workflow authoring); deny policies override this allow
+    PolicyInfo("step_type", "write", roles=("admin",)),
     # executions
     PolicyInfo("execution", "read", roles=("admin", "auditor")),
     PolicyInfo("execution", "run", roles=("admin",)),

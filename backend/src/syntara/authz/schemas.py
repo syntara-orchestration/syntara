@@ -5,7 +5,7 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from pydantic import Field as PydanticField
-from pydantic import computed_field, field_validator
+from pydantic import computed_field, field_validator, model_validator
 from sqlmodel import Field, SQLModel
 
 from syntara.core.constants import NAME_PATTERN
@@ -23,13 +23,13 @@ OptionalNameField = Annotated[
 # ---------------------------------------------------------------------------
 
 VALID_SCOPES = {"any", "self", "project", "own"}
-VALID_EFFECTS = {"allow"}
+VALID_EFFECTS = {"allow", "deny"}
 
 
 class PolicyStatementSchema(SQLModel):
     """A single policy statement."""
 
-    effect: str = Field(description="allow or deny")
+    effect: str = Field(description="allow or deny (deny is only permitted on step_type:write)")
     actions: list[str] = Field(description="List of resource_type:action strings")
     scope: str = Field(description="any, self, or project")
     conditions: dict[str, Any] | None = Field(default=None, description="Optional attribute-based conditions")
@@ -39,9 +39,29 @@ class PolicyStatementSchema(SQLModel):
     def validate_effect(cls, v: str) -> str:
         """Validate that effect is one of the allowed values."""
         if v not in VALID_EFFECTS:
-            msg = f"Invalid effect '{v}'. Only 'allow' is currently supported."
+            msg = f"Invalid effect '{v}'. Must be one of 'allow' or 'deny'."
             raise SafeValueError(msg)
         return v
+
+    @model_validator(mode="after")
+    def validate_deny_eligibility(self) -> "PolicyStatementSchema":
+        """Reject deny statements outside the deny-eligible resource:action pairs.
+
+        Lockout guard (AAP-74620): deny unconditionally overrides allow in
+        Rego, so a deny may only target step_type:write — never the means
+        to undo a deny (policy:delete, role-assignment:revoke, ...).
+        """
+        if self.effect != "deny":
+            return self
+        from syntara.authz.deny_eligibility import (  # noqa: PLC0415
+            deny_not_allowed_message,
+            find_ineligible_deny_actions,
+        )
+
+        ineligible = find_ineligible_deny_actions([{"effect": self.effect, "actions": self.actions}])
+        if ineligible:
+            raise SafeValueError(deny_not_allowed_message(ineligible))
+        return self
 
     @field_validator("scope")
     @classmethod

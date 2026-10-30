@@ -12,7 +12,8 @@ from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.authz.audit.policy_lifecycle import PolicyLifecycleEvent
 from syntara.authz.exceptions import (
     BuiltinProtectionError,
-    DenyEffectNotSupportedError,
+    DenyEffectNotAllowedError,
+    InvalidNodeKindError,
     InvalidResourceActionError,
     PolicyNameConflictError,
     PolicyNotFoundError,
@@ -74,30 +75,39 @@ class PolicyService(BaseService):
 
     @staticmethod
     def _validate_resource_actions(statements: list[dict[str, Any]]) -> None:
-        """Reject unregistered resource:action pairs and invalid step-type labels."""
+        """Reject unregistered resource:action pairs."""
         from syntara.authz.resource_actions import validate_statements  # noqa: PLC0415
-        from syntara.workflows.node_kinds import validate_node_kind_statements  # noqa: PLC0415
 
         invalid = validate_statements(statements)
         if invalid:
             msg = f"Unregistered resource:action pairs: {', '.join(invalid)}"
             raise InvalidResourceActionError(msg)
-        error = validate_node_kind_statements(statements)
-        if error:
-            raise InvalidResourceActionError(error)
 
     @staticmethod
-    def _validate_no_deny_effect(statements: list[dict[str, Any]]) -> None:
-        """Reject deny-effect statements (AAP-74620).
+    def _validate_node_kind_statements(statements: list[dict[str, Any]]) -> None:
+        """Reject unknown step types in step_type statements."""
+        from syntara.workflows.node_kinds import validate_node_kind_statements  # noqa: PLC0415
 
-        Deny-effect policies are not yet supported. A project-scoped deny
-        can lock out higher-privileged users because deny unconditionally
-        overrides allow in Rego. Re-enable when scoped deny controls are
-        implemented (e.g. admin-only via policy:create-deny permission).
+        error = validate_node_kind_statements(statements)
+        if error:
+            raise InvalidNodeKindError(error)
+
+    @staticmethod
+    def _validate_deny_effect(statements: list[dict[str, Any]]) -> None:
+        """Reject deny statements outside step_type:write (AAP-74620 lockout guard).
+
+        Deny unconditionally overrides allow in Rego, so a deny may only
+        target step_type:write — never policy:delete, role-assignment:revoke,
+        or any other means of undoing a deny.
         """
-        if any(s.get("effect") == "deny" for s in statements):
-            msg = "Deny-effect policies are not supported. Use allow-effect policies only."
-            raise DenyEffectNotSupportedError(msg)
+        from syntara.authz.deny_eligibility import (  # noqa: PLC0415
+            deny_not_allowed_message,
+            find_ineligible_deny_actions,
+        )
+
+        ineligible = find_ineligible_deny_actions(statements)
+        if ineligible:
+            raise DenyEffectNotAllowedError(deny_not_allowed_message(sorted(set(ineligible))))
 
     @staticmethod
     def _validate_project_statements(statements: list[dict[str, Any]]) -> None:
@@ -122,8 +132,9 @@ class PolicyService(BaseService):
 
             await assert_project_alive(self.session, project_id)
 
-        self._validate_no_deny_effect(statements)
+        self._validate_deny_effect(statements)
         self._validate_resource_actions(statements)
+        self._validate_node_kind_statements(statements)
         if project_id is not None:
             self._validate_project_statements(statements)
         if is_builtin_policy(name):
@@ -448,8 +459,9 @@ class PolicyService(BaseService):
         if description is not None:
             policy.description = description
         if statements is not None:
-            self._validate_no_deny_effect(statements)
+            self._validate_deny_effect(statements)
             self._validate_resource_actions(statements)
+            self._validate_node_kind_statements(statements)
             if policy.project_id is not None:
                 self._validate_project_statements(statements)
             policy.statements = statements

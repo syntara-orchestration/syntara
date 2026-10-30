@@ -484,6 +484,9 @@ E2E_COVERAGE_EXEMPT: set[str] = {
     "setting:write:any",
     # Authz query
     "authz:query:any",
+    # Step types have no routes to exercise e2e — covered by the unit and
+    # integration step-type deny suites (test_step_type_deny_evaluation.py).
+    "step_type:write:any",
     # Invocations
     "invocation:create:any",
     "invocation:read:any",

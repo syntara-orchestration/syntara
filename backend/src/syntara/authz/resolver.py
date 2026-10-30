@@ -85,10 +85,10 @@ def _add_builtin_role_statements(
     from syntara.authz.role_conventions import builtin_role_policy_names  # noqa: PLC0415
 
     for policy_name in builtin_role_policy_names(role_name):
-        for stmt in resolve_builtin_policy_statements(policy_name):
+        for idx, stmt in enumerate(resolve_builtin_policy_statements(policy_name)):
             if not _action_matches(stmt, action_accept):
                 continue
-            entry = {**stmt, "name": policy_name}
+            entry = {**stmt, "name": policy_name, "policy_name": policy_name, "statement_index": idx}
             name = f"{policy_name}@{project}" if project else policy_name
             if project:
                 entry = _scope_entry_to_project(entry, project)
@@ -193,8 +193,15 @@ def _add_stmt(
     result: list[dict[str, Any]],
     project: str,
 ) -> None:
-    name = stmt.get("name", fallback_name)
-    entry = _scope_entry_to_project(stmt, project) if project else stmt
+    entry = {**stmt}
+    # Builtin statements arrive without identifiers; custom ones already
+    # carry them from Policy.to_statement_dicts. Injecting them here keeps
+    # every effective statement reportable by its originating policy name.
+    entry.setdefault("name", fallback_name)
+    entry.setdefault("policy_name", fallback_name)
+    entry.setdefault("statement_index", 0)
+    name = entry["name"]
+    entry = _scope_entry_to_project(entry, project) if project else entry
     name = f"{name}@{project}" if project else name
     if name not in seen:
         seen.add(name)

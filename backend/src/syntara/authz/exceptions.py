@@ -155,6 +155,38 @@ class InvalidResourceActionError(SyntaraError):
     """Raised when a policy statement references an unregistered resource:action pair."""
 
 
-@fastapi_exception(handler=_invalid_action_handler)
-class DenyEffectNotSupportedError(SyntaraError):
-    """Raised when a policy statement uses effect='deny', which is not yet supported."""
+def _deny_effect_handler(request: Request, exc: SyntaraError) -> JSONResponse:
+    return create_problem_details_response(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        problem_type=PROBLEM_TYPES["validation_error"],
+        title="Deny Effect Not Allowed",
+        detail=exc.message,
+        code="DENY_EFFECT_NOT_ALLOWED",
+        instance=str(request.url),
+    )
+
+
+@fastapi_exception(handler=_deny_effect_handler)
+class DenyEffectNotAllowedError(SyntaraError):
+    """Raised when a deny statement targets a resource:action that is not deny-eligible."""
+
+
+def _invalid_step_type_handler(request: Request, exc: SyntaraError) -> JSONResponse:
+    return create_problem_details_response(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        problem_type=PROBLEM_TYPES["validation_error"],
+        title="Invalid Step Type",
+        detail=exc.message,
+        code="INVALID_STEP_TYPE",
+        instance=str(request.url),
+    )
+
+
+@fastapi_exception(handler=_invalid_step_type_handler)
+class InvalidNodeKindError(SyntaraError):
+    """Raised when a step-type policy statement references an unknown step type.
+
+    Internal name follows the ``node_kinds`` module vocabulary; the API
+    problem code (``INVALID_STEP_TYPE``) and user-facing messages use
+    "step type", the term users see in the product.
+    """

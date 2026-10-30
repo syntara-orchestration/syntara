@@ -41,10 +41,11 @@ def _expected_result(
     matched_policy: str = "",
     denial_reason: str = "",
     denied_by: str = "",
+    denied_by_policies: list[str] | None = None,
     allowed_projects: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build the exact result contract returned by the evaluator."""
-    return {
+    result: dict[str, Any] = {
         "allow": allow,
         "deny": deny,
         "matched_policy": matched_policy,
@@ -52,6 +53,9 @@ def _expected_result(
         "denied_by": denied_by,
         "allowed_projects": sorted(allowed_projects or []),
     }
+    if denied_by_policies:
+        result["denied_by_policies"] = sorted(denied_by_policies)
+    return result
 
 
 def _normalize_result(result: dict[str, Any]) -> dict[str, Any]:
@@ -108,6 +112,8 @@ def _normalize_opa_public_result(raw_result: dict[str, Any]) -> dict[str, Any]:
         normalized["matched_policy"] = matched_policies[0]
     if not normalized["denied_by"] and denied_policies:
         normalized["denied_by"] = denied_policies[0]
+    if denied_policies:
+        normalized["denied_by_policies"] = denied_policies
     return _normalize_result(normalized)
 
 
@@ -160,6 +166,7 @@ COMPATIBILITY_CASES = [
             deny=True,
             denial_reason="policy_deny",
             denied_by="block-a",
+            denied_by_policies=["block-a", "block-z"],
             allowed_projects=[],
         ),
     ),

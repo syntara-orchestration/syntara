@@ -186,4 +186,6 @@ def _normalize_raw(raw_result: dict[str, Any]) -> dict[str, Any]:
         normalized["matched_policy"] = matched_policies[0]
     if not normalized.get("denied_by") and denied_policies:
         normalized["denied_by"] = denied_policies[0]
+    if denied_policies:
+        normalized["denied_by_policies"] = denied_policies
     return normalized

@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.dependencies import PermissionChecker
-from syntara.authz.exceptions import InvalidResourceActionError
+from syntara.authz.exceptions import InvalidNodeKindError
 from syntara.authz.models.policy import Policy
 from syntara.authz.policy_router import get_policy_service, router
 from syntara.authz.resource_actions import get_resource_actions
@@ -84,7 +84,7 @@ def test_invalid_step_type_returns_422(
         },
     )
     assert response.status_code == 422
-    assert response.json()["code"] == "INVALID_RESOURCE_ACTION"
+    assert response.json()["code"] == "INVALID_STEP_TYPE"
     assert message in response.json()["detail"]
     session.commit.assert_not_called()
 
@@ -113,7 +113,7 @@ async def test_direct_service_call_rejects_invalid_kind(
 ) -> None:
     """Validation does not depend on the HTTP request schema."""
     _, service, session = policy_client
-    with pytest.raises(InvalidResourceActionError, match="Unknown step type 'scritp'"):
+    with pytest.raises(InvalidNodeKindError, match="Unknown step type 'scritp'"):
         await service.create_policy(
             "invalid-step",
             [
@@ -125,4 +125,45 @@ async def test_direct_service_call_rejects_invalid_kind(
                 }
             ],
         )
+    session.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("method", ["POST", "PATCH", "PUT"])
+def test_deny_step_type_policy_accepted(
+    policy_client: tuple[TestClient, PolicyService, AsyncMock], method: str
+) -> None:
+    """A deny statement on step_type:write can be persisted (AAP-99937)."""
+    client, _, session = policy_client
+    statement = {
+        "effect": "deny",
+        "scope": "any",
+        "actions": ["step_type:write"],
+        "conditions": {"resource_labels": {"kind": "script"}},
+    }
+    response = client.request(
+        method,
+        "/policies" if method == "POST" else f"/policies/{uuid4()}",
+        # "step-policy" matches the mocked policy's name so PATCH/PUT skip
+        # rename propagation, which the AsyncMock session cannot execute.
+        json={"name": "step-policy", "statements": [statement]},
+    )
+    assert response.status_code == (201 if method == "POST" else 200)
+    assert response.json()["statements"][0]["effect"] == "deny"
+    session.commit.assert_awaited_once()
+
+
+@pytest.mark.parametrize("method", ["POST", "PATCH", "PUT"])
+def test_deny_outside_step_type_write_rejected(
+    policy_client: tuple[TestClient, PolicyService, AsyncMock], method: str
+) -> None:
+    """A deny statement on any other resource:action is rejected at the schema layer."""
+    client, _, session = policy_client
+    statement = {"effect": "deny", "scope": "any", "actions": ["workflow:read"]}
+    response = client.request(
+        method,
+        "/policies" if method == "POST" else f"/policies/{uuid4()}",
+        json={"name": "deny-step-policy", "statements": [statement]},
+    )
+    assert response.status_code == 422
+    assert "Deny effect is only allowed on 'step_type:write'" in response.text
     session.commit.assert_not_called()

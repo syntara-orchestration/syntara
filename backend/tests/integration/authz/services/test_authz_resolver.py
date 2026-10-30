@@ -10,8 +10,8 @@ Tests cover:
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import insert
-from sqlmodel import select
+from sqlalchemy import delete, insert
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.models.assignments import RoleAssignment
@@ -116,7 +116,10 @@ async def test_soft_deleted_group_policies_not_resolved(seeded_db: AsyncSession,
     policies = await resolve_effective_policies(seeded_db, test_user.id)
     assert "deleted-grp:test:any" in {p["name"] for p in policies}
 
-    # Hard-delete the group (CASCADE removes user_groups row)
+    # Hard-delete the group the way GroupsService.delete_group does: drop its
+    # role assignments first (their FK is RESTRICT), then let CASCADE remove
+    # the user_groups row.
+    await seeded_db.exec(delete(RoleAssignment).where(col(RoleAssignment.group_id) == group.id))
     await seeded_db.delete(group)
     await seeded_db.commit()
 

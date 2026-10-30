@@ -47,7 +47,7 @@ async def test_authorize_allowed(
     assert result.allowed is True
     assert result.denied is False
     assert result.matched_policy == "test-allow"
-    mock_evaluator.evaluate.assert_awaited_once()
+    mock_evaluator.evaluate.assert_called_once()
 
 
 @pytest.mark.asyncio

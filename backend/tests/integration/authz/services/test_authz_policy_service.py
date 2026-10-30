@@ -415,27 +415,33 @@ async def test_create_project_policy_wildcard_eligible(test_db_session: AsyncSes
 
 
 # ---------------------------------------------------------------------------
-# Deny-effect rejection (AAP-74620)
+# Deny-effect eligibility (AAP-74620 lockout guard, AAP-99937)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_create_deny_policy_rejected(test_db_session: AsyncSession, test_user: User) -> None:
-    """Deny-effect policies are not supported and must be rejected."""
-    from syntara.authz.exceptions import DenyEffectNotSupportedError
-
+async def test_create_deny_policy_on_step_type_write_accepted(test_db_session: AsyncSession, test_user: User) -> None:
+    """Deny-effect policies on step_type:write are accepted (AAP-99937)."""
     svc = PolicyService(test_db_session, test_user)
-    with pytest.raises(DenyEffectNotSupportedError, match="not supported"):
-        await svc.create_policy(
-            name="deny-workflow-read",
-            statements=[{"effect": "deny", "actions": ["workflow:read"], "scope": "any"}],
-        )
+    policy = await svc.create_policy(
+        name="deny-script-steps",
+        statements=[
+            {
+                "effect": "deny",
+                "actions": ["step_type:write"],
+                "scope": "any",
+                "conditions": {"resource_labels": {"kind": "script"}},
+            }
+        ],
+    )
+    assert policy.statements[0]["effect"] == "deny"
 
 
 @pytest.mark.asyncio
-async def test_create_deny_policy_rejected_project_scoped(test_db_session: AsyncSession, test_user: User) -> None:
-    """Project-scoped deny-effect policies are also rejected."""
-    from syntara.authz.exceptions import DenyEffectNotSupportedError
+async def test_create_deny_policy_on_step_type_write_project_scoped_accepted(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    """Project-scoped deny policies on step_type:write are accepted."""
     from syntara.authz.models.project import Project
 
     project = Project(name="deny-proj-1", labels={})
@@ -444,7 +450,72 @@ async def test_create_deny_policy_rejected_project_scoped(test_db_session: Async
     await test_db_session.refresh(project)
 
     svc = PolicyService(test_db_session, test_user)
-    with pytest.raises(DenyEffectNotSupportedError, match="not supported"):
+    policy = await svc.create_policy(
+        name="deny-wf-steps-proj",
+        statements=[
+            {
+                "effect": "deny",
+                "actions": ["step_type:write"],
+                "scope": "project",
+                "conditions": {"resource_labels": {"kind": "http_request"}},
+            }
+        ],
+        project_id=project.id,
+    )
+    assert policy.project_id == project.id
+
+
+@pytest.mark.asyncio
+async def test_update_policy_to_deny_on_step_type_write_accepted(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    """Updating a policy to a deny statement on step_type:write is accepted."""
+    svc = PolicyService(test_db_session, test_user)
+    policy = await svc.create_policy(
+        name="allow-then-deny",
+        statements=[{"effect": "allow", "actions": ["workflow:read"], "scope": "any"}],
+    )
+
+    updated = await svc.update_policy(
+        policy_id=policy.id,
+        statements=[
+            {
+                "effect": "deny",
+                "actions": ["step_type:write"],
+                "scope": "any",
+                "conditions": {"resource_labels": {"kind": "agentic"}},
+            }
+        ],
+    )
+    assert updated.statements[0]["effect"] == "deny"
+
+
+@pytest.mark.asyncio
+async def test_create_deny_policy_rejected(test_db_session: AsyncSession, test_user: User) -> None:
+    """Deny on a resource:action outside step_type:write is rejected (lockout guard)."""
+    from syntara.authz.exceptions import DenyEffectNotAllowedError
+
+    svc = PolicyService(test_db_session, test_user)
+    with pytest.raises(DenyEffectNotAllowedError, match="only allowed on 'step_type:write'"):
+        await svc.create_policy(
+            name="deny-workflow-read",
+            statements=[{"effect": "deny", "actions": ["workflow:read"], "scope": "any"}],
+        )
+
+
+@pytest.mark.asyncio
+async def test_create_deny_policy_rejected_project_scoped(test_db_session: AsyncSession, test_user: User) -> None:
+    """Project-scoped deny on an ineligible resource:action is also rejected."""
+    from syntara.authz.exceptions import DenyEffectNotAllowedError
+    from syntara.authz.models.project import Project
+
+    project = Project(name="deny-proj-2", labels={})
+    test_db_session.add(project)
+    await test_db_session.commit()
+    await test_db_session.refresh(project)
+
+    svc = PolicyService(test_db_session, test_user)
+    with pytest.raises(DenyEffectNotAllowedError, match="only allowed on 'step_type:write'"):
         await svc.create_policy(
             name="deny-wf-read-proj",
             statements=[{"effect": "deny", "actions": ["workflow:read"], "scope": "project"}],
@@ -454,16 +525,16 @@ async def test_create_deny_policy_rejected_project_scoped(test_db_session: Async
 
 @pytest.mark.asyncio
 async def test_update_policy_to_deny_rejected(test_db_session: AsyncSession, test_user: User) -> None:
-    """Updating a policy to add deny-effect statements is rejected."""
-    from syntara.authz.exceptions import DenyEffectNotSupportedError
+    """Updating a policy to a deny outside step_type:write is rejected."""
+    from syntara.authz.exceptions import DenyEffectNotAllowedError
 
     svc = PolicyService(test_db_session, test_user)
     policy = await svc.create_policy(
-        name="allow-then-deny",
+        name="allow-then-deny-bad",
         statements=[{"effect": "allow", "actions": ["workflow:read"], "scope": "any"}],
     )
 
-    with pytest.raises(DenyEffectNotSupportedError, match="not supported"):
+    with pytest.raises(DenyEffectNotAllowedError, match="only allowed on 'step_type:write'"):
         await svc.update_policy(
             policy_id=policy.id,
             statements=[{"effect": "deny", "actions": ["workflow:read"], "scope": "any"}],

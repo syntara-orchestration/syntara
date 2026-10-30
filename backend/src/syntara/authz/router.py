@@ -1010,7 +1010,9 @@ async def what_can_i(
 
     permissions = [
         PermissionEntry(
-            policy_name=p.get("name", ""),
+            # Report the originating policy name; the per-statement
+            # evaluation identifier ("policyname/1") is never a display name.
+            policy_name=p.get("policy_name") or p.get("name", ""),
             effect=p.get("effect", ""),
             actions=p.get("actions", []),
             scope=p.get("scope", ""),

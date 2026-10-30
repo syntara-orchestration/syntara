@@ -462,7 +462,7 @@ export interface components {
     PolicyStatementSchema: {
       /**
        * Effect
-       * @description allow or deny
+       * @description allow or deny (deny is only permitted on step_type:write)
        */
       effect: string
       /**

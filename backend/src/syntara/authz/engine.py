@@ -155,6 +155,8 @@ class AuthzResult:
     denial_reason: str
     denied_by: str
     effective_policies: list[dict[str, Any]]
+    # All matching deny evaluation identifiers (sorted); ``denied_by`` is the first.
+    denied_by_policies: list[str] = field(default_factory=list)
 
 
 async def authorize(
@@ -214,6 +216,7 @@ async def authorize(
         denial_reason=opa_result.get("denial_reason", ""),
         denied_by=opa_result.get("denied_by", ""),
         effective_policies=effective,
+        denied_by_policies=list(opa_result.get("denied_by_policies", [])),
     )
 
     logger.debug(
