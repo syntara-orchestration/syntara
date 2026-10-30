@@ -1,5 +1,6 @@
 import { Button, FlexItem } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
+import type { ReactNode } from 'react'
 
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
 import { SynLabel } from '../../components/labels/SynLabel'
@@ -11,8 +12,13 @@ import { ApprovalActionButtons } from './ApprovalActionButtons'
 import { CancelExecutionButton } from './CancelExecutionButton'
 import { isExecutionRetryable } from './executionRetryable'
 import { RetryExecutionButton } from './RetryExecutionButton'
+import { isRetryFromFailureEligible } from './retryFromFailure'
+import { RetryFromFailureButton } from './RetryFromFailureButton'
 
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
+
+/** Matches the truncation length used for the same label in `historyRowModel`. */
+const TRUNCATED_ID_LENGTH = 8
 
 export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ execution: Execution | undefined }>) {
   if (!execution?.status && !execution?.created_at) {
@@ -28,6 +34,13 @@ export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ executio
       {execution.approval_pending ? (
         <FlexItem data-testid="approval-status-badge">
           <ApprovalPendingBadge approvalPending={execution.approval_pending} />
+        </FlexItem>
+      ) : null}
+      {execution.retried_from_execution_id ? (
+        <FlexItem data-testid="retried-from-badge">
+          <SynLabel isCompact={false}>
+            {`Retried from: ${execution.retried_from_execution_id.slice(0, TRUNCATED_ID_LENGTH)}`}
+          </SynLabel>
         </FlexItem>
       ) : null}
       {execution.created_at ? (
@@ -53,6 +66,7 @@ export type ExecutionDetailHeaderToolbarProps = Readonly<{
   isCancellable: boolean
   executionId: string
   execution: Execution | undefined
+  onRetryFromFailureClick?: (trigger: HTMLElement) => void
 }>
 
 export function ExecutionDetailHeaderToolbar({
@@ -67,8 +81,34 @@ export function ExecutionDetailHeaderToolbar({
   isCancellable,
   executionId,
   execution,
+  onRetryFromFailureClick,
 }: ExecutionDetailHeaderToolbarProps) {
   const isRetryable = isExecutionRetryable(execution?.status, execution?.mode)
+  const showRetryFromFailure = isRetryFromFailureEligible(execution?.status, execution?.mode)
+  let retryAction: ReactNode = null
+
+  if (execution && isRetryable && showRetryFromFailure) {
+    retryAction = (
+      <RetryExecutionButton
+        executionId={executionId}
+        workflowId={execution.workflow_id}
+        workflowVersionId={execution.workflow_version_id}
+        projectId={execution.project_id}
+        retryFromFailure={{ projectId: execution.project_id, onClick: onRetryFromFailureClick }}
+      />
+    )
+  } else if (execution && isRetryable) {
+    retryAction = (
+      <RetryExecutionButton
+        executionId={executionId}
+        workflowId={execution.workflow_id}
+        workflowVersionId={execution.workflow_version_id}
+        projectId={execution.project_id}
+      />
+    )
+  } else if (execution && showRetryFromFailure) {
+    retryAction = <RetryFromFailureButton projectId={execution.project_id} onClick={onRetryFromFailureClick} />
+  }
 
   return (
     <>
@@ -82,14 +122,7 @@ export function ExecutionDetailHeaderToolbar({
       {isCancellable && execution && (
         <CancelExecutionButton executionId={executionId} projectId={execution.project_id} />
       )}
-      {isRetryable && execution && (
-        <RetryExecutionButton
-          executionId={executionId}
-          workflowId={execution.workflow_id}
-          workflowVersionId={execution.workflow_version_id}
-          projectId={execution.project_id}
-        />
-      )}
+      {retryAction}
       <Button variant="secondary" onClick={onCopyToEditor}>
         Copy to editor
       </Button>
