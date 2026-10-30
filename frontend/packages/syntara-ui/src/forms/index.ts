@@ -11,13 +11,16 @@ export { FormFieldTypeEnum, FORM_FIELD_TYPE_VALUES, type FormFieldType } from '.
 export { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE } from './dateFieldValidationMessages'
 export { prepareFormDefinitionForCommit, sanitizeDateFieldForApi } from './dateFieldUtils'
 export {
+  formDefinitionBuilderSchema,
   formDefinitionSchema,
   formFieldSchema,
   parseFormDefinition,
   safeParseFormDefinition,
+  type FormDefinitionBuilderSchemaInput,
   type FormDefinitionSchemaInput,
   type FormFieldSchemaInput,
 } from './formDefinitionSchema'
+export { serializeFormDefinitionForStorage } from './formDefinitionStorage'
 export {
   assertValidFormDefinition,
   validateFormDefinitionDefaults,

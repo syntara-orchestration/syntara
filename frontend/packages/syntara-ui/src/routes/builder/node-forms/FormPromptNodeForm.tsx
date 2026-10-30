@@ -2,10 +2,11 @@ import { Alert, Button, Content, FormGroup, Stack, StackItem, TextArea, Title } 
 import type { Activity } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 import { use, useEffect, useMemo, useState } from 'react'
-import { Controller, FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
+import { Controller, FormProvider, useFormContext, useWatch } from 'react-hook-form'
 
 import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
 import { SynFormFieldBuilder } from '../../../components/forms/SynFormFieldBuilder'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
@@ -14,7 +15,7 @@ import { useIsVersionView } from '../VersionViewContext'
 import { ApproverMultiSelect } from './ApproverMultiSelect'
 import { FormPromptFormOptionsSection } from './FormPromptFormOptionsSection'
 import { getFormPromptNodeFormDefaultValues } from './formPromptNodeFormDefaults'
-import { formPromptFormSchema, type FormPromptFormData } from './formPromptNodeFormSchema'
+import { formPromptFormSchemaTyped, type FormPromptFormData } from './formPromptNodeFormSchema'
 import { mapFormPromptFormDataToSubmit } from './formPromptNodeFormSubmit'
 import { FormPromptPreviewModal } from './FormPromptPreviewModal'
 import {
@@ -32,7 +33,6 @@ import {
 } from './formPromptResponderConstants'
 import { FormPromptTimeoutSection } from './FormPromptTimeoutSection'
 import { ActivityNameField } from './shared/ActivityNameField'
-import { zodResolver } from './shared/formSchemaUtils'
 import { nodeHelp } from './shared/nodeFieldHelp'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
@@ -285,7 +285,7 @@ function FormPromptFormFields({
           onChange={(definition) =>
             setValue('form_definition', definition, {
               shouldDirty: true,
-              shouldValidate: true,
+              shouldValidate: false,
             })
           }
           isDisabled={isVersionView}
@@ -331,17 +331,17 @@ export function FormPromptNodeForm(props: FormPromptNodeFormProps) {
     props.onSubmit(mapFormPromptFormDataToSubmit(data, systemContinueOnFailure))
   }
 
-  const methods = useForm<FormPromptFormData>({
-    resolver: zodResolver(formPromptFormSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: formPromptFormSchemaTyped,
     defaultValues,
   })
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, methods, handleSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit)
 
   return (
-    <FormProvider {...methods}>
-      <NodeFormContainer formId="form-prompt-node-form" onSubmit={methods.handleSubmit(handleSubmit)}>
+    <FormProvider {...form}>
+      <NodeFormContainer formId="form-prompt-node-form" onSubmit={form.handleSubmit(handleSubmit)}>
         <FormPromptFormFields onHeaderContentChange={props.onHeaderContentChange} projectId={props.projectId} />
       </NodeFormContainer>
     </FormProvider>

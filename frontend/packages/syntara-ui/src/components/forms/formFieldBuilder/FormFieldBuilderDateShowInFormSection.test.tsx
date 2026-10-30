@@ -44,7 +44,7 @@ describe('FormFieldBuilderDateShowInFormSection', () => {
     expect(screen.getByRole('checkbox', { name: 'Timezone' })).not.toBeChecked()
   })
 
-  it('shows how to fix date and timezone without time', async () => {
+  it('does not show inline validation when date and timezone are on without time', async () => {
     const user = userEvent.setup()
     const definition = parseFormDefinition({
       fields: [{ type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due' }],
@@ -53,7 +53,12 @@ describe('FormFieldBuilderDateShowInFormSection', () => {
 
     await user.click(screen.getByRole('checkbox', { name: 'Timezone' }))
 
-    expect(screen.getByText('Select a time when both a date and timezone are included.')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Date' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Timezone' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Time' })).not.toBeChecked()
+    expect(
+      screen.queryByText('Select a time when both a date and timezone are included.')
+    ).not.toBeInTheDocument()
   })
 
   it('allows time without timezone after date is unchecked', async () => {

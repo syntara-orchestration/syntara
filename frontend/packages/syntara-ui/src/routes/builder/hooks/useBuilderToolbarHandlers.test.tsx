@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach, type MockedFunction } from 'vites
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { expectStringContaining } from '../../../test/test-helpers'
+import type { BuilderAction } from '../builderReducer'
 
 import type { UseBuilderToolbarHandlersOptions } from './useBuilderToolbarHandlers'
 import { useBuilderToolbarHandlers } from './useBuilderToolbarHandlers'
@@ -95,7 +96,8 @@ describe('useBuilderToolbarHandlers', () => {
           targetHandle: 'target',
         },
       ],
-    } as ReturnType<typeof useWorkflowStore.getState>)
+      setValidationErrorCount: vi.fn(),
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
   })
 
   it('handleRunWorkflow does not call executeWorkflow when workflow is missing', async () => {
@@ -128,7 +130,8 @@ describe('useBuilderToolbarHandlers', () => {
           targetHandle: 'target',
         },
       ],
-    } as ReturnType<typeof useWorkflowStore.getState>)
+      setValidationErrorCount: vi.fn(),
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
     const { result } = renderHook(() =>
       useBuilderToolbarHandlers(
@@ -169,7 +172,8 @@ describe('useBuilderToolbarHandlers', () => {
           targetHandle: 'target',
         },
       ],
-    } as ReturnType<typeof useWorkflowStore.getState>)
+      setValidationErrorCount: vi.fn(),
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
     const { result } = renderHook(() =>
       useBuilderToolbarHandlers(
@@ -196,11 +200,13 @@ describe('useBuilderToolbarHandlers', () => {
     const showError = vi.fn()
     const dispatch = vi.fn()
     const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
+    const setValidationErrorCount = vi.fn()
 
     // Mock dirty state with no edges
     vi.mocked(useWorkflowStore.getState).mockReturnValue({
       isDirty: true,
       edges: [],
+      setValidationErrorCount,
     } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
     const { result } = renderHook(() =>
@@ -216,6 +222,17 @@ describe('useBuilderToolbarHandlers', () => {
       title: 'Cannot run workflow',
       description: expectStringContaining('at least one connection'),
     })
+    const validationDispatch = dispatch.mock.calls
+      .map((call) => call[0] as BuilderAction)
+      .find((action) => action.type === 'SET_VALIDATION_ERRORS')
+    expect(validationDispatch?.type).toBe('SET_VALIDATION_ERRORS')
+    if (validationDispatch?.type !== 'SET_VALIDATION_ERRORS') {
+      throw new Error('expected SET_VALIDATION_ERRORS dispatch')
+    }
+    expect(validationDispatch.source).toBe('verify')
+    expect(validationDispatch.payload[0]?.message).toContain('at least one connection')
+    expect(validationDispatch.payload[0]?.severity).toBe('error')
+    expect(setValidationErrorCount).toHaveBeenCalledWith(1)
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CONFIRM_DIALOG', payload: false })
     // But execution should not happen
     expect(executeWorkflow).not.toHaveBeenCalled()
@@ -294,7 +311,7 @@ describe('useBuilderToolbarHandlers', () => {
           targetHandle: 'target',
         },
       ],
-    } as ReturnType<typeof useWorkflowStore.getState>)
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
     const { result } = renderHook(() =>
       useBuilderToolbarHandlers(buildOptions({ handleSaveWorkflow, executeWorkflow, dispatch }))
@@ -321,7 +338,7 @@ describe('useBuilderToolbarHandlers', () => {
           targetHandle: 'target',
         },
       ],
-    } as ReturnType<typeof useWorkflowStore.getState>)
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
     const { result } = renderHook(() =>
       useBuilderToolbarHandlers(buildOptions({ handleSaveWorkflow, executeWorkflow }))
@@ -453,7 +470,7 @@ describe('useBuilderToolbarHandlers', () => {
           targetHandle: 'target',
         },
       ],
-    } as ReturnType<typeof useWorkflowStore.getState>)
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
     const { result } = renderHook(() =>
       useBuilderToolbarHandlers(buildOptions({ handleSaveWorkflow, executeWorkflow, dispatch }))
@@ -482,7 +499,7 @@ describe('useBuilderToolbarHandlers', () => {
           targetHandle: 'target',
         },
       ],
-    } as ReturnType<typeof useWorkflowStore.getState>)
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
     const { result } = renderHook(() =>
       useBuilderToolbarHandlers(buildOptions({ handleSaveWorkflow, executeWorkflow }))
@@ -518,7 +535,7 @@ describe('useBuilderToolbarHandlers', () => {
           targetHandle: 'target',
         },
       ],
-    } as ReturnType<typeof useWorkflowStore.getState>)
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
     const { result } = renderHook(() => useBuilderToolbarHandlers(buildOptions({ executeWorkflow, dispatch })))
 
@@ -585,7 +602,7 @@ describe('useBuilderToolbarHandlers', () => {
     vi.mocked(useWorkflowStore.getState).mockReturnValue({
       isDirty: false,
       edges: [{ id: 'e1', source: 'trigger-1', target: 'wait-1', sourceHandle: 'source', targetHandle: 'target' }],
-    } as ReturnType<typeof useWorkflowStore.getState>)
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
     const { result } = renderHook(() =>
       useBuilderToolbarHandlers(buildOptions({ executeWorkflow, showError, dispatch, currentWorkflow }))
@@ -621,7 +638,7 @@ describe('useBuilderToolbarHandlers', () => {
     vi.mocked(useWorkflowStore.getState).mockReturnValue({
       isDirty: false,
       edges: [{ id: 'e1', source: 'trigger-1', target: 'wait-1', sourceHandle: 'source', targetHandle: 'target' }],
-    } as ReturnType<typeof useWorkflowStore.getState>)
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
     const { result } = renderHook(() =>
       useBuilderToolbarHandlers(buildOptions({ executeWorkflow, showError, dispatch, currentWorkflow }))
@@ -652,7 +669,7 @@ describe('useBuilderToolbarHandlers', () => {
     vi.mocked(useWorkflowStore.getState).mockReturnValue({
       isDirty: false,
       edges: [{ id: 'e1', source: 'trigger-1', target: 'wait-1', sourceHandle: 'source', targetHandle: 'target' }],
-    } as ReturnType<typeof useWorkflowStore.getState>)
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
     const { result } = renderHook(() => useBuilderToolbarHandlers(buildOptions({ executeWorkflow, currentWorkflow })))
 
@@ -675,7 +692,7 @@ describe('useBuilderToolbarHandlers', () => {
     vi.mocked(useWorkflowStore.getState).mockReturnValue({
       isDirty: false,
       edges: [{ id: 'e1', source: 'trigger-1', target: 'wait-1', sourceHandle: 'source', targetHandle: 'target' }],
-    } as ReturnType<typeof useWorkflowStore.getState>)
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
 
     const { result } = renderHook(() => useBuilderToolbarHandlers(buildOptions({ executeWorkflow, currentWorkflow })))
 

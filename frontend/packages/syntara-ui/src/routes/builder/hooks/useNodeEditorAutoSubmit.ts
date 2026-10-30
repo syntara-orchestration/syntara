@@ -12,17 +12,23 @@ export function useNodeEditorAutoSubmitRef() {
 export function useRegisterAutoSubmit<T extends FieldValues>(
   autoSubmitRef: MutableRefObject<AutoSubmitFn | null>,
   methods: UseFormReturn<T>,
-  onSubmit: (data: T) => boolean | void | Promise<boolean | void>
+  onSubmit: (data: T) => boolean | void | Promise<boolean | void>,
+  beforeSubmit?: () => void
 ) {
   const onSubmitRef = useRef(onSubmit)
+  const beforeSubmitRef = useRef(beforeSubmit)
   useEffect(() => {
     onSubmitRef.current = onSubmit
   }, [onSubmit])
+  useEffect(() => {
+    beforeSubmitRef.current = beforeSubmit
+  }, [beforeSubmit])
 
   useEffect(() => {
     autoSubmitRef.current = async () => {
       let succeeded = false
       try {
+        beforeSubmitRef.current?.()
         await methods.handleSubmit(
           async (data) => {
             const result = await onSubmitRef.current(data)

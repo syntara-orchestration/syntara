@@ -71,14 +71,6 @@ function pruneDateValueForIncludes(
   return next
 }
 
-export function isDateFieldDateAndTimezoneWithoutTime(field: FormField): boolean {
-  if (field.type !== 'date') {
-    return false
-  }
-  const includes = dateIncludesFromField(field)
-  return includes.date && includes.timezone && !includes.time
-}
-
 export function dateIncludesFromField(field: FormField): Record<DateComponentName, boolean> {
   if (field.type !== 'date') {
     return { date: true, time: false, timezone: false }
@@ -170,6 +162,6 @@ export function prepareFormDefinitionForCommit(
   definition: FormDefinitionSchemaInput | FormDefinition
 ): FormDefinitionSchemaInput {
   return {
-    fields: definition.fields.map((field) => sanitizeDateFieldForApi(field)),
+    fields: (definition.fields ?? []).map((field) => sanitizeDateFieldForApi(field)),
   }
 }

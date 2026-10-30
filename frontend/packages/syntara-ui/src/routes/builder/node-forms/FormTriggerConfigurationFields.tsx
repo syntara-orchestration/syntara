@@ -3,20 +3,16 @@ import {
   Button,
   Content,
   FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   Stack,
   StackItem,
   TextArea,
   Title,
 } from '@patternfly/react-core'
 import type { FormDefinition } from '@syntara/contracts'
-import { useState } from 'react'
+import { useCallback, use, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
-import type { FormDefinitionFieldServerError } from '../../../components/forms/formFieldBuilder/formDefinitionFieldServerError'
 import { SynFormFieldBuilder } from '../../../components/forms/SynFormFieldBuilder'
 import { useIsVersionView } from '../VersionViewContext'
 
@@ -24,22 +20,28 @@ import { FormPresentationOptionsSection } from './FormPresentationOptionsSection
 import { FormPromptPreviewModal } from './FormPromptPreviewModal'
 import { nodeHelp } from './shared/nodeFieldHelp'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
+import {
+  TriggerFormFieldBuilderCommitRefContext,
+  type TriggerFormFieldBuilderCommitHandlers,
+} from './triggerFormFieldBuilderCommitContext'
 import type { TriggerFormData } from './triggerFormSchema'
 
-type FormTriggerConfigurationFieldsProps = Readonly<{
-  formDefinitionError?: { message?: string }
-  serverFieldErrors?: ReadonlyArray<FormDefinitionFieldServerError>
-}>
-
-export function FormTriggerConfigurationFields({
-  formDefinitionError,
-  serverFieldErrors,
-}: FormTriggerConfigurationFieldsProps) {
+export function FormTriggerConfigurationFields() {
   const isVersionView = useIsVersionView()
   const { register, setValue, control } = useFormContext<TriggerFormData>()
+  const builderCommitRef = use(TriggerFormFieldBuilderCommitRefContext)
   const formDefinition = useWatch({ control, name: 'form_definition' })
   const message = useWatch({ control, name: 'message' })
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+
+  const registerBuilderCommit = useCallback(
+    (handlers: TriggerFormFieldBuilderCommitHandlers | null) => {
+      if (builderCommitRef) {
+        builderCommitRef.current = handlers
+      }
+    },
+    [builderCommitRef]
+  )
 
   return (
     <>
@@ -77,24 +79,17 @@ export function FormTriggerConfigurationFields({
           </Title>
         </StackItem>
         <StackItem>
-          {formDefinitionError?.message ? (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem variant="error">{formDefinitionError.message}</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          ) : null}
           <SynFormFieldBuilder
             designOnly
             optionsMode="static-only"
-            serverFieldErrors={serverFieldErrors}
             value={formDefinition ?? createEmptyFormDefinition()}
             onChange={(definition: FormDefinition) =>
               setValue('form_definition', definition, {
                 shouldDirty: true,
-                shouldValidate: true,
+                shouldValidate: false,
               })
             }
+            registerCommit={registerBuilderCommit}
             isDisabled={isVersionView}
           />
         </StackItem>

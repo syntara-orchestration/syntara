@@ -7,16 +7,19 @@ import {
 } from '@syntara/contracts'
 import { useMemo, type ReactNode } from 'react'
 
+import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import type { Trigger } from '../../../stores/workflowStoreTypes'
 import { parseJsonSchema } from '../../../utils/jsonSafeParse'
 import { isValidWebhookPath, normalizeWebhookPath } from '../../../utils/webhookPath'
-import type { ValidationError } from '../builderReducer'
 import type { TriggerFormData } from '../node-forms/TriggerNodeForm'
 import { TriggerNodeForm } from '../node-forms/TriggerNodeForm'
 import { buildFormTriggerActivityParameters } from '../utils/formTriggerActivityParameters'
-import { readStoredFormDefinition } from '../utils/readStoredFormDefinition'
+import {
+  readDraftFormDefinitionFromParameters,
+  readStoredFormDefinition,
+} from '../utils/readStoredFormDefinition'
 
 /**
  * Deep equality check for triggers to prevent marking workflow dirty when no changes are made.
@@ -194,15 +197,12 @@ function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: stri
     )
   }
   if (data.triggerType === TriggerTypeEnum.FORM_TRIGGER) {
-    if (!data.form_definition) {
-      throw new Error('Add at least one form field')
-    }
     return {
       id: trigger.id ?? 'form',
       type: TriggerTypeEnum.FORM_TRIGGER,
       name: name ?? 'Form trigger',
       parameters: buildFormTriggerActivityParameters({
-        form_definition: data.form_definition,
+        form_definition: data.form_definition ?? createEmptyFormDefinition(),
         message: data.message,
         submit_label: data.submit_label,
         success_message: data.success_message,
@@ -244,7 +244,10 @@ function mapFormTriggerInitialData(trigger: Trigger): TriggerFormData {
   return {
     name: trigger.name,
     triggerType: TriggerTypeEnum.FORM_TRIGGER,
-    form_definition: readStoredFormDefinition(params),
+    form_definition:
+      readDraftFormDefinitionFromParameters(params) ??
+      readStoredFormDefinition(params) ??
+      createEmptyFormDefinition(),
     message: (params.message as string | undefined) ?? '',
     submit_label: (params.submit_label as string | undefined) ?? '',
     success_message: (params.success_message as string | undefined) ?? '',
@@ -290,7 +293,6 @@ type TriggerNodeDetailsProps = Readonly<{
   triggerIndex: number
   onClose: () => void
   onHeaderContentChange?: (content: ReactNode | null) => void
-  serverValidationErrors?: ValidationError[]
 }>
 
 export function TriggerNodeDetails({
@@ -298,7 +300,6 @@ export function TriggerNodeDetails({
   triggerIndex,
   onClose,
   onHeaderContentChange,
-  serverValidationErrors,
 }: TriggerNodeDetailsProps) {
   const { showError } = useAlerts()
   // Use action accessor - component won't re-render when store state changes
@@ -324,17 +325,11 @@ export function TriggerNodeDetails({
     }
   }
 
-  const formServerErrors = serverValidationErrors?.map((err) => ({
-    fieldPath: err.fieldPath,
-    message: err.message,
-  }))
-
   return (
     <TriggerNodeForm
       initialData={initialData}
       onSubmit={handleSubmit}
       onHeaderContentChange={onHeaderContentChange}
-      serverValidationErrors={formServerErrors}
     />
   )
 }
