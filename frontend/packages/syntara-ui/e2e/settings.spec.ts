@@ -107,6 +107,13 @@ test.describe('Settings', () => {
     await expect(app).toHaveTitle(`Settings | ${APP_TITLE}`)
     const tabCount = await app.getByRole('tab').count()
     expect(tabCount).toBeGreaterThanOrEqual(1)
+
+    const systemTab = app.getByRole('tab', { name: 'System', exact: true })
+    await systemTab.click()
+    await expect(app).toHaveURL(/system-administration\/settings\/system$/)
+    const systemPanel = app.getByRole('tabpanel', { name: 'system' })
+    await expect(systemPanel).toBeVisible()
+    await expect(systemPanel).toHaveCSS('margin-block-start', '0px')
   })
 
   test('context manager tab shows grouped section headings', async ({ app }) => {
@@ -612,5 +619,41 @@ test.describe('Settings', () => {
       await authTab.click()
       await resetAllToDefaults(app)
     }
+  })
+})
+
+test.describe('Settings route panel layout', () => {
+  test('category tabs do not inherit detail-page spacing', async ({ app }) => {
+    await app.route('**/api/v1/authz/can_i', async (route) => {
+      const body: unknown = route.request().postDataJSON()
+      if (typeof body === 'object' && body !== null && 'resource_type' in body && body.resource_type === 'setting') {
+        await route.fulfill({
+          json: { allowed: true, denied: false, matched_policy: 'test-policy', denial_reason: '', denied_by: '' },
+        })
+        return
+      }
+      await route.continue()
+    })
+    await app.route('**/api/v1/settings/categories', (route) =>
+      route.fulfill({
+        json: {
+          resources: [
+            { slug: 'ai_llm', name: 'AI / LLM', description: 'AI settings', group_names: [] },
+            { slug: 'system', name: 'System', description: 'System settings', group_names: [] },
+          ],
+        },
+      })
+    )
+    await app.route(/\/api\/v1\/settings(?:\?.*)?$/, (route) => route.fulfill({ json: { resources: [], next: null } }))
+
+    await app.goto(toAppUrl('/system-administration/settings'))
+    const systemTab = app.getByRole('tab', { name: 'System', exact: true })
+    await expect(systemTab).toBeVisible()
+    await systemTab.click()
+    await expect(app).toHaveURL(/system-administration\/settings\/system$/)
+
+    const systemPanel = app.getByRole('tabpanel', { name: 'system' })
+    await expect(systemPanel).toBeVisible()
+    await expect(systemPanel).toHaveCSS('margin-block-start', '0px')
   })
 })

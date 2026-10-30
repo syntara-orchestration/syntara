@@ -41,9 +41,34 @@
     },
     {
       "kind": "page",
+      "parameters": ["credentialId"],
+      "sources": ["router"],
+      "template": "/configuration/credentials/$credentialId/"
+    },
+    {
+      "kind": "redirect",
       "parameters": ["credentialId", "tab"],
+      "redirectTo": "/configuration/credentials/$credentialId/details",
       "sources": ["appRoute", "navigation", "router"],
       "template": "/configuration/credentials/$credentialId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": ["credentialId"],
+      "sources": ["router"],
+      "template": "/configuration/credentials/$credentialId/details"
+    },
+    {
+      "kind": "page",
+      "parameters": ["credentialId"],
+      "sources": ["router"],
+      "template": "/configuration/credentials/$credentialId/integrations"
+    },
+    {
+      "kind": "page",
+      "parameters": ["credentialId"],
+      "sources": ["router"],
+      "template": "/configuration/credentials/$credentialId/workflows"
     },
     {
       "kind": "page",
@@ -143,9 +168,33 @@
     },
     {
       "kind": "page",
+      "parameters": ["groupId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/groups/$groupId/"
+    },
+    {
+      "kind": "page",
       "parameters": ["groupId", "tab"],
       "sources": ["appRoute", "navigation", "router"],
       "template": "/system-administration/access-management/groups/$groupId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": ["groupId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/groups/$groupId/details"
+    },
+    {
+      "kind": "page",
+      "parameters": ["groupId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/groups/$groupId/members"
+    },
+    {
+      "kind": "page",
+      "parameters": ["groupId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/groups/$groupId/roles"
     },
     {
       "kind": "page",
@@ -167,9 +216,33 @@
     },
     {
       "kind": "page",
+      "parameters": ["projectId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/projects/$projectId/"
+    },
+    {
+      "kind": "page",
       "parameters": ["projectId", "tab"],
       "sources": ["appRoute", "navigation", "router"],
       "template": "/system-administration/access-management/projects/$projectId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": ["projectId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/projects/$projectId/details"
+    },
+    {
+      "kind": "page",
+      "parameters": ["projectId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/projects/$projectId/role-assignments"
+    },
+    {
+      "kind": "page",
+      "parameters": ["projectId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/projects/$projectId/workflows"
     },
     {
       "kind": "page",
@@ -191,9 +264,33 @@
     },
     {
       "kind": "page",
+      "parameters": ["serviceAccountId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/service-accounts/$serviceAccountId/"
+    },
+    {
+      "kind": "page",
       "parameters": ["serviceAccountId", "tab"],
       "sources": ["appRoute", "navigation", "router"],
       "template": "/system-administration/access-management/service-accounts/$serviceAccountId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": ["serviceAccountId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/service-accounts/$serviceAccountId/assignments"
+    },
+    {
+      "kind": "page",
+      "parameters": ["serviceAccountId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/service-accounts/$serviceAccountId/credentials"
+    },
+    {
+      "kind": "page",
+      "parameters": ["serviceAccountId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/service-accounts/$serviceAccountId/details"
     },
     {
       "kind": "page",
@@ -215,15 +312,58 @@
     },
     {
       "kind": "page",
+      "parameters": ["userId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/users/$userId/"
+    },
+    {
+      "kind": "redirect",
       "parameters": ["userId", "tab"],
+      "redirectTo": "/system-administration/access-management/users/$userId/details",
       "sources": ["appRoute", "navigation", "router"],
       "template": "/system-administration/access-management/users/$userId/$tab"
     },
     {
       "kind": "page",
       "parameters": ["userId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/users/$userId/check-access"
+    },
+    {
+      "kind": "page",
+      "parameters": ["userId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/users/$userId/details"
+    },
+    {
+      "kind": "page",
+      "parameters": ["userId"],
       "sources": ["appRoute", "navigation", "router"],
       "template": "/system-administration/access-management/users/$userId/edit"
+    },
+    {
+      "kind": "page",
+      "parameters": ["userId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/users/$userId/groups"
+    },
+    {
+      "kind": "page",
+      "parameters": ["userId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/users/$userId/identities"
+    },
+    {
+      "kind": "page",
+      "parameters": ["userId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/users/$userId/permissions"
+    },
+    {
+      "kind": "page",
+      "parameters": ["userId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/users/$userId/roles"
     },
     {
       "kind": "page",
@@ -251,6 +391,12 @@
     },
     {
       "kind": "page",
+      "parameters": ["providerId"],
+      "sources": ["router"],
+      "template": "/system-administration/authentication/identity-providers/$providerId/"
+    },
+    {
+      "kind": "page",
       "parameters": ["providerId", "tab"],
       "sources": ["appRoute", "navigation", "router"],
       "template": "/system-administration/authentication/identity-providers/$providerId/$tab"
@@ -258,8 +404,20 @@
     {
       "kind": "page",
       "parameters": ["providerId"],
+      "sources": ["router"],
+      "template": "/system-administration/authentication/identity-providers/$providerId/details"
+    },
+    {
+      "kind": "page",
+      "parameters": ["providerId"],
       "sources": ["appRoute", "navigation", "router"],
       "template": "/system-administration/authentication/identity-providers/$providerId/edit"
+    },
+    {
+      "kind": "page",
+      "parameters": ["providerId"],
+      "sources": ["router"],
+      "template": "/system-administration/authentication/identity-providers/$providerId/group-mapping"
     },
     {
       "kind": "page",

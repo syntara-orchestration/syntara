@@ -13,8 +13,8 @@ import {
 } from '@patternfly/react-core'
 import { RhUiEditIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import type { Group } from '@syntara/contracts'
-import { useNavigate, useParams } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
+import { createContext, use, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsGroupDetail, breadcrumbsGroupDetailEarlyShell } from '../../../app/breadcrumbBuilders'
@@ -23,14 +23,13 @@ import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
-import { SynListPanel, SynListPanelTabs } from '../../../components/panels/list/SynListPanel'
+import { SynListPanel, SynListPanelTabs, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
-import { useUrlTab } from '../../../hooks/useUrlTab'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { accessClient } from '../../access/accessClient'
@@ -161,37 +160,77 @@ function GroupTabBar({
   )
 }
 
-function GroupTabContent({
-  group,
-  groupId,
-  activeTab,
-  showMembers,
-  showAssignments,
-  onMembersChange,
-}: Readonly<{
+type GroupDetailRouteContextValue = {
   group: Group
   groupId: string
-  activeTab: string
   showMembers: boolean
   showAssignments: boolean
   onMembersChange: () => void
-}>) {
+}
+
+const GroupDetailRouteContext = createContext<GroupDetailRouteContextValue | null>(null)
+
+function useGroupDetailRouteContext() {
+  const context = use(GroupDetailRouteContext)
+  if (!context) throw new Error('Group detail tab routes must be rendered inside GroupDetail')
+  return context
+}
+
+const noop = () => {}
+
+export function GroupDetailDetailsTabRoute() {
+  const { group } = useGroupDetailRouteContext()
+
   return (
-    <>
-      {activeTab === 'details' && <GroupDetailsTab group={group} />}
-      {activeTab === 'members' && showMembers && (
-        <GroupMembersPanel groupId={groupId} onMembershipChange={onMembersChange} />
-      )}
-      {activeTab === 'roles' && showAssignments && (
-        <RoleAssignmentsPanel
-          principalType={RolePrincipalType.GROUP}
-          principalId={groupId}
-          tabKey="roles"
-          tabLabel="Assignments"
-        />
-      )}
-    </>
+    <SynListPanelView
+      tabKey="details"
+      tabLabel="Details"
+      isPending={false}
+      error={null}
+      isEmpty={false}
+      hasActiveFilters={false}
+      onRetry={noop}
+      onClearAllFilters={noop}
+      body={<GroupDetailsTab group={group} />}
+    />
   )
+}
+
+export function GroupDetailMembersTabRoute() {
+  const { groupId, showMembers, onMembersChange } = useGroupDetailRouteContext()
+  if (!showMembers) return null
+
+  return (
+    <SynListPanelView
+      tabKey="members"
+      tabLabel="Members"
+      isPending={false}
+      error={null}
+      isEmpty={false}
+      hasActiveFilters={false}
+      onRetry={noop}
+      onClearAllFilters={noop}
+      body={<GroupMembersPanel groupId={groupId} onMembershipChange={onMembersChange} />}
+    />
+  )
+}
+
+export function GroupDetailAssignmentsTabRoute() {
+  const { groupId, showAssignments } = useGroupDetailRouteContext()
+  if (!showAssignments) return null
+
+  return (
+    <RoleAssignmentsPanel
+      principalType={RolePrincipalType.GROUP}
+      principalId={groupId}
+      tabKey="roles"
+      tabLabel="Assignments"
+    />
+  )
+}
+
+export function GroupDetailUnknownTabRoute() {
+  return null
 }
 
 function useGroupQueries(groupId: string | undefined) {
@@ -230,14 +269,13 @@ export function GroupDetail() {
   const groupsDocLink = useDocLink('groups')
   const { groupId }: { groupId: string } = useParams({ strict: false })
   const basePath = AppRoute.AccessManagement.GroupDetail.replace(':groupId', groupId ?? '')
-  type GroupTab = 'details' | 'members' | 'roles'
-  const [activeTab] = useUrlTab<GroupTab>(basePath)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const deleteDialog = useDialogState<Group>()
 
   const groupPermissions = useGroupPermissions()
   const { mutate: deleteGroup } = accessClient.useMutation('delete', '/groups/{group_id}')
   const { groupQuery, membersQuery, isAuthenticated, memberCount, roleAssignmentCount } = useGroupQueries(groupId)
+  const refetchMembers = membersQuery.refetch
   const { canReadMembers, canReadAssignments, isLoading: permissionsLoading } = useGroupDetailPermissions()
 
   const showMembers = !isAuthenticated && (permissionsLoading || canReadMembers)
@@ -255,6 +293,16 @@ export function GroupDetail() {
   })
 
   const groupData = groupQuery.data
+  const groupDetailRouteContextValue = useMemo<GroupDetailRouteContextValue | null>(() => {
+    if (!groupData) return null
+    return {
+      group: groupData as Group,
+      groupId: groupId ?? '',
+      showMembers,
+      showAssignments,
+      onMembersChange: () => detachPromise(refetchMembers()),
+    }
+  }, [groupData, groupId, showMembers, showAssignments, refetchMembers])
   const refetchGroup = groupQuery.refetch
   const queryState = useQueryState(groupQuery, {
     title: 'Error loading group',
@@ -284,7 +332,7 @@ export function GroupDetail() {
     )
   }
 
-  if (!groupData) return null
+  if (!groupData || !groupDetailRouteContextValue) return null
 
   const groupCrumbs = breadcrumbsGroupDetail(groupData.name)
 
@@ -314,16 +362,9 @@ export function GroupDetail() {
             memberCount={memberCount}
             roleAssignmentCount={roleAssignmentCount}
           />
-          <GroupTabContent
-            group={groupData as Group}
-            groupId={groupId ?? ''}
-            activeTab={activeTab}
-            showMembers={showMembers}
-            showAssignments={showAssignments}
-            onMembersChange={() => {
-              detachPromise(membersQuery.refetch())
-            }}
-          />
+          <GroupDetailRouteContext.Provider value={groupDetailRouteContextValue}>
+            <Outlet />
+          </GroupDetailRouteContext.Provider>
         </SynListPanel>
       </SynPageBody>
 

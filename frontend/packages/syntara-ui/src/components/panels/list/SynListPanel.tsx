@@ -302,16 +302,31 @@ export type SynListPanelTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | '
   validTabs?: string[]
   /** `<Tab>` elements. */
   children: ReactNode
+  /** Render the active nested route in the selected tab panel. */
+  renderPanel?: (activeTab: string) => ReactNode
+  /** Accessible panel names by tab key. Unlisted panels use their tab key as a fallback. */
+  tabPanelLabels?: Readonly<Record<string, string>>
+  /** Applies the full-height spacing layout used by nested detail tabs. */
+  routePanelLayout?: 'detail'
 }
 
 /** URL-driven tabs for use inside `SynListPanel`. */
-export function SynListPanelTabs({ basePath, defaultTab, validTabs, children, ...tabsProps }: SynListPanelTabsProps) {
+export function SynListPanelTabs({
+  basePath,
+  defaultTab,
+  validTabs,
+  children,
+  renderPanel,
+  tabPanelLabels,
+  routePanelLayout,
+  ...tabsProps
+}: SynListPanelTabsProps) {
   const tabCtx = useSynListPanelTabContext()
 
   // Inject tabContentId into each Tab so PF's aria-controls targets the panel rendered by
   // the corresponding SynListPanelView (which provides the matching id via SynListPanelTabContext).
   // Cast via `unknown` because React.Children.map's inferred type is broader than ReactNode.
-  const clonedChildren = (tabCtx
+  const clonedChildren = (tabCtx && !renderPanel
     ? React.Children.map(children, (child) => {
         if (!React.isValidElement(child)) return child
         const tab = child as React.ReactElement<{ eventKey: string | number; tabContentId?: string }>
@@ -320,8 +335,16 @@ export function SynListPanelTabs({ basePath, defaultTab, validTabs, children, ..
     : children) as unknown as React.ReactNode
 
   return (
-    <StackItem>
-      <SynUrlTabs basePath={basePath} defaultTab={defaultTab} validTabs={validTabs} {...tabsProps}>
+    <StackItem isFilled={!!renderPanel} className={renderPanel ? styles.tabsWithPanel : undefined}>
+      <SynUrlTabs
+        basePath={basePath}
+        defaultTab={defaultTab}
+        validTabs={validTabs}
+        renderPanel={renderPanel}
+        tabPanelLabels={tabPanelLabels}
+        routePanelLayout={routePanelLayout}
+        {...tabsProps}
+      >
         {clonedChildren}
       </SynUrlTabs>
     </StackItem>

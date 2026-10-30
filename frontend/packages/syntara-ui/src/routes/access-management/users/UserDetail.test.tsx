@@ -1,6 +1,15 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+} from '@tanstack/react-router'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createContext, use } from 'react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -11,7 +20,7 @@ import { accessClient, accessFetchClient } from '../../access/accessClient'
 import { AUTH_TYPE_FEDERATED } from '../adminConstants'
 import { useUserPermissions } from '../useUserPermissions'
 
-import { UserDetail } from './UserDetail'
+import { UserDetail, UserDetailTabRoute } from './UserDetail'
 import { computeRoleAssignmentCount } from './userDetailUtils'
 
 // ---------------------------------------------------------------------------
@@ -163,9 +172,49 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 })
 
+const userDetailTestPageContext = createContext<ReactNode>(null)
+
+function UserDetailTestPage() {
+  return use(userDetailTestPageContext)
+}
+
+function createUserDetailTestRouter() {
+  const rootRoute = createRootRoute({ component: Outlet })
+  const userDetailRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/system-administration/access-management/users/$userId',
+    component: UserDetailTestPage,
+  })
+  const tabPaths = ['/', 'details', 'groups', 'identities', 'roles', 'permissions', 'check-access'] as const
+  const tabRoutes = tabPaths.map((path) =>
+    createRoute({
+      getParentRoute: () => userDetailRoute,
+      path,
+      component: UserDetailTabRoute,
+    })
+  )
+
+  return createRouter({
+    routeTree: rootRoute.addChildren([userDetailRoute.addChildren(tabRoutes)]),
+    history: createMemoryHistory({ initialEntries: [routerTestState.pathname] }),
+  })
+}
+
+let userDetailTestRouter: ReturnType<typeof createUserDetailTestRouter>
+
+async function loadUserDetailTestRouter(path = routerTestState.pathname) {
+  routerTestState.pathname = path
+  userDetailTestRouter = createUserDetailTestRouter()
+  await userDetailTestRouter.load()
+}
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>
-    <AlertProvider>{children}</AlertProvider>
+    <AlertProvider>
+      <userDetailTestPageContext.Provider value={children}>
+        <RouterProvider router={userDetailTestRouter} />
+      </userDetailTestPageContext.Provider>
+    </AlertProvider>
   </QueryClientProvider>
 )
 
@@ -267,7 +316,7 @@ describe('computeRoleAssignmentCount', () => {
 })
 
 describe('UserDetail', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     mockAuthQuery.mockReturnValue({ data: { id: 'me-id' }, isPending: false, isError: false, error: null })
     vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
     vi.mocked(useUserPermissions).mockReturnValue({
@@ -286,6 +335,7 @@ describe('UserDetail', () => {
     revokeDialogMock.open.mockClear()
     revokeDialogMock.close.mockClear()
     mockSuccessQueries()
+    await loadUserDetailTestRouter()
   })
 
   // ---- Rendering ----------------------------------------------------------
@@ -1079,8 +1129,8 @@ describe('UserDetail', () => {
       )
     })
 
-    it('renders Groups tab content when URL is /groups', () => {
-      routerTestState.pathname = `/system-administration/access-management/users/${VALID_USER_ID}/groups`
+    it('renders Groups tab content when URL is /groups', async () => {
+      await loadUserDetailTestRouter(`/system-administration/access-management/users/${VALID_USER_ID}/groups`)
       render(<UserDetail />, { wrapper })
 
       expect(screen.queryByText('Username')).not.toBeInTheDocument()
@@ -1379,24 +1429,24 @@ describe('UserDetail', () => {
   // ---- Additional tab rendering -------------------------------------------
 
   describe('Identities and Roles tabs', () => {
-    it('renders Identities tab panel when URL includes /identities', () => {
-      routerTestState.pathname = `/system-administration/access-management/users/${VALID_USER_ID}/identities`
+    it('renders Identities tab panel when URL includes /identities', async () => {
+      await loadUserDetailTestRouter(`/system-administration/access-management/users/${VALID_USER_ID}/identities`)
       render(<UserDetail />, { wrapper })
 
       expect(screen.queryByText('Username')).not.toBeInTheDocument()
       expect(screen.getByTestId('identities-panel')).toBeInTheDocument()
     })
 
-    it('renders Role Assignments tab panel when URL includes /roles', () => {
-      routerTestState.pathname = `/system-administration/access-management/users/${VALID_USER_ID}/roles`
+    it('renders Role Assignments tab panel when URL includes /roles', async () => {
+      await loadUserDetailTestRouter(`/system-administration/access-management/users/${VALID_USER_ID}/roles`)
       render(<UserDetail />, { wrapper })
 
       expect(screen.queryByText('Username')).not.toBeInTheDocument()
       expect(screen.getByTestId('role-assignments-panel')).toBeInTheDocument()
     })
 
-    it('passes isBuiltinUser=true when user is builtin', () => {
-      routerTestState.pathname = `/system-administration/access-management/users/${VALID_USER_ID}/identities`
+    it('passes isBuiltinUser=true when user is builtin', async () => {
+      await loadUserDetailTestRouter(`/system-administration/access-management/users/${VALID_USER_ID}/identities`)
 
       vi.mocked(accessClient.useQuery).mockImplementation((_method, path) => {
         if (path === '/users/{user_id}') {
@@ -1417,8 +1467,8 @@ describe('UserDetail', () => {
       expect(screen.getByTestId('identities-panel')).toHaveAttribute('data-is-builtin', 'true')
     })
 
-    it('passes isLocalUser=false and hasPassword=false for federated user on identities tab', () => {
-      routerTestState.pathname = `/system-administration/access-management/users/${VALID_USER_ID}/identities`
+    it('passes isLocalUser=false and hasPassword=false for federated user on identities tab', async () => {
+      await loadUserDetailTestRouter(`/system-administration/access-management/users/${VALID_USER_ID}/identities`)
 
       vi.mocked(accessClient.useQuery).mockImplementation((_method, path) => {
         if (path === '/users/{user_id}') {
@@ -1441,7 +1491,7 @@ describe('UserDetail', () => {
   })
 
   describe('currentUserId from meQuery', () => {
-    it('passes currentUserId to identities panel when authClient returns the current user', () => {
+    it('passes currentUserId to identities panel when authClient returns the current user', async () => {
       mockAuthQuery.mockReturnValue({
         data: { id: 'me-user-id' },
         isPending: false,
@@ -1449,7 +1499,7 @@ describe('UserDetail', () => {
         error: null,
       })
 
-      routerTestState.pathname = `/system-administration/access-management/users/${VALID_USER_ID}/identities`
+      await loadUserDetailTestRouter(`/system-administration/access-management/users/${VALID_USER_ID}/identities`)
       render(<UserDetail />, { wrapper })
 
       expect(screen.getByTestId('identities-panel')).toHaveAttribute('data-current-user', 'me-user-id')
