@@ -241,6 +241,8 @@ describe('Kafka Subscribe form', () => {
     renderKafka()
     await user.clear(screen.getByRole('textbox', { name: 'Topic' }))
     await user.type(screen.getByRole('textbox', { name: 'Topic' }), 'orders.*')
+    await submitForm()
+    expect(screen.getByRole('textbox', { name: 'Topic' })).toHaveAccessibleDescription(/exact Kafka topic/)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Test runtime access' }))
     expect(mutate).not.toHaveBeenCalled()

@@ -26,6 +26,7 @@ export function FormFieldError({ message, error, id }: FormFieldErrorProps) {
 }
 
 type FormFieldHintOrErrorProps = Readonly<{
+  id?: string
   /** Static helper text shown when there is no validation error. */
   hint: string
   /** react-hook-form field error — replaces the hint when present. */
@@ -36,14 +37,14 @@ type FormFieldHintOrErrorProps = Readonly<{
  * Shows a hint below a field when valid, or an error message (with icon) when invalid.
  * Use for fields where a persistent hint should be replaced by the validation error.
  */
-export function FormFieldHintOrError({ error, hint }: FormFieldHintOrErrorProps) {
+export function FormFieldHintOrError({ error, hint, id }: FormFieldHintOrErrorProps) {
   if (error) {
-    return <FormFieldError error={error} />
+    return <FormFieldError id={id} error={error} />
   }
   return (
     <FormHelperText>
       <HelperText>
-        <HelperTextItem>{hint}</HelperTextItem>
+        <HelperTextItem id={id}>{hint}</HelperTextItem>
       </HelperText>
     </FormHelperText>
   )
