@@ -54,6 +54,7 @@ export function TypeaheadMenuToggle({
     <MenuToggle
       ref={toggleRef}
       variant="typeahead"
+      tabIndex={-1}
       isExpanded={isOpen}
       isDisabled={isDisabled || isPending}
       isFullWidth

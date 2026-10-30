@@ -193,7 +193,7 @@ describe('Kafka Subscribe form', () => {
     await waitFor(() => expect(toggle).toBeEnabled())
     toggle.focus()
     await user.keyboard('{Enter}')
-    await user.click(screen.getByRole('option', { name: 'Other Kafka' }))
+    await user.keyboard('{ArrowDown}{ArrowDown}{Enter}')
     expect(screen.getByRole('button', { name: 'Set up connection' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Kafka runtime credential' })).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveFocus()
