@@ -200,6 +200,16 @@ function getUsernameFromRequest(request: Request): string {
   return 'admin'
 }
 
+/** Matches can_i: admin/demo (and other default-allow personas) may write; auditor is read-only. */
+function canWriteExecutionTarget(username: string): boolean {
+  return username === 'admin' || username === 'demo'
+}
+
+/** Matches can_i: admin/demo/auditor may read. */
+function canReadExecutionTarget(username: string): boolean {
+  return username === 'admin' || username === 'demo' || username === 'auditor'
+}
+
 const randomCharacters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const randomCharactersLowercase = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
@@ -427,9 +437,8 @@ export const handlers = [
 
   http.get('/api/execution_plane/v1/execution_targets', ({ request }) => {
     const username = getUsernameFromRequest(request)
-    // Match backend role conventions: only admin/auditor have execution_target:read
-    // (project-admin / padmin are denied — same as can_i without a project grant).
-    if (username !== 'admin' && username !== 'auditor') {
+    // Align with can_i: admin/demo/auditor may read (viewer/user/project personas denied).
+    if (!canReadExecutionTarget(username)) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/forbidden',
@@ -539,7 +548,7 @@ export const handlers = [
 
   http.get('/api/execution_plane/v1/execution_targets/:target_id', ({ request, params }) => {
     const username = getUsernameFromRequest(request)
-    if (username !== 'admin' && username !== 'auditor') {
+    if (!canReadExecutionTarget(username)) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/forbidden',
@@ -570,7 +579,8 @@ export const handlers = [
 
   http.post('/api/execution_plane/v1/execution_targets', async ({ request }) => {
     const username = getUsernameFromRequest(request)
-    if (username !== 'admin') {
+    // Align with can_i (admin/demo allowed); otherwise create form is reachable then POST 403s.
+    if (!canWriteExecutionTarget(username)) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/forbidden',
@@ -680,7 +690,7 @@ export const handlers = [
 
   http.delete('/api/execution_plane/v1/execution_targets/:target_id', ({ request, params }) => {
     const username = getUsernameFromRequest(request)
-    if (username !== 'admin') {
+    if (!canWriteExecutionTarget(username)) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/forbidden',

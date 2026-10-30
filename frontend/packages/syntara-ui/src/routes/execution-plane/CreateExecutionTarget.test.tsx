@@ -111,7 +111,24 @@ describe('CreateExecutionTarget', () => {
     expect(queryParams).toMatchObject({
       integration_type: 'openshift',
       limit: 1,
+      include_total: true,
     })
+  })
+
+  it('does not show a cluster name when more than one OpenShift integration exists', async () => {
+    vi.mocked(integrationsClient.useQuery).mockReturnValue({
+      data: { resources: [OPENSHIFT_INTEGRATION], next: null, prev: null, total: 2 },
+      isPending: false,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn(),
+    } as ReturnType<typeof integrationsClient.useQuery>)
+
+    render(<CreateExecutionTarget />, { wrapper })
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Configure execution target' })).toBeInTheDocument()
+    expect(screen.queryByText('prod-openshift-east')).not.toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument()
   })
 
   it('does not submit when required fields are empty', async () => {
@@ -211,13 +228,10 @@ describe('CreateExecutionTarget', () => {
     expect(navigatedToDetail).toBe(false)
   })
 
-  it('navigates back to the list when Cancel is clicked', async () => {
-    const user = userEvent.setup()
+  it('renders Cancel as a link to the execution plane list', async () => {
     render(<CreateExecutionTarget />, { wrapper })
 
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
-
-    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.ExecutionPlane.Root })
+    expect(await screen.findByRole('link', { name: 'Cancel' })).toHaveAttribute('href', AppRoute.ExecutionPlane.Root)
   })
 
   it('has no accessibility violations', async () => {

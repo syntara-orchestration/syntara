@@ -13,22 +13,17 @@
  * - Skipped when Execution Plane API is unreachable (compose CI does not start it)
  * - Create/cluster assertions skipped without exactly one OpenShift integration
  */
-import { test, expect, toAppUrl, appBaseUrl, type Page } from './fixtures'
-import { hasSingleOpenShiftIntegration, isExecutionPlaneListReachable } from './helpers/execution-plane'
+import { test, expect, toAppUrl, type Page } from './fixtures'
+import {
+  createExecutionTargetViaApi,
+  deleteExecutionTargetViaApi,
+  hasSingleOpenShiftIntegration,
+  isExecutionPlaneListReachable,
+} from './helpers/execution-plane'
 import { buildUniqueName } from './helpers/workflows'
-import { getAuthToken } from './utils/api'
 
 const LIST_URL = '/execution-plane'
 const CREATE_URL = '/execution-plane/create'
-const SEEDED_TARGET_NAME = 'Prod OpenShift West'
-
-async function deleteExecutionTarget(app: Page, targetId: string): Promise<void> {
-  const token = await getAuthToken(app)
-  if (!token) return
-
-  const url = new URL(`/api/execution_plane/v1/execution_targets/${targetId}`, appBaseUrl).toString()
-  await app.request.delete(url, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
-}
 
 async function openCreateForm(app: Page): Promise<void> {
   await app.goto(toAppUrl(LIST_URL))
@@ -86,7 +81,7 @@ test.describe('Execution Plane — configure execution target', { tag: '@pr-chec
       await expect(app.getByRole('heading', { level: 1, name })).toBeVisible()
       await expect(app).toHaveURL(new RegExp(`/execution-plane/${createdId}$`))
     } finally {
-      if (createdId) await deleteExecutionTarget(app, createdId)
+      if (createdId) await deleteExecutionTargetViaApi(app, createdId)
     }
   })
 
@@ -104,23 +99,45 @@ test.describe('Execution Plane — configure execution target', { tag: '@pr-chec
   test('keeps form values when create fails with a duplicate name', async ({ app }) => {
     test.skip(!(await hasSingleOpenShiftIntegration(app)), 'Requires exactly one OpenShift integration')
 
-    await openCreateForm(app)
+    const name = buildUniqueName('e2e-et-dup')
+    let fixtureId: string | null = null
+    let accidentalCreateId: string | null = null
 
-    await app.getByRole('textbox', { name: 'Execution target name' }).fill(SEEDED_TARGET_NAME)
-    await app.getByRole('textbox', { name: 'Execution namespace' }).fill('aao-execution')
-    await app.getByRole('button', { name: 'Configure execution target' }).click()
+    try {
+      const fixture = await createExecutionTargetViaApi(app, { name })
+      fixtureId = fixture.id
 
-    await expect(app.getByText(/failed to configure execution target/i)).toBeVisible()
-    await expect(app.getByRole('textbox', { name: 'Execution target name' })).toHaveValue(SEEDED_TARGET_NAME)
-    await expect(app.getByRole('textbox', { name: 'Execution namespace' })).toHaveValue('aao-execution')
-    await expect(app).toHaveURL(new RegExp(`${CREATE_URL}$`))
+      await openCreateForm(app)
+
+      await app.getByRole('textbox', { name: 'Execution target name' }).fill(name)
+      await app.getByRole('textbox', { name: 'Execution namespace' }).fill('aao-execution')
+
+      const createResponse = app.waitForResponse(
+        (res) => res.request().method() === 'POST' && res.url().includes('/api/execution_plane/v1/execution_targets')
+      )
+      await app.getByRole('button', { name: 'Configure execution target' }).click()
+      const response = await createResponse
+      if (response.status() === 201) {
+        const body = (await response.json()) as { id?: string }
+        accidentalCreateId = body.id ?? null
+      }
+      expect(response.status(), 'duplicate create should be rejected').toBe(409)
+
+      await expect(app.getByText(/failed to configure execution target/i)).toBeVisible()
+      await expect(app.getByRole('textbox', { name: 'Execution target name' })).toHaveValue(name)
+      await expect(app.getByRole('textbox', { name: 'Execution namespace' })).toHaveValue('aao-execution')
+      await expect(app).toHaveURL(new RegExp(`${CREATE_URL}$`))
+    } finally {
+      if (accidentalCreateId) await deleteExecutionTargetViaApi(app, accidentalCreateId)
+      if (fixtureId) await deleteExecutionTargetViaApi(app, fixtureId)
+    }
   })
 
   test('prompts to discard unsaved changes when Cancel is clicked', async ({ app }) => {
     await openCreateForm(app)
 
     await app.getByRole('textbox', { name: 'Execution target name' }).fill(buildUniqueName('e2e-et-dirty'))
-    await app.getByRole('button', { name: 'Cancel' }).click()
+    await app.getByRole('link', { name: 'Cancel' }).click()
 
     const dialog = app.getByRole('dialog')
     await expect(dialog).toBeVisible()

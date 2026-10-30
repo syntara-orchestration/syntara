@@ -10,6 +10,7 @@ import { SynForm } from '../../components/forms/SynForm'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
+import { SynLink } from '../../components/SynLink'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../hooks/useDirtyFormGuard'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
@@ -18,6 +19,7 @@ import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
 
+import styles from './CreateExecutionTarget.module.css'
 import { CreateExecutionTargetFields } from './CreateExecutionTargetFields'
 import {
   EXECUTION_TARGET_FORM_DEFAULT_VALUES,
@@ -44,8 +46,7 @@ export function CreateExecutionTarget() {
   })
 
   const openshiftIntegrations = clusterQuery.data?.resources
-  const clusterName =
-    openshiftIntegrations?.length === 1 ? openshiftIntegrations[0]?.name?.trim() || undefined : undefined
+  const clusterName = clusterQuery.data?.total === 1 ? openshiftIntegrations?.[0]?.name?.trim() || undefined : undefined
 
   const form = useSynForm({
     schema: executionTargetFormSchema,
@@ -57,8 +58,6 @@ export function CreateExecutionTarget() {
     reset,
     formState: { isDirty },
   } = form
-
-  const navigateBack = () => detachPromise(navigate({ to: AppRoute.ExecutionPlane.Root }))
 
   const { dismiss } = useDirtyFormGuard({
     isDirty,
@@ -111,14 +110,23 @@ export function CreateExecutionTarget() {
               >
                 Configure execution target
               </Button>
-              <Button variant="link" onClick={navigateBack} isDisabled={isSaving}>
+              <SynLink
+                to={AppRoute.ExecutionPlane.Root}
+                onClick={
+                  isSaving
+                    ? (event) => {
+                        event.preventDefault()
+                      }
+                    : undefined
+                }
+              >
                 Cancel
-              </Button>
+              </SynLink>
             </ActionGroup>
           }
-          panelMainBodyProps={{ style: { padding: 'var(--pf-t--global--spacer--xl)' } }}
+          panelMainBodyProps={{ className: styles.panelBody }}
         >
-          <Stack style={{ maxWidth: '600px' }}>
+          <Stack className={styles.formStack}>
             <Form id="execution-target-create-form" onSubmit={handleSubmit(onSubmit)}>
               <SynForm form={form}>
                 <CreateExecutionTargetFields clusterName={clusterName} isClusterPending={clusterQuery.isPending} />
