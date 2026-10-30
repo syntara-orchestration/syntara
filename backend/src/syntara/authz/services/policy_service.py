@@ -10,9 +10,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.authz.audit.policy_lifecycle import PolicyLifecycleEvent
+from syntara.authz.deny_eligibility import validate_deny_statements
 from syntara.authz.exceptions import (
     BuiltinProtectionError,
-    DenyEffectNotSupportedError,
+    DenyEffectNotAllowedError,
+    InvalidNodeKindError,
     InvalidResourceActionError,
     PolicyNameConflictError,
     PolicyNotFoundError,
@@ -84,20 +86,14 @@ class PolicyService(BaseService):
             raise InvalidResourceActionError(msg)
         error = validate_node_kind_statements(statements)
         if error:
-            raise InvalidResourceActionError(error)
+            raise InvalidNodeKindError(error)
 
     @staticmethod
-    def _validate_no_deny_effect(statements: list[dict[str, Any]]) -> None:
-        """Reject deny-effect statements (AAP-74620).
-
-        Deny-effect policies are not yet supported. A project-scoped deny
-        can lock out higher-privileged users because deny unconditionally
-        overrides allow in Rego. Re-enable when scoped deny controls are
-        implemented (e.g. admin-only via policy:create-deny permission).
-        """
-        if any(s.get("effect") == "deny" for s in statements):
-            msg = "Deny-effect policies are not supported. Use allow-effect policies only."
-            raise DenyEffectNotSupportedError(msg)
+    def _validate_deny_effect(statements: list[dict[str, Any]]) -> None:
+        """Allow step-type denies while preserving recovery permissions (AAP-74620)."""
+        error = validate_deny_statements(statements)
+        if error:
+            raise DenyEffectNotAllowedError(error)
 
     @staticmethod
     def _validate_project_statements(statements: list[dict[str, Any]]) -> None:
@@ -122,7 +118,7 @@ class PolicyService(BaseService):
 
             await assert_project_alive(self.session, project_id)
 
-        self._validate_no_deny_effect(statements)
+        self._validate_deny_effect(statements)
         self._validate_resource_actions(statements)
         if project_id is not None:
             self._validate_project_statements(statements)
@@ -437,6 +433,12 @@ class PolicyService(BaseService):
             msg = "Cannot modify builtin policy"
             raise BuiltinProtectionError(msg)
 
+        if statements is not None:
+            self._validate_deny_effect(statements)
+            self._validate_resource_actions(statements)
+            if policy.project_id is not None:
+                self._validate_project_statements(statements)
+
         if name is not None and name != policy.name:
             if is_builtin_policy(name):
                 msg = f"Policy name '{name}' is reserved for a built-in policy"
@@ -448,10 +450,6 @@ class PolicyService(BaseService):
         if description is not None:
             policy.description = description
         if statements is not None:
-            self._validate_no_deny_effect(statements)
-            self._validate_resource_actions(statements)
-            if policy.project_id is not None:
-                self._validate_project_statements(statements)
             policy.statements = statements
             policy.scope = self._derive_scope_from_statements(statements)
         if labels is not None:

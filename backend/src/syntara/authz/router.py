@@ -838,9 +838,9 @@ async def can_i(
     return CanIResponse(
         allowed=result.allowed,
         denied=result.denied,
-        matched_policy=result.matched_policy,
+        matched_policy=result.policy_name(result.matched_policy),
         denial_reason=result.denial_reason,
-        denied_by=result.denied_by,
+        denied_by=result.policy_name(result.denied_by),
     )
 
 
@@ -1010,7 +1010,7 @@ async def what_can_i(
 
     permissions = [
         PermissionEntry(
-            policy_name=p.get("name", ""),
+            policy_name=p.get("policy_name", p.get("name", "")),
             effect=p.get("effect", ""),
             actions=p.get("actions", []),
             scope=p.get("scope", ""),

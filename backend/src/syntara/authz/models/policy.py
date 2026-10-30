@@ -122,17 +122,19 @@ class Policy(BaseResource, table=True):
 
         Single-statement policies use the policy name as-is.
         Multi-statement policies derive names: "policyname/0", "policyname/1".
+        Original policy names and statement indexes remain structured metadata.
 
         Returns:
             List of statement dicts with name, effect, actions, scope, conditions.
 
         """
         stmts: list[dict[str, Any]] = self.statements if isinstance(self.statements, list) else []
-        if len(stmts) == 1:
-            d: dict[str, Any] = {**stmts[0], "name": self.name}
-            return [d]
-        result: list[dict[str, Any]] = []
-        for i, s in enumerate(stmts):
-            d = {**s, "name": f"{self.name}/{i}"}
-            result.append(d)
-        return result
+        return [
+            {
+                **statement,
+                "name": self.name if len(stmts) == 1 else f"{self.name}/{i}",
+                "policy_name": self.name,
+                "statement_index": i,
+            }
+            for i, statement in enumerate(stmts)
+        ]

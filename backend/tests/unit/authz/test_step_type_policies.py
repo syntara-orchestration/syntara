@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.dependencies import PermissionChecker
-from syntara.authz.exceptions import InvalidResourceActionError
+from syntara.authz.exceptions import DenyEffectNotAllowedError, InvalidResourceActionError
 from syntara.authz.models.policy import Policy
 from syntara.authz.policy_router import get_policy_service, router
 from syntara.authz.resource_actions import get_resource_actions
@@ -53,6 +53,7 @@ def test_resource_actions_endpoint_lists_only_write(policy_client: tuple[TestCli
 
 
 @pytest.mark.parametrize("method", ["POST", "PATCH", "PUT"])
+@pytest.mark.parametrize("effect", ["allow", "deny"])
 @pytest.mark.parametrize(
     ("conditions", "message"),
     [
@@ -67,6 +68,7 @@ def test_resource_actions_endpoint_lists_only_write(policy_client: tuple[TestCli
 def test_invalid_step_type_returns_422(
     policy_client: tuple[TestClient, PolicyService, AsyncMock],
     method: str,
+    effect: str,
     conditions: dict[str, Any],
     message: str,
 ) -> None:
@@ -79,7 +81,7 @@ def test_invalid_step_type_returns_422(
         json={
             "name": "step-policy",
             "statements": [
-                {"effect": "allow", "scope": "project", "actions": ["step_type:write"], "conditions": conditions}
+                {"effect": effect, "scope": "project", "actions": ["step_type:write"], "conditions": conditions}
             ],
         },
     )
@@ -90,13 +92,19 @@ def test_invalid_step_type_returns_422(
 
 
 @pytest.mark.parametrize("method", ["POST", "PATCH", "PUT"])
+@pytest.mark.parametrize("effect", ["allow", "deny"])
+@pytest.mark.parametrize("scope", ["any", "project"])
 @pytest.mark.parametrize("conditions", [None, {"resource_labels": {"kind": "manual_trigger"}}])
 def test_valid_step_policy_accepted(
-    policy_client: tuple[TestClient, PolicyService, AsyncMock], method: str, conditions: dict[str, Any] | None
+    policy_client: tuple[TestClient, PolicyService, AsyncMock],
+    method: str,
+    effect: str,
+    scope: str,
+    conditions: dict[str, Any] | None,
 ) -> None:
     """A project-scoped kind or an unrestricted statement can be persisted."""
     client, _, session = policy_client
-    statement = {"effect": "allow", "scope": "project", "actions": ["step_type:write"], "conditions": conditions}
+    statement = {"effect": effect, "scope": scope, "actions": ["step_type:write"], "conditions": conditions}
     response = client.request(
         method,
         "/policies" if method == "POST" else f"/policies/{uuid4()}",
@@ -125,4 +133,41 @@ async def test_direct_service_call_rejects_invalid_kind(
                 }
             ],
         )
+    session.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("method", ["POST", "PATCH", "PUT"])
+@pytest.mark.parametrize("action", ["step_type:*", "step_type:execute", "workflow:read", "policy:delete"])
+def test_ineligible_deny_returns_422(
+    policy_client: tuple[TestClient, PolicyService, AsyncMock], method: str, action: str
+) -> None:
+    client, _, session = policy_client
+    response = client.request(
+        method,
+        "/policies" if method == "POST" else f"/policies/{uuid4()}",
+        json={"name": "step-policy", "statements": [{"effect": "deny", "scope": "any", "actions": [action]}]},
+    )
+    assert response.status_code == 422
+    assert action in str(response.json())
+    session.commit.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("update", [False, True])
+@pytest.mark.parametrize(
+    ("actions", "scope"), [(["policy:delete"], "any"), (["step_type:*"], "any"), (["step_type:write"], "self")]
+)
+async def test_direct_service_deny_validation_precedes_mutation(
+    policy_client: tuple[TestClient, PolicyService, AsyncMock], actions: list[str], scope: str, *, update: bool
+) -> None:
+    _, service, session = policy_client
+    policy = await service.get_policy(uuid4())
+    statements = [{"effect": "deny", "actions": actions, "scope": scope}]
+    with pytest.raises(DenyEffectNotAllowedError):
+        if update:
+            await service.update_policy(policy.id, name="renamed-policy", description="changed", statements=statements)
+        else:
+            await service.create_policy("invalid-deny", statements)
+    assert policy.name == "step-policy"
+    assert policy.statements == []
     session.commit.assert_not_called()
