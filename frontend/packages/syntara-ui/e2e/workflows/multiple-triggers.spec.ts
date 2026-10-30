@@ -55,8 +55,8 @@ test.describe('Multiple triggers', () => {
       const runToggle = app.getByRole('button', { name: 'Run workflow' })
       await expect(runToggle).toBeVisible()
       await runToggle.click()
-      await expect(app.getByRole('menuitem', { name: TRIGGER_NAME })).toBeVisible()
-      await expect(app.getByRole('menuitem', { name: SECONDARY_TRIGGER_NAME })).toBeVisible()
+      await expect(app.getByRole('menuitem', { name: TRIGGER_NAME, exact: true })).toBeVisible()
+      await expect(app.getByRole('menuitem', { name: SECONDARY_TRIGGER_NAME, exact: true })).toBeVisible()
     } finally {
       await deleteWorkflowViaApi(app, workflowId)
     }
@@ -76,7 +76,7 @@ test.describe('Multiple triggers', () => {
       await openBuilderById(app, workflowId)
       await expectCanvasStepTitleVisible(app, TRIGGER_NAME, { timeout: 30_000 })
       await app.getByRole('button', { name: 'Run workflow' }).click()
-      await app.getByRole('menuitem', { name: TRIGGER_NAME }).click()
+      await app.getByRole('menuitem', { name: TRIGGER_NAME, exact: true }).click()
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('heading', { name: 'Run workflow?' })).toBeVisible()
@@ -105,8 +105,8 @@ test.describe('Multiple triggers', () => {
       await expectCanvasStepTitleVisible(app, TRIGGER_NAME, { timeout: 30_000 })
       await app.getByRole('button', { name: 'Run workflow' }).click()
       // trigger.name ?? `Trigger ${index + 1}` — unnamed trigger at index 1 becomes "Trigger 2"
-      await expect(app.getByRole('menuitem', { name: TRIGGER_NAME })).toBeVisible()
-      await expect(app.getByRole('menuitem', { name: 'Trigger 2' })).toBeVisible()
+      await expect(app.getByRole('menuitem', { name: TRIGGER_NAME, exact: true })).toBeVisible()
+      await expect(app.getByRole('menuitem', { name: 'Trigger 2', exact: true })).toBeVisible()
     } finally {
       await deleteWorkflowViaApi(app, workflowId)
     }

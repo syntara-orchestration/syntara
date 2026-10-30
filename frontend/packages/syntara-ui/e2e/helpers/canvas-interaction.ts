@@ -24,7 +24,11 @@ export async function layoutCanvas(page: Page) {
 }
 
 export function canvasStepNode(page: Page, stepName: string) {
-  return page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
+  // Match the title heading, not any text. Type subtitles repeat across steps
+  // (every manual trigger subtitle is "Manual trigger").
+  return page.locator('[role="group"][aria-roledescription="node"]').filter({
+    has: page.getByRole('heading', { name: stepName, exact: true }),
+  })
 }
 
 /** Primary title on a canvas step node (subtitle may repeat the name under StandardStepHeader). */

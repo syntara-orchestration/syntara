@@ -25,7 +25,6 @@ import {
   createWorkflowWithTrigger,
   deleteWorkflow,
   openWorkflowInBuilder,
-  openStepForEditing,
 } from './helpers/workflows'
 import { deleteWorkflowViaApi } from './utils/api'
 
@@ -207,13 +206,15 @@ test.describe('Validation error panel', () => {
 
       await expect(app.getByText(/Verification failed/)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
 
-      await app.getByRole('button', { name: /alert details/i }).click()
+      await app.getByRole('button', { name: /Danger alert details/i }).click()
 
-      const nodeLink = app.getByRole('button', { name: stepName })
+      const nodeLink = app.getByRole('button', { name: stepName, exact: true })
       await expect(nodeLink).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
       await nodeLink.click()
 
-      await openStepForEditing(app, stepName)
+      await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(stepName, {
+        timeout: VERIFY_BANNER_TIMEOUT,
+      })
     } finally {
       await app.unroute(VALIDATE_ROUTE)
       await deleteWorkflow(app, workflowName)
