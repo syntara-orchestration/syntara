@@ -19,6 +19,7 @@ import {
 } from '../../src/components/expressions/expressionBuilderLabels'
 import { expect, type Page } from '../fixtures'
 
+import { canvasStepNode, clickCanvasStepToOpenEditor } from './canvas-interaction'
 import {
   ensureLlmCredential,
   ensureAapIntegration,
@@ -34,7 +35,6 @@ import {
   openStepForEditing,
   triggerLayout,
 } from './workflows'
-import { canvasStepNode, clickCanvasStepToOpenEditor } from './canvas-interaction'
 
 export { ensureLlmCredential, createLlmIntegration, deleteLlmIntegration, selectLlmCredential }
 

@@ -9,7 +9,7 @@ import { expect, type Page } from '@playwright/test'
 
 import { AppRoute } from '../../src/app/AppRoute'
 import { toAppUrl } from '../fixtures'
-import { canvasStepNode, clickCanvasStepToOpenEditor } from '../helpers/canvas-interaction'
+import { clickCanvasStepToOpenEditor } from '../helpers/canvas-interaction'
 
 import { MOCK_IDENTITY_PROVIDER_ID } from './mock-ids'
 import type { CanvasPageEntry, PageEntry } from './page-registry'
@@ -97,7 +97,10 @@ async function openStepEditorFromCanvasTitle(page: Page, title: string | RegExp)
   if (typeof title === 'string') {
     await clickCanvasStepToOpenEditor(node, title)
   } else {
-    await node.getByRole('button', { name: /^Edit / }).first().click({ timeout: 5_000 })
+    await node
+      .getByRole('button', { name: /^Edit / })
+      .first()
+      .click({ timeout: 5_000 })
   }
   // Do not key off the header Name field alone — with onHeaderContentChange the
   // toolbar can show a Name input without the three-panel step editor mounting,
