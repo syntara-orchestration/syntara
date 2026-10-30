@@ -1,6 +1,7 @@
 import { Content, ContentVariants } from '@patternfly/react-core'
 import { RhUiExternalLinkIcon } from '@patternfly/react-icons'
 import { Thead, Th, Tbody, Td, Tr } from '@patternfly/react-table'
+import { ActivityTypeEnum } from '@syntara/contracts'
 import type React from 'react'
 import { Fragment, useMemo } from 'react'
 
@@ -8,6 +9,8 @@ import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
 import { formatElapsedTime } from '../../utils/dateUtils'
+import { extractSubWorkflowChild } from '../workflows/execution/subWorkflowChild'
+import { SubWorkflowRunLink } from '../workflows/execution/SubWorkflowRunLink'
 import type { ActivityState } from '../workflows/execution/types'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
@@ -79,6 +82,45 @@ function AAPJobLink({ url }: Readonly<{ url: string }>) {
   )
 }
 
+function ActivityNameCell({
+  displayName,
+  type,
+  state,
+}: Readonly<{ displayName: string; type?: string; state?: ActivityState }>) {
+  const subWorkflowChild = type === ActivityTypeEnum.SUB_WORKFLOW ? extractSubWorkflowChild(state?.outputData) : null
+  return (
+    <Td dataLabel="Name">
+      {displayName}
+      {subWorkflowChild && (
+        <div style={{ marginTop: 'var(--pf-t--global--spacer--xs)' }}>
+          <SubWorkflowRunLink
+            childExecutionId={subWorkflowChild.childExecutionId}
+            childName={subWorkflowChild.childName}
+          />
+        </div>
+      )}
+    </Td>
+  )
+}
+
+function ActivityErrorRow({
+  errorDetails,
+  executionError,
+  hasAAPColumn,
+}: Readonly<{ errorDetails?: string | null; executionError?: string | null; hasAAPColumn: boolean }>) {
+  if (!errorDetails || errorDetails === executionError) return null
+  const columnCount = hasAAPColumn ? 6 : 5
+  return (
+    <Tr>
+      <Td colSpan={columnCount} style={{ paddingTop: 0 }}>
+        <Content component={ContentVariants.small} style={ERROR_STYLE}>
+          {errorDetails}
+        </Content>
+      </Td>
+    </Tr>
+  )
+}
+
 function ActivityRow({
   id,
   name,
@@ -103,7 +145,6 @@ function ActivityRow({
   const elapsedMs = computeActivityDurationMs(state, now) ?? undefined
   const displayName = name ?? id
   const jobUrl = isAAPNodeType(type) ? extractAAPJobUrl(state?.outputData) : null
-  const columnCount = hasAAPColumn ? 6 : 5
 
   return (
     <Fragment>
@@ -112,7 +153,7 @@ function ActivityRow({
         onRowClick={onRowClick ? () => onRowClick(id, displayName) : undefined}
         isRowSelected={isSelected}
       >
-        <Td dataLabel="Name">{displayName}</Td>
+        <ActivityNameCell displayName={displayName} type={type} state={state} />
         <Td dataLabel="Started">{state?.startedAt ? <ExecutionTimestamp dateString={state.startedAt} /> : DASH}</Td>
         <Td dataLabel="Ended">{state?.completedAt ? <ExecutionTimestamp dateString={state.completedAt} /> : DASH}</Td>
         <Td dataLabel="Elapsed time">{elapsedMs === undefined ? DASH : formatElapsedTime(elapsedMs)}</Td>
@@ -121,15 +162,11 @@ function ActivityRow({
         </Td>
         {hasAAPColumn && <Td dataLabel="AAP Job">{jobUrl ? <AAPJobLink url={jobUrl} /> : null}</Td>}
       </Tr>
-      {state?.errorDetails && state.errorDetails !== executionError && (
-        <Tr>
-          <Td colSpan={columnCount} style={{ paddingTop: 0 }}>
-            <Content component={ContentVariants.small} style={ERROR_STYLE}>
-              {state.errorDetails}
-            </Content>
-          </Td>
-        </Tr>
-      )}
+      <ActivityErrorRow
+        errorDetails={state?.errorDetails}
+        executionError={executionError}
+        hasAAPColumn={hasAAPColumn}
+      />
     </Fragment>
   )
 }

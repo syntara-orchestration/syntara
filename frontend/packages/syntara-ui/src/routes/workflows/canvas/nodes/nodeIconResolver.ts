@@ -38,24 +38,37 @@ export function getTaskIconDescriptor(taskData: TaskActivity): IconDescriptor {
   return { icon: executorMeta?.icon, id: iconId }
 }
 
+const TRIGGER_ICON_DESCRIPTORS: Readonly<Record<string, IconDescriptor>> = {
+  [TriggerTypeEnum.SCHEDULED]: { icon: nodeMetadata.scheduledTrigger.icon, id: RegistryNodeId.TRIGGER_SCHEDULED },
+  [TriggerTypeEnum.WEBHOOK_TRIGGER]: { icon: nodeMetadata.webhookTrigger.icon, id: RegistryNodeId.TRIGGER_WEBHOOK },
+  [TriggerTypeEnum.EDA_TRIGGER]: { icon: nodeMetadata.edaTrigger.icon, id: RegistryNodeId.TRIGGER_EDA },
+  [TriggerTypeEnum.SUBWORKFLOW_TRIGGER]: {
+    icon: nodeMetadata.subWorkflowTrigger.icon,
+    id: RegistryNodeId.TRIGGER_SUBWORKFLOW,
+  },
+}
+
+function resolveTriggerIconDescriptor(
+  node: Pick<Node<NodeType['data']>, 'id' | 'type' | 'data'>,
+  currentWorkflow?: { triggers?: Array<{ type?: string }> } | null
+): IconDescriptor {
+  const triggerIndex = parseTriggerIndex(node.id) ?? 0
+  const triggerType =
+    currentWorkflow?.triggers?.[triggerIndex]?.type ?? (node.data as { triggerType?: string }).triggerType
+  return (
+    (triggerType ? TRIGGER_ICON_DESCRIPTORS[triggerType] : undefined) ?? {
+      icon: nodeMetadata.trigger.icon,
+      id: RegistryNodeId.TRIGGER_MANUAL,
+    }
+  )
+}
+
 export function getCanvasNodeIconDescriptor(
   node: Pick<Node<NodeType['data']>, 'id' | 'type' | 'data'>,
   currentWorkflow?: { triggers?: Array<{ type?: string }> } | null
 ): IconDescriptor {
   if (node.type === 'trigger') {
-    const triggerIndex = parseTriggerIndex(node.id) ?? 0
-    const triggerType =
-      currentWorkflow?.triggers?.[triggerIndex]?.type ?? (node.data as { triggerType?: string }).triggerType
-    if (triggerType === TriggerTypeEnum.SCHEDULED) {
-      return { icon: nodeMetadata.scheduledTrigger.icon, id: RegistryNodeId.TRIGGER_SCHEDULED }
-    }
-    if (triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER) {
-      return { icon: nodeMetadata.webhookTrigger.icon, id: RegistryNodeId.TRIGGER_WEBHOOK }
-    }
-    if (triggerType === TriggerTypeEnum.EDA_TRIGGER) {
-      return { icon: nodeMetadata.edaTrigger.icon, id: RegistryNodeId.TRIGGER_EDA }
-    }
-    return { icon: nodeMetadata.trigger.icon, id: RegistryNodeId.TRIGGER_MANUAL }
+    return resolveTriggerIconDescriptor(node, currentWorkflow)
   }
 
   if (node.type === 'condition') {

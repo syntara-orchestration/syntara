@@ -24,7 +24,20 @@ export type WorkflowDefShape = {
   workflow?: { activities?: ActivityLike[] }
   /** v2 format stores nodes at top level */
   nodes?: ActivityLike[]
+  /** v2 format stores triggers separately from nodes; needed so trigger types reach typeMap */
+  triggers?: ActivityLike[]
   edges?: Array<WorkflowDefEdge | Record<string, unknown>>
+}
+
+/**
+ * A node/trigger type is a trigger when its type ends in `_trigger`
+ * (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger,
+ * subworkflow_trigger). This mirrors the backend's own convention
+ * (`node.type.endswith("_trigger")`) and is used to exclude triggers from the
+ * run's executable activity list.
+ */
+export function isTriggerActivityType(type: string | null | undefined): boolean {
+  return typeof type === 'string' && type.endsWith('_trigger')
 }
 
 const CHILD_KEYS: (keyof ActivityLike)[] = ['steps', 'then', 'else']
@@ -101,14 +114,19 @@ function buildDefinitionNameMap(def: WorkflowDefShape | null | undefined): {
 } {
   const fromActivities = buildNameMap(def?.workflow?.activities)
   const fromNodes = buildNameMap(def?.nodes)
-  if (fromNodes.nameMap.size === 0) return fromActivities
+  // Triggers are stored in a separate top-level `triggers` array in v2 (not in
+  // `nodes`), so merge them in explicitly; otherwise a trigger row in the
+  // activity list has no type and cannot be classified as a trigger.
+  const fromTriggers = buildNameMap(def?.triggers)
   const mergedNames = new Map(fromActivities.nameMap)
   const mergedTypes = new Map(fromActivities.typeMap)
-  for (const [id, name] of fromNodes.nameMap) {
-    mergedNames.set(id, name)
-  }
-  for (const [id, type] of fromNodes.typeMap) {
-    mergedTypes.set(id, type)
+  for (const source of [fromNodes, fromTriggers]) {
+    for (const [id, name] of source.nameMap) {
+      mergedNames.set(id, name)
+    }
+    for (const [id, type] of source.typeMap) {
+      mergedTypes.set(id, type)
+    }
   }
   return { nameMap: mergedNames, typeMap: mergedTypes }
 }

@@ -28,7 +28,7 @@ import styles from './ExecutionDetailsPanel.module.css'
 import { HeaderMetadata, LoadingErrorState, NoSelectionState, type ViewMode } from './ExecutionDetailsPanelHeader'
 import { useSelectedActivity } from './hooks/useSelectedActivity'
 import { useActivityFilters } from './useActivityFilters'
-import { useActivityNameMap, type WorkflowDefShape } from './useActivityNameMap'
+import { isTriggerActivityType, useActivityNameMap, type WorkflowDefShape } from './useActivityNameMap'
 
 export type { WorkflowDefShape } from './useActivityNameMap'
 
@@ -350,20 +350,30 @@ export function ExecutionDetailsPanel({
 
   const { nameMap, activityOrder } = useActivityNameMap(workflowDefinition, activityStates)
 
+  // The run's activity list shows executable steps only; triggers (e.g. the
+  // manual "start" row) are excluded. Filter them out once here so the Overview
+  // table and the Details list stay consistent. This hides trigger rows from
+  // the list only — their ActivityExecution records are untouched and their
+  // data remains available (e.g. Invocation details).
+  const executableActivityOrder = useMemo(
+    () => activityOrder.filter((item) => !isTriggerActivityType(item.type)),
+    [activityOrder]
+  )
+
   const { filters, filteredActivityOrder, handleFilterChange, hasActiveFilters } = useActivityFilters(
-    activityOrder,
+    executableActivityOrder,
     activityStates
   )
 
-  const hasFilteredOutActivities = hasActiveFilters && activityOrder.length > 0
-  const showFilters = activityOrder.length > 0 || hasActiveFilters
+  const hasFilteredOutActivities = hasActiveFilters && executableActivityOrder.length > 0
+  const showFilters = executableActivityOrder.length > 0 || hasActiveFilters
 
   const { resolvedNodeId, effectiveKey, displayNodeName, selectedNodeState, selectedNodeType, handleRowClick } =
     useSelectedActivity({
       selectedNodeId,
       selectedNodeNameProp,
       activityStates,
-      activityOrder,
+      activityOrder: executableActivityOrder,
       nameMap,
       onNodeSelect,
     })

@@ -1,8 +1,11 @@
 import { Content, ContentVariants, Stack, StackItem } from '@patternfly/react-core'
 import { Tbody, Td, Tr } from '@patternfly/react-table'
+import { ActivityTypeEnum } from '@syntara/contracts'
 
 import { ExecutionTimeRange } from '../../components/table/ExecutionTimestamp'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
+import { extractSubWorkflowChild } from '../workflows/execution/subWorkflowChild'
+import { SubWorkflowRunLink } from '../workflows/execution/SubWorkflowRunLink'
 import type { ActivityState } from '../workflows/execution/types'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
@@ -33,6 +36,8 @@ export function CompactActivityList({
           const { baseId } = parseCompositeKey(id)
           const displayName = name ?? id
           const isSelected = baseId === selectedNodeId
+          const subWorkflowChild =
+            type === ActivityTypeEnum.SUB_WORKFLOW ? extractSubWorkflowChild(state?.outputData) : null
 
           return (
             <Tr
@@ -44,6 +49,14 @@ export function CompactActivityList({
               <Td dataLabel="Name" className={styles.nameCell}>
                 <Stack>
                   <StackItem>{displayName}</StackItem>
+                  {subWorkflowChild && (
+                    <StackItem>
+                      <SubWorkflowRunLink
+                        childExecutionId={subWorkflowChild.childExecutionId}
+                        childName={subWorkflowChild.childName}
+                      />
+                    </StackItem>
+                  )}
                   {hasTimeRange && (
                     <StackItem>
                       <Content component={ContentVariants.small} className={styles.subtleText}>

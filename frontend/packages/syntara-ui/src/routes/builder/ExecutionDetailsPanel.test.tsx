@@ -160,6 +160,54 @@ describe('ExecutionDetailsPanel', () => {
     })
   })
 
+  describe('trigger rows (executable-only activity list)', () => {
+    const WORKFLOW_DEF_WITH_TRIGGER: WorkflowDefShape = {
+      nodes: [
+        { id: 'task-1', name: 'Process data' },
+        { id: 'task-2', name: 'Send notification' },
+      ],
+      // Triggers live in a separate top-level array in v2 definitions.
+      triggers: [{ id: 'start', type: 'manual_trigger', name: 'start' }],
+    }
+
+    const EXECUTION_WITH_TRIGGER = {
+      ...EXECUTION,
+      data: {
+        ...EXECUTION.data,
+        activities: [
+          {
+            activity_id: 'start',
+            status: 'completed',
+            started_at: '2024-01-01T00:00:00Z',
+            completed_at: '2024-01-01T00:00:00Z',
+          },
+          {
+            activity_id: 'task-1',
+            status: 'completed',
+            started_at: '2024-01-01T00:00:00Z',
+            completed_at: '2024-01-01T00:01:00Z',
+          },
+          { activity_id: 'task-2', status: 'running', started_at: '2024-01-01T00:01:00Z', completed_at: null },
+        ],
+      },
+    }
+
+    it('excludes the manual trigger row while keeping executable activities', () => {
+      vi.mocked(executionsClient.useQuery).mockReturnValue({ ...EXECUTION_WITH_TRIGGER, refetch: vi.fn() })
+
+      renderPanel(WORKFLOW_DEF_WITH_TRIGGER)
+
+      // Executable nodes still render...
+      expect(screen.getByText('Process data')).toBeInTheDocument()
+      expect(screen.getByText('Send notification')).toBeInTheDocument()
+      // ...but the trigger row (persisted, not deleted) is filtered out of the list.
+      expect(screen.queryByText('start')).not.toBeInTheDocument()
+      expect(screen.getAllByTestId('activity-status-label')).toHaveLength(2)
+
+      vi.mocked(executionsClient.useQuery).mockReturnValue(EXECUTION)
+    })
+  })
+
   describe('activity table columns', () => {
     it('renders original column headers without sort controls', () => {
       renderPanel(WORKFLOW_DEF)

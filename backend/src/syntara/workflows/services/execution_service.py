@@ -933,6 +933,76 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             allowed_projects=allowed_projects,
         )
 
+    async def list_child_executions(
+        self,
+        parent_execution_id: UUID,
+        node_id: str | None = None,
+        *,
+        limit: int = 20,
+        cursor: str | None = None,
+        sort: str | None = None,
+        include_total: bool = False,
+        allowed_projects: AllowedProjectsResult | None = None,
+    ) -> ExecutionListResponse:
+        """List child (sub-workflow) executions spawned by a parent execution.
+
+        Read-only lookup that reuses the already-persisted parent-child
+        relationship: a child execution records ``parent_execution_id`` and
+        ``parent_node_id`` in its ``execution_metadata`` when the Sub-workflow
+        setup activity creates it. No new data is written.
+
+        The ``execution_metadata`` match is a JSONB filter on a small id-only
+        query; the resulting ids are then paged through the shared
+        ``list_resources`` pipeline via ``id_restriction``, so this endpoint
+        inherits cursor pagination, project-visibility scoping, eager-loaded
+        workflow metadata, and the automatic ``id`` sort tiebreaker that makes
+        ordering deterministic — including ``for_each`` children created in the
+        same instant. This deliberately avoids adding ``parent_execution_id`` /
+        ``parent_node_id`` to the model-wide ``__filterable_fields__``.
+
+        Args:
+            parent_execution_id: Parent execution whose children to list. It is
+                matched against the string stored in each child's
+                ``execution_metadata``.
+            node_id: Optional parent Sub-workflow node id, to scope results to a
+                single node. A ``for_each`` node spawns one child per iteration.
+            limit: Maximum number of children per page.
+            cursor: Cursor token for pagination.
+            sort: Sort parameter (defaults to ``created_at`` ascending).
+            include_total: Whether to include the total count.
+            allowed_projects: Optional project scope filter for authorization.
+
+        Returns:
+            ExecutionListResponse of child executions.
+
+        Raises:
+            ExecutionNotFoundError: If the parent execution does not exist.
+
+        """
+        # Verify the parent execution exists (mirrors ``list_execution_activities``);
+        # a children lookup for an unknown parent is a 404, not an empty page.
+        parent_result = await self.session.exec(select(Execution).where(Execution.id == parent_execution_id))
+        if parent_result.one_or_none() is None:
+            raise ExecutionNotFoundError(parent_execution_id)
+
+        id_query = select(Execution.id).where(
+            col(Execution.execution_metadata)["parent_execution_id"].astext == str(parent_execution_id)
+        )
+        if node_id is not None:
+            id_query = id_query.where(col(Execution.execution_metadata)["parent_node_id"].astext == node_id)
+        child_ids = list((await self.session.exec(id_query)).all())
+
+        return await self.list_resources(
+            model=Execution,
+            response_type=ExecutionListResponse,
+            limit=limit,
+            cursor=cursor,
+            sort=sort or "created_at",
+            include_total=include_total,
+            allowed_projects=allowed_projects,
+            id_restriction=child_ids,
+        )
+
     async def list_execution_activities(
         self,
         execution_id: UUID,

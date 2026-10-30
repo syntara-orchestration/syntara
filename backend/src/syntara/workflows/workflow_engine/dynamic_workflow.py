@@ -15,6 +15,7 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.exceptions import TimeoutError as TemporalTimeoutError
+from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
     from syntara.core.exceptions import SafeValueError
@@ -55,7 +56,17 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeType,
 )
 from syntara.workflows.workflow_engine.unified_eval import safe_eval_with_namespace
-from syntara.workflows.workflow_engine.utils.loop_iteration_ids import loop_control_activity_id
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
+    join_loop_iteration_id,
+    loop_control_activity_id,
+    loop_index_chain,
+)
+
+# Dedicated Temporal patch for iteration-aware sub-workflow child identity. A
+# dedicated id (not the loop-iteration patch) ensures existing in-flight
+# sub-workflow executions replay with their original activity scheduling even
+# when they already marked the loop-iteration patch via a loop or approval.
+_SUBWORKFLOW_ITERATION_IDS_PATCH = "subworkflow-iteration-unique-ids"
 
 # Trigger types allowed for dynamic dispatch via Temporal activities.
 # Each entry must have a corresponding @activity.defn with a matching name.
@@ -176,12 +187,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         self._project_id: str = ""
         self._created_by_user_id: str = ""
+        self._sub_workflow_depth: int = 0
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
                 self.resolver.set_namespace(ns_key, ns_data)
             wf_ctx = workflow_metadata.get("workflow_context", {})
             self._project_id = wf_ctx.get("workflow", {}).get("project_id", "")
             self._created_by_user_id = wf_ctx.get("execution", {}).get("created_by_user_id", "")
+            depth = workflow_metadata.get("sub_workflow_depth", 0)
+            self._sub_workflow_depth = depth if isinstance(depth, int) else 0
 
         self.node_inputs: dict[str, dict[str, Any]] = {}
         self.node_control_data: dict[str, dict[str, Any]] = {}
@@ -628,6 +642,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 {k: self._scrub_data(v) for k, v in self.node_inputs.items()} if include_node_results else {}
             ),
             "completed_activities": list(node_outputs.keys()),
+            "completed_nodes": self._completed_node_ids(),
             "failed_activities": self.failed_nodes,
         }
 
@@ -1682,7 +1697,104 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if node_type == NodeType.LOOP:
             return await self._execute_loop_node(node_id, node, resolved_parameters, timeout_seconds=timeout_seconds)
 
-        return {"output": {"status": "skipped", "reason": f"Unsupported node type: {node_type}"}}
+        if node_type == NodeType.SUB_WORKFLOW:
+            result = await self._execute_sub_workflow_node(node, resolved_parameters)
+        else:
+            result = {"output": {"status": "skipped", "reason": f"Unsupported node type: {node_type}"}}
+        return result
+
+    async def _execute_sub_workflow_node(
+        self,
+        node: ActivityNode,
+        resolved_parameters: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Execute a sub-workflow node via Reference Mode.
+
+        Calls the setup activity to resolve and prepare the child execution,
+        then starts the child OrchestratorWorkflow via execute_child_workflow.
+        """
+        # Iteration-aware invocation identity: the canvas node id plus one
+        # _iter_{n} suffix per enclosing loop, so a sub_workflow node inside a
+        # for_each derives a distinct child per iteration; outside a loop it is
+        # exactly node.id. The whole scheduling change is gated behind a
+        # dedicated patch so existing in-flight executions replay with their
+        # original (pre-change) activity id and args.
+        if workflow.patched(_SUBWORKFLOW_ITERATION_IDS_PATCH):
+            invocation_node_id = join_loop_iteration_id(
+                node.id, loop_index_chain(node.id, self.loop_body_map, self.node_control_data)
+            )
+            setup_args: list[Any] = [
+                resolved_parameters,
+                self.execution_id,
+                node.id,
+                self._created_by_user_id,
+                self._sub_workflow_depth,
+                invocation_node_id,
+            ]
+            setup_activity_id = f"__internal__setup_sub_workflow_{invocation_node_id}"
+        else:
+            setup_args = [
+                resolved_parameters,
+                self.execution_id,
+                node.id,
+                self._created_by_user_id,
+                self._sub_workflow_depth,
+            ]
+            setup_activity_id = f"__internal__setup_sub_workflow_{node.id}"
+
+        setup_result: dict[str, Any] = cast(
+            "dict[str, Any]",
+            await workflow.execute_activity(
+                ActivityName.SUB_WORKFLOW,
+                args=setup_args,
+                activity_id=setup_activity_id,
+                start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            ),
+        )
+
+        child_result = await workflow.execute_child_workflow(
+            "orchestrator_workflow",
+            args=[
+                setup_result["workflow_definition"],
+                setup_result["execution_id"],
+                setup_result["trigger_node_id"],
+                setup_result["input_data"],
+                False,
+                None,
+                None,
+                None,
+                setup_result["workflow_metadata"],
+            ],
+            id=setup_result["temporal_workflow_id"],
+            task_queue=setup_result["task_queue"],
+            parent_close_policy=ParentClosePolicy.REQUEST_CANCEL,
+        )
+
+        valid_child_statuses = {"completed", "completed_with_errors", "failed", "cancelled"}
+        raw_status = child_result.get("status") if isinstance(child_result, dict) else None
+        child_status = raw_status if raw_status in valid_child_statuses else None
+        is_success = child_status == "completed"
+        status_detail = child_status or "returned unexpected status"
+        output = {
+            "Result": {
+                "child_execution_id": setup_result["execution_id"],
+                "child_workflow_id": setup_result.get("child_workflow_id"),
+                "child_workflow_name": setup_result.get("child_workflow_name"),
+                "child_workflow_version": setup_result.get("child_workflow_version"),
+                "child_status": child_status,
+                "outputs": None,
+            },
+            "StatusCode": 0 if is_success else 1,
+            "StatusMessage": ("Sub-workflow completed successfully" if is_success else f"Sub-workflow {status_detail}"),
+            "ErrorMessage": None if is_success else f"Sub-workflow {status_detail}",
+        }
+
+        if not is_success:
+            msg = f"Sub-workflow {status_detail}"
+            raise ApplicationError(msg, {"output": output}, type="SubWorkflowFailedError", non_retryable=True)
+
+        return {"output": output}
 
     def _process_node_result(self, node: ActivityNode, result: dict[str, Any]) -> dict[str, Any]:
         """Extract control data and output from an activity result."""
@@ -1790,6 +1902,38 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         """
         return list(self.skipped_nodes)
+
+    def _completed_node_ids(self) -> list[str]:
+        """Node IDs whose namespace is marked ``status == "completed"``.
+
+        This positive completion marker is set only on successful node
+        completion (``_process_completed_task``). Failed nodes carry
+        ``status == "failed"`` and skipped/disabled nodes have an empty
+        namespace, so both are excluded without inferring completion from the
+        absence of other states. Used by the ``get_completed_nodes`` query and
+        surfaced in the completion result as ``completed_nodes`` so the activity
+        finalizer has an authoritative source even if the query fails.
+        """
+        return [
+            node_id
+            for node_id, namespace in self.resolver.get_all_namespaces().items()
+            if isinstance(namespace, dict) and namespace.get("status") == "completed"
+        ]
+
+    @workflow.query
+    def get_completed_nodes(self) -> list[str]:
+        """Query to get node IDs that completed successfully.
+
+        Consumed by ActivitySyncService when finalizing an execution to mark
+        sub-workflow activity rows COMPLETED: a sub-workflow node executes via
+        an internal setup activity plus a child workflow, so no
+        ACTIVITY_TASK_COMPLETED event ever reaches its per-node activity row.
+
+        Returns:
+            List of node IDs whose namespace is marked completed.
+
+        """
+        return self._completed_node_ids()
 
     @workflow.query
     def get_detached_nodes(self) -> list[str]:

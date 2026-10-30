@@ -1,5 +1,6 @@
 import { Button, FlexItem } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
+import { useNavigate } from '@tanstack/react-router'
 
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
 import { SynLabel } from '../../components/labels/SynLabel'
@@ -15,9 +16,14 @@ import { RetryExecutionButton } from './RetryExecutionButton'
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
 
 export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ execution: Execution | undefined }>) {
+  const navigate = useNavigate()
   if (!execution?.status && !execution?.created_at) {
     return null
   }
+  const parentExecutionId =
+    typeof execution.execution_metadata?.parent_execution_id === 'string'
+      ? execution.execution_metadata.parent_execution_id
+      : undefined
   return (
     <>
       {execution.status ? (
@@ -35,6 +41,17 @@ export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ executio
           <SynLabel isCompact={false}>
             Viewing run: <ExecutionTimestamp dateString={execution.created_at} />
           </SynLabel>
+        </FlexItem>
+      ) : null}
+      {parentExecutionId ? (
+        <FlexItem data-testid="view-parent-run">
+          <Button
+            variant="link"
+            isInline
+            onClick={() => navigate({ to: '/executions/$executionId', params: { executionId: parentExecutionId } })}
+          >
+            View parent run
+          </Button>
         </FlexItem>
       ) : null}
     </>

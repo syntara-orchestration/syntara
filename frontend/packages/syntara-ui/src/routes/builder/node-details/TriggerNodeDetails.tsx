@@ -190,6 +190,17 @@ function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: stri
       TriggerTypeEnum.EDA_TRIGGER
     )
   }
+  if (data.triggerType === TriggerTypeEnum.SUBWORKFLOW_TRIGGER) {
+    const inputSchema = parseJsonSchema(data.inputSchema)
+    return {
+      id: trigger.id ?? 'subworkflow_trigger',
+      type: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
+      name: name ?? 'Workflow Trigger',
+      parameters: {
+        ...(inputSchema && { input_schema: inputSchema }),
+      },
+    }
+  }
   throw new Error('Invalid trigger type')
 }
 
@@ -211,6 +222,14 @@ export function TriggerNodeDetails({ trigger, triggerIndex, onClose, onHeaderCon
       return {
         name: trigger.name,
         triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
+        inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
+      }
+    }
+
+    if (trigger.type === TriggerTypeEnum.SUBWORKFLOW_TRIGGER) {
+      return {
+        name: trigger.name,
+        triggerType: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
         inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
       }
     }

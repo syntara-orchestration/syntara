@@ -16,6 +16,7 @@ export const RegistryNodeId = {
   TRIGGER_SCHEDULED: 'trigger-scheduled',
   TRIGGER_WEBHOOK: 'trigger-webhook',
   TRIGGER_EDA: 'trigger-eda',
+  TRIGGER_SUBWORKFLOW: 'trigger-subworkflow',
   ACTION: 'action',
   ACTION_SCRIPT: 'action-script',
   ACTION_API: 'action-api',
