@@ -55,7 +55,7 @@ RUN --mount=from=override,source=/,target=/tmp/override \
 RUN npm run build
 
 # Production stage
-FROM registry.access.redhat.com/ubi9/nginx-124:latest@sha256:f414eb6c23a501c921542b75e30032979640682d8eaa37b500d7d34f4048e5ec
+FROM registry.access.redhat.com/ubi9/nginx-124:latest@sha256:0c8e228be319804347f650e267e2f2a677b0cfe27266c560b737a6d9008fa96f
 
 USER 0
 
