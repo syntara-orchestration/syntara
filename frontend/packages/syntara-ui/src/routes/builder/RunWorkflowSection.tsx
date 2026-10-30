@@ -1,16 +1,9 @@
-import {
-  Button,
-  Dropdown,
-  DropdownItem,
-  DropdownList,
-  Icon,
-  MenuToggle,
-  type MenuToggleElement,
-} from '@patternfly/react-core'
+import { Button, Dropdown, Icon, MenuToggle, type MenuToggleElement } from '@patternfly/react-core'
 import { RhUiPlayIcon } from '@patternfly/react-icons'
 import { useCallback, useState, type Dispatch, type Ref } from 'react'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
+import { RunWorkflowTriggerDropdownList } from '../workflows/RunWorkflowTriggerDropdownList'
 
 import type { BuilderAction } from './builderReducer'
 import type { BuilderPermissions } from './useBuilderPermissions'
@@ -104,20 +97,19 @@ export function RunWorkflowSection({
           toggle={renderRunToggle}
           popperProps={{ position: 'left' }}
         >
-          <DropdownList>
-            {triggers?.map((trigger, index) => (
-              <DropdownItem
-                key={trigger.id}
-                onClick={() => {
-                  dispatch({ type: 'SET_SELECTED_TRIGGER', payload: index })
-                  dispatch({ type: 'SET_CONFIRM_DIALOG', payload: true })
-                  setIsRunDropdownOpen(false)
-                }}
-              >
-                {trigger.name ?? `Trigger ${index + 1}`}
-              </DropdownItem>
-            ))}
-          </DropdownList>
+          <RunWorkflowTriggerDropdownList
+            options={(triggers ?? []).map((trigger, index) => ({
+              id: trigger.id,
+              label: trigger.name ?? `Trigger ${index + 1}`,
+            }))}
+            onSelect={(option) => {
+              const index = triggers?.findIndex((trigger) => trigger.id === option.id) ?? -1
+              if (index < 0) return
+              dispatch({ type: 'SET_SELECTED_TRIGGER', payload: index })
+              dispatch({ type: 'SET_CONFIRM_DIALOG', payload: true })
+              setIsRunDropdownOpen(false)
+            }}
+          />
         </Dropdown>
       </DisabledWithTooltip>
     )

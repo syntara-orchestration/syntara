@@ -9,6 +9,7 @@ describe('workflowListRunResolutionUi', () => {
     isResolvingRun: true,
     runConfirmVisible: false,
     hasPendingRunInput: false,
+    formStepSelectVisible: false,
   }
 
   describe('workflowListRunPreparingCandidate', () => {
@@ -26,6 +27,10 @@ describe('workflowListRunResolutionUi', () => {
 
     it('is false while a form or JSON input dialog is open', () => {
       expect(workflowListRunPreparingCandidate({ ...baseState, hasPendingRunInput: true })).toBe(false)
+    })
+
+    it('is false while the form step selector is visible', () => {
+      expect(workflowListRunPreparingCandidate({ ...baseState, formStepSelectVisible: true })).toBe(false)
     })
 
     it('is false after resolution finishes', () => {

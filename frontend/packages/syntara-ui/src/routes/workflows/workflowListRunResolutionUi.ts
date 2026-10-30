@@ -7,12 +7,20 @@ export type WorkflowListRunResolutionUiState = {
   isResolvingRun: boolean
   runConfirmVisible: boolean
   hasPendingRunInput: boolean
+  formStepSelectVisible: boolean
 }
 
 /** True while trigger resolution is in flight and no follow-up UI has opened yet. */
 export function workflowListRunPreparingCandidate(state: WorkflowListRunResolutionUiState): boolean {
-  const { runDialogOpen, hasWorkflow, isResolvingRun, runConfirmVisible, hasPendingRunInput } = state
-  return Boolean(runDialogOpen && hasWorkflow) && isResolvingRun && !runConfirmVisible && !hasPendingRunInput
+  const { runDialogOpen, hasWorkflow, isResolvingRun, runConfirmVisible, hasPendingRunInput, formStepSelectVisible } =
+    state
+  return (
+    Boolean(runDialogOpen && hasWorkflow) &&
+    isResolvingRun &&
+    !runConfirmVisible &&
+    !hasPendingRunInput &&
+    !formStepSelectVisible
+  )
 }
 
 /** Whether the run confirmation step should be visible after resolution. */
