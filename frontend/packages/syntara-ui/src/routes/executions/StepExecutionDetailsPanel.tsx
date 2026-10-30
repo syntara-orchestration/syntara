@@ -79,7 +79,8 @@ type DataPaneProps = {
   view: PanelView
   onViewChange: (view: PanelView) => void
   titleAddon?: ReactNode
-  reserveTitleAddonSpace?: boolean
+  titleAction?: ReactNode
+  stackControls?: boolean
   className?: string
   isErrorState?: boolean
 }
@@ -91,7 +92,8 @@ function DataPane({
   view,
   onViewChange,
   titleAddon,
-  reserveTitleAddonSpace = false,
+  titleAction,
+  stackControls = false,
   className,
   isErrorState = false,
 }: Readonly<DataPaneProps>) {
@@ -142,13 +144,15 @@ function DataPane({
         <div className={styles.dataPaneHeader}>
           <div className={styles.dataPaneTitleRow}>
             <span className={styles.dataPaneTitle}>{title}</span>
+            {titleAddon && <span className={styles.dataPaneTitleAddon}>{titleAddon}</span>}
           </div>
-          {(titleAddon || reserveTitleAddonSpace) && <div className={styles.dataPaneTitleAddonRow}>{titleAddon}</div>}
+          {titleAction && <div className={styles.dataPaneTitleActionRow}>{titleAction}</div>}
           <div className={styles.dataPaneControlsWrap}>
             <Flex
-              alignItems={{ default: 'alignItemsCenter' }}
+              alignItems={{ default: stackControls ? 'alignItemsStretch' : 'alignItemsCenter' }}
+              direction={stackControls ? { default: 'column' } : undefined}
               gap={{ default: 'gapSm' }}
-              className={styles.dataPaneControls}
+              className={`${styles.dataPaneControls}${stackControls ? ` ${styles.dataPaneControlsStack}` : ''}`}
             >
               <FlexItem className={styles.searchWrap}>
                 <SearchInput
@@ -394,46 +398,35 @@ function StepContentArea({
               data={effectiveInputData}
               view={inputView}
               onViewChange={setInputView}
-              reserveTitleAddonSpace
+              stackControls
               className={styles.retryParametersViewer}
-              titleAddon={
-                <Flex
-                  alignItems={{ default: 'alignItemsCenter' }}
-                  gap={{ default: 'gapSm' }}
-                  flexWrap={{ default: 'nowrap' }}
-                >
-                  {hasSavedRetryOverride && (
-                    <FlexItem>
-                      <SynLabel color="blue">Edited for retry</SynLabel>
-                    </FlexItem>
-                  )}
-                  {retryEditorProps.canEdit && (
-                    <FlexItem>
-                      <Tooltip content="Edit parameters for retry">
-                        <Button
-                          variant="plain"
-                          aria-label="Edit parameters for retry"
-                          isDisabled={retryEditorProps.isDisabled}
-                          onClick={() =>
-                            retryEditorProps.onEdit(
-                              retryEditorProps.target.id,
-                              getRetryInputEditorValue(
-                                inputData,
-                                retryEditorProps.savedOverride,
-                                retryEditorProps.target.parameterNames
-                              )
-                            )
-                          }
-                          icon={
-                            <Icon isInline>
-                              <RhUiEditIcon />
-                            </Icon>
-                          }
-                        />
-                      </Tooltip>
-                    </FlexItem>
-                  )}
-                </Flex>
+              titleAddon={hasSavedRetryOverride ? <SynLabel color="blue">Edited for retry</SynLabel> : undefined}
+              titleAction={
+                retryEditorProps.canEdit ? (
+                  <Tooltip content="Edit parameters for retry">
+                    <Button
+                      variant="plain"
+                      className={styles.retryInputEditButton}
+                      aria-label="Edit parameters for retry"
+                      isDisabled={retryEditorProps.isDisabled}
+                      onClick={() =>
+                        retryEditorProps.onEdit(
+                          retryEditorProps.target.id,
+                          getRetryInputEditorValue(
+                            inputData,
+                            retryEditorProps.savedOverride,
+                            retryEditorProps.target.parameterNames
+                          )
+                        )
+                      }
+                      icon={
+                        <Icon isInline>
+                          <RhUiEditIcon />
+                        </Icon>
+                      }
+                    />
+                  </Tooltip>
+                ) : undefined
               }
             />
             <RetryInputOverrideDetails {...retryEditorProps} />
@@ -449,7 +442,7 @@ function StepContentArea({
           data={outputData}
           view={outputView}
           onViewChange={setOutputView}
-          reserveTitleAddonSpace={Boolean(retryEditorProps)}
+          stackControls={Boolean(retryEditorProps)}
           isErrorState={stepIsFailed}
         />
       </FlexItem>

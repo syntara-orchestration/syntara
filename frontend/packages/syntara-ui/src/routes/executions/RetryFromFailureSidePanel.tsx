@@ -192,24 +192,26 @@ export function RetryFromFailureSidePanel({
                   <Title headingLevel="h3" size={TitleSizes.md}>
                     Retry plan
                   </Title>
-                  <RetryPlan
-                    defaultPreview={defaultPreviewQuery.preview}
-                    defaultIsLoading={defaultPreviewQuery.isLoading}
-                    defaultIsError={defaultPreviewQuery.isError}
-                    activePreview={activePreview}
-                    activeIsLoading={activeIsLoading}
-                    activeIsError={activeIsError}
-                    defaultPoints={defaultPoints}
-                    selectablePoints={selectablePoints}
-                    visiblePoints={visiblePoints}
-                    requestedRetryPointIds={requestedRetryPointIds}
-                    scopeMode={scopeMode}
-                    scopeId={scopeId}
-                    isRetryPending={retry.isPending || hasUnsavedInputOverrides}
-                    onSelectAll={setAllRetryPoints}
-                    onChoosePoints={chooseRetryPoints}
-                    onUpdatePoint={updateRetryPoint}
-                  />
+                  <div className={styles.retryPlanCard} data-testid="retry-plan-card">
+                    <RetryPlan
+                      defaultPreview={defaultPreviewQuery.preview}
+                      defaultIsLoading={defaultPreviewQuery.isLoading}
+                      defaultIsError={defaultPreviewQuery.isError}
+                      activePreview={activePreview}
+                      activeIsLoading={activeIsLoading}
+                      activeIsError={activeIsError}
+                      defaultPoints={defaultPoints}
+                      selectablePoints={selectablePoints}
+                      visiblePoints={visiblePoints}
+                      requestedRetryPointIds={requestedRetryPointIds}
+                      scopeMode={scopeMode}
+                      scopeId={scopeId}
+                      isRetryPending={retry.isPending || hasUnsavedInputOverrides}
+                      onSelectAll={setAllRetryPoints}
+                      onChoosePoints={chooseRetryPoints}
+                      onUpdatePoint={updateRetryPoint}
+                    />
+                  </div>
                   <div className="pf-v6-u-screen-reader" role="status" aria-live="polite" aria-atomic="true">
                     {retryPlanAnnouncement}
                   </div>

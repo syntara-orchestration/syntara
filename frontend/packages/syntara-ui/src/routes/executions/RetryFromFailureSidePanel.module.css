@@ -28,6 +28,12 @@
   padding: 0 var(--pf-t--global--spacer--md) var(--pf-t--global--spacer--md);
 }
 
+.retryPlanCard {
+  padding: var(--pf-t--global--spacer--md);
+  border: 1px solid var(--pf-t--global--border--color--default);
+  border-radius: var(--pf-t--global--border--radius--small);
+}
+
 .retryPoint {
   display: flex;
   flex-direction: column;

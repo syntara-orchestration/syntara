@@ -150,6 +150,12 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await expect(panel.getByRole('heading', { name: 'Retry run from failure' })).toBeVisible()
       await expect(panel.getByRole('heading', { name: 'How retry works' })).toBeVisible()
       await expect(panel.getByRole('heading', { name: 'Retry plan' })).toBeVisible()
+      const retryPlanCard = panel.getByTestId('retry-plan-card')
+      await expect(retryPlanCard).toBeVisible()
+      const retryPlanCardBorderWidth = await retryPlanCard.evaluate((element) =>
+        Number.parseFloat(window.getComputedStyle(element).borderTopWidth)
+      )
+      expect(retryPlanCardBorderWidth).toBe(1)
       await expect(app.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
       await expect(panel.getByRole('button', { name: 'Retry 2 steps' })).toBeVisible()
       await expect(app.getByRole('button', { name: 'Copy to editor' })).toHaveCount(0)
@@ -175,6 +181,8 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       const panel = app.getByRole('complementary', { name: 'Retry run from failure review' })
       const allPoints = panel.getByRole('radio', { name: 'All eligible failure points' })
       const choosePoints = panel.getByRole('radio', { name: 'Choose failure points' })
+      const retryPlanCard = panel.getByTestId('retry-plan-card')
+      await expect(retryPlanCard.getByRole('radiogroup', { name: 'Retry scope' })).toBeVisible()
       const retryOrigin = app.getByTestId('retry-origin-step2')
       const stepNode = app.locator('.react-flow__node[data-id="step2"]')
 
@@ -256,31 +264,49 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await expect(app.getByText(/"code": "echo retry"/, { exact: false })).toBeVisible()
       await expect(retryButton).toBeEnabled()
 
+      const inputTitle = app.getByText('Input parameters', { exact: true })
+      const inputTitleBounds = await inputTitle.evaluate((element) => {
+        const bounds = element.getBoundingClientRect()
+        return { left: bounds.left, top: bounds.top }
+      })
+      const editedBadgeBounds = await app.getByText('Edited for retry').evaluate((element) => {
+        const bounds = element.getBoundingClientRect()
+        return { left: bounds.left, top: bounds.top }
+      })
+      expect(Math.abs(inputTitleBounds.top - editedBadgeBounds.top)).toBeLessThanOrEqual(2)
+
+      const editIcon = app.getByRole('button', { name: 'Edit parameters for retry' }).locator('svg')
+      const editIconLeft = await editIcon.evaluate((element) => element.getBoundingClientRect().left)
+      expect(Math.abs(editIconLeft - inputTitleBounds.left)).toBeLessThan(3)
+
       const searchInput = app.getByRole('textbox', { name: 'Search input parameters data' })
       const viewToggle = app.getByRole('group', { name: 'Input parameters view selection' })
-      const searchCenter = await searchInput.evaluate((element) => {
+      const searchBounds = await searchInput.evaluate((element) => {
         const bounds = element.getBoundingClientRect()
-        return (bounds.top + bounds.bottom) / 2
+        return { left: bounds.left, top: bounds.top, bottom: bounds.bottom, width: bounds.width }
       })
-      const viewToggleCenter = await viewToggle.evaluate((element) => {
+      const viewToggleBounds = await viewToggle.evaluate((element) => {
         const bounds = element.getBoundingClientRect()
-        return (bounds.top + bounds.bottom) / 2
+        return { left: bounds.left, top: bounds.top, width: bounds.width }
       })
-      expect(Math.abs(searchCenter - viewToggleCenter)).toBeLessThan(2)
+      expect(viewToggleBounds.top).toBeGreaterThan(searchBounds.bottom)
+      expect(Math.abs(searchBounds.left - viewToggleBounds.left)).toBeLessThan(2)
+      expect(Math.abs(searchBounds.width - viewToggleBounds.width)).toBeLessThan(3)
 
       const outputSearchInput = app.getByRole('textbox', { name: 'Search output data' })
       const outputViewToggle = app.getByRole('group', { name: 'Output view selection' })
-      const outputSearchCenter = await outputSearchInput.evaluate((element) => {
+      const outputSearchBounds = await outputSearchInput.evaluate((element) => {
         const bounds = element.getBoundingClientRect()
-        return (bounds.top + bounds.bottom) / 2
+        return { left: bounds.left, top: bounds.top, bottom: bounds.bottom, width: bounds.width }
       })
-      const outputViewToggleCenter = await outputViewToggle.evaluate((element) => {
+      const outputViewToggleBounds = await outputViewToggle.evaluate((element) => {
         const bounds = element.getBoundingClientRect()
-        return (bounds.top + bounds.bottom) / 2
+        return { left: bounds.left, top: bounds.top, width: bounds.width }
       })
-      expect(Math.abs(outputSearchCenter - outputViewToggleCenter)).toBeLessThan(2)
-      expect(Math.abs(searchCenter - outputSearchCenter)).toBeLessThan(2)
-      expect(Math.abs(viewToggleCenter - outputViewToggleCenter)).toBeLessThan(2)
+      expect(outputViewToggleBounds.top).toBeGreaterThan(outputSearchBounds.bottom)
+      expect(Math.abs(outputSearchBounds.left - outputViewToggleBounds.left)).toBeLessThan(2)
+      expect(Math.abs(outputSearchBounds.width - outputViewToggleBounds.width)).toBeLessThan(3)
+      expect(outputSearchBounds.top).toBeLessThan(searchBounds.top)
 
       await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
       await expect(app.getByRole('textbox', { name: /Input parameters for/ })).toHaveValue(/echo retry/)
