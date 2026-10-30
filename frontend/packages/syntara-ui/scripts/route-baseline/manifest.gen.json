@@ -264,9 +264,33 @@
     },
     {
       "kind": "page",
+      "parameters": ["serviceAccountId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/service-accounts/$serviceAccountId/"
+    },
+    {
+      "kind": "page",
       "parameters": ["serviceAccountId", "tab"],
       "sources": ["appRoute", "navigation", "router"],
       "template": "/system-administration/access-management/service-accounts/$serviceAccountId/$tab"
+    },
+    {
+      "kind": "page",
+      "parameters": ["serviceAccountId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/service-accounts/$serviceAccountId/assignments"
+    },
+    {
+      "kind": "page",
+      "parameters": ["serviceAccountId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/service-accounts/$serviceAccountId/credentials"
+    },
+    {
+      "kind": "page",
+      "parameters": ["serviceAccountId"],
+      "sources": ["router"],
+      "template": "/system-administration/access-management/service-accounts/$serviceAccountId/details"
     },
     {
       "kind": "page",

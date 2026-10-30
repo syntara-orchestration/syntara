@@ -22,6 +22,10 @@ import {
   ProjectsTab,
   RolesTab,
   ServiceAccountDetail,
+  ServiceAccountDetailAssignmentsTabRoute,
+  ServiceAccountDetailCredentialsTabRoute,
+  ServiceAccountDetailDetailsTabRoute,
+  ServiceAccountDetailUnknownTabRoute,
   ServiceAccountsTab,
   TransferIdentityWizard,
   UserDetail,
@@ -207,6 +211,40 @@ const projectDetailTabRoutes = [
   }),
 ]
 
+const serviceAccountDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/system-administration/access-management/service-accounts/$serviceAccountId',
+  component: makeRouteComponent(<ServiceAccountDetail />),
+})
+
+const serviceAccountDetailTabRoutes = [
+  createRoute({
+    getParentRoute: () => serviceAccountDetailRoute,
+    path: '/',
+    component: makeRouteComponent(<ServiceAccountDetailDetailsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => serviceAccountDetailRoute,
+    path: '/details',
+    component: makeRouteComponent(<ServiceAccountDetailDetailsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => serviceAccountDetailRoute,
+    path: '/credentials',
+    component: makeRouteComponent(<ServiceAccountDetailCredentialsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => serviceAccountDetailRoute,
+    path: '/assignments',
+    component: makeRouteComponent(<ServiceAccountDetailAssignmentsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => serviceAccountDetailRoute,
+    path: '/$tab',
+    component: makeRouteComponent(<ServiceAccountDetailUnknownTabRoute />),
+  }),
+]
+
 const userDetailUnknownTabRoute = createRoute({
   getParentRoute: () => userDetailRoute,
   path: '$tab',
@@ -238,14 +276,5 @@ export const accessManagementRoutes = [
   userDetailRoute.addChildren([...userDetailTabRoutes, userDetailUnknownTabRoute]),
   groupDetailRoute.addChildren(groupDetailTabRoutes),
   projectDetailRoute.addChildren(projectDetailTabRoutes),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/service-accounts/$serviceAccountId',
-    component: makeRouteComponent(<ServiceAccountDetail />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/access-management/service-accounts/$serviceAccountId/$tab',
-    component: makeRouteComponent(<ServiceAccountDetail />),
-  }),
+  serviceAccountDetailRoute.addChildren(serviceAccountDetailTabRoutes),
 ]

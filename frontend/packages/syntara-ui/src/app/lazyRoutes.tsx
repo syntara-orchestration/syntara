@@ -171,6 +171,26 @@ export const ServiceAccountDetail = lazy(() =>
     default: m.ServiceAccountDetail,
   }))
 )
+export const ServiceAccountDetailDetailsTabRoute = lazy(() =>
+  import('../routes/access-management/service-accounts/ServiceAccountDetail').then((m) => ({
+    default: m.ServiceAccountDetailDetailsTabRoute,
+  }))
+)
+export const ServiceAccountDetailCredentialsTabRoute = lazy(() =>
+  import('../routes/access-management/service-accounts/ServiceAccountDetail').then((m) => ({
+    default: m.ServiceAccountDetailCredentialsTabRoute,
+  }))
+)
+export const ServiceAccountDetailAssignmentsTabRoute = lazy(() =>
+  import('../routes/access-management/service-accounts/ServiceAccountDetail').then((m) => ({
+    default: m.ServiceAccountDetailAssignmentsTabRoute,
+  }))
+)
+export const ServiceAccountDetailUnknownTabRoute = lazy(() =>
+  import('../routes/access-management/service-accounts/ServiceAccountDetail').then((m) => ({
+    default: m.ServiceAccountDetailUnknownTabRoute,
+  }))
+)
 export const Credentials = lazy(() => import('../routes/configuration/credentials/Credentials'))
 export const CredentialDetail = lazy(() => import('../routes/configuration/credentials/CredentialDetail'))
 export const CredentialDetailsTabRoute = lazy(() =>

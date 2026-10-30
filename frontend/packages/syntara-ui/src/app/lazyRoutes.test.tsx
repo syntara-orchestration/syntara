@@ -90,6 +90,10 @@ vi.mock('../routes/access-management/projects/ProjectDetail', () => ({
 }))
 vi.mock('../routes/access-management/service-accounts/ServiceAccountDetail', () => ({
   ServiceAccountDetail: () => <div>ServiceAccountDetail</div>,
+  ServiceAccountDetailDetailsTabRoute: () => <div>ServiceAccountDetailDetailsTabRoute</div>,
+  ServiceAccountDetailCredentialsTabRoute: () => <div>ServiceAccountDetailCredentialsTabRoute</div>,
+  ServiceAccountDetailAssignmentsTabRoute: () => <div>ServiceAccountDetailAssignmentsTabRoute</div>,
+  ServiceAccountDetailUnknownTabRoute: () => <div>ServiceAccountDetailUnknownTabRoute</div>,
 }))
 vi.mock('../routes/configuration/credentials/Credentials', () => ({ default: () => <div>Credentials</div> }))
 vi.mock('../routes/configuration/credentials/CredentialDetail', () => ({
@@ -147,6 +151,10 @@ const lazyRouteNames = [
   'ProjectsTab',
   'RolesTab',
   'ServiceAccountDetail',
+  'ServiceAccountDetailDetailsTabRoute',
+  'ServiceAccountDetailCredentialsTabRoute',
+  'ServiceAccountDetailAssignmentsTabRoute',
+  'ServiceAccountDetailUnknownTabRoute',
   'ServiceAccountsTab',
   'Credentials',
   'CredentialDetail',
