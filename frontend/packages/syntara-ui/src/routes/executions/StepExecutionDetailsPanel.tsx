@@ -460,11 +460,7 @@ export function StepExecutionDetailsPanel({
 
   return (
     <Stack className={styles.contentContainer}>
-      <StepDetailsHeader
-        stepName={stepName}
-        stepTimestamp={stepTimestamp}
-        status={stepState?.status}
-      />
+      <StepDetailsHeader stepName={stepName} stepTimestamp={stepTimestamp} status={stepState?.status} />
 
       {/* Approval audit strip (shown only for decided approval steps) */}
       {approvalAudit && (

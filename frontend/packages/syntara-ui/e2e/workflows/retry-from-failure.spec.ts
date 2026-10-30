@@ -303,7 +303,9 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       })
       expect(Math.abs(inputTitleBounds.top - editedBadgeBounds.top)).toBeLessThanOrEqual(4)
 
-      const editButtonBounds = await app.getByRole('button', { name: 'Edit parameters for retry' }).evaluate((element) => {
+      const editButtonBounds = await app
+        .getByRole('button', { name: 'Edit parameters for retry' })
+        .evaluate((element) => {
           const bounds = element.getBoundingClientRect()
           return { left: bounds.left, top: bounds.top, bottom: bounds.bottom }
         })
