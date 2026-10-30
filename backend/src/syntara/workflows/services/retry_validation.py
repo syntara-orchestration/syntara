@@ -1,7 +1,7 @@
 """Pre-retry validation for retry-from-failure (AAP-92820).
 
   Shared by ``GET /executions/{id}/retry-from-failure-preview`` (pure verdict,
-  no state mutation, reports the default selection) and
+  no state mutation, reports the default or requested selection) and
   ``POST /executions/{id}/retry-from-failure`` (re-validates the caller's
   selection independently before doing any work, so the retry endpoint is safe
   to call directly).
@@ -83,7 +83,11 @@ from syntara.workflows.exceptions import ExecutionNotFoundError
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.utils.loop_iteration_names import LOOP_ITERATION_SEP, strip_iteration_suffix
+from syntara.workflows.utils.loop_iteration_names import (
+    LOOP_ITERATION_SEP,
+    strip_all_iteration_suffixes,
+    strip_iteration_suffix,
+)
 from syntara.workflows.utils.template_refs import FieldPath, find_template_refs, paths_overlap
 from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
 
@@ -109,6 +113,7 @@ class RetryValidation:
     sanitized_replacements: dict[str, list[str]] = field(default_factory=dict)
     step_count_by_eligible_point: dict[str, int] = field(default_factory=dict)
     total_step_count: int = 0
+    retained_result_count: int = 0
 
 
 def definition_nodes(definition: dict[str, Any]) -> list[dict[str, Any]]:
@@ -642,9 +647,15 @@ async def validate_retry_from_failure(
         )
     else:
         reported_selection = normalized
-    step_counts, total_steps = (
-        _step_counts(snapshot_def, reported_selection, successors) if snapshot is not None else ({}, 0)
-    )
+    if snapshot is not None:
+        retry_path = collect_downstream_node_ids(snapshot_def, reported_selection, successors)
+        step_counts, total_steps = _step_counts(snapshot_def, reported_selection, successors)
+        retained_result_count = sum(
+            strip_all_iteration_suffixes(activity.activity_name) not in retry_path for activity in completed
+        )
+    else:
+        step_counts, total_steps = {}, 0
+        retained_result_count = 0
     replacements = (
         _sanitized_replacements(snapshot_def, failed_ids, completed_outputs, successors) if snapshot is not None else {}
     )
@@ -658,6 +669,7 @@ async def validate_retry_from_failure(
             sanitized_replacements=replacements,
             step_count_by_eligible_point=step_counts,
             total_step_count=total_steps,
+            retained_result_count=retained_result_count,
         )
 
     return RetryValidation(
@@ -667,4 +679,5 @@ async def validate_retry_from_failure(
         sanitized_replacements=replacements,
         step_count_by_eligible_point=step_counts,
         total_step_count=total_steps,
+        retained_result_count=retained_result_count,
     )
