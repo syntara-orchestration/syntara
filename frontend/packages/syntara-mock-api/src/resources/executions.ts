@@ -12,6 +12,7 @@ const HELLO_WORLD = workflowIdByName['hello-world']
 const LOOP_DEMO = workflowIdByName['loop-demo']
 const PARALLEL_DEMO = workflowIdByName['parallel-demo']
 const DEPLOYMENT_APPROVAL = workflowIdByName['deployment-approval']
+const BASIC_SEQUENCE = workflowIdByName['basic-sequence-test']
 
 export const executions: Execution[] = [
   {
@@ -277,4 +278,21 @@ export const executions: Execution[] = [
       }),
     }
   }),
+
+  // Manual QA fixture for retry-from-failure: a sequential run where
+  // step1 completed, step2 failed, and step3 never dispatched. Exercises the
+  // "Retry from failure" button on a FAILED execution with real eligible points.
+  {
+    id: 'exec-retry-demo',
+    created_at: mockDate.hoursAgo3,
+    updated_at: mockDate.hoursAgo3Plus2s,
+    workflow_id: BASIC_SEQUENCE,
+    workflow_name: workflowNames[BASIC_SEQUENCE],
+    status: 'failed',
+    started_at: mockDate.hoursAgo3Plus1s,
+    completed_at: mockDate.hoursAgo3Plus2s,
+    started_by: 'user-1',
+    input_data: {},
+    error_details: 'Task execution failed: Second Step exited with a non-zero status',
+  },
 ]
