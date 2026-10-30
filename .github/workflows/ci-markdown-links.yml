@@ -1,0 +1,57 @@
+---
+name: CI Markdown Links
+
+on:
+  pull_request:
+    paths:
+      - '*.md'
+      - '**/*.md'
+      - '*.markdown'
+      - '**/*.markdown'
+      - '.github/workflows/ci-markdown-links.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  markdown-links:
+    name: Markdown links
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out the linter source
+        # Use reviewed source until the package is published to npm.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ansible/ui-packages
+          # A commit pin keeps the linter version fixed between runs.
+          ref: 2a1b00ca758d457717a993db23be984a25a13d5e
+          path: .tools/ui-packages
+          # The linter only reads files, so it does not need Git credentials.
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          # md-link-lint requires Node 22.23.4 or Node 24 and newer.
+          node-version: '24.x'
+
+      - name: Install linter dependencies
+        # Use the lockfile and skip install hooks; build the tool below.
+        run: npm ci --ignore-scripts --workspace=packages/md-link-lint --include-workspace-root=false
+        working-directory: .tools/ui-packages
+
+      - name: Build linter
+        # dist is generated during the build and stays out of source control.
+        run: npm run build --workspace=packages/md-link-lint
+        working-directory: .tools/ui-packages
+
+      - name: Check local Markdown links
+        # Do not lint the nested checkout; scan Syntara's Markdown files.
+        run: node .tools/ui-packages/packages/md-link-lint/dist/cli.js --exclude '.tools/**'
