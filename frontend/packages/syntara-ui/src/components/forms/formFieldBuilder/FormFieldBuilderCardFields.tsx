@@ -3,7 +3,6 @@ import type { FormDefinition, FormField } from '@syntara/contracts'
 import { Controller, useFormContext } from 'react-hook-form'
 
 import { FormFieldTypeEnum, type FormFieldType } from '../../../forms'
-import { SynTextAreaField } from '../SynTextAreaField'
 import { SynTextField } from '../SynTextField'
 
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
@@ -106,30 +105,16 @@ export function FormFieldBuilderCardFields({
         </StackItem>
       )}
       <StackItem>
-        {field.type === FormFieldTypeEnum.CHECKBOX || field.type === FormFieldTypeEnum.DATE ? (
-          <SynTextAreaField
-            name={`fields.${index}.help_text`}
-            control={control}
-            label="Help text"
-            fieldId={`${idPrefix}-help`}
-            isDisabled={isDisabled}
-            placeholder={examples.helpText}
-            labelHelp={formFieldBuilderLabelHelp('helpText', 'Help text')}
-            rows={3}
-            onValueChange={commit}
-          />
-        ) : (
-          <SynTextField
-            name={`fields.${index}.help_text`}
-            control={control}
-            label="Help text"
-            fieldId={`${idPrefix}-help`}
-            isDisabled={isDisabled}
-            placeholder={examples.helpText}
-            labelHelp={formFieldBuilderLabelHelp('helpText', 'Help text')}
-            onValueChange={commit}
-          />
-        )}
+        <SynTextField
+          name={`fields.${index}.help_text`}
+          control={control}
+          label="Help text"
+          fieldId={`${idPrefix}-help`}
+          isDisabled={isDisabled}
+          placeholder={examples.helpText}
+          labelHelp={formFieldBuilderLabelHelp('helpText', 'Help text')}
+          onValueChange={commit}
+        />
       </StackItem>
 
       {isOptionsField(field) && (
