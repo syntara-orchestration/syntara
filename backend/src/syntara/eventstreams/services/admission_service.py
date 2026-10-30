@@ -14,7 +14,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.config.base import get_settings
-from syntara.core.constants import EventSchedulingDefaults
+from syntara.core.constants import EventDeliveryDefaults, EventSchedulingDefaults
 from syntara.core.exceptions import SafeValueError
 from syntara.eventstreams.core.deduplication import (
     ClaimLost,
@@ -312,7 +312,7 @@ class EventAdmissionService:
                 )
                 next_attempt = now + timedelta(seconds=delay)
             else:
-                next_attempt = datetime.max.replace(tzinfo=UTC)
+                next_attempt = EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT
             result = await EventDeliveryStore(session).record_scheduling_failure(
                 claim, next_attempt_at=next_attempt, error_code=failure.code.value
             )
