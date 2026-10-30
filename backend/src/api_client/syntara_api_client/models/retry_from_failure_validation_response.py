@@ -41,6 +41,8 @@ class RetryFromFailureValidationResponse:
             count for each eligible retry point.
         total_step_count (int | Unset): Deduplicated total of steps that will re-run across the eligible points.
             Default: 0.
+        retained_result_count (int | Unset): Number of completed activity results outside the selected retry paths that
+            will be retained. Default: 0.
     """
 
     eligible: bool
@@ -51,6 +53,7 @@ class RetryFromFailureValidationResponse:
     sanitized_replacements: RetryFromFailureValidationResponseSanitizedReplacements | Unset = UNSET
     step_count_by_eligible_point: RetryFromFailureValidationResponseStepCountByEligiblePoint | Unset = UNSET
     total_step_count: int | Unset = 0
+    retained_result_count: int | Unset = 0
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -84,6 +87,8 @@ class RetryFromFailureValidationResponse:
 
         total_step_count = self.total_step_count
 
+        retained_result_count = self.retained_result_count
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -105,6 +110,8 @@ class RetryFromFailureValidationResponse:
             field_dict["step_count_by_eligible_point"] = step_count_by_eligible_point
         if total_step_count is not UNSET:
             field_dict["total_step_count"] = total_step_count
+        if retained_result_count is not UNSET:
+            field_dict["retained_result_count"] = retained_result_count
 
         return field_dict
 
@@ -155,6 +162,8 @@ class RetryFromFailureValidationResponse:
 
         total_step_count = d.pop("total_step_count", UNSET)
 
+        retained_result_count = d.pop("retained_result_count", UNSET)
+
         retry_from_failure_validation_response = cls(
             eligible=eligible,
             reason=reason,
@@ -164,6 +173,7 @@ class RetryFromFailureValidationResponse:
             sanitized_replacements=sanitized_replacements,
             step_count_by_eligible_point=step_count_by_eligible_point,
             total_step_count=total_step_count,
+            retained_result_count=retained_result_count,
         )
 
         retry_from_failure_validation_response.additional_properties = d
