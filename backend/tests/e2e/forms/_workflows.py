@@ -171,6 +171,45 @@ def producer_prompt_consumer_workflow(
     )
 
 
+def form_trigger_consumer_workflow(
+    name: str,
+    *,
+    form_fields: list[dict[str, Any]],
+    consumer_code: str = DEFAULT_CONSUMER_CODE,
+    consumer_environment: Mapping[str, str] | None = None,
+) -> WorkflowDefinition:
+    """Build a Form Trigger workflow that exposes submitted values to a script consumer."""
+    consumer_parameters: dict[str, Any] = {"language": "python", "code": consumer_code}
+    if consumer_environment is not None:
+        consumer_parameters["environment"] = dict(consumer_environment)
+
+    return WorkflowDefinition.from_dict(
+        {
+            "name": name,
+            "schema_version": "2.0.0",
+            "triggers": [
+                {
+                    "id": "form",
+                    "type": "form_trigger",
+                    "parameters": {
+                        "message": "Enter the requested values.",
+                        "form_definition": {"fields": form_fields},
+                    },
+                }
+            ],
+            "nodes": [
+                {
+                    "id": "consumer",
+                    "name": "Consumer Node",
+                    "type": "script",
+                    "parameters": consumer_parameters,
+                }
+            ],
+            "edges": [{"from": "form", "to": "consumer"}],
+        }
+    )
+
+
 APPROVAL_REASON_FIELD: dict[str, Any] = {
     "type": "text",
     "value_name": "reason",
