@@ -13,10 +13,12 @@ import { expectPageTitle } from '../../test/pageTitle'
 
 import ExecutionPlane from './ExecutionPlane'
 
+const mockDeleteMutate = vi.fn()
+
 vi.mock('../../client', () => ({
   executionPlaneClient: {
     useQuery: vi.fn(),
-    useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+    useMutation: vi.fn(() => ({ mutate: mockDeleteMutate, isPending: false })),
   },
   authMiddleware: { onRequest: vi.fn(({ request }: { request: unknown }) => request) },
   interfaceTagMiddleware: { onRequest: vi.fn() },
@@ -139,6 +141,116 @@ describe('ExecutionPlane', () => {
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText(/Staging OpenShift/)).toBeInTheDocument()
     expect(within(dialog).getByRole('checkbox', { name: /permanently deleted/i })).toBeInTheDocument()
+  })
+
+  it('disables delete kebab action when canDelete is false', async () => {
+    vi.mocked(useCanI).mockImplementation((action) => ({
+      allowed: action === 'create',
+      isChecking: false,
+      isError: false,
+    }))
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Staging OpenShift' }))
+    const deleteItem = screen.getByRole('menuitem', { name: /Delete execution target/i })
+    expect(deleteItem).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('treats 202 Accepted as success, refetches, and leaves the pagination cursor unchanged', async () => {
+    const user = userEvent.setup()
+    const refetch = vi.fn().mockResolvedValue(undefined)
+    mockSearchParams.set('cursor', 'page-2-cursor')
+    mockFacadeQuery({ refetch })
+
+    mockDeleteMutate.mockImplementation(
+      (_params: unknown, callbacks?: { onSuccess?: () => void; onSettled?: () => void }) => {
+        callbacks?.onSuccess?.()
+        callbacks?.onSettled?.()
+      }
+    )
+
+    render(<ExecutionPlane />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Staging OpenShift' }))
+    await user.click(screen.getByRole('menuitem', { name: /Delete execution target/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('checkbox', { name: /permanently deleted/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+    expect(mockDeleteMutate).toHaveBeenCalledWith(
+      { params: { path: { target_id: 'et-002' } } },
+      expect.objectContaining({ onSuccess: expect.any(Function) as unknown as () => void })
+    )
+    expect(await screen.findByText('Deletion accepted')).toBeInTheDocument()
+    expect(refetch).toHaveBeenCalled()
+    expect(mockSetSearchParams).not.toHaveBeenCalled()
+    expect(mockSearchParams.get('cursor')).toBe('page-2-cursor')
+    // Target remains until a subsequent refetch returns updated data
+    expect(screen.getByRole('link', { name: 'Staging OpenShift' })).toBeInTheDocument()
+  })
+
+  it('shows an error alert on 409 conflict and keeps the target in the list', async () => {
+    const user = userEvent.setup()
+    const refetch = vi.fn().mockResolvedValue(undefined)
+    mockFacadeQuery({ refetch })
+
+    mockDeleteMutate.mockImplementation(
+      (_params: unknown, callbacks?: { onError?: (error: unknown) => void; onSettled?: () => void }) => {
+        callbacks?.onError?.({
+          status: 409,
+          detail: 'Cannot delete the default execution target; promote another target first',
+        })
+        callbacks?.onSettled?.()
+      }
+    )
+
+    render(<ExecutionPlane />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Prod OpenShift West' }))
+    await user.click(screen.getByRole('menuitem', { name: /Delete execution target/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('checkbox', { name: /permanently deleted/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+    expect(await screen.findByText('Delete failed')).toBeInTheDocument()
+    expect(
+      screen.getByText(/Cannot delete the default execution target; promote another target first/)
+    ).toBeInTheDocument()
+    expect(refetch).not.toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: 'Prod OpenShift West' })).toBeInTheDocument()
+  })
+
+  it('shows an error alert for in-use conflict and keeps the target in the list', async () => {
+    const user = userEvent.setup()
+    const refetch = vi.fn().mockResolvedValue(undefined)
+    mockFacadeQuery({ refetch })
+
+    mockDeleteMutate.mockImplementation(
+      (_params: unknown, callbacks?: { onError?: (error: unknown) => void; onSettled?: () => void }) => {
+        callbacks?.onError?.({
+          status: 409,
+          detail: 'Execution target is in use and cannot be deleted',
+        })
+        callbacks?.onSettled?.()
+      }
+    )
+
+    render(<ExecutionPlane />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Staging OpenShift' }))
+    await user.click(screen.getByRole('menuitem', { name: /Delete execution target/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('checkbox', { name: /permanently deleted/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+    expect(await screen.findByText('Delete failed')).toBeInTheDocument()
+    expect(screen.getByText(/Execution target is in use and cannot be deleted/)).toBeInTheDocument()
+    expect(refetch).not.toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: 'Staging OpenShift' })).toBeInTheDocument()
   })
 
   it('requests execution targets from the facade endpoint with cursor query params', () => {

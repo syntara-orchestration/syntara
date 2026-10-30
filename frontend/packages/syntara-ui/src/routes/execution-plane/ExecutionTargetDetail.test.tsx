@@ -239,6 +239,45 @@ describe('ExecutionTargetDetail', () => {
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/execution-plane' })
   })
 
+  it('stays on the detail page and shows an error when delete returns 409', async () => {
+    const user = userEvent.setup()
+    mockDeleteMutate.mockImplementation(
+      (_params: unknown, callbacks?: { onError?: (error: unknown) => void; onSettled?: () => void }) => {
+        callbacks?.onError?.({
+          status: 409,
+          detail: 'Cannot delete the default execution target; promote another target first',
+        })
+        callbacks?.onSettled?.()
+      }
+    )
+
+    render(<ExecutionTargetDetail />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Prod OpenShift West' }))
+    await user.click(screen.getByRole('menuitem', { name: /Delete execution target/i }))
+
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('checkbox', { name: /permanently deleted/i }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+    expect(await screen.findByText('Delete failed')).toBeInTheDocument()
+    expect(mockNavigate).not.toHaveBeenCalled()
+    expect(screen.getByRole('heading', { level: 1, name: 'Prod OpenShift West' })).toBeInTheDocument()
+  })
+
+  it('disables delete kebab action when canDelete is false', async () => {
+    vi.mocked(useCanI).mockImplementation((action) => ({
+      allowed: action === 'create',
+      isChecking: false,
+      isError: false,
+    }))
+    const user = userEvent.setup()
+    render(<ExecutionTargetDetail />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Prod OpenShift West' }))
+    expect(screen.getByRole('menuitem', { name: /Delete execution target/i })).toHaveAttribute('aria-disabled', 'true')
+  })
+
   it('has no accessibility violations on the details view', async () => {
     const { container } = render(<ExecutionTargetDetail />, { wrapper })
 

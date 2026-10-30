@@ -569,6 +569,76 @@ export const handlers = [
   }),
 
   /**
+   * Minimal POST for E2E self-containment (create-then-delete). The Create PR owns
+   * the full form-oriented handler; merge should keep the richer create validation.
+   */
+  http.post('/api/execution_plane/v1/execution_targets', async ({ request }) => {
+    const username = getUsernameFromRequest(request)
+    if (username !== 'admin') {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:create',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const body = (await request.json()) as {
+      name?: string
+      placement?: { namespace?: string; node_selectors?: string[]; tolerations?: string[] }
+      labels?: Record<string, string>
+      is_default?: boolean
+    }
+    const name = body.name?.trim() ?? ''
+    const namespace = body.placement?.namespace?.trim() ?? ''
+    if (!name || !namespace) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/validation-error',
+          title: 'Validation Error',
+          detail: 'name and placement.namespace are required',
+          code: 'VALIDATION_ERROR',
+          retryable: false,
+        },
+        { status: 422 }
+      )
+    }
+
+    const seedClusterId = executionTargets[0]?.cluster_id ?? 'b1000000-0000-4000-8000-000000000001'
+    const seedEndpoint = executionTargets[0]?.endpoint ?? 'https://api.openshift.example.com:6443'
+    const id = uuidv4()
+    const created = {
+      id,
+      cluster_id: seedClusterId,
+      name,
+      backend_type: 'kubernetes',
+      endpoint: seedEndpoint,
+      placement: {
+        type: 'kubernetes' as const,
+        namespace,
+        node_selectors: body.placement?.node_selectors ?? [],
+        tolerations: body.placement?.tolerations ?? [],
+      },
+      status: 'registering',
+      enabled: true,
+      is_default: body.is_default ?? false,
+      status_message: null,
+      labels: body.labels ?? {},
+      created_at: mockDate.now,
+      last_ran_at: null,
+    }
+    executionTargets.unshift(created)
+    return HttpResponse.json(created, {
+      status: 201,
+      headers: { Location: `/api/execution_plane/v1/execution_targets/${id}` },
+    })
+  }),
+
+  /**
    * DELETE execution target — 202 Accepted (draining continues independently).
    * 409 when the target is the current default or marked with the mock in-use label.
    * Mock removes the row on success for deterministic list/pagination tests; the UI
