@@ -81,9 +81,9 @@ function resolveCopySource(options: {
   jsonObject: object | undefined
   copyContent: string | undefined
 }): string {
-  return options.shouldHighlight
-    ? options.highlightedView.source
-    : resolveCopyText(options.codeContent, options.jsonObject, options.copyContent)
+  if (options.copyContent !== undefined) return options.copyContent
+  if (options.shouldHighlight) return options.highlightedView.source
+  return resolveCopyText(options.codeContent, options.jsonObject, undefined)
 }
 
 function findSearchRanges(source: string, searchTerm: string): SearchRange[] {
