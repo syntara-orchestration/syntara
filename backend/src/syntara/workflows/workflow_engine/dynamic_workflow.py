@@ -23,12 +23,20 @@ with workflow.unsafe.imports_passed_through():
         resolve_workflow_integration,
     )
     from syntara.workflows.workflow_engine.activities.integration_scope_activity import validate_node_references
+    from syntara.workflows.workflow_engine.activities.kafka_publish_connection import prepare_kafka_publish
+    from syntara.workflows.workflow_engine.activities.kafka_publish_errors import fail_publish
     from syntara.workflows.workflow_engine.activities.wait_activity import complete_wait
     from syntara.workflows.workflow_engine.constants import (
         DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
         ENGINE_MAX_OUTPUT_BYTES_KEY,
         ENGINE_TIMEOUT_SECONDS_KEY,
         INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS,
+        TEMPORAL_PAYLOAD_MAX_BYTES,
+    )
+    from syntara.workflows.workflow_engine.models.kafka_publish import (
+        KAFKA_PUBLISH_BUDGET_SECONDS,
+        KAFKA_PUBLISH_HEARTBEAT_TIMEOUT_SECONDS,
+        KafkaPublishParameters,
     )
     from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
     from syntara.workflows.workflow_engine.node_settings_resolver import (
@@ -38,7 +46,9 @@ with workflow.unsafe.imports_passed_through():
         resolve_retry_policy,
         resolve_timeout,
     )
+    from syntara.workflows.workflow_engine.services.kafka_publish_message import compile_publish_message
     from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credential_values, scrub_credentials
+    from syntara.workflows.workflow_engine.utils.temporal_argument_size import temporal_argument_size
     from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.approval_mixin import WorkflowApprovalMixin
@@ -1489,6 +1499,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 "default_port": node.parameters.get("default_port", "default"),
                 "namespace": self.resolver.get_complete_namespace(),
             }
+        elif node_type == NodeType.KAFKA_PUBLISH:
+            try:
+                KafkaPublishParameters.model_validate(node.parameters)
+                resolved_parameters = self._resolve_node_parameters(node)
+            except (KeyError, ValueError, TypeError):
+                fail_publish("kafka_invalid_message")
         else:
             # For all other nodes: standard resolution (Tier 1)
             resolved_parameters = self._resolve_node_parameters(node)
@@ -1630,6 +1646,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         Validates references, resolves credentials, and scrubs them after execution.
         """
+        if node.type == NodeType.KAFKA_PUBLISH:
+            return await self._dispatch_kafka_publish(node, resolved_parameters, timeout_seconds)
         await self._validate_node_references(node, resolved_parameters)
         await self._resolve_and_inject_credentials(node, resolved_parameters)
         await self._resolve_and_inject_integration(node, resolved_parameters)
@@ -1638,6 +1656,69 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             return await self._dispatch_node_to_executor(node, resolved_parameters, graph, timeout_seconds)
         finally:
             self._scrub_activity_credentials(resolved_parameters)
+
+    async def _dispatch_kafka_publish(
+        self, node: ActivityNode, parameters: dict[str, Any], timeout_seconds: int
+    ) -> dict[str, Any]:
+        """Keep preparation, queueing and all Temporal attempts under one deadline."""
+        deadline = workflow.now() + timedelta(seconds=KAFKA_PUBLISH_BUDGET_SECONDS)
+        sending = False
+        prepared: dict[str, Any] = {}
+        try:
+            # Validate the stored literal references as well as resolved data.
+            # Runtime templating must never bypass destination restrictions.
+            KafkaPublishParameters.model_validate(node.parameters)
+            compile_publish_message(KafkaPublishParameters.model_validate(parameters))
+            prepare_args = [parameters, self._project_id, min(timeout_seconds, KAFKA_PUBLISH_BUDGET_SECONDS)]
+            if temporal_argument_size(prepare_args) > TEMPORAL_PAYLOAD_MAX_BYTES:
+                fail_publish("kafka_arguments_too_large")
+            async with asyncio.timeout(KAFKA_PUBLISH_BUDGET_SECONDS):
+                prepared = await workflow.execute_activity(
+                    prepare_kafka_publish,
+                    args=prepare_args,
+                    activity_id=f"__internal__prepare_kafka_publish_{node.id}",
+                    start_to_close_timeout=timedelta(
+                        seconds=min(timeout_seconds + self._TEMPORAL_MARGIN, KAFKA_PUBLISH_BUDGET_SECONDS)
+                    ),
+                    schedule_to_close_timeout=timedelta(seconds=KAFKA_PUBLISH_BUDGET_SECONDS),
+                    retry_policy=resolve_retry_policy(node, self._runtime_settings),
+                )
+                for secret in prepared.get("_resolved_credentials", {}).get("_secret_values", []):
+                    if isinstance(secret, str):
+                        self._secret_values.add(secret)
+                prepared["_kafka_publish_deadline"] = deadline.isoformat()
+                prepared[ENGINE_TIMEOUT_SECONDS_KEY] = timeout_seconds
+                args = [prepared, node.outputs, self._project_id]
+                if temporal_argument_size(args) > TEMPORAL_PAYLOAD_MAX_BYTES:
+                    fail_publish("kafka_arguments_too_large")
+                remaining = (deadline - workflow.now()).total_seconds()
+                if remaining <= 0:
+                    fail_publish("kafka_timeout")
+                sending = True
+                return cast(
+                    "dict[str, Any]",
+                    await workflow.execute_activity(
+                        ActivityName.KAFKA_PUBLISH,
+                        args=args,
+                        activity_id=node.id,
+                        start_to_close_timeout=timedelta(
+                            seconds=min(timeout_seconds + self._TEMPORAL_MARGIN, remaining)
+                        ),
+                        schedule_to_close_timeout=timedelta(seconds=remaining),
+                        heartbeat_timeout=timedelta(seconds=KAFKA_PUBLISH_HEARTBEAT_TIMEOUT_SECONDS),
+                        retry_policy=resolve_retry_policy(node, self._runtime_settings),
+                    ),
+                )
+        except (TimeoutError, TemporalTimeoutError):
+            fail_publish("kafka_timeout", uncertain=sending)
+        except ActivityError as exc:
+            if isinstance(exc.cause, TemporalTimeoutError):
+                fail_publish("kafka_timeout", uncertain=sending)
+            raise
+        except (ValueError, TypeError):
+            fail_publish("kafka_invalid_message")
+        finally:
+            self._scrub_activity_credentials(prepared)
 
     async def _dispatch_node_to_executor(
         self,

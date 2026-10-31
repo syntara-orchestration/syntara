@@ -41,6 +41,9 @@ const TYPE_MAP = {
 }
 
 function mapType(jsonSchemaType) {
+  if (Array.isArray(jsonSchemaType)) {
+    return mapType(jsonSchemaType.find((type) => type !== 'null'))
+  }
   if (jsonSchemaType === undefined || jsonSchemaType === null) {
     return 'unknown'
   }
@@ -65,7 +68,7 @@ function extractFields(completedResult) {
     const prop = properties[name] ?? {}
     return {
       name,
-      type: mapType(prop.type),
+      type: mapType(prop.type ?? prop.anyOf?.map((variant) => variant.type)),
       description: prop.description ?? '',
     }
   })

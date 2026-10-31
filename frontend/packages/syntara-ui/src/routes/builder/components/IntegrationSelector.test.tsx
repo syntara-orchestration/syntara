@@ -1,5 +1,5 @@
 import type { IntegrationsAPI } from '@syntara/contracts'
-import { IntegrationStatusEnum } from '@syntara/contracts'
+import { IntegrationStatusEnum, IntegrationTypeEnum } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -85,6 +85,13 @@ function renderSelector(props: Partial<Parameters<typeof IntegrationSelector>[0]
 }
 
 describe('IntegrationSelector', () => {
+  it('uses the Kafka API and workflow project scope for Kafka selection', () => {
+    mockQuerySuccess([])
+    renderSelector({ integrationType: IntegrationTypeEnum.KAFKA, projectId: 'project-id', label: 'Kafka integration' })
+    expect(integrationsClient.useQuery).toHaveBeenCalledWith('get', '/kafka_integrations', {
+      params: { query: { enabled: true, project_id: 'project-id' } },
+    })
+  })
   beforeEach(() => {
     mockQuerySuccess()
   })

@@ -14,6 +14,7 @@ const ACTIVITY_EXECUTOR_TYPES = [
   'script',
   'agentic',
   'http_request',
+  'kafka_publish',
   'aap_job_template',
   'aap_workflow_job_template',
   'approval',
