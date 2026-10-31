@@ -30,7 +30,6 @@ import {
   RhUiProfileFillIcon,
   RhUiQuestionMarkCircleIcon,
 } from '@patternfly/react-icons'
-// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- MastheadLogo needs a plain anchor; SynLink adds PF Button styling
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
 

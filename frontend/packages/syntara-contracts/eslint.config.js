@@ -7,6 +7,9 @@ export default tseslint.config(
     // Hand-written files (index.ts, interfaces.ts) are still linted.
     ignores: ['src/*-api.ts', 'src/tool-manager.ts', 'src/node-output-schemas.ts'],
   },
+  {
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   { languageOptions: { parserOptions: { tsconfigRootDir: import.meta.dirname } } }
