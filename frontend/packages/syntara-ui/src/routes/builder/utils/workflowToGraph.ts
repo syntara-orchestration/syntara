@@ -58,6 +58,7 @@ export function extractTaskActivities(activities: Activity[]): Activity[] {
     if (
       activity.type === ActivityTypeEnum.SCRIPT ||
       activity.type === ActivityTypeEnum.HTTP_REQUEST ||
+      activity.type === ActivityTypeEnum.KAFKA_PUBLISH ||
       activity.type === ActivityTypeEnum.AGENTIC ||
       activity.type === ActivityTypeEnum.AAP_JOB_TEMPLATE ||
       activity.type === ActivityTypeEnum.AAP_WORKFLOW_JOB_TEMPLATE ||

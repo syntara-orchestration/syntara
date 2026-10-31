@@ -1403,6 +1403,7 @@ export interface components {
         | components['schemas']['AAPJobTemplateNode']
         | components['schemas']['AAPWorkflowJobTemplateNode']
         | components['schemas']['HTTPRequestNode']
+        | components['schemas']['KafkaPublishNode']
         | components['schemas']['AgenticNode']
         | components['schemas']['ScriptNode']
         | components['schemas']['ApprovalNode']
@@ -2773,6 +2774,87 @@ export interface components {
       resolve_unscheduled?: boolean
       /** Reason */
       reason: string
+    }
+    /**
+     * KafkaEncodedValue
+     * @description Explicit text or binary representation; empty bytes remain distinct from null.
+     */
+    KafkaEncodedValue: {
+      /**
+       * Encoding
+       * @enum {string}
+       */
+      encoding: 'utf-8' | 'base64'
+      /** Value */
+      value: string
+    }
+    /**
+     * KafkaPublishHeader
+     * @description One ordered header; duplicate names and null values are intentional.
+     */
+    KafkaPublishHeader: {
+      /** Name */
+      name: string
+      value: components['schemas']['KafkaEncodedValue'] | null
+    }
+    /**
+     * KafkaPublishParameters
+     * @description Fixed destination and a templated JSON message, with no producer overrides.
+     */
+    KafkaPublishParameters: {
+      /** Integration Id */
+      integration_id: string
+      /** Credential Id */
+      credential_id?: string | null
+      /** Topic */
+      topic: string
+      /**
+       * Payload
+       * @description Required JSON value; explicit null publishes JSON null, not a tombstone
+       */
+      payload: unknown
+      key?: components['schemas']['KafkaEncodedValue'] | null
+      /** Headers */
+      headers?: components['schemas']['KafkaPublishHeader'][] | string
+    }
+    /**
+     * KafkaPublishNode
+     * @description Publish one JSON record using a step-selected Kafka connection.
+     */
+    KafkaPublishNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'kafka_publish'
+      parameters: components['schemas']['KafkaPublishParameters']
+      settings?: components['schemas']['NodeSettingsFull'] | null
+    } & {
+      [key: string]: unknown
     }
     /**
      * UserReferenceType

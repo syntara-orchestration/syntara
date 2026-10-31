@@ -143,11 +143,17 @@
       "oneOf": [
         {
           "allOf": [
-            {"$ref": "#/$defs/node_base"},
+            {
+              "$ref": "#/$defs/node_base"
+            },
             {
               "properties": {
-                "type": {"const": "event_subscribe_trigger"},
-                "parameters": {"$ref": "triggers/event_subscribe.schema.json#/parameterSchema"}
+                "type": {
+                  "const": "event_subscribe_trigger"
+                },
+                "parameters": {
+                  "$ref": "triggers/event_subscribe.schema.json#/parameterSchema"
+                }
               }
             }
           ]
@@ -462,6 +468,26 @@
                 },
                 "settings": {
                   "$ref": "common-definitions.schema.json#/$defs/nodeSettingsCof"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "kafka_publish"
+                },
+                "parameters": {
+                  "$ref": "executors/kafka_publish.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsFull"
                 }
               }
             }

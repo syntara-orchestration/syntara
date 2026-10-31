@@ -12,6 +12,7 @@ class NodeType(str, Enum):
     EVENT_SUBSCRIBE_TRIGGER = "event_subscribe_trigger"
     HTTP_REQUEST = "http_request"
     INTERNAL_ACTIVITY = "internal_activity"
+    KAFKA_PUBLISH = "kafka_publish"
     LOOP = "loop"
     MANUAL_TRIGGER = "manual_trigger"
     SCHEDULED_TRIGGER = "scheduled_trigger"

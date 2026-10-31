@@ -93,6 +93,9 @@ def _collect_expected_integration_types(workflow_definition: dict[str, Any]) -> 
         if node_type in _AAP_NODE_TYPES and _is_valid_uuid(direct_id := params.get("integration_id")):
             ids_to_check[UUID(direct_id)] = IntegrationType.ANSIBLE_AUTOMATION_PLATFORM
 
+        if node_type == NodeType.KAFKA_PUBLISH and _is_valid_uuid(direct_id := params.get("integration_id")):
+            ids_to_check[UUID(direct_id)] = IntegrationType.KAFKA
+
         if node_type == NodeType.AGENTIC:
             for conn in params.get("integration_connections") or []:
                 if _is_valid_uuid(conn_id := conn.get("integration_id")):

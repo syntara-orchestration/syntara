@@ -63,6 +63,16 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
     { name: 'headers', type: 'object', description: 'Response headers' },
     { name: 'elapsed', type: 'number', description: 'Request duration in seconds' },
   ],
+  kafka_publish: [
+    { name: 'topic', type: 'string', description: 'Topic containing the acknowledged record' },
+    { name: 'partition', type: 'number', description: 'Kafka partition selected by the producer' },
+    { name: 'offset', type: 'string', description: 'Kafka offset as a decimal string; null when unavailable' },
+    {
+      name: 'timestamp_ms',
+      type: 'number',
+      description: 'Kafka record timestamp in milliseconds; null when unavailable',
+    },
+  ],
   agentic: [
     { name: 'status', type: 'string', description: 'Execution succeeded' },
     {
@@ -80,7 +90,7 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
     },
     {
       name: 'integration_ids',
-      type: 'unknown',
+      type: 'array',
       description: 'UUIDs of integrations used during execution (captured at runtime from integration_connections)',
     },
   ],

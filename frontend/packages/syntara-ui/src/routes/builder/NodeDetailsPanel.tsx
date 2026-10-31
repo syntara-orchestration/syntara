@@ -77,6 +77,7 @@ function getAddModeFormId(
   const simpleFormMap: Record<string, string> = {
     [RegistryNodeId.TRIGGER]: 'trigger-node-form',
     [RegistryNodeId.ACTION]: 'action-node-form',
+    [ExecutorTypeEnum.KAFKA_PUBLISH]: 'kafka-publish-node-form',
     [RegistryNodeId.AGENT]: 'ai-agent-node-form',
     [RegistryNodeId.APPROVAL]: 'approval-node-form',
   }
@@ -109,6 +110,7 @@ function getAddModeFormId(
 /** Get formId for TASK nodes by checking executor type */
 function getTaskFormId(taskData: TaskActivity): string {
   const executor = taskData.type
+  if (executor === ExecutorTypeEnum.KAFKA_PUBLISH) return 'kafka-publish-node-form'
 
   // Check if it's an AAP job template task
   if (executor === ExecutorTypeEnum.AAP_JOB_TEMPLATE) {

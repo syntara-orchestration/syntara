@@ -20,7 +20,9 @@ import { projectIdParam } from '../../../utils/queryParams'
 
 import { resolveFormGroupLabelHelp } from './resolveFormGroupLabelHelp'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead =
+  | IntegrationsAPI.components['schemas']['IntegrationRead']
+  | IntegrationsAPI.components['schemas']['KafkaIntegrationRead']
 type IntegrationStatus = (typeof IntegrationStatusEnum)[keyof typeof IntegrationStatusEnum]
 
 const STATUS_CONFIG: Record<
@@ -53,6 +55,7 @@ function getIntegrationBaseUrl(integration: IntegrationRead): string {
 }
 
 export type IntegrationSelectorProps = {
+  integrationType?: typeof IntegrationTypeEnum.MCP_SERVER | typeof IntegrationTypeEnum.KAFKA
   value?: string
   onChange: (integrationId: string | undefined) => void
   label?: string
@@ -114,18 +117,25 @@ export function IntegrationSelector({
   helpText,
   projectId,
   labelHelp,
+  integrationType = IntegrationTypeEnum.MCP_SERVER,
 }: Readonly<IntegrationSelectorProps>) {
   const [isOpen, setIsOpen] = useState(false)
 
-  const { data, isPending, isError, refetch } = integrationsClient.useQuery('get', '/integrations', {
-    params: {
-      query: {
-        integration_type: IntegrationTypeEnum.MCP_SERVER,
-        enabled: true,
-        ...projectIdParam(projectId),
+  const isKafka = integrationType === IntegrationTypeEnum.KAFKA
+  const emptyLabel = isKafka ? 'No Kafka integrations available' : 'No MCP server integrations available'
+  const { data, isPending, isError, refetch } = integrationsClient.useQuery(
+    'get',
+    isKafka ? '/kafka_integrations' : '/integrations',
+    {
+      params: {
+        query: {
+          ...(isKafka ? {} : { integration_type: IntegrationTypeEnum.MCP_SERVER }),
+          enabled: true,
+          ...projectIdParam(projectId),
+        },
       },
-    },
-  })
+    }
+  )
 
   const integrations: IntegrationRead[] = useMemo(() => data?.resources ?? [], [data?.resources])
 
@@ -174,9 +184,9 @@ export function IntegrationSelector({
         toggle={renderToggle}
         shouldFocusToggleOnSelect
       >
-        <SelectList aria-label="MCP server integration options">
+        <SelectList aria-label={`${label} options`}>
           <SelectOption value={NO_INTEGRATION_VALUE} isSelected={!value}>
-            No integration (use direct connection)
+            {isKafka ? 'Select a Kafka integration' : 'No integration (use direct connection)'}
           </SelectOption>
           {integrations.map((integration) => (
             <SelectOption
@@ -191,7 +201,7 @@ export function IntegrationSelector({
           ))}
           {integrations.length === 0 && !isPending && (
             <SelectOption isDisabled value="__empty__">
-              {isError ? 'Failed to load integrations' : 'No MCP server integrations available'}
+              {isError ? 'Failed to load integrations' : emptyLabel}
             </SelectOption>
           )}
         </SelectList>

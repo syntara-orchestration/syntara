@@ -1,5 +1,5 @@
-import { Flex, FlexItem, Stack, StackItem, Tab, Tabs } from '@patternfly/react-core'
-import { useState } from 'react'
+import { Flex, FlexItem, Stack, StackItem, Tab, TabContent, Tabs } from '@patternfly/react-core'
+import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { SynPageBody } from '../../../../components/layout/SynPage'
@@ -15,6 +15,7 @@ type NodeFormTabsLayoutProps = {
 
 export function NodeFormTabsLayout({ parametersContent, settingsContent, hideSettingsTab }: NodeFormTabsLayoutProps) {
   const [activeTabKey, setActiveTabKey] = useState<number>(0)
+  const panelId = useId()
   const tabBarAction = useNodeFormTabBar()
 
   return (
@@ -23,8 +24,10 @@ export function NodeFormTabsLayout({ parametersContent, settingsContent, hideSet
         <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
           <FlexItem>
             <Tabs activeKey={activeTabKey} onSelect={(_event, key) => setActiveTabKey(Number(key))}>
-              <Tab eventKey={0} title="Parameters" />
-              {!hideSettingsTab && settingsContent !== undefined && <Tab eventKey={1} title="Settings" />}
+              <Tab eventKey={0} title="Parameters" tabContentId={`${panelId}-parameters`} />
+              {!hideSettingsTab && settingsContent !== undefined && (
+                <Tab eventKey={1} title="Settings" tabContentId={`${panelId}-settings`} />
+              )}
             </Tabs>
           </FlexItem>
           {tabBarAction && <FlexItem>{tabBarAction}</FlexItem>}
@@ -32,7 +35,16 @@ export function NodeFormTabsLayout({ parametersContent, settingsContent, hideSet
       </StackItem>
       <SynPageBody>
         <Stack hasGutter>
-          <StackItem>{activeTabKey === 0 ? parametersContent : (settingsContent ?? null)}</StackItem>
+          <StackItem>
+            <TabContent id={`${panelId}-parameters`} aria-label="Parameters" hidden={activeTabKey !== 0}>
+              {activeTabKey === 0 ? parametersContent : []}
+            </TabContent>
+            {!hideSettingsTab && settingsContent !== undefined && (
+              <TabContent id={`${panelId}-settings`} aria-label="Settings" hidden={activeTabKey !== 1}>
+                {activeTabKey === 1 ? settingsContent : []}
+              </TabContent>
+            )}
+          </StackItem>
         </Stack>
       </SynPageBody>
     </Stack>
