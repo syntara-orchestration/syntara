@@ -788,7 +788,12 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
                 "type": "loop",
                 "parameters": {"type": "for_each", "items": '["first", "second"]'},
             },
-            {"id": "route", "name": "Route", "type": "condition", "parameters": {"condition": "1 == 1"}},
+            {
+                "id": "route",
+                "name": "Route",
+                "type": "condition",
+                "parameters": {"condition": "${loop.item} == 'first'"},
+            },
             _script_node(
                 "repair_body",
                 "import os\n"
@@ -800,7 +805,14 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
                     "ITEM": "${loop.item}",
                 },
             ),
-            _script_node("unused_branch", "print('must-not-run')"),
+            _script_node(
+                "alternate_body",
+                "import os; print(f\"alternate:{os.environ['PHASE']}:{os.environ['ITEM']}\")",
+                environment={
+                    "PHASE": "${outer_context.stdout_json.phase}",
+                    "ITEM": "${loop.item}",
+                },
+            ),
             _script_node("finished", "print('nested-loop-finished')"),
         ],
         [
@@ -809,9 +821,9 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
             {"from": "outer_context", "to": "inner_loop"},
             {"from": "inner_loop", "to": "route", "from_port": "iterate"},
             {"from": "route", "to": "repair_body", "from_port": "true"},
-            {"from": "route", "to": "unused_branch", "from_port": "false"},
+            {"from": "route", "to": "alternate_body", "from_port": "false"},
             {"from": "repair_body", "to": "inner_loop", "to_port": "iterate"},
-            {"from": "unused_branch", "to": "inner_loop", "to_port": "iterate"},
+            {"from": "alternate_body", "to": "inner_loop", "to_port": "iterate"},
             {"from": "inner_loop", "to": "outer_loop", "from_port": "complete", "to_port": "iterate"},
             {"from": "outer_loop", "to": "finished", "from_port": "complete"},
         ],
@@ -835,22 +847,21 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
             "route_iter_0_iter_1",
             "route_iter_1_iter_0",
             "repair_body_iter_0_iter_0",
-            "repair_body_iter_0_iter_1",
             "repair_body_iter_1_iter_0",
+            "alternate_body_iter_0_iter_1",
         },
     )
     assert source_rows["repair_body_iter_0_iter_0"].status == "completed"
-    assert source_rows["repair_body_iter_0_iter_1"].status == "completed"
     assert source_rows["repair_body_iter_1_iter_0"].status == "failed"
     assert "first:first" in _listed_stdout(source_rows["repair_body_iter_0_iter_0"])
-    assert "first:second" in _listed_stdout(source_rows["repair_body_iter_0_iter_1"])
     assert "second:first" in _listed_stdout(source_rows["repair_body_iter_1_iter_0"])
     assert _activity_output(source_rows["route_iter_0_iter_0"]).get("evaluated_result") is True
+    assert _activity_output(source_rows["route_iter_0_iter_1"]).get("evaluated_result") is False
     assert _activity_output(source_rows["route_iter_1_iter_0"]).get("evaluated_result") is True
-
-    for temporal_id in ("unused_branch_iter_0_iter_0", "unused_branch_iter_0_iter_1", "unused_branch_iter_1_iter_0"):
-        unused_branch = source_rows.get(temporal_id)
-        assert unused_branch is None or unused_branch.status == "skipped"
+    assert source_rows["alternate_body_iter_0_iter_1"].status == "completed"
+    assert "alternate:first:second" in _listed_stdout(source_rows["alternate_body_iter_0_iter_1"])
+    unreached_repair = source_rows.get("repair_body_iter_0_iter_1")
+    assert unreached_repair is None or unreached_repair.status != "completed"
 
     preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
     assert preview.eligible is True
@@ -874,11 +885,11 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
             "route_iter_0_iter_0",
             "route_iter_0_iter_1",
             "repair_body_iter_0_iter_0",
-            "repair_body_iter_0_iter_1",
+            "alternate_body_iter_0_iter_1",
             "route_iter_1_iter_0",
             "repair_body_iter_1_iter_0",
             "route_iter_1_iter_1",
-            "repair_body_iter_1_iter_1",
+            "alternate_body_iter_1_iter_1",
         },
     )
 
@@ -887,7 +898,7 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
         "route_iter_0_iter_0",
         "route_iter_0_iter_1",
         "repair_body_iter_0_iter_0",
-        "repair_body_iter_0_iter_1",
+        "alternate_body_iter_0_iter_1",
     ):
         assert retry_rows[temporal_id].status == source_rows[temporal_id].status
         assert _timestamp(retry_rows[temporal_id], "started_at") == _timestamp(source_rows[temporal_id], "started_at")
@@ -902,11 +913,11 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
         source_rows["repair_body_iter_1_iter_0"], "started_at"
     )
     assert "recovered:second:first" in _listed_stdout(repaired_middle)
-    assert _activity_output(retry_rows["route_iter_1_iter_1"]).get("evaluated_result") is True
-    assert retry_rows["repair_body_iter_1_iter_1"].status == "completed"
-    assert "recovered:second:second" in _listed_stdout(retry_rows["repair_body_iter_1_iter_1"])
-    unused_final_branch = retry_rows.get("unused_branch_iter_1_iter_1")
-    assert unused_final_branch is None or unused_final_branch.status == "skipped"
+    assert _activity_output(retry_rows["route_iter_1_iter_1"]).get("evaluated_result") is False
+    assert retry_rows["alternate_body_iter_1_iter_1"].status == "completed"
+    assert "alternate:second:second" in _listed_stdout(retry_rows["alternate_body_iter_1_iter_1"])
+    unreached_final_repair = retry_rows.get("repair_body_iter_1_iter_1")
+    assert unreached_final_repair is None or unreached_final_repair.status != "completed"
 
 
 def test_retry_defaults_to_all_failed_parallel_branches_when_selection_is_omitted(
