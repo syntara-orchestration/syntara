@@ -913,7 +913,7 @@ def test_retry_defaults_to_all_failed_parallel_branches_when_selection_is_omitte
     syntara_api: SyntaraApiRegistry,
     first_project_id: UUID,
 ) -> None:
-    """An empty retry_point_ids list retries every currently failed branch."""
+    """Omitting retry_point_ids retries every currently failed branch."""
     name = unique_name("e2e-retry-parallel-default-selection")
     source = create_and_run_workflow(
         syntara_api,
@@ -932,11 +932,10 @@ def test_retry_defaults_to_all_failed_parallel_branches_when_selection_is_omitte
     assert preview.eligible is True
     assert set(preview.eligible_point_ids) == {"failure_a", "failure_b"}
 
-    # Empty retry_point_ids is the documented default: retry every currently failed point.
+    # Omit retry_point_ids entirely to exercise the API's default selection behavior.
     retried = _start_retry(
         syntara_api,
         source.id,
-        [],
         overrides={
             "failure_a": {"code": "print('fixed-a')"},
             "failure_b": {"code": "print('fixed-b')"},
