@@ -1,7 +1,7 @@
 .panel {
   height: 100%;
   max-height: 100%;
-  width: min(24rem, 92vw);
+  width: min(92vw, clamp(18rem, 22vw, 24rem));
   flex-shrink: 0;
 }
 
@@ -26,6 +26,18 @@
 .bodyPadding {
   min-height: 0;
   padding: 0 var(--pf-t--global--spacer--md) var(--pf-t--global--spacer--md);
+}
+
+.retryPlanCard {
+  padding: var(--pf-t--global--spacer--md);
+  border: 1px solid var(--pf-t--global--border--color--default);
+  border-radius: var(--pf-t--global--border--radius--small);
+}
+
+.retryPlanSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--sm);
 }
 
 .retryPoint {

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { Children, isValidElement, type ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { FlowNodeType } from '../../constants'
@@ -35,7 +36,33 @@ vi.mock('@xyflow/react', async (importOriginal) => {
     ...(actual as Record<string, unknown>),
     ReactFlow: (props: Record<string, unknown>) => {
       latestReactFlowProps = props
-      return <div data-testid="reactflow" />
+      const previewMarkers = Children.toArray(props.children as ReactNode).flatMap((child) =>
+        isValidElement<{
+          nodeId?: string
+          position?: string
+          align?: string
+          offset?: number
+          children?: ReactNode
+          'data-testid'?: string
+        }>(child) && typeof child.props.nodeId === 'string'
+          ? [child.props]
+          : []
+      )
+      return (
+        <div data-testid="reactflow">
+          {previewMarkers.map(({ nodeId, position, align, offset, children, 'data-testid': testId }) => (
+            <div
+              key={nodeId}
+              data-testid={testId ?? `retry-preview-${nodeId}`}
+              data-position={position}
+              data-align={align}
+              data-offset={offset}
+            >
+              {children}
+            </div>
+          ))}
+        </div>
+      )
     },
     Background: () => null,
     BackgroundVariant: { Dots: 'dots' },
@@ -252,6 +279,49 @@ describe('BuilderFlow execution view', () => {
     expect(screen.getByRole('progressbar')).toBeInTheDocument()
   })
 
+  it('anchors the retry origin marker above and close to its execution node', () => {
+    setWorkflowState({
+      currentWorkflow: {
+        id: 'workflow-retry-preview',
+        inputs: {},
+        triggers: [],
+        workflow: {
+          activities: [
+            { id: 'step-a', type: 'script', name: 'Step A', parameters: {} },
+            { id: 'step-b', type: 'script', name: 'Step B', parameters: {} },
+          ],
+        },
+      },
+      triggers: [],
+      edges: [{ id: 'edge-step-a-b', source: 'step-a', target: 'step-b' }],
+    })
+    setExecutionState(new Map())
+
+    render(
+      <ExecutionViewContext.Provider value={true}>
+        <BuilderFlow
+          workflowId="workflow-retry-preview"
+          panelOpen={false}
+          executionStatus="failed"
+          retryPreviewPointIds={['step-a#iter-2']}
+        />
+      </ExecutionViewContext.Provider>
+    )
+
+    const retryOrigin = screen.getByTestId('retry-origin-step-a')
+    expect(retryOrigin).toBeInTheDocument()
+    expect(retryOrigin).toHaveAttribute('data-position', 'top')
+    expect(retryOrigin).toHaveAttribute('data-align', 'end')
+    expect(retryOrigin).toHaveAttribute('data-offset', '8')
+    expect(screen.getByTestId('retry-origin-label-step-a')).toHaveAttribute('aria-hidden', 'true')
+    const nodes = (latestReactFlowProps as Record<string, unknown>).nodes as Array<{
+      id: string
+      ariaLabel?: string
+    }>
+    expect(nodes.find((node) => node.id === 'step-a')?.ariaLabel).toBe('Step A, retry origin')
+    expect(screen.queryByTestId('retry-origin-step-b')).not.toBeInTheDocument()
+  })
+
   it('keeps edit interactions enabled outside execution view', () => {
     render(<BuilderFlow workflowId="workflow-1" panelOpen={false} executionStatus={null} />)
 
@@ -327,7 +397,7 @@ describe('BuilderFlow execution view', () => {
       currentWorkflow: {
         id: 'workflow-retry',
         inputs: {},
-        triggers: [{ type: 'manual', name: 'Manual Trigger' }],
+        triggers: [{ id: 'trigger-manual', type: 'manual', name: 'Manual Trigger' }],
         workflow: {
           activities: [
             {
@@ -349,13 +419,14 @@ describe('BuilderFlow execution view', () => {
         { id: 'edge-trigger-replayed', source: 'trigger-0', target: 'task-replayed' },
         { id: 'edge-replayed-fresh', source: 'task-replayed', target: 'task-fresh' },
       ],
-      triggers: [{ type: 'manual', name: 'Manual Trigger' }],
+      triggers: [{ id: 'trigger-manual', type: 'manual', name: 'Manual Trigger' }],
     })
-    // Retry created at noon. The first step carries the source run's 11:00 start,
-    // the second actually ran inside the retry at 12:00:05.
+    // Retry created at noon. The trigger and first step carry the source run's
+    // 11:00 start; the second actually ran inside the retry at 12:00:05.
     setRetryReplayBaseline('2026-10-09T12:00:00Z')
     setExecutionState(
       new Map([
+        ['trigger-manual', { status: 'completed', startedAt: '2026-10-09T11:00:00Z' } as never],
         ['task-replayed', { status: 'completed', startedAt: '2026-10-09T11:00:00Z' } as never],
         ['task-fresh', { status: 'running', startedAt: '2026-10-09T12:00:05Z' } as never],
       ])
@@ -375,6 +446,7 @@ describe('BuilderFlow execution view', () => {
         unknown
       >
 
+    expect(stateOf('trigger-0').replayed).toBe(true)
     expect(stateOf('task-replayed').replayed).toBe(true)
     expect(stateOf('task-fresh').replayed).toBe(false)
   })

@@ -70,6 +70,7 @@ export function RetryExecutionButton({
             toggleRef.current = node
           }}
           variant="secondary"
+          data-testid="retry-run-menu-toggle"
           onClick={() => setIsRetryMenuOpen((isOpen) => !isOpen)}
           isExpanded={isRetryMenuOpen}
         >

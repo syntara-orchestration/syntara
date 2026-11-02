@@ -1,3 +1,4 @@
+import type { ExecutionsAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { executionsClient } from '../../../client'
@@ -9,6 +10,10 @@ type UseRetryFromFailureParams = {
   executionId: string
   onSuccess?: (newExecutionId: string) => void
 }
+
+type InputParameterOverrides = NonNullable<
+  ExecutionsAPI.components['schemas']['RetryFailureRequest']['input_parameter_overrides']
+>
 
 function invalidateRetryQueries(queryClient: ReturnType<typeof useQueryClient>) {
   detachPromise(
@@ -36,11 +41,18 @@ export function useRetryFromFailure({ executionId, onSuccess }: UseRetryFromFail
   const retryMutation = executionsClient.useMutation('post', '/executions/{execution_id}/retry_from_failure')
   /* v8 ignore stop */
 
-  function handleRetry(retryPointIds?: string[]) {
+  function handleRetry(retryPointIds?: string[], inputParameterOverrides?: InputParameterOverrides) {
+    const body: ExecutionsAPI.components['schemas']['RetryFailureRequest'] = {
+      ...(retryPointIds?.length ? { retry_point_ids: retryPointIds } : {}),
+      ...(inputParameterOverrides && Object.keys(inputParameterOverrides).length > 0
+        ? { input_parameter_overrides: inputParameterOverrides }
+        : {}),
+    }
+
     retryMutation.mutate(
       {
         params: { path: { execution_id: executionId } },
-        body: retryPointIds?.length ? { retry_point_ids: retryPointIds } : {},
+        body,
       },
       {
         onSuccess(data) {
