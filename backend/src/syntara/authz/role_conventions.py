@@ -18,6 +18,8 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID, uuid5
 
+from syntara.workflows.node_kinds import NODE_KINDS, node_kind_display_label
+
 _BUILTIN_NS = UUID("a3c1f8d0-7e2b-4f5a-9c6d-1b8e3f0a2d4c")
 
 
@@ -29,33 +31,42 @@ class PolicyInfo:
     action: str
     scope: str = "any"
     roles: tuple[str, ...] = field(default=(), compare=False, hash=False)
+    effect: str = "allow"
+    kind: str | None = None
 
     @property
     def name(self) -> str:
-        """Canonical 3-part policy name."""
-        return f"{self.resource}:{self.action}:{self.scope}"
+        """Canonical name, with effect and kind appended for step-type denies."""
+        name = f"{self.resource}:{self.action}:{self.scope}"
+        return f"{name}:deny:{self.kind}" if self.effect == "deny" else name
 
     @property
     def description(self) -> str:
         """Human-readable description."""
         scope_label = "own" if self.scope == "self" else self.scope
+        if self.effect == "deny" and self.kind is not None:
+            location = "in every project" if self.scope == "any" else "in the assigned project"
+            return f"Block authoring {node_kind_display_label(self.kind)} steps {location}"
         action_label = self.action.capitalize()
         return f"{action_label} {scope_label} {self.resource}"
 
     @property
     def statements(self) -> list[dict[str, object]]:
         """Rego policy statement list."""
-        return [
-            {
-                "effect": "allow",
-                "actions": [f"{self.resource}:{self.action}"],
-                "scope": self.scope,
-            }
-        ]
+        statement: dict[str, object] = {
+            "effect": self.effect,
+            "actions": [f"{self.resource}:{self.action}"],
+            "scope": self.scope,
+        }
+        if self.kind is not None:
+            statement["conditions"] = {"resource_labels": {"kind": self.kind}}
+        return [statement]
 
     @classmethod
     def from_name(cls, name: str) -> PolicyInfo:
-        """Parse a canonical policy name (``resource:action:scope``) into a PolicyInfo."""
+        """Look up registered names, or parse a legacy allow-policy name."""
+        if name in _POLICY_MAP:
+            return _POLICY_MAP[name]
         parts = name.split(":")
         if len(parts) == 3:  # noqa: PLR2004
             return cls(resource=parts[0], action=parts[1], scope=parts[2])
@@ -236,6 +247,13 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("service_account", "enable", scope="project", roles=("project-admin",)),
 ]
 
+# Denies are available for explicit role composition, never assigned by default.
+BUILTIN_POLICIES.extend(
+    PolicyInfo("step_type", "write", scope=scope, effect="deny", kind=kind)
+    for kind in sorted(NODE_KINDS)
+    for scope in ("any", "project")
+)
+
 BUILTIN_ROLES: list[RoleInfo] = [
     RoleInfo("admin", "Full access to all resources"),
     RoleInfo("auditor", "Read-only access with audit log visibility"),
@@ -323,7 +341,7 @@ def builtin_roles_with_system_grant(resource: str, action: str) -> frozenset[str
     return frozenset(
         role_name
         for p in BUILTIN_POLICIES
-        if p.resource == resource and p.action == action and p.scope in ("any", "system", "")
+        if p.effect == "allow" and p.resource == resource and p.action == action and p.scope in ("any", "system", "")
         for role_name in p.roles
     )
 

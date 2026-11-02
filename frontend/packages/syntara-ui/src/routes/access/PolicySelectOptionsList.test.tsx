@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { SELECT_ALL_LABEL } from './policySelectConstants'
 import { PolicySelectOptionsList } from './PolicySelectOptionsList'
 
 describe('PolicySelectOptionsList', () => {
@@ -43,7 +44,7 @@ describe('PolicySelectOptionsList', () => {
       />
     )
 
-    expect(screen.getByRole('menuitem', { name: 'Select all' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: SELECT_ALL_LABEL })).toBeInTheDocument()
   })
 
   it('disables Select All and shows progress while selection is in progress', () => {

@@ -16,6 +16,8 @@ from syntara.authz.role_conventions import (
     resolve_builtin_policy_statements,
     resolve_builtin_role_statements,
 )
+from syntara.authz.services.policy_service import PolicyService
+from syntara.workflows.node_kinds import NODE_KINDS
 
 # ============================================================================
 # PolicyInfo
@@ -23,6 +25,30 @@ from syntara.authz.role_conventions import (
 
 
 class TestPolicyInfo:  # noqa: D101
+    @pytest.mark.parametrize("kind", sorted(NODE_KINDS))
+    @pytest.mark.parametrize("scope", ["any", "project"])
+    def test_step_type_deny_catalog(self, kind: str, scope: str) -> None:
+        name = f"step_type:write:{scope}:deny:{kind}"
+        policy = get_builtin_policy(name)
+        assert policy is not None
+        assert policy.roles == ()
+        assert policy.statements == [
+            {
+                "effect": "deny",
+                "actions": ["step_type:write"],
+                "scope": scope,
+                "conditions": {"resource_labels": {"kind": kind}},
+            }
+        ]
+        assert PolicyInfo.from_name(name) == policy
+        PolicyService._validate_deny_effect(policy.statements)
+        PolicyService._validate_resource_actions(policy.statements)
+
+    def test_no_builtin_step_type_allow_or_internal_kind(self) -> None:
+        policies = [p for p in BUILTIN_POLICIES if p.resource == "step_type"]
+        assert len(policies) == 2 * len(NODE_KINDS)
+        assert all(p.effect == "deny" and p.kind != "internal_activity" for p in policies)
+
     def test_name_format(self) -> None:
         p = PolicyInfo("workflow", "create", scope="project")
         assert p.name == "workflow:create:project"

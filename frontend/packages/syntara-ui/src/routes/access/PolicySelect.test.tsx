@@ -10,7 +10,7 @@ import { AlertProvider } from '../../providers/alerts'
 import { accessClient } from './accessClient'
 import { fetchAllPoliciesForSelect } from './fetchAllPoliciesForSelect'
 import { PolicySelect } from './PolicySelect'
-import { SELECT_ALL_LOAD_ERROR } from './policySelectConstants'
+import { SELECT_ALL_LABEL, SELECT_ALL_LOAD_ERROR } from './policySelectConstants'
 
 vi.mock('../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
@@ -60,9 +60,27 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 )
 
 const mockPolicies = [
-  { id: 'p1', name: 'workflow-admin', description: 'Manage workflows', is_project_eligible: false },
-  { id: 'p2', name: 'project-viewer', description: 'View projects', is_project_eligible: false },
-  { id: 'p3', name: 'execution-runner', description: null, is_project_eligible: false },
+  {
+    id: 'p1',
+    name: 'workflow-admin',
+    description: 'Manage workflows',
+    is_project_eligible: false,
+    statements: [{ effect: 'allow' }],
+  },
+  {
+    id: 'p2',
+    name: 'project-viewer',
+    description: 'View projects',
+    is_project_eligible: false,
+    statements: [{ effect: 'allow' }],
+  },
+  {
+    id: 'p3',
+    name: 'execution-runner',
+    description: null,
+    is_project_eligible: false,
+    statements: [{ effect: 'allow' }],
+  },
 ]
 
 function renderPolicySelect(overrides: Partial<React.ComponentProps<typeof PolicySelect>> = {}) {
@@ -275,7 +293,7 @@ describe('PolicySelect', () => {
 
       await user.click(getInput())
 
-      expect(screen.getByRole('option', { name: 'Select all' })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: SELECT_ALL_LABEL })).toBeInTheDocument()
     })
 
     it('fetches all policies when Select All is clicked', async () => {
@@ -283,7 +301,7 @@ describe('PolicySelect', () => {
       const { onChange } = renderPolicySelect()
 
       await user.click(getInput())
-      await user.click(screen.getByRole('option', { name: 'Select all' }))
+      await user.click(screen.getByRole('option', { name: SELECT_ALL_LABEL }))
 
       await waitFor(() => {
         expect(fetchAllPoliciesForSelect).toHaveBeenCalledWith({
@@ -300,14 +318,14 @@ describe('PolicySelect', () => {
     it('includes policies beyond the first page when Select All is clicked', async () => {
       vi.mocked(fetchAllPoliciesForSelect).mockResolvedValue([
         ...mockPolicies,
-        { id: 'p4', name: 'extra-policy', description: 'Extra access' },
+        { id: 'p4', name: 'extra-policy', description: 'Extra access', statements: [{ effect: 'allow' }] },
       ] as never)
 
       const user = userEvent.setup()
       const { onChange } = renderPolicySelect()
 
       await user.click(getInput())
-      await user.click(screen.getByRole('option', { name: 'Select all' }))
+      await user.click(screen.getByRole('option', { name: SELECT_ALL_LABEL }))
 
       await waitFor(() => {
         expect(onChange).toHaveBeenCalledWith(['workflow-admin', 'project-viewer', 'execution-runner', 'extra-policy'])
@@ -319,7 +337,7 @@ describe('PolicySelect', () => {
       const { onChange } = renderPolicySelect({ selected: ['workflow-admin'] })
 
       await user.click(getInput())
-      await user.click(screen.getByRole('option', { name: 'Select all' }))
+      await user.click(screen.getByRole('option', { name: SELECT_ALL_LABEL }))
 
       await waitFor(() => {
         expect(onChange).toHaveBeenCalledWith(['workflow-admin', 'project-viewer', 'execution-runner'])
@@ -333,7 +351,7 @@ describe('PolicySelect', () => {
 
       await user.click(getInput())
       await user.type(getInput(), 'workflow')
-      await user.click(screen.getByRole('option', { name: 'Select all' }))
+      await user.click(screen.getByRole('option', { name: SELECT_ALL_LABEL }))
 
       await waitFor(() => {
         expect(fetchAllPoliciesForSelect).toHaveBeenCalledWith({
@@ -363,7 +381,7 @@ describe('PolicySelect', () => {
 
       await user.click(getInput())
 
-      expect(screen.queryByRole('option', { name: 'Select all' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: SELECT_ALL_LABEL })).not.toBeInTheDocument()
     })
 
     it('does not show project-only policies in the dropdown for global roles', async () => {
@@ -403,7 +421,7 @@ describe('PolicySelect', () => {
       renderPolicySelect()
 
       await user.click(getInput())
-      await user.click(screen.getByRole('option', { name: 'Select all' }))
+      await user.click(screen.getByRole('option', { name: SELECT_ALL_LABEL }))
 
       expect(screen.getByRole('option', { name: /Selecting all/i })).toBeDisabled()
     })
@@ -415,7 +433,7 @@ describe('PolicySelect', () => {
       renderPolicySelect()
 
       await user.click(getInput())
-      await user.click(screen.getByRole('option', { name: 'Select all' }))
+      await user.click(screen.getByRole('option', { name: SELECT_ALL_LABEL }))
 
       await waitFor(() => {
         expect(mockShowError).toHaveBeenCalledWith(SELECT_ALL_LOAD_ERROR)

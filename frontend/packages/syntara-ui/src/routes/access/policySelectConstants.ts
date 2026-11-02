@@ -4,13 +4,14 @@ export type PolicySelectListItem = {
   description?: string | null
   project_id?: string | null
   is_project_eligible: boolean
+  statements?: readonly unknown[]
 }
 
 /** Sentinel value for the "Select All" action in policy multi-select dropdowns. */
 export const SELECT_ALL_VALUE = '__select_all__'
 
 /** Label for the select-all menu action (matches MultiSelectFilter). */
-export const SELECT_ALL_LABEL = 'Select all'
+export const SELECT_ALL_LABEL = 'Select all allow policies'
 
 export const SELECT_ALL_LOAD_ERROR = {
   title: 'Failed to load policies',
@@ -41,4 +42,16 @@ export function filterPoliciesForRoleSelect<T extends PolicySelectListItem>(
 /** Merge currently selected policy names with all option names (deduped). */
 export function mergeSelectAll(currentSelected: string[], optionNames: string[]): string[] {
   return [...new Set([...currentSelected, ...optionNames])]
+}
+
+/** Deny and mixed policies require explicit selection. Missing statements are not grants. */
+export function isAllowOnlyPolicy(policy: PolicySelectListItem): boolean {
+  const statements = policy.statements ?? []
+  return (
+    statements.length > 0 &&
+    statements.every(
+      (statement) =>
+        typeof statement === 'object' && statement !== null && 'effect' in statement && statement.effect === 'allow'
+    )
+  )
 }

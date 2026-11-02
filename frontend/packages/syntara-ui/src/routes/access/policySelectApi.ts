@@ -9,6 +9,7 @@ type PolicyListPayload = {
         description?: string | null
         project_id?: string | null
         is_project_eligible: boolean
+        statements?: readonly unknown[]
       }[]
     | null
   next?: string | null
@@ -31,6 +32,7 @@ export function toPolicySelectPageResult(result: {
         description: policy.description,
         project_id: policy.project_id,
         is_project_eligible: policy.is_project_eligible,
+        statements: policy.statements ?? [],
       })),
     },
   }

@@ -172,6 +172,24 @@ There are two seeding paths:
 
 Both functions only create groups, the default project, the admin user, and role assignments. Built-in policies and roles are not seeded into the database — they are resolved from `role_conventions.py` at runtime.
 
+The data-only Alembic migration `9e4b7c2a6f81` separately creates the custom
+`default-step-type-write` policy, the system-scoped `step-type-author` role,
+and its global assignment to `authenticated`. The policy allows
+`step_type:write` for every authorable kind. The implicit authenticated group
+also applies to service accounts; ordinary workflow permissions are still
+required. All three grant records have `is_builtin=False`.
+
+Alembic history makes this initialization run once on both fresh installs and
+upgrades. No startup seeder recreates these grants, so administrator edits and
+deletions survive restarts and future upgrades. Initial name/reference conflicts,
+including custom policies using new built-in deny names, abort the migration
+without adopting or overwriting records. Resolve the reported conflicts and retry.
+
+Downgrading past this revision removes only untouched defaults with no additional
+references. An edited, renamed, deleted, or additionally referenced grant blocks
+the downgrade and preserves the migration history. Keep the migrated database
+when rolling back application code in that situation.
+
 ## Protecting API Endpoints
 
 Use the `PermissionChecker` dependency on your router endpoints:
@@ -371,9 +389,21 @@ role assignment must make it effective.
 `who_can` excludes users blocked for the requested kind/project and retains
 its existing query authorization gate. These policy checks do not enforce
 workflow saves or expose a palette endpoint.
-Default authoring grants are seeded as editable custom records by the
-separate default-policy story; no built-in grant is added here. Save
-enforcement must ship with that seeding so existing authors retain access.
+The built-in catalog provides `step_type:write:{scope}:deny:{kind}` for every
+authorable kind at scopes `any` and `project`. These read-only policies have
+stable identities and are not assigned automatically. Administrators attach
+them to roles through Access Management. No built-in policy allows
+`step_type:write`; the default allow is the custom policy created by the
+one-time migration above.
+
+The Policies tab displays definitions and their custom/built-in status. Editing
+or deleting a custom policy uses the existing policy API; this change does not
+add a policy editor. The role picker's **Select all allow policies** action
+adds only nonempty policies containing exclusively allow statements. Deny and
+mixed-statement policies require individual selection, and existing selections
+are preserved. Deleting the default allow blocks authoring unless another
+policy grants access. Workflow-save enforcement (P5) must ship after these
+default grants are available; this change alone does not enforce saves.
 
 ## Query Endpoints
 

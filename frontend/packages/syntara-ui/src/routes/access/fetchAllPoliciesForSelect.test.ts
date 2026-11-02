@@ -31,7 +31,7 @@ describe('fetchAllPoliciesForSelect', () => {
   })
 
   it('delegates to fetchAllPages with scoped query params', async () => {
-    const policies = [{ name: 'policy-a', is_project_eligible: true }]
+    const policies = [{ name: 'policy-a', is_project_eligible: true, statements: [] }]
     vi.mocked(accessFetchClient.GET).mockResolvedValue({
       data: { resources: policies, next: null },
     } as never)

@@ -35,6 +35,8 @@ from syntara_api_client.models.upload_files_body import UploadFilesBody
 from syntara_api_client.models.workflow_create import WorkflowCreate
 from syntara_api_client.models.workflow_update import WorkflowUpdate
 
+from syntara.workflows.node_kinds import NODE_KINDS
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from uuid import UUID
@@ -408,6 +410,9 @@ OWN_SCOPED_CASES: list[PolicyTestCase] = [
 # ---------------------------------------------------------------------------
 
 E2E_COVERAGE_EXEMPT: set[str] = {
+    # Every kind/scope is covered by registry, resolver and real-Rego tests;
+    # workflow-save enforcement belongs to P5.
+    *(f"step_type:write:{scope}:deny:{kind}" for kind in NODE_KINDS for scope in ("any", "project")),
     # System-scoped CRUD policies that follow the same pattern as the
     # representative cases already tested e2e (create/read tested, so
     # update/delete for the same resource are unit-test-only).

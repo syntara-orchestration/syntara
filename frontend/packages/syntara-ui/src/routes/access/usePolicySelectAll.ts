@@ -2,7 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { detachPromise } from '../../utils/detachPromise'
 
-import { mergeSelectAll, SELECT_ALL_LOAD_ERROR, type PolicySelectListItem } from './policySelectConstants'
+import {
+  isAllowOnlyPolicy,
+  mergeSelectAll,
+  SELECT_ALL_LOAD_ERROR,
+  type PolicySelectListItem,
+} from './policySelectConstants'
 
 type ShowError = (alert: { title: string; description?: string }) => void
 
@@ -39,7 +44,7 @@ export function usePolicySelectAll({
           onChange(
             mergeSelectAll(
               selectedRef.current,
-              policies.map((policy) => policy.name)
+              policies.filter(isAllowOnlyPolicy).map((policy) => policy.name)
             )
           )
           onAfterSelect?.()
