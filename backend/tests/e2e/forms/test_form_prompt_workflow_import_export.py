@@ -21,7 +21,10 @@ from ._helpers import (
     PROMPT_POLL_TIMEOUT,
     assert_consumer_completed,
     assert_responders_configured,
+    create_workflow,
+    export_workflow_definition,
     get_form_prompt,
+    get_workflow_definition,
     submit_form_prompt,
     wait_for_form_prompt_paused,
 )
@@ -199,57 +202,6 @@ def _definition_with_invalid_form_prompt(
     return definition
 
 
-def _create_workflow(
-    syntara_api: SyntaraApiRegistry,
-    cleanup_workflows: list[UUID],
-    *,
-    name: str,
-    project_id: UUID,
-    workflow_definition: dict[str, Any],
-    is_import: bool,
-) -> WorkflowRead:
-    """POST a workflow definition and register the created row for teardown."""
-    body = WorkflowCreate.from_dict(
-        {
-            "name": name,
-            "description": "Form prompt workflow import/export E2E",
-            "workflow_definition": workflow_definition,
-            "project_id": str(project_id),
-            "is_import": is_import,
-        }
-    )
-    response = syntara_api.workflows.create(body=body)
-    assert response.status_code == HTTPStatus.CREATED, (
-        f"Expected 201 when creating {name!r}, got {response.status_code}: {response.content!r}"
-    )
-    workflow = cast("WorkflowRead", response.assert_and_get())
-    cleanup_workflows.append(UUID(str(workflow.id)))
-    return workflow
-
-
-def _export_definition(syntara_api: SyntaraApiRegistry, workflow_id: UUID) -> dict[str, Any]:
-    """Export version 1 and parse the JSON attachment body."""
-    response = syntara_api.workflows.export_version(workflow_id=workflow_id, version=1)
-    assert response.status_code == HTTPStatus.OK, (
-        f"Expected JSON export 200, got {response.status_code}: {response.content!r}"
-    )
-    assert response.headers["content-type"].split(";", maxsplit=1)[0] == "application/json"
-    assert "attachment" in response.headers["content-disposition"]
-    definition = json.loads(response.content)
-    assert isinstance(definition, dict)
-    return definition
-
-
-def _get_workflow_definition(syntara_api: SyntaraApiRegistry, workflow_id: UUID) -> dict[str, Any]:
-    """GET a workflow and return the current version's serialized definition."""
-    response = syntara_api.workflows.get(workflow_id=workflow_id)
-    assert response.status_code == HTTPStatus.OK, (
-        f"Expected workflow GET 200, got {response.status_code}: {response.content!r}"
-    )
-    workflow = cast("WorkflowReadWithVersion", response.assert_and_get())
-    return workflow.version.workflow_definition.to_dict()
-
-
 def _node_by_id(definition: dict[str, Any], node_id: str) -> dict[str, Any]:
     return next(node for node in definition["nodes"] if node["id"] == node_id)
 
@@ -333,17 +285,18 @@ def test_form_prompt_workflow_export_import_round_trip_executes(
     """
     source_name = unique_name("e2e-form-prompt-export-source")
     source_definition = _handcrafted_workflow_definition(source_name, form_prompt_responder)
-    source = _create_workflow(
+    source = create_workflow(
         syntara_api,
         cleanup_workflows,
         name=source_name,
+        description="Form prompt workflow import/export E2E",
         project_id=first_project_id,
         workflow_definition=source_definition,
         is_import=False,
     )
     assert source.has_validation_issues is False
 
-    exported_definition = _export_definition(syntara_api, UUID(str(source.id)))
+    exported_definition = export_workflow_definition(syntara_api, UUID(str(source.id)))
     assert exported_definition["nodes"] == source_definition["nodes"]
     assert exported_definition["edges"] == source_definition["edges"]
 
@@ -355,17 +308,18 @@ def test_form_prompt_workflow_export_import_round_trip_executes(
     imported_name = unique_name("e2e-form-prompt-export-imported")
     imported_definition = copy.deepcopy(exported_definition)
     imported_definition["name"] = imported_name
-    imported = _create_workflow(
+    imported = create_workflow(
         syntara_api,
         cleanup_workflows,
         name=imported_name,
+        description="Form prompt workflow import/export E2E",
         project_id=first_project_id,
         workflow_definition=imported_definition,
         is_import=True,
     )
     assert imported.has_validation_issues is False
 
-    persisted_definition = _get_workflow_definition(syntara_api, UUID(str(imported.id)))
+    persisted_definition = get_workflow_definition(syntara_api, UUID(str(imported.id)))
     assert persisted_definition == imported_definition
     prompt_node = _node_by_id(persisted_definition, "form_prompt")
     parameters = prompt_node["parameters"]
@@ -533,7 +487,7 @@ def test_form_prompt_import_reports_save_time_validation_findings(
             for finding in prompt_findings
         ), f"Unknown source reference missing from {prompt_findings!r}"
 
-    saved_definition = _get_workflow_definition(syntara_api, UUID(str(workflow.id)))
+    saved_definition = get_workflow_definition(syntara_api, UUID(str(workflow.id)))
     assert (
         _node_by_id(saved_definition, "form_prompt")["parameters"]
         == _node_by_id(definition, "form_prompt")["parameters"]
@@ -556,16 +510,17 @@ def test_import_renamed_form_prompt_node_preserves_configuration_and_edges(
         form_prompt_responder,
         prompt_node_id="form_prompt_1",
     )
-    source = _create_workflow(
+    source = create_workflow(
         syntara_api,
         cleanup_workflows,
         name=source_name,
+        description="Form prompt workflow import/export E2E",
         project_id=first_project_id,
         workflow_definition=source_definition,
         is_import=False,
     )
     assert source.has_validation_issues is False
-    exported_definition = _export_definition(syntara_api, UUID(str(source.id)))
+    exported_definition = export_workflow_definition(syntara_api, UUID(str(source.id)))
 
     imported_name = unique_name("e2e-form-prompt-rename-imported")
     imported_definition = copy.deepcopy(exported_definition)
@@ -581,16 +536,17 @@ def test_import_renamed_form_prompt_node_preserves_configuration_and_edges(
             if edge[endpoint] == "form_prompt_1":
                 edge[endpoint] = "user_choice"
 
-    imported = _create_workflow(
+    imported = create_workflow(
         syntara_api,
         cleanup_workflows,
         name=imported_name,
+        description="Form prompt workflow import/export E2E",
         project_id=first_project_id,
         workflow_definition=imported_definition,
         is_import=True,
     )
     assert imported.has_validation_issues is False
-    persisted_definition = _get_workflow_definition(syntara_api, UUID(str(imported.id)))
+    persisted_definition = get_workflow_definition(syntara_api, UUID(str(imported.id)))
 
     renamed_prompt = _node_by_id(persisted_definition, "user_choice")
     assert renamed_prompt["name"] == "User Choice"
@@ -623,17 +579,18 @@ def test_import_handcrafted_form_prompt_workflow_executes(
     """
     name = unique_name("e2e-form-prompt-handcrafted")
     definition = _handcrafted_workflow_definition(name, form_prompt_responder)
-    workflow = _create_workflow(
+    workflow = create_workflow(
         syntara_api,
         cleanup_workflows,
         name=name,
+        description="Form prompt workflow import/export E2E",
         project_id=first_project_id,
         workflow_definition=definition,
         is_import=True,
     )
     assert workflow.has_validation_issues is False
 
-    persisted_definition = _get_workflow_definition(syntara_api, UUID(str(workflow.id)))
+    persisted_definition = get_workflow_definition(syntara_api, UUID(str(workflow.id)))
     assert persisted_definition == definition
     assert {node["type"] for node in persisted_definition["nodes"]} == {"script", "form_prompt"}
     prompt_parameters = _node_by_id(persisted_definition, "form_prompt")["parameters"]
