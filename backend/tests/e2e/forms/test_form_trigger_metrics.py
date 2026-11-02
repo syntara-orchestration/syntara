@@ -61,16 +61,6 @@ def _histogram_sample(
     return 0.0
 
 
-def _histogram_count(client: httpx.Client) -> float:
-    """Return the Form Trigger histogram observation count for the execution service."""
-    return _histogram_sample(client, "count")
-
-
-def _histogram_sum(client: httpx.Client) -> float:
-    """Return the Form Trigger histogram observation sum in seconds."""
-    return _histogram_sample(client, "sum")
-
-
 def _wait_for_metric_count(
     client: httpx.Client,
     expected_minimum: float,
@@ -78,7 +68,7 @@ def _wait_for_metric_count(
     """Poll the histogram until it contains at least the expected number of observations."""
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
-        count = _histogram_count(client)
+        count = _histogram_sample(client, "count")
         if count >= expected_minimum:
             return count
         time.sleep(0.25)
@@ -120,8 +110,8 @@ def test_form_trigger_submission_records_latency_metric(
     """
     workflow = _create_workflow(workflow_factory, first_project_id, name_prefix="e2e-form-trigger-metric")
     client = syntara_client.get_httpx_client()
-    before_count = _histogram_count(client)
-    before_sum = _histogram_sum(client)
+    before_count = _histogram_sample(client, "count")
+    before_sum = _histogram_sample(client, "sum")
 
     execution = submit_form_trigger_and_track(
         syntara_api,
@@ -132,7 +122,7 @@ def test_form_trigger_submission_records_latency_metric(
     assert_consumer_completed(syntara_api, UUID(str(execution.id)))
 
     after_count = _wait_for_metric_count(client, before_count + 1)
-    after_sum = _histogram_sum(client)
+    after_sum = _histogram_sample(client, "sum")
     assert after_count >= before_count + 1
     sum_delta_seconds = after_sum - before_sum
     assert sum_delta_seconds > 0
