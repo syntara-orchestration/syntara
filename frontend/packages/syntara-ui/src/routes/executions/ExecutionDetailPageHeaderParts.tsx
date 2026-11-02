@@ -67,6 +67,7 @@ export type ExecutionDetailHeaderToolbarProps = Readonly<{
   executionId: string
   execution: Execution | undefined
   onRetryFromFailureClick?: (trigger: HTMLElement) => void
+  isRetryMode?: boolean
 }>
 
 export function ExecutionDetailHeaderToolbar({
@@ -82,7 +83,10 @@ export function ExecutionDetailHeaderToolbar({
   executionId,
   execution,
   onRetryFromFailureClick,
+  isRetryMode = false,
 }: ExecutionDetailHeaderToolbarProps) {
+  if (isRetryMode) return null
+
   const isRetryable = isExecutionRetryable(execution?.status, execution?.mode)
   const showRetryFromFailure = isRetryFromFailureEligible(execution?.status, execution?.mode)
   let retryAction: ReactNode = null
