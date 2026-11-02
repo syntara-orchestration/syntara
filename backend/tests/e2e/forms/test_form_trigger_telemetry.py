@@ -26,7 +26,6 @@ from ._helpers import (
 )
 from ._telemetry import (
     SEGMENT_EVENT_TIMEOUT_SECONDS,
-    get_segment_events,
     require_segment_server_url,
     wait_for_segment_event,
 )

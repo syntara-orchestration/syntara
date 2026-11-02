@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import time
 from http import HTTPStatus
@@ -10,24 +9,20 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 import pytest
-from syntara_api_client.models import SettingUpdate, WorkflowCreate
-from syntara_api_client.models.metric_record import MetricRecord
-from syntara_api_client.models.metric_type import MetricType
-from syntara_api_client.models.metrics_record_page import MetricsRecordPage
-from syntara_api_client.models.metrics_store_summary import MetricsStoreSummary
-from syntara_api_client.types import Unset
+from prometheus_client.parser import text_string_to_metric_families
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
+    from collections.abc import Callable
 
+    import httpx
     from syntara_api_client.api import SyntaraApiRegistry
-    from syntara_api_client.models import WorkflowRead
+    from syntara_api_client.client import AuthenticatedClient
+    from syntara_api_client.models import WorkflowCreate, WorkflowRead
 
 if not os.environ.get("APP_BASE_URL"):
     pytest.skip("APP_BASE_URL not set — full stack required", allow_module_level=True)
 
 from ._helpers import (
-    assert_and_get_response,
     assert_consumer_completed,
     create_form_trigger_workflow,
     submit_form_trigger_and_track,
@@ -36,7 +31,8 @@ from ._workflows import REQUIRED_AND_OPTIONAL_FIELDS
 
 pytestmark = [pytest.mark.e2e]
 
-_METRIC_TYPE = MetricType.FORM_TRIGGER_SUBMISSION_START_MS
+_METRICS_URL = f"{os.environ['APP_BASE_URL'].rstrip('/')}/metrics"
+_HISTOGRAM_NAME = "orchestrator_form_trigger_submission_start_seconds"
 _METRIC_LABELS = {"component": "execution_service"}
 _VALID_SUBMISSION: dict[str, Any] = {
     "required_text": "FORM_TRIGGER_METRIC_CONTROL_97126",
@@ -45,63 +41,48 @@ _VALID_SUBMISSION: dict[str, Any] = {
 }
 
 
-@pytest.fixture(scope="module", autouse=True)
-def metrics_perf_test_mode(
-    syntara_api: SyntaraApiRegistry,
-) -> Generator[None, None, None]:
-    """Enable the metrics store for this module and restore its prior effective value."""
-    setting = assert_and_get_response(syntara_api.settings.get(key="metrics.perf_test_mode"))
-    original_value = setting.value if setting.value is not None else setting.default_value
-    assert isinstance(original_value, bool)
-    syntara_api.settings.update(
-        key="metrics.perf_test_mode",
-        body=SettingUpdate(value=True),
-    ).assert_and_get()
-    try:
-        yield
-    finally:
-        # PATCH cannot restore null; restoring the effective default is behaviorally equivalent.
-        syntara_api.settings.update(
-            key="metrics.perf_test_mode",
-            body=SettingUpdate(value=original_value),
-        ).assert_and_get()
-        # _guard synchronizes the recorder flag and flushes the store on this request.
-        response = syntara_api.internal_metrics.get_summary()
-        expected_status = HTTPStatus.OK if original_value else HTTPStatus.NOT_FOUND
-        assert response.status_code == expected_status, (
-            f"Expected metrics summary status {expected_status}, got {response.status_code}: {response.content!r}"
-        )
-        if original_value:
-            summary = assert_and_get_response(response)
-            assert isinstance(summary, MetricsStoreSummary)
+def _histogram_sample(
+    client: httpx.Client,
+    sample_suffix: str,
+) -> float:
+    """Read a Form Trigger histogram sample from the configured E2E client scrape."""
+    response = client.get(_METRICS_URL)
+    if response.status_code == HTTPStatus.NOT_FOUND:
+        pytest.skip("OpenMetrics scrape endpoint is disabled in this E2E environment")
+    assert response.status_code == HTTPStatus.OK, f"OpenMetrics scrape returned {response.status_code}: {response.text}"
+
+    sample_name = f"{_HISTOGRAM_NAME}_{sample_suffix}"
+    for family in text_string_to_metric_families(response.text):
+        if family.name != _HISTOGRAM_NAME:
+            continue
+        for sample in family.samples:
+            if sample.name == sample_name and sample.labels == _METRIC_LABELS:
+                return float(sample.value)
+    return 0.0
 
 
-def _metric_page(syntara_api: SyntaraApiRegistry) -> tuple[list[MetricRecord], int]:
-    """Read the filtered Form Trigger latency records from the internal metrics API."""
-    response = syntara_api.internal_metrics.get_records(
-        metric_type=_METRIC_TYPE.value,
-        labels=json.dumps(_METRIC_LABELS),
-        limit=10000,
-    )
-    page = assert_and_get_response(response)
-    assert isinstance(page, MetricsRecordPage)
-    assert isinstance(page.records, list), f"Expected metrics records list, got {page.records!r}"
-    assert all(isinstance(record, MetricRecord) for record in page.records)
-    return page.records, page.total
+def _histogram_count(client: httpx.Client) -> float:
+    """Return the Form Trigger histogram observation count for the execution service."""
+    return _histogram_sample(client, "count")
+
+
+def _histogram_sum(client: httpx.Client) -> float:
+    """Return the Form Trigger histogram observation sum in seconds."""
+    return _histogram_sample(client, "sum")
 
 
 def _wait_for_metric_count(
-    syntara_api: SyntaraApiRegistry,
-    expected_minimum: int,
-) -> tuple[list[MetricRecord], int]:
-    """Poll the metrics store until it contains at least the expected number of records."""
+    client: httpx.Client,
+    expected_minimum: float,
+) -> float:
+    """Poll the histogram until it contains at least the expected number of observations."""
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
-        records, total = _metric_page(syntara_api)
-        if total >= expected_minimum:
-            return records, total
+        count = _histogram_count(client)
+        if count >= expected_minimum:
+            return count
         time.sleep(0.25)
-    pytest.fail(f"Metrics store did not reach {expected_minimum} records within 15 seconds")
+    pytest.fail(f"OpenMetrics histogram did not reach {expected_minimum} observations within 15 seconds")
 
 
 def _create_workflow(
@@ -122,6 +103,7 @@ def _create_workflow(
 
 def test_form_trigger_submission_records_latency_metric(
     syntara_api: SyntaraApiRegistry,
+    syntara_client: AuthenticatedClient,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
     form_execution_cleanup: Callable[[UUID], None],
@@ -131,13 +113,15 @@ def test_form_trigger_submission_records_latency_metric(
     Procedure:
     1. Create a workflow and snapshot the current metric count.
     2. Submit valid form data and wait for the consumer to complete.
-    3. Check that exactly one valid latency record was added.
+    3. Check that at least one valid histogram observation was added.
 
     Expected:
-    - The metric count increases by one and the new record is in milliseconds.
+    - The histogram count increases and its latency sum increases by a positive amount in seconds.
     """
     workflow = _create_workflow(workflow_factory, first_project_id, name_prefix="e2e-form-trigger-metric")
-    _, before = _metric_page(syntara_api)
+    client = syntara_client.get_httpx_client()
+    before_count = _histogram_count(client)
+    before_sum = _histogram_sum(client)
 
     execution = submit_form_trigger_and_track(
         syntara_api,
@@ -147,12 +131,8 @@ def test_form_trigger_submission_records_latency_metric(
     )
     assert_consumer_completed(syntara_api, UUID(str(execution.id)))
 
-    records, total = _wait_for_metric_count(syntara_api, before + 1)
-    assert total == before + 1
-    record = records[-1]
-    assert record.metric_type == _METRIC_TYPE
-    labels = record.labels
-    assert not isinstance(labels, Unset)
-    assert labels["component"] == _METRIC_LABELS["component"]
-    assert record.unit == "ms"
-    assert record.value >= 0
+    after_count = _wait_for_metric_count(client, before_count + 1)
+    after_sum = _histogram_sum(client)
+    assert after_count >= before_count + 1
+    sum_delta_seconds = after_sum - before_sum
+    assert sum_delta_seconds > 0
