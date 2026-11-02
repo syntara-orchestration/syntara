@@ -1,4 +1,4 @@
-"""Shared builders and cases for invalid form-prompt and Form Trigger definitions."""
+"""Shared builders and cases for invalid Form Prompt and Form Trigger definitions."""
 
 from __future__ import annotations
 
