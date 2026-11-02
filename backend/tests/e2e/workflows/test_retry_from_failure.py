@@ -7,10 +7,10 @@ They assert observable execution state and outputs rather than workflow-engine i
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
@@ -41,6 +41,8 @@ _RETRY_RUN_POLICIES = [
     "execution:run:project",
     "execution:read:project",
 ]
+
+_T = TypeVar("_T")
 
 
 def _script_node(node_id: str, code: str, *, environment: dict[str, str] | None = None) -> dict[str, Any]:
@@ -106,20 +108,35 @@ def _activity_input(activity: ActivityExecution) -> dict[str, Any]:
     return dict(value.additional_properties)
 
 
-def _activity_executions_by_name(
+def _activity_executions_by(
     syntara_api: SyntaraApiRegistry,
     execution_id: UUID,
+    key: Callable[[ActivityExecution], str],
 ) -> dict[str, ActivityExecution]:
     executions = syntara_api.executions.list_activities(execution_id=execution_id, limit=100).assert_and_get()
-    return {activity.activity_name: activity for activity in executions.resources}
+    return {key(activity): activity for activity in executions.resources}
 
 
-def _activity_executions_by_temporal_id(
-    syntara_api: SyntaraApiRegistry,
-    execution_id: UUID,
-) -> dict[str, ActivityExecution]:
-    executions = syntara_api.executions.list_activities(execution_id=execution_id, limit=100).assert_and_get()
-    return {activity.temporal_activity_id: activity for activity in executions.resources}
+def _wait_until(
+    initial_value: _T,
+    fetch_next: Callable[[], _T],
+    is_ready: Callable[[_T], bool],
+    timeout_details: Callable[[_T], str],
+    *,
+    description: str,
+    max_polls: int,
+    poll_interval: int,
+) -> _T:
+    """Poll one value consistently, with ``max_polls`` counting observations."""
+    value = initial_value
+    for attempt in range(max_polls):
+        if is_ready(value):
+            return value
+        if attempt + 1 < max_polls:
+            time.sleep(poll_interval)
+            value = fetch_next()
+    msg = f"Timed out waiting for {description}. {timeout_details(value)}"
+    raise AssertionError(msg)
 
 
 def _wait_for_activity_executions(
@@ -131,15 +148,20 @@ def _wait_for_activity_executions(
     poll_interval: int = 1,
 ) -> dict[str, ActivityExecution]:
     """Wait for activity rows to sync, including nested-loop Temporal IDs."""
-    rows: dict[str, ActivityExecution] = {}
-    for _ in range(max_polls):
-        rows = _activity_executions_by_temporal_id(syntara_api, execution_id)
-        if required_temporal_ids <= rows.keys():
-            return rows
-        time.sleep(poll_interval)
-    missing = sorted(required_temporal_ids - rows.keys())
-    msg = f"Execution {execution_id} is missing activity rows: {missing}"
-    raise AssertionError(msg)
+
+    def missing_rows(rows: dict[str, ActivityExecution]) -> str:
+        missing = sorted(required_temporal_ids - rows.keys())
+        return f"Execution {execution_id} is missing activity rows: {missing}"
+
+    return _wait_until(
+        _activity_executions_by(syntara_api, execution_id, lambda activity: activity.temporal_activity_id),
+        lambda: _activity_executions_by(syntara_api, execution_id, lambda activity: activity.temporal_activity_id),
+        lambda rows: required_temporal_ids <= rows.keys(),
+        missing_rows,
+        description=f"activity rows for execution {execution_id}",
+        max_polls=max_polls,
+        poll_interval=poll_interval,
+    )
 
 
 def _timestamp(activity: ActivityData | ActivityExecution, field: str) -> datetime:
@@ -164,36 +186,36 @@ def _wait_for_activity_ids(
     Loop iterations are written as later composite keys (``loop_body#iter-1``).
     The execution can already be terminal before those rows have been synced.
     """
-    for _ in range(max_polls):
-        activities = execution.activities
-        present = {activity.activity_id for activity in activities} if isinstance(activities, list) else set()
-        if required_ids <= present:
-            return execution
-        time.sleep(poll_interval)
-        execution = syntara_api.executions.get(execution_id=execution.id, include="activities").assert_and_get()
-    activities = execution.activities
-    present = {activity.activity_id for activity in activities} if isinstance(activities, list) else set()
-    missing = sorted(required_ids - present)
-    msg = f"Execution {execution.id} is missing activity rows: {missing}"
-    raise AssertionError(msg)
+
+    def present_ids(current: ExecutionRead) -> set[str]:
+        activities = current.activities
+        return {activity.activity_id for activity in activities} if isinstance(activities, list) else set()
+
+    def missing_rows(current: ExecutionRead) -> str:
+        missing = sorted(required_ids - present_ids(current))
+        return f"Execution {current.id} is missing activity rows: {missing}"
+
+    return _wait_until(
+        execution,
+        lambda: syntara_api.executions.get(execution_id=execution.id, include="activities").assert_and_get(),
+        lambda current: required_ids <= present_ids(current),
+        missing_rows,
+        description=f"activity rows for execution {execution.id}",
+        max_polls=max_polls,
+        poll_interval=poll_interval,
+    )
 
 
 def _listed_stdout(activity: ActivityExecution) -> str:
-    value = activity.output_data
-    if value is None or isinstance(value, Unset):
-        return ""
-    if isinstance(value, Mapping):
-        data = dict(value)
-    else:
-        extra = getattr(value, "additional_properties", None)
-        data = dict(extra) if isinstance(extra, Mapping) else {}
-    return str(data.get("stdout", "")).strip()
+    return str(_activity_output(activity).get("stdout", "")).strip()
 
 
 def _loop_body_rows(syntara_api: SyntaraApiRegistry, execution_id: UUID) -> dict[str, ActivityExecution]:
     return {
         name: activity
-        for name, activity in _activity_executions_by_name(syntara_api, execution_id).items()
+        for name, activity in _activity_executions_by(
+            syntara_api, execution_id, lambda activity: activity.activity_name
+        ).items()
         if name == "loop_body" or name.startswith("loop_body#iter-")
     }
 
@@ -207,18 +229,23 @@ def _wait_for_loop_stdouts(
     poll_interval: int = 1,
 ) -> dict[str, ActivityExecution]:
     """Wait until listed loop-body rows include every expected stdout value."""
-    rows: dict[str, ActivityExecution] = {}
-    for _ in range(max_polls):
-        rows = _loop_body_rows(syntara_api, execution_id)
-        present = {_listed_stdout(activity) for activity in rows.values()}
-        if required_stdouts <= present:
-            return rows
-        time.sleep(poll_interval)
-    found = sorted({_listed_stdout(activity) for activity in rows.values()})
-    msg = (
-        f"Execution {execution_id} loop body rows {sorted(rows)} have stdout {found}, wanted {sorted(required_stdouts)}"
+
+    def missing_rows(rows: dict[str, ActivityExecution]) -> str:
+        found = sorted({_listed_stdout(activity) for activity in rows.values()})
+        return (
+            f"Execution {execution_id} loop body rows {sorted(rows)} have stdout {found}, "
+            f"wanted {sorted(required_stdouts)}"
+        )
+
+    return _wait_until(
+        _loop_body_rows(syntara_api, execution_id),
+        lambda: _loop_body_rows(syntara_api, execution_id),
+        lambda rows: required_stdouts <= {_listed_stdout(activity) for activity in rows.values()},
+        missing_rows,
+        description=f"loop body outputs for execution {execution_id}",
+        max_polls=max_polls,
+        poll_interval=poll_interval,
     )
-    raise AssertionError(msg)
 
 
 def _start_retry(
@@ -239,6 +266,33 @@ def _start_retry(
     )
     assert response.status_code == HTTPStatus.CREATED
     return response.assert_and_get()
+
+
+def _create_failed_parallel_source(
+    syntara_api: SyntaraApiRegistry,
+    project_id: UUID,
+    *,
+    name_prefix: str,
+) -> tuple[ExecutionRead, dict[str, ActivityData]]:
+    """Create a failed parallel run with both failures and preview eligibility confirmed."""
+    name = unique_name(name_prefix)
+    source = create_and_run_workflow(
+        syntara_api,
+        name,
+        _parallel_failure_definition(name),
+        timeout=60,
+        project_id=project_id,
+    )
+    assert source.status == ExecutionStatus.FAILED
+    source = _wait_for_activity_ids(syntara_api, source, {"failure_a", "failure_b"})
+    source_activities = _activities_by_id(source)
+    assert source_activities["failure_a"].status == "failed"
+    assert source_activities["failure_b"].status == "failed"
+
+    preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
+    assert preview.eligible is True
+    assert set(preview.eligible_point_ids) == {"failure_a", "failure_b"}
+    return source, source_activities
 
 
 def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
@@ -280,7 +334,9 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
     source_activities = _activities_by_id(source)
     assert source_activities["producer"].status == "completed"
     assert source_activities["repair"].status == "failed"
-    source_activity_executions = _activity_executions_by_name(syntara_api, source.id)
+    source_activity_executions = _activity_executions_by(
+        syntara_api, source.id, lambda activity: activity.activity_name
+    )
     assert _activity_input(source_activity_executions["repair"]).get("environment") == {"MESSAGE": "from-source"}
     source_trigger = source_activity_executions["trigger"]
     assert source_trigger.status == "completed"
@@ -306,7 +362,7 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
     retry_activities = _activities_by_id(final)
-    retry_activity_executions = _activity_executions_by_name(syntara_api, final.id)
+    retry_activity_executions = _activity_executions_by(syntara_api, final.id, lambda activity: activity.activity_name)
     assert _activity_input(retry_activity_executions["repair"]).get("environment") == {"MESSAGE": "retry-only"}
 
     # Retry dispatches the trigger again but keeps its original display timestamps.
@@ -342,7 +398,9 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
         poll_interval=1,
     )
     assert ordinary_final.status == ExecutionStatus.FAILED
-    ordinary_activity_executions = _activity_executions_by_name(syntara_api, ordinary_run.id)
+    ordinary_activity_executions = _activity_executions_by(
+        syntara_api, ordinary_run.id, lambda activity: activity.activity_name
+    )
     assert _activity_input(ordinary_activity_executions["repair"]).get("environment") == {"MESSAGE": "from-source"}
 
 
@@ -925,23 +983,11 @@ def test_retry_defaults_to_all_failed_parallel_branches_when_selection_is_omitte
     first_project_id: UUID,
 ) -> None:
     """Omitting retry_point_ids retries every currently failed branch."""
-    name = unique_name("e2e-retry-parallel-default-selection")
-    source = create_and_run_workflow(
+    source, _ = _create_failed_parallel_source(
         syntara_api,
-        name,
-        _parallel_failure_definition(name),
-        timeout=60,
-        project_id=first_project_id,
+        first_project_id,
+        name_prefix="e2e-retry-parallel-default-selection",
     )
-    assert source.status == ExecutionStatus.FAILED
-    source = _wait_for_activity_ids(syntara_api, source, {"failure_a", "failure_b"})
-    source_activities = _activities_by_id(source)
-    assert source_activities["failure_a"].status == "failed"
-    assert source_activities["failure_b"].status == "failed"
-
-    preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
-    assert preview.eligible is True
-    assert set(preview.eligible_point_ids) == {"failure_a", "failure_b"}
 
     # Omit retry_point_ids entirely to exercise the API's default selection behavior.
     retried = _start_retry(
@@ -969,22 +1015,11 @@ def test_retry_can_select_a_subset_of_parallel_failed_branches(
     first_project_id: UUID,
 ) -> None:
     """A selected failure and its downstream work rerun while the other failure is retained."""
-    name = unique_name("e2e-retry-parallel-subset-selection")
-    source = create_and_run_workflow(
+    source, source_activities = _create_failed_parallel_source(
         syntara_api,
-        name,
-        _parallel_failure_definition(name),
-        timeout=60,
-        project_id=first_project_id,
+        first_project_id,
+        name_prefix="e2e-retry-parallel-subset-selection",
     )
-    assert source.status == ExecutionStatus.FAILED
-    source_activities = _activities_by_id(source)
-    assert source_activities["failure_a"].status == "failed"
-    assert source_activities["failure_b"].status == "failed"
-
-    preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
-    assert preview.eligible is True
-    assert preview.eligible_point_ids == ["failure_a", "failure_b"]
 
     retried = _start_retry(
         syntara_api,
@@ -1011,18 +1046,11 @@ def test_retry_accepts_multiple_selected_parallel_failure_points(
     first_project_id: UUID,
 ) -> None:
     """Explicitly selecting multiple eligible failures reruns both parallel paths."""
-    name = unique_name("e2e-retry-parallel-multiple-selection")
-    source = create_and_run_workflow(
+    source, _ = _create_failed_parallel_source(
         syntara_api,
-        name,
-        _parallel_failure_definition(name),
-        timeout=60,
-        project_id=first_project_id,
+        first_project_id,
+        name_prefix="e2e-retry-parallel-multiple-selection",
     )
-    assert source.status == ExecutionStatus.FAILED
-    source_activities = _activities_by_id(source)
-    assert source_activities["failure_a"].status == "failed"
-    assert source_activities["failure_b"].status == "failed"
 
     retried = _start_retry(
         syntara_api,
