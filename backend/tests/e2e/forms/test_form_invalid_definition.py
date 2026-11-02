@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 pytestmark = [pytest.mark.e2e]
 
 
-@pytest.mark.parametrize("variant", FORM_VARIANTS, ids=lambda variant: variant.label)
+@pytest.mark.parametrize("variant", FORM_VARIANTS, ids=["form_prompt", "form_trigger"])
 def test_create_saves_invalid_form_definition_and_persists_issue_flag(
     syntara_api: SyntaraApiRegistry,
     cleanup_workflows: list[UUID],
@@ -78,14 +78,14 @@ def test_create_saves_invalid_form_definition_and_persists_issue_flag(
     )
     assert finding.severity.value == "error"
     assert finding.message.strip()
-    assert "validation failed" not in finding.message.lower()
+    assert "match pattern" in finding.message.lower()
     assert ".fields.0" in (finding.field_path or "")
 
     saved = assert_and_get_response(syntara_api.workflows.get(workflow_id=workflow.id))
     assert saved.has_validation_issues is True
 
 
-@pytest.mark.parametrize("variant", FORM_VARIANTS, ids=lambda variant: variant.label)
+@pytest.mark.parametrize("variant", FORM_VARIANTS, ids=["form_prompt", "form_trigger"])
 def test_validate_returns_rfc9457_details_and_accepts_a_valid_form(
     syntara_api: SyntaraApiRegistry,
     variant: FormVariant,
@@ -117,7 +117,7 @@ def test_validate_returns_rfc9457_details_and_accepts_a_valid_form(
     assert validation_result.error_count == 0
 
 
-@pytest.mark.parametrize("variant", FORM_VARIANTS, ids=lambda variant: variant.label)
+@pytest.mark.parametrize("variant", FORM_VARIANTS, ids=["form_prompt", "form_trigger"])
 def test_publish_rejects_invalid_form_definition_and_it_cannot_run_as_published(
     syntara_api: SyntaraApiRegistry,
     cleanup_workflows: list[UUID],
@@ -205,7 +205,7 @@ def test_validate_reports_specific_form_field_defect(
         assert any(message_substring in finding["message"] for finding in findings), findings
 
 
-@pytest.mark.parametrize("variant", FORM_VARIANTS, ids=lambda variant: variant.label)
+@pytest.mark.parametrize("variant", FORM_VARIANTS, ids=["form_prompt", "form_trigger"])
 def test_validate_collects_multiple_form_field_defects_in_field_order(
     syntara_api: SyntaraApiRegistry,
     variant: FormVariant,
@@ -250,7 +250,7 @@ def test_validate_collects_multiple_form_field_defects_in_field_order(
     assert severities == expected_order
 
 
-@pytest.mark.parametrize("variant", FORM_VARIANTS, ids=lambda variant: variant.label)
+@pytest.mark.parametrize("variant", FORM_VARIANTS, ids=["form_prompt", "form_trigger"])
 def test_update_to_invalid_form_definition_flips_durable_issue_flag(
     syntara_api: SyntaraApiRegistry,
     cleanup_workflows: list[UUID],
@@ -306,7 +306,7 @@ def test_update_to_invalid_form_definition_flips_durable_issue_flag(
     )
 
 
-@pytest.mark.parametrize("variant", FORM_VARIANTS, ids=lambda variant: variant.label)
+@pytest.mark.parametrize("variant", FORM_VARIANTS, ids=["form_prompt", "form_trigger"])
 def test_valid_multi_field_form_definition_can_be_published(
     syntara_api: SyntaraApiRegistry,
     cleanup_workflows: list[UUID],
