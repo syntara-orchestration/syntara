@@ -98,7 +98,7 @@ async def register_cluster(
 async def _read_cluster(client: ExecutionPlaneHttpClient, resource_key: UUID) -> dict[str, object]:
     """Read back the authoritative cluster by its stable source key."""
     page = await client.list_clusters(limit=2, filters={"source_integration_id": str(resource_key)})
-    resources = page["resources"]
+    resources: list[dict[str, object]] = page["resources"]
     if len(resources) != 1 or page.get("next") or page.get("prev"):
         message = "Expected exactly one Execution Plane cluster for the registration"
         raise ExecutionPlaneRejectedError(message)

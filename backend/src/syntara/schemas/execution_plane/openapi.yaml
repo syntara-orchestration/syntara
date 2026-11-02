@@ -356,6 +356,116 @@ paths:
       x-app-permission:
         resource: execution_target
         action: delete
+  /api/execution_plane/v1/clusters:
+    post:
+      tags:
+        - Execution Plane
+      summary: Register an execution cluster
+      description: 'Register a standalone execution cluster (and its default execution target) through EP commands. The registration is keyed by the cluster name: re-posting the same name re-applies the same desired state idempotently. The credential must already exist in AO and be able to manage the cluster. Replaces the direct EP ClusterProvision calls the Konflux e2e used to make.'
+      operationId: create_cluster
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClusterRegistrationCreate'
+      responses:
+        '201':
+          description: Registered cluster
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterFacadeRead'
+          headers:
+            Location:
+              description: AO cluster detail path
+              schema:
+                type: string
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: create
+    get:
+      tags:
+        - Execution Plane
+      summary: List execution clusters
+      description: Retrieve registered execution clusters. Filters use field=value or field[operator]=value; EP validates fields and operators. Keep filters, sort, and limit unchanged when following opaque cursors.
+      operationId: list_clusters
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            exclusiveMinimum: 0
+            description: Maximum number of results per page
+            default: 20
+            title: Limit
+          description: Maximum number of results per page
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Pagination cursor from previous response
+            title: Cursor
+          description: Pagination cursor from previous response
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                pattern: ^-?[a-z][a-z0-9_]*$
+              - type: 'null'
+            description: Sort parameter (e.g., 'name', '-created_at')
+            title: Sort
+          description: Sort parameter (e.g., 'name', '-created_at')
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            description: Include total count in response (expensive)
+            default: false
+            title: Include Total
+          description: Include total count in response (expensive)
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterListResponse'
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: read
   /api/execution_plane/v1/work_items:
     get:
       tags:
@@ -531,6 +641,146 @@ paths:
         action: null
 components:
   schemas:
+    ClusterFacadeRead:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        source_integration_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Source Integration Id
+        name:
+          type: string
+          title: Name
+        endpoint:
+          type: string
+          title: Endpoint
+        status:
+          type: string
+          title: Status
+        status_message:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Status Message
+        enabled:
+          type: boolean
+          title: Enabled
+        is_default:
+          type: boolean
+          title: Is Default
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+        project_ids:
+          anyOf:
+            - items:
+                type: string
+                format: uuid
+              type: array
+            - type: 'null'
+          title: Project Ids
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+      type: object
+      required:
+        - id
+        - name
+        - endpoint
+        - status
+        - enabled
+        - is_default
+        - labels
+        - created_at
+        - updated_at
+      title: ClusterFacadeRead
+      description: Safe cluster fields available to AO's authorized management API.
+    ClusterListResponse:
+      properties:
+        resources:
+          items:
+            $ref: '#/components/schemas/ClusterFacadeRead'
+          type: array
+          title: Resources
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+        total:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Total
+      type: object
+      required:
+        - resources
+      title: ClusterListResponse
+      description: Paginated list response for clusters.
+    ClusterRegistrationCreate:
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        endpoint:
+          type: string
+          maxLength: 2048
+          title: Endpoint
+        namespace:
+          type: string
+          maxLength: 63
+          minLength: 1
+          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+          title: Namespace
+          description: Namespace the dispatcher ServiceAccount and Jobs run in
+        credential_ref:
+          type: string
+          format: uuid
+          title: Credential Ref
+          description: Existing AO credential that can manage the cluster
+        ca_certificate:
+          anyOf:
+            - type: string
+              maxLength: 65536
+            - type: 'null'
+          title: Ca Certificate
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+      additionalProperties: false
+      type: object
+      required:
+        - name
+        - endpoint
+        - namespace
+        - credential_ref
+      title: ClusterRegistrationCreate
+      description: 'A standalone cluster registration: the cluster plus its default target.'
     Command:
       properties:
         command_id:
