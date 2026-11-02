@@ -4,7 +4,7 @@ import json
 import time
 from collections.abc import Callable, Collection, Mapping
 from http import HTTPStatus
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 from uuid import UUID
 
 import pytest
@@ -39,6 +39,9 @@ from ._workflows import (
     producer_prompt_consumer_workflow,
 )
 
+if TYPE_CHECKING:
+    from syntara_api_client.models.workflow_read_with_version import WorkflowReadWithVersion
+
 PROMPT_POLL_TIMEOUT = 60
 EXECUTION_POLL_TIMEOUT = 90
 ACTIVITY_OUTPUT_POLL_TIMEOUT = 30
@@ -58,6 +61,58 @@ def activity_output(activity: ActivityData) -> dict[str, Any]:
 def activities_by_id(execution: ExecutionRead) -> dict[str, ActivityData]:
     """Index an execution's activities by activity_id."""
     return {activity.activity_id: activity for activity in (execution.activities or [])}
+
+
+def create_workflow(
+    syntara_api: SyntaraApiRegistry,
+    cleanup_workflows: list[UUID],
+    *,
+    name: str,
+    description: str,
+    project_id: UUID,
+    workflow_definition: dict[str, Any],
+    is_import: bool,
+) -> WorkflowRead:
+    """Create a workflow from a raw definition and register it for teardown."""
+    body = WorkflowCreate.from_dict(
+        {
+            "name": name,
+            "description": description,
+            "workflow_definition": workflow_definition,
+            "project_id": str(project_id),
+            "is_import": is_import,
+        }
+    )
+    response = syntara_api.workflows.create(body=body)
+    assert response.status_code == HTTPStatus.CREATED, (
+        f"Expected 201 when creating {name!r}, got {response.status_code}: {response.content!r}"
+    )
+    workflow = cast("WorkflowRead", response.assert_and_get())
+    cleanup_workflows.append(UUID(str(workflow.id)))
+    return workflow
+
+
+def export_workflow_definition(syntara_api: SyntaraApiRegistry, workflow_id: UUID) -> dict[str, Any]:
+    """Export version 1 and parse the JSON attachment body."""
+    response = syntara_api.workflows.export_version(workflow_id=workflow_id, version=1)
+    assert response.status_code == HTTPStatus.OK, (
+        f"Expected JSON export 200, got {response.status_code}: {response.content!r}"
+    )
+    assert response.headers["content-type"].split(";", maxsplit=1)[0] == "application/json"
+    assert "attachment" in response.headers["content-disposition"]
+    definition = json.loads(response.content)
+    assert isinstance(definition, dict)
+    return definition
+
+
+def get_workflow_definition(syntara_api: SyntaraApiRegistry, workflow_id: UUID) -> dict[str, Any]:
+    """GET a workflow and return the current version's serialized definition."""
+    response = syntara_api.workflows.get(workflow_id=workflow_id)
+    assert response.status_code == HTTPStatus.OK, (
+        f"Expected workflow GET 200, got {response.status_code}: {response.content!r}"
+    )
+    workflow = cast("WorkflowReadWithVersion", response.assert_and_get())
+    return workflow.version.workflow_definition.to_dict()
 
 
 def create_form_trigger_workflow(
@@ -237,7 +292,7 @@ def assert_problem_response(
     return problem
 
 
-def assert_definition_invalid(response: Response[Any]) -> dict[str, Any]:
+def assert_definition_invalid(response: Response[Any], *, node_id: str = "prompt") -> dict[str, Any]:
     """Assert an RFC 9457 workflow-definition validation problem and return it."""
     problem = assert_problem_response(
         response,
@@ -254,7 +309,7 @@ def assert_definition_invalid(response: Response[Any]) -> dict[str, Any]:
     assert validation_result["is_valid"] is False
     assert validation_result["error_count"] >= 1
     assert validation_result["findings"]
-    assert any(finding.get("node_id") == "prompt" for finding in validation_result["findings"])
+    assert any(finding.get("node_id") == node_id for finding in validation_result["findings"])
     return problem
 
 
