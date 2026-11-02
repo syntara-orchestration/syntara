@@ -202,7 +202,7 @@ export const INTEGRATION_TYPE_OPTIONS = [
   { value: IntegrationTypeEnum.MCP_SERVER, label: 'MCP Server' },
   { value: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM, label: 'Ansible Automation Platform' },
   { value: IntegrationTypeEnum.LLM_PROVIDER, label: 'LLM Provider' },
-  { value: IntegrationTypeEnum.OPENSHIFT, label: 'OpenShift' },
+  { value: IntegrationTypeEnum.OPENSHIFT, label: 'Execution plane infrastructure' },
 ] as const
 
 export const PROVIDER_HINT_OPTIONS = [

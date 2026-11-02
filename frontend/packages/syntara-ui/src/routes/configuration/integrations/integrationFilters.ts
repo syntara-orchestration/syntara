@@ -20,7 +20,7 @@ export const INTEGRATION_TYPE_LABELS: Record<string, string> = {
   [IntegrationTypeEnum.MCP_SERVER]: 'MCP Server',
   [IntegrationTypeEnum.LLM_PROVIDER]: 'LLM Provider',
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]: 'Ansible Automation Platform',
-  [IntegrationTypeEnum.OPENSHIFT]: 'OpenShift',
+  [IntegrationTypeEnum.OPENSHIFT]: 'Execution plane infrastructure',
 }
 
 export const PROVIDER_HINT_LABELS: Record<string, string> = {

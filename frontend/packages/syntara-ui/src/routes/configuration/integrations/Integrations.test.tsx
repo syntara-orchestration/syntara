@@ -373,7 +373,7 @@ describe('Integrations Component', () => {
       const dataRow = screen.getAllByRole('row')[1]
       const dataCells = within(dataRow).getAllByRole('cell')
       expect(dataCells[1]).toHaveTextContent('Validating')
-      expect(dataCells[2]).toHaveTextContent('OpenShift')
+      expect(dataCells[2]).toHaveTextContent('Execution plane infrastructure')
     })
 
     it('renders tool count column', () => {
