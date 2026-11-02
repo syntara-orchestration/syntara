@@ -3,15 +3,16 @@
 from uuid import UUID
 
 from execution_plane_client.commands.base import CommandPayload
-from execution_plane_client.commands.credentials import CredentialResolution, CredentialResolve
+from execution_plane_client.commands.credentials import CredentialResolve
+from execution_plane_client.commands.results import CredentialResolveCommandResult
 from execution_plane_client.errors import ProtocolConflict
+from execution_plane_client.handlers import HandlingResult
 from execution_plane_client.protocol import MessageEnvelope
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.execution_plane.commands.context import AOCommandContext
-from syntara.execution_plane.commands.results import AOCommandResult
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type
 
 
@@ -35,12 +36,13 @@ class CredentialResolveCommandHandler:
 
     async def handle(
         self, message: MessageEnvelope, payload: CommandPayload, context: AOCommandContext
-    ) -> AOCommandResult:
+    ) -> HandlingResult:
         """Return a correlated credential value without exposing resolution details."""
+        del message
         if not isinstance(payload, CredentialResolve):
             raise ProtocolConflict
         credential = await self._resolve_credential(context.session, payload.credential_ref)
-        return AOCommandResult(
+        return HandlingResult(
             resource=None,
-            body=CredentialResolution(message_id=message.message_id, credential=credential),
+            result=CredentialResolveCommandResult(credential=credential),
         )

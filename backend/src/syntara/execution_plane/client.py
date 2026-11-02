@@ -16,10 +16,12 @@ from uuid import UUID, uuid4
 import httpx
 import jwt
 from execution_plane_client.commands.control import CancelCommand
-from execution_plane_client.protocol import MessageEnvelope, TransportReceipt
+from execution_plane_client.commands.results import TransportReceipt
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+    from execution_plane_client.protocol import MessageEnvelope
 
 from syntara.auth.services.token_service import get_key_manager
 from syntara.core.config.base import get_settings
@@ -31,6 +33,7 @@ EP_TOKEN_LIFETIME_SECONDS = 300
 EP_SCOPES = (
     "work.execute command.cancel cluster.register cluster.update cluster.delete "
     "execution_target.register execution_target.update execution_target.delete "
+    "execution_target.health "
     "work-items:read execution-targets:read clusters:read"
 )
 

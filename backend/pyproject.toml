@@ -139,6 +139,8 @@ constraint-dependencies = [
 syntara-api-client = { path = "src/api_client", editable = true }
 orchestrator-cli = { path = "src/cli", editable = true }
 orchestrator-test-sdk = { path = "test-sdk", editable = true }
+# Temporary branch pin for the typed CommandResult contract (AAP-98627).
+execution-plane-client = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git", subdirectory = "src/execution_plane_client", branch = "AAP-98627" }
 
 [project.scripts]
 orchestrator-admin = "syntara.orchestrator_admin:app"

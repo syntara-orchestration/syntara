@@ -56,6 +56,26 @@ export interface paths {
     patch: operations['update_execution_target']
     trace?: never
   }
+  '/api/execution_plane/v1/execution_targets/{target_id}/health': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get execution target health
+     * @description Dispatch a target health command and return EP's shallow typed result.
+     */
+    get: operations['get_execution_target_health']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/execution_plane/v1/work_items': {
     parameters: {
       query?: never
@@ -135,15 +155,21 @@ export interface components {
       client_id: string
     }
     /**
-     * CredentialResolution
-     * @description The resolved credential value for one submitted command.
+     * CredentialResolveCommandResult
+     * @description Typed result returned for a credential-resolution command.
      */
-    CredentialResolution: {
+    CredentialResolveCommandResult: {
       /**
-       * Message Id
-       * Format: uuid
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
        */
-      message_id: string
+      command_type: 'credential.resolve'
+      /**
+       * Command Revision
+       * @default 1
+       * @constant
+       */
+      command_revision?: 1
       /** Credential */
       credential: string
     }
@@ -224,6 +250,21 @@ export interface components {
       created_at: string
       /** Last Ran At */
       last_ran_at?: string | null
+    }
+    /**
+     * ExecutionTargetHealthResult
+     * @description AO's shallow view of an EP on-demand target health probe.
+     */
+    ExecutionTargetHealthResult: {
+      /** Healthy */
+      healthy: boolean
+      /** Message */
+      message?: string | null
+      /**
+       * Skipped
+       * @default false
+       */
+      skipped?: boolean
     }
     /**
      * ExecutionTargetListResponse
@@ -359,6 +400,32 @@ export interface components {
       revision?: number | null
     }
     /**
+     * TargetHealthCommandResult
+     * @description Typed result returned for an execution-target health command.
+     */
+    TargetHealthCommandResult: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      command_type: 'execution_target.health'
+      /**
+       * Command Revision
+       * @default 1
+       * @constant
+       */
+      command_revision?: 1
+      /** Healthy */
+      healthy: boolean
+      /** Message */
+      message?: string | null
+      /**
+       * Skipped
+       * @default false
+       */
+      skipped?: boolean
+    }
+    /**
      * TransportReceipt
      * @description Receipt of a handled request, without a persisted command record.
      */
@@ -375,6 +442,10 @@ export interface components {
        */
       message_id: string
       resource?: components['schemas']['ResourceReference'] | null
+      /** Result */
+      result?:
+        | (components['schemas']['CredentialResolveCommandResult'] | components['schemas']['TargetHealthCommandResult'])
+        | null
     }
     /** ValidationError */
     ValidationError: {
@@ -756,6 +827,65 @@ export interface operations {
       }
     }
   }
+  get_execution_target_health: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        target_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description On-demand execution target health */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExecutionTargetHealthResult']
+        }
+      }
+      /** @description Execution target or installed cluster not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Cluster not ready or protected target lifecycle conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Invalid Execution Plane response */
+      502: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Execution Plane unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
   list_work_items: {
     parameters: {
       query?: {
@@ -841,7 +971,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['TransportReceipt'] | components['schemas']['CredentialResolution']
+          'application/json': components['schemas']['TransportReceipt']
         }
       }
       /** @description Validation Error */

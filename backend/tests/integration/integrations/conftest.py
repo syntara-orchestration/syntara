@@ -9,7 +9,8 @@ from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
-from execution_plane_client.protocol import MessageEnvelope, ResourceReference, TransportReceipt
+from execution_plane_client.commands.results import TransportReceipt
+from execution_plane_client.protocol import MessageEnvelope, ResourceReference
 
 from syntara.authz.models.project import Project
 from syntara.execution_plane import cluster_sync_commands

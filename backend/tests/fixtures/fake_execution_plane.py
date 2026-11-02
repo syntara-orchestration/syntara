@@ -9,8 +9,9 @@ import os
 import sys
 from typing import TYPE_CHECKING, Any, Self
 
+from execution_plane_client.commands.results import TransportReceipt
 from execution_plane_client.commands.work import WorkExecute
-from execution_plane_client.protocol import MessageEnvelope, ResourceReference, TransportReceipt
+from execution_plane_client.protocol import MessageEnvelope, ResourceReference
 
 if TYPE_CHECKING:
     from uuid import UUID
