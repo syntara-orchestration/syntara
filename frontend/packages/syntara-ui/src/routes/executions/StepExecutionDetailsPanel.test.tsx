@@ -7,6 +7,14 @@ import { axe } from 'vitest-axe'
 
 import { StepExecutionDetailsPanel } from './StepExecutionDetailsPanel'
 
+vi.mock('../../providers/theme/useColorScheme', () => ({
+  useColorScheme: () => ({
+    colorScheme: 'dark',
+    setColorScheme: vi.fn(),
+    toggleColorScheme: vi.fn(),
+  }),
+}))
+
 const mockActivityData = {
   resources: [
     {
@@ -79,6 +87,65 @@ describe('StepExecutionDetailsPanel', () => {
 
     expect(screen.getByText(/"host"/)).toBeInTheDocument()
     expect(screen.getByText(/"10.0.0.1"/)).toBeInTheDocument()
+  })
+
+  it('keeps the parameter viewer and previews saved retry inputs over the resolved values', async () => {
+    const user = userEvent.setup()
+    const retryInputOverride = {
+      target: { id: 'run_aap_vm', name: 'Run AAP VM', parameterNames: ['host', 'template_id'] },
+      canEdit: true,
+      isDisabled: false,
+      savedOverride: { host: 'retry.example' },
+      draft: undefined,
+      error: undefined,
+      isEditing: false,
+      onEdit: vi.fn(),
+      onCancel: vi.fn(),
+      onSave: vi.fn(),
+      onDraftChange: vi.fn(),
+    }
+
+    render(<StepExecutionDetailsPanel {...defaultProps} retryInputOverride={retryInputOverride} />, { wrapper })
+
+    expect(screen.getByRole('textbox', { name: 'Search input parameters data' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Input parameters view selection')).toBeInTheDocument()
+    expect(screen.getByText('Edited for retry')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit parameters for retry' })).toBeInTheDocument()
+    expect(screen.getByText(/"host": "retry\.example"/)).toBeInTheDocument()
+    expect(screen.getByText(/"template_id": 42/)).toBeInTheDocument()
+    expect(mockActivityData.resources[0]?.input_data).toEqual({ host: '10.0.0.1', template_id: 42 })
+
+    await user.click(screen.getAllByRole('button', { name: 'Table' })[0])
+    expect(screen.getByLabelText('Input data')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Edit parameters for retry' }))
+    expect(retryInputOverride.onEdit).toHaveBeenCalledWith(
+      'run_aap_vm',
+      JSON.stringify({ host: 'retry.example', template_id: 42 }, null, 2)
+    )
+  })
+
+  it('replaces parameter and output panes with the retry editor while editing', () => {
+    const retryInputOverride = {
+      target: { id: 'run_aap_vm', name: 'Run AAP VM', parameterNames: ['host', 'template_id'] },
+      canEdit: true,
+      isDisabled: false,
+      savedOverride: { host: 'retry.example' },
+      draft: JSON.stringify({ host: 'retry.example', template_id: 42 }, null, 2),
+      error: undefined,
+      isEditing: true,
+      onEdit: vi.fn(),
+      onCancel: vi.fn(),
+      onSave: vi.fn(),
+      onDraftChange: vi.fn(),
+    }
+
+    render(<StepExecutionDetailsPanel {...defaultProps} retryInputOverride={retryInputOverride} />, { wrapper })
+
+    expect(screen.getByRole('textbox', { name: 'Input parameters for Run AAP VM' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reset parameters' })).toBeInTheDocument()
+    expect(screen.queryByText('Output')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Input parameters view selection')).not.toBeInTheDocument()
   })
 
   it('shows output data in the output pane by default (JSON view)', () => {
@@ -259,7 +326,7 @@ describe('StepExecutionDetailsPanel', () => {
     expect(searchInputs[0]).toHaveValue('')
   })
 
-  it('renders running status with elapsed time updating', () => {
+  it('renders running status without a separate step elapsed time', () => {
     const propsWithRunning = {
       ...defaultProps,
       stepState: {
@@ -272,7 +339,7 @@ describe('StepExecutionDetailsPanel', () => {
     render(<StepExecutionDetailsPanel {...propsWithRunning} />, { wrapper })
 
     expect(screen.getByText('Running')).toBeInTheDocument()
-    expect(screen.getByText(/Elapsed time:/)).toBeInTheDocument()
+    expect(screen.queryByText(/Elapsed time:/)).not.toBeInTheDocument()
   })
 
   it('renders failed status with error styling on output', () => {
@@ -290,13 +357,12 @@ describe('StepExecutionDetailsPanel', () => {
     expect(screen.getByText('Failed')).toBeInTheDocument()
   })
 
-  it('renders timestamp range when step has both start and end times', () => {
+  it('renders only the completion timestamp when step has both start and end times', () => {
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
-    // Start and end render as two separate <time> elements (via PatternFly Timestamp)
-    // joined by " - ". Timestamps render in local timezone, so just verify the date
-    // appears twice rather than asserting an exact combined string.
-    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(2)
+    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(1)
+    expect(screen.queryByText(/ - /)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Elapsed time:/)).not.toBeInTheDocument()
   })
 
   it('renders only start timestamp when completion time is missing', () => {
