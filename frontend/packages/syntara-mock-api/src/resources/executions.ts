@@ -288,6 +288,7 @@ export const executions: Execution[] = [
     updated_at: mockDate.hoursAgo3Plus2s,
     workflow_id: BASIC_SEQUENCE,
     workflow_name: workflowNames[BASIC_SEQUENCE],
+    project_id: workflows.find((workflow) => workflow.id === BASIC_SEQUENCE)?.project_id,
     status: 'failed',
     started_at: mockDate.hoursAgo3Plus1s,
     completed_at: mockDate.hoursAgo3Plus2s,
