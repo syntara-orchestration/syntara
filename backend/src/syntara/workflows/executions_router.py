@@ -5,7 +5,7 @@ from uuid import UUID
 
 import structlog
 from fastapi import Depends, Query, Request, Response, status
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.service import RPCError
 
@@ -28,6 +28,7 @@ from syntara.workflows.models.execution import (
     RetryFromFailureValidationResponse,
 )
 from syntara.workflows.models.query_params import ActivityListParams, ExecutionIncludeParams
+from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.services import ExecutionService
 from syntara.workflows.workflow_engine.services.temporal_execution_service import (
     TemporalExecutionService,
@@ -351,9 +352,51 @@ async def retry_from_failure_preview(
 async def retry_from_failure(
     execution_id: UUID,
     body: RetryFailureRequest,
+    request: Request,
     service: Annotated[ExecutionService, Depends(get_execution_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ExecutionRead:
     """Retry a failed execution from failure points."""
+    # AC-14: changing resolved inputs is a workflow edit, scoped to the
+    # workflow associated with the original execution. A retry without values
+    # to override still requires only execution:run.
+    if any(body.input_parameter_overrides.values()):
+        workflow_context_result = await db.exec(
+            select(Execution.workflow_id, Workflow.labels, Project.name)
+            .join(Workflow, col(Workflow.id) == col(Execution.workflow_id))
+            .outerjoin(Project, col(Project.id) == col(Workflow.project_id))
+            .where(Execution.id == execution_id)
+        )
+        workflow_context = workflow_context_result.first()
+        if workflow_context is not None:
+            workflow_id, workflow_labels, resource_project = workflow_context
+            authz_result = await authorize(
+                db,
+                get_authz_evaluator(request),
+                AuthzRequest(
+                    user_id=current_user.id,
+                    action="update",
+                    resource_type="workflow",
+                    resource_id=str(workflow_id),
+                    resource_project=resource_project or "",
+                    resource_labels=dict(workflow_labels or {}),
+                    user_labels=current_user.labels,
+                    user_metadata=current_user.authz_metadata,
+                ),
+            )
+            if not authz_result.allowed:
+                logger.info(
+                    "Authorization denied",
+                    user_id=str(current_user.id),
+                    resource_type="workflow",
+                    action="update",
+                    resource_id=str(workflow_id),
+                    denied_by=authz_result.denied_by,
+                )
+                msg = "Not authorized to perform update on workflow"
+                raise AuthorizationDeniedError(msg)
+
     logger.info("Retrying execution from failure", execution_id=execution_id)
     return await service.retry_from_failure(execution_id, body.retry_point_ids, body.input_parameter_overrides)
 
