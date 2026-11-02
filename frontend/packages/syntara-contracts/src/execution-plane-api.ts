@@ -56,6 +56,30 @@ export interface paths {
     patch: operations['update_execution_target']
     trace?: never
   }
+  '/api/execution_plane/v1/clusters': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List execution clusters
+     * @description Retrieve registered execution clusters. Filters use field=value or field[operator]=value; EP validates fields and operators. Keep filters, sort, and limit unchanged when following opaque cursors.
+     */
+    get: operations['list_clusters']
+    put?: never
+    /**
+     * Register an execution cluster
+     * @description Register a standalone execution cluster (and its default execution target) through EP commands. The registration is keyed by the cluster name: re-posting the same name re-applies the same desired state idempotently. The credential must already exist in AO and be able to manage the cluster. Replaces the direct EP ClusterProvision calls the Konflux e2e used to make.
+     */
+    post: operations['create_cluster']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/execution_plane/v1/work_items': {
     parameters: {
       query?: never
@@ -100,6 +124,93 @@ export interface paths {
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
+    /**
+     * ClusterFacadeRead
+     * @description Safe cluster fields available to AO's authorized management API.
+     */
+    ClusterFacadeRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Source Integration Id */
+      source_integration_id?: string | null
+      /** Name */
+      name: string
+      /** Endpoint */
+      endpoint: string
+      /** Status */
+      status: string
+      /** Status Message */
+      status_message?: string | null
+      /** Enabled */
+      enabled: boolean
+      /** Is Default */
+      is_default: boolean
+      /** Labels */
+      labels: {
+        [key: string]: string
+      }
+      /** Project Ids */
+      project_ids?: string[] | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+    }
+    /**
+     * ClusterListResponse
+     * @description Paginated list response for clusters.
+     */
+    ClusterListResponse: {
+      /** Resources */
+      resources: components['schemas']['ClusterFacadeRead'][]
+      /** Next */
+      next?: string | null
+      /** Prev */
+      prev?: string | null
+      /** Total */
+      total?: number | null
+    }
+    /**
+     * ClusterRegistrationCreate
+     * @description A standalone cluster registration: the cluster plus its default target.
+     */
+    ClusterRegistrationCreate: {
+      /** Name */
+      name: string
+      /** Endpoint */
+      endpoint: string
+      /**
+       * Namespace
+       * @description Namespace the dispatcher ServiceAccount and Jobs run in
+       */
+      namespace: string
+      /**
+       * Credential Ref
+       * Format: uuid
+       * @description Existing AO credential that can manage the cluster
+       */
+      credential_ref: string
+      /** Ca Certificate */
+      ca_certificate?: string | null
+      /** Labels */
+      labels?: {
+        [key: string]: string
+      }
+      /**
+       * Enabled
+       * @default true
+       */
+      enabled?: boolean
+    }
     /**
      * Command
      * @description One versioned operation; participants persist only its domain effects.
@@ -730,6 +841,107 @@ export interface operations {
           [name: string]: unknown
         }
         content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Invalid Execution Plane response */
+      502: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Execution Plane unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  list_clusters: {
+    parameters: {
+      query?: {
+        /** @description Maximum number of results per page */
+        limit?: number
+        /** @description Pagination cursor from previous response */
+        cursor?: string | null
+        /** @description Sort parameter (e.g., 'name', '-created_at') */
+        sort?: string | null
+        /** @description Include total count in response (expensive) */
+        include_total?: boolean
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ClusterListResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Invalid Execution Plane response */
+      502: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Execution Plane unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  create_cluster: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ClusterRegistrationCreate']
+      }
+    }
+    responses: {
+      /** @description Registered cluster */
+      201: {
+        headers: {
+          /** @description AO cluster detail path */
+          Location?: string
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ClusterFacadeRead']
+        }
       }
       /** @description Validation Error */
       422: {
