@@ -265,17 +265,22 @@ export class ExecutionStateEnricher {
    * Trigger nodes are treated the same as regular activity nodes — their status
    * is read directly from `activityStates` using the trigger's real ID.
    *
-   * @param triggerRealId - The trigger's real ID (from workflow definition) for activityStates lookup
-   * @param executionStatus - Current execution status (null if not in execution view)
-   * @param activityStates - Map of activity states from execution store
+   * @param options - Trigger data and execution context used to enrich it
    * @returns Trigger data enriched with execution metadata
    */
-  enrichTriggerNode<T extends Record<string, unknown>>(
-    triggerRealId: string | undefined,
-    triggerData: T,
-    executionStatus: string | null | undefined,
+  enrichTriggerNode<T extends Record<string, unknown>>({
+    triggerRealId,
+    triggerData,
+    executionStatus,
+    activityStates,
+    replayBaselineAt,
+  }: {
+    triggerRealId: string | undefined
+    triggerData: T
+    executionStatus: string | null | undefined
     activityStates: Map<string, ActivityState>
-  ): T & { metadata?: { __showExecutionBadge?: boolean }; __executionState?: ExecutionState } {
+    replayBaselineAt?: string | null
+  }): T & { metadata?: { __showExecutionBadge?: boolean }; __executionState?: ExecutionState } {
     if (!executionStatus) {
       return triggerData
     }
@@ -301,6 +306,7 @@ export class ExecutionStateEnricher {
         started_at: triggerState?.startedAt ?? undefined,
         completed_at: triggerState?.completedAt ?? undefined,
         error_details: triggerState?.errorDetails ?? undefined,
+        replayed: isReplayedStep(triggerState?.startedAt, replayBaselineAt),
       },
     }
   }

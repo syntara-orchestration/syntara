@@ -1,5 +1,5 @@
 import { useReactFlow } from '@xyflow/react'
-import { useCallback, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 
 import {
   useWorkflowStore,
@@ -9,6 +9,7 @@ import {
   selectTriggers,
   selectActivities,
 } from '../../stores/useWorkflowStore'
+import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 import { useExecutionStore, selectRetryReplayBaseline } from '../workflows/stores/useExecutionStore'
 
 import { ActiveExecutionContext } from './ActiveExecutionContext'
@@ -23,6 +24,8 @@ import { useWorkflowGraphInit } from './hooks/useWorkflowGraphInit'
 import { useWorkflowInitialization } from './hooks/useWorkflowInitialization'
 import type { BuilderFlowProps } from './types'
 
+const EMPTY_RETRY_PREVIEW_POINT_IDS: readonly string[] = []
+
 export function BuilderFlow(props: BuilderFlowProps) {
   const {
     workflowId,
@@ -33,6 +36,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
     activeEdgeId,
     executionStatus,
     copiedRunActivityIds,
+    retryPreviewPointIds = EMPTY_RETRY_PREVIEW_POINT_IDS,
     onNodeClick,
     onAddNodeFromEdge,
     onNodesDeleted,
@@ -84,6 +88,18 @@ export function BuilderFlow(props: BuilderFlowProps) {
     initialNodes,
     initialEdges,
   })
+
+  // The preview API identifies exact restart points, including loop iteration IDs.
+  // The execution canvas has one node per base activity, so anchor the retry marker
+  // to its base node without changing graph state or inferring downstream rerun nodes.
+  const retryPreviewBaseIds = useMemo(
+    () => new Set(retryPreviewPointIds.map((pointId) => parseCompositeKey(pointId).baseId)),
+    [retryPreviewPointIds]
+  )
+  const retryPreviewNodeIds = useMemo(
+    () => nodes.filter((node) => retryPreviewBaseIds.has(node.id)).map((node) => node.id),
+    [nodes, retryPreviewBaseIds]
+  )
 
   const { onNodeDragStart, onNodeDrag, onNodeDragStop, onLayout } = usePositionEventHandlers(
     nodes,
@@ -188,6 +204,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
         effectiveExecutionStatus={effectiveExecutionStatus}
         isReadOnly={isReadOnly}
         nodes={nodes}
+        retryPreviewNodeIds={retryPreviewNodeIds}
         edges={edges}
         onNodesChange={onNodesChange}
         onNodeDragStart={isReadOnly ? undefined : onNodeDragStart}
