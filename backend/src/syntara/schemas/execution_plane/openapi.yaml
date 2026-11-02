@@ -361,7 +361,7 @@ paths:
       tags:
         - Execution Plane
       summary: Register an execution cluster
-      description: 'Register a standalone execution cluster (and its default execution target) through EP commands. The registration is keyed by the cluster name: re-posting the same name re-applies the same desired state idempotently. The credential must already exist in AO and be able to manage the cluster. Replaces the direct EP ClusterProvision calls the Konflux e2e used to make.'
+      description: 'Register a standalone execution cluster through EP commands. The registration is keyed by the cluster name: re-posting the same name re-applies the same desired state idempotently. The credential must already exist in AO and be able to manage the cluster. Clusters carry no dispatch namespace: create execution targets on the cluster through the execution_targets endpoint. Replaces the direct EP ClusterProvision calls the Konflux e2e used to make.'
       operationId: create_cluster
       security:
         - bearerAuth: []
@@ -745,13 +745,6 @@ components:
           type: string
           maxLength: 2048
           title: Endpoint
-        namespace:
-          type: string
-          maxLength: 63
-          minLength: 1
-          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-          title: Namespace
-          description: Namespace the dispatcher ServiceAccount and Jobs run in
         credential_ref:
           type: string
           format: uuid
@@ -777,10 +770,9 @@ components:
       required:
         - name
         - endpoint
-        - namespace
         - credential_ref
       title: ClusterRegistrationCreate
-      description: 'A standalone cluster registration: the cluster plus its default target.'
+      description: A standalone cluster registration; dispatch namespaces come from targets.
     Command:
       properties:
         command_id:

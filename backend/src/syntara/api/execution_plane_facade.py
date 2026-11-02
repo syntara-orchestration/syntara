@@ -62,7 +62,7 @@ from syntara.execution_plane.client import (
 from syntara.execution_plane.clusters import (
     ClusterRegistrationCreate,
     register_cluster,
-    standalone_cluster_resource_key,
+    standalone_cluster_resource_id,
 )
 from syntara.execution_plane.targets import (
     ExecutionTargetCreate,
@@ -305,10 +305,12 @@ async def delete_execution_target(target_id: UUID) -> ExecutionTargetDeleteAccep
     summary="Register an execution cluster",
     status_code=status.HTTP_201_CREATED,
     description=(
-        "Register a standalone execution cluster (and its default execution target) through EP commands. "
-        "The registration is keyed by the cluster name: re-posting the same name re-applies the same "
-        "desired state idempotently. The credential must already exist in AO and be able to manage "
-        "the cluster. Replaces the direct EP ClusterProvision calls the Konflux e2e used to make."
+        "Register a standalone execution cluster through EP commands. The registration is keyed "
+        "by the cluster name: re-posting the same name re-applies the same desired state "
+        "idempotently. The credential must already exist in AO and be able to manage the cluster. "
+        "Clusters carry no dispatch namespace: create execution targets on the cluster through "
+        "the execution_targets endpoint. Replaces the direct EP ClusterProvision calls the "
+        "Konflux e2e used to make."
     ),
     responses={
         502: {"description": "Invalid Execution Plane response"},
@@ -323,15 +325,14 @@ async def delete_execution_target(target_id: UUID) -> ExecutionTargetDeleteAccep
     dependencies=[Depends(PermissionChecker("execution_target", "create"))],
 )
 async def create_cluster(data: ClusterRegistrationCreate, response: Response) -> ClusterFacadeRead:
-    """Register a standalone cluster and its default target through EP commands."""
-    resource_key = standalone_cluster_resource_key(data.name)
+    """Register a standalone cluster through EP commands."""
+    resource_id = standalone_cluster_resource_id(data.name)
     async with _target_client() as client:
         cluster = await register_cluster(
             client,
-            resource_key=resource_key,
+            resource_id=resource_id,
             name=data.name,
             endpoint=data.endpoint,
-            namespace=data.namespace,
             credential_ref=data.credential_ref,
             ca_certificate=data.ca_certificate,
             labels=data.labels,
