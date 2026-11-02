@@ -141,7 +141,7 @@ def create_workflow(
     fields: list[dict[str, Any]],
 ) -> WorkflowRead:
     """Create a draft workflow and register it for fixture cleanup."""
-    definition = WorkflowCreateWorkflowDefinitionType1.from_dict(variant.build_definition(name, fields))
+    definition = WorkflowCreateWorkflowDefinitionType1.from_dict(variant.build_definition(name, fields, None))
     response = syntara_api.workflows.create(
         body=WorkflowCreate(
             name=name,

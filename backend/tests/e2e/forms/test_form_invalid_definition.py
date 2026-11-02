@@ -270,7 +270,7 @@ def test_update_to_invalid_form_definition_flips_durable_issue_flag(
     assert workflow.has_validation_issues is False
 
     invalid_definition = WorkflowUpdateWorkflowDefinitionType1.from_dict(
-        variant.build_definition(name, [INVALID_DROPDOWN_DEFAULT])
+        variant.build_definition(name, [INVALID_DROPDOWN_DEFAULT], None)
     )
     update = syntara_api.workflows.update(
         workflow_id=workflow.id,
