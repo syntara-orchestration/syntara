@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import pytest
@@ -48,7 +48,7 @@ print(json.dumps({
 
 def _execution_input(execution: ExecutionRead) -> dict[str, Any]:
     """Return the submitted input payload from an execution response."""
-    return execution.input_data.to_dict()
+    return cast("dict[str, Any]", execution.input_data.to_dict())
 
 
 def test_retry_reuses_original_form_trigger_inputs(
