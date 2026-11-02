@@ -24,18 +24,17 @@ async def authenticated_only_user(
     user_factory: Callable[..., Awaitable[User]],
     test_db_session: AsyncSession,
 ) -> User:
-    """Create a user with only the 'authenticated' role (no 'user' role).
+    """Create a user with only the implicit authenticated-group roles (no 'user' role).
 
     This user is authenticated but lacks the 'user' role required for file upload.
-    Note: user is created but NOT added to the test-users group, so they only have
-    the 'authenticated' role, not the 'user' role.
+    They are not added to the test-users group, so they receive no user role.
     """
     return await user_factory(username="auth-only", email="auth-only@example.com")
 
 
 @pytest_asyncio.fixture
 async def authenticated_only_client(base_client: AsyncClient, authenticated_only_user: User) -> AsyncClient:
-    """Authenticated client with only the 'authenticated' role (no 'user' role)."""
+    """Authenticated client with no user role beyond the implicit group defaults."""
     from syntara.api.main import app
     from syntara.auth.dependencies import get_current_user
 
@@ -67,8 +66,8 @@ async def test_upload_authorised(auth_client: AsyncClient, sample_pdf_path: Path
 async def test_upload_unauthorised(authenticated_only_client: AsyncClient) -> None:
     """Test that authenticated users without 'user' role receive 403 Forbidden.
 
-    The authenticated_only_client provides a user with only the 'authenticated' role,
-    lacking the 'user' role required for file upload.
+    The authenticated_only_client provides a user without the 'user' role required
+    for file upload.
     """
     files: list[tuple[str, tuple[str, bytes, str]]] = []
 

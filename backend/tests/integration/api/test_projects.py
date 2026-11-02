@@ -53,10 +53,11 @@ async def test_authenticated_user_has_default_policies(
     policy_names = {p["name"] for p in policies}
 
     # The "authenticated" role is assigned to the "authenticated" group,
-    # which includes user:read:self, user:update:self, project:create:any
+    # with step-author also assigned to that group for step_type:write:any.
     assert "project:create:any" in policy_names
     assert "user:read:self" in policy_names
     assert "user:update:self" in policy_names
+    assert "step_type:write:any" in policy_names
 
 
 @pytest.mark.asyncio
