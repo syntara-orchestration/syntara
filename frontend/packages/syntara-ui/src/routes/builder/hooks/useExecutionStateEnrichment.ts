@@ -103,13 +103,13 @@ export function useExecutionStateEnrichment({
       const updatedNodes = currentNodes.map((node) => {
         if (node.id.startsWith('trigger-')) {
           const triggerRealId = triggers[Number.parseInt(node.id.split('-')[1], 10)]?.id
-          const enriched = executionStateEnricher.enrichTriggerNode(
+          const enriched = executionStateEnricher.enrichTriggerNode({
             triggerRealId,
-            node.data,
-            effectiveExecutionStatus,
+            triggerData: node.data,
+            executionStatus: effectiveExecutionStatus,
             activityStates,
-            replayBaselineAt
-          )
+            replayBaselineAt,
+          })
           return applyEnrichedDataStable(node, enriched, anyChangedRef)
         }
         const activity = activitiesById.get(node.id)
