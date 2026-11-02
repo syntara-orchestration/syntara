@@ -162,18 +162,17 @@ async def test_form_trigger_submission_emits_metadata_only_audit_event(
     assert event.execution_id == execution_id
     assert event.activity_id == "form"
     assert event.actor_id == test_user.id
-    assert event.structured_data.model_dump()["field_count"] == 5
-    assert event.structured_data.model_dump()["field_types"] == ["date", "dropdown", "email", "number", "text"]
-    exported_payload = event.model_dump_json()
-    for submitted_value in (
-        "FORM_TRIGGER_PRIVATE_TEXT_97126",
-        "713",
-        "2051-03-19",
-        "private.user.97126@example.com",
-    ):
-        assert submitted_value not in exported_payload
-    for field_label in ("Required text", "Environment", "Count", "Start", "Contact"):
-        assert field_label not in exported_payload
+    assert event.event_message == "Form trigger submitted with 5 field(s)"
+    assert event.resource_name == form_trigger_workflow.name
+    audit_metadata = event.structured_data.model_dump()
+    assert audit_metadata.pop("submitted_at") is not None
+    assert audit_metadata == {
+        "data_type": "form-trigger-submitted",
+        "error_type": None,
+        "error_message": None,
+        "field_count": 5,
+        "field_types": ["date", "dropdown", "email", "number", "text"],
+    }
 
 
 @pytest.mark.integration
