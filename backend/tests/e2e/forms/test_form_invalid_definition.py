@@ -32,7 +32,6 @@ from ._invalid_definition import (
     TRIGGER_VARIANT,
     VALID_TEXT_FIELD,
     FormVariant,
-    _workflow_definition,
     create_workflow,
     element_findings,
     validate_definition,
@@ -271,7 +270,7 @@ def test_update_to_invalid_form_definition_flips_durable_issue_flag(
     assert workflow.has_validation_issues is False
 
     invalid_definition = WorkflowUpdateWorkflowDefinitionType1.from_dict(
-        _workflow_definition(variant, name, [INVALID_DROPDOWN_DEFAULT])
+        variant.build_definition(name, [INVALID_DROPDOWN_DEFAULT])
     )
     update = syntara_api.workflows.update(
         workflow_id=workflow.id,

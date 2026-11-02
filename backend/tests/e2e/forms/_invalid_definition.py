@@ -116,15 +116,6 @@ TRIGGER_VARIANT = FormVariant(
 FORM_VARIANTS = (PROMPT_VARIANT, TRIGGER_VARIANT)
 
 
-def _workflow_definition(
-    variant: FormVariant,
-    name: str,
-    fields: list[dict[str, Any]],
-    extra_parameters: Mapping[str, Any] | None = None,
-) -> dict[str, Any]:
-    return variant.build_definition(name, fields, extra_parameters)
-
-
 def validate_definition(
     syntara_api: SyntaraApiRegistry,
     variant: FormVariant,
@@ -135,7 +126,7 @@ def validate_definition(
 ) -> Response[Any]:
     """Call the stateless validator with a definition for the selected variant."""
     definition = WorkflowValidateRequestWorkflowDefinition.from_dict(
-        _workflow_definition(variant, name, fields, extra_parameters)
+        variant.build_definition(name, fields, extra_parameters)
     )
     return syntara_api.workflows.validate_definition(body=WorkflowValidateRequest(workflow_definition=definition))
 
@@ -150,7 +141,7 @@ def create_workflow(
     fields: list[dict[str, Any]],
 ) -> WorkflowRead:
     """Create a draft workflow and register it for fixture cleanup."""
-    definition = WorkflowCreateWorkflowDefinitionType1.from_dict(_workflow_definition(variant, name, fields))
+    definition = WorkflowCreateWorkflowDefinitionType1.from_dict(variant.build_definition(name, fields))
     response = syntara_api.workflows.create(
         body=WorkflowCreate(
             name=name,
