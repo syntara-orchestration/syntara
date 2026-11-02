@@ -31,7 +31,7 @@ start_loggers()
 async def main() -> None:
     """Run the Temporal workflow worker."""
     validate_encryption_key_at_startup()
-    # Fail fast if timezone data is missing (AAP-86297)
+    # Fail fast if timezone data is missing from the runtime image.
     from syntara.workflow_core.models import (  # noqa: PLC0415
         _get_valid_timezones,
     )
