@@ -153,6 +153,7 @@ class TestFormTriggerTelemetry:
         for key in ("input_data", "response_data", "submitted_by", "user_id", "username", "email"):
             assert key not in properties
 
+        # Search the full message so form labels or values cannot leak outside properties either.
         serialized_event = json.dumps(message)
         assert _FIELD_LABEL not in serialized_event
         assert _OPTIONAL_FIELD_LABEL not in serialized_event
