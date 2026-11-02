@@ -1058,6 +1058,8 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/AgenticExecutorParameters
     IntegrationConnectionConfig:
       $ref: ./shared-schemas.yaml#/components/schemas/IntegrationConnectionConfig
+    ExecutionTargetProfile:
+      $ref: ./shared-schemas.yaml#/components/schemas/ExecutionTargetProfile
     ScriptExecutorParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/ScriptExecutorParameters
     ApprovalNodeParameters:

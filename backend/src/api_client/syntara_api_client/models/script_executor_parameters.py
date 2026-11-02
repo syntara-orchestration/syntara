@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -10,6 +10,7 @@ from ..models.script_language import ScriptLanguage
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.execution_target_profile import ExecutionTargetProfile
     from ..models.script_executor_parameters_environment import ScriptExecutorParametersEnvironment
 
 
@@ -23,18 +24,30 @@ class ScriptExecutorParameters:
     Attributes:
         language (ScriptLanguage): Supported script languages for script executor.
         code (str): Script code to execute
+        execution_profile (ExecutionTargetProfile | None | Unset): Execution Plane placement profile for this workload.
         environment (ScriptExecutorParametersEnvironment | Unset): Environment variables
     """
 
     language: ScriptLanguage
     code: str
+    execution_profile: ExecutionTargetProfile | None | Unset = UNSET
     environment: ScriptExecutorParametersEnvironment | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.execution_target_profile import ExecutionTargetProfile
+
         language = self.language.value
 
         code = self.code
+
+        execution_profile: dict[str, Any] | None | Unset
+        if isinstance(self.execution_profile, Unset):
+            execution_profile = UNSET
+        elif isinstance(self.execution_profile, ExecutionTargetProfile):
+            execution_profile = self.execution_profile.to_dict()
+        else:
+            execution_profile = self.execution_profile
 
         environment: dict[str, Any] | Unset = UNSET
         if not isinstance(self.environment, Unset):
@@ -48,6 +61,8 @@ class ScriptExecutorParameters:
                 "code": code,
             }
         )
+        if execution_profile is not UNSET:
+            field_dict["execution_profile"] = execution_profile
         if environment is not UNSET:
             field_dict["environment"] = environment
 
@@ -55,12 +70,30 @@ class ScriptExecutorParameters:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.execution_target_profile import ExecutionTargetProfile
         from ..models.script_executor_parameters_environment import ScriptExecutorParametersEnvironment
 
         d = dict(src_dict)
         language = ScriptLanguage(d.pop("language"))
 
         code = d.pop("code")
+
+        def _parse_execution_profile(data: object) -> ExecutionTargetProfile | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                execution_profile_type_0 = ExecutionTargetProfile.from_dict(data)
+
+                return execution_profile_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(ExecutionTargetProfile | None | Unset, data)
+
+        execution_profile = _parse_execution_profile(d.pop("execution_profile", UNSET))
 
         _environment = d.pop("environment", UNSET)
         environment: ScriptExecutorParametersEnvironment | Unset
@@ -72,6 +105,7 @@ class ScriptExecutorParameters:
         script_executor_parameters = cls(
             language=language,
             code=code,
+            execution_profile=execution_profile,
             environment=environment,
         )
 

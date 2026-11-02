@@ -14,12 +14,12 @@
  */
 
 import { test, expect, toAppUrl } from './fixtures'
-import { addEdaTrigger } from './helpers/v2-nodes'
+import { addEdaTrigger } from './helpers/v2-steps'
 import {
   buildUniqueName,
   clickAddConnectedStep,
   clickSaveAndWait,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   deleteWorkflow,
   fillCodeEditor,
   selectProjectIfRequired,
@@ -46,7 +46,7 @@ test.describe('EDA Trigger', () => {
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Process event')
       await fillCodeEditor(app, { value: 'print("processing EDA event")' })
       await app.getByRole('button', { name: 'Create', exact: true }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
       // Save workflow (select project right before save)
       // Pin the workflow to the service account's own project. `ensureProject`
@@ -79,7 +79,7 @@ test.describe('EDA Trigger', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
 
     // Wait for trigger selection and select EDA trigger
-    await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Event-Driven Ansible trigger', exact: true }).click()
 
     // Type a path
@@ -98,7 +98,7 @@ test.describe('EDA Trigger', () => {
   test('EDA form shows webhook activation alert', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
 
-    await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Event-Driven Ansible trigger', exact: true }).click()
 
     await expect(app.getByText('EDA activation')).toBeVisible()
@@ -107,7 +107,7 @@ test.describe('EDA Trigger', () => {
   test.skip('EDA form validates empty path', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
 
-    await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Event-Driven Ansible trigger', exact: true }).click()
 
     // Leave webhook path empty, attempt to submit
@@ -120,7 +120,7 @@ test.describe('EDA Trigger', () => {
   test('EDA form validates invalid path characters', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
 
-    await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Event-Driven Ansible trigger', exact: true }).click()
 
     // Enter invalid characters

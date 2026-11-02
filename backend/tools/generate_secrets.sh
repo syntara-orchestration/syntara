@@ -177,6 +177,15 @@ main() {
         info "  Encryption key: $SECRETS_DIR/encryption-key"
     fi
 
+    # EP has a separate ownership boundary and must not use AO's data key.
+    if [[ -f "$SECRETS_DIR/ep-credential-encryption-key" ]] && [[ "$force" != true ]]; then
+        info "Execution Plane credential encryption key already exists, skipping"
+    else
+        info "Generating Execution Plane credential encryption key..."
+        openssl rand -base64 32 | tr -d '\n' > "$SECRETS_DIR/ep-credential-encryption-key"
+        chmod 600 "$SECRETS_DIR/ep-credential-encryption-key"
+    fi
+
     # Prevent permissions issues once secrets are mounted to syntara containers
     chmod -R +r "${SECRETS_DIR}"
 
@@ -187,6 +196,7 @@ main() {
     info "  APP_JWT_BACKUP_KEYS='[{\"key_id\":\"orchestrator-backup\",\"key_path\":\"/run/secrets/jwt-backup.pem\"}]'"
     info "  APP_ADMIN_PASSWORD_PATH=/run/secrets/admin-password"
     info "  APP_SECRET_ENCRYPTION_KEY_PATH=/run/secrets/encryption-key"
+    info "  EP_CREDENTIAL_ENCRYPTION_KEY_PATH=/run/secrets/ep-credential-encryption-key"
     info ""
     info "Bootstrap admin password saved to: $SECRETS_DIR/admin-password"
 }

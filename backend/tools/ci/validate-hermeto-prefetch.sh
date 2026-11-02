@@ -9,7 +9,7 @@ OUTPUT_DIR="${BACKEND_ROOT}/.hermeto-output"
 PREFETCH_OUTPUT_DIR="${OUTPUT_DIR}/output"
 PREFETCH_MODE="${PREFETCH_MODE:-permissive}"
 ENABLE_PACKAGE_REGISTRY_PROXY="${ENABLE_PACKAGE_REGISTRY_PROXY:-false}"
-PREFETCH_INPUT_DEFAULT='[{"type":"pip","path":"backend"},{"type":"rpm","path":"backend"},{"type":"generic","path":"backend"}]'
+PREFETCH_INPUT_DEFAULT='[{"type":"pip","path":"backend","requirements_files":["requirements.txt","requirements-vcs.txt"]},{"type":"rpm","path":"backend"},{"type":"generic","path":"backend"}]'
 PREFETCH_INPUT="${PREFETCH_INPUT:-${PREFETCH_INPUT_DEFAULT}}"
 PIP_ONLY=false
 LOG_FILE="${BACKEND_ROOT}/.hermeto-prefetch.log"
@@ -40,7 +40,7 @@ require_rhsm() {
 declare -a REQUIRED_BACKENDS=("pip" "rpm" "generic")
 if [ "${PIP_ONLY}" = true ]; then
 	REQUIRED_BACKENDS=("pip" "generic")
-	PREFETCH_INPUT='[{"type":"pip","path":"backend"},{"type":"generic","path":"backend"}]'
+	PREFETCH_INPUT='[{"type":"pip","path":"backend","requirements_files":["requirements.txt","requirements-vcs.txt"]},{"type":"generic","path":"backend"}]'
 fi
 
 # Remove stale prefetch output from previous runs. Hermeto may generate

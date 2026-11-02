@@ -31,6 +31,7 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from uvicorn import Config, Server
 
+from syntara.audit.outbox.worker import get_outbox_worker
 from syntara.authz.engine import clear_authz_cache, init_authz_cache
 from syntara.authz.models.project import Project
 from syntara.authz.resolver import AUTHENTICATED_GROUP_NAME
@@ -218,6 +219,33 @@ def _reset_opa_cache() -> Generator[None, None, None]:
     init_authz_cache(enabled=True, ttl_seconds=300)
     yield
     clear_authz_cache()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _reset_outbox_worker_for_test(
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[None, None]:
+    """Isolate the audit outbox worker singleton between tests.
+
+    Clears stale tasks (from prior test event loops) and points the singleton's
+    session factories at the current test DB so writes and drain queries hit the
+    same testcontainer database that the test itself uses.
+    """
+    if get_outbox_worker.cache_info().currsize == 0:
+        yield
+        return
+
+    worker = get_outbox_worker()
+    worker._pending.clear()
+    original_write_factory = worker._write_session_factory
+    original_session_factory = worker._session_factory
+    worker._write_session_factory = test_db_session_factory
+    worker._session_factory = test_db_session_factory
+    try:
+        yield
+    finally:
+        worker._write_session_factory = original_write_factory
+        worker._session_factory = original_session_factory
 
 
 @pytest.fixture(autouse=True)

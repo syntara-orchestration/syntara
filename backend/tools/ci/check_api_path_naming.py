@@ -1,6 +1,6 @@
 """Check that API endpoint paths use snake_case (no hyphens).
 
-Scans all Python files under src/syntara/ for FastAPI router definitions and
+Scans Syntara Python sources for FastAPI router definitions and
 verifies that URL path segments do not contain hyphens. Path parameters
 (e.g., {project_id}) are ignored.
 

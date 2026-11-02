@@ -653,3 +653,21 @@ class TestTyperCommands:
             monkeypatch.delenv("APP_PRODUCT_NAME", raising=False)
             get_settings.cache_clear()
             importlib.reload(admin_main)
+
+
+class TestReconcileClustersCommand:
+    """The admin command uses the shared reconciler and reports incomplete runs."""
+
+    @pytest.mark.parametrize(("failed", "skipped"), [(0, 0), (1, 0), (0, 1)])
+    def test_exit_status_and_scope(self, failed, skipped):
+        from typer.testing import CliRunner
+
+        from syntara.orchestrator_admin import __main__ as cli
+
+        integration_id = uuid4()
+        result = {"synced": 1, "failed": failed, "skipped": skipped}
+        with patch.object(cli, "_reconcile_clusters_async", new=AsyncMock(return_value=result)) as reconcile:
+            response = CliRunner().invoke(cli.app, ["reconcile-clusters", "--integration-id", str(integration_id)])
+        assert response.exit_code == (1 if failed or skipped else 0), response.output
+        reconcile.assert_awaited_once_with(integration_id)
+        assert f"failed: {failed}" in response.output

@@ -9,8 +9,10 @@ from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
+from execution_plane_client.protocol import MessageEnvelope, ResourceReference, TransportReceipt
 
 from syntara.authz.models.project import Project
+from syntara.execution_plane import cluster_sync_commands
 from syntara.integrations.models.integration import (
     IntegrationCreate,
     IntegrationProjectAssignment,
@@ -35,6 +37,42 @@ BASE_URL = "/api/v1/integrations"
 # ---------------------------------------------------------------------------
 # Service-level fixtures & helpers (used by lifecycle tests)
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def ep_cluster_commands(monkeypatch: pytest.MonkeyPatch) -> list[MessageEnvelope]:
+    """Acknowledge direct EP commands while exercising real AO database writes."""
+    commands: list[MessageEnvelope] = []
+    clusters: dict[str, UUID] = {}
+
+    async def submit(message: MessageEnvelope) -> TransportReceipt:
+        commands.append(message)
+        revision = message.command.payload["desired_revision"]
+        assert isinstance(revision, int)
+        key = str(message.command.payload["resource_key"])
+        cluster_id = clusters.setdefault(key, uuid4())
+        if message.command.command_type == "cluster.delete":
+            clusters.pop(key, None)
+        return TransportReceipt(
+            message_id=message.message_id,
+            resource=ResourceReference(
+                kind="cluster",
+                resource_id=cluster_id,
+                revision=revision,
+            ),
+        )
+
+    async def inventory(*, limit: int, filters: dict[str, str]) -> dict[str, object]:
+        key = filters["source_integration_id"]
+        resources = [{"id": str(clusters[key])}] if key in clusters else []
+        return {"resources": resources[:limit], "next": None, "prev": None}
+
+    client = AsyncMock()
+    client.list_clusters.side_effect = inventory
+    client.__aenter__.return_value = client
+    client.submit_command.side_effect = submit
+    monkeypatch.setattr(cluster_sync_commands, "ExecutionPlaneHttpClient", lambda: client)
+    return commands
 
 
 @pytest.fixture
@@ -77,6 +115,21 @@ async def aap_credential_id(credential_factory: CredentialFactory) -> UUID:
     cred = await credential_factory.create(ct, project)
     secret_service = create_secret_service(credential_factory.session)
     cred.secret_id = await secret_service.create_secret({"host": "https://gateway.example.com"})
+    await credential_factory.session.flush()
+    return UUID(str(cred.id))
+
+
+@pytest_asyncio.fixture
+async def http_bearer_token_credential_id(credential_factory: CredentialFactory) -> UUID:
+    """Create an HTTP Bearer Token credential with a stored secret and return its ID."""
+    from syntara.core.services.secret_service import create_secret_service
+
+    ct = await credential_factory.create_type("HTTP Bearer Token")
+    ct.injectors = {"extra_vars": {"bearer_token": "{{token}}"}, "env": {}, "file": {}}
+    project = await credential_factory.create_project()
+    cred = await credential_factory.create(ct, project)
+    secret_service = create_secret_service(credential_factory.session)
+    cred.secret_id = await secret_service.create_secret({"token": "test-bearer-token"})
     await credential_factory.session.flush()
     return UUID(str(cred.id))
 

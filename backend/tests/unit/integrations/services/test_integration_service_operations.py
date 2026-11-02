@@ -381,6 +381,31 @@ class TestValidateIntegration:
 
     @pytest.mark.asyncio
     @patch(f"{SERVICE_MODULE}.AuditEventDispatcher")
+    @patch(f"{SERVICE_MODULE}.get_runtime_settings")
+    @patch(f"{SERVICE_MODULE}.create_health_check_adapter")
+    async def test_adapter_construction_failure_after_validating_sets_error_status(
+        self,
+        mock_adapter_factory: MagicMock,
+        mock_settings: MagicMock,
+        mock_audit: MagicMock,
+        test_db_session: AsyncSession,
+        integration_service: IntegrationService,
+    ) -> None:
+        created = await integration_service.create_integration(_mcp_create())
+        mock_adapter_factory.side_effect = RuntimeError("adapter registry unavailable")
+        mock_settings.return_value = _mock_runtime_settings()
+
+        with pytest.raises(RuntimeError, match="adapter registry unavailable"):
+            await integration_service.validate_integration(created.id)
+
+        integration = await test_db_session.get(Integration, created.id)
+        assert integration is not None
+        assert integration.validation_status == IntegrationStatus.ERROR
+        assert integration.validation_error == "Unexpected error during validation: RuntimeError"
+        assert integration.last_validated_at is not None
+
+    @pytest.mark.asyncio
+    @patch(f"{SERVICE_MODULE}.AuditEventDispatcher")
     @patch(f"{SERVICE_MODULE}.create_health_check_adapter")
     async def test_credential_required_llm_sets_error_status_and_last_validated_at(
         self,
@@ -829,6 +854,31 @@ class TestRefreshIntegrationResources:
         assert integration is not None
         assert integration.refresh_status == IntegrationRefreshStatus.ERROR
         assert integration.refresh_error == "Connection refused"
+
+    @pytest.mark.asyncio
+    @patch(f"{SERVICE_MODULE}.AuditEventDispatcher")
+    @patch(f"{SERVICE_MODULE}.get_runtime_settings")
+    @patch(f"{SERVICE_MODULE}.create_health_check_adapter")
+    async def test_adapter_construction_failure_after_refreshing_sets_error_status(
+        self,
+        mock_adapter_factory: MagicMock,
+        mock_settings: MagicMock,
+        mock_audit: MagicMock,
+        test_db_session: AsyncSession,
+        integration_service: IntegrationService,
+    ) -> None:
+        created = await integration_service.create_integration(_mcp_create())
+        mock_adapter_factory.side_effect = RuntimeError("adapter registry unavailable")
+        mock_settings.return_value = _mock_runtime_settings()
+
+        with pytest.raises(RuntimeError, match="adapter registry unavailable"):
+            await integration_service.refresh_resources(created.id)
+
+        integration = await test_db_session.get(Integration, created.id)
+        assert integration is not None
+        assert integration.refresh_status == IntegrationRefreshStatus.ERROR
+        assert integration.refresh_error == "Unexpected error during refresh: RuntimeError"
+        assert integration.last_refreshed_at is not None
 
     @pytest.mark.asyncio
     async def test_refresh_unsupported_type_raises(

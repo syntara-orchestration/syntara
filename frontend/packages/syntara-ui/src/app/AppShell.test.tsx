@@ -34,7 +34,7 @@ vi.mock('./useDockState', () => ({
   DockStateContext: { Provider: ({ children }: { children: React.ReactNode }) => children },
   useDockStateProvider: () => ({
     isDockExpanded: false,
-    isDockTextExpanded: false,
+    isDockOverlay: false,
     isMobile: false,
     dockedToggleRef: { current: null },
     mobileToggleRef: { current: null },

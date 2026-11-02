@@ -10,6 +10,40 @@
       "code"
     ],
     "properties": {
+      "execution_profile": {
+        "anyOf": [
+          {
+            "oneOf": [
+              {
+                "title": "ExecutionTargetProfile",
+                "type": "object",
+                "required": [
+                  "type",
+                  "execution_target_id"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "execution_target"
+                  },
+                  "execution_target_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "additionalProperties": false
+              }
+            ],
+            "discriminator": {
+              "propertyName": "type"
+            }
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Execution Plane placement profile for this workload.",
+        "default": null
+      },
       "language": {
         "type": "string",
         "enum": [

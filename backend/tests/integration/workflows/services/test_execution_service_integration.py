@@ -6,7 +6,6 @@ workflow execution details (which are tested in tests/integration/workflow/).
 """
 
 import asyncio
-from collections.abc import AsyncGenerator
 from uuid import uuid4
 
 import pytest
@@ -16,9 +15,9 @@ from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from syntara.workflows.workflow_engine.activities.ep.ep_dispatch_activity import execute_script_activity
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
@@ -261,7 +260,7 @@ class TestCreateTemporalExecutionServiceFactory:
 
     async def test_create_execution_service_integration(
         self,
-        temporal_env: AsyncGenerator[None, None],
+        temporal_env: WorkflowEnvironment,
         temporal_worker: Worker,
     ) -> None:
         """Test creating TemporalExecutionService via factory function.
@@ -269,26 +268,17 @@ class TestCreateTemporalExecutionServiceFactory:
         Note: This test uses the real test environment but doesn't connect to
         localhost:7233 - it uses the test environment's client instead.
         """
-        # For this test, we'll verify the factory function works with the
-        # test environment by checking the service can be created and used
-        # We can't easily test connecting to a real external server in unit tests
+        # Use the environment paired with the execution-plane completion client.
+        service = TemporalExecutionService(
+            temporal_client=temporal_env.client,
+            task_queue="test-queue",
+        )
 
-        # This is more of a "does the factory function work" test
-        # Real connection to external Temporal would be in manual/system tests
+        assert service.temporal_client is not None
+        assert service.task_queue == "test-queue"
 
-        # Instead, let's verify the service structure is created correctly
-        # Create a minimal test to verify the factory creates a valid service
-        async with await WorkflowEnvironment.start_time_skipping() as env:
-            service = TemporalExecutionService(
-                temporal_client=env.client,
-                task_queue="test-queue",
-            )
-
-            assert service.temporal_client is not None
-            assert service.task_queue == "test-queue"
-
-            # Verify we can use it
-            workflow_yaml = """
+        # Verify we can use it
+        workflow_yaml = """
 schema_version: "2.0.0"
 name: factory-test
 description: Test factory function
@@ -308,25 +298,25 @@ edges:
   to: task1
 """
 
-            # Need to start a worker for this test
-            async with Worker(
-                env.client,
-                task_queue="test-queue",
-                workflows=[OrchestratorWorkflow],
-                activities=[execute_script_activity, manual_trigger, fetch_workflow_runtime_settings],
-            ):
-                workflow_def = yaml.safe_load(workflow_yaml)
-                result = await service.start_workflow(
-                    workflow_def=workflow_def,
-                    workflow_name="factory-test",
-                    trigger_node_id="trigger_manual",
-                    workflow_metadata=TEST_WORKFLOW_METADATA,
-                )
+        # Need to start a worker for this test
+        async with Worker(
+            temporal_env.client,
+            task_queue="test-queue",
+            workflows=[OrchestratorWorkflow],
+            activities=[execute_script_activity, manual_trigger, fetch_workflow_runtime_settings],
+        ):
+            workflow_def = yaml.safe_load(workflow_yaml)
+            result = await service.start_workflow(
+                workflow_def=workflow_def,
+                workflow_name="factory-test",
+                trigger_node_id="trigger_manual",
+                workflow_metadata=TEST_WORKFLOW_METADATA,
+            )
 
-                assert result.status == "running"
+            assert result.status == "running"
 
-                handle = service.temporal_client.get_workflow_handle(
-                    result.temporal_workflow_id, run_id=result.temporal_run_id
-                )
-                workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
-                assert workflow_result["status"] == "completed"
+            handle = service.temporal_client.get_workflow_handle(
+                result.temporal_workflow_id, run_id=result.temporal_run_id
+            )
+            workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
+            assert workflow_result["status"] == "completed"

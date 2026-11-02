@@ -1,0 +1,1043 @@
+---
+openapi: 3.1.0
+info:
+  title: Execution Plane API
+  description: Execution Plane operator endpoints — manage execution targets and observe work items.
+  version: 0.3.0
+paths:
+  /api/execution_plane/v1/execution_targets:
+    post:
+      tags:
+        - Execution Plane
+      summary: Create execution target
+      description: Create a Kubernetes target on the installed cluster through EP commands.
+      operationId: create_execution_target
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutionTargetCreate'
+      responses:
+        '201':
+          description: Created execution target
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetFacadeRead'
+          headers:
+            Location:
+              description: AO target detail path
+              schema:
+                type: string
+        '404':
+          description: Execution target or installed cluster not found
+        '409':
+          description: Cluster not ready or protected target lifecycle conflict
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: create
+    get:
+      tags:
+        - Execution Plane
+      summary: List execution targets
+      description: Retrieve registered execution targets. Filters use field=value or field[operator]=value; labels[key]=value matches a label and an empty value tests key existence. EP validates fields and operators. Keep filters, sort, and limit unchanged when following opaque cursors.
+      operationId: list_execution_targets
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            exclusiveMinimum: 0
+            description: Maximum number of results per page
+            default: 20
+            title: Limit
+          description: Maximum number of results per page
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Pagination cursor from previous response
+            title: Cursor
+          description: Pagination cursor from previous response
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                pattern: ^-?[a-z][a-z0-9_]*$
+              - type: 'null'
+            description: Sort parameter (e.g., 'name', '-created_at')
+            title: Sort
+          description: Sort parameter (e.g., 'name', '-created_at')
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            description: Include total count in response (expensive)
+            default: false
+            title: Include Total
+          description: Include total count in response (expensive)
+        - name: id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Target UUID; id[in]=uuid1,uuid2 for membership
+            title: Id
+          description: Target UUID; id[in]=uuid1,uuid2 for membership
+        - name: cluster_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Physical cluster UUID; supports eq and in
+            title: Cluster Id
+          description: Physical cluster UUID; supports eq and in
+        - name: name
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Name; supports eq, in, contains, and starts_with
+            title: Name
+          description: Name; supports eq, in, contains, and starts_with
+        - name: endpoint
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Endpoint; supports eq, in, contains, and starts_with
+            title: Endpoint
+          description: Endpoint; supports eq, in, contains, and starts_with
+        - name: status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Target status; supports eq and in
+            title: Status
+          description: Target status; supports eq and in
+        - name: backend_type
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Backend type; supports eq and in
+            title: Backend Type
+          description: Backend type; supports eq and in
+        - name: enabled
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Boolean; supports eq, in, and isnull
+            title: Enabled
+          description: Boolean; supports eq, in, and isnull
+        - name: is_default
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Boolean; supports eq, in, and isnull
+            title: Is Default
+          description: Boolean; supports eq, in, and isnull
+        - name: created_at
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Creation time; supports eq, in, gt, gte, lt, lte, and isnull
+            title: Created At
+          description: Creation time; supports eq, in, gt, gte, lt, lte, and isnull
+        - name: last_ran_at
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Last run time; supports ranges and isnull
+            title: Last Ran At
+          description: Last run time; supports ranges and isnull
+        - name: status_message
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Status message; supports text operators and isnull
+            title: Status Message
+          description: Status message; supports text operators and isnull
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetListResponse'
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: read
+  /api/execution_plane/v1/execution_targets/{target_id}:
+    get:
+      tags:
+        - Execution Plane
+      summary: Get execution target
+      description: Read the authoritative EP target by its physical UUID.
+      operationId: get_execution_target
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: target_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Target Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetFacadeRead'
+        '404':
+          description: Execution target or installed cluster not found
+        '409':
+          description: Cluster not ready or protected target lifecycle conflict
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: read
+    patch:
+      tags:
+        - Execution Plane
+      summary: Update execution target
+      description: Patch target placement, routing labels, name, enabled state, or default selection through EP.
+      operationId: update_execution_target
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: target_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Target Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutionTargetUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetFacadeRead'
+        '404':
+          description: Execution target or installed cluster not found
+        '409':
+          description: Cluster not ready or protected target lifecycle conflict
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: update
+    delete:
+      tags:
+        - Execution Plane
+      summary: Delete execution target
+      description: Begin draining a target; promote another target before deleting the default.
+      operationId: delete_execution_target
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: target_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Target Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetDeleteAccepted'
+        '404':
+          description: Execution target or installed cluster not found
+        '409':
+          description: Cluster not ready or protected target lifecycle conflict
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: delete
+  /api/execution_plane/v1/work_items:
+    get:
+      tags:
+        - Execution Plane
+      summary: List work items
+      description: Retrieve work items. Filters use field=value or field[operator]=value; comma-separated values within one field/operator use OR and different fields/operators use AND. EP validates fields and operators. Keep filters, sort, and limit unchanged when following opaque cursors.
+      operationId: list_work_items
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            exclusiveMinimum: 0
+            description: Maximum number of results per page
+            default: 20
+            title: Limit
+          description: Maximum number of results per page
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Pagination cursor from previous response
+            title: Cursor
+          description: Pagination cursor from previous response
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                pattern: ^-?[a-z][a-z0-9_]*$
+              - type: 'null'
+            description: Sort parameter (e.g., 'name', '-created_at')
+            title: Sort
+          description: Sort parameter (e.g., 'name', '-created_at')
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            description: Include total count in response (expensive)
+            default: false
+            title: Include Total
+          description: Include total count in response (expensive)
+        - name: id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Work UUID; id[in]=uuid1,uuid2 for membership
+            title: Id
+          description: Work UUID; id[in]=uuid1,uuid2 for membership
+        - name: status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Work status; supports eq and in
+            title: Status
+          description: Work status; supports eq and in
+        - name: created_at
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Creation time; supports eq, in, gt, gte, lt, lte, and isnull
+            title: Created At
+          description: Creation time; supports eq, in, gt, gte, lt, lte, and isnull
+        - name: claimed_at
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Claim time; supports ranges and isnull
+            title: Claimed At
+          description: Claim time; supports ranges and isnull
+        - name: completed_at
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Completion time; supports ranges and isnull
+            title: Completed At
+          description: Completion time; supports ranges and isnull
+        - name: resource_cleanup_status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Cleanup status; supports eq and in
+            title: Resource Cleanup Status
+          description: Cleanup status; supports eq and in
+        - name: resource_cleanup_error
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Cleanup error; supports text operators and isnull
+            title: Resource Cleanup Error
+          description: Cleanup error; supports text operators and isnull
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkItemListResponse'
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: work_item
+        action: read
+  /api/execution_plane/v1/commands:
+    post:
+      tags:
+        - Execution Plane
+      summary: Receive an Execution Plane command
+      description: Authenticate one command, dispatch it through the registry, and return its result.
+      operationId: receive_execution_plane_command
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageEnvelope'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: '#/components/schemas/TransportReceipt'
+                  - $ref: '#/components/schemas/CredentialResolution'
+                title: Response Receive Execution Plane Command
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: null
+        action: null
+components:
+  schemas:
+    Command:
+      properties:
+        command_id:
+          type: string
+          format: uuid
+          title: Command Id
+        parent_command_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Parent Command Id
+        command_type:
+          type: string
+          pattern: ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$
+          title: Command Type
+        command_revision:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Command Revision
+        payload:
+          additionalProperties: true
+          type: object
+          title: Payload
+        occurred_at:
+          type: string
+          format: date-time
+          title: Occurred At
+      additionalProperties: false
+      type: object
+      required:
+        - command_id
+        - command_type
+        - command_revision
+        - payload
+        - occurred_at
+      title: Command
+      description: One versioned operation; participants persist only its domain effects.
+    CommandScope:
+      properties:
+        client_id:
+          type: string
+          maxLength: 255
+          minLength: 1
+          pattern: ^[A-Za-z0-9_.:@/-]+$
+          title: Client Id
+      additionalProperties: false
+      type: object
+      required:
+        - client_id
+      title: CommandScope
+      description: Initiating service client; project authorization belongs to the caller.
+    CredentialResolution:
+      properties:
+        message_id:
+          type: string
+          format: uuid
+          title: Message Id
+        credential:
+          type: string
+          maxLength: 65536
+          minLength: 1
+          title: Credential
+      additionalProperties: false
+      type: object
+      required:
+        - message_id
+        - credential
+      title: CredentialResolution
+      description: The resolved credential value for one submitted command.
+    ExecutionTargetCreate:
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        placement:
+          $ref: '#/components/schemas/KubernetesTargetPlacement'
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+        is_default:
+          type: boolean
+          title: Is Default
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+        - name
+        - placement
+      title: ExecutionTargetCreate
+      description: A Kubernetes target on the single cluster provisioned at installation.
+    ExecutionTargetDeleteAccepted:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        accepted:
+          type: boolean
+          const: true
+          title: Accepted
+          default: true
+      type: object
+      required:
+        - id
+      title: ExecutionTargetDeleteAccepted
+      description: EP accepted deletion; draining and physical removal happen independently.
+    ExecutionTargetFacadeRead:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        cluster_id:
+          type: string
+          format: uuid
+          title: Cluster Id
+        name:
+          type: string
+          title: Name
+        backend_type:
+          type: string
+          title: Backend Type
+        endpoint:
+          type: string
+          title: Endpoint
+        placement:
+          oneOf:
+            - $ref: '#/components/schemas/KubernetesPlacement'
+            - $ref: '#/components/schemas/RHELPlacement'
+          title: Placement
+          discriminator:
+            propertyName: type
+            mapping:
+              kubernetes: '#/components/schemas/KubernetesPlacement'
+              rhel: '#/components/schemas/RHELPlacement'
+        status:
+          type: string
+          title: Status
+        enabled:
+          type: boolean
+          title: Enabled
+        is_default:
+          type: boolean
+          title: Is Default
+        status_message:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Status Message
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        last_ran_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Last Ran At
+      type: object
+      required:
+        - id
+        - cluster_id
+        - name
+        - backend_type
+        - endpoint
+        - placement
+        - status
+        - enabled
+        - is_default
+        - labels
+        - created_at
+      title: ExecutionTargetFacadeRead
+      description: Safe target fields available to AO's authorized management API.
+    ExecutionTargetListResponse:
+      properties:
+        resources:
+          items:
+            $ref: '#/components/schemas/ExecutionTargetFacadeRead'
+          type: array
+          title: Resources
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+        total:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Total
+      type: object
+      required:
+        - resources
+      title: ExecutionTargetListResponse
+      description: Paginated list response for ExecutionTarget.
+    ExecutionTargetUpdate:
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        placement:
+          $ref: '#/components/schemas/KubernetesTargetPlacement'
+          title: Placement
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+        is_default:
+          type: boolean
+          title: Is Default
+        enabled:
+          type: boolean
+          title: Enabled
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      title: ExecutionTargetUpdate
+      description: Patch mutable target fields. Placement requires a namespace; omitted selectors are retained.
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    KubernetesPlacement:
+      properties:
+        type:
+          type: string
+          const: kubernetes
+          title: Type
+        namespace:
+          type: string
+          maxLength: 63
+          minLength: 1
+          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+          title: Namespace
+        node_selectors:
+          items:
+            type: string
+          type: array
+          title: Node Selectors
+        tolerations:
+          items:
+            type: string
+          type: array
+          title: Tolerations
+      type: object
+      required:
+        - type
+        - namespace
+      title: KubernetesPlacement
+      description: Kubernetes scheduling metadata returned by the Execution Plane.
+    KubernetesTargetPlacement:
+      properties:
+        type:
+          type: string
+          const: kubernetes
+          title: Type
+          default: kubernetes
+        namespace:
+          type: string
+          maxLength: 63
+          minLength: 1
+          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+          title: Namespace
+        node_selectors:
+          items:
+            type: string
+          type: array
+          title: Node Selectors
+        tolerations:
+          items:
+            type: string
+          type: array
+          title: Tolerations
+      additionalProperties: false
+      type: object
+      required:
+        - namespace
+      title: KubernetesTargetPlacement
+      description: Validated Kubernetes placement for writes, using EP's shared command contract.
+    MessageEnvelope:
+      properties:
+        message_id:
+          type: string
+          format: uuid
+          title: Message Id
+        message_type:
+          type: string
+          const: command.submit
+          title: Message Type
+          default: command.submit
+        command_id:
+          type: string
+          format: uuid
+          title: Command Id
+        sequence:
+          type: integer
+          minimum: 0.0
+          title: Sequence
+          default: 0
+        source_id:
+          type: string
+          maxLength: 255
+          minLength: 1
+          pattern: ^[A-Za-z0-9_.:@/-]+$
+          title: Source Id
+        destination_id:
+          type: string
+          maxLength: 255
+          minLength: 1
+          pattern: ^[A-Za-z0-9_.:@/-]+$
+          title: Destination Id
+        scope:
+          $ref: '#/components/schemas/CommandScope'
+        command:
+          $ref: '#/components/schemas/Command'
+      additionalProperties: false
+      type: object
+      required:
+        - message_id
+        - command_id
+        - source_id
+        - destination_id
+        - scope
+        - command
+      title: MessageEnvelope
+      description: Participant identity around one logical command.
+    RHELPlacement:
+      properties:
+        type:
+          type: string
+          const: rhel
+          title: Type
+      type: object
+      required:
+        - type
+      title: RHELPlacement
+      description: RHEL placement marker returned by the Execution Plane.
+    ResourceReference:
+      properties:
+        kind:
+          type: string
+          maxLength: 255
+          minLength: 1
+          pattern: ^[A-Za-z0-9_.:@/-]+$
+          title: Kind
+        resource_id:
+          type: string
+          format: uuid
+          title: Resource Id
+        resource_key:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Resource Key
+        revision:
+          anyOf:
+            - type: integer
+              exclusiveMinimum: 0.0
+            - type: 'null'
+          title: Revision
+      additionalProperties: false
+      type: object
+      required:
+        - kind
+        - resource_id
+      title: ResourceReference
+      description: Safe reference from a command to a participant-owned resource.
+    TransportReceipt:
+      properties:
+        received:
+          type: boolean
+          const: true
+          title: Received
+          default: true
+        message_id:
+          type: string
+          format: uuid
+          title: Message Id
+        resource:
+          anyOf:
+            - $ref: '#/components/schemas/ResourceReference'
+            - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+        - message_id
+      title: TransportReceipt
+      description: Receipt of a handled request, without a persisted command record.
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      title: ValidationError
+    WorkItemFacadeRead:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        status:
+          type: string
+          title: Status
+        result:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+          title: Result
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        claimed_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Claimed At
+        completed_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Completed At
+      type: object
+      required:
+        - id
+        - status
+        - created_at
+      title: WorkItemFacadeRead
+      description: Safe work state; internal tokens and storage metadata stay private.
+    WorkItemListResponse:
+      properties:
+        resources:
+          items:
+            $ref: '#/components/schemas/WorkItemFacadeRead'
+          type: array
+          title: Resources
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+        total:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Total
+      type: object
+      required:
+        - resources
+      title: WorkItemListResponse
+      description: Paginated list response for WorkItem.
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: JWT token authentication
+      scheme: bearer
+      bearerFormat: JWT

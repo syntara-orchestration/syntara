@@ -412,6 +412,17 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
           />
         )}
 
+        {isOpenShift && (
+          <SynTextField<IntegrationFormData, 'configuration.namespace'>
+            name="configuration.namespace"
+            label="Namespace"
+            fieldId="namespace"
+            placeholder="default"
+            isRequired
+            labelHelp={<Content>Namespace reserved for execution workloads</Content>}
+          />
+        )}
+
         <SecurityFields />
 
         <ScopeFields<IntegrationFormData>

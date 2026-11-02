@@ -1,0 +1,12 @@
+{
+  "name": "script-e2e-openshift",
+  "integration_type": "openshift",
+  "configuration": {
+    "integration_type": "openshift",
+    "base_url": "https://api.dev-cluster.example.com:6443",
+    "namespace": "syntara-script-e2e"
+  },
+  "management_credential_id": "00000000-0000-0000-0000-000000000001",
+  "scope": "global",
+  "enabled": true
+}

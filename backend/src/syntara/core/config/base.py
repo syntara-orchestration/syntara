@@ -1492,15 +1492,32 @@ class WorkflowEngineSettings(BaseSettings):
         ge=1024,
     )
 
-    # SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python)
-    # directly in the Temporal worker process without additional sandboxing. Enabling this
-    # grants any user with workflow:create + execution:run permissions the ability
-    # to run arbitrary commands on the worker infrastructure, with access to all
-    # environment variables.
-    # Enabling Script Node is not recommended for production deployments.
+    # Script nodes execute user-supplied code in the selected Execution Plane
+    # workload. Enabling them requires an approved execution target and
+    # namespace isolation; Temporal dispatches the request rather than running
+    # the script inside its worker process.
     script_nodes_enabled: bool = Field(
         default=False,
         description="Enable Script node execution in workflows (Developer Preview)",
+    )
+
+    # Cold-start Execution Plane node dispatch: the AO activity selects the
+    # container image per node type and writes it into the WorkItem payload; the
+    # EP worker creates a fresh pod from that reference. Keys are workflow node
+    # types (e.g. "script"); values are fully-qualified image refs the target
+    # cluster can pull.
+    #
+    # Only the script node is sent to EP in the first isolated release.
+    # Pin the SDK-native script workload to the tested registry digest.
+    # Deployments can override the mapping with APP_NODE_CONTAINER_IMAGES.
+    node_container_images: dict[str, str] = Field(
+        default_factory=lambda: {
+            "script": (
+                "quay.io/pjohari/syntara-node-script@"
+                "sha256:a18617479a99fb46bd62f4f8c712eef764f73410adf2718bc2c00e0f28cf1280"
+            ),
+        },
+        description="Node type to container image reference for Execution Plane dispatch",
     )
 
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]
@@ -1804,6 +1821,28 @@ class WorkflowClientSettings(BaseSettings):
         default=30.0,
         description="Per-attempt timeout to prevent unbounded wait times (applies to initial + all retries)",
         gt=0,
+    )
+
+    ep_api_url: str | None = Field(
+        default=None,
+        description="Base URL for the independently deployed Execution Plane API.",
+    )
+
+    ep_cluster_reconciliation_interval_seconds: float = Field(
+        default=300.0,
+        description="Seconds between integration-backed EP cluster reconciliation cycles",
+        gt=0,
+    )
+
+    ep_request_timeout_seconds: float = Field(
+        default=10.0,
+        description="Per-request timeout for AO to EP HTTP operations.",
+        gt=0,
+    )
+
+    ep_callback_service_cn: str = Field(
+        default="execution-plane.ao.svc",
+        description="mTLS service identity permitted to deliver EP completion events.",
     )
 
     @model_validator(mode="after")

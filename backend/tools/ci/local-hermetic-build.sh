@@ -19,7 +19,7 @@ PREFETCH_OUTPUT_DIR="${OUTPUT_DIR}/output"
 IMAGE_TAG="${IMAGE_TAG:-localhost/syntara-local:hermetic}"
 PREFETCH_MODE="${PREFETCH_MODE:-permissive}"
 ENABLE_PACKAGE_REGISTRY_PROXY="${ENABLE_PACKAGE_REGISTRY_PROXY:-false}"
-PREFETCH_INPUT_DEFAULT='[{"type":"pip","path":"backend"},{"type":"rpm","path":"backend"},{"type":"generic","path":"backend"}]'
+PREFETCH_INPUT_DEFAULT='[{"type":"pip","path":"backend","requirements_files":["requirements.txt","requirements-vcs.txt"]},{"type":"rpm","path":"backend"},{"type":"generic","path":"backend"}]'
 PREFETCH_INPUT="${PREFETCH_INPUT:-${PREFETCH_INPUT_DEFAULT}}"
 KBC_CACHE_MODE="${KBC_CACHE_MODE:-volume}"
 KBC_STORAGE_VOLUME="${KBC_STORAGE_VOLUME:-kbc-storage-cache}"
@@ -146,7 +146,7 @@ require_rhsm() {
 declare -a REQUIRED_BACKENDS=("pip" "rpm" "generic")
 if [ "${PIP_ONLY}" = true ]; then
 	REQUIRED_BACKENDS=("pip" "generic")
-	PREFETCH_INPUT='[{"type":"pip","path":"backend"},{"type":"generic","path":"backend"}]'
+	PREFETCH_INPUT='[{"type":"pip","path":"backend","requirements_files":["requirements.txt","requirements-vcs.txt"]},{"type":"generic","path":"backend"}]'
 fi
 
 resolve_auth_file() {

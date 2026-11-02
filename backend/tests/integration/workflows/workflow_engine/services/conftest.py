@@ -1,10 +1,15 @@
 """Shared fixtures for integration/services tests."""
 
-from collections.abc import Generator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import pytest
 
 from tests.fixtures.settings import FakeSettingsCache, enable_script_nodes
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 @pytest.fixture(autouse=True)

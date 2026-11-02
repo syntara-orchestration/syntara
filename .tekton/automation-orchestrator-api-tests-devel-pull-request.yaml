@@ -1,4 +1,17 @@
 ---
+# Thin stub: the ao-api-tests bundle pipeline with an Execution Plane.
+#
+# feat/ANSTRAT-1803 dispatches every script-node activity to the standalone
+# Execution Plane, so the e2e environment must deploy one: ep-revision pins
+# the EP source for deploy-ao (aap-konflux-pipelines#4719), and
+# ao-operator-revision pins the operator branch that honors
+# ENABLE_EXECUTION_PLANE in {cr-name}-admin-settings (the prebuilt operator
+# bundle ignores it — automation-orchestrator-operator#1573). When both land
+# on their mainlines, these pins drop and the stub converges to devel's.
+#
+# The pipeline bundle must carry the EP params + prepare-execution-plane task
+# (aap-konflux-pipelines#4746); until it merges and republishes, the digest
+# below points at the last pre-EP build and the EP pins are inert.
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
@@ -10,8 +23,10 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: >-
-      event == "pull_request" && target_branch == "devel" &&
+      event == "pull_request" &&
+      (target_branch == "devel" || target_branch.startsWith("feature/") || target_branch.startsWith("feat/")) &&
       (files.all.exists(x, x.startsWith("backend/")) ||
+      files.all.exists(x, x.startsWith("tools/")) ||
       ".tekton/automation-orchestrator-api-tests-devel-pull-request.yaml".pathChanged())
   creationTimestamp: null
   labels:
@@ -36,12 +51,24 @@ spec:
       value: '{{revision}}'
     - name: pipeline-github-pr-number
       value: '{{pull_request_number}}'
+    - name: ao-revision
+      value: '{{revision}}'
+    - name: ao-pr-number
+      value: '{{pull_request_number}}'
+    - name: ao-operator-revision
+      value: AAP-90779-ep-from-source
+    - name: ao-operator-git-url
+      value: https://github.com/automation-nexus/automation-orchestrator-operator.git
+    - name: ep-git-url
+      value: https://github.com/syntara-orchestration/syntara-execution-plane.git
+    - name: ep-revision
+      value: v0.1.7
   pipelineRef:
     params:
       - name: name
         value: ao-api-tests
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:4a3c422fe8bd9896c7e2a563362ec4d1c9d63a64c7f33e36187b594bdfda364f
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:cf6d90a610854519b75099ce1094f1443c98945af2fa737ee3ce69e15b15a357
       - name: kind
         value: pipeline
       - name: secret
@@ -50,7 +77,7 @@ spec:
 
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner
-    
+
   workspaces:
     - name: workspace
       volumeClaimTemplate:
@@ -59,4 +86,4 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 1Gi
+              storage: 1G

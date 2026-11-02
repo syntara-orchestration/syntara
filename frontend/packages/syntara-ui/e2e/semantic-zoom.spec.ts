@@ -52,7 +52,7 @@ test('large workflow remains usable across semantic zoom after adding a step', a
   // zoom level with many nodes, so assert by role rather than visible text.
   const terminalImportedStep = app
     .locator('.react-flow')
-    .getByRole('button', { name: `Imported step ${IMPORTED_STEP_COUNT}` })
+    .getByRole('button', { name: `Imported step ${IMPORTED_STEP_COUNT}, Script` })
   await expect(terminalImportedStep, 'the imported 60-step workflow should be on the canvas').toBeAttached({
     timeout: 15_000,
   })

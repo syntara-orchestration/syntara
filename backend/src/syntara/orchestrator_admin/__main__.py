@@ -2,6 +2,8 @@
 
 Usage::
 
+    automation-orchestrator-admin reconcile-clusters [--integration-id UUID]
+
     automation-orchestrator-admin enable-user --username alice --yes
 
     automation-orchestrator-admin reset-password --username alice
@@ -23,6 +25,7 @@ import os
 import sys
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated
+from uuid import UUID  # noqa: TC003 — Typer resolves command annotations at runtime.
 
 import typer
 
@@ -322,6 +325,29 @@ def reset_password(
 def main() -> None:
     """Entry point for ``python -m syntara.orchestrator_admin``."""
     app()
+
+
+async def _reconcile_clusters_async(integration_id: UUID | None) -> dict[str, int]:
+    from syntara.core.database.session import AsyncSessionLocal, engine  # noqa: PLC0415
+    from syntara.execution_plane.integration_sync import reconcile_integration_clusters  # noqa: PLC0415
+
+    try:
+        return await reconcile_integration_clusters(AsyncSessionLocal, integration_id)
+    finally:
+        await engine.dispose()
+
+
+@app.command()
+def reconcile_clusters(
+    integration_id: Annotated[
+        UUID | None, typer.Option("--integration-id", help="Reconcile one integration; omit for all.")
+    ] = None,
+) -> None:
+    """Apply current integration configuration to EP clusters once."""
+    result = asyncio.run(_reconcile_clusters_async(integration_id))
+    typer.echo(f"Synced: {result['synced']}; failed: {result['failed']}; skipped: {result['skipped']}")
+    if result["failed"] or result["skipped"]:
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

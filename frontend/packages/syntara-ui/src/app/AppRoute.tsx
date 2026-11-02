@@ -14,6 +14,10 @@ export const AppRoute = {
   Approvals: {
     Root: '/approvals',
   },
+  ExecutionPlane: {
+    Root: '/execution-plane',
+    Detail: '/execution-plane/:executionTargetId',
+  },
   Configuration: {
     Overview: '/configuration',
     Integrations: {

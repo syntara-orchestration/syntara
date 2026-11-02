@@ -10,6 +10,7 @@ These are unit-level contract tests -- no database or Temporal required.
 """
 
 from typing import Any
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -325,6 +326,22 @@ class TestScriptNodeParameters:
         """Template expressions like ${input.code} bypass field validation."""
         config = ScriptExecutorParameters(language=ScriptLanguage.PYTHON, code="${input.code}")
         assert config.code == "${input.code}"
+
+    def test_execution_target_profile_round_trips_through_workflow(self) -> None:
+        """A Script node keeps its Execution Target profile through validation and graph parsing."""
+        execution_target_id = uuid4()
+        definition = _minimal_workflow()
+        definition["nodes"][0]["parameters"]["execution_profile"] = {
+            "type": "execution_target",
+            "execution_target_id": str(execution_target_id),
+        }
+
+        WorkflowValidator().validate_workflow_definition(definition)
+        graph = WorkflowGraph.from_dict(definition)
+        config = ScriptExecutorParameters.model_validate(graph.get_node("script_1").parameters)
+
+        assert config.execution_profile is not None
+        assert config.execution_profile.execution_target_id == execution_target_id
 
 
 class TestAPIExecutorParameters:

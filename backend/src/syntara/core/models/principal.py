@@ -38,6 +38,7 @@ KNOWN_SERVICE_CNS: tuple[str, ...] = (
     "worker.ao.svc",
     "background-worker.ao.svc",
     "temporal.ao.svc",
+    "execution-plane.ao.svc",
 )
 
 

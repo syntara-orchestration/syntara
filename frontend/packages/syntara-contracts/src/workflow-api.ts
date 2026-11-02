@@ -1771,10 +1771,32 @@ export interface components {
       credential_id: string
     }
     /**
+     * ExecutionTargetProfile
+     * @description Execution Plane profile that selects a specific Execution Target.
+     */
+    ExecutionTargetProfile: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'execution_target'
+      /**
+       * Execution Target Id
+       * Format: uuid
+       * @description UUID of the Execution Plane execution target selected for this workload.
+       */
+      execution_target_id: string
+    }
+    /**
      * ScriptExecutorParameters
      * @description Parameters for script executor.
      */
     ScriptExecutorParameters: {
+      /**
+       * Execution Profile
+       * @description Execution Plane placement profile for this workload.
+       */
+      execution_profile?: components['schemas']['ExecutionTargetProfile'] | null
       language: components['schemas']['ScriptLanguage']
       /**
        * Code

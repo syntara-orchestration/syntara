@@ -1,0 +1,50 @@
+---
+# Cold-start Execution Plane demo override (AAP-93615).
+#
+# Layers the kind-cluster network onto the base full-stack compose WITHOUT changing
+# the default dev stack. The base podman-compose.yml must stay runnable for people
+# who have no kind cluster, so the external `kind` network lives here. Kubernetes
+# API certificate verification stays enabled; configure the target with Kind's CA.
+#
+# Prereqs (see backend/docs/execution-plane/kind-demo-runbook.md):
+#   1. A kind cluster named `execution-plane` exists (creates the `kind` podman
+#      network and the `execution-plane-control-plane` container this file targets).
+#   2. The script node image is loaded into that cluster.
+#   3. A default VANILLA_K8S ExecutionTarget points at
+#      https://execution-plane-control-plane:6443 with a ServiceAccount token.
+#
+# Run with:
+#   uv run podman-compose -p syntara \
+#     -f ../podman-compose.yml -f ../podman-compose.kind-demo.override.yml \
+#     up -d syntara temporal-worker temporal-background-worker execution-plane-worker
+services:
+  syntara:
+    # The API validates the Kubernetes endpoint during Integration creation.
+    networks:
+      - default
+      - kind
+
+  temporal-background-worker:
+    # Scheduled Integration health checks run here and must resolve the kind
+    # API hostname for the SSRF revalidation before calling OpenShift.
+    networks:
+      - default
+      - kind
+
+  temporal-worker:
+    # Workflow-triggered Integration validation also performs SSRF DNS checks.
+    networks:
+      - default
+      - kind
+
+  execution-plane-worker:
+    # Join the kind podman network so the API-server hostname resolves in-container.
+    networks:
+      - default
+      - kind
+networks:
+  # Re-declare the project default so podman-compose keeps the EP worker on it
+  # (for database/temporal DNS) alongside the external kind network.
+  default: {}
+  kind:
+    external: true

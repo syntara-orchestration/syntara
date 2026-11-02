@@ -17,6 +17,13 @@ PODMAN_PROJECT ?= syntara
 POSTGRES_IMAGE ?= quay.io/sclorg/postgresql-15-c9s
 REDIS_IMAGE ?= mirror.gcr.io/library/redis:6
 APP_IMAGE ?= localhost/syntara:latest
+EP_IMAGE ?= localhost/execution-plane:latest
+EP_REPOSITORY ?= ../../syntara-execution-plane
+EP_BUILD_CONTEXT ?= $(abspath $(EP_REPOSITORY))
+EP_DB_MIGRATOR_PASSWORD ?= ep-migrator
+EP_DB_RUNTIME_PASSWORD ?= ep-runtime
+EP_DATABASE_MIGRATOR_URL ?= postgresql+asyncpg://execution_plane_migrator:$(EP_DB_MIGRATOR_PASSWORD)@localhost:$${APP_DB_PORT:-5432}/execution_plane
+EP_DATABASE_RUNTIME_URL ?= postgresql+asyncpg://execution_plane_runtime:$(EP_DB_RUNTIME_PASSWORD)@localhost:$${APP_DB_PORT:-5432}/execution_plane
 APP_UI_IMAGE ?= quay.io/ansible/syntara-ui
 APP_UI_VERSION ?= latest
 XFAIL_ARGS := $(if $(SYNTARA_XFAIL_SOURCE),--xfail-from-url $(SYNTARA_XFAIL_SOURCE)backend.md,)
@@ -42,7 +49,7 @@ COMPOSE_FINAL_CMD := $(COMPOSE_CMD) $(COMPOSE_ARGS)
 S2S_TLS_VARS = \
 	APP_S2S_TLS_ENABLED=true \
 	APP_S2S_TLS_CA_CERT_PATH=.secrets/certs/ca.pem \
-	APP_S2S_TLS_CN_ALLOWLIST='["backend.ao.svc","worker.ao.svc","background-worker.ao.svc","temporal.ao.svc"]'
+	APP_S2S_TLS_CN_ALLOWLIST='["backend.ao.svc","worker.ao.svc","background-worker.ao.svc","temporal.ao.svc","execution-plane.ao.svc"]'
 WORKER_BASE_URL = https://localhost:8000/api/v1
 
 
@@ -196,6 +203,13 @@ endef
 # Default to empty so it runs all tests if not provided
 E2E_TARGET ?=
 E2E_ARGS :=
+# Set to 1 to run the e2e suite with the Execution Plane up (see test-e2e-ep)
+E2E_EP ?=
+export E2E_EP
+
+.PHONY: test-e2e-ep
+test-e2e-ep: ## Run E2E tests with the Execution Plane up (local kind cluster dispatch)
+	@E2E_EP=1 $(MAKE) test-e2e
 
 .PHONY: test-e2e
 test-e2e: check-deps ## Run E2E tests (Usage: make test-e2e [E2E_TARGET=path] [PHASE=pr-check | EXCLUDE=pr-check])
@@ -240,6 +254,7 @@ endif
 
 # Development workflow
 # ========================================================
+
 .PHONY: db-seed
 db-seed: check-deps ## Run all required database seeders
 	@echo "🌱 Seeding database..."
@@ -260,9 +275,11 @@ db-seed-all: check-deps ## Run all database seeders including dev samples
 
 .PHONY: dev
 dev: check-deps _ensure-secrets _ensure-certs ## Run development server with auto-reload
-	@echo "🔄 Running database migrations..."
+	@echo "🔄 Running database migrations and seed data..."
 	@APP_ADMIN_PASSWORD_PATH=.secrets/admin-password uv run alembic upgrade head
+	@$(MAKE) ep-migrate
 	@$(MAKE) db-seed
+	@$(MAKE) admin-password
 	@echo "✅ Migrations and seeding complete"
 	@echo "🪣 Ensuring S3 bucket exists on moto..."
 	@uv run python -c "\
@@ -296,7 +313,6 @@ dev: check-deps _ensure-secrets _ensure-certs ## Run development server with aut
 	APP_S3_USE_PATH_STYLE=$${APP_S3_USE_PATH_STYLE:-true} \
 	uv run python -m syntara.api.main
 
-
 .PHONY: worker-run
 worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow worker
 	@echo "🔄 Starting Temporal workflow worker..."
@@ -327,6 +343,46 @@ background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal 
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
 	uv run python -m syntara.workflows.background_worker
 
+# Execution Plane worker
+# ========================================================
+
+.PHONY: ep-migrate
+ep-migrate: check-deps ## Apply execution_plane schema migrations (separate from main Syntara migrations)
+	@echo "🔄 Running execution_plane migrations..."
+	@$(COMPOSE_FINAL_CMD) up execution-plane-db-init
+	@cd $(EP_REPOSITORY) && \
+		DATABASE_URL="$${EP_DATABASE_MIGRATOR_URL:-$(EP_DATABASE_MIGRATOR_URL)}" \
+		EP_CREDENTIAL_ENCRYPTION_KEY_PATH="$(abspath .secrets/ep-credential-encryption-key)" \
+		uv run alembic upgrade head
+	@echo "✅ execution_plane migrations complete"
+
+.PHONY: ep-api-run ep-worker-run
+ep-api-run: check-deps _ensure-secrets ## Run the standalone Execution Plane API from its own checkout
+	@echo "🔄 Starting Execution Plane API on port 8001..."
+	@cd $(EP_REPOSITORY) && \
+		EP_DATABASE_URL="$${EP_DATABASE_URL:-$(EP_DATABASE_RUNTIME_URL)}" \
+		EP_AO_JWT_PUBLIC_KEY_PATH="$(abspath .secrets/jwt-primary.pub)" \
+		EP_AO_JWT_ISSUER="$${EP_AO_JWT_ISSUER:-https://0.0.0.0:8000}" \
+		EP_CREDENTIAL_ENCRYPTION_KEY_PATH="$(abspath .secrets/ep-credential-encryption-key)" \
+		EP_API_TLS_CERT_PATH="$(abspath .secrets/certs/execution-plane.crt)" \
+		EP_API_TLS_KEY_PATH="$(abspath .secrets/certs/execution-plane.key)" \
+		EP_API_TLS_CLIENT_CA_PATH="$(abspath .secrets/certs/ca.pem)" \
+		uv run execution-plane-api
+
+ep-worker-run: check-deps _ensure-secrets _ensure-certs ## Run the standalone Execution Plane worker in the foreground
+	@echo "🔄 Starting Execution Plane worker..."
+	@cd $(EP_REPOSITORY) && \
+		EP_DATABASE_URL="$${EP_DATABASE_URL:-$(EP_DATABASE_RUNTIME_URL)}" \
+		EP_CREDENTIAL_ENCRYPTION_KEY_PATH="$(abspath .secrets/ep-credential-encryption-key)" \
+		EP_COMPLETION_CALLBACK_URL="$${EP_COMPLETION_CALLBACK_URL:-https://localhost:8000/api/execution_plane/v1/commands}" \
+		EP_NODE_STARTUP_SECONDS="$${EP_NODE_STARTUP_SECONDS:-120}" \
+		EP_NODE_GRACE_SECONDS="$${EP_NODE_GRACE_SECONDS:-30}" \
+		EP_WORKLOAD_ALLOWED_EGRESS_CIDRS="$${EP_WORKLOAD_ALLOWED_EGRESS_CIDRS:-[]}" \
+		EP_WORKLOAD_FORBIDDEN_EGRESS_CIDRS="$${EP_WORKLOAD_FORBIDDEN_EGRESS_CIDRS:-[]}" \
+		EP_CALLBACK_CA_CERT_PATH="$(abspath .secrets/certs/ca.pem)" \
+		EP_CALLBACK_CERT_PATH="$(abspath .secrets/certs/execution-plane.crt)" \
+		EP_CALLBACK_KEY_PATH="$(abspath .secrets/certs/execution-plane.key)" \
+		uv run python -m execution_plane.worker
 
 # Database
 # ========================================================
@@ -389,12 +445,15 @@ temporal-clean: ## Stop Temporal and remove data
 
 
 .PHONY: build-images
-build-images: ## Build container images for syntara and temporal-worker
+build-images: ## Build container images for syntara, temporal-worker, and execution-plane
 	@echo "🔨 Building container images..."
 	@echo "📦 Building syntara image..."
 	$(COMPOSE_FINAL_CMD) build syntara
+	@echo "📦 Building execution-plane image from $(EP_REPOSITORY)..."
+	podman build -f "$(EP_BUILD_CONTEXT)/Containerfile" -t "$(EP_IMAGE)" "$(EP_BUILD_CONTEXT)"
 	@echo "✅ Container images built successfully"
-	@echo "   Image: $${APP_IMAGE:-localhost/syntara:latest}"
+	@echo "   Syntara image:         $${APP_IMAGE:-localhost/syntara:latest}"
+	@echo "   Execution Plane image: $${EP_IMAGE:-localhost/execution-plane:latest}"
 
 
 # Secrets management
@@ -428,7 +487,7 @@ certs-generate-force: ## Regenerate TLS certificates (overwrites existing)
 _ensure-certs:
 	@missing=0; \
 	for f in ca.pem ca.key backend.crt backend.key worker.crt worker.key \
-		background-worker.crt background-worker.key temporal.crt temporal.key; do \
+		background-worker.crt background-worker.key temporal.crt temporal.key execution-plane.crt execution-plane.key; do \
 		if [ ! -f .secrets/certs/$$f ]; then missing=1; break; fi; \
 	done; \
 	if [ $$missing -eq 1 ]; then \
@@ -448,7 +507,13 @@ _ensure-secrets:
 	fi
 
 .PHONY: run-all
-run-all: _ensure-secrets _ensure-certs ## Start all services (foreground, Ctrl+C to stop)
+run-all: _ensure-secrets _ensure-certs ## Register the local EP cluster and start the full stack with a containerized EP worker
+	@echo "🔄 Running database migrations and seed data..."
+	@APP_ADMIN_PASSWORD_PATH=.secrets/admin-password uv run alembic upgrade head
+	@$(MAKE) ep-migrate
+	@$(MAKE) db-seed
+	@$(MAKE) admin-password
+	@echo "✅ Migrations and seeding complete"
 	@echo "🚀 Starting all services..."
 	@echo "📍 Syntara API: http://localhost:$${APP_API_PORT:-8000}"
 	@echo "📍 Syntara UI: http://localhost:$${APP_UI_PORT:-8080}"
@@ -461,15 +526,35 @@ run-all: _ensure-secrets _ensure-certs ## Start all services (foreground, Ctrl+C
 	@echo ""
 	$(COMPOSE_FINAL_CMD) up --build --force-recreate
 
-.PHONY: services-run
-services-run: _ensure-secrets _ensure-certs ## Start all services (database + cache + temporal + UI + worker + background-worker + MCP) in background
-	@echo "🚀 Starting all services (database + cache + temporal + UI + worker + background-worker + MCP)..."
+.PHONY: run-all-kind
+run-all-kind: _ensure-secrets _ensure-certs ## Start the full stack with the EP worker attached to the external kind network
+	@echo "🔄 Running database migrations and seed data..."
+	@APP_ADMIN_PASSWORD_PATH=.secrets/admin-password uv run alembic upgrade head
+	@$(MAKE) ep-migrate
+	@$(MAKE) db-seed
+	@$(MAKE) admin-password
+	@echo "✅ Migrations and seeding complete"
+	@echo "🚀 Starting all services with the kind network override..."
+	@echo "📍 Syntara API: http://localhost:$${APP_API_PORT:-8000}"
+	@echo "📍 Syntara UI: http://localhost:$${APP_UI_PORT:-8080}"
 	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/syntara_api"
 	@echo "📍 Cache: cache://localhost:$${APP_CACHE_PORT:-6379}"
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
 	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
 	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
-	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
+	@echo "Press Ctrl+C to stop"
+	@echo ""
+	$(COMPOSE_FINAL_CMD) -f ../podman-compose.kind-demo.override.yml up --build --force-recreate
+
+.PHONY: services-run
+services-run: _ensure-secrets _ensure-certs ## Start infrastructure services (including the separate EP database) in background
+	@echo "🚀 Starting infrastructure services (database + cache + temporal + Syntara workers + MCP)..."
+	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/syntara_api"
+	@echo "📍 Cache: cache://localhost:$${APP_CACHE_PORT:-6379}"
+	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
+	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
+	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
+	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d database execution-plane-db-init redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
 	@echo "✅ All services started in background"
 	@echo "   Use 'make services-logs' to view logs"
 	@echo "   Use 'make services-stop' to stop services"
@@ -575,8 +660,11 @@ services-clean: ## Stop all services and remove all data (destructive)
 OPENAPI_SPEC ?= src/syntara/schemas/openapi.yaml
 OPENAPI_PUBLIC_SPEC ?= src/syntara/schemas/openapi-public.yaml
 OPENAPI_PUBLIC_SPEC_JSON ?= src/syntara/schemas/openapi-public.json
-OPENAPI_GENERATED_FILES = $(OPENAPI_SPEC) $(OPENAPI_PUBLIC_SPEC) $(OPENAPI_PUBLIC_SPEC_JSON)
-OPENAPI_BASE_REF ?= devel
+OPENAPI_EP_SPEC ?= src/syntara/schemas/execution_plane/openapi.yaml
+OPENAPI_GENERATED_FILES = $(OPENAPI_SPEC) $(OPENAPI_PUBLIC_SPEC) $(OPENAPI_PUBLIC_SPEC_JSON) $(OPENAPI_EP_SPEC)
+# GitHub Actions provides the actual pull-request base branch. Fall back to
+# devel for local checks outside a pull-request context.
+OPENAPI_BASE_REF ?= $(if $(GITHUB_BASE_REF),$(GITHUB_BASE_REF),devel)
 VERBOSITY ?= -v
 
 .PHONY: api-spec-validation
@@ -591,7 +679,7 @@ verify-test-structure: ## Verify test directory structure matches source code do
 .PHONY: api-spec-drift
 api-spec-drift: ## Check that committed openapi.yaml matches the generated spec (VERBOSITY=-v/-vv/-vvv)
 	@echo "🔍 Checking OpenAPI spec is up to date..."
-	@uv run python tools/export_openapi.py 2>/dev/null | uv run python tools/ci/check_openapi_spec.py $(OPENAPI_SPEC) $(VERBOSITY)
+	@uv run python -m tools.export_openapi 2>/dev/null | uv run python tools/ci/check_openapi_spec.py $(OPENAPI_SPEC) $(VERBOSITY)
 
 .PHONY: api-spec-bundle
 api-spec-bundle: ## Bundle all domain sub-specs into a single merged openapi.yaml (no external $refs)
@@ -613,13 +701,25 @@ api-spec-bundle-public: ## Bundle public-facing spec (excludes internal endpoint
 .PHONY: api-spec-drift-public
 api-spec-drift-public: ## Check that committed public spec matches the generated spec
 	@echo "🔍 Checking public OpenAPI spec is up to date..."
-	@uv run python tools/export_openapi.py --public 2>/dev/null | uv run python tools/ci/check_openapi_spec.py $(OPENAPI_PUBLIC_SPEC) $(VERBOSITY)
+	@uv run python -m tools.export_openapi --public 2>/dev/null | uv run python tools/ci/check_openapi_spec.py $(OPENAPI_PUBLIC_SPEC) $(VERBOSITY)
+
+.PHONY: api-spec-bundle-ep
+api-spec-bundle-ep: ## Generate the Execution Plane OpenAPI spec from the FastAPI router
+	@echo "📦 Generating Execution Plane OpenAPI spec..."
+	@uv run python -m tools.export_openapi --execution-plane -o $(OPENAPI_EP_SPEC) 2>/dev/null
+	@uv run pre-commit run yamlfmt --files $(OPENAPI_EP_SPEC) > /dev/null 2>&1 || true
+	@echo "✅ EP spec written to $(OPENAPI_EP_SPEC)"
+
+.PHONY: api-spec-drift-ep
+api-spec-drift-ep: ## Check that committed EP spec matches the generated spec (VERBOSITY=-v/-vv/-vvv)
+	@echo "🔍 Checking Execution Plane OpenAPI spec is up to date..."
+	@uv run python -m tools.export_openapi --execution-plane 2>/dev/null | uv run python tools/ci/check_openapi_spec.py $(OPENAPI_EP_SPEC) $(VERBOSITY)
 
 .PHONY: api-spec-bundle-all
-api-spec-bundle-all: api-spec-bundle api-spec-bundle-public ## Bundle both full and public specs
+api-spec-bundle-all: api-spec-bundle api-spec-bundle-public api-spec-bundle-ep ## Bundle both full and public specs, and regenerate EP spec
 
 .PHONY: api-spec-drift-all
-api-spec-drift-all: api-spec-drift api-spec-drift-public ## Check both specs match implementation
+api-spec-drift-all: api-spec-drift api-spec-drift-public api-spec-drift-ep ## Check all specs match implementation
 
 .PHONY: print-openapi-generated-files
 print-openapi-generated-files: ## Print the list of generated OpenAPI spec files (for CI drift checks)
@@ -706,6 +806,7 @@ reachability: ## Verify all standards docs are reachable from CLAUDE.md
 sync-requirements: ## Check/sync requirements.txt with uv.lock
 	@echo "🔍 Syncing requirements.txt with uv.lock..."
 	uv export --frozen --python=3.12 --no-dev --no-editable --no-emit-package pywin32 --no-emit-package colorama --no-emit-workspace --output-file requirements.txt
+	uv run python tools/ci/split_vcs_requirements.py
 	@echo "🔧 Filtering hashes to Linux x86_64/aarch64 only (for Hermeto prefetch)..."
 	uv run python tools/ci/filter_requirements_hashes.py
 	@echo "✅ requirements.txt is in sync"

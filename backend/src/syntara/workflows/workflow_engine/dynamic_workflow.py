@@ -377,7 +377,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if is_cancellation:
             namespace_entry["status"] = "cancelled"
             self._cancelled_node = node_id
-            # TODO(https://redhat.atlassian.net/browse/AAP-86855): cancelled nodes are not in failed_nodes
+            # TODO: cancelled nodes are not in failed_nodes  # noqa: TD002, TD003
             # or skipped_nodes, so _mark_downstream_as_skipped is a no-op (it
             # requires predecessors in one of those sets), converge ALL-strategy
             # treats the cancelled branch as successful, and
@@ -1651,7 +1651,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         if node_type in self._EXECUTOR_ACTIVITY_MAP:
             extra_args: list[Any] | None = None
-            if node_type in self._AAP_NODE_TYPES:
+            if node_type == NodeType.SCRIPT:
+                extra_args = [self.execution_id]
+            elif node_type in self._AAP_NODE_TYPES:
                 extra_args = [self.execution_id, self._created_by_user_id]
             elif node_type == NodeType.AGENTIC:
                 extra_args = [self.execution_id, self.request_id, self._project_id, self._created_by_user_id]

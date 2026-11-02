@@ -8,7 +8,7 @@ import json
 import re
 import uuid
 from enum import Enum, IntEnum, StrEnum
-from typing import Any, ClassVar, Literal
+from typing import Annotated, Any, ClassVar, Literal
 from urllib.parse import urlparse
 from zoneinfo import available_timezones
 
@@ -331,7 +331,34 @@ class NodeSettingsFull(NodeSettingsNoRetry):
 
 
 # Executor configuration models
-class ScriptExecutorParameters(TemplateAwareBaseModel):
+class ExecutionTargetProfile(BaseModel):
+    """Execution Plane profile that selects a specific Execution Target."""
+
+    type: Literal["execution_target"]
+    execution_target_id: uuid.UUID = Field(
+        description="UUID of the Execution Plane execution target selected for this workload."
+    )
+
+
+# Extension point for future Execution Plane placement profiles. Add new
+# concrete profile models to this discriminated union instead of adding
+# profile-specific fields directly to executor parameter models.
+ExecutionPlaneExecutionProfile = Annotated[
+    ExecutionTargetProfile,
+    Field(discriminator="type"),
+]
+
+
+class ExecutionPlaneMixin(BaseModel):
+    """Mixin for executor configs that accept an Execution Plane profile."""
+
+    execution_profile: ExecutionPlaneExecutionProfile | None = Field(
+        default=None,
+        description="Execution Plane placement profile for this workload.",
+    )
+
+
+class ScriptExecutorParameters(ExecutionPlaneMixin, TemplateAwareBaseModel):
     """Parameters for script executor."""
 
     language: ScriptLanguage

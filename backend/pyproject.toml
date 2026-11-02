@@ -72,6 +72,7 @@ dependencies = [
     "uuid-utils>=0.9.0",
     "pypdf>=6.19.0",
     "nh3>=0.2.21",
+    "execution-plane-client>=0.1.8",
 ]
 
 [project.optional-dependencies]
@@ -182,7 +183,7 @@ ignore = [
 "src/syntara/core/models/base/resource.py" = ["A005"]  # Allow module name shadowing stdlib
 "tools/**/*.py" = ["T201", "INP001", "PLC0415", "ARG001", "ANN401", "TRY003", "EM102"]  # CLI tools: print, deferred imports, unused args
 "scripts/**/*.py" = ["T201", "INP001", "D103"]  # Standalone scripts: print, no package, no docstrings
-"tests/**/*.py" = [
+"**/tests/**/*.py" = [
     "S101",     # Allow assert statements in tests
     "ANN001",   # Don't require type annotations for test function arguments (fixtures)
     "ANN201",   # Don't require return type annotations for test functions
@@ -221,6 +222,9 @@ ignore = [
 [tool.pyrefly]
 python-version = "3.12.0"
 project-includes = ["src"]
+# Editable installs are otherwise inferred as third-party directories and skipped.
+disable-project-excludes-heuristics = true
+project-excludes = ["**/__pycache__", "**/node_modules", ".venv/**", "src/api_client", "src/cli", "test-sdk/src"]
 
 # SQLModel/SQLAlchemy stubs cause false positives for these rules.
 # unbound-name and bad-return have a few false positives in existing code
@@ -313,7 +317,6 @@ markers = [
     "k8s_required: marks tests that need KUBECONFIG + PERF_K8S_NAMESPACE to reach a Kubernetes cluster",
     "ssrf_enforced: keep write-time SSRF base_url validation active (opt out of the autouse bypass)",
     "xfail_from_url: dynamically applied by --xfail-from-url from a remote URL",
-    "requires_httpbin: marks tests that need httpbin reachable at runtime (skipped if unreachable)",
 ]
 
 # Coverage configuration

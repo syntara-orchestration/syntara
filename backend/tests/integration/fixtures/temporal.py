@@ -12,15 +12,18 @@ from temporalio.worker import Worker
 
 from syntara.workflows.workflow_engine.activities.condition import condition
 from syntara.workflows.workflow_engine.activities.converge import converge
+from syntara.workflows.workflow_engine.activities.ep.ep_dispatch_activity import execute_script_activity
 from syntara.workflows.workflow_engine.activities.internal_activity import execute_internal_activity
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from tests.fixtures.fake_execution_plane import FakeExecutionPlaneHttpClient
+from tests.fixtures.settings import FakeSettingsCache
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Callable
 
+    from sqlalchemy.ext.asyncio import AsyncEngine
     from temporalio.client import Client
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -41,7 +44,6 @@ async def _create_temporal_worker(
     """Start a Temporal worker with all registered activities."""
     import syntara.settings.cache.settings_cache as _settings_mod
     from syntara.core.config.base import get_settings
-    from tests.fixtures.settings import FakeSettingsCache
 
     original = _settings_mod._runtime_settings
     _settings_mod._runtime_settings = FakeSettingsCache()  # type: ignore[assignment]
@@ -64,13 +66,30 @@ async def _create_temporal_worker(
 
 
 @pytest_asyncio.fixture(scope="session")
-async def temporal_env() -> AsyncGenerator[WorkflowEnvironment, None]:
+async def _temporal_server() -> AsyncGenerator[WorkflowEnvironment, None]:
     """Provide a Temporal test environment."""
     logger.info("Starting Temporal test environment...")
     async with await WorkflowEnvironment.start_time_skipping() as env:
         logger.info("Temporal test environment started (namespace: %s)", env.client.namespace)
         yield env
     logger.info("Temporal test environment stopped")
+
+
+@pytest_asyncio.fixture
+async def temporal_env(
+    _temporal_server: WorkflowEnvironment,
+    test_db_engine: AsyncEngine,
+    monkeypatch: pytest.MonkeyPatch,
+) -> AsyncGenerator[WorkflowEnvironment, None]:
+    """Pair Temporal with a test double for the independently deployed EP API."""
+    from syntara.workflows.workflow_engine.activities.ep import ep_dispatch_activity
+
+    database_url = test_db_engine.url
+    monkeypatch.setenv("APP_DATABASE_URL", database_url.render_as_string(hide_password=False))
+    monkeypatch.setattr(ep_dispatch_activity, "ExecutionPlaneHttpClient", FakeExecutionPlaneHttpClient)
+
+    with _temporal_server.auto_time_skipping_disabled():
+        yield _temporal_server
 
 
 @pytest_asyncio.fixture

@@ -7,7 +7,7 @@ to the database in real-time by streaming Temporal history events.
 import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
-from uuid import UUID
+from uuid import UUID, uuid5
 
 import structlog
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -668,6 +668,7 @@ class ActivitySyncService(
 
                     # V2 workflows: Create records for all node types (triggers, control, executors)
                     new_activity = ActivityExecution(
+                        id=uuid5(execution_id, activity_id),
                         execution_id=execution_id,
                         activity_name=activity_id,
                         node_type=node_type,

@@ -8,6 +8,7 @@ import {
   RhUiNetworkIcon,
   RhUiPlayCircleIcon,
   RhUiSecuredIcon,
+  RhUiServerStackIcon,
   RhUiSettingsIcon,
   RhUiUsersIcon,
 } from '@patternfly/react-icons'
@@ -64,6 +65,18 @@ export const NAV_ITEMS: TNavigationItem[] = [
       { action: 'read', resourceType: 'approval' },
       { action: 'decide', resourceType: 'approval' },
     ],
+  },
+  {
+    label: 'Execution Plane',
+    path: AppRoute.ExecutionPlane.Root,
+    icon: <RhUiServerStackIcon />,
+    requiredPermissions: [{ action: 'read', resourceType: 'execution_target' }],
+  },
+  {
+    label: 'Execution Target Detail',
+    path: AppRoute.ExecutionPlane.Detail,
+    hidden: true,
+    requiredPermissions: [{ action: 'read', resourceType: 'execution_target' }],
   },
   {
     label: 'Configuration',
