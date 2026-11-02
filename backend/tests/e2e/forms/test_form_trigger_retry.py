@@ -1,6 +1,5 @@
 """E2E coverage for Form Trigger retries, repeated submissions, and deleted workflows."""
 
-import json
 from collections.abc import Callable
 from http import HTTPStatus
 from typing import Any
@@ -87,12 +86,8 @@ def test_retry_reuses_original_form_trigger_inputs(
     assert str(original_final.status) == "completed"
 
     retry_response = syntara_api.executions.retry(execution_id=original_id)
-    assert retry_response.status_code in {HTTPStatus.OK, HTTPStatus.CREATED}, (
-        f"Expected 200 OK or 201 Created, got {retry_response.status_code}: {retry_response.content!r}"
-    )
-    # The generated client currently models 201. Parse the response body directly so
-    # this test also accepts a valid 200 response from a server version that uses it.
-    retried = ExecutionRead.from_dict(json.loads(retry_response.content))
+    assert retry_response.status_code == HTTPStatus.CREATED
+    retried = retry_response.assert_and_get()
     retried_id = UUID(str(retried.id))
     form_execution_cleanup(retried_id)
 
