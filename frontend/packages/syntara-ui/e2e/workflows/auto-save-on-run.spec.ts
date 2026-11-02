@@ -40,7 +40,7 @@ test('workflow auto-saves when clicking Run with unsaved changes', async ({ app 
     ).toBeVisible()
 
     // Click the Run button without manually saving
-    const runButton = app.getByRole('button', { name: 'Run' })
+    const runButton = app.getByRole('button', { name: 'Run', exact: true })
     await expect(runButton).toBeVisible()
     await runButton.click()
 
@@ -100,7 +100,7 @@ test('run confirmation shows "Run now" when workflow has no unsaved changes', as
     // Do NOT make changes - workflow is already saved
 
     // Click the Run button
-    const runButton = app.getByRole('button', { name: 'Run' })
+    const runButton = app.getByRole('button', { name: 'Run', exact: true })
     await expect(runButton).toBeVisible()
     await runButton.click()
 
@@ -139,8 +139,8 @@ test('canceling run dialog with unsaved changes keeps workflow dirty', async ({ 
       app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Cancel Run Test' })
     ).toBeVisible()
 
-    // Click Run
-    const runButton = app.getByRole('button', { name: 'Run' })
+    // exact: true avoids Edit/expand labels that contain "Run" (e.g. "Cancel Run Test")
+    const runButton = app.getByRole('button', { name: 'Run', exact: true })
     await runButton.click()
 
     // Wait for confirmation dialog

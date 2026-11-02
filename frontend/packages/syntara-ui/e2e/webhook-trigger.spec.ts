@@ -130,7 +130,8 @@ test.describe('Webhook Trigger', () => {
 
       // Trigger is created and appears on the canvas (form closes)
       await expect(app.getByRole('button', { name: 'Create' })).not.toBeAttached({ timeout: 10_000 })
-      await expectCanvasStepTitleVisible(app, 'Webhook Trigger')
+      // Unnamed webhook uses default base name "Trigger" (type is the subtitle).
+      await expectCanvasStepTitleVisible(app, 'Trigger')
     } finally {
       await deleteServiceAccountViaApi(app, sa.id)
     }
