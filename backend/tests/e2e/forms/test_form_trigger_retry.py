@@ -7,8 +7,9 @@ from typing import Any
 from uuid import UUID
 
 import pytest
+from orchestrator_test_sdk.e2e import unique_name
 from syntara_api_client.api import SyntaraApiRegistry
-from syntara_api_client.models import ExecutionRead, WorkflowCreate, WorkflowRead
+from syntara_api_client.models import ExecutionRead, WorkflowCreate, WorkflowDefinition, WorkflowRead, WorkflowUpdate
 
 from ._helpers import (
     activities_by_id,
@@ -22,6 +23,7 @@ from ._helpers import (
     submit_form_trigger_and_track,
     wait_for_activity_outputs,
 )
+from ._workflows import form_trigger_consumer_workflow
 
 pytestmark = [pytest.mark.e2e]
 
@@ -177,4 +179,50 @@ def test_submission_after_workflow_deletion_returns_workflow_not_found(
     assert problem["title"] == "Workflow Not Found"
     assert problem["detail"] == "The requested workflow was not found"
 
+    assert_no_executions_for_workflow(syntara_api, workflow_id)
+
+
+def test_submission_fails_after_form_trigger_is_removed_from_workflow(
+    syntara_api: SyntaraApiRegistry,
+    workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+    first_project_id: UUID,
+) -> None:
+    """A Form Trigger submission is rejected after that trigger is removed from the workflow."""
+    name = unique_name("e2e-form-trigger-deleted-node")
+    definition = form_trigger_consumer_workflow(name, form_fields=_FORM_FIELDS).to_dict()
+    definition["triggers"].append({"id": "manual", "type": "manual_trigger", "parameters": {}})
+    definition["edges"].append({"from": "manual", "to": "consumer"})
+    workflow = workflow_factory(
+        WorkflowCreate(
+            name=name,
+            description="E2E: reject Form Trigger submission after trigger removal",
+            project_id=first_project_id,
+            workflow_definition=WorkflowDefinition.from_dict(definition),
+        )
+    )
+    workflow_id = UUID(str(workflow.id))
+
+    current = assert_and_get_with_502_skip(syntara_api.workflows.get(workflow_id=workflow_id))
+    updated_definition = current.version.workflow_definition.to_dict()
+    updated_definition["triggers"] = [trigger for trigger in updated_definition["triggers"] if trigger["id"] != "form"]
+    updated_definition["edges"] = [edge for edge in updated_definition["edges"] if edge["from"] != "form"]
+    update_response = syntara_api.workflows.update(
+        workflow_id=workflow_id,
+        body=WorkflowUpdate(
+            workflow_definition=WorkflowDefinition.from_dict(updated_definition),
+            change_description="Remove the Form Trigger",
+        ),
+    )
+    assert update_response.status_code == HTTPStatus.OK
+    updated = assert_and_get_with_502_skip(update_response)
+    updated_triggers = updated.version.workflow_definition.to_dict()["triggers"]
+    assert [trigger["id"] for trigger in updated_triggers] == ["manual"]
+
+    submission_response = submit_form_trigger(syntara_api, workflow, _FORM_INPUTS)
+    problem = assert_problem_response(
+        submission_response,
+        expected_status=HTTPStatus.UNPROCESSABLE_ENTITY,
+        expected_code="VALIDATION_ERROR",
+    )
+    assert problem["detail"] == "Specified trigger_node_id 'form' not found in workflow triggers"
     assert_no_executions_for_workflow(syntara_api, workflow_id)
