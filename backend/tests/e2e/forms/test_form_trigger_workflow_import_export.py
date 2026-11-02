@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import json
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
@@ -16,6 +15,8 @@ from syntara_api_client.models.activity_data_output_data_type_0 import ActivityD
 from syntara_api_client.models.execution_status import ExecutionStatus
 from syntara_api_client.models.validation_result import ValidationResult
 from syntara_api_client.models.workflow_read_with_version import WorkflowReadWithVersion
+
+from ._helpers import create_workflow, export_workflow_definition, get_workflow_definition
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -131,57 +132,6 @@ def _definition_with_invalid_form_trigger(name: str, *, fields: list[dict[str, A
     return definition
 
 
-def _create_workflow(
-    syntara_api: SyntaraApiRegistry,
-    cleanup_workflows: list[UUID],
-    *,
-    name: str,
-    project_id: UUID,
-    workflow_definition: dict[str, Any],
-    is_import: bool,
-) -> WorkflowRead:
-    """POST a workflow definition and register the created row for teardown."""
-    body = WorkflowCreate.from_dict(
-        {
-            "name": name,
-            "description": "Form Trigger workflow import/export E2E",
-            "workflow_definition": workflow_definition,
-            "project_id": str(project_id),
-            "is_import": is_import,
-        }
-    )
-    response = syntara_api.workflows.create(body=body)
-    assert response.status_code == HTTPStatus.CREATED, (
-        f"Expected 201 when creating {name!r}, got {response.status_code}: {response.content!r}"
-    )
-    workflow = cast("WorkflowRead", response.assert_and_get())
-    cleanup_workflows.append(UUID(str(workflow.id)))
-    return workflow
-
-
-def _export_definition(syntara_api: SyntaraApiRegistry, workflow_id: UUID) -> dict[str, Any]:
-    """Export version 1 and parse the JSON attachment body."""
-    response = syntara_api.workflows.export_version(workflow_id=workflow_id, version=1)
-    assert response.status_code == HTTPStatus.OK, (
-        f"Expected JSON export 200, got {response.status_code}: {response.content!r}"
-    )
-    assert response.headers["content-type"].split(";", maxsplit=1)[0] == "application/json"
-    assert "attachment" in response.headers["content-disposition"]
-    definition = json.loads(response.content)
-    assert isinstance(definition, dict)
-    return definition
-
-
-def _get_workflow_definition(syntara_api: SyntaraApiRegistry, workflow_id: UUID) -> dict[str, Any]:
-    """GET a workflow and return the current version's serialized definition."""
-    response = syntara_api.workflows.get(workflow_id=workflow_id)
-    assert response.status_code == HTTPStatus.OK, (
-        f"Expected workflow GET 200, got {response.status_code}: {response.content!r}"
-    )
-    workflow = cast("WorkflowReadWithVersion", response.assert_and_get())
-    return workflow.version.workflow_definition.to_dict()
-
-
 def _submit_form_trigger(
     syntara_api: SyntaraApiRegistry,
     workflow_id: UUID,
@@ -241,17 +191,18 @@ def test_form_trigger_workflow_export_import_round_trip_executes(
     """
     source_name = unique_name("e2e-form-trigger-export-source")
     source_definition = _form_trigger_workflow_definition(source_name)
-    source = _create_workflow(
+    source = create_workflow(
         syntara_api,
         cleanup_workflows,
         name=source_name,
+        description="Form Trigger workflow import/export E2E",
         project_id=first_project_id,
         workflow_definition=source_definition,
         is_import=False,
     )
     assert source.has_validation_issues is False
 
-    exported_definition = _export_definition(syntara_api, UUID(str(source.id)))
+    exported_definition = export_workflow_definition(syntara_api, UUID(str(source.id)))
     assert exported_definition["triggers"] == source_definition["triggers"]
     assert exported_definition["nodes"] == source_definition["nodes"]
     assert exported_definition["edges"] == source_definition["edges"]
@@ -263,17 +214,18 @@ def test_form_trigger_workflow_export_import_round_trip_executes(
     imported_name = unique_name("e2e-form-trigger-export-imported")
     imported_definition = copy.deepcopy(exported_definition)
     imported_definition["name"] = imported_name
-    imported = _create_workflow(
+    imported = create_workflow(
         syntara_api,
         cleanup_workflows,
         name=imported_name,
+        description="Form Trigger workflow import/export E2E",
         project_id=first_project_id,
         workflow_definition=imported_definition,
         is_import=True,
     )
     assert imported.has_validation_issues is False
 
-    persisted_definition = _get_workflow_definition(syntara_api, UUID(str(imported.id)))
+    persisted_definition = get_workflow_definition(syntara_api, UUID(str(imported.id)))
     assert persisted_definition == imported_definition
     assert len(persisted_definition["triggers"]) == 1
     assert persisted_definition["triggers"][0]["type"] == "form_trigger"
@@ -346,7 +298,7 @@ def test_form_trigger_import_reports_save_time_validation_findings(
         for finding in trigger_findings
     ), f"Field type path missing from {trigger_findings!r}"
 
-    saved_definition = _get_workflow_definition(syntara_api, UUID(str(workflow.id)))
+    saved_definition = get_workflow_definition(syntara_api, UUID(str(workflow.id)))
     saved_trigger = next(trigger for trigger in saved_definition["triggers"] if trigger["id"] == "form_trigger")
     submitted_trigger = next(trigger for trigger in definition["triggers"] if trigger["id"] == "form_trigger")
     assert saved_trigger["parameters"] == submitted_trigger["parameters"]
@@ -363,16 +315,17 @@ def test_import_renamed_form_trigger_preserves_configuration_and_edges(
     """Import applies a Form Trigger ID change and keeps its parameters and connection."""
     source_name = unique_name("e2e-form-trigger-rename-source")
     source_definition = _form_trigger_workflow_definition(source_name)
-    source = _create_workflow(
+    source = create_workflow(
         syntara_api,
         cleanup_workflows,
         name=source_name,
+        description="Form Trigger workflow import/export E2E",
         project_id=first_project_id,
         workflow_definition=source_definition,
         is_import=False,
     )
     assert source.has_validation_issues is False
-    exported_definition = _export_definition(syntara_api, UUID(str(source.id)))
+    exported_definition = export_workflow_definition(syntara_api, UUID(str(source.id)))
 
     imported_name = unique_name("e2e-form-trigger-rename-imported")
     imported_definition = copy.deepcopy(exported_definition)
@@ -385,16 +338,17 @@ def test_import_renamed_form_trigger_preserves_configuration_and_edges(
     for variable, expression in consumer["parameters"]["environment"].items():
         consumer["parameters"]["environment"][variable] = expression.replace("${form_trigger.", "${user_choice.")
 
-    imported = _create_workflow(
+    imported = create_workflow(
         syntara_api,
         cleanup_workflows,
         name=imported_name,
+        description="Form Trigger workflow import/export E2E",
         project_id=first_project_id,
         workflow_definition=imported_definition,
         is_import=True,
     )
     assert imported.has_validation_issues is False
-    persisted_definition = _get_workflow_definition(syntara_api, UUID(str(imported.id)))
+    persisted_definition = get_workflow_definition(syntara_api, UUID(str(imported.id)))
 
     renamed_trigger = next(trigger for trigger in persisted_definition["triggers"] if trigger["id"] == "user_choice")
     assert renamed_trigger["parameters"] == original_parameters
@@ -412,17 +366,18 @@ def test_import_handcrafted_form_trigger_workflow_executes(
     """Import and execute a hand-authored Form Trigger workflow without exporting a source."""
     name = unique_name("e2e-form-trigger-handcrafted")
     definition = _form_trigger_workflow_definition(name)
-    workflow = _create_workflow(
+    workflow = create_workflow(
         syntara_api,
         cleanup_workflows,
         name=name,
+        description="Form Trigger workflow import/export E2E",
         project_id=first_project_id,
         workflow_definition=definition,
         is_import=True,
     )
     assert workflow.has_validation_issues is False
 
-    persisted_definition = _get_workflow_definition(syntara_api, UUID(str(workflow.id)))
+    persisted_definition = get_workflow_definition(syntara_api, UUID(str(workflow.id)))
     assert persisted_definition == definition
     assert len(persisted_definition["triggers"]) == 1
     assert persisted_definition["triggers"][0]["type"] == "form_trigger"
