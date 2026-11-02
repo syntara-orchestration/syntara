@@ -114,6 +114,34 @@ def test_user_with_execution_run_can_submit_form_trigger(
     assert_consumer_completed(syntara_api, UUID(str(execution.id)))
 
 
+def test_admin_with_execution_run_any_can_submit_form_trigger(
+    admin_api: SyntaraApiRegistry,
+    syntara_api: SyntaraApiRegistry,
+    workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+    form_trigger_permission_env: dict[str, Any],
+    form_execution_cleanup: Callable[[UUID], None],
+) -> None:
+    """An admin with execution:run:any can start and complete a Form Trigger.
+
+    Procedure:
+    1. Create a Form Trigger workflow in the dedicated project.
+    2. Submit valid data as the admin.
+    3. Wait for the execution's consumer node to complete.
+
+    Expected:
+    - The submission creates an execution and its consumer completes.
+    """
+    workflow = _build_workflow(workflow_factory, form_trigger_permission_env["project_id"])
+    execution = submit_form_trigger_and_track(
+        admin_api,
+        workflow,
+        _VALID_SUBMISSION,
+        form_execution_cleanup,
+    )
+
+    assert_consumer_completed(syntara_api, UUID(str(execution.id)))
+
+
 def test_user_without_execution_run_is_denied_and_no_execution_is_created(
     syntara_api: SyntaraApiRegistry,
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
