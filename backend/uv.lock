@@ -973,8 +973,8 @@ wheels = [
 
 [[package]]
 name = "execution-plane-client"
-version = "0.1.8.dev7+gd64c3561d"
-source = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&branch=refactor%2Fremove-cluster-namespace-and-correlation#d64c3561df0afa981fc8457b6dbfc24b34ae0e45" }
+version = "0.1.10.dev4+g137f6b2f7"
+source = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&branch=refactor%2Fremove-cluster-namespace-and-correlation#137f6b2f7816a3aec93670a9064bb64aae6d7432" }
 dependencies = [
     { name = "pydantic" },
 ]
