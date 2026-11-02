@@ -429,13 +429,15 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         graph: WorkflowGraph,
         pending_tasks: dict[str, asyncio.Task[Any]],
     ) -> None:
-        """Replay exclusive descendants that recorded output on an unselected branch.
+        """Keep recorded descendants of an unselected failure reachable.
 
         A restored unselected failure must not execute downstream work against
-        output that no longer exists. Descendants that already recorded a result
-        still have to be replayed, or a later converge treats them as skipped
-        and evaluates the gate against the wrong set of inputs. Converges are
-        left to the gate: they re-evaluate from the preserved plus new results.
+        output that no longer exists. Descendants with recorded source outcomes
+        must stay reachable: ordinary nodes can replay, while loops and controls
+        may need to run through their retry-aware execution path. Otherwise a
+        later converge can treat the branch as skipped and evaluate the gate
+        against the wrong set of inputs. Converges are left to the gate, which
+        re-evaluates from the preserved plus new results.
         """
         if not self.retry_context:
             return
@@ -450,7 +452,11 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             successor = graph.get_node(successor_id)
             if successor.type == NodeType.CONVERGE:
                 continue
-            if not self._should_restore_node(successor_id, graph):
+            # Reachability is based on retry-region membership and a recorded
+            # terminal source outcome, not on whether the node can be replayed
+            # directly. Loops and controls with unknown routing must still reach
+            # _execute_node(), which can run their retry-aware path normally.
+            if not self._is_retry_traversable_source_node(successor_id, graph):
                 continue
             workflow.logger.info(f"Scheduling restored unselected-branch successor {successor_id} from {node_id}")
             pending_tasks[successor_id] = asyncio.create_task(self._execute_node(node=successor, graph=graph))
@@ -1153,9 +1159,10 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                 if succ_node.type == NodeType.CONVERGE:
                     continue
 
-                # Retry reuses recorded output on unselected branches. Skipping a
-                # restorable successor here would drop that result before replay.
-                if self.retry_context and self._should_restore_node(succ_id, graph):
+                # Keep source-recorded nodes in the retry-restorable region
+                # reachable. Some (loops and controls with unknown routing) must
+                # run through _execute_node() instead of being directly replayed.
+                if self._is_retry_traversable_source_node(succ_id, graph):
                     continue
 
                 if boundary is not None and succ_id not in boundary:

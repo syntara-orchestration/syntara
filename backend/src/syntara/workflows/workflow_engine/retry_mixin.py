@@ -625,6 +625,26 @@ class WorkflowRetryMixin:
         # projection is also built from temporal_activity_id, never activity_name.
         return self._retry_source_statuses.get(node_id)
 
+    def _is_retry_traversable_source_node(self, node_id: str, graph: WorkflowGraph) -> bool:
+        """Whether retry traversal may reach a node with a recorded source outcome.
+
+        This is deliberately broader than ``_should_restore_node``: a loop or a
+        control node whose route cannot be inferred may need to run through its
+        normal retry-aware path. They still need to belong to the retry-restorable
+        region and have a terminal source record before an unselected branch may
+        keep them reachable.
+        """
+        if not self.retry_context:
+            return False
+
+        node_id_without_iteration = strip_iteration_suffix(node_id)
+        if node_id_without_iteration not in self._retry_restorable_nodes(
+            graph
+        ) and not self._is_before_selected_failure_iteration(node_id):
+            return False
+
+        return self._source_status_for_node(node_id, graph) in _RESTORABLE_SOURCE_STATUS_VALUES
+
     def _is_before_selected_failure_iteration(self, node_id: str) -> bool:
         """Whether this row belongs to an earlier enclosing-loop iteration.
 
