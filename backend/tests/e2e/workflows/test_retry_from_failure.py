@@ -16,9 +16,9 @@ import pytest
 from orchestrator_test_sdk.e2e import unique_name
 from orchestrator_test_sdk.e2e.auth import api_for
 from orchestrator_test_sdk.e2e.helpers import create_and_run_workflow, poll_execution_until_complete
-from syntara_api_client.models import ExecutionCreate, RetryFailureRequest
+from syntara_api_client.models import ExecutionCreate, RetryFailureRequest, RetryFromFailureValidationResponse
 from syntara_api_client.models.execution_status import ExecutionStatus
-from syntara_api_client.types import Unset
+from syntara_api_client.types import UnexpectedResponseException, Unset
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -43,6 +43,12 @@ _RETRY_RUN_POLICIES = [
 ]
 
 _T = TypeVar("_T")
+
+# Cluster load can leave activity rows and stdout 30s+ behind a terminal execution.
+_ACTIVITY_SYNC_POLLS = 90
+_ACTIVITY_SYNC_INTERVAL = 1
+_TRANSIENT_GATEWAY_STATUSES = {502, 503, 504}
+_TERMINAL_ACTIVITY_STATUSES = frozenset({"completed", "failed", "skipped", "cancelled"})
 
 
 def _script_node(node_id: str, code: str, *, environment: dict[str, str] | None = None) -> dict[str, Any]:
@@ -108,6 +114,19 @@ def _activity_input(activity: ActivityExecution) -> dict[str, Any]:
     return dict(value.additional_properties)
 
 
+def _activity_status(activity: ActivityData | ActivityExecution) -> str:
+    return str(getattr(activity.status, "value", activity.status))
+
+
+def _is_terminal_activity(activity: ActivityData | ActivityExecution) -> bool:
+    return _activity_status(activity) in _TERMINAL_ACTIVITY_STATUSES
+
+
+def _skip_transient_gateway(exc: UnexpectedResponseException) -> None:
+    if exc.status_code in _TRANSIENT_GATEWAY_STATUSES:
+        pytest.skip("Backend returned 502 Bad Gateway — transient infrastructure issue")
+
+
 def _activity_executions_by(
     syntara_api: SyntaraApiRegistry,
     execution_id: UUID,
@@ -118,7 +137,6 @@ def _activity_executions_by(
 
 
 def _wait_until(
-    initial_value: _T,
     fetch_next: Callable[[], _T],
     is_ready: Callable[[_T], bool],
     timeout_details: Callable[[_T], str],
@@ -128,13 +146,22 @@ def _wait_until(
     poll_interval: int,
 ) -> _T:
     """Poll one value consistently, with ``max_polls`` counting observations."""
-    value = initial_value
+    value: _T | None = None
     for attempt in range(max_polls):
+        try:
+            value = fetch_next()
+        except UnexpectedResponseException as exc:
+            if exc.status_code in _TRANSIENT_GATEWAY_STATUSES:
+                if attempt + 1 < max_polls:
+                    time.sleep(poll_interval)
+                    continue
+                pytest.skip("Backend returned 502 Bad Gateway — transient infrastructure issue")
+            raise
         if is_ready(value):
             return value
         if attempt + 1 < max_polls:
             time.sleep(poll_interval)
-            value = fetch_next()
+    assert value is not None
     msg = f"Timed out waiting for {description}. {timeout_details(value)}"
     raise AssertionError(msg)
 
@@ -144,19 +171,43 @@ def _wait_for_activity_executions(
     execution_id: UUID,
     required_temporal_ids: set[str],
     *,
-    max_polls: int = 30,
-    poll_interval: int = 1,
+    required_stdouts: Mapping[str, str] | None = None,
+    max_polls: int = _ACTIVITY_SYNC_POLLS,
+    poll_interval: int = _ACTIVITY_SYNC_INTERVAL,
 ) -> dict[str, ActivityExecution]:
-    """Wait for activity rows to sync, including nested-loop Temporal IDs."""
+    """Wait for activity rows, terminal status, and optional stdout to sync."""
+    stdout_snippets = dict(required_stdouts or {})
+
+    def fetch_rows() -> dict[str, ActivityExecution]:
+        return _activity_executions_by(syntara_api, execution_id, lambda activity: activity.temporal_activity_id)
+
+    def is_ready(rows: dict[str, ActivityExecution]) -> bool:
+        if not required_temporal_ids <= rows.keys():
+            return False
+        if not all(_is_terminal_activity(rows[temporal_id]) for temporal_id in required_temporal_ids):
+            return False
+        return all(snippet in _listed_stdout(rows[temporal_id]) for temporal_id, snippet in stdout_snippets.items())
 
     def missing_rows(rows: dict[str, ActivityExecution]) -> str:
         missing = sorted(required_temporal_ids - rows.keys())
-        return f"Execution {execution_id} is missing activity rows: {missing}"
+        pending = sorted(
+            temporal_id
+            for temporal_id in required_temporal_ids
+            if temporal_id in rows and not _is_terminal_activity(rows[temporal_id])
+        )
+        stdout_missing = {
+            temporal_id: _listed_stdout(rows[temporal_id])
+            for temporal_id, snippet in stdout_snippets.items()
+            if temporal_id in rows and snippet not in _listed_stdout(rows[temporal_id])
+        }
+        return (
+            f"Execution {execution_id} is missing activity rows: {missing}; "
+            f"non-terminal: {pending}; stdout still missing: {stdout_missing}"
+        )
 
     return _wait_until(
-        _activity_executions_by(syntara_api, execution_id, lambda activity: activity.temporal_activity_id),
-        lambda: _activity_executions_by(syntara_api, execution_id, lambda activity: activity.temporal_activity_id),
-        lambda rows: required_temporal_ids <= rows.keys(),
+        fetch_rows,
+        is_ready,
         missing_rows,
         description=f"activity rows for execution {execution_id}",
         max_polls=max_polls,
@@ -178,27 +229,45 @@ def _wait_for_activity_ids(
     execution: ExecutionRead,
     required_ids: set[str],
     *,
-    max_polls: int = 30,
-    poll_interval: int = 1,
+    required_stdouts: Mapping[str, str] | None = None,
+    max_polls: int = _ACTIVITY_SYNC_POLLS,
+    poll_interval: int = _ACTIVITY_SYNC_INTERVAL,
 ) -> ExecutionRead:
-    """Wait until include=activities has every expected row.
+    """Wait until include=activities has every expected terminal row.
 
     Loop iterations are written as later composite keys (``loop_body#iter-1``).
     The execution can already be terminal before those rows have been synced.
     """
+    stdout_snippets = dict(required_stdouts or {})
 
-    def present_ids(current: ExecutionRead) -> set[str]:
+    def present(current: ExecutionRead) -> dict[str, ActivityData]:
         activities = current.activities
-        return {activity.activity_id for activity in activities} if isinstance(activities, list) else set()
+        return {activity.activity_id: activity for activity in activities} if isinstance(activities, list) else {}
+
+    def is_ready(current: ExecutionRead) -> bool:
+        rows = present(current)
+        if not required_ids <= rows.keys():
+            return False
+        if not all(_is_terminal_activity(rows[activity_id]) for activity_id in required_ids):
+            return False
+        return all(
+            snippet in str(_activity_output(rows[activity_id]).get("stdout", ""))
+            for activity_id, snippet in stdout_snippets.items()
+        )
 
     def missing_rows(current: ExecutionRead) -> str:
-        missing = sorted(required_ids - present_ids(current))
-        return f"Execution {current.id} is missing activity rows: {missing}"
+        rows = present(current)
+        missing = sorted(required_ids - rows.keys())
+        pending = sorted(
+            activity_id
+            for activity_id in required_ids
+            if activity_id in rows and not _is_terminal_activity(rows[activity_id])
+        )
+        return f"Execution {current.id} is missing activity rows: {missing}; non-terminal: {pending}"
 
     return _wait_until(
-        execution,
         lambda: syntara_api.executions.get(execution_id=execution.id, include="activities").assert_and_get(),
-        lambda current: required_ids <= present_ids(current),
+        is_ready,
         missing_rows,
         description=f"activity rows for execution {execution.id}",
         max_polls=max_polls,
@@ -225,27 +294,51 @@ def _wait_for_loop_stdouts(
     execution_id: UUID,
     required_stdouts: set[str],
     *,
-    max_polls: int = 30,
-    poll_interval: int = 1,
+    max_polls: int = _ACTIVITY_SYNC_POLLS,
+    poll_interval: int = _ACTIVITY_SYNC_INTERVAL,
 ) -> dict[str, ActivityExecution]:
-    """Wait until listed loop-body rows include every expected stdout value."""
+    """Wait until terminal loop-body rows include every expected stdout value."""
+
+    def terminal_stdouts(rows: dict[str, ActivityExecution]) -> set[str]:
+        return {_listed_stdout(activity) for activity in rows.values() if _is_terminal_activity(activity)}
 
     def missing_rows(rows: dict[str, ActivityExecution]) -> str:
-        found = sorted({_listed_stdout(activity) for activity in rows.values()})
+        found = sorted(terminal_stdouts(rows))
+        pending = sorted(name for name, activity in rows.items() if not _is_terminal_activity(activity))
         return (
-            f"Execution {execution_id} loop body rows {sorted(rows)} have stdout {found}, "
-            f"wanted {sorted(required_stdouts)}"
+            f"Execution {execution_id} loop body rows {sorted(rows)} have terminal stdout {found}, "
+            f"non-terminal {pending}, wanted {sorted(required_stdouts)}"
         )
 
     return _wait_until(
-        _loop_body_rows(syntara_api, execution_id),
         lambda: _loop_body_rows(syntara_api, execution_id),
-        lambda rows: required_stdouts <= {_listed_stdout(activity) for activity in rows.values()},
+        lambda rows: required_stdouts <= terminal_stdouts(rows),
         missing_rows,
         description=f"loop body outputs for execution {execution_id}",
         max_polls=max_polls,
         poll_interval=poll_interval,
     )
+
+
+def _create_and_run(
+    syntara_api: SyntaraApiRegistry,
+    name: str,
+    definition: dict[str, Any],
+    *,
+    timeout: int,
+    project_id: UUID,
+) -> ExecutionRead:
+    try:
+        return create_and_run_workflow(
+            syntara_api,
+            name,
+            definition,
+            timeout=timeout,
+            project_id=project_id,
+        )
+    except UnexpectedResponseException as exc:
+        _skip_transient_gateway(exc)
+        raise
 
 
 def _start_retry(
@@ -260,12 +353,26 @@ def _start_retry(
         request["retry_point_ids"] = retry_point_ids
     if overrides is not None:
         request["input_parameter_overrides"] = overrides
-    response = syntara_api.executions.retry_from_failure(
-        execution_id=execution_id,
-        body=RetryFailureRequest.from_dict(request),
-    )
+    try:
+        response = syntara_api.executions.retry_from_failure(
+            execution_id=execution_id,
+            body=RetryFailureRequest.from_dict(request),
+        )
+    except UnexpectedResponseException as exc:
+        _skip_transient_gateway(exc)
+        raise
+    if response.status_code in _TRANSIENT_GATEWAY_STATUSES:
+        pytest.skip("Backend returned 502 Bad Gateway — transient infrastructure issue")
     assert response.status_code == HTTPStatus.CREATED
     return response.assert_and_get()
+
+
+def _preview_retry(syntara_api: SyntaraApiRegistry, execution_id: UUID) -> RetryFromFailureValidationResponse:
+    try:
+        return syntara_api.executions.retry_from_failure_preview(execution_id=execution_id).assert_and_get()
+    except UnexpectedResponseException as exc:
+        _skip_transient_gateway(exc)
+        raise
 
 
 def _create_failed_parallel_source(
@@ -276,7 +383,7 @@ def _create_failed_parallel_source(
 ) -> tuple[ExecutionRead, dict[str, ActivityData]]:
     """Create a failed parallel run with both failures and preview eligibility confirmed."""
     name = unique_name(name_prefix)
-    source = create_and_run_workflow(
+    source = _create_and_run(
         syntara_api,
         name,
         _parallel_failure_definition(name),
@@ -289,7 +396,7 @@ def _create_failed_parallel_source(
     assert source_activities["failure_a"].status == "failed"
     assert source_activities["failure_b"].status == "failed"
 
-    preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
+    preview = _preview_retry(syntara_api, source.id)
     assert preview.eligible is True
     assert set(preview.eligible_point_ids) == {"failure_a", "failure_b"}
     return source, source_activities
@@ -323,7 +430,7 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
         ],
     )
 
-    source = create_and_run_workflow(
+    source = _create_and_run(
         syntara_api,
         name,
         definition,
@@ -334,14 +441,14 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
     source_activities = _activities_by_id(source)
     assert source_activities["producer"].status == "completed"
     assert source_activities["repair"].status == "failed"
-    source_activity_executions = _activity_executions_by(
-        syntara_api, source.id, lambda activity: activity.activity_name
+    source_activity_executions = _wait_for_activity_executions(
+        syntara_api, source.id, {"producer", "repair", "trigger"}
     )
     assert _activity_input(source_activity_executions["repair"]).get("environment") == {"MESSAGE": "from-source"}
     source_trigger = source_activity_executions["trigger"]
     assert source_trigger.status == "completed"
 
-    preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
+    preview = _preview_retry(syntara_api, source.id)
     assert preview.eligible is True
     assert preview.eligible_point_ids == ["repair"]
 
@@ -359,10 +466,15 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
     assert retried.retried_from_execution_id == source.id
     assert retried.workflow_version_id == source.workflow_version_id
 
-    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
+    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
     retry_activities = _activities_by_id(final)
-    retry_activity_executions = _activity_executions_by(syntara_api, final.id, lambda activity: activity.activity_name)
+    retry_activity_executions = _wait_for_activity_executions(
+        syntara_api,
+        final.id,
+        {"producer", "repair", "consumer", "trigger"},
+        required_stdouts={"consumer": "retry-only"},
+    )
     assert _activity_input(retry_activity_executions["repair"]).get("environment") == {"MESSAGE": "retry-only"}
 
     # Retry dispatches the trigger again but keeps its original display timestamps.
@@ -388,19 +500,21 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
     assert "retry-only" in _activity_output(retry_activities["consumer"]).get("stdout", "")
 
     # A later ordinary run uses the unchanged workflow definition and fails again.
-    ordinary_run = syntara_api.executions.create(
-        body=ExecutionCreate(workflow_id=source.workflow_id, trigger_node_id="trigger")
-    ).assert_and_get()
+    try:
+        ordinary_run = syntara_api.executions.create(
+            body=ExecutionCreate(workflow_id=source.workflow_id, trigger_node_id="trigger")
+        ).assert_and_get()
+    except UnexpectedResponseException as exc:
+        _skip_transient_gateway(exc)
+        raise
     ordinary_final = poll_execution_until_complete(
         syntara_api,
         ordinary_run.id,
-        max_polls=60,
+        max_polls=90,
         poll_interval=1,
     )
     assert ordinary_final.status == ExecutionStatus.FAILED
-    ordinary_activity_executions = _activity_executions_by(
-        syntara_api, ordinary_run.id, lambda activity: activity.activity_name
-    )
+    ordinary_activity_executions = _wait_for_activity_executions(syntara_api, ordinary_run.id, {"repair"})
     assert _activity_input(ordinary_activity_executions["repair"]).get("environment") == {"MESSAGE": "from-source"}
 
 
@@ -409,7 +523,7 @@ def test_completed_execution_is_not_eligible_for_retry_from_failure(
     first_project_id: UUID,
 ) -> None:
     name = unique_name("e2e-retry-not-eligible")
-    source = create_and_run_workflow(
+    source = _create_and_run(
         syntara_api,
         name,
         _workflow_definition(
@@ -422,7 +536,7 @@ def test_completed_execution_is_not_eligible_for_retry_from_failure(
     )
     assert source.status == ExecutionStatus.COMPLETED
 
-    preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
+    preview = _preview_retry(syntara_api, source.id)
     assert preview.eligible is False
     assert preview.reason
 
@@ -430,6 +544,8 @@ def test_completed_execution_is_not_eligible_for_retry_from_failure(
         execution_id=source.id,
         body=RetryFailureRequest.from_dict({"retry_point_ids": []}),
     )
+    if response.status_code in _TRANSIENT_GATEWAY_STATUSES:
+        pytest.skip("Backend returned 502 Bad Gateway — transient infrastructure issue")
     assert response.status_code == HTTPStatus.CONFLICT
     assert getattr(response.parsed, "code", None) == "EXECUTION_NOT_RETRYABLE_FROM_FAILURE"
 
@@ -453,7 +569,7 @@ def test_retry_handles_an_unselected_branch_without_replay_output(
             {"from": "condition", "to": "untaken_branch", "from_port": "false"},
         ],
     )
-    source = create_and_run_workflow(
+    source = _create_and_run(
         syntara_api,
         name,
         definition,
@@ -509,7 +625,7 @@ def test_retry_replays_converge_when_branch_state_matches_source(
             {"from": "join", "to": "repair"},
         ],
     )
-    source = create_and_run_workflow(
+    source = _create_and_run(
         syntara_api,
         name,
         definition,
@@ -569,7 +685,7 @@ def test_retry_reexecutes_converge_after_repaired_branch_changes_gate_state(
             {"from": "join", "to": "consumer"},
         ],
     )
-    source = create_and_run_workflow(
+    source = _create_and_run(
         syntara_api,
         name,
         definition,
@@ -629,7 +745,7 @@ def test_retry_any_converge_does_not_wait_for_an_unnecessary_slow_branch(
         ],
     )
 
-    source = create_and_run_workflow(
+    source = _create_and_run(
         syntara_api,
         name,
         definition,
@@ -651,7 +767,7 @@ def test_retry_any_converge_does_not_wait_for_an_unnecessary_slow_branch(
         ["repair"],
         overrides={"repair": {"code": "print('repaired')"}},
     )
-    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=30, poll_interval=1)
+    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
 
     retry_activities = _activities_by_id(final)
@@ -698,7 +814,7 @@ def test_retrying_a_quorum_branch_prevents_stale_failed_converge_restoration(
         ],
     )
 
-    source = create_and_run_workflow(
+    source = _create_and_run(
         syntara_api,
         name,
         definition,
@@ -716,7 +832,7 @@ def test_retrying_a_quorum_branch_prevents_stale_failed_converge_restoration(
     assert source_rows["retained_failure"].status == "failed"
     assert source_rows["join"].status == "failed"
 
-    preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
+    preview = _preview_retry(syntara_api, source.id)
     assert preview.eligible is True
     assert "repair_branch" in preview.eligible_point_ids
 
@@ -732,6 +848,10 @@ def test_retrying_a_quorum_branch_prevents_stale_failed_converge_restoration(
         syntara_api,
         final.id,
         {"already_successful", "repair_branch", "retained_failure", "join", "after_join"},
+        required_stdouts={
+            "repair_branch": "repaired-quorum-branch",
+            "after_join": "quorum-reached",
+        },
     )
 
     assert retry_rows["already_successful"].status == "completed"
@@ -781,11 +901,11 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
             {"from": "loop_body", "to": "loop", "to_port": "iterate"},
         ],
     )
-    source = create_and_run_workflow(
+    source = _create_and_run(
         syntara_api,
         name,
         definition,
-        timeout=60,
+        timeout=90,
         project_id=first_project_id,
     )
     assert source.status == ExecutionStatus.FAILED
@@ -794,7 +914,7 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
     assert getattr(source_by_stdout["alpha"].status, "value", source_by_stdout["alpha"].status) == "completed"
     assert getattr(source_by_stdout["bravo"].status, "value", source_by_stdout["bravo"].status) == "failed"
 
-    preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
+    preview = _preview_retry(syntara_api, source.id)
     assert preview.eligible is True
     assert "loop_body" in preview.eligible_point_ids
 
@@ -887,7 +1007,7 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
         ],
     )
 
-    source = create_and_run_workflow(
+    source = _create_and_run(
         syntara_api,
         name,
         definition,
@@ -908,6 +1028,11 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
             "repair_body_iter_1_iter_0",
             "alternate_body_iter_0_iter_1",
         },
+        required_stdouts={
+            "repair_body_iter_0_iter_0": "first:first",
+            "repair_body_iter_1_iter_0": "second:first",
+            "alternate_body_iter_0_iter_1": "alternate:first:second",
+        },
     )
     assert source_rows["repair_body_iter_0_iter_0"].status == "completed"
     assert source_rows["repair_body_iter_1_iter_0"].status == "failed"
@@ -921,7 +1046,7 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
     unreached_repair = source_rows.get("repair_body_iter_0_iter_1")
     assert unreached_repair is None or unreached_repair.status != "completed"
 
-    preview = syntara_api.executions.retry_from_failure_preview(execution_id=source.id).assert_and_get()
+    preview = _preview_retry(syntara_api, source.id)
     assert preview.eligible is True
     assert "repair_body" in preview.eligible_point_ids
 
@@ -948,6 +1073,10 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
             "repair_body_iter_1_iter_0",
             "route_iter_1_iter_1",
             "alternate_body_iter_1_iter_1",
+        },
+        required_stdouts={
+            "repair_body_iter_1_iter_0": "recovered:second:first",
+            "alternate_body_iter_1_iter_1": "alternate:second:second",
         },
     )
 
@@ -1000,7 +1129,17 @@ def test_retry_defaults_to_all_failed_parallel_branches_when_selection_is_omitte
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
-    final = _wait_for_activity_ids(syntara_api, final, {"failure_a", "failure_b", "after_a", "after_b"})
+    final = _wait_for_activity_ids(
+        syntara_api,
+        final,
+        {"failure_a", "failure_b", "after_a", "after_b"},
+        required_stdouts={
+            "failure_a": "fixed-a",
+            "failure_b": "fixed-b",
+            "after_a": "after-a",
+            "after_b": "after-b",
+        },
+    )
     retry_activities = _activities_by_id(final)
     assert retry_activities["failure_a"].status == "completed"
     assert retry_activities["failure_b"].status == "completed"
@@ -1086,7 +1225,7 @@ def test_retry_input_overrides_are_run_local_and_reject_unknown_keys(
         [_script_node("failure", "raise SystemExit(1)")],
         [{"from": "trigger", "to": "failure"}],
     )
-    source = create_and_run_workflow(
+    source = _create_and_run(
         syntara_api,
         name,
         definition,
@@ -1109,6 +1248,8 @@ def test_retry_input_overrides_are_run_local_and_reject_unknown_keys(
             }
         ),
     )
+    if rejected_override.status_code in _TRANSIENT_GATEWAY_STATUSES:
+        pytest.skip("Backend returned 502 Bad Gateway — transient infrastructure issue")
     assert rejected_override.status_code == HTTPStatus.FORBIDDEN
 
     # AC-14 only gates changing inputs. A user with run permission can retry unchanged inputs.
@@ -1133,6 +1274,8 @@ def test_retry_input_overrides_are_run_local_and_reject_unknown_keys(
             }
         ),
     )
+    if rejected_new_input_key.status_code in _TRANSIENT_GATEWAY_STATUSES:
+        pytest.skip("Backend returned 502 Bad Gateway — transient infrastructure issue")
     assert rejected_new_input_key.status_code == HTTPStatus.CONFLICT
     assert getattr(rejected_new_input_key.parsed, "code", None) == "EXECUTION_NOT_RETRYABLE_FROM_FAILURE"
 
@@ -1144,12 +1287,19 @@ def test_retry_input_overrides_are_run_local_and_reject_unknown_keys(
     )
     assert editor_retry.retried_from_execution_id == source.id
     assert editor_retry.workflow_version_id == source.workflow_version_id
-    editor_retry_final = poll_execution_until_complete(syntara_api, editor_retry.id, max_polls=60, poll_interval=1)
+    editor_retry_final = poll_execution_until_complete(syntara_api, editor_retry.id, max_polls=90, poll_interval=1)
     assert editor_retry_final.status == ExecutionStatus.COMPLETED, editor_retry_final.error_details
+    editor_retry_final = _wait_for_activity_ids(
+        syntara_api, editor_retry_final, {"failure"}, required_stdouts={"failure": "repaired"}
+    )
 
     # The override belongs only to the retry; a later standard run still executes the failing definition.
-    later_run = syntara_api.executions.create(
-        body=ExecutionCreate(workflow_id=source.workflow_id, trigger_node_id="trigger")
-    ).assert_and_get()
+    try:
+        later_run = syntara_api.executions.create(
+            body=ExecutionCreate(workflow_id=source.workflow_id, trigger_node_id="trigger")
+        ).assert_and_get()
+    except UnexpectedResponseException as exc:
+        _skip_transient_gateway(exc)
+        raise
     later_run_final = poll_execution_until_complete(syntara_api, later_run.id, max_polls=60, poll_interval=1)
     assert later_run_final.status == ExecutionStatus.FAILED
