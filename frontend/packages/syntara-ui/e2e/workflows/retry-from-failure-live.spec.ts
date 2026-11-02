@@ -46,6 +46,10 @@ function isUnknownArray(value: unknown): value is unknown[] {
   return Array.isArray(value)
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item: unknown) => typeof item === 'string')
+}
+
 function stringProperty(value: unknown, key: string, context: string): string {
   if (!isRecord(value)) {
     throw new Error(`${context} did not contain a string ${key}`)
@@ -129,6 +133,23 @@ async function openRetryPanel(app: Page): Promise<void> {
   await expect(retryFromFailureButton).toBeEnabled()
   await retryFromFailureButton.click()
   await expect(app.getByRole('complementary', { name: 'Retry run from failure review' })).toBeVisible()
+}
+
+async function getEligibleRetryPointIds(app: Page, executionId: string): Promise<string[]> {
+  const token = await getAuthToken(app)
+  if (!token) throw new Error('Could not obtain auth token to inspect the retry preview')
+
+  const response = await apiRequest(app, 'get', `/executions/${executionId}/retry_from_failure_preview`, { token })
+  if (!response.ok()) {
+    const body = await response.text().catch(() => '(unreadable)')
+    throw new Error(`GET retry-from-failure preview returned ${response.status()}: ${body}`)
+  }
+
+  const body: unknown = await response.json()
+  if (!isRecord(body) || body['eligible'] !== true || !isStringArray(body['eligible_point_ids'])) {
+    throw new Error('Default retry preview was not eligible or did not contain eligible_point_ids')
+  }
+  return body['eligible_point_ids']
 }
 
 async function trackRetryResponse(response: {
@@ -307,31 +328,53 @@ test.describe('Retry from failure — real backend', () => {
 
   test('canvas selection does not narrow real failed points or move the retry origin marker', async ({ app }) => {
     const run = requireRun(multipleFailureRun, 'Multiple-failure run')
+    const eligiblePointIds = await getEligibleRetryPointIds(app, run.executionId)
+    expect([...eligiblePointIds].sort(), 'The real backend preview should report both parallel failures').toEqual([
+      'branch_a',
+      'branch_b',
+    ])
+
     await openExecutionDetail(app, run.executionId)
-    const failedStep = app.getByTestId('rf__node-branch_b').getByRole('heading', { name: 'Branch B', level: 2 })
+    const branchANode = app.getByTestId('rf__node-branch_a')
+    const branchBNode = app.getByTestId('rf__node-branch_b')
+    const failedStep = branchBNode.getByRole('heading', { name: 'Branch B', level: 2 })
     await failedStep.click()
     await openRetryPanel(app)
 
     const panel = app.getByRole('complementary', { name: 'Retry run from failure review' })
     const allPoints = panel.getByRole('radio', { name: 'All eligible failure points' })
     const choosePoints = panel.getByRole('radio', { name: 'Choose failure points' })
-    const retryOrigin = app.getByTestId('retry-origin-branch_b')
+    const branchAOrigin = app.getByTestId('retry-origin-branch_a')
+    const branchBOrigin = app.getByTestId('retry-origin-branch_b')
     await expect(allPoints).toBeChecked()
     await expect(choosePoints).not.toBeChecked()
-    await expect(retryOrigin).toBeVisible()
+    await expect(branchAOrigin).toBeVisible()
+    await expect(branchBOrigin).toBeVisible()
 
-    const markerBox = await retryOrigin.boundingBox()
-    const stepNodeBox = await app.locator('.react-flow__node[data-id="branch_b"]').boundingBox()
-    if (markerBox === null || stepNodeBox === null) {
+    const markerBoxBefore = await branchBOrigin.boundingBox()
+    const stepNodeBoxBefore = await branchBNode.boundingBox()
+    if (markerBoxBefore === null || stepNodeBoxBefore === null) {
       throw new Error('Could not measure the retry origin marker and failed step')
     }
-    const markerGap = stepNodeBox.y - (markerBox.y + markerBox.height)
-    expect(markerGap).toBeGreaterThanOrEqual(0)
-    expect(markerGap).toBeLessThanOrEqual(24)
+    const markerGapBefore = stepNodeBoxBefore.y - (markerBoxBefore.y + markerBoxBefore.height)
+    expect(markerGapBefore).toBeGreaterThanOrEqual(0)
+    expect(markerGapBefore).toBeLessThanOrEqual(24)
 
-    await failedStep.click()
+    await branchANode.getByRole('heading', { name: 'Branch A', level: 2 }).click()
     await expect(allPoints).toBeChecked()
     await expect(choosePoints).not.toBeChecked()
+    await expect(branchAOrigin).toBeVisible()
+    await expect(branchBOrigin).toBeVisible()
+
+    const markerBoxAfter = await branchBOrigin.boundingBox()
+    const stepNodeBoxAfter = await branchBNode.boundingBox()
+    if (markerBoxAfter === null || stepNodeBoxAfter === null) {
+      throw new Error('Could not remeasure the retry origin marker and failed step after canvas selection')
+    }
+    const markerGapAfter = stepNodeBoxAfter.y - (markerBoxAfter.y + markerBoxAfter.height)
+    expect(Math.abs(markerBoxAfter.x - markerBoxBefore.x)).toBeLessThanOrEqual(1)
+    expect(Math.abs(markerBoxAfter.y - markerBoxBefore.y)).toBeLessThanOrEqual(1)
+    expect(Math.abs(markerGapAfter - markerGapBefore)).toBeLessThanOrEqual(1)
   })
 
   test('retry override changes the failed run only and the real retry reuses upstream output @pr-check', async ({
