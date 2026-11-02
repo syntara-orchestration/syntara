@@ -185,6 +185,7 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
             "pending",
             "claimed",
             "dispatched",
+            "running",
             "cancel_requested",
             "reconciliation_required",
         }:
