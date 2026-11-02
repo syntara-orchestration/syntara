@@ -74,24 +74,6 @@ def _create_form_trigger_workflow(
     )
 
 
-def _submit_positive_control(
-    syntara_api: SyntaraApiRegistry,
-    workflow: WorkflowRead,
-    form_execution_cleanup: Callable[[UUID], None],
-) -> UUID:
-    """Submit and track a valid request to prove the telemetry capture path is live."""
-    execution = submit_form_trigger_and_track(
-        syntara_api,
-        workflow,
-        {"reason": _FIELD_VALUE},
-        form_execution_cleanup,
-    )
-    execution_id = UUID(str(execution.id))
-    assert_consumer_completed(syntara_api, execution_id)
-    wait_for_segment_event(_SEGMENT_SERVER_URL, "form_trigger_submitted", execution_id)
-    return execution_id
-
-
 class TestFormTriggerTelemetry:
     """Telemetry emitted for a form-trigger submission reaches Segment without submitted data."""
 
@@ -125,7 +107,6 @@ class TestFormTriggerTelemetry:
             form_execution_cleanup,
         )
         execution_id = UUID(str(execution.id))
-
         assert_consumer_completed(syntara_api, execution_id)
         message = wait_for_segment_event(_SEGMENT_SERVER_URL, "form_trigger_submitted", execution_id)
         properties = message["properties"]
