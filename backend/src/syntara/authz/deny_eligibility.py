@@ -21,6 +21,12 @@ def find_ineligible_deny_actions(statements: list[dict[str, Any]]) -> list[str]:
 
 def validate_deny_statements(statements: list[dict[str, Any]]) -> str | None:
     """Share deny eligibility validation between API schemas and service callers."""
+    for statement in statements:
+        if statement.get("effect") != "deny":
+            continue
+        for action in statement.get("actions", []):
+            if not isinstance(action, str):
+                return f"Deny-effect actions must be strings; got: {action!r}"
     invalid = find_ineligible_deny_actions(statements)
     if invalid:
         return f"Deny-effect statements may only target '{_DENY_ACTION}'; got: {', '.join(invalid)}"

@@ -171,3 +171,22 @@ async def test_direct_service_deny_validation_precedes_mutation(
     assert policy.name == "step-policy"
     assert policy.statements == []
     session.commit.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("update", [False, True])
+async def test_direct_service_non_string_deny_actions_raise_validation_error(
+    policy_client: tuple[TestClient, PolicyService, AsyncMock], *, update: bool
+) -> None:
+    """Malformed deny actions surface as DenyEffectNotAllowedError, not TypeError."""
+    _, service, session = policy_client
+    policy = await service.get_policy(uuid4())
+    statements: list[dict[str, Any]] = [{"effect": "deny", "actions": [None], "scope": "any"}]
+    with pytest.raises(DenyEffectNotAllowedError, match="must be strings"):
+        if update:
+            await service.update_policy(policy.id, name="renamed-policy", description="changed", statements=statements)
+        else:
+            await service.create_policy("invalid-deny", statements)
+    assert policy.name == "step-policy"
+    assert policy.statements == []
+    session.commit.assert_not_called()

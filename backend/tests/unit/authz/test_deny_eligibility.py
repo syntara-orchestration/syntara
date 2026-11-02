@@ -57,6 +57,23 @@ def test_allow_statements_and_empty_input_are_unchanged() -> None:
     assert validate_deny_statements([{"effect": "allow", "actions": ["policy:delete"], "scope": "self"}]) is None
 
 
+@pytest.mark.parametrize(
+    ("actions", "bad"),
+    [
+        ([None], "None"),
+        ([123], "123"),
+        (["step_type:write", None], "None"),
+        (["workflow_node:write", 42], "42"),
+    ],
+)
+def test_non_string_actions_are_rejected(actions: list[Any], bad: str) -> None:
+    statements = [{"effect": "deny", "actions": actions, "scope": "any"}]
+    error = validate_deny_statements(statements)
+    assert error is not None
+    assert "must be strings" in error
+    assert bad in error
+
+
 def test_every_statement_is_checked() -> None:
     statements = [
         {"effect": "allow", "actions": ["policy:delete"]},

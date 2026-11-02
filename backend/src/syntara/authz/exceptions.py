@@ -160,6 +160,5 @@ class DenyEffectNotAllowedError(SyntaraError):
     """Raised when a deny statement targets an ineligible action or scope."""
 
 
-@fastapi_exception(handler="syntara.authz.exceptions._invalid_action_handler")
 class InvalidNodeKindError(InvalidResourceActionError):
     """Raised when step-type policy selectors are invalid."""
