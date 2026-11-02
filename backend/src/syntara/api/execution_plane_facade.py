@@ -59,6 +59,11 @@ from syntara.execution_plane.client import (
     ExecutionPlaneRejectedError,
     ExecutionPlaneUnavailableError,
 )
+from syntara.execution_plane.clusters import (
+    ClusterRegistrationCreate,
+    register_cluster,
+    standalone_cluster_resource_key,
+)
 from syntara.execution_plane.targets import (
     ExecutionTargetCreate,
     ExecutionTargetDeleteAccepted,
@@ -185,6 +190,32 @@ class WorkItemFacadeRead(BaseModel):
     completed_at: datetime | None = None
 
 
+class ClusterFacadeRead(BaseModel):
+    """Safe cluster fields available to AO's authorized management API."""
+
+    id: UUID
+    source_integration_id: UUID | None = None
+    name: str
+    endpoint: str
+    status: str
+    status_message: str | None = None
+    enabled: bool
+    is_default: bool
+    labels: dict[str, str]
+    project_ids: list[UUID] | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ClusterListResponse(BaseModel):
+    """Paginated list response for clusters."""
+
+    resources: list[ClusterFacadeRead]
+    next: str | None = None
+    prev: str | None = None
+    total: int | None = None
+
+
 @asynccontextmanager
 async def _target_client() -> AsyncIterator[ExecutionPlaneHttpClient]:
     """Translate domain failures while keeping service-auth failures private."""
@@ -266,6 +297,99 @@ async def delete_execution_target(target_id: UUID) -> ExecutionTargetDeleteAccep
     async with _target_client() as client:
         await delete_target(client, target_id)
     return ExecutionTargetDeleteAccepted(id=target_id)
+
+
+@router.post(
+    "/clusters",
+    operation_id="create_cluster",
+    summary="Register an execution cluster",
+    status_code=status.HTTP_201_CREATED,
+    description=(
+        "Register a standalone execution cluster (and its default execution target) through EP commands. "
+        "The registration is keyed by the cluster name: re-posting the same name re-applies the same "
+        "desired state idempotently. The credential must already exist in AO and be able to manage "
+        "the cluster. Replaces the direct EP ClusterProvision calls the Konflux e2e used to make."
+    ),
+    responses={
+        502: {"description": "Invalid Execution Plane response"},
+        503: {"description": "Execution Plane unavailable"},
+        201: {
+            "description": "Registered cluster",
+            "headers": {"Location": {"description": "AO cluster detail path", "schema": {"type": "string"}}},
+        },
+    },
+    # Clusters are the parent resource of execution targets; a dedicated
+    # "cluster" RBAC resource type is a followup once role conventions catch up.
+    dependencies=[Depends(PermissionChecker("execution_target", "create"))],
+)
+async def create_cluster(data: ClusterRegistrationCreate, response: Response) -> ClusterFacadeRead:
+    """Register a standalone cluster and its default target through EP commands."""
+    resource_key = standalone_cluster_resource_key(data.name)
+    async with _target_client() as client:
+        cluster = await register_cluster(
+            client,
+            resource_key=resource_key,
+            name=data.name,
+            endpoint=data.endpoint,
+            namespace=data.namespace,
+            credential_ref=data.credential_ref,
+            ca_certificate=data.ca_certificate,
+            labels=data.labels,
+            enabled=data.enabled,
+        )
+        read = ClusterFacadeRead.model_validate(cluster)
+    response.headers["Location"] = f"/api/execution_plane/v1/clusters/{read.id}"
+    logger.info("Registered execution cluster", cluster_id=str(read.id), name=read.name)
+    return read
+
+
+@router.get(
+    "/clusters",
+    operation_id="list_clusters",
+    summary="List execution clusters",
+    description=(
+        "Retrieve registered execution clusters. Filters use field=value or field[operator]=value; "
+        "EP validates fields and operators. Keep filters, sort, and limit unchanged when following "
+        "opaque cursors."
+    ),
+    responses={
+        502: {"description": "Invalid Execution Plane response"},
+        503: {"description": "Execution Plane unavailable"},
+    },
+    dependencies=[Depends(PermissionChecker("execution_target", "read"))],
+)
+async def list_clusters(
+    request: Request,
+    params: Annotated[BaseListParams, Query()],
+) -> ClusterListResponse:
+    """Read registered execution clusters from EP after AO permission checks."""
+    filters = {
+        key: value for key, value in request.query_params.multi_items() if key not in BaseListParams.model_fields
+    }
+    try:
+        async with ExecutionPlaneHttpClient() as client:
+            page = await client.list_clusters(
+                limit=params.limit,
+                filters=filters or None,
+            )
+        resources = [ClusterFacadeRead.model_validate(item) for item in page["resources"]]
+    except ExecutionPlaneUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Execution Plane unavailable",
+        ) from exc
+    except (ValidationError, KeyError, TypeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Invalid Execution Plane response",
+        ) from exc
+    logger.info("Listed execution clusters", count=len(resources))
+    return ClusterListResponse(
+        resources=resources,
+        next=page.get("next"),
+        prev=page.get("prev"),
+        total=page.get("total"),
+    )
 
 
 @router.get(
