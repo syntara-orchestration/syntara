@@ -194,3 +194,62 @@ async def test_sensitive_unknown_error_is_terminal_and_sanitized(publisher: Simp
         assert error.value.details[0]["output"]["delivery_status"] == "not_sent"
     finally:
         await _cleanup(publisher)
+
+
+@pytest.mark.asyncio
+async def test_cancellation_while_waiting_to_enqueue_prevents_later_send(publisher: SimpleNamespace) -> None:
+    waiting = asyncio.Event()
+    available = asyncio.Event()
+    enqueued = asyncio.Event()
+
+    async def send(*args: object, **kwargs: object) -> asyncio.Future[RecordMetadata]:
+        waiting.set()
+        await available.wait()
+        enqueued.set()
+        return cast("asyncio.Future[RecordMetadata]", publisher.future)
+
+    publisher.producer.send.side_effect = send
+    task = asyncio.create_task(module.execute_kafka_publish_activity(publisher.inputs, None, "project"))
+    try:
+        await asyncio.wait_for(waiting.wait(), timeout=1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        available.set()
+        await asyncio.sleep(0)
+        assert not enqueued.is_set()
+        assert not publisher.future.cancelled()
+    finally:
+        await _cleanup(publisher)
+
+
+@pytest.mark.asyncio
+async def test_startup_timeout_is_distinct_from_worker_capacity(publisher: SimpleNamespace) -> None:
+    ready = asyncio.Event()
+    publisher.producer.start.side_effect = ready.wait
+    publisher.inputs[ENGINE_TIMEOUT_SECONDS_KEY] = 0.03
+    try:
+        with pytest.raises(ApplicationError) as error:
+            await module.execute_kafka_publish_activity(publisher.inputs, None, "project")
+        assert error.value.type == "kafka_timeout"
+        assert error.value.details[0]["output"]["delivery_status"] == "not_sent"
+        publisher.producer.send.assert_not_awaited()
+    finally:
+        ready.set()
+        await _cleanup(publisher)
+
+
+@pytest.mark.asyncio
+async def test_pending_delivery_holds_capacity_for_subsequent_invocation(publisher: SimpleNamespace) -> None:
+    publisher.inputs[ENGINE_TIMEOUT_SECONDS_KEY] = 0.03
+    try:
+        with pytest.raises(ApplicationError) as first:
+            await module.execute_kafka_publish_activity(publisher.inputs, None, "project")
+        assert first.value.details[0]["output"]["delivery_status"] == "unconfirmed"
+        with pytest.raises(ApplicationError) as second:
+            await module.execute_kafka_publish_activity(publisher.inputs, None, "project")
+        assert second.value.type == "kafka_capacity_unavailable"
+        assert second.value.details[0]["output"]["delivery_status"] == "not_sent"
+        assert publisher.producer.send.await_count == 1
+    finally:
+        await _cleanup(publisher)

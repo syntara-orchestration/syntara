@@ -122,9 +122,13 @@ async def _publish_once(
         attempt.waiting_for_capacity = False
         await _recheck_connection(parameters, config, project_id)
 
-    attempt.waiting_for_capacity = True
-    async with pool.acquire(reuse_key, identity, lambda: AIOKafkaProducer(**options)) as entry:
+    def admitted(entry: ProducerEntry) -> None:
         attempt.entry = entry
+        attempt.waiting_for_capacity = False
+
+    attempt.waiting_for_capacity = True
+    async with pool.acquire(reuse_key, identity, lambda: AIOKafkaProducer(**options), on_admission=admitted) as entry:
+        attempt.waiting_for_capacity = True
         attempt.send = await pool.submit(entry, parameters.topic, value, key, headers, size, before_send=before_send)
         attempt.waiting_for_capacity = False
         if attempt.send.task is None:
@@ -163,6 +167,8 @@ async def execute_kafka_publish_activity(
         # Retain send ownership and report certainty while keeping cancellation
         # in the normal Temporal cancellation path.
         activity.heartbeat({"delivery_status": "unconfirmed" if attempt.uncertain else "not_sent"})
+        if attempt.send is not None:
+            attempt.send.cancel_before_enqueue()
         raise
     except ApplicationError as exc:
         code = exc.type if exc.type is not None and exc.type.startswith("kafka_") else "kafka_invalid_reference"

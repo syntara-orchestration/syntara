@@ -13,7 +13,7 @@ from typing import Any
 
 import structlog
 from aiokafka.conn import AIOKafkaConnection, collect_hosts
-from aiokafka.errors import IncompatibleBrokerVersion, KafkaError
+from aiokafka.errors import AuthenticationFailedError, IncompatibleBrokerVersion, KafkaError, SaslAuthenticationFailed
 from aiokafka.protocol.api import Request
 from aiokafka.protocol.metadata import MetadataRequest_v4, MetadataRequest_v5
 
@@ -47,10 +47,14 @@ async def _connect(config: KafkaConfiguration, options: dict[str, Any]) -> AIOKa
     for host, port, _ in collect_hosts(list(config.bootstrap_servers), randomize=False):
         try:
             return await create_conn(host, port, **options)
-        except (ssl.SSLError, IncompatibleBrokerVersion):
-            # Classified by the caller. Both subclass the fallback errors below.
+        except (ssl.SSLError, IncompatibleBrokerVersion, AuthenticationFailedError, SaslAuthenticationFailed):
+            # Classified by the caller; do not retry terminal authentication or TLS failures.
             raise
-        except (OSError, KafkaError):
+        except (OSError, KafkaError) as exc:
+            # Fallback must not turn an unclassified terminal broker error
+            # into a retryable connection failure for Publish.
+            if isinstance(exc, KafkaError) and not exc.retriable:
+                raise
             continue
     return None
 

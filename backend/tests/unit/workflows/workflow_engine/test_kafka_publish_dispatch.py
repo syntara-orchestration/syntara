@@ -8,6 +8,7 @@ import pytest
 from temporalio import workflow
 from temporalio.exceptions import ApplicationError
 
+from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.activities.kafka_publish_connection import prepare_kafka_publish
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode
@@ -27,6 +28,7 @@ def dispatch(monkeypatch: pytest.MonkeyPatch) -> tuple[OrchestratorWorkflow, Asy
     engine._project_id = "project"
     engine._runtime_settings = {}
     engine._secret_values = set()
+    engine.node_inputs = {}
     monkeypatch.setattr(workflow, "now", lambda: datetime(2026, 1, 1, tzinfo=UTC))
     call = AsyncMock()
     monkeypatch.setattr(workflow, "execute_activity", call)
@@ -76,4 +78,18 @@ async def test_stored_destination_template_cannot_bypass_validation(
             node, {**PARAMETERS, "topic": "resolved-topic", "payload": None, "headers": []}, 30
         )
     assert error.value.type == "kafka_invalid_message"
+    call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_missing_template_reference_fails_safely_before_preparation(
+    dispatch: tuple[OrchestratorWorkflow, AsyncMock],
+) -> None:
+    engine, call = dispatch
+    engine.resolver = NamespaceResolver()
+    engine.loop_body_map = {}
+    with pytest.raises(ApplicationError) as error:
+        await engine._dispatch_kafka_publish(ActivityNode("publish", "kafka_publish", PARAMETERS), None, 30)
+    assert error.value.type == "kafka_invalid_message"
+    assert error.value.details[0]["output"]["delivery_status"] == "not_sent"
     call.assert_not_awaited()

@@ -88,6 +88,8 @@ record. `unconfirmed` means delivery may have happened or cannot be ruled out.
 An earlier uncertain attempt is not erased by a later pre-send failure. After
 worker loss, retries conservatively retain uncertainty without a delivery ledger.
 Errors omit message/key/header values, credentials and raw broker exception text.
+Kafka SDK diagnostics are sanitized at application log sinks, including when
+debug logging is enabled, because protocol dumps can contain record bytes.
 
 Cancellation uses existing workflow/activity states and stops new action work
 once observed. A queued send may still complete after cancellation or timeout.
@@ -111,6 +113,12 @@ once, using existing credential encryption/scrubbing in Temporal history. It
 never falls back to the integration's management credential. SSL or explicitly
 opted-in PLAINTEXT connections can omit a runtime credential under the shared
 Kafka connection rules.
+
+Saving a workflow checks Integration visibility and runtime credential
+compatibility. Preparation reads the revision and credential within one database
+snapshot so concurrent rotation cannot associate a secret with the wrong
+producer revision. Preparation also heartbeats for cancellation and receives the
+original invocation deadline on every retry, including after queueing.
 
 Automatic send retries keep that secret version. A later invocation resolves
 the latest version. Before another action send, Publish checks current resource
@@ -171,3 +179,13 @@ external Kafka messages.
 The performance team validates the existing under-50-ms p95 target with
 `acks=all` for messages under 1 MB. Functional tests and these operating defaults
 do not constitute that benchmark.
+
+## Backend validation
+
+The ordinary integration suite starts a disposable KRaft broker through
+testcontainers. It checks exact JSON/key/header bytes, confirmed missing topics,
+disabled implicit topic creation, and lower broker message limits. Temporal
+integration scenarios exercise automatic retries, `max_retries=0`, terminal
+authorization failures, frozen inputs and downstream execution. The opt-in
+`test_kafka_publish_live.py` additionally exercises the root Compose SASL/TLS
+fixture (`SYNTARA_KAFKA_PUBLISH_LIVE=1`).
