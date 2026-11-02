@@ -412,6 +412,20 @@ def test_override_replaces_resolved_value() -> None:
     assert resolved == {"code": "echo fixed", "other": "kept"}
 
 
+def test_override_replaces_value_resolved_from_previous_step() -> None:
+    """AC-14: override an expression-resolved value while preserving other inputs and the definition."""
+    wf = _make_workflow({"input_parameter_overrides": {"step_2": {"code": "echo fixed"}}})
+    wf.resolver.set_namespace("step_1", {"result": "echo from previous step"})
+    original_parameters = {"code": "${step_1.result}", "description": "ran ${step_1.result}"}
+    node = _node(parameters=original_parameters)
+
+    resolved = wf._resolve_node_parameters(node)
+    wf._apply_input_overrides(node, resolved)
+
+    assert resolved == {"code": "echo fixed", "description": "ran echo from previous step"}
+    assert node.parameters == original_parameters
+
+
 def test_override_applies_to_its_own_node_only() -> None:
     """An override for another node must not touch this one's inputs."""
     wf = _make_workflow({"input_parameter_overrides": {"step_9": {"code": "echo fixed"}}})
