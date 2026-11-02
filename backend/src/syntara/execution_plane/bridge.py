@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import TYPE_CHECKING, Annotated
 
 from execution_plane_client.catalog import CommandCatalog
-from execution_plane_client.commands.credentials import CredentialResolution
+from execution_plane_client.commands.results import TransportReceipt
 from execution_plane_client.errors import ProtocolConflict, UnsupportedCommand
-from execution_plane_client.protocol import MessageEnvelope, TransportReceipt
+from execution_plane_client.protocol import MessageEnvelope  # noqa: TC002 — FastAPI resolves this body annotation.
 from fastapi import Depends, HTTPException, Request, status
 from pydantic import ValidationError
 from sqlmodel.ext.asyncio.session import AsyncSession  # noqa: TC002 — FastAPI resolves dependency annotations
@@ -28,7 +28,7 @@ from syntara.workflows.workflow_engine.services.temporal_execution_service impor
 )
 
 if TYPE_CHECKING:
-    from syntara.execution_plane.commands.results import AOCommandResult
+    from execution_plane_client.handlers import HandlingResult
 
 router = SyntaraRouter(prefix="/api/execution_plane/v1", tags=["Execution Plane"])
 catalog = CommandCatalog()
@@ -41,14 +41,13 @@ registry = build_ao_registry()
     dependencies=[NO_PERMISSION],
     operation_id="receive_execution_plane_command",
     summary="Receive an Execution Plane command",
-    response_model=TransportReceipt | CredentialResolution,
 )
 async def receive_execution_plane_command(
     request: Request,
     message: MessageEnvelope,
     session: Annotated[AsyncSession, Depends(get_db)],
     temporal_service: Annotated[TemporalExecutionService | None, Depends(get_temporal_execution_service)],
-) -> TransportReceipt | CredentialResolution:
+) -> TransportReceipt:
     """Authenticate one command, dispatch it through the registry, and return its result."""
     settings = get_settings()
     if (
@@ -62,7 +61,7 @@ async def receive_execution_plane_command(
     try:
         payload = catalog.validate(message)
         handler = registry.get(message.command.command_type, message.command.command_revision)
-        result = await handler.handle(message, payload, AOCommandContext(session, temporal_service))
+        handled = await handler.handle(message, payload, AOCommandContext(session, temporal_service))
     except CommandDependencyUnavailableError:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Temporal is unavailable") from None
     except CommandResourceNotFoundError:
@@ -71,4 +70,13 @@ async def receive_execution_plane_command(
         ) from None
     except (ValidationError, UnsupportedCommand, ProtocolConflict):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Invalid command") from None
-    return cast("AOCommandResult", result).body
+    return _transport_receipt(message, handled)
+
+
+def _transport_receipt(message: MessageEnvelope, handled: HandlingResult) -> TransportReceipt:
+    """Normalize one participant result into the shared receipt contract."""
+    return TransportReceipt(
+        message_id=message.message_id,
+        resource=handled.resource,
+        result=handled.result,
+    )

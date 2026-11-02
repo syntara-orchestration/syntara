@@ -62,9 +62,11 @@ from syntara.execution_plane.client import (
 from syntara.execution_plane.targets import (
     ExecutionTargetCreate,
     ExecutionTargetDeleteAccepted,
+    ExecutionTargetHealthResult,
     ExecutionTargetUpdate,
     create_target,
     delete_target,
+    get_target_health,
     update_target,
 )
 
@@ -238,6 +240,19 @@ async def get_execution_target(target_id: UUID) -> ExecutionTargetFacadeRead:
         if target.id != target_id:
             raise ExecutionPlaneRejectedError
         return target
+
+
+@router.get(
+    "/execution_targets/{target_id}/health",
+    operation_id="get_execution_target_health",
+    summary="Get execution target health",
+    responses={**_TARGET_RESPONSES, 200: {"description": "On-demand execution target health"}},
+    dependencies=[Depends(PermissionChecker("execution_target", "read", resource_id_param="target_id"))],
+)
+async def get_execution_target_health(target_id: UUID) -> ExecutionTargetHealthResult:
+    """Dispatch a target health command and return EP's shallow typed result."""
+    async with _target_client() as client:
+        return await get_target_health(client, target_id)
 
 
 @router.patch(

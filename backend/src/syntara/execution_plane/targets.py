@@ -4,8 +4,9 @@ from typing import Annotated, Literal, Self
 from uuid import UUID, uuid4
 
 from execution_plane_client.commands.base import CommandPayload
+from execution_plane_client.commands.results import TargetHealthCommandResult, TransportReceipt
 from execution_plane_client.commands.targets import KubernetesPlacement as CommandKubernetesPlacement
-from execution_plane_client.commands.targets import TargetDelete, TargetRegister, TargetUpdate
+from execution_plane_client.commands.targets import TargetDelete, TargetHealth, TargetRegister, TargetUpdate
 from fastapi import HTTPException, status
 from pydantic import model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -61,6 +62,16 @@ class ExecutionTargetDeleteAccepted(SQLModel):
     accepted: Literal[True] = True
 
 
+class ExecutionTargetHealthResult(SQLModel):
+    """AO's shallow view of an EP on-demand target health probe."""
+
+    model_config = {"extra": "forbid"}
+
+    healthy: bool
+    message: str | None = None
+    skipped: bool = False
+
+
 class _InstalledCluster(SQLModel):
     """Installed cluster fields used to create targets."""
 
@@ -79,7 +90,9 @@ async def _installed_cluster(client: ExecutionPlaneHttpClient) -> _InstalledClus
     return _InstalledCluster.model_validate(resource)
 
 
-async def _submit_target_command(client: ExecutionPlaneHttpClient, command: CommandPayload, target_id: UUID) -> None:
+async def _submit_target_command(
+    client: ExecutionPlaneHttpClient, command: CommandPayload, target_id: UUID
+) -> TransportReceipt:
     """Require EP to confirm that the command affected the intended target."""
     receipt = await client.submit_command(
         command.to_message(source_id=EP_CLIENT_ID, destination_id=EP_AUDIENCE, client_id=EP_CLIENT_ID)
@@ -91,6 +104,7 @@ async def _submit_target_command(client: ExecutionPlaneHttpClient, command: Comm
     ):
         message = "Execution Plane returned an invalid target receipt"
         raise ExecutionPlaneRejectedError(message)
+    return receipt
 
 
 async def _read_target(client: ExecutionPlaneHttpClient, target_id: UUID) -> dict[str, object]:
@@ -136,3 +150,16 @@ async def update_target(
 async def delete_target(client: ExecutionPlaneHttpClient, target_id: UUID) -> None:
     """Request EP's drain lifecycle; deletion is not immediate."""
     await _submit_target_command(client, TargetDelete(resource_id=target_id), target_id)
+
+
+async def get_target_health(client: ExecutionPlaneHttpClient, target_id: UUID) -> ExecutionTargetHealthResult:
+    """Run an on-demand health probe and return AO's shallow typed result."""
+    receipt = await _submit_target_command(client, TargetHealth(resource_id=target_id), target_id)
+    if not isinstance(receipt.result, TargetHealthCommandResult):
+        message = "Execution Plane returned an invalid target health result"
+        raise ExecutionPlaneRejectedError(message)
+    return ExecutionTargetHealthResult(
+        healthy=receipt.result.healthy,
+        message=receipt.result.message,
+        skipped=receipt.result.skipped,
+    )

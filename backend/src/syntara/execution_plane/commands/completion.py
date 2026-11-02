@@ -7,7 +7,8 @@ import structlog
 from execution_plane_client.commands.base import CommandPayload
 from execution_plane_client.commands.control import Completion
 from execution_plane_client.errors import ProtocolConflict
-from execution_plane_client.protocol import MessageEnvelope, ResourceReference, TransportReceipt
+from execution_plane_client.handlers import HandlingResult
+from execution_plane_client.protocol import MessageEnvelope, ResourceReference
 from sqlmodel import col, select
 from temporalio.exceptions import ApplicationError
 
@@ -16,7 +17,6 @@ from syntara.execution_plane.commands.errors import (
     CommandDependencyUnavailableError,
     CommandResourceNotFoundError,
 )
-from syntara.execution_plane.commands.results import AOCommandResult
 from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.models.execution import Execution
 
@@ -92,7 +92,7 @@ class CompletionCommandHandler:
 
     async def handle(
         self, message: MessageEnvelope, payload: CommandPayload, context: AOCommandContext
-    ) -> AOCommandResult:
+    ) -> HandlingResult:
         """Complete or fail the activity addressed by the originating command."""
         if not isinstance(payload, Completion):
             raise ProtocolConflict
@@ -124,7 +124,4 @@ class CompletionCommandHandler:
             status=payload.status,
         )
         resource = ResourceReference(kind="work_item", resource_id=work_id)
-        return AOCommandResult(
-            resource=resource,
-            body=TransportReceipt(message_id=message.message_id, resource=resource),
-        )
+        return HandlingResult(resource=resource)

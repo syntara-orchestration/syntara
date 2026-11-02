@@ -74,12 +74,25 @@ def harness(monkeypatch):
             CommandCatalog().validate(message)
             target_id = message.command.payload["resource_id"]
             target["id"] = target_id
+            result = (
+                {
+                    "command_type": "execution_target.health",
+                    "command_revision": 1,
+                    **state.get(
+                        "health_result",
+                        {"healthy": True, "message": "probe succeeded", "skipped": False},
+                    ),
+                }
+                if message.command.command_type == "execution_target.health"
+                else None
+            )
             return httpx.Response(
                 200,
                 json={
                     "received": True,
                     "message_id": str(message.message_id),
                     "resource": {"kind": "execution_target", "resource_id": target_id},
+                    "result": result,
                     **state.get("receipt_patch", {}),
                 },
             )
@@ -273,10 +286,42 @@ async def test_detail_returns_authoritative_target_without_credentials(harness):
     assert len(requests) == 1
 
 
+@pytest.mark.asyncio
+async def test_target_health_dispatches_typed_command_and_returns_result(harness):
+    app, requests, _ = harness
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="https://ao.example") as client:
+        response = await client.get(f"{PREFIX}/{TARGET_ID}/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"healthy": True, "message": "probe succeeded", "skipped": False}
+    assert len(requests) == 1
+    assert requests[0].method == "POST"
+    assert requests[0].url.path == "/v1/commands"
+    assert requests[0].headers["authorization"] == "Bearer test-token"
+    command = json.loads(requests[0].content)["command"]
+    assert command["command_type"] == "execution_target.health"
+    assert command["command_revision"] == 1
+    assert command["payload"] == {"resource_id": str(TARGET_ID)}
+
+
+@pytest.mark.asyncio
+async def test_target_health_requires_a_typed_command_result(harness):
+    app, _, state = harness
+    state["receipt_patch"] = {"result": None}
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="https://ao.example") as client:
+        response = await client.get(f"{PREFIX}/{TARGET_ID}/health")
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Invalid Execution Plane response"
+
+
 def test_service_token_can_submit_target_commands():
-    assert {"execution_target.register", "execution_target.update", "execution_target.delete"} <= set(
-        client_module.EP_SCOPES.split()
-    )
+    assert {
+        "execution_target.register",
+        "execution_target.update",
+        "execution_target.delete",
+        "execution_target.health",
+    } <= set(client_module.EP_SCOPES.split())
 
 
 @pytest.mark.parametrize("action", ["create", "update", "delete"])

@@ -356,6 +356,47 @@ paths:
       x-app-permission:
         resource: execution_target
         action: delete
+  /api/execution_plane/v1/execution_targets/{target_id}/health:
+    get:
+      tags:
+        - Execution Plane
+      summary: Get execution target health
+      description: Dispatch a target health command and return EP's shallow typed result.
+      operationId: get_execution_target_health
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: target_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Target Id
+      responses:
+        '200':
+          description: On-demand execution target health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetHealthResult'
+        '404':
+          description: Execution target or installed cluster not found
+        '409':
+          description: Cluster not ready or protected target lifecycle conflict
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: read
   /api/execution_plane/v1/work_items:
     get:
       tags:
@@ -516,10 +557,7 @@ paths:
           content:
             application/json:
               schema:
-                anyOf:
-                  - $ref: '#/components/schemas/TransportReceipt'
-                  - $ref: '#/components/schemas/CredentialResolution'
-                title: Response Receive Execution Plane Command
+                $ref: '#/components/schemas/TransportReceipt'
         '422':
           description: Validation Error
           content:
@@ -583,12 +621,18 @@ components:
         - client_id
       title: CommandScope
       description: Initiating service client; project authorization belongs to the caller.
-    CredentialResolution:
+    CredentialResolveCommandResult:
       properties:
-        message_id:
+        command_type:
           type: string
-          format: uuid
-          title: Message Id
+          const: credential.resolve
+          title: Command Type
+          default: credential.resolve
+        command_revision:
+          type: integer
+          const: 1
+          title: Command Revision
+          default: 1
         credential:
           type: string
           maxLength: 65536
@@ -597,10 +641,9 @@ components:
       additionalProperties: false
       type: object
       required:
-        - message_id
         - credential
-      title: CredentialResolution
-      description: The resolved credential value for one submitted command.
+      title: CredentialResolveCommandResult
+      description: Typed result returned for a credential-resolution command.
     ExecutionTargetCreate:
       properties:
         name:
@@ -715,6 +758,26 @@ components:
         - created_at
       title: ExecutionTargetFacadeRead
       description: Safe target fields available to AO's authorized management API.
+    ExecutionTargetHealthResult:
+      properties:
+        healthy:
+          type: boolean
+          title: Healthy
+        message:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Message
+        skipped:
+          type: boolean
+          title: Skipped
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+        - healthy
+      title: ExecutionTargetHealthResult
+      description: AO's shallow view of an EP on-demand target health probe.
     ExecutionTargetListResponse:
       properties:
         resources:
@@ -923,6 +986,36 @@ components:
         - resource_id
       title: ResourceReference
       description: Safe reference from a command to a participant-owned resource.
+    TargetHealthCommandResult:
+      properties:
+        command_type:
+          type: string
+          const: execution_target.health
+          title: Command Type
+          default: execution_target.health
+        command_revision:
+          type: integer
+          const: 1
+          title: Command Revision
+          default: 1
+        healthy:
+          type: boolean
+          title: Healthy
+        message:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Message
+        skipped:
+          type: boolean
+          title: Skipped
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+        - healthy
+      title: TargetHealthCommandResult
+      description: Typed result returned for an execution-target health command.
     TransportReceipt:
       properties:
         received:
@@ -938,6 +1031,18 @@ components:
           anyOf:
             - $ref: '#/components/schemas/ResourceReference'
             - type: 'null'
+        result:
+          anyOf:
+            - oneOf:
+                - $ref: '#/components/schemas/CredentialResolveCommandResult'
+                - $ref: '#/components/schemas/TargetHealthCommandResult'
+              discriminator:
+                propertyName: command_type
+                mapping:
+                  credential.resolve: '#/components/schemas/CredentialResolveCommandResult'
+                  execution_target.health: '#/components/schemas/TargetHealthCommandResult'
+            - type: 'null'
+          title: Result
       additionalProperties: false
       type: object
       required:

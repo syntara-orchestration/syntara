@@ -62,7 +62,7 @@ spec:
     - name: ep-git-url
       value: https://github.com/syntara-orchestration/syntara-execution-plane.git
     - name: ep-revision
-      value: AAP-97911
+      value: AAP-98627
   pipelineRef:
     params:
       - name: name

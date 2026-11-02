@@ -47,7 +47,7 @@ def credential_command() -> MessageEnvelope:
 
 
 @pytest.mark.asyncio
-async def test_credential_command_returns_typed_correlated_resolution(
+async def test_credential_command_returns_typed_correlated_transport_receipt(
     callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     app, _ = callback
@@ -64,7 +64,16 @@ async def test_credential_command_returns_typed_correlated_resolution(
         response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
 
     assert response.status_code == 200, response.text
-    assert response.json() == {"message_id": str(message.message_id), "credential": "resolved-token"}
+    assert response.json() == {
+        "received": True,
+        "message_id": str(message.message_id),
+        "resource": None,
+        "result": {
+            "command_type": "credential.resolve",
+            "command_revision": 1,
+            "credential": "resolved-token",
+        },
+    }
     assert resolved["credential_ref"] == CredentialResolve.model_validate(message.command.payload).credential_ref
 
 

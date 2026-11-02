@@ -6,7 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid5
 
 import pytest
-from execution_plane_client.protocol import MessageEnvelope, ResourceReference, TransportReceipt
+from execution_plane_client.commands.results import TransportReceipt
+from execution_plane_client.protocol import MessageEnvelope, ResourceReference
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
