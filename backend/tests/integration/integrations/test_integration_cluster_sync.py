@@ -29,7 +29,6 @@ def _openshift_create(credential_id: UUID | None = None) -> IntegrationCreate:
         configuration={
             "integration_type": "openshift",
             "base_url": "https://openshift.example.com:6443",
-            "namespace": "syntara-workers",
         },
         management_credential_id=credential_id,
     )
@@ -57,7 +56,6 @@ async def test_openshift_crud_and_project_assignments_submit_cluster_commands(
             configuration={
                 "integration_type": "openshift",
                 "base_url": "https://other.example.com:6443",
-                "namespace": "other-workers",
             },
         ),
     )

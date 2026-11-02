@@ -750,11 +750,6 @@ export interface components {
        */
       base_url: string
       /**
-       * Namespace
-       * @description Namespace reserved for future execution workloads
-       */
-      namespace: string
-      /**
        * Allow Http
        * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
        * @default false

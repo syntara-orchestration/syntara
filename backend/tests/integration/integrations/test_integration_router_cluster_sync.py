@@ -28,7 +28,6 @@ async def test_create_update_delete_and_recreate_submit_ep_commands(
         "configuration": {
             "integration_type": "openshift",
             "base_url": "https://api.example.com:6443",
-            "namespace": "default",
         },
         "management_credential_id": str(http_bearer_token_credential_id),
         "scope": "global",
@@ -85,7 +84,6 @@ async def test_ep_failure_preserves_ao_update_and_later_reconciliation_applies_i
             "configuration": {
                 "integration_type": "openshift",
                 "base_url": "https://api.example.com:6443",
-                "namespace": "default",
             },
             "management_credential_id": str(http_bearer_token_credential_id),
         },

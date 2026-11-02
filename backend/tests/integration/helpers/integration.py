@@ -68,7 +68,6 @@ class IntegrationFactory:
             configuration = OpenShiftConfiguration(
                 integration_type="openshift",
                 base_url=base_url,
-                namespace="ep-dev-workers",
             )
         else:
             assert_never(integration_type)

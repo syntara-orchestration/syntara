@@ -146,12 +146,6 @@ class OpenShiftConfiguration(IntegrationSecurityMixin):
 
     integration_type: Literal["openshift"] = "openshift"
     base_url: str = Field(description="OpenShift Kubernetes API URL", json_schema_extra={"format": "uri"})
-    namespace: str = Field(
-        min_length=1,
-        max_length=63,
-        pattern=r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
-        description="Namespace reserved for future execution workloads",
-    )
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
