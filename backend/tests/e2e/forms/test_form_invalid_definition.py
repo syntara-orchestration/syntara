@@ -1,4 +1,4 @@
-"""E2E coverage for invalid form-prompt and Form Trigger definitions."""
+"""E2E coverage for invalid Form Prompt and Form Trigger definitions."""
 
 from __future__ import annotations
 
