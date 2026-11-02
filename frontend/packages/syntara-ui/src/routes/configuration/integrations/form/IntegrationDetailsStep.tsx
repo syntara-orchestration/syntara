@@ -21,10 +21,12 @@ import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynTextField } from '../../../../components/forms/SynTextField'
 import { SynSelect } from '../../../../components/SynSelect'
 import { integrationHelp } from '../integrationFieldHelp'
+import { EXECUTION_PLANE_SINGLETON_HELP } from '../integrationFieldHelpText'
 import { PROVIDERS_HIDING_BASE_URL, PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
 
 import { INTEGRATION_TYPE_OPTIONS, PROVIDER_HINT_OPTIONS, type IntegrationFormData } from './integrationFormSchema'
 import { ScopeFields } from './ScopeFields'
+import { useOpenShiftIntegrationExists } from './useOpenShiftIntegrationExists'
 import styles from './WizardSteps.module.css'
 
 function ProviderHintMenuToggle({
@@ -107,12 +109,14 @@ function IntegrationTypeSelect({
   onOpenChange,
   onSelect,
   renderToggle,
+  isOpenShiftDisabled,
 }: Readonly<{
   value: string
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   onSelect: (value: string) => void
   renderToggle: (toggleRef: Ref<MenuToggleElement>) => ReactNode
+  isOpenShiftDisabled: boolean
 }>) {
   return (
     <SynSelect
@@ -127,11 +131,19 @@ function IntegrationTypeSelect({
       shouldFocusToggleOnSelect
     >
       <SelectList>
-        {INTEGRATION_TYPE_OPTIONS.map((opt) => (
-          <SelectOption key={opt.value} value={opt.value}>
-            {opt.label}
-          </SelectOption>
-        ))}
+        {INTEGRATION_TYPE_OPTIONS.map((opt) => {
+          const isDisabled = opt.value === IntegrationTypeEnum.OPENSHIFT && isOpenShiftDisabled
+          return (
+            <SelectOption
+              key={opt.value}
+              value={opt.value}
+              isDisabled={isDisabled}
+              description={isDisabled ? EXECUTION_PLANE_SINGLETON_HELP : undefined}
+            >
+              {opt.label}
+            </SelectOption>
+          )
+        })}
       </SelectList>
     </SynSelect>
   )
@@ -281,6 +293,7 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
   })
   const [isTypeOpen, setIsTypeOpen] = useState(false)
   const [isProviderOpen, setIsProviderOpen] = useState(false)
+  const { exists: openShiftExists } = useOpenShiftIntegrationExists()
 
   const isLLM = integrationType === IntegrationTypeEnum.LLM_PROVIDER
   const isAAP = integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
@@ -332,9 +345,11 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
               value={field.value}
               isOpen={isTypeOpen}
               onOpenChange={setIsTypeOpen}
+              isOpenShiftDisabled={openShiftExists}
               onSelect={(value) => {
                 const validType = INTEGRATION_TYPE_OPTIONS.find((opt) => opt.value === value)
                 if (!validType) return
+                if (validType.value === IntegrationTypeEnum.OPENSHIFT && openShiftExists) return
                 onTypeChange(validType.value)
                 setIsTypeOpen(false)
               }}

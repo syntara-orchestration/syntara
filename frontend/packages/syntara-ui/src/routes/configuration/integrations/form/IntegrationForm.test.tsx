@@ -48,6 +48,16 @@ vi.mock('../../../access/useAllProjects', () => {
   return { useAllProjects: projectsMock, useSelectableProjects: projectsMock }
 })
 
+vi.mock('./useOpenShiftIntegrationExists', () => ({
+  useOpenShiftIntegrationExists: () => ({
+    exists: false,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+  OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY: ['openshift-integration-exists'],
+}))
+
 vi.mock('../../../builder/components/CredentialSelector', () => ({
   CredentialSelector: ({
     label,

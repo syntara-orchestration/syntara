@@ -11,6 +11,7 @@ import { detachPromise } from '../../../../utils/detachPromise'
 import { useProjectAssignmentSync } from '../useProjectAssignmentSync'
 
 import type { IntegrationFormData } from './integrationFormSchema'
+import { OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY } from './useOpenShiftIntegrationExists'
 
 type UseCreateIntegrationOptions = {
   handleError: ReturnType<typeof useFormMutationErrorHandler>
@@ -59,6 +60,8 @@ export function useCreateIntegration({ handleError, onBeforeNavigate }: UseCreat
                 discovered_models: discoveredModels ?? null,
               },
             })
+
+            await queryClient.invalidateQueries({ queryKey: OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY })
 
             if (formData.scope === 'project' && formData.project_ids.length > 0 && created.id) {
               const result = await syncAssignments(created.id, [], formData.project_ids)

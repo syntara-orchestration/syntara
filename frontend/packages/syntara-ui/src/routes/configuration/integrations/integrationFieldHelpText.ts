@@ -3,6 +3,9 @@
 export const INTEGRATION_TYPE_HELP =
   'Registers a connection to an external service. MCP servers expose tools for agent workflows. LLM providers supply models. Automation platform integrations verify gateway connectivity.'
 
+/** Shown on the disabled Execution plane infrastructure type option when one already exists. */
+export const EXECUTION_PLANE_SINGLETON_HELP = 'Only one Execution plane infrastructure integration is supported.'
+
 export const NAME_HELP =
   'A unique name that identifies this integration. Use a name that describes the service or environment, such as "Production MCP" or "Dev LLM Gateway."'
 
