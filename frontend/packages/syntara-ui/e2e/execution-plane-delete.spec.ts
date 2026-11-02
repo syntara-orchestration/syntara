@@ -45,8 +45,7 @@ test.describe('Execution Plane — delete execution target', { tag: '@pr-check' 
   test('deletes from the list and treats 202 as success', async ({ app }) => {
     const name = buildUniqueName('e2e-et-del')
     const created = await createExecutionTargetViaApi(app, { name })
-    expect(created, 'Failed to create execution target via API').toBeTruthy()
-    const targetId = created!.id
+    const targetId = created.id
 
     try {
       await app.goto(toAppUrl(LIST_URL))
@@ -69,8 +68,7 @@ test.describe('Execution Plane — delete execution target', { tag: '@pr-check' 
   test('deletes from the detail page and navigates to the list', async ({ app }) => {
     const name = buildUniqueName('e2e-et-del-detail')
     const created = await createExecutionTargetViaApi(app, { name })
-    expect(created, 'Failed to create execution target via API').toBeTruthy()
-    const targetId = created!.id
+    const targetId = created.id
 
     try {
       await app.goto(toAppUrl(`/execution-plane/${targetId}`))
