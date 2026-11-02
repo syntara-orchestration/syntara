@@ -30,12 +30,14 @@ from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
+from syntara.credentials.lib.kafka_connection import kafka_credential_required
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.eventstreams.adapters.subscribe_parameters import validate_event_subscribe_parameters
 from syntara.eventstreams.audit.subscription_lifecycle import EventSubscriptionLifecycleEvent
 from syntara.eventstreams.services.subscription_service import EventSubscriptionService
-from syntara.integrations.models.integration import Integration
+from syntara.integrations.models.integration import Integration, IntegrationType
+from syntara.integrations.models.integration_configuration import KafkaConfiguration
 from syntara.integrations.services.integration_service import IntegrationService
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
@@ -78,6 +80,7 @@ from syntara.workflows.validators import (
     workflow_validator,
 )
 from syntara.workflows.validators.workflow_definition import collect_event_subscribe_config_findings
+from syntara.workflows.workflow_engine.models.kafka_publish import KafkaPublishParameters
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 if TYPE_CHECKING:
@@ -488,6 +491,46 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         # early-return — it would otherwise be silently skipped if a trigger ever
         # carried no credential. It self-guards when no such trigger exists.
         await self._validate_event_subscribe_bindings(workflow_definition)
+        await self._validate_kafka_publish_bindings(workflow_definition)
+
+    async def _validate_kafka_publish_bindings(self, workflow_definition: dict[str, Any]) -> None:
+        """Apply shared visibility and credential rules before binding a Publish node."""
+        configs = [
+            KafkaPublishParameters.model_validate(node.get("parameters", {}))
+            for node in workflow_definition.get("nodes", [])
+            if node.get("type") == NodeType.KAFKA_PUBLISH
+        ]
+        if not configs:
+            return
+        visible_ids = None if self.is_cert_authenticated else await self._resolve_visible_integration_ids()
+        integration_service = IntegrationService(self.session, self.user)
+        for config in configs:
+            integration_id = UUID(config.integration_id)
+            if visible_ids is not None and integration_id not in visible_ids:
+                msg = "One or more selected Integrations are not visible to the current user"
+                raise SafeValueError(msg)
+            integration = await self.session.get(Integration, integration_id)
+            if (
+                integration is None
+                or not integration.enabled
+                or integration.integration_type != IntegrationType.KAFKA
+                or not isinstance(integration.configuration, KafkaConfiguration)
+            ):
+                msg = "One or more Kafka Publish resource references are unavailable"
+                raise SafeValueError(msg)
+            if config.credential_id is None:
+                if kafka_credential_required(integration.configuration.security_protocol):
+                    msg = "Kafka Publish requires a runtime Kafka credential for SASL_SSL"
+                    raise SafeValueError(msg)
+                continue
+            credential_id = UUID(config.credential_id)
+            credential = await self.session.get(Credential, credential_id)
+            if credential is None or not credential.enabled:
+                msg = "One or more Kafka Publish resource references are unavailable"
+                raise SafeValueError(msg)
+            await integration_service._validate_credential_type(  # noqa: SLF001 -- reuse shared compatibility rules
+                IntegrationType.KAFKA, credential_id
+            )
 
     async def _validate_event_subscribe_bindings(self, workflow_definition: dict[str, Any]) -> None:
         """Apply actor-facing Integration visibility and runtime credential compatibility."""

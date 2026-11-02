@@ -1,8 +1,10 @@
 """Resolve a Publish snapshot and recheck its resource availability before sends."""
 
 import asyncio
+import contextlib
 import hashlib
 import json
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -26,6 +28,7 @@ from syntara.integrations.lib.kafka_connection import approved_broker_addresses
 from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
+from syntara.workflows.workflow_engine.activities.common import HEARTBEAT_STOP_MONITOR
 from syntara.workflows.workflow_engine.activities.credential_resolution_activity import _resolve_single_credential
 from syntara.workflows.workflow_engine.activities.integration_scope_activity import _validate_integrations
 from syntara.workflows.workflow_engine.activities.kafka_publish_errors import (
@@ -34,7 +37,10 @@ from syntara.workflows.workflow_engine.activities.kafka_publish_errors import (
     publish_failure,
 )
 from syntara.workflows.workflow_engine.constants import TEMPORAL_PAYLOAD_MAX_BYTES
-from syntara.workflows.workflow_engine.models.kafka_publish import KafkaPublishParameters
+from syntara.workflows.workflow_engine.models.kafka_publish import (
+    KAFKA_PUBLISH_HEARTBEAT_SECONDS,
+    KafkaPublishParameters,
+)
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 from syntara.workflows.workflow_engine.utils.temporal_argument_size import temporal_argument_size
 
@@ -116,21 +122,40 @@ async def check_publish_topic(config: KafkaConfiguration, credentials: dict[str,
             if item[0]:
                 error_type = for_code(item[0])
                 raise error_type
+            _check_partitions(item[3])
             return
         fail_publish("kafka_metadata_unavailable", retryable=True)
     finally:
         await _close(connection)
 
 
+def _check_partitions(partitions: list[tuple[Any, ...]]) -> None:
+    if not partitions:
+        fail_publish("kafka_metadata_unavailable", retryable=True)
+    for partition in partitions:
+        if partition[0]:
+            raise for_code(partition[0])
+
+
 @activity.defn(name=ActivityName.KAFKA_PUBLISH_PREPARE)
 async def prepare_kafka_publish(
-    parameters: dict[str, Any], project_id: str, timeout_seconds: float = 30
+    parameters: dict[str, Any], project_id: str, timeout_seconds: float = 30, deadline: str | None = None
 ) -> dict[str, Any]:
     """Resolve secrets once per logical invocation; Temporal encrypts this result."""
+    heartbeat = asyncio.create_task(_preparation_heartbeat())
     try:
+        if deadline is not None:
+            timeout_seconds = min(
+                timeout_seconds, (datetime.fromisoformat(deadline) - datetime.now(UTC)).total_seconds() - 0.1
+            )
+            if timeout_seconds <= 0:
+                fail_publish("kafka_timeout")
         async with asyncio.timeout(timeout_seconds):
             model = KafkaPublishParameters.model_validate(parameters)
             async with _session_factory() as session:
+                # The revision and decrypted fields must describe the same
+                # database snapshot when a credential rotates during preparation.
+                await session.connection(execution_options={"isolation_level": "REPEATABLE READ"})
                 config, revision = await current_publish_resources(session, model, project_id)
                 credentials: dict[str, Any] = {"extra_vars": {}, "_secret_values": []}
                 if model.credential_id is not None:
@@ -159,3 +184,13 @@ async def prepare_kafka_publish(
         code, retryable, _fatal = classify_publish_error(exc)
         error = publish_failure(code, retryable=retryable)
         raise error from None
+    finally:
+        heartbeat.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await heartbeat
+
+
+async def _preparation_heartbeat() -> None:
+    while True:
+        activity.heartbeat({HEARTBEAT_STOP_MONITOR: True, "delivery_status": "not_sent"})
+        await asyncio.sleep(KAFKA_PUBLISH_HEARTBEAT_SECONDS)

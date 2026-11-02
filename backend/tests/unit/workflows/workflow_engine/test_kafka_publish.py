@@ -4,7 +4,7 @@ import asyncio
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
-from aiokafka import TopicPartition
+from aiokafka import TopicPartition, errors
 from aiokafka.structs import RecordMetadata
 from pydantic import ValidationError
 from temporalio.api.common.v1 import Payloads
@@ -204,6 +204,33 @@ async def test_shutdown_wait_does_not_cancel_pending_delivery_or_cleanup() -> No
 
 def test_unknown_errors_do_not_start_automatic_action_retry() -> None:
     assert classify_publish_error(RuntimeError("sensitive broker text")) == ("kafka_unexpected_error", False, False)
+
+
+@pytest.mark.parametrize("error", [errors.NotEnoughReplicasError, errors.NotEnoughReplicasAfterAppendError])
+def test_insufficient_replicas_allow_action_recovery(error: type[Exception]) -> None:
+    assert classify_publish_error(error()) == ("kafka_metadata_unavailable", True, False)
+
+
+@pytest.mark.asyncio
+async def test_cancellation_before_delivery_task_starts_releases_reserved_capacity() -> None:
+    producer = FakeProducer()
+    pool = KafkaPublishPool(1)
+    try:
+        async with pool.acquire("revision", "identity", lambda: cast("AIOKafkaProducer", producer)) as entry:
+            send = await pool.submit(entry, "outcomes", b"null", None, [], 100)
+            send.cancel_before_enqueue()
+            assert send.task is not None
+            with pytest.raises(asyncio.CancelledError):
+                await send.task
+            producer.ack()
+            # A second send proves both the permit and byte accounting were released.
+            next_send = await asyncio.wait_for(pool.submit(entry, "outcomes", b"null", None, [], 100), timeout=1)
+            assert next_send.task is not None
+            await next_send.task
+    finally:
+        if not producer.future.done():
+            producer.ack()
+        await pool.close()
 
 
 @pytest.mark.asyncio

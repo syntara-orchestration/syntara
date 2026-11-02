@@ -63,6 +63,12 @@ _ERROR_RULES: tuple[tuple[tuple[type[Exception], ...], str, bool, bool], ...] = 
         False,
     ),
     ((errors.MessageSizeTooLargeError, errors.RecordTooLargeError), "kafka_message_too_large", False, False),
+    (
+        (errors.NotEnoughReplicasError, errors.NotEnoughReplicasAfterAppendError),
+        "kafka_metadata_unavailable",
+        True,
+        False,
+    ),
     ((errors.InvalidTopicError,), "kafka_topic_not_found", False, False),
     (
         (errors.ProducerFenced, errors.InvalidProducerEpoch, errors.OutOfOrderSequenceNumber),

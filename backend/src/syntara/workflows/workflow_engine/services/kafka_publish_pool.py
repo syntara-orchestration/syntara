@@ -45,6 +45,24 @@ class PublishSend:
 
     task: asyncio.Task[RecordMetadata] | None = None
     enqueued: bool = False
+    started: bool = False
+    cancelled: bool = False
+
+    def cancel_before_enqueue(self) -> None:
+        """Stop pre-enqueue work when cancellation is observed by the activity.
+
+        aiokafka's send coroutine can be cancelled before it returns a delivery
+        future. Once it returns, the queued delivery keeps its counted owner.
+        """
+        self.cancelled = True
+        if self.started and not self.enqueued and self.task is not None:
+            self.task.cancel()
+
+    def begin(self) -> None:
+        """Observe cancellation even when it arrived before this task started."""
+        self.started = True
+        if self.cancelled:
+            raise asyncio.CancelledError
 
     @property
     def may_have_delivered(self) -> bool:
@@ -77,7 +95,12 @@ class KafkaPublishPool:
 
     @contextlib.asynccontextmanager
     async def acquire(
-        self, key: str, identity: str, factory: Callable[[], AIOKafkaProducer]
+        self,
+        key: str,
+        identity: str,
+        factory: Callable[[], AIOKafkaProducer],
+        *,
+        on_admission: Callable[[ProducerEntry], None] | None = None,
     ) -> AsyncIterator[ProducerEntry]:
         """Wait for a compatible producer; the caller supplies the deadline."""
         async with self._condition:
@@ -103,6 +126,8 @@ class KafkaPublishPool:
                 await self._condition.wait()
             entry.users += 1
         try:
+            if on_admission is not None:
+                on_admission(entry)
             if entry.ready is not None:
                 await asyncio.shield(entry.ready)
             yield entry
@@ -167,6 +192,7 @@ class KafkaPublishPool:
         size: int,
     ) -> RecordMetadata:
         try:
+            send.begin()
             future = await entry.producer.send(topic, value=value, key=key, headers=headers)
             send.enqueued = True
             return await asyncio.shield(future)

@@ -8,7 +8,7 @@ import asyncio
 import collections
 import copy
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any, ClassVar, cast
 
 from temporalio import workflow
@@ -78,6 +78,13 @@ ALLOWED_TRIGGER_TYPES: set[str] = {
 
 # Marker value for pre-resolved node inputs in test executions
 PRE_RESOLVED_MARKER = "__pre_resolved"
+
+
+def _publish_remaining_budget(deadline: datetime) -> float:
+    remaining = (deadline - workflow.now()).total_seconds()
+    if remaining <= 0:
+        fail_publish("kafka_timeout")
+    return remaining
 
 
 def _parse_items(items: Any) -> Any:  # noqa: ANN401
@@ -1500,11 +1507,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 "namespace": self.resolver.get_complete_namespace(),
             }
         elif node_type == NodeType.KAFKA_PUBLISH:
-            try:
-                KafkaPublishParameters.model_validate(node.parameters)
-                resolved_parameters = self._resolve_node_parameters(node)
-            except (KeyError, ValueError, TypeError):
-                fail_publish("kafka_invalid_message")
+            result = await self._dispatch_kafka_publish(node, None, resolve_timeout(node, self._runtime_settings))
+            return self._process_node_result(node, result)
         else:
             # For all other nodes: standard resolution (Tier 1)
             resolved_parameters = self._resolve_node_parameters(node)
@@ -1658,7 +1662,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             self._scrub_activity_credentials(resolved_parameters)
 
     async def _dispatch_kafka_publish(
-        self, node: ActivityNode, parameters: dict[str, Any], timeout_seconds: int
+        self, node: ActivityNode, parameters: dict[str, Any] | None, timeout_seconds: int
     ) -> dict[str, Any]:
         """Keep preparation, queueing and all Temporal attempts under one deadline."""
         deadline = workflow.now() + timedelta(seconds=KAFKA_PUBLISH_BUDGET_SECONDS)
@@ -1668,19 +1672,22 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             # Validate the stored literal references as well as resolved data.
             # Runtime templating must never bypass destination restrictions.
             KafkaPublishParameters.model_validate(node.parameters)
+            if parameters is None:
+                parameters = self._resolve_node_parameters(node)
+            self.node_inputs[node.id] = copy.deepcopy(parameters)
             compile_publish_message(KafkaPublishParameters.model_validate(parameters))
-            prepare_args = [parameters, self._project_id, min(timeout_seconds, KAFKA_PUBLISH_BUDGET_SECONDS)]
+            remaining = _publish_remaining_budget(deadline)
+            prepare_args = [parameters, self._project_id, min(timeout_seconds, remaining), deadline.isoformat()]
             if temporal_argument_size(prepare_args) > TEMPORAL_PAYLOAD_MAX_BYTES:
                 fail_publish("kafka_arguments_too_large")
-            async with asyncio.timeout(KAFKA_PUBLISH_BUDGET_SECONDS):
+            async with asyncio.timeout(remaining):
                 prepared = await workflow.execute_activity(
                     prepare_kafka_publish,
                     args=prepare_args,
                     activity_id=f"__internal__prepare_kafka_publish_{node.id}",
-                    start_to_close_timeout=timedelta(
-                        seconds=min(timeout_seconds + self._TEMPORAL_MARGIN, KAFKA_PUBLISH_BUDGET_SECONDS)
-                    ),
-                    schedule_to_close_timeout=timedelta(seconds=KAFKA_PUBLISH_BUDGET_SECONDS),
+                    start_to_close_timeout=timedelta(seconds=min(timeout_seconds + self._TEMPORAL_MARGIN, remaining)),
+                    schedule_to_close_timeout=timedelta(seconds=remaining),
+                    heartbeat_timeout=timedelta(seconds=KAFKA_PUBLISH_HEARTBEAT_TIMEOUT_SECONDS),
                     retry_policy=resolve_retry_policy(node, self._runtime_settings),
                 )
                 for secret in prepared.get("_resolved_credentials", {}).get("_secret_values", []):
@@ -1691,9 +1698,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 args = [prepared, node.outputs, self._project_id]
                 if temporal_argument_size(args) > TEMPORAL_PAYLOAD_MAX_BYTES:
                     fail_publish("kafka_arguments_too_large")
-                remaining = (deadline - workflow.now()).total_seconds()
-                if remaining <= 0:
-                    fail_publish("kafka_timeout")
+                remaining = _publish_remaining_budget(deadline)
                 sending = True
                 return cast(
                     "dict[str, Any]",
@@ -1715,7 +1720,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             if isinstance(exc.cause, TemporalTimeoutError):
                 fail_publish("kafka_timeout", uncertain=sending)
             raise
-        except (ValueError, TypeError):
+        except (KeyError, ValueError, TypeError, RecursionError):
             fail_publish("kafka_invalid_message")
         finally:
             self._scrub_activity_credentials(prepared)
