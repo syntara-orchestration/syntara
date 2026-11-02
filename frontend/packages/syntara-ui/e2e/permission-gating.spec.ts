@@ -21,6 +21,7 @@
 import { loginAsUser } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
 import { clickMainNavEntry, expectDockedNavGroupChildLinks, mainNavGroup, mainNavigation } from './helpers/docked-nav'
+import { isExecutionPlaneListReachable } from './helpers/execution-plane'
 import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
@@ -960,6 +961,51 @@ test.describe('Permission gating — Credential actions', () => {
     } finally {
       await deleteCredentialViaApi(app, credential.id)
     }
+  })
+})
+
+// ── Action gating — Execution targets ────────────────────────────────────
+//
+// Backend role conventions: execution_target:read = admin+auditor;
+// execution_target:delete = admin only. Viewer/user cannot load the list at all.
+
+test.describe('Permission gating — Execution target actions', () => {
+  test('auditor: Delete execution target kebab is aria-disabled', async ({ app, auditorApp }) => {
+    test.skip(
+      !(await isExecutionPlaneListReachable(app)),
+      'Execution Plane API is not available in this environment (compose CI does not start execution-plane-api)'
+    )
+
+    const seededName = 'Staging OpenShift'
+    await auditorApp.goto(toAppUrl('/execution-plane'))
+    await expect(auditorApp.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+
+    const emptyState = auditorApp.getByText('No execution targets yet')
+    const row = auditorApp.getByRole('row', { name: new RegExp(seededName) })
+    await expect(row.or(emptyState)).toBeVisible({ timeout: 15_000 })
+
+    if (await emptyState.isVisible()) {
+      return
+    }
+
+    await auditorApp.getByPlaceholder('Filter by name').fill(seededName)
+    await auditorApp.getByRole('button', { name: 'Apply filter' }).click()
+    await expect(row).toBeVisible({ timeout: 15_000 })
+    await openRowKebab(row, /Delete execution target/i)
+    await expect(auditorApp.getByRole('menuitem', { name: /Delete execution target/i })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+  })
+
+  test('viewer: direct URL to Execution Plane list shows access denied', async ({ viewerApp }) => {
+    await viewerApp.goto(toAppUrl('/execution-plane'))
+    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+  })
+
+  test('user: direct URL to Execution Plane list shows access denied', async ({ userApp }) => {
+    await userApp.goto(toAppUrl('/execution-plane'))
+    await expect(userApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
   })
 })
 

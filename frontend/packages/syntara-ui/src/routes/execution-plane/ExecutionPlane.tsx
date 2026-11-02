@@ -15,9 +15,9 @@ import {
   SynListPanelToolbar,
   SynListPanelView,
 } from '../../components/panels/list/SynListPanel'
+import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { LinkCell } from '../../components/table/LinkCell'
-import { useCanI } from '../../hooks/useCanI'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import type { FilterFieldDefinition } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
@@ -26,18 +26,26 @@ import { useDocLink } from '../../utils/docs/useDocLink'
 import { ExecutionPlaneEmptyState } from './ExecutionPlaneEmptyState'
 import { getExecutionPlaneFilterDefinitions } from './executionPlaneFilters'
 import { executionPlaneDefaultSort, executionPlaneTableColumns } from './executionPlaneTableColumns'
+import { buildExecutionTargetDeleteAction } from './executionTargetDeleteAction'
+import { ExecutionTargetDialogs } from './ExecutionTargetDialogs'
 import { ExecutionTargetStatusLabel } from './ExecutionTargetStatusLabel'
 import { getNodeSelectors } from './getNodeSelectors'
 import { NodeSelectorsCell } from './NodeSelectorsCell'
+import { useExecutionTargetActions } from './useExecutionTargetActions'
+import { useExecutionTargetPermissions } from './useExecutionTargetPermissions'
 
 type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
 
 function ExecutionPlaneTableContent({
   rows,
   getSortParams,
+  deleteDialog,
+  permissions,
 }: Readonly<{
   rows: ExecutionTarget[]
   getSortParams: (columnField: string) => ThProps['sort']
+  deleteDialog: { open: (item: ExecutionTarget) => void }
+  permissions: ReturnType<typeof useExecutionTargetPermissions>
 }>) {
   return (
     <>
@@ -52,10 +60,11 @@ function ExecutionPlaneTableContent({
           <Th width={15} sort={getSortParams('status')}>
             Status
           </Th>
-          <Th width={30}>OpenShift node selector</Th>
-          <Th width={15} sort={getSortParams('enabled')}>
+          <Th width={25}>OpenShift node selector</Th>
+          <Th width={10} sort={getSortParams('enabled')}>
             State
           </Th>
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       <Tbody>
@@ -80,6 +89,12 @@ function ExecutionPlaneTableContent({
                 {target.enabled ? 'Enabled' : 'Disabled'}
               </SynLabel>
             </Td>
+            <Td isActionCell>
+              <SynKebabMenu
+                actions={[buildExecutionTargetDeleteAction(target, deleteDialog, permissions)]}
+                aria-label={`Actions for ${target.name}`}
+              />
+            </Td>
           </Tr>
         ))}
       </Tbody>
@@ -89,7 +104,7 @@ function ExecutionPlaneTableContent({
 
 export default function ExecutionPlane() {
   const docLink = useDocLink('executionPlane')
-  const { allowed: canConfigure } = useCanI('create', 'integration')
+  const permissions = useExecutionTargetPermissions()
 
   const {
     cursor,
@@ -119,6 +134,10 @@ export default function ExecutionPlane() {
     }
   )
 
+  const { deleteDialog, handleDelete } = useExecutionTargetActions({
+    onSuccess: () => detachPromise(query.refetch()),
+  })
+
   const results = query.data?.resources ?? []
 
   useCursorReset({
@@ -146,7 +165,7 @@ export default function ExecutionPlane() {
             isEmpty={isEmpty}
             hasActiveFilters={hasActiveFilters}
             onClearAllFilters={handleClearAllFilters}
-            noDataState={<ExecutionPlaneEmptyState canConfigure={canConfigure} />}
+            noDataState={<ExecutionPlaneEmptyState canConfigure={permissions.canCreate} />}
             toolbar={
               !isEmpty || hasActiveFilters ? (
                 <SynListPanelToolbar
@@ -159,12 +178,19 @@ export default function ExecutionPlane() {
             }
             body={
               <SynListPanelTable caption="Execution targets" footer={getFooterProps(query.data)} useFixedLayout={false}>
-                <ExecutionPlaneTableContent rows={results} getSortParams={getSortParams} />
+                <ExecutionPlaneTableContent
+                  rows={results}
+                  getSortParams={getSortParams}
+                  deleteDialog={deleteDialog}
+                  permissions={permissions}
+                />
               </SynListPanelTable>
             }
           />
         </SynListPanel>
       </SynPageBody>
+
+      <ExecutionTargetDialogs deleteDialog={deleteDialog} onDelete={handleDelete} />
     </SynPage>
   )
 }

@@ -28,15 +28,20 @@ import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
 import { SynErrorState } from '../../components/states/SynErrorState'
 import { useQueryState } from '../../components/states/useQueryState'
+import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { SynLink } from '../../components/SynLink'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { getErrorStatus } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
 
+import { buildExecutionTargetDeleteAction } from './executionTargetDeleteAction'
+import { ExecutionTargetDialogs } from './ExecutionTargetDialogs'
 import { ExecutionTargetStatusLabel } from './ExecutionTargetStatusLabel'
 import { getNodeSelectors } from './getNodeSelectors'
 import { NodeSelectorsCell } from './NodeSelectorsCell'
+import { useExecutionTargetActions } from './useExecutionTargetActions'
+import { useExecutionTargetPermissions } from './useExecutionTargetPermissions'
 
 type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
 
@@ -142,6 +147,7 @@ export default function ExecutionTargetDetail() {
   const { executionTargetId }: { executionTargetId?: string } = useParams({ strict: false })
   const navigate = useNavigate()
   const docLink = useDocLink('executionPlane')
+  const permissions = useExecutionTargetPermissions()
   const hasId = Boolean(executionTargetId?.length)
 
   const query = executionPlaneClient.useQuery(
@@ -152,6 +158,10 @@ export default function ExecutionTargetDetail() {
     },
     { enabled: hasId, refetchInterval: 30_000 }
   )
+
+  const { deleteDialog, handleDelete } = useExecutionTargetActions({
+    onSuccess: () => detachPromise(navigate({ to: AppRoute.ExecutionPlane.Root })),
+  })
 
   const target = query.data
   const queryState = useQueryState(query, {
@@ -194,12 +204,20 @@ export default function ExecutionTargetDetail() {
         breadcrumbs={breadcrumbsExecutionTargetDetail(target.name)}
         title={target.name}
         docLink={docLink}
+        toolbar={
+          <SynKebabMenu
+            actions={[buildExecutionTargetDeleteAction(target, deleteDialog, permissions)]}
+            aria-label={`Actions for ${target.name}`}
+          />
+        }
       />
       <SynPageBody>
         <SynPanel isFullHeight isScrollable>
           <ExecutionTargetDetailsBody target={target} />
         </SynPanel>
       </SynPageBody>
+
+      <ExecutionTargetDialogs deleteDialog={deleteDialog} onDelete={handleDelete} />
     </SynPage>
   )
 }
