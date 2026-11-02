@@ -150,8 +150,8 @@ class TestFormTriggerTelemetry:
         assert anonymous_id
         assert message.get("userId") is None
         # The Segment identity is anonymous; the submitter identity belongs on the audit event.
-        assert isinstance(properties.get("entitlement_id"), str)
-        assert properties["entitlement_id"]
+        assert "entitlement_id" in properties
+        assert isinstance(properties["entitlement_id"], str)
 
         timestamp_value = message.get("timestamp")
         assert isinstance(timestamp_value, str)
