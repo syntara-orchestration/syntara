@@ -13,7 +13,7 @@ from syntara_api_client.models import ExecutionRead, WorkflowCreate, WorkflowDef
 from ._helpers import (
     activities_by_id,
     activity_output,
-    assert_and_get_with_502_skip,
+    assert_and_get_response,
     assert_consumer_completed,
     assert_no_executions_for_workflow,
     assert_problem_response,
@@ -140,7 +140,7 @@ def test_repeated_submission_creates_distinct_completed_executions(
         assert activity_output(activities["form"])["response_data"] == _FORM_INPUTS
         assert activity_output(activities["consumer"])["stdout_json"] == _FORM_INPUTS
 
-    executions = assert_and_get_with_502_skip(
+    executions = assert_and_get_response(
         syntara_api.executions.list(additional_params={"workflow_id": str(workflow_id)}, limit=100)
     )
     assert executions.resources is not None
@@ -197,7 +197,7 @@ def test_submission_fails_after_form_trigger_is_removed_from_workflow(
     )
     workflow_id = UUID(str(workflow.id))
 
-    current = assert_and_get_with_502_skip(syntara_api.workflows.get(workflow_id=workflow_id))
+    current = assert_and_get_response(syntara_api.workflows.get(workflow_id=workflow_id))
     updated_definition = current.version.workflow_definition.to_dict()
     updated_definition["triggers"] = [trigger for trigger in updated_definition["triggers"] if trigger["id"] != "form"]
     updated_definition["edges"] = [edge for edge in updated_definition["edges"] if edge["from"] != "form"]
@@ -209,7 +209,7 @@ def test_submission_fails_after_form_trigger_is_removed_from_workflow(
         ),
     )
     assert update_response.status_code == HTTPStatus.OK
-    updated = assert_and_get_with_502_skip(update_response)
+    updated = assert_and_get_response(update_response)
     updated_triggers = updated.version.workflow_definition.to_dict()["triggers"]
     assert [trigger["id"] for trigger in updated_triggers] == ["manual"]
 
