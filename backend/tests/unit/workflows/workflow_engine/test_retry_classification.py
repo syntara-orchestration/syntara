@@ -1366,8 +1366,7 @@ class TestRestoredTerminalOutcomeInTheCompletionPath:
         import asyncio
         from unittest.mock import AsyncMock, patch
 
-        wf = _injectable_workflow()
-        wf.retry_context = _retry("step_3")
+        wf = _injectable_workflow(source_statuses={"step_1": "failed", "step_3": "failed"})
         wf.retry_context = _retry("step_3")
         node = ActivityNode(node_id="step_1", node_type="script", parameters={})
         mock_wf.execute_activity = AsyncMock(
@@ -1449,6 +1448,65 @@ class TestRestoredTerminalOutcomeInTheCompletionPath:
 
 
 @pytest.mark.asyncio
+async def test_restored_unselected_failure_replays_exclusive_recorded_successor(
+    mock_wf: MagicMock,
+) -> None:
+    """Exclusive descendants with a source record are replayed, not skipped.
+
+    Skipping ``east_post`` after restoring ``east`` as failed made a later All
+    converge treat that branch as never-run and evaluate the gate without it.
+    """
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    from syntara.workflows.workflow_engine.graph import WorkflowGraph
+    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("east", {"id": "east", "type": "script", "parameters": {}})
+    backend.add_node("east_post", {"id": "east_post", "type": "script", "parameters": {}})
+    backend.add_node("west", {"id": "west", "type": "script", "parameters": {}})
+    backend.add_node("join", {"id": "join", "type": "converge", "parameters": {"strategy": "all"}})
+    backend.add_edge("east", "east_post", None)
+    backend.add_edge("east_post", "join", None)
+    backend.add_edge("west", "join", None)
+    graph = WorkflowGraph(backend)
+
+    wf = _injectable_workflow(
+        source_statuses={"east": "failed", "east_post": "failed", "west": "failed", "join": "failed"}
+    )
+    wf.retry_context = _retry("west")
+    wf._execute_node = AsyncMock(return_value={"output": {}})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "failed",
+            "input_data": {},
+            "output_data": {"partial": True},
+            "error_details": "east failed",
+            "started_at": None,
+            "completed_at": None,
+        }
+    )
+    node = ActivityNode(node_id="east", node_type="script", parameters={})
+    result = await wf._maybe_restore_retry_output(node, graph)
+    assert result is not None
+
+    async def supplied() -> dict[str, Any]:
+        return wf._process_supplied_result(node, result)
+
+    task = asyncio.create_task(supplied())
+    pending = {node.id: task}
+    await wf._process_completed_task(task, pending, graph)
+
+    assert "east" in wf.failed_nodes
+    assert "east_post" not in wf.skipped_nodes
+    assert "east_post" in pending
+    pending["east_post"].cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await pending["east_post"]
+
+
+@pytest.mark.asyncio
 async def test_a_restored_failure_with_no_output_falls_back_to_the_declared_model(
     mock_wf: MagicMock,
 ) -> None:
@@ -1461,7 +1519,7 @@ async def test_a_restored_failure_with_no_output_falls_back_to_the_declared_mode
     import asyncio
     from unittest.mock import AsyncMock, patch
 
-    wf = _injectable_workflow()
+    wf = _injectable_workflow(source_statuses={"step_1": "failed", "step_3": "failed"})
     wf.retry_context = _retry("step_3")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
     mock_wf.execute_activity = AsyncMock(

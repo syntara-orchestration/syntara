@@ -392,9 +392,10 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         scheduled for a restored skip: the source run never ran them, and scheduling
         them would execute work the retry was meant to skip.
 
-        A restored failure propagates the way a live one does, so an unselected
-        failure still suppresses its downstream nodes instead of letting them run
-        against output that no longer exists.
+        A restored failure propagates the way a live one does, so exclusive
+        descendants that never ran stay suppressed. Descendants that recorded
+        output are still replayed, or a later converge would treat them as
+        skipped and evaluate the gate against the wrong inputs.
         """
         if restored_status == ActivityStatus.SKIPPED.value:
             workflow.logger.info(
@@ -419,6 +420,41 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         if cof:
             self._route_failed_node(node_id, node)
             await self._handle_continued_failure(node_id, node, graph, pending_tasks)
+            return
+        await self._schedule_restorable_unselected_successors(node_id, graph, pending_tasks)
+
+    async def _schedule_restorable_unselected_successors(
+        self,
+        node_id: str,
+        graph: WorkflowGraph,
+        pending_tasks: dict[str, asyncio.Task[Any]],
+    ) -> None:
+        """Replay exclusive descendants that recorded output on an unselected branch.
+
+        A restored unselected failure must not execute downstream work against
+        output that no longer exists. Descendants that already recorded a result
+        still have to be replayed, or a later converge treats them as skipped
+        and evaluates the gate against the wrong set of inputs. Converges are
+        left to the gate: they re-evaluate from the preserved plus new results.
+        """
+        if not self.retry_context:
+            return
+        for successor_id in graph.get_successors(node_id):
+            if (
+                successor_id in self.skipped_nodes
+                or successor_id in self.failed_nodes
+                or successor_id in pending_tasks
+                or self.resolver.has_namespace(successor_id)
+            ):
+                continue
+            successor = graph.get_node(successor_id)
+            if successor.type == NodeType.CONVERGE:
+                continue
+            if not self._should_restore_node(successor_id, graph):
+                continue
+            workflow.logger.info(f"Scheduling restored unselected-branch successor {successor_id} from {node_id}")
+            pending_tasks[successor_id] = asyncio.create_task(self._execute_node(node=successor, graph=graph))
+            self._handle_converge_timeout(successor_id, graph, pending_tasks)
 
     @staticmethod
     def _find_node_for_task(
@@ -1115,6 +1151,11 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                 # let _check_converge_successors handle them.
                 succ_node = graph.get_node(succ_id)
                 if succ_node.type == NodeType.CONVERGE:
+                    continue
+
+                # Retry reuses recorded output on unselected branches. Skipping a
+                # restorable successor here would drop that result before replay.
+                if self.retry_context and self._should_restore_node(succ_id, graph):
                     continue
 
                 if boundary is not None and succ_id not in boundary:
