@@ -41,16 +41,6 @@ _OPTIONAL_FIELD_LABEL = "PRIVATE_OPTIONAL_COUNT_LABEL_97126"
 _FIELD_VALUE = "PRIVATE_APPROVAL_REASON_VALUE_97126"
 
 
-def _form_trigger_segment_event_count() -> int:
-    """Count form-trigger events from the full captured-event list.
-
-    The bundled mock's event-type-only filter is not part of the documented test contract, so
-    filter the unfiltered response client-side for the negative-case baseline.
-    """
-    events = get_segment_events(_SEGMENT_SERVER_URL)
-    return sum(event.get("event") == "form_trigger_submitted" for event in events)
-
-
 def _create_form_trigger_workflow(
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     project_id: UUID,
