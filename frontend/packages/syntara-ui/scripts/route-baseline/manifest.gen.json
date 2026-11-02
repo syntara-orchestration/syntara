@@ -90,6 +90,12 @@
     {
       "kind": "page",
       "parameters": [],
+      "sources": ["appRoute", "router"],
+      "template": "/feature-flag-demo"
+    },
+    {
+      "kind": "page",
+      "parameters": [],
       "sources": ["appRoute", "navigation", "router"],
       "template": "/my-profile"
     },
