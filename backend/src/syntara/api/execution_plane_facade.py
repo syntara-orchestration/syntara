@@ -43,6 +43,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import datetime  # noqa: TC003 — Pydantic resolves model annotations at runtime
+from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 from uuid import UUID  # noqa: TC003 — Pydantic resolves model annotations at runtime
 
@@ -141,10 +142,17 @@ class WorkItemListResponse(BaseModel):
     total: int | None = None
 
 
+class PlacementType(StrEnum):
+    """Discriminator for the Execution Plane placement union."""
+
+    KUBERNETES = "kubernetes"
+    RHEL = "rhel"
+
+
 class KubernetesPlacement(BaseModel):
     """Kubernetes scheduling metadata returned by the Execution Plane."""
 
-    type: Literal["kubernetes"]
+    type: Literal[PlacementType.KUBERNETES]
     namespace: str = Field(min_length=1, max_length=63, pattern=r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
     node_selectors: list[str] = Field(default_factory=list)
     tolerations: list[str] = Field(default_factory=list)
@@ -153,7 +161,7 @@ class KubernetesPlacement(BaseModel):
 class RHELPlacement(BaseModel):
     """RHEL placement marker returned by the Execution Plane."""
 
-    type: Literal["rhel"]
+    type: Literal[PlacementType.RHEL]
 
 
 class ExecutionTargetFacadeRead(BaseModel):
