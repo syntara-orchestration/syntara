@@ -11,7 +11,7 @@ from typing import Any, ClassVar
 from uuid import UUID, uuid4
 
 from pydantic import ConfigDict, model_validator
-from sqlalchemy import Column, Index, Integer, Text, UniqueConstraint, text
+from sqlalchemy import Index, Text, UniqueConstraint, text
 from sqlmodel import DateTime, Field, SQLModel
 
 from syntara.core.constants import FieldLimits
@@ -120,12 +120,6 @@ class Integration(NamedResource, UserOwnedResource, table=True):
         description="Optional credential for admin operations (validation, tool/model discovery)",
     )
 
-    execution_plane_revision: int = Field(
-        default=0,
-        sa_column=Column(Integer, nullable=False, server_default="0"),
-        description="Internal revision for EP cluster commands",
-    )
-
     last_validated_at: datetime | None = Field(
         default=None,
         description="Timestamp of last validation check",
@@ -178,7 +172,6 @@ class Integration(NamedResource, UserOwnedResource, table=True):
             "refresh_error",
             "last_refreshed_at",
             "last_successful_refresh_at",
-            "execution_plane_revision",
         }
     )
 
