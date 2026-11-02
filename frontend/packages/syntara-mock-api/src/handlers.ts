@@ -1978,6 +1978,10 @@ export const handlers = [
     const retainedResultCount = (activityExecutions[executionId] ?? []).filter(
       (activity) => activity.status === MOCK_ACTIVITY_STATUS.COMPLETED && !retryPointSet.has(activity.activity_name)
     ).length
+    const retryDemoIncludesDownstreamStep = executionId === 'exec-retry-demo' && selectedPointIds.includes('step2')
+    const stepCountByPoint = Object.fromEntries(
+      selectedPointIds.map((id) => [id, retryDemoIncludesDownstreamStep && id === 'step2' ? 2 : 1])
+    )
 
     return HttpResponse.json({
       eligible: true,
@@ -1986,8 +1990,8 @@ export const handlers = [
       sanitized_node_ids: [],
       auto_included_node_ids: [],
       sanitized_replacements: {},
-      step_count_by_eligible_point: Object.fromEntries(selectedPointIds.map((id) => [id, 1])),
-      total_step_count: selectedPointIds.length,
+      step_count_by_eligible_point: stepCountByPoint,
+      total_step_count: retryDemoIncludesDownstreamStep ? 2 : selectedPointIds.length,
       retained_result_count: retainedResultCount,
     })
   }),
