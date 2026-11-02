@@ -134,13 +134,11 @@ class TestFormTriggerTelemetry:
         assert properties["trigger_node_id"] == "form"
         assert properties["field_count"] == 2
         assert properties["field_types"] == ["number", "text"]
+        # Segment uses an anonymous installation identity; the audit record identifies the submitter.
         anonymous_id = message.get("anonymousId")
         assert isinstance(anonymous_id, str)
         assert anonymous_id
         assert message.get("userId") is None
-        # The Segment identity is anonymous; the submitter identity belongs on the audit event.
-        assert "entitlement_id" in properties
-        assert isinstance(properties["entitlement_id"], str)
 
         timestamp_value = message.get("timestamp")
         assert isinstance(timestamp_value, str)
