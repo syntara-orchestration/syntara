@@ -6,7 +6,8 @@ storing cluster state in AO. Unlike the Integration sync path
 driven by an Integration row: the caller names the cluster, its endpoint, and an
 existing AO credential that can manage it. This is what lets aap-dev register
 the Kind cluster (and any admin register a standalone cluster) through AO
-instead of posting ClusterProvision straight to the EP API (AAP-100760).
+instead of posting ClusterProvision straight to the EP API (see the
+cluster-registration story tracked on the AO board).
 """
 
 from uuid import NAMESPACE_URL, UUID, uuid5
