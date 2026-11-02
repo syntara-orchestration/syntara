@@ -47,8 +47,6 @@ def _histogram_sample(
 ) -> float:
     """Read a Form Trigger histogram sample from the configured E2E client scrape."""
     response = client.get(_METRICS_URL)
-    if response.status_code == HTTPStatus.NOT_FOUND:
-        pytest.skip("OpenMetrics scrape endpoint is disabled in this E2E environment")
     assert response.status_code == HTTPStatus.OK, f"OpenMetrics scrape returned {response.status_code}: {response.text}"
 
     sample_name = f"{_HISTOGRAM_NAME}_{sample_suffix}"
