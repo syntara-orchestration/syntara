@@ -17,6 +17,7 @@
  */
 import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
+import { createLlmProviderCredential } from './helpers/llm-helpers'
 import { buildUniqueName, clickAddConnectedStep, startWorkflowWithTrigger } from './helpers/workflows'
 import { deleteIntegrationViaApi, type SeededIntegration } from './seeds/resources'
 import { apiRequest, deleteCredentialViaApi, ensureProject } from './utils/api'
@@ -25,23 +26,11 @@ async function ensureLlmCredentialId(app: Page): Promise<string> {
   const project = await ensureProject(app)
   if (!project) throw new Error('Could not ensure project for credential creation')
 
-  const typesResp = await apiRequest(app, 'get', '/credential_types')
-  if (!typesResp.ok()) throw new Error('Could not list credential types')
-  const types = (await typesResp.json()) as { resources?: Array<{ id: string; name: string }> }
-  const llmType = types.resources?.find((t) => t.name === 'LLM Provider')
-  if (!llmType) throw new Error('LLM Provider credential type not found')
-
   const credName = `e2e-llm-models-cred-${Date.now()}`
-  const createResp = await apiRequest(app, 'post', '/credentials', {
-    data: {
-      name: credName,
-      credential_type_id: llmType.id,
-      project_id: project.id,
-      inputs: { api_key: 'sk-e2e-test-key' },
-    },
+  const cred = await createLlmProviderCredential(app, {
+    name: credName,
+    projectId: project.id,
   })
-  if (!createResp.ok()) throw new Error('Could not create LLM credential')
-  const cred = (await createResp.json()) as { id: string }
   return cred.id
 }
 
