@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import time
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -59,20 +58,6 @@ def _histogram_sample(
     return 0.0
 
 
-def _wait_for_metric_count(
-    client: httpx.Client,
-    expected_minimum: float,
-) -> float:
-    """Poll the histogram until it contains at least the expected number of observations."""
-    deadline = time.monotonic() + 15
-    while time.monotonic() < deadline:
-        count = _histogram_sample(client, "count")
-        if count >= expected_minimum:
-            return count
-        time.sleep(0.25)
-    pytest.fail(f"OpenMetrics histogram did not reach {expected_minimum} observations within 15 seconds")
-
-
 def _create_workflow(
     workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
     first_project_id: UUID,
@@ -119,7 +104,7 @@ def test_form_trigger_submission_records_latency_metric(
     )
     assert_consumer_completed(syntara_api, UUID(str(execution.id)))
 
-    after_count = _wait_for_metric_count(client, before_count + 1)
+    after_count = _histogram_sample(client, "count")
     after_sum = _histogram_sample(client, "sum")
     assert after_count >= before_count + 1
     sum_delta_seconds = after_sum - before_sum
