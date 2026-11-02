@@ -519,7 +519,10 @@ export const activityExecutions: Record<string, ActivityExecution[]> = {
       status: 'failed',
       started_at: mockDate.hoursAgo3Plus1s,
       completed_at: mockDate.hoursAgo3Plus2s,
-      input_data: {} as Record<string, unknown>,
+      input_data: {
+        language: 'bash',
+        code: 'echo "Step 2: Starting"\nsleep 1\necho "Step 2: Complete"',
+      } as Record<string, unknown>,
       output_data: null,
       error_details: 'Second Step exited with a non-zero status',
       retry_count: 0,

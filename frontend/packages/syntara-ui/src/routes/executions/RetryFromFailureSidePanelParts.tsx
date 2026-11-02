@@ -50,8 +50,6 @@ type RetryPlanContentProps = Readonly<{
   isError: boolean
   isEmptySelection: boolean
   visiblePoints: RetryPlanPoint[]
-  scopeLabel: string
-  showSinglePointGuidance: boolean
 }>
 
 /** Retry scope controls and the stateful retry plan view. */
@@ -128,8 +126,6 @@ export function RetryPlan({
           isError={activeIsError}
           isEmptySelection={scopeMode === 'selected' && requestedRetryPointIds.length === 0}
           visiblePoints={visiblePoints}
-          scopeLabel={getScopeLabel(scopeMode, requestedRetryPointIds.length)}
-          showSinglePointGuidance={selectablePoints.length === 1}
         />
       </StackItem>
     </Stack>
@@ -204,15 +200,7 @@ function RetryScopeSelector({
   )
 }
 
-function RetryPlanContent({
-  preview,
-  isLoading,
-  isError,
-  isEmptySelection,
-  visiblePoints,
-  scopeLabel,
-  showSinglePointGuidance,
-}: RetryPlanContentProps) {
+function RetryPlanContent({ preview, isLoading, isError, isEmptySelection, visiblePoints }: RetryPlanContentProps) {
   if (isEmptySelection) {
     return (
       <Alert isInline variant="info" title="Choose at least one failure point">
@@ -261,67 +249,49 @@ function RetryPlanContent({
     )
   }
 
-  return (
-    <RetryPlanSummary
-      preview={preview}
-      visiblePoints={visiblePoints}
-      scopeLabel={scopeLabel}
-      showSinglePointGuidance={showSinglePointGuidance}
-    />
-  )
+  return <RetryPlanSummary preview={preview} visiblePoints={visiblePoints} />
 }
 
 type RetryPlanSummaryProps = Readonly<{
   preview: RetryFromFailurePreview
   visiblePoints: RetryPlanPoint[]
-  scopeLabel: string
-  showSinglePointGuidance: boolean
 }>
 
-function RetryPlanSummary({ preview, visiblePoints, scopeLabel, showSinglePointGuidance }: RetryPlanSummaryProps) {
+function RetryPlanSummary({ preview, visiblePoints }: RetryPlanSummaryProps) {
   return (
-    <>
-      <DescriptionList isHorizontal isCompact aria-label="Retry plan summary">
-        <DescriptionListGroup>
-          <DescriptionListTerm>Scope</DescriptionListTerm>
-          <DescriptionListDescription>{scopeLabel}</DescriptionListDescription>
-        </DescriptionListGroup>
-        <DescriptionListGroup>
-          <DescriptionListTerm>Steps to retry</DescriptionListTerm>
-          <DescriptionListDescription>{preview.total_step_count ?? '—'}</DescriptionListDescription>
-        </DescriptionListGroup>
-        <DescriptionListGroup>
-          <DescriptionListTerm>Retry starts at</DescriptionListTerm>
-          <DescriptionListDescription>
-            <div data-testid="retry-starts-at">
-              {visiblePoints.length === 1 ? (
-                <RetryPlanPointLabel point={visiblePoints[0]} />
-              ) : (
-                <List isPlain aria-label="Failure points included in the retry">
-                  {visiblePoints.map((point) => (
-                    <ListItem key={point.id}>
-                      <RetryPlanPointLabel point={point} />
-                    </ListItem>
-                  ))}
-                </List>
-              )}
-            </div>
-          </DescriptionListDescription>
-        </DescriptionListGroup>
-        <DescriptionListGroup>
-          <DescriptionListTerm>Retained results</DescriptionListTerm>
-          <DescriptionListDescription>
-            {getRetainedResultLabel(preview.retained_result_count)}
-          </DescriptionListDescription>
-        </DescriptionListGroup>
-      </DescriptionList>
-      {showSinglePointGuidance && (
-        <Content component={ContentVariants.small}>
-          This retry starts at {visiblePoints[0].name} and reruns {preview.total_step_count ?? '—'}{' '}
-          {preview.total_step_count === 1 ? 'step' : 'steps'}.
-        </Content>
-      )}
-    </>
+    <DescriptionList isHorizontal isCompact aria-label="Retry plan summary">
+      <DescriptionListGroup>
+        <DescriptionListTerm>Steps to retry</DescriptionListTerm>
+        <DescriptionListDescription>
+          <div>
+            <div>{getRetryStepCountLabel(preview.total_step_count)}</div>
+            <Content component={ContentVariants.small}>Includes affected steps and any downstream merge step</Content>
+          </div>
+        </DescriptionListDescription>
+      </DescriptionListGroup>
+      <DescriptionListGroup>
+        <DescriptionListTerm>Retry starts at</DescriptionListTerm>
+        <DescriptionListDescription>
+          <div data-testid="retry-starts-at">
+            {visiblePoints.length === 1 ? (
+              <RetryPlanPointLabel point={visiblePoints[0]} />
+            ) : (
+              <List isPlain aria-label="Failure points included in the retry">
+                {visiblePoints.map((point) => (
+                  <ListItem key={point.id}>
+                    <RetryPlanPointLabel point={point} />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </div>
+        </DescriptionListDescription>
+      </DescriptionListGroup>
+      <DescriptionListGroup>
+        <DescriptionListTerm>Retained results</DescriptionListTerm>
+        <DescriptionListDescription>{getRetainedResultLabel(preview.retained_result_count)}</DescriptionListDescription>
+      </DescriptionListGroup>
+    </DescriptionList>
   )
 }
 
@@ -339,10 +309,9 @@ function getRetainedResultLabel(count: number | undefined): string {
   return `${count} completed ${count === 1 ? 'result' : 'results'} retained`
 }
 
-function getScopeLabel(scopeMode: RetryScopeMode, selectedCount: number): string {
-  if (scopeMode === 'all') return 'All eligible failure points'
-  if (selectedCount === 1) return '1 selected failure point'
-  return `${selectedCount} selected failure points`
+function getRetryStepCountLabel(count: number | undefined): string {
+  if (count === undefined) return 'The number of steps to retry is unavailable.'
+  return `${count} ${count === 1 ? 'step' : 'steps'} will be retried`
 }
 
 export function HowRetryWorks() {
@@ -351,14 +320,22 @@ export function HowRetryWorks() {
       <Title className={styles.sectionTitle} headingLevel="h3" size={TitleSizes.md}>
         How retry works
       </Title>
-      <List>
-        <ListItem>The retry uses the same workflow version as this run.</ListItem>
-        <ListItem>
-          Failed steps and affected downstream steps run again. Completed results outside the selected retry paths are
-          reused, and shared downstream steps count once in the retry total.
-        </ListItem>
-        <ListItem>External side effects from the original run are not undone.</ListItem>
-      </List>
+      <Stack hasGutter>
+        <StackItem>
+          <Content component={ContentVariants.p}>
+            This retry uses the same workflow version as this run, preserving the definition that ran. Nodes outside the
+            selected retry scope will not re-execute. Completed nodes retain their previous result, failed nodes remain
+            failed, and nodes that did not run remain skipped. Nodes in the selected scope will be retried and may
+            repeat external side effects.
+          </Content>
+        </StackItem>
+        <StackItem>
+          <Content component={ContentVariants.p}>
+            To change the parameters for this retry, select the failed node in Run details and choose Edit parameters
+            for retry.
+          </Content>
+        </StackItem>
+      </Stack>
     </>
   )
 }
@@ -368,9 +345,10 @@ type RetryFooterProps = Readonly<{
   onCancel: () => void
   isRetryDisabled: boolean
   isRetryPending: boolean
+  stepCount?: number
 }>
 
-export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending }: RetryFooterProps) {
+export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending, stepCount }: RetryFooterProps) {
   return (
     <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
       <FlexItem>
@@ -381,7 +359,7 @@ export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending
           isDisabled={isRetryDisabled}
           data-testid="retry-from-failure-confirm"
         >
-          Retry run from failure
+          {getRetryButtonLabel(stepCount)}
         </Button>
       </FlexItem>
       <FlexItem>
@@ -391,4 +369,10 @@ export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending
       </FlexItem>
     </Flex>
   )
+}
+
+function getRetryButtonLabel(stepCount: number | undefined): string {
+  if (stepCount === undefined) return 'Retry run from failure'
+  const stepLabel = stepCount === 1 ? 'step' : 'steps'
+  return `Retry ${stepCount} ${stepLabel}`
 }

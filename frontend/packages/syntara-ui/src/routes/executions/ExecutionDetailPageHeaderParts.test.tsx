@@ -120,6 +120,29 @@ describe('ExecutionDetailPageHeaderParts', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
+  it('hides the normal execution actions while retry mode is active', () => {
+    const queryClient = new QueryClient()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetailHeaderToolbar
+          showApprovalActionStrip={false}
+          isApprovalLoading={false}
+          onReviewClick={() => {}}
+          historyCardOpen={false}
+          onToggleHistory={() => {}}
+          onBackToEditor={() => {}}
+          onCopyToEditor={() => {}}
+          isCancellable
+          executionId="exec-123"
+          execution={undefined}
+          isRetryMode
+        />
+      </QueryClientProvider>
+    )
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
   it('renders cancel button when execution is cancellable', () => {
     const queryClient = new QueryClient()
     const execution = {

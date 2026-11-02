@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 
@@ -70,16 +70,26 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByTestId('retry-from-failure-panel')).toHaveFocus()
     expect(screen.getByRole('heading', { name: 'How retry works' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Retry plan' })).toBeInTheDocument()
-    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByText('3 steps will be retried')).toBeInTheDocument()
+    expect(screen.getByText('Includes affected steps and any downstream merge step')).toBeInTheDocument()
     expect(screen.getByText('Second Step')).toBeInTheDocument()
-    expect(screen.getByText('All eligible failure points')).toBeInTheDocument()
     expect(screen.getByText('Script')).toBeInTheDocument()
     expect(screen.getByText('1 completed result retained')).toBeInTheDocument()
-    expect(screen.getByText(/Completed results outside the selected retry paths are reused/)).toBeInTheDocument()
-    expect(screen.getByText('This retry starts at Second Step and reruns 3 steps.')).toBeInTheDocument()
+    expect(
+      screen.getByText(/This retry uses the same workflow version as this run, preserving the definition that ran/)
+    ).toBeInTheDocument()
+    expect(screen.getByText(/Nodes outside the selected retry scope will not re-execute/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/Completed nodes retain their previous result, failed nodes remain failed/)
+    ).toBeInTheDocument()
+    expect(screen.getByText(/nodes that did not run remain skipped/)).toBeInTheDocument()
+    expect(screen.getByText(/may repeat external side effects/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/To change the parameters for this retry, select the failed node in Run details/)
+    ).toBeInTheDocument()
   })
 
-  it('narrows the plan and request to the selected failed node', async () => {
+  it('defaults the retry scope to all eligible failure points', async () => {
     const user = userEvent.setup()
     vi.mocked(useRetryFromFailurePreview).mockReturnValue({
       preview: {
@@ -106,19 +116,35 @@ describe('RetryFromFailureSidePanel', () => {
         isError: false,
       }
     })
-    renderPanel({ selectedNodeId: 'step-2' })
+    renderPanel()
 
-    const retryStartsAt = screen.getByTestId('retry-starts-at')
-    expect(retryStartsAt).toHaveTextContent('Second Step')
-    expect(retryStartsAt).not.toHaveTextContent('First Step')
-    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'All eligible failure points' })).toBeChecked()
+    expect(screen.getByText('5 steps will be retried')).toBeInTheDocument()
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
 
-    expect(mockHandleRetry).toHaveBeenCalledWith(['step-2'])
+    expect(mockHandleRetry).toHaveBeenCalledWith(undefined, {})
+  })
+
+  it('submits saved input overrides with the retry request', async () => {
+    const user = userEvent.setup()
+    const overrides = { 'step-2': { endpoint: 'https://retry.example' } }
+    renderPanel({ inputParameterOverrides: overrides })
+
+    await user.click(screen.getByTestId('retry-from-failure-confirm'))
+
+    expect(mockHandleRetry).toHaveBeenCalledWith(undefined, overrides)
+  })
+
+  it('requires input edits to be saved or cancelled before retrying', () => {
+    renderPanel({ hasUnsavedInputOverrides: true })
+
+    expect(screen.getByText('Save or cancel input changes in Run details before retrying.')).toBeInTheDocument()
+    expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
   })
 
   it('previews an exact selected subset and retries only the checked failure points', async () => {
     const user = userEvent.setup()
+    const onRetryPreviewPointIdsChange = vi.fn()
     const allPoints = ['step-1', 'step-2']
     vi.mocked(useRetryFromFailurePreview).mockImplementation(({ retryPointIds }) => {
       const selectedIds = retryPointIds ?? allPoints
@@ -138,13 +164,16 @@ describe('RetryFromFailureSidePanel', () => {
         isError: false,
       }
     })
-    renderPanel()
+    renderPanel({ onRetryPreviewPointIdsChange })
+
+    await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith(allPoints))
 
     await user.click(screen.getByRole('radio', { name: 'Choose failure points' }))
+    await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith([]))
     await user.click(screen.getByRole('checkbox', { name: 'First Step' }))
+    await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith(['step-1']))
 
-    expect(screen.getByText('1 selected failure point')).toBeInTheDocument()
-    expect(screen.getByText('4')).toBeInTheDocument()
+    expect(screen.getByText('4 steps will be retried')).toBeInTheDocument()
     expect(screen.getByText('3 completed results retained')).toBeInTheDocument()
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Retry plan updated. 1 selected failure point. 4 steps to retry. Retry starts at First Step. 3 completed results retained.'
@@ -154,15 +183,15 @@ describe('RetryFromFailureSidePanel', () => {
     expect(retryStartsAt).not.toHaveTextContent('Second Step')
 
     await user.click(screen.getByRole('checkbox', { name: 'Second Step' }))
-    expect(screen.getByText('2 selected failure points')).toBeInTheDocument()
-    expect(screen.getByText('5')).toBeInTheDocument()
+    await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith(allPoints))
+    expect(screen.getByText('5 steps will be retried')).toBeInTheDocument()
     expect(screen.getByText('2 completed results retained')).toBeInTheDocument()
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Retry plan updated. 2 selected failure points. 5 steps to retry. Retry starts at First Step, Second Step. 2 completed results retained.'
     )
 
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
-    expect(mockHandleRetry).toHaveBeenCalledWith(['step-1', 'step-2'])
+    expect(mockHandleRetry).toHaveBeenCalledWith(['step-1', 'step-2'], {})
   })
 
   it('requires a selected failure point before showing a subset plan', async () => {
@@ -249,9 +278,10 @@ describe('RetryFromFailureSidePanel', () => {
       isLoading: false,
       isError: false,
     })
-    renderPanel({ selectedNodeId: 'step-2' })
+    renderPanel()
 
-    expect(screen.getAllByText('—')).toHaveLength(2)
+    expect(screen.getByText('The number of steps to retry is unavailable.')).toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument()
     expect(screen.getByText('Second Step')).toBeInTheDocument()
   })
 
@@ -269,10 +299,10 @@ describe('RetryFromFailureSidePanel', () => {
     })
     renderPanel()
 
-    expect(screen.getByText('This retry starts at Second Step and reruns 1 step.')).toBeInTheDocument()
+    expect(screen.getByText('1 step will be retried')).toBeInTheDocument()
   })
 
-  it('keeps the default plan when the selected node is auto-included', async () => {
+  it('keeps auto-included points in the all-points retry plan', async () => {
     const user = userEvent.setup()
     vi.mocked(useRetryFromFailurePreview).mockReturnValue({
       preview: {
@@ -285,13 +315,13 @@ describe('RetryFromFailureSidePanel', () => {
       isLoading: false,
       isError: false,
     })
-    renderPanel({ selectedNodeId: 'step-2' })
+    renderPanel()
 
     expect(screen.getByText('First Step')).toBeInTheDocument()
     expect(screen.getByText('Second Step')).toBeInTheDocument()
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
 
-    expect(mockHandleRetry).toHaveBeenCalledWith(undefined)
+    expect(mockHandleRetry).toHaveBeenCalledWith(undefined, {})
   })
 
   it('disables retry and cancel while the retry request is pending', () => {
