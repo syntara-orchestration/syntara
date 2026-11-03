@@ -15,13 +15,14 @@ import {
 import { RhUiArrowRightIcon } from '@patternfly/react-icons'
 import type { ActivityExecution } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 
 import { executionsClient } from '../../../client'
 import { SynCodeBlock } from '../../../components/details/SynCodeBlock'
 import { formatDateTime, formatElapsedTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { ActivityStatusLabel, StatusLabel } from '../ExecutionStatus'
+import { buildDefinitionNameMap, type WorkflowDefShape } from '../useActivityNameMap'
 
 import { type ChildExecution, useChildExecutions } from './hooks/useChildExecutions'
 
@@ -57,17 +58,26 @@ function formatNodeType(nodeType: string | null | undefined): string {
 function ChildActivityRow({
   activity,
   variant = 'activity',
-}: Readonly<{ activity: ActivityExecution; variant?: 'activity' | 'trigger' }>) {
+  nameMap,
+}: Readonly<{ activity: ActivityExecution; variant?: 'activity' | 'trigger'; nameMap: Map<string, string> }>) {
   const [expanded, setExpanded] = useState(false)
   const duration = formatDuration(activity.started_at, activity.completed_at)
   const isTrigger = variant === 'trigger'
   const dataLabel = isTrigger ? 'Received input data' : 'Output data'
+  // Resolve the node id to its friendly child-workflow step name; keep the id
+  // as secondary diagnostic detail when a name is found.
+  const stepName = nameMap.get(activity.activity_name) ?? activity.activity_name
 
   const toggle = (
     <Flex alignItems={{ default: 'alignItemsCenter' }} spaceItems={{ default: 'spaceItemsSm' }}>
       <FlexItem>
-        <strong>{activity.activity_name}</strong>
+        <strong>{stepName}</strong>
       </FlexItem>
+      {stepName !== activity.activity_name && (
+        <FlexItem>
+          <Content component={ContentVariants.small}>{activity.activity_name}</Content>
+        </FlexItem>
+      )}
       <FlexItem>
         <Label isCompact color="grey">
           {formatNodeType(activity.node_type)}
@@ -102,7 +112,7 @@ function ChildActivityRow({
       toggleContent={toggle}
       isExpanded={expanded}
       onToggle={(_e, value) => setExpanded(value)}
-      aria-label={`Activity ${activity.activity_name}`}
+      aria-label={`Activity ${stepName}`}
     >
       {activity.error_details && (
         <Alert
@@ -132,6 +142,20 @@ function ChildActivitiesList({ childExecutionId }: Readonly<{ childExecutionId: 
     '/executions/{execution_id}/activities',
     { params: { path: { execution_id: childExecutionId }, query: { limit: 100, include_total: true } } },
     { enabled: Boolean(childExecutionId) }
+  )
+  // Fetch the child workflow definition so each activity's node id can be shown
+  // as its friendly step name. Built directly (not via useActivityNameMap) so the
+  // parent builder store never leaks into the child's name resolution.
+  const definitionQuery = executionsClient.useQuery(
+    'get',
+    '/executions/{execution_id}',
+    { params: { path: { execution_id: childExecutionId }, query: { include: 'workflow_definition' } } },
+    { enabled: Boolean(childExecutionId) }
+  )
+  const stepNames = useMemo(
+    () =>
+      buildDefinitionNameMap(definitionQuery.data?.workflow_definition as WorkflowDefShape | null | undefined).nameMap,
+    [definitionQuery.data]
   )
 
   if (query.isLoading) {
@@ -164,7 +188,7 @@ function ChildActivitiesList({ childExecutionId }: Readonly<{ childExecutionId: 
       {executable.length > 0 ? (
         executable.map((activity) => (
           <StackItem key={activity.id ?? activity.activity_name}>
-            <ChildActivityRow activity={activity} />
+            <ChildActivityRow activity={activity} nameMap={stepNames} />
           </StackItem>
         ))
       ) : (
@@ -178,7 +202,7 @@ function ChildActivitiesList({ childExecutionId }: Readonly<{ childExecutionId: 
             <Stack hasGutter>
               {triggers.map((trigger) => (
                 <StackItem key={trigger.id ?? trigger.activity_name}>
-                  <ChildActivityRow activity={trigger} variant="trigger" />
+                  <ChildActivityRow activity={trigger} variant="trigger" nameMap={stepNames} />
                 </StackItem>
               ))}
             </Stack>
