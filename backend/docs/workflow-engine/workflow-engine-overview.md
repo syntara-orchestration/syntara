@@ -125,7 +125,7 @@ Shared infrastructure every node type gets for free, no per-node opt-in required
 - [Switch Node](switch-node.md)
 - [Wait Node](wait-node.md)
 - [Converge Node](converge-node.md)
-- [Form Prompt Overview](../form-prompts/form-prompt-overview.md) — the `form_prompt` node: form definition, async completion, timeout and branch routing
+- [Form Prompt Overview](../forms/form-prompt-overview.md) — the `form_prompt` node: form definition, async completion, timeout and branch routing
 - [Approval Overview](../approvals/approval-overview.md) — the `approval` node
 - [Node Settings](node-settings.md) — timeout and retry configuration resolution
 - [Retry Policies](retry-policies.md) — retry behavior for transient failures

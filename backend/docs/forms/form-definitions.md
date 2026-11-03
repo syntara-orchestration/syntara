@@ -1,9 +1,10 @@
 # Form Definitions
 
 A form definition describes the fields and options used to collect structured input in a
-workflow. Form prompts and form triggers share the form definition, field models, and validator;
-differences in behavior are noted below. This guide explains how to define fields and parameters,
-how they are validated, and how to extend the shared models.
+workflow. [Form prompts](form-prompt-overview.md) and [form triggers](../workflow-engine/triggers/form-trigger.md)
+share the form definition, field models, and validator; differences in behavior are noted below.
+This guide explains how to define fields and parameters, how they are validated, and how to
+extend the shared models.
 
 ## Fields
 
@@ -14,6 +15,10 @@ unknown properties.
 
 The supported field types are `text`, `textarea`, `masked_text`, `email`, `number`, `checkbox`,
 `date`, `dropdown`, and `multi_select`.
+
+`FormPromptDefinition` and `FormTriggerDefinition` both inherit from `FormDefinition`. They share
+the common field models and specialize dropdown and multi-select fields to enforce their option
+rules.
 
 #### Dropdown and Multi-Select Options
 
@@ -44,11 +49,10 @@ UI, but the value is stored in plain text.
 Form parameters are settings on the workflow node that configure the form itself; fields inside
 `form_definition` define the answers it collects.
 
-Form prompts and form triggers share `message`, `form_definition`, `submit_label`,
-`success_message`, and `css_override` through `BaseFormParameters`. Form prompts also have
-`responder_users`, `responder_groups`, `response_window`, and `fallback_decision`. Form prompts
-use `FormPromptDefinition`; form triggers use `FormTriggerDefinition` to enforce their option
-rules.
+Form prompts and form triggers use separate parameter models: `FormPromptNodeParameters` and
+`FormTriggerParameters`. Both inherit `message`, `form_definition`, `submit_label`,
+`success_message`, and `css_override` from `BaseFormParameters`. The prompt model additionally adds
+`responder_users`, `responder_groups`, `response_window`, and `fallback_decision`.
 
 The shared `css_override` is author-supplied CSS shown to submitters. A security validator rejects
 patterns that could enable data exfiltration or code execution.
@@ -108,5 +112,5 @@ both for a shared parameter. Both models reject unknown properties, so the schem
 
 ## Related Documentation
 
-- [Form Prompt Overview](form-prompts/form-prompt-overview.md) — prompt runtime behavior
-- [Form Trigger](workflow-engine/triggers/form-trigger.md) — trigger runtime behavior
+- [Form Prompt Overview](form-prompt-overview.md) — prompt runtime behavior
+- [Form Trigger](../workflow-engine/triggers/form-trigger.md) — trigger runtime behavior

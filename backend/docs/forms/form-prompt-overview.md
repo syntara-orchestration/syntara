@@ -54,7 +54,7 @@ Key properties:
 
 Form definitions list the fields a user can fill in and use a defined set of supported field
 types. Form parameters configure the form itself. Most field, option, and validation rules are
-shared by form prompts and form triggers. See [Form Definitions](../form-definitions.md) for the
+shared by form prompts and form triggers. See [Form Definitions](form-definitions.md) for the
 full guide, including where the two differ.
 
 ## The Form Prompt Step
@@ -273,7 +273,7 @@ Errors use RFC 9457 problem details. See [Audit](../audit.md) and
 ### Adding a new field type or parameter
 
 For steps to add a field type or form parameter, see
-[Extending Forms](../form-definitions.md#extending-forms).
+[Extending Forms](form-definitions.md#extending-forms).
 
 ## Current Limitations
 
@@ -294,7 +294,7 @@ For steps to add a field type or form parameter, see
 
 ## Related Documentation
 
-- [Form Definitions and Fields](../form-definitions.md) — field types and validation shared
+- [Form Definitions](form-definitions.md) — field types and validation shared
   by form prompts and form triggers
 - [Workflow Engine Architecture](../workflow-engine/workflow-engine-overview.md) — graph
   execution, async completion, and live-status sync shared by every step type

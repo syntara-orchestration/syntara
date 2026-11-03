@@ -2,17 +2,17 @@
 
 A form trigger lets a user start a workflow by filling out and submitting a form. Downstream
 nodes can reference the submitted values. Form triggers share their form definitions, field
-models, and common parameters with the [form prompt step](../../form-prompts/form-prompt-overview.md).
+models, and common parameters with the [form prompt step](../../forms/form-prompt-overview.md).
 
 For the shared trigger architecture, including output mapping, namespace registration, and how the
 workflow selects a trigger activity from its node type, see [Trigger System Overview](overview.md).
 
 ## Architecture
 
-The form is presented before a workflow execution begins. After a complete submission, the API
+The form is presented before a workflow execution begins. The user submits it through the existing
+`POST /api/v1/executions` endpoint; form triggers have no separate submit endpoint. The API
 validates the answers and starts exactly one execution, with the form-trigger activity as its
-entry node. The API does not create a pending form record or pause a workflow while it waits for
-input.
+entry node. It does not create a pending form record or pause a workflow while it waits for input.
 
 The form definition lives in the workflow version, and the UI renders it from there. There is no
 dedicated form-trigger table, service, or read endpoint.
@@ -23,7 +23,7 @@ mapped output under `response_data`.
 
 Form definitions list the fields a user can fill in and use a defined set of supported field
 types. Form parameters configure the form itself. Most field, option, and validation rules are
-shared by form prompts and form triggers. See [Form Definitions](../../form-definitions.md) for
+shared by form prompts and form triggers. See [Form Definitions](../../forms/form-definitions.md) for
 the full guide, including where the two differ.
 
 ## Submitting a Form
@@ -93,7 +93,7 @@ logged and swallowed so they do not prevent a submission.
 ### Adding a new field type or parameter
 
 For steps to add a field type or form parameter, see
-[Extending Forms](../../form-definitions.md#extending-forms).
+[Extending Forms](../../forms/form-definitions.md#extending-forms).
 
 ### Adding a trigger type
 
@@ -102,10 +102,10 @@ service or database table. See [Adding a New Trigger Type](overview.md#adding-a-
 
 ## Related Documentation
 
-- [Form Definitions](../../form-definitions.md) — field types, validation and parameters shared
+- [Form Definitions](../../forms/form-definitions.md) — field types, validation and parameters shared
   by form prompts and form triggers
 - [Trigger System Overview](overview.md) — shared trigger behavior, output flow, and multi-trigger resolution  
-- [Form Prompt Overview](../../form-prompts/form-prompt-overview.md) — the sibling collection
+- [Form Prompt Overview](../../forms/form-prompt-overview.md) — the sibling collection
   point that pauses a running workflow
 - [Manual Trigger](manual-trigger.md) — another trigger with no external state
 - [Workflow Engine Architecture](../workflow-engine-overview.md) — graph execution and dispatch
