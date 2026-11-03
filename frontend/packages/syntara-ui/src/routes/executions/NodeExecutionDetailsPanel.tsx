@@ -19,7 +19,7 @@ import {
   RhUiWarningFillIcon,
 } from '@patternfly/react-icons'
 import { ActivityTypeEnum } from '@syntara/contracts'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { SynLabel } from '../../components/labels/SynLabel'
@@ -48,6 +48,7 @@ import { AgentTraceView } from './AgentTraceView'
 import { useNodeExecutionDetails } from './hooks/useNodeExecutionDetails'
 import styles from './NodeExecutionDetailsPanel.module.css'
 import { NodeDetailTabBar, SubWorkflowOutputView } from './NodeExecutionDetailsViews'
+import { nodeTabPanelAttrs } from './nodeTabPanel'
 import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
 
 type NodeExecutionDetailsPanelProps = {
@@ -432,6 +433,12 @@ export function NodeExecutionDetailsPanel({
   const [activeTab, setActiveTab] = useState<'io' | 'agent-steps' | 'child-activities'>('io')
   const isAgenticNode = nodeType === ActivityTypeEnum.AGENTIC
   const isSubWorkflowNode = nodeType === ActivityTypeEnum.SUB_WORKFLOW
+  // Tab/panel wiring: the Input/Output, Agent steps and Child activities tabs render
+  // their content in a shared region below. Give that region role="tabpanel" and point
+  // its aria-labelledby at the active tab's button so assistive tech gets the tab-to-panel
+  // relationship (PatternFly composes a tab button's id as `pf-tab-{eventKey}-{id}`).
+  const hasNodeTabs = isAgenticNode || isSubWorkflowNode
+  const tabsBaseId = useId()
   const { inputData, outputData, isLoading, error, refetch } = useNodeExecutionDetails(
     nodeId,
     executionId,
@@ -492,12 +499,13 @@ export function NodeExecutionDetailsPanel({
 
       {/* Tab bar for agentic nodes (Input/Output | Agent steps) and sub-workflow
           nodes (Input/Output | Child activities). Input/Output stays the default. */}
-      {(isAgenticNode || isSubWorkflowNode) && (
+      {hasNodeTabs && (
         <NodeDetailTabBar
           activeTab={activeTab}
           onTabChange={setActiveTab}
           isAgenticNode={isAgenticNode}
           isSubWorkflowNode={isSubWorkflowNode}
+          idBase={tabsBaseId}
         />
       )}
 
@@ -509,7 +517,11 @@ export function NodeExecutionDetailsPanel({
         />
       )}
 
-      <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
+      <StackItem
+        isFilled
+        style={{ minHeight: 0, overflow: 'hidden' }}
+        {...nodeTabPanelAttrs(hasNodeTabs, tabsBaseId, activeTab)}
+      >
         <NodeDetailBody
           isSubWorkflowNode={isSubWorkflowNode}
           executionId={executionId}
