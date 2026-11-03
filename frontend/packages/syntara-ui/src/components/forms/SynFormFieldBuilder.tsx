@@ -3,7 +3,12 @@ import type { FormDefinition } from '@syntara/contracts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 
-import { formDefinitionSchema, safeParseFormDefinition, type FormDefinitionSchemaInput } from '../../forms'
+import {
+  formDefinitionSchema,
+  prepareFormDefinitionForCommit,
+  safeParseFormDefinition,
+  type FormDefinitionSchemaInput,
+} from '../../forms'
 import { zodResolver } from '../../routes/builder/node-forms/shared/formSchemaUtils'
 
 import type { FormDefinitionFieldServerError } from './formFieldBuilder/formDefinitionFieldServerError'
@@ -24,10 +29,14 @@ export type SynFormFieldBuilderProps = {
   isDisabled?: boolean
   /** When true, shows only the field cards (no Design / Preview / JSON tabs). */
   designOnly?: boolean
+  /** When true, hides the design-tab banner and commits draft-shaped definitions on change (advisory save). */
+  draftMode?: boolean
   /** Restricts dropdown/multi-select fields to static option lists (form triggers). */
   optionsMode?: FormFieldBuilderOptionsMode
   /** API validation errors mapped to `fields.{index}.{subPath}` in the builder form. */
   serverFieldErrors?: ReadonlyArray<FormDefinitionFieldServerError>
+  /** Registers flush/read handlers so the parent can sync field edits before submit. */
+  registerCommit?: (handlers: { flush: () => void; readPreparedDefinition: () => FormDefinition } | null) => void
 }
 
 /**
@@ -41,18 +50,21 @@ export function SynFormFieldBuilder({
   onChange,
   isDisabled,
   designOnly = false,
+  draftMode = false,
   optionsMode = 'default',
   serverFieldErrors,
+  registerCommit,
 }: Readonly<SynFormFieldBuilderProps>) {
   const [activeTab, setActiveTab] = useState<BuilderTab>('design')
   const lastEmittedRef = useRef(JSON.stringify(value))
 
+  const isDraftBuilder = draftMode
   const defaultValues: FormDefinitionSchemaInput = { fields: value.fields }
 
   const methods = useForm<FormDefinitionSchemaInput, unknown, FormDefinition>({
-    resolver: zodResolver(formDefinitionSchema),
-    mode: 'onTouched',
-    reValidateMode: 'onChange',
+    resolver: isDraftBuilder ? undefined : zodResolver(formDefinitionSchema),
+    mode: isDraftBuilder ? 'onSubmit' : 'onTouched',
+    reValidateMode: isDraftBuilder ? 'onSubmit' : 'onChange',
     defaultValues,
   })
 
@@ -71,6 +83,15 @@ export function SynFormFieldBuilder({
 
   const commit = useCallback(() => {
     const raw = methods.getValues()
+    if (isDraftBuilder) {
+      const prepared = prepareFormDefinitionForCommit({ fields: raw.fields })
+      const next = JSON.stringify(prepared)
+      if (next !== lastEmittedRef.current) {
+        lastEmittedRef.current = next
+        onChange(prepared)
+      }
+      return
+    }
     // Keep builder toggles as the user set them (e.g. time on, timezone off). API repair runs on publish via
     // prepareFormDefinitionForCommit — do not reset RHF here or checkboxes snap back.
     const parsed = safeParseFormDefinition(raw)
@@ -82,11 +103,21 @@ export function SynFormFieldBuilder({
       lastEmittedRef.current = next
       onChange(parsed.data)
     }
-  }, [methods, onChange])
+  }, [isDraftBuilder, methods, onChange])
+
+  const readPreparedDefinition = useCallback((): FormDefinition => {
+    const raw = methods.getValues()
+    return prepareFormDefinitionForCommit({ fields: raw.fields ?? [] })
+  }, [methods])
+
+  useEffect(() => {
+    registerCommit?.({ flush: commit, readPreparedDefinition })
+    return () => registerCommit?.(null)
+  }, [commit, readPreparedDefinition, registerCommit])
 
   const designTab = (
     <div className={designOnly ? styles.designOnlyPanel : styles.tabPanelBody}>
-      <FormFieldBuilderDesignTab isDisabled={isDisabled} />
+      <FormFieldBuilderDesignTab isDisabled={isDisabled} hideValidationBanner={isDraftBuilder} />
     </div>
   )
 

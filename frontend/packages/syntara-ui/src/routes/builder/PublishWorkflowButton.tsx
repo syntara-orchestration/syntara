@@ -3,6 +3,8 @@ import { RhUiPublishIcon } from '@patternfly/react-icons'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 
+import { workflowVerificationBlockedTooltip } from './workflowVerificationBlockedTooltip'
+
 type PublishWorkflowButtonProps = Readonly<{
   canEdit: boolean
   hasNoSteps: boolean
@@ -28,7 +30,6 @@ export function PublishWorkflowButton({
 }: PublishWorkflowButtonProps) {
   const hasErrors = validationErrorCount > 0
   const canPublish = canEdit && !hasNoSteps && !hasErrors && !isVerifying && !hasNoChanges && !isNodeEditorOpen
-  const errorSuffix = validationErrorCount === 1 ? '' : 's'
 
   let tooltipContent = editTooltip
   if (isNodeEditorOpen && canEdit) {
@@ -40,7 +41,7 @@ export function PublishWorkflowButton({
   } else if (canEdit && isVerifying) {
     tooltipContent = 'Verifying workflow...'
   } else if (canEdit && hasErrors) {
-    tooltipContent = `Verify your workflow before publishing — ${validationErrorCount} error${errorSuffix} found`
+    tooltipContent = workflowVerificationBlockedTooltip('publishing', validationErrorCount)
   }
 
   return (

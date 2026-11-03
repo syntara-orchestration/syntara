@@ -1,13 +1,13 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Button, Flex, FlexItem, FormGroup, Stack, StackItem, TextInput } from '@patternfly/react-core'
+import { Button, Flex, FlexItem, Stack, StackItem, TextInput } from '@patternfly/react-core'
 import { RhUiGripVerticalFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import type { FormDefinition } from '@syntara/contracts'
 import { useId } from 'react'
-import { Controller, useFormContext, useWatch } from 'react-hook-form'
+import { useFormContext, useWatch } from 'react-hook-form'
 
 import { labelToValueName, slugifyLabelToValueNameBase } from '../../../forms'
-import { FormFieldError } from '../../FormFieldError'
+import { SynFormField } from '../SynFormField'
 import { SynTextField } from '../SynTextField'
 
 import styles from './formFieldBuilder.module.css'
@@ -100,50 +100,47 @@ export function StaticOptionRow({
             )}
             <Stack hasGutter>
               <StackItem>
-                <Controller
+                <SynFormField
                   control={control}
                   name={`fields.${fieldIndex}.options.values.${optionIndex}.display_label`}
-                  render={({ field: rhfField, fieldState }) => (
-                    <FormGroup
-                      label="Option label"
-                      fieldId={`${idPrefix}-display-label`}
-                      isRequired
-                      labelHelp={formFieldBuilderLabelHelp('optionDisplayLabel', 'Option label')}
-                    >
-                      <TextInput
-                        id={`${idPrefix}-display-label`}
-                        value={rhfField.value ?? ''}
-                        validated={fieldState.error ? 'error' : 'default'}
-                        isDisabled={isDisabled}
-                        onChange={(_event, nextLabel) => {
-                          const values = getValues(`fields.${fieldIndex}.options.values`) ?? []
-                          const current = values[optionIndex]
-                          if (!current) {
-                            return
-                          }
-                          const taken = otherOptionValues(values, optionIndex)
-                          const previousAuto = labelToValueName(current.display_label, taken)
-                          const shouldAutoRename =
-                            current.value === '' ||
-                            current.value === previousAuto ||
-                            current.value === slugifyLabelToValueNameBase(current.display_label)
+                  label="Option label"
+                  fieldId={`${idPrefix}-display-label`}
+                  isRequired
+                  labelHelp={formFieldBuilderLabelHelp('optionDisplayLabel', 'Option label')}
+                >
+                  {({ field: rhfField, fieldState }) => (
+                    <TextInput
+                      id={`${idPrefix}-display-label`}
+                      value={rhfField.value ?? ''}
+                      validated={fieldState.error ? 'error' : 'default'}
+                      isDisabled={isDisabled}
+                      onChange={(_event, nextLabel) => {
+                        const values = getValues(`fields.${fieldIndex}.options.values`) ?? []
+                        const current = values[optionIndex]
+                        if (!current) {
+                          return
+                        }
+                        const taken = otherOptionValues(values, optionIndex)
+                        const previousAuto = labelToValueName(current.display_label, taken)
+                        const shouldAutoRename =
+                          current.value === '' ||
+                          current.value === previousAuto ||
+                          current.value === slugifyLabelToValueNameBase(current.display_label)
 
-                          rhfField.onChange(nextLabel)
-                          if (shouldAutoRename) {
-                            setValue(
-                              `fields.${fieldIndex}.options.values.${optionIndex}.value`,
-                              labelToValueName(nextLabel, taken),
-                              { shouldValidate: false }
-                            )
-                          }
-                          commit()
-                        }}
-                        onBlur={rhfField.onBlur}
-                      />
-                      <FormFieldError error={fieldState.error} />
-                    </FormGroup>
+                        rhfField.onChange(nextLabel)
+                        if (shouldAutoRename) {
+                          setValue(
+                            `fields.${fieldIndex}.options.values.${optionIndex}.value`,
+                            labelToValueName(nextLabel, taken),
+                            { shouldValidate: false }
+                          )
+                        }
+                        commit()
+                      }}
+                      onBlur={rhfField.onBlur}
+                    />
                   )}
-                />
+                </SynFormField>
               </StackItem>
               <StackItem>
                 <SynTextField

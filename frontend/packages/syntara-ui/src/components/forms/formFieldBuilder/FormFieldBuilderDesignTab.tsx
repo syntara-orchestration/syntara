@@ -32,9 +32,13 @@ import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
 
 type FormFieldBuilderDesignTabProps = {
   isDisabled?: boolean
+  hideValidationBanner?: boolean
 }
 
-export function FormFieldBuilderDesignTab({ isDisabled }: Readonly<FormFieldBuilderDesignTabProps>) {
+export function FormFieldBuilderDesignTab({
+  isDisabled,
+  hideValidationBanner = false,
+}: Readonly<FormFieldBuilderDesignTabProps>) {
   const commit = useFormFieldBuilderCommit()
   const { control, getValues } = useFormContext<FormDefinition>()
   const watchedFields = useWatch({ control, name: 'fields' })
@@ -84,7 +88,7 @@ export function FormFieldBuilderDesignTab({ isDisabled }: Readonly<FormFieldBuil
 
   return (
     <Stack hasGutter className={styles.designTab}>
-      {!definitionValidation.success && (
+      {!hideValidationBanner && !definitionValidation.success && (
         <StackItem>
           <Alert
             variant="warning"

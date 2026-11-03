@@ -1,7 +1,7 @@
 import { MissedSchedulePolicyEnum, ScheduleTypeEnum, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
 import { z } from 'zod'
 
-import { formDefinitionSchema } from '../../../forms'
+import { formDefinitionBuilderFormFieldSchema } from '../../../forms'
 import { safeJSONReviver } from '../../../utils/jsonSafeParse'
 import { parseRepeatingInterval } from '../../../utils/triggerFormatting'
 import { isValidWebhookPath } from '../../../utils/webhookPath'
@@ -33,7 +33,7 @@ const triggerFormSchemaBase = z.object({
   inputSchema: z.string().optional(),
   webhookPath: z.string().optional(),
   authorizedServiceAccountIds: z.array(z.string().uuid()).optional(),
-  form_definition: formDefinitionSchema.optional(),
+  form_definition: formDefinitionBuilderFormFieldSchema.optional(),
   message: z.string().max(2000).optional(),
   submit_label: z.string().max(64).optional(),
   success_message: z.string().max(500).optional(),
@@ -163,19 +163,6 @@ function refineWebhookStyleTriggerForm(data: TriggerFormSchemaInput, ctx: z.Refi
   }
 }
 
-function refineFormTriggerForm(data: TriggerFormSchemaInput, ctx: z.RefinementCtx) {
-  if (data.triggerType !== TriggerTypeEnum.FORM_TRIGGER) return
-
-  const fieldCount = data.form_definition?.fields?.length ?? 0
-  if (fieldCount === 0) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Add at least one form field',
-      path: ['form_definition'],
-    })
-  }
-}
-
 function refineTriggerFormSchema(data: TriggerFormSchemaInput, ctx: z.RefinementCtx) {
   if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER || WEBHOOK_TRIGGER_TYPES.has(data.triggerType)) {
     validateInputSchemaJson(data.inputSchema, ctx)
@@ -183,12 +170,11 @@ function refineTriggerFormSchema(data: TriggerFormSchemaInput, ctx: z.Refinement
 
   refineScheduledTriggerForm(data, ctx)
   refineWebhookStyleTriggerForm(data, ctx)
-  refineFormTriggerForm(data, ctx)
 }
 
 export const triggerFormSchema = triggerFormSchemaBase.superRefine(refineTriggerFormSchema)
 
-export type TriggerFormData = z.infer<typeof triggerFormSchemaBase>
+export type TriggerFormData = z.infer<typeof triggerFormSchema>
 
 // Re-export webhook path utilities from their canonical location
 export { normalizeWebhookPath, isValidWebhookPath } from '../../../utils/webhookPath'

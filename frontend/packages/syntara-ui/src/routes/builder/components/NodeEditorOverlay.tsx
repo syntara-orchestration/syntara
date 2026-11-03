@@ -1,4 +1,5 @@
 import { Flex, FlexItem } from '@patternfly/react-core'
+import type { FormDefinition } from '@syntara/contracts'
 import type { Node } from '@xyflow/react'
 import { memo } from 'react'
 
@@ -29,6 +30,7 @@ type NodeEditorOverlayProps = {
   onRunStep?: () => void
   onNodeAdded?: () => void
   validationErrors?: ValidationError[]
+  onFormDefinitionCommitted?: (nodeId: string, formDefinition: FormDefinition) => void
 }
 
 export const NodeEditorOverlay = memo(function NodeEditorOverlay(props: NodeEditorOverlayProps) {
@@ -52,6 +54,7 @@ export const NodeEditorOverlay = memo(function NodeEditorOverlay(props: NodeEdit
     onRunStep,
     onNodeAdded,
     validationErrors,
+    onFormDefinitionCommitted,
   } = props
 
   const stepDocKey = resolveStepDocKey({ mode, nodeTypeId, nodeSubtypeId, selectedNode })
@@ -90,6 +93,7 @@ export const NodeEditorOverlay = memo(function NodeEditorOverlay(props: NodeEdit
           readOnly={isVersionView}
           onNodeAdded={onNodeAdded}
           validationErrors={validationErrors}
+          onFormDefinitionCommitted={onFormDefinitionCommitted}
         />
       </FlexItem>
     </Flex>

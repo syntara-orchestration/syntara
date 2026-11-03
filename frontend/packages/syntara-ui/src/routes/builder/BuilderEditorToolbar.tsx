@@ -146,6 +146,7 @@ type BuilderEditorToolbarProps = Readonly<{
   builderPermissions: BuilderPermissions
   isNodeEditorOpen?: boolean
   beforeVerify?: () => Promise<boolean>
+  bannerBlockingValidationErrorCount?: number
 }>
 
 export function BuilderEditorToolbar({
@@ -176,6 +177,7 @@ export function BuilderEditorToolbar({
   builderPermissions,
   isNodeEditorOpen,
   beforeVerify,
+  bannerBlockingValidationErrorCount,
 }: BuilderEditorToolbarProps) {
   const { importFileRef, handleImportFile, handleExport, handleVerify, isVerifying, validationErrorCount } =
     useWorkflowImportExport({
@@ -257,6 +259,7 @@ export function BuilderEditorToolbar({
         triggers={triggers}
         isSaved={!!workflow?.id}
         validationErrorCount={validationErrorCount}
+        bannerBlockingValidationErrorCount={bannerBlockingValidationErrorCount}
         dispatch={dispatch}
         builderPermissions={builderPermissions}
         isNodeEditorOpen={isNodeEditorOpen}

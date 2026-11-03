@@ -1,6 +1,6 @@
 import type { FormDefinition } from '@syntara/contracts'
 
-import { prepareFormDefinitionForCommit, safeParseFormDefinition } from '../../../forms'
+import { serializeFormDefinitionForStorage } from '../../../forms'
 
 export type FormTriggerActivityParameterInput = {
   form_definition: FormDefinition
@@ -20,22 +20,8 @@ function appendOptionalString(target: Record<string, unknown>, key: string, valu
 }
 
 export function buildFormTriggerActivityParameters(input: FormTriggerActivityParameterInput): Record<string, unknown> {
-  const preparedDefinition = prepareFormDefinitionForCommit(input.form_definition)
-  const parsedDefinition = safeParseFormDefinition(preparedDefinition)
-  if (!parsedDefinition.success) {
-    const detail = parsedDefinition.errors[0]?.message ?? 'Form definition is invalid'
-    throw new Error(detail)
-  }
-
-  for (const field of parsedDefinition.data.fields) {
-    const options = field.type === 'dropdown' || field.type === 'multi_select' ? field.options : null
-    if (options?.source === 'dynamic') {
-      throw new Error(`Field "${field.value_name}": dynamic options are not supported on a form trigger`)
-    }
-  }
-
   const result: Record<string, unknown> = {
-    form_definition: parsedDefinition.data,
+    form_definition: serializeFormDefinitionForStorage(input.form_definition),
   }
   appendOptionalString(result, 'message', input.message)
   appendOptionalString(result, 'submit_label', input.submit_label)

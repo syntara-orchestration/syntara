@@ -5,6 +5,14 @@ import { createEmptyFormDefinition } from '../../../components/forms/formFieldBu
 import { formPromptFormSchema, formPromptStoredParametersSchema } from './formPromptNodeFormSchema'
 
 describe('formPromptFormSchema', () => {
+  it('accepts an empty form definition in the builder', () => {
+    const result = formPromptFormSchema.safeParse({
+      name: 'Survey',
+      form_definition: { fields: [] },
+    })
+    expect(result.success).toBe(true)
+  })
+
   it('accepts a minimal valid form prompt payload', () => {
     const result = formPromptFormSchema.safeParse({
       name: 'Survey',

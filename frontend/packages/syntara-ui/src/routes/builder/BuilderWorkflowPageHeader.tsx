@@ -64,6 +64,7 @@ type BuilderToolbarContentProps = Readonly<{
   onToggleVersionHistory?: () => void
   isNodeEditorOpen?: boolean
   beforeVerify?: () => Promise<boolean>
+  bannerBlockingValidationErrorCount?: number
 }>
 
 /**
@@ -114,6 +115,7 @@ function BuilderToolbarContent({
   onToggleVersionHistory,
   isNodeEditorOpen,
   beforeVerify,
+  bannerBlockingValidationErrorCount,
 }: BuilderToolbarContentProps) {
   if (isViewingVersion && onExitVersionView) {
     return (
@@ -207,6 +209,7 @@ function BuilderToolbarContent({
       builderPermissions={builderPermissions}
       isNodeEditorOpen={isNodeEditorOpen}
       beforeVerify={beforeVerify}
+      bannerBlockingValidationErrorCount={bannerBlockingValidationErrorCount}
     />
   )
 }
@@ -338,6 +341,7 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   onPendingImport: (data: PendingImportData) => void
   isNodeEditorOpen?: boolean
   beforeVerify?: () => Promise<boolean>
+  bannerBlockingValidationErrorCount?: number
 }>
 
 /**
@@ -388,6 +392,7 @@ export function BuilderWorkflowPageHeader({
   onPendingImport,
   isNodeEditorOpen,
   beforeVerify,
+  bannerBlockingValidationErrorCount,
 }: BuilderWorkflowPageHeaderProps) {
   const builderDocLink = useDocLink('builder')
   const publishDialog = useDialogState<true>()
@@ -435,6 +440,7 @@ export function BuilderWorkflowPageHeader({
       onToggleVersionHistory={handleToggleVersionHistory}
       isNodeEditorOpen={isNodeEditorOpen}
       beforeVerify={beforeVerify}
+      bannerBlockingValidationErrorCount={bannerBlockingValidationErrorCount}
     />
   )
 

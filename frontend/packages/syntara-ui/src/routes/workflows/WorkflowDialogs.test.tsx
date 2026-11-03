@@ -1,6 +1,6 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -156,6 +156,31 @@ const formTriggerWorkflowDefinition = {
   ],
 }
 
+const multipleFormStepWorkflowDefinition = {
+  triggers: [
+    {
+      id: 'form-a',
+      name: 'Alpha intake',
+      type: 'form_trigger',
+      parameters: {
+        form_definition: {
+          fields: [{ type: 'text', value_name: 'alpha', label: 'Alpha', required: true }],
+        },
+      },
+    },
+    {
+      id: 'form-b',
+      name: 'Beta intake',
+      type: 'form_trigger',
+      parameters: {
+        form_definition: {
+          fields: [{ type: 'text', value_name: 'beta', label: 'Beta', required: true }],
+        },
+      },
+    },
+  ],
+}
+
 describe('WorkflowDialogs', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -192,7 +217,14 @@ describe('WorkflowDialogs', () => {
       runDialog: createDialogState(mockWorkflow(), true),
     })
 
+    await waitFor(() => {
+      expect(vi.mocked(workflowFetchClient.GET)).toHaveBeenCalled()
+    })
     await screen.findByRole('button', { name: 'Run now' })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, WORKFLOW_LIST_RUN_PREPARING_DELAY_MS))
+      await Promise.resolve()
+    })
     expect(await axe(container)).toHaveNoViolations()
   })
 
@@ -316,6 +348,57 @@ describe('WorkflowDialogs', () => {
     expect(await screen.findByRole('heading', { name: 'Run Important Project Workflow' })).toBeInTheDocument()
     expect(screen.queryByText('Run workflow?')).not.toBeInTheDocument()
     expect(screen.queryByText('Set mock output data for')).not.toBeInTheDocument()
+  })
+
+  it('shows the form step selector when multiple form steps require input', async () => {
+    const user = userEvent.setup()
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(
+      mockGetResponse({
+        id: 'wf-1',
+        current_version: 1,
+        published_version_number: 1,
+        version: {
+          workflow_definition: multipleFormStepWorkflowDefinition,
+        },
+      })
+    )
+
+    renderDialogs({
+      runDialog: createDialogState(mockWorkflow(), true),
+    })
+
+    const chooseDialog = await screen.findByRole('dialog', { name: 'Choose form step' })
+    expect(screen.queryByText('Run workflow?')).not.toBeInTheDocument()
+    expect(within(chooseDialog).getByRole('button', { name: 'Beta intake' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Beta intake' }))
+    expect(await screen.findByRole('heading', { name: 'Run Important Project Workflow' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Beta' })).toBeInTheDocument()
+  })
+
+  it('closes the form step selector without opening the run form when cancelled', async () => {
+    const user = userEvent.setup()
+    const onRunWorkflow = vi.fn()
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(
+      mockGetResponse({
+        id: 'wf-1',
+        current_version: 1,
+        published_version_number: 1,
+        version: {
+          workflow_definition: multipleFormStepWorkflowDefinition,
+        },
+      })
+    )
+
+    const runDialog = createDialogState(mockWorkflow(), true)
+    renderDialogs({ runDialog, onRunWorkflow })
+
+    await screen.findByRole('heading', { name: 'Choose form step' })
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByRole('heading', { name: 'Run Important Project Workflow' })).not.toBeInTheDocument()
+    expect(onRunWorkflow).not.toHaveBeenCalled()
+    expect(runDialog.close).toHaveBeenCalled()
   })
 
   it('disables form trigger submit when execution:run is denied', async () => {

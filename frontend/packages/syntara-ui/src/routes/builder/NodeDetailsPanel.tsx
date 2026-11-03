@@ -2,6 +2,7 @@ import { Button, Flex } from '@patternfly/react-core'
 import type {
   ConditionActivity,
   ConvergeActivity,
+  FormDefinition,
   LoopActivity,
   SwitchActivity,
   TaskActivity,
@@ -201,8 +202,17 @@ function renderEditModeContent(params: {
   onHeaderContentChange: (content: ReactNode | null) => void
   projectId?: string
   validationErrors?: ValidationError[]
+  onFormDefinitionCommitted?: (nodeId: string, formDefinition: FormDefinition) => void
 }): ReactNode {
-  const { node, currentWorkflow, onClose, onHeaderContentChange, projectId, validationErrors } = params
+  const {
+    node,
+    currentWorkflow,
+    onClose,
+    onHeaderContentChange,
+    projectId,
+    validationErrors,
+    onFormDefinitionCommitted,
+  } = params
   if (node.type === FlowNodeType.TRIGGER) {
     const triggerIdx = parseTriggerIndex(node.id) ?? 0
     const trigger = currentWorkflow?.triggers?.[triggerIdx]
@@ -215,6 +225,7 @@ function renderEditModeContent(params: {
           onClose={onClose}
           onHeaderContentChange={onHeaderContentChange}
           serverValidationErrors={triggerValidationErrors}
+          onFormDefinitionCommitted={onFormDefinitionCommitted}
         />
       )
     }
@@ -245,6 +256,7 @@ function renderEditModeContent(params: {
   }
 
   if (node.type === FlowNodeType.FORM_PROMPT) {
+    const activityValidationErrors = validationErrors?.filter((err) => err.nodeId === node.id)
     return (
       <FormPromptNodeDetails
         taskData={node.data as Activity}
@@ -252,6 +264,8 @@ function renderEditModeContent(params: {
         onClose={onClose}
         onHeaderContentChange={onHeaderContentChange}
         projectId={projectId}
+        serverValidationErrors={activityValidationErrors}
+        onFormDefinitionCommitted={onFormDefinitionCommitted}
       />
     )
   }
@@ -334,6 +348,7 @@ type NodeDetailsPanelProps = {
   readOnly?: boolean
   onNodeAdded?: () => void
   validationErrors?: ValidationError[]
+  onFormDefinitionCommitted?: (nodeId: string, formDefinition: FormDefinition) => void
 }
 
 function createAddStepHandler(
@@ -363,6 +378,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
     readOnly,
     onNodeAdded,
     validationErrors,
+    onFormDefinitionCommitted,
   } = props
   const { showError } = useAlerts()
   // Use typed selector for optimized subscription
@@ -516,6 +532,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
           onHeaderContentChange: setHeaderContent,
           projectId,
           validationErrors,
+          onFormDefinitionCommitted,
         })}
       </Flex>
     )
