@@ -1,9 +1,11 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { executionsClient } from '../../client'
+import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
 import { ExecutionDetailsPanel, type WorkflowDefShape } from './ExecutionDetailsPanel'
 
@@ -87,23 +89,34 @@ vi.mock('./ExecutionStatus', () => ({
   ActivityStatusLabel: ({ status }: { status: string }) => <div data-testid="activity-status-label">{status}</div>,
 }))
 
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
 function renderPanel(workflowDefinition?: WorkflowDefShape | null) {
-  return render(<ExecutionDetailsPanel executionId="exec-123" workflowDefinition={workflowDefinition} />)
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <ExecutionDetailsPanel executionId="exec-123" workflowDefinition={workflowDefinition} />
+    </QueryClientProvider>
+  )
 }
 
 function renderPanelWithClose(onClosePanel: () => void, headerLabel?: string) {
   return render(
-    <ExecutionDetailsPanel
-      executionId="exec-123"
-      workflowDefinition={WORKFLOW_DEF}
-      headerLabel={headerLabel}
-      onClosePanel={onClosePanel}
-    />
+    <QueryClientProvider client={queryClient}>
+      <ExecutionDetailsPanel
+        executionId="exec-123"
+        workflowDefinition={WORKFLOW_DEF}
+        headerLabel={headerLabel}
+        onClosePanel={onClosePanel}
+      />
+    </QueryClientProvider>
   )
 }
 
 describe('ExecutionDetailsPanel', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useExecutionStore.getState().reset()
+  })
 
   describe('header', () => {
     it('renders title and execution status', () => {
