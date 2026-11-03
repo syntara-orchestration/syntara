@@ -307,19 +307,27 @@ class ActivitySyncService(
         }
     )
 
-    async def reconcile_stale_executions(self) -> None:
-        """Reconcile executions stuck in RUNNING status after a worker restart.
+    _RECONCILABLE_EXECUTION_STATUSES: frozenset[ExecutionStatus] = frozenset(
+        {
+            ExecutionStatus.RUNNING,
+            ExecutionStatus.PAUSED,
+        }
+    )
 
-        Queries the database for executions in RUNNING status, checks each
-        one's Temporal workflow status, and updates the DB for any that have
-        already completed in Temporal. Executions still running in Temporal
-        are skipped to avoid duplicate monitoring across workers.
+    async def reconcile_stale_executions(self) -> None:
+        """Reconcile executions stuck in RUNNING or PAUSED status after a worker restart.
+
+        Queries the database for executions in RUNNING or PAUSED status (e.g. an
+        approval node left PAUSED awaiting a decision), checks each one's Temporal
+        workflow status, and updates the DB for any that have already completed in
+        Temporal. Executions still running in Temporal are skipped to avoid
+        duplicate monitoring across workers.
         """
         try:
             async with self.session_factory() as session:
                 query = (
                     select(Execution)
-                    .where(Execution.status == ExecutionStatus.RUNNING)
+                    .where(Execution.status.in_(self._RECONCILABLE_EXECUTION_STATUSES))  # type: ignore[attr-defined]
                     .options(selectinload(Execution.activities))  # type: ignore[arg-type]
                 )
                 result = await session.exec(query)
@@ -391,7 +399,7 @@ class ActivitySyncService(
             )
             result = await session.exec(query)
             fresh_execution = result.one_or_none()
-            if not fresh_execution or fresh_execution.status != ExecutionStatus.RUNNING:
+            if not fresh_execution or fresh_execution.status not in self._RECONCILABLE_EXECUTION_STATUSES:
                 return "skipped"
 
             if completed_at <= fresh_execution.created_at:
