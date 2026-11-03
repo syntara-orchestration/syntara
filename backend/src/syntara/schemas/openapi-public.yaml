@@ -34798,6 +34798,17 @@ components:
         published_version:
           type: integer
           title: Published Version
+        published_version_name:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Published Version Name
+        published_version_created_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Published Version Created At
         is_eligible:
           type: boolean
           title: Is Eligible
