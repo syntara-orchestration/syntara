@@ -2293,7 +2293,6 @@ export interface operations {
   list_child_executions: {
     parameters: {
       query?: {
-        node_id?: string | null
         /** @description Maximum number of results per page */
         limit?: components['parameters']['limitParam']
         /** @description Pagination cursor from previous response */
@@ -2302,6 +2301,8 @@ export interface operations {
         sort?: components['parameters']['sortParam']
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
+        /** @description Filter by parent sub-workflow node ID. */
+        node_id?: string | null
       }
       header?: never
       path: {
@@ -2324,6 +2325,7 @@ export interface operations {
       401: components['responses']['UnauthorizedError']
       403: components['responses']['ForbiddenError']
       404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']

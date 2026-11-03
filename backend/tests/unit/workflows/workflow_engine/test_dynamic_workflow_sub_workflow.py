@@ -18,7 +18,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4, uuid5
 
 import pytest
-from temporalio.exceptions import ApplicationError
+from temporalio.exceptions import (
+    ApplicationError,
+    ChildWorkflowError,
+    TerminatedError,
+)
+from temporalio.exceptions import CancelledError as TemporalCancelledError
+from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 from temporalio.workflow import ParentClosePolicy
 
 from syntara.workflows.workflow_engine.activities.sub_workflow_setup_activity import (
@@ -148,6 +154,7 @@ class TestSetupActivityDepthLimit:
         activity = _make_setup_activity()
 
         mock_session = AsyncMock()
+        mock_session.get = AsyncMock(return_value=None)
         exec_result = MagicMock()
         exec_result.first.return_value = None
         mock_session.exec = AsyncMock(return_value=exec_result)
@@ -245,15 +252,24 @@ class TestSetupActivityIdempotency:
         mock_version.version = 1
         mock_version.workflow_definition = _make_child_workflow_def()
 
-        mock_session_1 = AsyncMock()
-        exec_result = MagicMock()
-        exec_result.first.return_value = (mock_workflow, mock_version)
-        mock_session_1.exec = AsyncMock(return_value=exec_result)
+        existing_execution = MagicMock()
+        existing_execution.workflow_id = child_wf_id
+        existing_execution.workflow_version_id = mock_version.id
+        existing_execution.temporal_workflow_id = f"child-wf-{expected_child_exec_id}"
+        existing_execution.input_data = None
+        existing_execution.created_at = None
 
-        mock_session_2 = AsyncMock()
-        mock_session_2.get = AsyncMock(return_value=MagicMock())
+        mock_session_resume = AsyncMock()
+        mock_session_resume.get = AsyncMock(
+            side_effect=[existing_execution, mock_version, mock_workflow],
+        )
 
-        activity._session_factory = _mock_session_factory(mock_session_1, mock_session_2)
+        mock_session_persist = AsyncMock()
+        persist_result = MagicMock()
+        persist_result.first.return_value = None
+        mock_session_persist.exec = AsyncMock(return_value=persist_result)
+
+        activity._session_factory = _mock_session_factory(mock_session_resume, mock_session_persist)
 
         with patch(
             "syntara.workflows.utils.workflow_metadata.resolve_user_display_name",
@@ -268,8 +284,62 @@ class TestSetupActivityIdempotency:
             )
 
         assert result["execution_id"] == str(expected_child_exec_id)
-        mock_session_2.add.assert_not_called()
-        mock_session_2.commit.assert_not_called()
+        mock_session_resume.add.assert_not_called()
+
+    async def test_retry_preserves_pinned_version(self) -> None:
+        """On retry, the definition comes from the pinned version, not a re-resolved one."""
+        activity = _make_setup_activity()
+        child_wf_id = uuid4()
+        parent_exec_id = "parent-exec-002"
+        parent_node_id = "sub_wf_node"
+
+        expected_child_exec_id = uuid5(_SUB_WORKFLOW_NAMESPACE, f"{parent_exec_id}:{parent_node_id}")
+
+        pinned_def = _make_child_workflow_def(trigger_id="t1")
+        mock_version = MagicMock()
+        mock_version.id = uuid4()
+        mock_version.version = 3
+        mock_version.workflow_definition = pinned_def
+
+        mock_workflow = MagicMock()
+        mock_workflow.id = child_wf_id
+        mock_workflow.name = "child-wf"
+        mock_workflow.project_id = uuid4()
+        mock_workflow.created_by = uuid4()
+
+        existing_execution = MagicMock()
+        existing_execution.workflow_id = child_wf_id
+        existing_execution.workflow_version_id = mock_version.id
+        existing_execution.temporal_workflow_id = f"child-wf-{expected_child_exec_id}"
+        existing_execution.input_data = {"pinned": True}
+        existing_execution.created_at = None
+
+        mock_session_resume = AsyncMock()
+        mock_session_resume.get = AsyncMock(
+            side_effect=[existing_execution, mock_version, mock_workflow],
+        )
+        mock_session_persist = AsyncMock()
+        persist_result = MagicMock()
+        persist_result.first.return_value = None
+        mock_session_persist.exec = AsyncMock(return_value=persist_result)
+
+        activity._session_factory = _mock_session_factory(mock_session_resume, mock_session_persist)
+
+        with patch(
+            "syntara.workflows.utils.workflow_metadata.resolve_user_display_name",
+            return_value="Author",
+        ):
+            result = await activity.run(
+                parameters={"workflow_id": str(child_wf_id), "trigger_node_id": "t1"},
+                parent_execution_id=parent_exec_id,
+                parent_node_id=parent_node_id,
+                created_by_user_id=str(uuid4()),
+                current_depth=0,
+            )
+
+        assert result["workflow_definition"] == pinned_def
+        assert result["input_data"] == {"pinned": True}
+        assert result["child_workflow_version"] == 3
 
 
 class TestSetupActivityExecution:
@@ -293,15 +363,24 @@ class TestSetupActivityExecution:
         mock_version.version = 2
         mock_version.workflow_definition = _make_child_workflow_def()
 
-        mock_session_1 = AsyncMock()
+        mock_session_idempotency = AsyncMock()
+        mock_session_idempotency.get = AsyncMock(return_value=None)
+
+        mock_session_create = AsyncMock()
         exec_result = MagicMock()
         exec_result.first.return_value = (mock_workflow, mock_version)
-        mock_session_1.exec = AsyncMock(return_value=exec_result)
+        mock_session_create.exec = AsyncMock(return_value=exec_result)
 
-        mock_session_2 = AsyncMock()
-        mock_session_2.get = AsyncMock(return_value=None)
+        mock_session_persist = AsyncMock()
+        persist_result = MagicMock()
+        persist_result.first.return_value = None
+        mock_session_persist.exec = AsyncMock(return_value=persist_result)
 
-        activity._session_factory = _mock_session_factory(mock_session_1, mock_session_2)
+        activity._session_factory = _mock_session_factory(
+            mock_session_idempotency,
+            mock_session_create,
+            mock_session_persist,
+        )
 
         with patch(
             "syntara.workflows.utils.workflow_metadata.resolve_user_display_name",
@@ -325,8 +404,8 @@ class TestSetupActivityExecution:
         assert result["child_workflow_name"] == "child-wf"
         assert result["child_workflow_version"] == 2
         assert result["workflow_metadata"]["sub_workflow_depth"] == 1
-        mock_session_2.add.assert_called_once()
-        mock_session_2.commit.assert_called_once()
+        mock_session_create.add.assert_called_once()
+        mock_session_create.commit.assert_called_once()
 
 
 class TestSetupActivityDeterministicId:
@@ -545,6 +624,208 @@ class TestSubWorkflowDispatch:
 
 
 # ---------------------------------------------------------------------------
+# ChildWorkflowError handling - Temporal-level child failures (D1-D3)
+# ---------------------------------------------------------------------------
+
+
+def _make_child_workflow_error(cause: Exception) -> ChildWorkflowError:
+    """Build a ChildWorkflowError with a specific cause for testing."""
+    exc = ChildWorkflowError(
+        "child workflow failed",
+        namespace="default",
+        workflow_id="test-child-wf-id",
+        run_id="test-run-id",
+        workflow_type="orchestrator_workflow",
+        initiated_event_id=1,
+        started_event_id=2,
+        retry_state=None,
+    )
+    exc.__cause__ = cause
+    return exc
+
+
+class TestChildWorkflowErrorHandling:
+    """Verify M1 output is preserved when execute_child_workflow raises ChildWorkflowError."""
+
+    async def test_terminated_child_preserves_m1_output(self) -> None:
+        """External termination preserves child_execution_id and metadata."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(
+                side_effect=_make_child_workflow_error(TerminatedError("terminated by user"))
+            )
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError, match="Sub-workflow terminated") as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.non_retryable
+        assert exc_info.value.type == "SubWorkflowFailedError"
+        output = exc_info.value.details[0]["output"]
+        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert output["Result"]["child_workflow_id"] == setup_result["child_workflow_id"]
+        assert output["Result"]["child_workflow_name"] == setup_result["child_workflow_name"]
+        assert output["Result"]["child_workflow_version"] == setup_result["child_workflow_version"]
+        assert output["Result"]["child_status"] == "terminated"
+        assert output["StatusCode"] == 1
+
+    async def test_cancelled_child_preserves_m1_output(self) -> None:
+        """Temporal-level cancellation preserves M1 output and uses SubWorkflowFailedError."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(side_effect=_make_child_workflow_error(TemporalCancelledError()))
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError, match="Sub-workflow cancelled") as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.non_retryable
+        assert exc_info.value.type == "SubWorkflowFailedError"
+        output = exc_info.value.details[0]["output"]
+        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert output["Result"]["child_status"] == "cancelled"
+        assert output["StatusCode"] == 1
+
+    async def test_timed_out_child_preserves_m1_output(self) -> None:
+        """Child timeout preserves M1 output."""
+        from temporalio.exceptions import TimeoutType
+
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(
+                side_effect=_make_child_workflow_error(
+                    TemporalTimeoutError("timeout", type=TimeoutType.START_TO_CLOSE, last_heartbeat_details=[])
+                )
+            )
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError, match="Sub-workflow timed_out") as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.non_retryable
+        assert exc_info.value.type == "SubWorkflowFailedError"
+        output = exc_info.value.details[0]["output"]
+        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert output["Result"]["child_status"] == "timed_out"
+        assert output["StatusCode"] == 1
+
+    async def test_cancelled_child_does_not_cancel_parent(self) -> None:
+        """Cancelled child must use SubWorkflowFailedError, not InvocationCancelledError."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(side_effect=_make_child_workflow_error(TemporalCancelledError()))
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError) as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.type == "SubWorkflowFailedError"
+        assert exc_info.value.type != "InvocationCancelledError"
+
+    async def test_normal_child_failure_path_unchanged(self) -> None:
+        """Normal child failure (returns dict) still works after ChildWorkflowError handling."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "failed"})
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError, match="Sub-workflow failed") as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        output = exc_info.value.details[0]["output"]
+        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert output["Result"]["child_status"] == "failed"
+
+    async def test_normal_child_success_path_unchanged(self) -> None:
+        """Normal child success still returns output without raising."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "completed"})
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            result = await wf._execute_sub_workflow_node(node, {})
+
+        output = result["output"]
+        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert output["Result"]["child_status"] == "completed"
+        assert output["StatusCode"] == 0
+        assert output["ErrorMessage"] is None
+
+    async def test_m1_output_propagated_through_handle_node_failure(self) -> None:
+        """Verify _handle_node_failure persists M1 output to the resolver namespace."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        m1_output = OrchestratorWorkflow._build_sub_workflow_output(setup_result, "terminated")
+        app_error = ApplicationError(
+            "Sub-workflow terminated",
+            {"output": m1_output},
+            type="SubWorkflowFailedError",
+            non_retryable=True,
+        )
+
+        mock_graph = MagicMock()
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow"):
+            wf._handle_node_failure("sub_wf_1", app_error, mock_graph, {})
+
+        assert "sub_wf_1" in wf.failed_nodes
+        set_call = wf.resolver.set_namespace.call_args
+        persisted = set_call[0][1]
+        assert persisted["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert persisted["Result"]["child_status"] == "terminated"
+        assert persisted["StatusCode"] == 1
+        assert persisted["status"] == "failed"
+
+
+# ---------------------------------------------------------------------------
 # Setup activity — disabled-workflow error
 # ---------------------------------------------------------------------------
 
@@ -565,6 +846,7 @@ class TestSetupActivityDisabledWorkflow:
         mock_row.first.return_value = (mock_workflow, mock_version)
 
         mock_session = AsyncMock()
+        mock_session.get = AsyncMock(return_value=None)
         mock_session.exec = AsyncMock(return_value=mock_row)
 
         @contextlib.asynccontextmanager
