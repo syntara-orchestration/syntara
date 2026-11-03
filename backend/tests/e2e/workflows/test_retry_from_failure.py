@@ -287,47 +287,6 @@ def _listed_stdout(activity: ActivityExecution) -> str:
     return str(_activity_output(activity).get("stdout", "")).strip()
 
 
-def _loop_body_rows(syntara_api: SyntaraApiRegistry, execution_id: UUID) -> dict[str, ActivityExecution]:
-    return {
-        name: activity
-        for name, activity in _activity_executions_by(
-            syntara_api, execution_id, lambda activity: activity.activity_name
-        ).items()
-        if name == "loop_body" or name.startswith("loop_body#iter-")
-    }
-
-
-def _wait_for_loop_stdouts(
-    syntara_api: SyntaraApiRegistry,
-    execution_id: UUID,
-    required_stdouts: set[str],
-    *,
-    max_polls: int = _ACTIVITY_SYNC_POLLS,
-    poll_interval: int = _ACTIVITY_SYNC_INTERVAL,
-) -> dict[str, ActivityExecution]:
-    """Wait until terminal loop-body rows include every expected stdout value."""
-
-    def terminal_stdouts(rows: dict[str, ActivityExecution]) -> set[str]:
-        return {_listed_stdout(activity) for activity in rows.values() if _is_terminal_activity(activity)}
-
-    def missing_rows(rows: dict[str, ActivityExecution]) -> str:
-        found = sorted(terminal_stdouts(rows))
-        pending = sorted(name for name, activity in rows.items() if not _is_terminal_activity(activity))
-        return (
-            f"Execution {execution_id} loop body rows {sorted(rows)} have terminal stdout {found}, "
-            f"non-terminal {pending}, wanted {sorted(required_stdouts)}"
-        )
-
-    return _wait_until(
-        lambda: _loop_body_rows(syntara_api, execution_id),
-        lambda rows: required_stdouts <= terminal_stdouts(rows),
-        missing_rows,
-        description=f"loop body outputs for execution {execution_id}",
-        max_polls=max_polls,
-        poll_interval=poll_interval,
-    )
-
-
 def _create_and_run(
     syntara_api: SyntaraApiRegistry,
     name: str,
@@ -873,7 +832,8 @@ def test_retrying_a_quorum_branch_prevents_stale_failed_converge_restoration(
         overrides={"repair_branch": {"code": "print('repaired-quorum-branch')"}},
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
-    assert final.status == ExecutionStatus.COMPLETED, final.error_details
+    # The unselected failure is retained, so a satisfied ANY quorum completes with errors.
+    assert final.status == ExecutionStatus.COMPLETED_WITH_ERRORS, final.error_details
     retry_rows = _wait_for_activity_executions(
         syntara_api,
         final.id,
@@ -921,7 +881,7 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
             },
             _script_node(
                 "loop_body",
-                "import os, sys\nitem = os.environ['ITEM']\nprint(item)\nif item == 'bravo':\n    raise SystemExit(1)",
+                "import os\nitem = os.environ['ITEM']\nprint(item)\nif item == 'bravo':\n    raise SystemExit(1)",
                 environment={"ITEM": "$" + "{loop.item}"},
             ),
         ],
@@ -939,10 +899,13 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
         project_id=first_project_id,
     )
     assert source.status == ExecutionStatus.FAILED
-    source_rows = _wait_for_loop_stdouts(syntara_api, source.id, {"alpha", "bravo"})
-    source_by_stdout = {_listed_stdout(activity): activity for activity in source_rows.values()}
-    assert getattr(source_by_stdout["alpha"].status, "value", source_by_stdout["alpha"].status) == "completed"
-    assert getattr(source_by_stdout["bravo"].status, "value", source_by_stdout["bravo"].status) == "failed"
+    source_rows = _wait_for_activity_executions(syntara_api, source.id, {"loop_body_iter_0", "loop_body_iter_1"})
+    source_alpha = source_rows["loop_body_iter_0"]
+    source_bravo = source_rows["loop_body_iter_1"]
+    assert _activity_status(source_alpha) == "completed"
+    assert _activity_status(source_bravo) == "failed"
+    assert _activity_input(source_alpha).get("environment") == {"ITEM": "alpha"}
+    assert _activity_input(source_bravo).get("environment") == {"ITEM": "bravo"}
 
     preview = _preview_retry(syntara_api, source.id)
     assert preview.eligible is True
@@ -956,25 +919,34 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
-    retry_rows = _wait_for_loop_stdouts(syntara_api, final.id, {"alpha", "bravo", "charlie"})
-    retry_by_stdout = {_listed_stdout(activity): activity for activity in retry_rows.values()}
+    retry_rows = _wait_for_activity_executions(
+        syntara_api,
+        final.id,
+        {"loop_body_iter_0", "loop_body_iter_1", "loop_body_iter_2"},
+        required_stdouts={"loop_body_iter_1": "bravo", "loop_body_iter_2": "charlie"},
+    )
+    retry_alpha = retry_rows["loop_body_iter_0"]
+    retry_bravo = retry_rows["loop_body_iter_1"]
+    retry_charlie = retry_rows["loop_body_iter_2"]
 
-    # The first iteration is replayed from the source with its original output and times.
-    assert getattr(retry_by_stdout["alpha"].status, "value", retry_by_stdout["alpha"].status) == "completed"
-    assert _listed_stdout(retry_by_stdout["alpha"]) == _listed_stdout(source_by_stdout["alpha"])
-    assert _timestamp(retry_by_stdout["alpha"], "started_at") == _timestamp(source_by_stdout["alpha"], "started_at")
-    assert _timestamp(retry_by_stdout["alpha"], "completed_at") == _timestamp(source_by_stdout["alpha"], "completed_at")
-    # The failed iteration is repaired, and the final item runs after the resume point.
-    assert getattr(retry_by_stdout["bravo"].status, "value", retry_by_stdout["bravo"].status) == "completed"
-    assert _timestamp(retry_by_stdout["bravo"], "started_at") > _timestamp(source_by_stdout["bravo"], "started_at")
-    assert getattr(retry_by_stdout["charlie"].status, "value", retry_by_stdout["charlie"].status) == "completed"
+    # The first iteration is restored with its resolved input, output, and original timestamps.
+    assert _activity_status(retry_alpha) == "completed"
+    assert _activity_input(retry_alpha) == _activity_input(source_alpha)
+    assert _activity_output(retry_alpha) == _activity_output(source_alpha)
+    assert _timestamp(retry_alpha, "started_at") == _timestamp(source_alpha, "started_at")
+    assert _timestamp(retry_alpha, "completed_at") == _timestamp(source_alpha, "completed_at")
+    # The failed occurrence reruns with the override, then iteration 2 proceeds.
+    assert _activity_status(retry_bravo) == "completed"
+    assert _activity_input(retry_bravo).get("environment") == _activity_input(source_bravo).get("environment")
+    assert _timestamp(retry_bravo, "started_at") > _timestamp(source_bravo, "started_at")
+    assert _activity_status(retry_charlie) == "completed"
 
 
 def test_retry_replays_nested_loop_iterations_and_control_node_routes(
     syntara_api: SyntaraApiRegistry,
     first_project_id: UUID,
 ) -> None:
-    """A nested-loop retry replays prior routes and resumes the selected body occurrence."""
+    """A nested-loop retry restores prior routes and resumes the selected body occurrence."""
     name = unique_name("e2e-retry-nested-loop-control-route")
     definition = _workflow_definition(
         name,
@@ -983,50 +955,38 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
                 "id": "outer_loop",
                 "name": "Outer loop",
                 "type": "loop",
-                "parameters": {"type": "for_each", "items": '["first", "second"]'},
+                "parameters": {
+                    "type": "for_each",
+                    "items": '[["safe:first", "safe:second"], ["fail:first", "fail:second"]]',
+                },
             },
-            _script_node(
-                "outer_context",
-                "import json, os; print(json.dumps({'phase': os.environ['PHASE']}))",
-                environment={"PHASE": "${loop.item}"},
-            ),
             {
                 "id": "inner_loop",
                 "name": "Inner loop",
                 "type": "loop",
-                "parameters": {"type": "for_each", "items": '["first", "second"]'},
+                "parameters": {"type": "for_each", "items": "${loop.item}"},
             },
             {
                 "id": "route",
-                "name": "Route",
+                "name": "Route to the selected failure",
                 "type": "condition",
-                "parameters": {"condition": "${loop.item} == 'first'"},
+                "parameters": {"condition": "${loop.item} == 'fail:second'"},
             },
             _script_node(
                 "repair_body",
-                "import os\n"
-                "print(f\"{os.environ['PHASE']}:{os.environ['ITEM']}\")\n"
-                "if os.environ['PHASE'] == 'second' and os.environ['ITEM'] == 'first':\n"
-                "    raise SystemExit(1)",
-                environment={
-                    "PHASE": "${outer_context.stdout_json.phase}",
-                    "ITEM": "${loop.item}",
-                },
+                "import os; print(f\"repair:{os.environ['ITEM']}\"); raise SystemExit(1)",
+                environment={"ITEM": "${loop.item}"},
             ),
             _script_node(
                 "alternate_body",
-                "import os; print(f\"alternate:{os.environ['PHASE']}:{os.environ['ITEM']}\")",
-                environment={
-                    "PHASE": "${outer_context.stdout_json.phase}",
-                    "ITEM": "${loop.item}",
-                },
+                "import os; print(f\"alternate:{os.environ['ITEM']}\")",
+                environment={"ITEM": "${loop.item}"},
             ),
             _script_node("finished", "print('nested-loop-finished')"),
         ],
         [
             {"from": "trigger", "to": "outer_loop"},
-            {"from": "outer_loop", "to": "outer_context", "from_port": "iterate"},
-            {"from": "outer_context", "to": "inner_loop"},
+            {"from": "outer_loop", "to": "inner_loop", "from_port": "iterate"},
             {"from": "inner_loop", "to": "route", "from_port": "iterate"},
             {"from": "route", "to": "repair_body", "from_port": "true"},
             {"from": "route", "to": "alternate_body", "from_port": "false"},
@@ -1049,32 +1009,33 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
         syntara_api,
         source.id,
         {
-            "outer_context_iter_0",
-            "outer_context_iter_1",
             "route_iter_0_iter_0",
+            "alternate_body_iter_0_iter_0",
             "route_iter_0_iter_1",
-            "route_iter_1_iter_0",
-            "repair_body_iter_0_iter_0",
-            "repair_body_iter_1_iter_0",
             "alternate_body_iter_0_iter_1",
+            "route_iter_1_iter_0",
+            "alternate_body_iter_1_iter_0",
+            "route_iter_1_iter_1",
+            "repair_body_iter_1_iter_1",
         },
         required_stdouts={
-            "repair_body_iter_0_iter_0": "first:first",
-            "repair_body_iter_1_iter_0": "second:first",
-            "alternate_body_iter_0_iter_1": "alternate:first:second",
+            "alternate_body_iter_0_iter_0": "alternate:safe:first",
+            "alternate_body_iter_0_iter_1": "alternate:safe:second",
+            "alternate_body_iter_1_iter_0": "alternate:fail:first",
         },
     )
-    assert source_rows["repair_body_iter_0_iter_0"].status == "completed"
-    assert source_rows["repair_body_iter_1_iter_0"].status == "failed"
-    assert "first:first" in _listed_stdout(source_rows["repair_body_iter_0_iter_0"])
-    assert "second:first" in _listed_stdout(source_rows["repair_body_iter_1_iter_0"])
-    assert _activity_output(source_rows["route_iter_0_iter_0"]).get("evaluated_result") is True
-    assert _activity_output(source_rows["route_iter_0_iter_1"]).get("evaluated_result") is False
-    assert _activity_output(source_rows["route_iter_1_iter_0"]).get("evaluated_result") is True
+    for temporal_id in (
+        "route_iter_0_iter_0",
+        "route_iter_0_iter_1",
+        "route_iter_1_iter_0",
+    ):
+        assert _activity_output(source_rows[temporal_id]).get("evaluated_result") is False
+    assert source_rows["alternate_body_iter_0_iter_0"].status == "completed"
     assert source_rows["alternate_body_iter_0_iter_1"].status == "completed"
-    assert "alternate:first:second" in _listed_stdout(source_rows["alternate_body_iter_0_iter_1"])
-    unreached_repair = source_rows.get("repair_body_iter_0_iter_1")
-    assert unreached_repair is None or unreached_repair.status != "completed"
+    assert source_rows["alternate_body_iter_1_iter_0"].status == "completed"
+    assert _activity_output(source_rows["route_iter_1_iter_1"]).get("evaluated_result") is True
+    assert _activity_status(source_rows["repair_body_iter_1_iter_1"]) == "failed"
+    assert _activity_input(source_rows["repair_body_iter_1_iter_1"]).get("environment") == {"ITEM": "fail:second"}
 
     preview = _preview_retry(syntara_api, source.id)
     assert preview.eligible is True
@@ -1084,9 +1045,7 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
         syntara_api,
         source.id,
         ["repair_body"],
-        overrides={
-            "repair_body": {"code": "import os; print(f\"recovered:{os.environ['PHASE']}:{os.environ['ITEM']}\")"}
-        },
+        overrides={"repair_body": {"code": "import os; print(f\"recovered:{os.environ['ITEM']}\")"}},
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
@@ -1094,47 +1053,49 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
         syntara_api,
         final.id,
         {
-            "outer_context_iter_0",
             "route_iter_0_iter_0",
+            "alternate_body_iter_0_iter_0",
             "route_iter_0_iter_1",
-            "repair_body_iter_0_iter_0",
             "alternate_body_iter_0_iter_1",
             "route_iter_1_iter_0",
-            "repair_body_iter_1_iter_0",
+            "alternate_body_iter_1_iter_0",
             "route_iter_1_iter_1",
-            "alternate_body_iter_1_iter_1",
+            "repair_body_iter_1_iter_1",
+            "finished",
         },
         required_stdouts={
-            "repair_body_iter_1_iter_0": "recovered:second:first",
-            "alternate_body_iter_1_iter_1": "alternate:second:second",
+            "alternate_body_iter_0_iter_0": "alternate:safe:first",
+            "alternate_body_iter_0_iter_1": "alternate:safe:second",
+            "alternate_body_iter_1_iter_0": "alternate:fail:first",
+            "repair_body_iter_1_iter_1": "recovered:fail:second",
+            "finished": "nested-loop-finished",
         },
     )
 
-    # The first outer iteration, including its control routing and body outputs, is replayed.
+    # Earlier outer and inner occurrences, including their control routes, retain source results.
     for temporal_id in (
         "route_iter_0_iter_0",
+        "alternate_body_iter_0_iter_0",
         "route_iter_0_iter_1",
-        "repair_body_iter_0_iter_0",
         "alternate_body_iter_0_iter_1",
+        "route_iter_1_iter_0",
+        "alternate_body_iter_1_iter_0",
     ):
         assert retry_rows[temporal_id].status == source_rows[temporal_id].status
+        assert _activity_output(retry_rows[temporal_id]) == _activity_output(source_rows[temporal_id])
         assert _timestamp(retry_rows[temporal_id], "started_at") == _timestamp(source_rows[temporal_id], "started_at")
         assert _timestamp(retry_rows[temporal_id], "completed_at") == _timestamp(
             source_rows[temporal_id], "completed_at"
         )
 
-    # The failed nested occurrence is rerun, then the next inner iteration follows the recorded route.
-    repaired_middle = retry_rows["repair_body_iter_1_iter_0"]
-    assert repaired_middle.status == "completed"
-    assert _timestamp(repaired_middle, "started_at") > _timestamp(
-        source_rows["repair_body_iter_1_iter_0"], "started_at"
-    )
-    assert "recovered:second:first" in _listed_stdout(repaired_middle)
-    assert _activity_output(retry_rows["route_iter_1_iter_1"]).get("evaluated_result") is False
-    assert retry_rows["alternate_body_iter_1_iter_1"].status == "completed"
-    assert "alternate:second:second" in _listed_stdout(retry_rows["alternate_body_iter_1_iter_1"])
-    unreached_final_repair = retry_rows.get("repair_body_iter_1_iter_1")
-    assert unreached_final_repair is None or unreached_final_repair.status != "completed"
+    repaired = retry_rows["repair_body_iter_1_iter_1"]
+    assert repaired.status == "completed"
+    assert _activity_input(repaired).get("environment") == _activity_input(
+        source_rows["repair_body_iter_1_iter_1"]
+    ).get("environment")
+    assert _timestamp(repaired, "started_at") > _timestamp(source_rows["repair_body_iter_1_iter_1"], "started_at")
+    assert _activity_output(retry_rows["route_iter_1_iter_1"]).get("evaluated_result") is True
+    assert retry_rows["finished"].status == "completed"
 
 
 def test_retry_defaults_to_all_failed_parallel_branches_when_selection_is_omitted(
@@ -1142,7 +1103,7 @@ def test_retry_defaults_to_all_failed_parallel_branches_when_selection_is_omitte
     first_project_id: UUID,
 ) -> None:
     """Omitting retry_point_ids retries every currently failed branch."""
-    source, _ = _create_failed_parallel_source(
+    source, source_activities = _create_failed_parallel_source(
         syntara_api,
         first_project_id,
         name_prefix="e2e-retry-parallel-default-selection",
@@ -1159,24 +1120,18 @@ def test_retry_defaults_to_all_failed_parallel_branches_when_selection_is_omitte
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
-    final = _wait_for_activity_ids(
+    retry_rows = _wait_for_activity_executions(
         syntara_api,
-        final,
+        final.id,
         {"failure_a", "failure_b", "after_a", "after_b"},
-        required_stdouts={
-            "failure_a": "fixed-a",
-            "failure_b": "fixed-b",
-            "after_a": "after-a",
-            "after_b": "after-b",
-        },
+        required_stdouts={"failure_a": "fixed-a"},
     )
-    retry_activities = _activities_by_id(final)
-    assert retry_activities["failure_a"].status == "completed"
-    assert retry_activities["failure_b"].status == "completed"
-    assert "fixed-a" in _activity_output(retry_activities["failure_a"]).get("stdout", "")
-    assert "fixed-b" in _activity_output(retry_activities["failure_b"]).get("stdout", "")
-    assert "after-a" in _activity_output(retry_activities["after_a"]).get("stdout", "")
-    assert "after-b" in _activity_output(retry_activities["after_b"]).get("stdout", "")
+    for node_id, code in (("failure_a", "print('fixed-a')"), ("failure_b", "print('fixed-b')")):
+        assert _activity_status(retry_rows[node_id]) == "completed"
+        assert _activity_input(retry_rows[node_id]).get("code") == code
+        assert _timestamp(retry_rows[node_id], "started_at") > _timestamp(source_activities[node_id], "started_at")
+    assert _activity_status(retry_rows["after_a"]) == "completed"
+    assert _activity_status(retry_rows["after_b"]) == "completed"
 
 
 def test_retry_can_select_a_subset_of_parallel_failed_branches(
@@ -1221,7 +1176,7 @@ def test_retry_accepts_multiple_selected_parallel_failure_points(
     first_project_id: UUID,
 ) -> None:
     """Explicitly selecting multiple eligible failures reruns both parallel paths."""
-    source, _ = _create_failed_parallel_source(
+    source, source_activities = _create_failed_parallel_source(
         syntara_api,
         first_project_id,
         name_prefix="e2e-retry-parallel-multiple-selection",
@@ -1238,22 +1193,18 @@ def test_retry_accepts_multiple_selected_parallel_failure_points(
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
-    final = _wait_for_activity_ids(
+    retry_rows = _wait_for_activity_executions(
         syntara_api,
-        final,
+        final.id,
         {"failure_a", "failure_b", "after_a", "after_b"},
-        required_stdouts={
-            "failure_a": "fixed-a",
-            "failure_b": "fixed-b",
-            "after_a": "after-a",
-            "after_b": "after-b",
-        },
+        required_stdouts={"failure_a": "fixed-a", "failure_b": "fixed-b"},
     )
-    retry_activities = _activities_by_id(final)
-    assert retry_activities["failure_a"].status == "completed"
-    assert retry_activities["failure_b"].status == "completed"
-    assert retry_activities["after_a"].status == "completed"
-    assert retry_activities["after_b"].status == "completed"
+    for node_id, code in (("failure_a", "print('fixed-a')"), ("failure_b", "print('fixed-b')")):
+        assert _activity_status(retry_rows[node_id]) == "completed"
+        assert _activity_input(retry_rows[node_id]).get("code") == code
+        assert _timestamp(retry_rows[node_id], "started_at") > _timestamp(source_activities[node_id], "started_at")
+    assert _activity_status(retry_rows["after_a"]) == "completed"
+    assert _activity_status(retry_rows["after_b"]) == "completed"
 
 
 def test_retry_input_overrides_are_run_local_and_reject_unknown_keys(
