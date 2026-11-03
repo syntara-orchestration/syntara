@@ -1,6 +1,7 @@
 import { Button, FlexItem } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
 
+import { executionsClient } from '../../client'
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynLink } from '../../components/SynLink'
@@ -16,13 +17,23 @@ import { RetryExecutionButton } from './RetryExecutionButton'
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
 
 export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ execution: Execution | undefined }>) {
+  const parentExecutionId =
+    typeof execution?.execution_metadata?.parent_execution_id === 'string'
+      ? execution.execution_metadata.parent_execution_id
+      : undefined
+  // Resolve the parent workflow name from its execution id so the return link can match
+  // the forward link; fall back to the concise label while it loads or is unavailable.
+  const parentQuery = executionsClient.useQuery(
+    'get',
+    '/executions/{execution_id}',
+    { params: { path: { execution_id: parentExecutionId ?? '' } } },
+    { enabled: Boolean(parentExecutionId) }
+  )
+  const parentName = parentQuery.data?.workflow_name ?? null
+
   if (!execution?.status && !execution?.created_at) {
     return null
   }
-  const parentExecutionId =
-    typeof execution.execution_metadata?.parent_execution_id === 'string'
-      ? execution.execution_metadata.parent_execution_id
-      : undefined
   return (
     <>
       {execution.status ? (
@@ -44,7 +55,9 @@ export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ executio
       ) : null}
       {parentExecutionId ? (
         <FlexItem data-testid="view-parent-run">
-          <SynLink to={`/executions/${parentExecutionId}`}>View parent run</SynLink>
+          <SynLink to={`/executions/${parentExecutionId}`}>
+            View parent run{parentName ? `: ${parentName}` : ''}
+          </SynLink>
         </FlexItem>
       ) : null}
     </>

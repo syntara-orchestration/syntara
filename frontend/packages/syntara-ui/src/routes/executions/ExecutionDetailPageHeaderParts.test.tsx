@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { executionsClient } from '../../client'
 import { useCanI } from '../../hooks/useCanI'
 
 import { ExecutionDetailHeaderToolbar, ExecutionDetailTitleRowAddons } from './ExecutionDetailPageHeaderParts'
@@ -17,6 +18,7 @@ vi.mock('../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
   interfaceTagMiddleware: { onRequest: vi.fn() },
   executionsClient: {
+    useQuery: vi.fn(() => ({ data: undefined, isLoading: false, isError: false })),
     useMutation: vi.fn(() => ({
       mutate: vi.fn(),
       isPending: false,
@@ -222,6 +224,20 @@ describe('ExecutionDetailPageHeaderParts', () => {
     render(<ExecutionDetailTitleRowAddons execution={execution} />)
     expect(screen.getByTestId('view-parent-run')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View parent run' })).toBeInTheDocument()
+  })
+
+  it('includes the parent workflow name when it resolves', () => {
+    vi.mocked(executionsClient.useQuery).mockReturnValueOnce({
+      data: { workflow_name: 'Parent Flow' },
+      isLoading: false,
+      isError: false,
+    })
+    const execution = {
+      status: 'completed' as const,
+      execution_metadata: { parent_execution_id: 'exec-parent-001' },
+    } as never
+    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    expect(screen.getByRole('link', { name: 'View parent run: Parent Flow' })).toBeInTheDocument()
   })
 
   it('does not render a View parent run link for a top-level execution', () => {
