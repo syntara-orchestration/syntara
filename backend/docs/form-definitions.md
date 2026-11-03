@@ -1,8 +1,9 @@
 # Form Definitions
 
-The form definition, field models, and form validator are shared between form prompts and
-form triggers; differences in behavior are noted below. This guide explains how to define fields
-and parameters, how they are validated, and how to extend the shared models.
+A form definition describes the fields and options used to collect structured input in a
+workflow. Form prompts and form triggers share the form definition, field models, and validator;
+differences in behavior are noted below. This guide explains how to define fields and parameters,
+how they are validated, and how to extend the shared models.
 
 ## Fields
 
@@ -14,7 +15,7 @@ unknown properties.
 The supported field types are `text`, `textarea`, `masked_text`, `email`, `number`, `checkbox`,
 `date`, `dropdown`, and `multi_select`.
 
-### Dropdown and Multi-Select Options
+#### Dropdown and Multi-Select Options
 
 Form prompts can use dynamic options for dropdown and multi-select fields. Form triggers require
 static options because no upstream workflow nodes have run yet.
@@ -23,7 +24,7 @@ When the workflow reaches a form prompt step, the engine evaluates the dynamic e
 saves the resulting options with the prompt. Responders see that saved list, and submissions are
 checked against the same list.
 
-### Date Fields
+#### Date Fields
 
 The `date` field can collect a date, time, timezone, or a permitted combination. Inputs use ISO
 8601 `YYYY-MM-DD` dates, 24-hour `HH:MM` times, and IANA timezone names. The validator rejects
@@ -33,10 +34,10 @@ is also selected.
 After validation, the selected components are normalized into one string. If the field collects
 time and timezone without a date, the time string uses the timezone's standard UTC offset.
 
-### Form Limits
+#### Form Limits
 
-Forms collect structured values. File uploads and encrypted-secret fields are not supported.
-`masked_text` hides a value in the UI, but the value is stored in plain text.
+File uploads and encrypted-secret fields are not supported. `masked_text` hides a value in the
+UI, but the value is stored in plain text.
 
 ## Form Parameters
 
@@ -60,11 +61,12 @@ expressions throughout their parameters.
 
 ### When saving a workflow
 
-Default form values are checked with the same coercion rules used for submitted values.
+When a workflow is saved, each field's default is checked as if a user had submitted it. For
+example, a date default must use a valid date and the form's selected components, and a dropdown
+default must match one of its options.
 
-Findings use `form_prompt_configuration` for form prompts and `form_trigger_configuration` for
-form triggers. Drafts can be saved with findings; `/workflows/validate` returns `422`, and
-publishing returns `409`.
+Validation findings use `form_prompt_configuration` for form prompts and
+`form_trigger_configuration` for form triggers. Drafts can be saved with findings, publishing is blocked until the findings are resolved.
 
 ### When submitting a form
 

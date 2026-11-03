@@ -52,9 +52,10 @@ Key properties:
 
 ## Form Definitions, Fields, and Parameters
 
-Form definitions list the fields in a form, while form parameters configure how the form is used.
-
-Form prompts share their form definitions, field models, and common parameters with the form trigger. See [Form Definitions](../form-definitions.md#form-definitions) for field types, parameter rules, and validation details.
+Form definitions list the fields a user can fill in and use a defined set of supported field
+types. Form parameters configure the form itself. Most field, option, and validation rules are
+shared by form prompts and form triggers. See [Form Definitions](../form-definitions.md) for the
+full guide, including where the two differ.
 
 ## The Form Prompt Step
 

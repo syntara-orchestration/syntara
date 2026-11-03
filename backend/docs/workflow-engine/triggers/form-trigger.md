@@ -2,29 +2,29 @@
 
 A form trigger lets a user start a workflow by filling out and submitting a form. Downstream
 nodes can reference the submitted values. Form triggers share their form definitions, field
-models, and common parameters with the [form prompt step](../../form-prompts/form-prompt-overview.md),
-which collects input while a workflow is running.
+models, and common parameters with the [form prompt step](../../form-prompts/form-prompt-overview.md).
 
 For the shared trigger architecture, including output mapping, namespace registration, and how the
 workflow selects a trigger activity from its node type, see [Trigger System Overview](overview.md).
 
 ## Architecture
 
+The form is presented before a workflow execution begins. After a complete submission, the API
+validates the answers and starts exactly one execution, with the form-trigger activity as its
+entry node. The API does not create a pending form record or pause a workflow while it waits for
+input.
+
 The form definition lives in the workflow version, and the UI renders it from there. There is no
-separate form table, form service, or endpoint to fetch a form.
+dedicated form-trigger table, service, or read endpoint.
 The execution stores the cleaned submission in `input_data`; the trigger activity stores its
 mapped output under `response_data`.
 
-Because a form trigger runs before an execution exists, it has no upstream output and no running
-workflow to pause. The backend receives data only after a complete submission. Each accepted
-submission starts an execution, with no pending form state or deadline.
-
 ## Form Definitions, Fields, and Parameters
 
-Form definitions list the fields in a form, while form parameters configure how the form is used.
-
-Form triggers share their form definitions, field models, and common parameters with the form prompt step type.
-See [Form Definitions](../../form-definitions.md) for field types, parameter rules, and validation details.
+Form definitions list the fields a user can fill in and use a defined set of supported field
+types. Form parameters configure the form itself. Most field, option, and validation rules are
+shared by form prompts and form triggers. See [Form Definitions](../../form-definitions.md) for
+the full guide, including where the two differ.
 
 ## Submitting a Form
 
@@ -61,10 +61,11 @@ make it larger than the JSONB limit.
 
 ### Reading submitted values
 
-The trigger output places submitted values under `response_data`. Read a field at
+The trigger output places submitted values under `response_data`. Fields can be referenced by downstream nodes at
 `${<trigger_node_id>.response_data.<value_name>}` or
-`${trigger.response_data.<value_name>}`. Use `workflow_context.execution.created_by` and
-`workflow_context.execution.created_at` for the execution's creator and creation time.
+`${trigger.response_data.<value_name>}`. The trigger output does not include submitter or
+response-time metadata. The execution context provides the execution's creator and creation time
+through `workflow_context.execution.created_by` and `workflow_context.execution.created_at`.
 
 ### Retrying an execution
 
