@@ -61,6 +61,7 @@ from pydantic import ValidationError
 
 from syntara.authz.dependencies import PermissionChecker, ProjectScopeFilter
 from syntara.authz.engine import AllowedProjectsResult  # noqa: TC001 — FastAPI resolves dependency annotations
+from syntara.core.models.base import BaseListParams
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.execution_plane.client import (
     ExecutionPlaneHttpClient,
@@ -80,7 +81,6 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 router = SyntaraRouter(prefix="/api/execution_plane/v1", tags=["Execution Plane"])
-
 _target_scope = ProjectScopeFilter("execution_target", "read")
 _work_item_scope = ProjectScopeFilter("work_item", "read")
 _TARGET_RESPONSES: dict[int | str, dict[str, Any]] = {
@@ -290,13 +290,14 @@ async def _list_ep_resources(
     """List EP resources after AO permission checks. EP has no project scope."""
     if not allowed_projects.all_projects and not allowed_projects.project_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No project-scoped access to EP resources")
-    filters = {key: value for key, value in query_params if key not in EPListParams.model_fields}
+    filters = {key: value for key, value in query_params if key not in BaseListParams.model_fields}
+    sort = params.sort if any(key == "sort" for key, _ in query_params) else None
     try:
         list_page = client.list_work_items if operation == "work_items" else client.list_execution_targets
         return await list_page(
             limit=params.limit,
             cursor=params.cursor,
-            sort=params.sort,
+            sort=sort,
             include_total=params.include_total,
             filters=filters,
         )
