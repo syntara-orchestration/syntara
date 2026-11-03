@@ -5,9 +5,6 @@ workflow through `submitted`; if the prompt times out, the workflow follows its 
 outcome. Other branches can continue and finish while the prompt is pending. Unlike an
 approval, which collects a yes/no decision, a form prompt collects structured answers.
 
-> This overview describes the feature's architecture and behavior. See
-> [API Surface](#api-surface) for API shapes.
-
 The sections follow the feature's own lifecycle: what an author defines, what the engine
 creates when the step runs, what comes back when someone answers, and what happens when
 nobody does.
@@ -57,10 +54,7 @@ Key properties:
 
 Form definitions list the fields in a form, while form parameters configure how the form is used.
 
-The form prompt step type shares its form definitions, field models, and common parameters with
-form triggers. See [Form Definitions](../form-definitions.md#form-definitions) for field types,
-[Form Parameters](../form-definitions.md#form-parameters) for parameter rules, and
-[Validation](../form-definitions.md#validation) for validation details.
+Form prompts share their form definitions, field models, and common parameters with the form trigger. See [Form Definitions](../form-definitions.md#form-definitions) for field types, parameter rules, and validation details.
 
 ## The Form Prompt Step
 
@@ -277,9 +271,8 @@ Errors use RFC 9457 problem details. See [Audit](../audit.md) and
 
 ### Adding a new field type or parameter
 
-For steps to add a new field type or form parameter, see
-[Adding a Field Type](../../form-definitions.md#adding-a-field-type) or 
-[Adding a Parameter](../../form-definitions.md#adding-a-parameter).
+For steps to add a field type or form parameter, see
+[Extending Forms](../form-definitions.md#extending-forms).
 
 ## Current Limitations
 

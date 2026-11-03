@@ -91,9 +91,8 @@ logged and swallowed so they do not prevent a submission.
 
 ### Adding a new field type or parameter
 
-For steps to add a new field type or form node parameter, see
-[Adding a Field Type](../../form-definitions.md#adding-a-field-type) or
-[Adding a Parameter](../../form-definitions.md#adding-a-parameter).
+For steps to add a field type or form parameter, see
+[Extending Forms](../../form-definitions.md#extending-forms).
 
 ### Adding a trigger type
 

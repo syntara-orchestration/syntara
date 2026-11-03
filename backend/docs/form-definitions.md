@@ -1,9 +1,10 @@
-# Form Definitions and Fields
+# Form Definitions
 
-The form definition, field models, and submission validator are shared between form prompts and
-form triggers; differences are noted below. This guide explains how to define and extend forms.
+The form definition, field models, and form validator are shared between form prompts and
+form triggers; differences in behavior are noted below. This guide explains how to define fields
+and parameters, how they are validated, and how to extend the shared models.
 
-## Form Definitions
+## Fields
 
 A `FormDefinition` is an ordered list of 1 to 100 fields. Each field has a unique `value_name`
 that downstream steps use to read its submitted value. Fields also have a label, a required
@@ -13,12 +14,28 @@ unknown properties.
 The supported field types are `text`, `textarea`, `masked_text`, `email`, `number`, `checkbox`,
 `date`, `dropdown`, and `multi_select`.
 
-- Dropdown and multi-select fields can use dynamic options in form prompts; form triggers require
-static options.
-- The `date` field can collect a date, time, timezone, or a permitted combination. After validation, those
-  components are combined into one string: an ISO 8601 date/time value, or an IANA timezone name
-  when timezone is the only component.
-- Forms collect structured values. File uploads and encrypted-secret fields are not supported.
+### Dropdown and Multi-Select Options
+
+Form prompts can use dynamic options for dropdown and multi-select fields. Form triggers require
+static options because no upstream workflow nodes have run yet.
+
+When the workflow reaches a form prompt step, the engine evaluates the dynamic expressions and
+saves the resulting options with the prompt. Responders see that saved list, and submissions are
+checked against the same list.
+
+### Date Fields
+
+The `date` field can collect a date, time, timezone, or a permitted combination. Inputs use ISO
+8601 `YYYY-MM-DD` dates, 24-hour `HH:MM` times, and IANA timezone names. The validator rejects
+impossible dates and unrecognized timezones. A date and timezone can be combined only when a time
+is also selected.
+
+After validation, the selected components are normalized into one string. If the field collects
+time and timezone without a date, the time string uses the timezone's standard UTC offset.
+
+### Form Limits
+
+Forms collect structured values. File uploads and encrypted-secret fields are not supported.
 `masked_text` hides a value in the UI, but the value is stored in plain text.
 
 ## Form Parameters
@@ -59,7 +76,9 @@ version.
 The submission validator also applies field-specific checks: it validates email formatting and
 rejects impossible calendar dates or invalid IANA timezone names.
 
-## Adding a Field Type
+## Extending Forms
+
+### Adding a Field Type
 
 1. **Add the field model** in `forms/models/form_fields.py` and to the `FormField` union. Add a
    field used by both form prompts and form triggers to `CommonFormField`; for a field used by
