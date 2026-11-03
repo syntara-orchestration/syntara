@@ -38,7 +38,7 @@ from syntara.eventstreams.adapters.subscribe_parameters import (
 )
 from syntara.eventstreams.audit.subscription_lifecycle import EventSubscriptionLifecycleEvent
 from syntara.eventstreams.services.subscription_service import EventSubscriptionService
-from syntara.integrations.models.integration import Integration
+from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.services.integration_service import IntegrationService
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
@@ -540,6 +540,11 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 msg = "One or more Event Subscribe resource references are unavailable"
                 raise SafeValueError(msg)
             if integration is None:
+                if config.credential_id is not None:
+                    # Kafka is the supported runtime even before a draft selects its Integration.
+                    await integration_service._validate_credential_type(  # noqa: SLF001 -- reuse Integration compatibility rules
+                        IntegrationType.KAFKA, config.credential_id
+                    )
                 continue
             try:
                 validate_parameters(

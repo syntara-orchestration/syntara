@@ -12,7 +12,7 @@ from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.core.exceptions import SafeValueError
 from syntara.credentials.models.credential import Credential
 from syntara.integrations.exceptions import IntegrationCredentialTypeMismatchError
-from syntara.integrations.models.integration import Integration, IntegrationScope
+from syntara.integrations.models.integration import Integration, IntegrationScope, IntegrationType
 from syntara.workflows.services.workflow_service import WorkflowService
 from syntara.workflows.validators.workflow_integrations import (
     _extract_integration_ids,
@@ -359,3 +359,34 @@ async def test_draft_reference_validation_allows_omissions_only_on_advisory_save
     assert await validate_workflow_references(session, definition, uuid4(), allow_incomplete_subscriptions=True) == []
     with pytest.raises(SafeValueError, match="Invalid Event Subscribe"):
         await validate_workflow_references(session, definition, uuid4())
+
+
+@pytest.mark.parametrize("compatible", [False, True])
+async def test_credential_only_draft_checks_kafka_compatibility(
+    service: WorkflowService, definition: dict[str, Any], *, compatible: bool
+) -> None:
+    credential_id = definition["triggers"][0]["parameters"]["credential_id"]
+    definition["triggers"][0]["parameters"] = {"credential_id": credential_id}
+    cast("AsyncMock", service.session).get.return_value = SimpleNamespace(enabled=True)
+    with patch(
+        f"{SERVICE}.IntegrationService._validate_credential_type",
+        new_callable=AsyncMock,
+    ) as validate_type:
+        if compatible:
+            await service._validate_event_subscribe_bindings(definition, allow_incomplete=True)
+        else:
+            validate_type.side_effect = IntegrationCredentialTypeMismatchError("kafka", "wrong", frozenset({"Kafka"}))
+            with pytest.raises(IntegrationCredentialTypeMismatchError):
+                await service._validate_event_subscribe_bindings(definition, allow_incomplete=True)
+        validate_type.assert_awaited_once_with(IntegrationType.KAFKA, UUID(credential_id))
+
+
+@pytest.mark.parametrize("credential", [None, SimpleNamespace(enabled=False)])
+async def test_credential_only_draft_rejects_unavailable_credential(
+    service: WorkflowService, definition: dict[str, Any], credential: SimpleNamespace | None
+) -> None:
+    credential_id = definition["triggers"][0]["parameters"]["credential_id"]
+    definition["triggers"][0]["parameters"] = {"credential_id": credential_id}
+    cast("AsyncMock", service.session).get.return_value = credential
+    with pytest.raises(SafeValueError, match="unavailable"):
+        await service._validate_event_subscribe_bindings(definition, allow_incomplete=True)
