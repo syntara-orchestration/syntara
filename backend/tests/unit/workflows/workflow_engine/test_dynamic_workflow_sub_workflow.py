@@ -817,7 +817,7 @@ class TestChildWorkflowErrorHandling:
             wf._handle_node_failure("sub_wf_1", app_error, mock_graph, {})
 
         assert "sub_wf_1" in wf.failed_nodes
-        set_call = wf.resolver.set_namespace.call_args
+        set_call = wf.resolver.set_namespace.call_args  # type: ignore[attr-defined]
         persisted = set_call[0][1]
         assert persisted["Result"]["child_execution_id"] == setup_result["execution_id"]
         assert persisted["Result"]["child_status"] == "terminated"
