@@ -6,7 +6,7 @@ the form starts the workflow, and downstream nodes can use the submitted values.
 For the shared trigger architecture, including output mapping, namespace registration, and how the
 workflow selects a trigger activity from its node type, see [Trigger System Overview](overview.md).
 
-## Architecture
+## How a Form Trigger Works
 
 The form is presented before a workflow execution begins. The user submits it through the existing
 `POST /api/v1/executions` endpoint; form triggers have no separate submit endpoint. The API
