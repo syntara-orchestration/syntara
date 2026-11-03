@@ -307,7 +307,11 @@ class ActivitySyncService(
         }
     )
 
-    _RECONCILABLE_STATUSES: frozenset[ExecutionStatus] = frozenset(
+    # An execution's in-process monitor task does not survive a worker restart.
+    # RUNNING and PAUSED executions both rely on that task to reach a terminal
+    # status (PAUSED while awaiting an approval that may be granted after the
+    # worker that owned the monitor has already died), so both are reconciled.
+    _RECONCILABLE_EXECUTION_STATUSES: frozenset[ExecutionStatus] = frozenset(
         {
             ExecutionStatus.RUNNING,
             ExecutionStatus.PAUSED,
@@ -317,17 +321,16 @@ class ActivitySyncService(
     async def reconcile_stale_executions(self) -> None:
         """Reconcile executions stuck in RUNNING or PAUSED status after a worker restart.
 
-        Queries the database for executions in RUNNING or PAUSED (pending
-        approval) status, checks each one's Temporal workflow status, and
-        updates the DB for any that have already completed in Temporal.
-        Executions still running in Temporal are skipped to avoid duplicate
-        monitoring across workers.
+        Queries the database for executions in RUNNING or PAUSED status, checks
+        each one's Temporal workflow status, and updates the DB for any that have
+        already completed in Temporal. Executions still running in Temporal
+        are skipped to avoid duplicate monitoring across workers.
         """
         try:
             async with self.session_factory() as session:
                 query = (
                     select(Execution)
-                    .where(Execution.status.in_(self._RECONCILABLE_STATUSES))  # type: ignore[attr-defined]
+                    .where(Execution.status.in_(self._RECONCILABLE_EXECUTION_STATUSES))  # type: ignore[attr-defined]
                     .options(selectinload(Execution.activities))  # type: ignore[arg-type]
                 )
                 result = await session.exec(query)
@@ -399,7 +402,7 @@ class ActivitySyncService(
             )
             result = await session.exec(query)
             fresh_execution = result.one_or_none()
-            if not fresh_execution or fresh_execution.status not in self._RECONCILABLE_STATUSES:
+            if not fresh_execution or fresh_execution.status not in self._RECONCILABLE_EXECUTION_STATUSES:
                 return "skipped"
 
             if completed_at <= fresh_execution.created_at:

@@ -9,6 +9,8 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import Select
+from sqlmodel.sql._expression_select_cls import SelectOfScalar
 from temporalio.api.enums.v1 import EventType
 from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedError
 from temporalio.exceptions import ApplicationError
@@ -5325,57 +5327,6 @@ class TestReconcileStaleExecutions:
 
         mock_session.commit.assert_not_awaited()
 
-    @staticmethod
-    def _statuses_matched_by_query(query: Any) -> set[ExecutionStatus]:  # noqa: ANN401 — query is a SQLAlchemy Select
-        """Return the ExecutionStatus values a stale-executions query filters on.
-
-        Introspects the compiled ``WHERE`` clause's bound value(s) so this test
-        exercises the real query built by ``reconcile_stale_executions`` instead
-        of a mock that would match regardless of the actual filter.
-        """
-        value = query.whereclause.right.value
-        return set(value) if isinstance(value, list) else {value}
-
-    @pytest.mark.asyncio
-    async def test_paused_pending_approval_execution_is_reconciled_after_restart(self) -> None:
-        """A PAUSED (pending-approval) execution must be reconciled like a RUNNING one.
-
-        Reproduces executions left in "Paused - Pending Approval" forever after a
-        worker restart: the Temporal workflow already completed (e.g. the approval
-        was decided), but startup reconciliation only looks at RUNNING executions
-        and never notices the PAUSED one.
-        """
-        service, mock_session, mock_client = self._make_service()
-        execution = self._make_stale_execution()
-        execution.status = ExecutionStatus.PAUSED
-
-        queries: list[Any] = []
-
-        async def fake_exec(query: Any) -> Mock:  # noqa: ANN401 — mock side_effect callable
-            queries.append(query)
-            result = Mock()
-            if len(queries) == 1:
-                matched_statuses = self._statuses_matched_by_query(query)
-                result.all.return_value = [execution] if execution.status in matched_statuses else []
-            else:
-                result.one_or_none.return_value = execution
-            return result
-
-        mock_session.exec = AsyncMock(side_effect=fake_exec)
-
-        mock_event = Mock()
-        mock_event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
-        mock_event.event_time = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)
-        mock_event.workflow_execution_completed_event_attributes = None
-        mock_client.get_workflow_handle = Mock(
-            return_value=self._make_temporal_handle("COMPLETED", events=[mock_event]),
-        )
-
-        with patch.object(service, "_publish_snapshot", new_callable=AsyncMock):
-            await service.reconcile_stale_executions()
-
-        assert execution.status == ExecutionStatus.COMPLETED
-
     @pytest.mark.asyncio
     async def test_deleted_execution_during_reconcile_skipped(self) -> None:
         """Execution deleted between initial query and re-fetch is skipped."""
@@ -5401,6 +5352,43 @@ class TestReconcileStaleExecutions:
             mock_snapshot.assert_not_awaited()
 
         mock_session.commit.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_paused_execution_left_by_restart_is_reconciled(self) -> None:
+        """An execution left PAUSED by a worker restart must still be reconciled.
+
+        Once Temporal shows the workflow finished — e.g. after the pending
+        approval was later decided against a different worker — the execution
+        should be reconciled to a terminal status, just like a RUNNING one.
+        """
+        service, mock_session, mock_client = self._make_service()
+        execution = self._make_stale_execution()
+        execution.status = ExecutionStatus.PAUSED
+
+        def fake_exec(query: Select[tuple[Execution]] | SelectOfScalar[Execution]) -> Mock:
+            compiled = str(query.compile(compile_kwargs={"literal_binds": True}))
+            result = Mock()
+            if "executions.id =" in compiled:
+                result.one_or_none.return_value = execution
+            else:
+                result.all.return_value = [execution] if "'paused'" in compiled else []
+            return result
+
+        mock_session.exec = AsyncMock(side_effect=fake_exec)
+
+        mock_event = Mock()
+        mock_event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+        mock_event.event_time = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)
+        mock_event.workflow_execution_completed_event_attributes = None
+        mock_client.get_workflow_handle = Mock(
+            return_value=self._make_temporal_handle("COMPLETED", events=[mock_event]),
+        )
+
+        with patch.object(service, "_publish_snapshot", new_callable=AsyncMock):
+            await service.reconcile_stale_executions()
+
+        assert execution.status == ExecutionStatus.COMPLETED
+        mock_session.commit.assert_awaited()
 
 
 class TestQueryActivityIoOutputMerge:
