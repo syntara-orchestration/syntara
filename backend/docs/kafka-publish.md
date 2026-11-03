@@ -5,6 +5,19 @@ integration, select the runtime Kafka credential when the connection uses SASL,
 and enter an existing, fixed topic. Publish runs in the normal workflow worker;
 that worker must be able to reach the integration's brokers.
 
+The builder uses dedicated key and ordered header controls. Select **Null (no
+bytes)**, **UTF-8 text**, or **Base64 binary** explicitly; enter values without
+JSON quotes. An empty text or Base64 value remains empty bytes. Add, remove, or
+move header rows without combining repeated names. **Header source → Full-value
+template** accepts a template that resolves to the complete ordered header list.
+Define referenced trigger inputs in the trigger's input schema before publishing.
+
+Runtime credential selection becomes available once the chosen integration's
+connection settings have loaded. SASL_SSL requires a compatible runtime Kafka
+credential. SSL and opted-in PLAINTEXT allow omission. Changing the integration
+clears the previous runtime credential. The integration's management credential
+is never substituted. Published versions show these controls read-only.
+
 The payload editor accepts any JSON value, including arrays, strings, numbers,
 booleans and `null`. A full-value template such as `${trigger.payload}` preserves
 the referenced value's type. A JSON-looking string stays a string. Missing
@@ -22,17 +35,23 @@ An example node in a v2 workflow definition:
     "integration_id": "11111111-1111-4111-8111-111111111111",
     "credential_id": "22222222-2222-4222-8222-222222222222",
     "topic": "automation.outcomes",
-    "payload": {"outcome": "${previous_step.outcome}"},
-    "key": {"encoding": "utf-8", "value": "order-123"},
+    "payload": { "outcome": "${previous_step.outcome}" },
+    "key": { "encoding": "utf-8", "value": "order-123" },
     "headers": [
-      {"name": "correlation-id", "value": {"encoding": "utf-8", "value": "request-123"}},
-      {"name": "binary-context", "value": {"encoding": "base64", "value": "AAEC"}},
-      {"name": "optional-context", "value": null}
+      {
+        "name": "correlation-id",
+        "value": { "encoding": "utf-8", "value": "request-123" }
+      },
+      {
+        "name": "binary-context",
+        "value": { "encoding": "base64", "value": "AAEC" }
+      },
+      { "name": "optional-context", "value": null }
     ]
   },
   "settings": {
     "timeout": 30,
-    "retry_policy": {"max_retries": 3}
+    "retry_policy": { "max_retries": 3 }
   }
 }
 ```
@@ -99,7 +118,12 @@ resume downstream execution.
 ## Success output
 
 ```json
-{"topic":"automation.outcomes","partition":2,"offset":"98321","timestamp_ms":1793354400000}
+{
+  "topic": "automation.outcomes",
+  "partition": 2,
+  "offset": "98321",
+  "timestamp_ms": 1793354400000
+}
 ```
 
 Offsets are decimal strings to preserve precision in JavaScript. Unavailable
@@ -129,18 +153,18 @@ invocation. Authentication rejection of an older secret is terminal.
 
 ## Limits and worker lifecycle
 
-| Limit or producer setting | Value |
-| --- | --- |
-| Conservative uncompressed Kafka record estimate | 1,048,576 bytes, inclusive; includes value, decoded key, headers and record/batch overhead |
-| Complete encoded Temporal arguments | 1,887,436 bytes, using the existing converter and credential-codec framing |
-| Header entries | 128, counting duplicates and null-valued entries |
-| Active/starting/retiring producer instances per worker | Worker `max_concurrent_activities` (N; default 50) |
-| Unresolved sends per worker | N, including sends whose callers stopped waiting |
-| Retained Kafka record data | N × 1 MiB; this is not a total process RAM limit |
-| Unused producer expiry | 300 seconds; no pending sends |
-| Producer request timeout | 10,000 ms |
-| Batch target / internal retry backoff | 16,384 bytes / 100 ms |
-| Compression / intentional linger | None / 0 ms |
+| Limit or producer setting                              | Value                                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| Conservative uncompressed Kafka record estimate        | 1,048,576 bytes, inclusive; includes value, decoded key, headers and record/batch overhead |
+| Complete encoded Temporal arguments                    | 1,887,436 bytes, using the existing converter and credential-codec framing                 |
+| Header entries                                         | 128, counting duplicates and null-valued entries                                           |
+| Active/starting/retiring producer instances per worker | Worker `max_concurrent_activities` (N; default 50)                                         |
+| Unresolved sends per worker                            | N, including sends whose callers stopped waiting                                           |
+| Retained Kafka record data                             | N × 1 MiB; this is not a total process RAM limit                                           |
+| Unused producer expiry                                 | 300 seconds; no pending sends                                                              |
+| Producer request timeout                               | 10,000 ms                                                                                  |
+| Batch target / internal retry backoff                  | 16,384 bytes / 100 ms                                                                      |
+| Compression / intentional linger                       | None / 0 ms                                                                                |
 
 Kafka and Temporal limits are checked independently before their respective
 scheduling/sending boundaries. Messages are not split or truncated. The broker
@@ -182,6 +206,12 @@ do not constitute that benchmark.
 
 ## Backend validation
 
+Upgrades must apply migration `07f34fed0845`, which adds `kafka_publish` to the
+PostgreSQL `nodetype` enum used by activity execution records. Without it, Kafka
+can acknowledge a record while execution/result persistence fails. The additive
+migration preserves existing records; downgrade retains the enum label so stored
+Kafka Publish executions remain readable by compatible application versions.
+
 The ordinary integration suite starts a disposable KRaft broker through
 testcontainers. It checks exact JSON/key/header bytes, confirmed missing topics,
 disabled implicit topic creation, and lower broker message limits. Temporal
@@ -189,3 +219,25 @@ integration scenarios exercise automatic retries, `max_retries=0`, terminal
 authorization failures, frozen inputs and downstream execution. The opt-in
 `test_kafka_publish_live.py` additionally exercises the root Compose SASL/TLS
 fixture (`SYNTARA_KAFKA_PUBLISH_LIVE=1`).
+
+## Browser validation
+
+`frontend/packages/syntara-ui/e2e/kafka-publish.spec.ts` covers builder creation,
+save/reopen/edit, JSON null, binary keys, ordered duplicate/null/empty headers,
+payload and header templates, zero additional retries, accessibility, and viewing
+a published version. It runs with the mock API or a real backend.
+
+`kafka-publish-live.spec.ts` is opt-in with `SYNTARA_E2E_KAFKA_PUBLISH_LIVE=1`
+and real-backend mode. It creates separate management and runtime credentials,
+assigns a project-scoped integration, configures and saves the action through the
+UI, runs it through the real worker, and consumes the resulting Kafka record to
+check exact value/key/header bytes and acknowledgment metadata. Test resources
+and its unique topic are removed afterward.
+
+The live browser test requires the disposable SASL/PLAIN TLS fixture identity
+from `backend/samples/kafka`, the generated local CA, and backend dependencies
+installed with `make install`. Set `SYNTARA_E2E_KAFKA_BOOTSTRAP` to an address
+reachable by both the worker and test runner. Advertised broker addresses must
+also be reachable, allowed by each process's existing integration allowlist, and
+covered by the broker's TLS certificate. The test does not start or reconfigure
+the broker or application services.

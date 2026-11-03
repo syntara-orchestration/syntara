@@ -29,8 +29,8 @@ export default function registerKafkaPublishNode() {
         }))
         useWorkflowStore.getState().addActivity(activity)
         onSuccess(activityId)
-      } catch (error) {
-        onError(error instanceof Error ? error.message : 'Failed to add Kafka Publish')
+      } catch {
+        onError('Failed to add Kafka Publish. Check the action configuration.')
       }
     },
   })

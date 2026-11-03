@@ -1,8 +1,13 @@
 import { ActivityTypeEnum, type Activity } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
+import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
-import { buildKafkaPublishParameters } from '../node-forms/kafkaPublishFormSchema'
+import {
+  buildKafkaPublishParameters,
+  kafkaPublishInitialFields,
+  kafkaPublishParametersSchema,
+} from '../node-forms/kafkaPublishFormSchema'
 import { KafkaPublishNodeForm } from '../node-forms/KafkaPublishNodeForm'
 
 export function KafkaPublishNodeDetails({
@@ -17,7 +22,15 @@ export function KafkaPublishNodeDetails({
   projectId?: string
 }>) {
   const { updateActivity } = useWorkflowStoreActions()
-  const parameters = taskData.parameters
+  const parameters = kafkaPublishParametersSchema.safeParse(taskData.parameters)
+  if (!parameters.success) {
+    return (
+      <SynErrorState
+        title="Invalid Kafka Publish configuration"
+        message="The saved parameters do not match the Kafka Publish contract. Correct the configuration in the workflow definition."
+      />
+    )
+  }
   return (
     <KafkaPublishNodeForm
       key={taskData.id}
@@ -25,12 +38,7 @@ export function KafkaPublishNodeDetails({
       onHeaderContentChange={onHeaderContentChange}
       initialData={{
         name: taskData.name ?? '',
-        integration_id: typeof parameters.integration_id === 'string' ? parameters.integration_id : '',
-        credential_id: typeof parameters.credential_id === 'string' ? parameters.credential_id : '',
-        topic: typeof parameters.topic === 'string' ? parameters.topic : '',
-        payload: JSON.stringify(parameters.payload, null, 2),
-        key: parameters.key == null ? '' : JSON.stringify(parameters.key, null, 2),
-        headers: JSON.stringify(parameters.headers ?? [], null, 2),
+        ...kafkaPublishInitialFields(parameters.data),
         settings: taskData.settings ?? {},
       }}
       onSubmit={(data) => {

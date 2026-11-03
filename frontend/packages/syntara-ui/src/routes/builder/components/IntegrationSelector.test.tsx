@@ -7,16 +7,10 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { integrationsClient } from '../../../client'
-
 import { IntegrationSelector } from './IntegrationSelector'
 
-vi.mock('../../../client', () => ({
-  integrationsClient: {
-    useQuery: vi.fn(),
-    useMutation: vi.fn(),
-  },
-}))
+const { integrationsQuery } = vi.hoisted(() => ({ integrationsQuery: vi.fn() }))
+vi.mock('./useAllIntegrations', () => ({ useAllIntegrations: integrationsQuery }))
 
 type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
@@ -52,30 +46,30 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 )
 
 function mockQuerySuccess(resources = mockIntegrations) {
-  vi.mocked(integrationsClient.useQuery).mockReturnValue({
-    data: { resources, next: null, prev: null },
+  integrationsQuery.mockReturnValue({
+    data: resources,
     isPending: false,
     isError: false,
     refetch: vi.fn(),
-  } as ReturnType<typeof integrationsClient.useQuery>)
+  })
 }
 
 function mockQueryLoading() {
-  vi.mocked(integrationsClient.useQuery).mockReturnValue({
+  integrationsQuery.mockReturnValue({
     data: undefined,
     isPending: true,
     isError: false,
     refetch: vi.fn(),
-  } as ReturnType<typeof integrationsClient.useQuery>)
+  })
 }
 
 function mockQueryError() {
-  vi.mocked(integrationsClient.useQuery).mockReturnValue({
+  integrationsQuery.mockReturnValue({
     data: undefined,
     isPending: false,
     isError: true,
     refetch: vi.fn(),
-  } as ReturnType<typeof integrationsClient.useQuery>)
+  })
 }
 
 function renderSelector(props: Partial<Parameters<typeof IntegrationSelector>[0]> = {}) {
@@ -88,9 +82,7 @@ describe('IntegrationSelector', () => {
   it('uses the Kafka API and workflow project scope for Kafka selection', () => {
     mockQuerySuccess([])
     renderSelector({ integrationType: IntegrationTypeEnum.KAFKA, projectId: 'project-id', label: 'Kafka integration' })
-    expect(integrationsClient.useQuery).toHaveBeenCalledWith('get', '/kafka_integrations', {
-      params: { query: { enabled: true, project_id: 'project-id' } },
-    })
+    expect(integrationsQuery).toHaveBeenCalledWith(IntegrationTypeEnum.KAFKA, 'project-id')
   })
   beforeEach(() => {
     mockQuerySuccess()
@@ -240,20 +232,12 @@ describe('IntegrationSelector', () => {
 
   it('passes project_id to the integrations query when projectId is provided', () => {
     renderSelector({ projectId: 'proj-123' })
-    expect(integrationsClient.useQuery).toHaveBeenCalledWith('get', '/integrations', {
-      params: {
-        query: { integration_type: 'mcp_server', enabled: true, project_id: 'proj-123' },
-      },
-    })
+    expect(integrationsQuery).toHaveBeenCalledWith(IntegrationTypeEnum.MCP_SERVER, 'proj-123')
   })
 
   it('does not include project_id in the query when projectId is omitted', () => {
     renderSelector()
-    expect(integrationsClient.useQuery).toHaveBeenCalledWith('get', '/integrations', {
-      params: {
-        query: { integration_type: 'mcp_server', enabled: true },
-      },
-    })
+    expect(integrationsQuery).toHaveBeenCalledWith(IntegrationTypeEnum.MCP_SERVER, undefined)
   })
 
   it('renders only project-scoped integrations when projectId filters the result set', async () => {
