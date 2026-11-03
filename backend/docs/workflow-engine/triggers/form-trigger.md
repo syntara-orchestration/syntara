@@ -1,8 +1,7 @@
 # Form Trigger
 
-A form trigger lets a user start a workflow by filling out and submitting a form. Downstream
-nodes can reference the submitted values. Form triggers share their form definitions, field
-models, and common parameters with the [form prompt step](../../forms/form-prompt-overview.md).
+A form trigger is a workflow entry point that collects structured input from a user. Submitting
+the form starts the workflow, and downstream nodes can use the submitted values.
 
 For the shared trigger architecture, including output mapping, namespace registration, and how the
 workflow selects a trigger activity from its node type, see [Trigger System Overview](overview.md).
