@@ -131,6 +131,24 @@ async def emit_completion_metrics(
 # ---------------------------------------------------------------------------
 
 
+def _map_status_for_prometheus(status: ExecutionStatus) -> str:
+    """Map ExecutionStatus to Prometheus label value.
+
+    Maps terminal execution statuses to bounded label values. Does not map
+    PENDING/RUNNING/PAUSED as those are not terminal.
+    """
+    if status == ExecutionStatus.COMPLETED:
+        return "completed"
+    if status == ExecutionStatus.COMPLETED_WITH_ERRORS:
+        return "completed_with_errors"
+    if status == ExecutionStatus.FAILED:
+        return "failed"
+    if status == ExecutionStatus.CANCELLED:
+        return "cancelled"
+    # Should not reach here for terminal statuses
+    return "unknown"
+
+
 def _emit_workflow(
     execution: Execution,
     workflow_type: str,
@@ -148,6 +166,20 @@ def _emit_workflow(
     duration_ms = (execution.completed_at - execution.created_at).total_seconds() * 1000
     recorder.record(MetricType.WORKFLOW_DURATION, duration_ms, unit="ms", labels=labels)
     recorder.record(MetricType.WORKFLOW_STATUS, value=1, labels=labels)
+
+    # Emit retry-specific metrics if this is a retry execution
+    # Handle both explicit retry_kind and legacy retries (NULL retry_kind but has parent)
+    if execution.retry_kind or execution.retried_from_execution_id:
+        # Use 'unknown' for legacy retries that lack explicit classification
+        retry_kind = execution.retry_kind if execution.retry_kind else "unknown"
+        retry_status = _map_status_for_prometheus(execution.status)
+        retry_labels = {
+            "retry_kind": retry_kind,
+            "status": retry_status,
+        }
+        recorder.record(MetricType.WORKFLOW_RETRY_COMPLETIONS, value=1, labels=retry_labels)
+        duration_s = (execution.completed_at - execution.created_at).total_seconds()
+        recorder.record(MetricType.WORKFLOW_RETRY_DURATION, duration_s, unit="s", labels=retry_labels)
 
     with _workflow_completion_lock:
         _workflow_completion_counts[1] += 1

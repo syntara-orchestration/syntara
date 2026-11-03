@@ -57,7 +57,7 @@ class OrchestratorPrometheusMetrics:
 
     """
 
-    def __init__(self, registry: CollectorRegistry | None = None) -> None:
+    def __init__(self, registry: CollectorRegistry | None = None) -> None:  # noqa: PLR0915
         """Initialise metrics and bind them to *registry*."""
         self.registry = registry or CollectorRegistry()
 
@@ -387,5 +387,26 @@ class OrchestratorPrometheusMetrics:
             "orchestrator_system_error_rate",
             "System-wide error rate",
             ["component"],
+            registry=self.registry,
+        )
+        # Retry telemetry metrics
+        self.workflow_retry_requests_total = Counter(
+            "orchestrator_workflow_retry_requests_total",
+            "Total number of retry requests by kind and outcome",
+            ["retry_kind", "outcome"],
+            registry=self.registry,
+        )
+
+        self.workflow_retry_completions_total = Counter(
+            "orchestrator_workflow_retry_completions_total",
+            "Total number of retry executions that reached terminal status",
+            ["retry_kind", "status"],
+            registry=self.registry,
+        )
+
+        self.workflow_retry_duration_seconds = Histogram(
+            "orchestrator_workflow_retry_duration_seconds",
+            "Duration of retry executions from creation to completion",
+            ["retry_kind", "status"],
             registry=self.registry,
         )

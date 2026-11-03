@@ -74,6 +74,10 @@ _COMPONENT_METRIC_MAP: dict[MetricType, tuple[str, str, tuple[str, ...]]] = {
     MetricType.SYSTEM_UPTIME: ("system_uptime", "gauge", ()),
     MetricType.SYSTEM_E2E_LATENCY: ("system_e2e_latency_seconds", "histogram", ()),
     MetricType.SYSTEM_ERROR_RATE: ("system_error_rate", "gauge", ()),
+    # Retry Telemetry
+    MetricType.WORKFLOW_RETRY_REQUESTS: ("workflow_retry_requests_total", "counter", ("retry_kind", "outcome")),
+    MetricType.WORKFLOW_RETRY_COMPLETIONS: ("workflow_retry_completions_total", "counter", ("retry_kind", "status")),
+    MetricType.WORKFLOW_RETRY_DURATION: ("workflow_retry_duration_seconds", "histogram", ("retry_kind", "status")),
 }
 
 

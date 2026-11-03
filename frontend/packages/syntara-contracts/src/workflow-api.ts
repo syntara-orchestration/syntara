@@ -935,6 +935,11 @@ export interface components {
       /** Retried From Execution Id */
       retried_from_execution_id?: string | null
       /**
+       * Retry Kind
+       * @description Type of retry execution: 'plain' (retry_execution), 'from_failure' (retry_from_failure), 'unknown' (legacy), or null (not a retry)
+       */
+      retry_kind?: string | null
+      /**
        * Trigger Type
        * @description Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger)
        */
