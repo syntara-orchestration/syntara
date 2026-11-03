@@ -15,23 +15,22 @@ entry node. It does not create a pending form record or pause a workflow while i
 
 The form definition lives in the workflow version, and the UI renders it from there. There is no
 dedicated form-trigger table, service, or read endpoint.
-The execution stores the cleaned submission in `input_data`; the trigger activity stores its
-mapped output under `response_data`.
+The execution stores the validated answers in `input_data`. The trigger activity applies output
+mapping and puts the mapped values under `response_data`, where downstream nodes can use them.
 
 ## Form Definitions, Fields, and Parameters
 
-Form definitions list the fields a user can fill in and use a defined set of supported field
-types. Form parameters configure the form itself. Most field, option, and validation rules are
-shared by form prompts and form triggers. See [Form Definitions](../../forms/form-definitions.md) for
+Form definitions list the fields a user will fill in. Authors choose each field's type from the
+supported set and configure its label, required status, and other settings. Form parameters
+configure the form itself. Most field, option, and validation rules are
+shared by [form prompts](../../forms/form-prompt-overview.md) and form triggers. See [Form Definitions](../../forms/form-definitions.md) for
 the full guide, including where the two differ.
 
 ## Submitting a Form
 
-The forms domain owns the field models and shared submission validator; the workflows domain
-owns the trigger and execution path. Before starting a workflow,
-`ExecutionService.create_execution()` calls `validate_form_trigger_submission()` in
-`workflows/form_trigger.py`. That function checks the trigger's form definition, then
-calls `validate_form_submission()` in `forms/validators/submission.py` to validate and normalize the answers.
+Before starting the workflow, the executions API validates the answers against the form definition
+and normalizes them for downstream steps. The forms domain owns the field models and shared
+validation; the workflows domain owns the trigger and execution path.
 
 ```mermaid
 sequenceDiagram
@@ -107,4 +106,3 @@ service or database table. See [Adding a New Trigger Type](overview.md#adding-a-
 - [Form Prompt Overview](../../forms/form-prompt-overview.md) — the sibling collection
   point that pauses a running workflow
 - [Manual Trigger](manual-trigger.md) — another trigger with no external state
-- [Workflow Engine Architecture](../workflow-engine-overview.md) — graph execution and dispatch

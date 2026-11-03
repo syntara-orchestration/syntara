@@ -52,8 +52,9 @@ Key properties:
 
 ## Form Definitions, Fields, and Parameters
 
-Form definitions list the fields a user can fill in and use a defined set of supported field
-types. Form parameters configure the form itself. Most field, option, and validation rules are
+Form definitions list the fields a user will fill in. Authors choose each field's type from the
+supported set and configure its label, required status, and other settings. Form parameters
+configure the form itself. Most field, option, and validation rules are
 shared by form prompts and form triggers. See [Form Definitions](form-definitions.md) for the
 full guide, including where the two differ.
 

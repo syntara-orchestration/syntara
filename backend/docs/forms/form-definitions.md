@@ -3,15 +3,15 @@
 A form definition describes the fields and options used to collect structured input in a
 workflow. [Form prompts](form-prompt-overview.md) and [form triggers](../workflow-engine/triggers/form-trigger.md)
 share the form definition, field models, and validator; differences in behavior are noted below.
-This guide explains how to define fields and parameters, how they are validated, and how to
+This guide explains how form fields and parameters are defined, how they are validated, and how to
 extend the shared models.
 
 ## Fields
 
 A `FormDefinition` is an ordered list of 1 to 100 fields. Each field has a unique `value_name`
 that downstream steps use to read its submitted value. Fields also have a label, a required
-flag, optional help and placeholder text, and a type-specific default. Definitions reject
-unknown properties.
+flag, optional help and placeholder text, and a type-specific default. Each field must use a
+supported type and its defined settings; unknown types and extra settings are rejected.
 
 The supported field types are `text`, `textarea`, `masked_text`, `email`, `number`, `checkbox`,
 `date`, `dropdown`, and `multi_select`.
