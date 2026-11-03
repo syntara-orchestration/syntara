@@ -9,6 +9,7 @@ export type UpstreamNodeInfo = {
   id: string
   name?: string
   type: string
+  parameters?: Record<string, unknown>
   icon?: ComponentType<{ className?: string }>
   iconId?: string
 }
@@ -40,6 +41,7 @@ export function useUpstreamNodes(nodeId: string): UpstreamNodeInfo[] {
           id: activity.id,
           name: activity.name,
           type: activity.type,
+          parameters: activity.parameters,
         })
       }
     }
@@ -51,6 +53,7 @@ export function useUpstreamNodes(nodeId: string): UpstreamNodeInfo[] {
           id: trigger.id,
           name: trigger.name,
           type: trigger.type,
+          parameters: trigger.parameters,
         }
         nodeMap.set(trigger.id, info)
         nodeMap.set(buildTriggerNodeId(i), info)

@@ -1,10 +1,10 @@
 import { Alert, Button, Flex, FlexItem, Label, Stack, StackItem } from '@patternfly/react-core'
 import { RhUiCloseIcon } from '@patternfly/react-icons'
-import { getNodeOutputSchema, TriggerTypeEnum } from '@syntara/contracts'
+import { TriggerTypeEnum } from '@syntara/contracts'
 
 import type { UpstreamNodeInfo } from './hooks/useUpstreamNodes'
 import { InputEmptyState } from './InputEmptyState'
-import { getTriggerInputSchemaFields } from './utils/triggerSchemaUtils'
+import { getEffectiveOutputSchema } from './utils/effectiveOutputSchema'
 import { InputJsonView } from './views/InputJsonView'
 import { InputSchemaPreview } from './views/InputSchemaPreview'
 import { InputSchemaView } from './views/InputSchemaView'
@@ -13,6 +13,7 @@ import type { PanelView } from './ViewToggle'
 
 const TRIGGER_TYPES: ReadonlySet<string> = new Set([
   TriggerTypeEnum.MANUAL_TRIGGER,
+  TriggerTypeEnum.FORM_TRIGGER,
   TriggerTypeEnum.SCHEDULED,
   TriggerTypeEnum.EVENT,
   TriggerTypeEnum.WEBHOOK_TRIGGER,
@@ -44,8 +45,7 @@ export function InputNodeContent({
   const expressionNodeId = TRIGGER_TYPES.has(upstreamNode.type) ? 'trigger' : upstreamNode.id
 
   if (!nodeData) {
-    const schema = getNodeOutputSchema(upstreamNode.type)
-    const effectiveSchema = schema ?? getTriggerInputSchemaFields(upstreamNode.id, triggers)
+    const effectiveSchema = getEffectiveOutputSchema(upstreamNode, triggers)
     if (!effectiveSchema) {
       const supportsInputSchema =
         upstreamNode.type === TriggerTypeEnum.MANUAL_TRIGGER ||

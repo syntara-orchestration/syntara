@@ -20,6 +20,7 @@ import { useIsVersionView } from '../VersionViewContext'
 
 import { InlineMockEditor } from './InlineMockEditor'
 import styles from './panels.module.css'
+import { getEffectiveOutputSchema } from './utils/effectiveOutputSchema'
 import { buildMockJsonSkeleton, parseJsonObject } from './utils/mockDataUtils'
 import { OutputJsonView } from './views/OutputJsonView'
 import { OutputSchemaView } from './views/OutputSchemaView'
@@ -43,10 +44,9 @@ export function OutputPanel({ outputData, nodeId }: Readonly<OutputPanelProps>) 
   const outputMock = useMockDataStore((s) => s.getOutputMock(nodeId))
   const activities = useWorkflowStore(selectActivities)
 
-  const nodeType = useMemo(() => {
-    const activity = activities?.find((a) => a.id === nodeId)
-    return activity?.type ?? null
-  }, [activities, nodeId])
+  const activity = useMemo(() => activities?.find((a) => a.id === nodeId), [activities, nodeId])
+  const nodeType = activity?.type ?? null
+  const effectiveSchema = useMemo(() => (activity ? getEffectiveOutputSchema(activity) : null), [activity])
 
   // Priority: real execution data > mock data > empty
   const displayData = outputData ?? outputMock
@@ -58,7 +58,7 @@ export function OutputPanel({ outputData, nodeId }: Readonly<OutputPanelProps>) 
     }
 
     // Fallback: use the node type's output schema
-    const skeleton = buildMockJsonSkeleton(nodeType, null)
+    const skeleton = buildMockJsonSkeleton(nodeType, effectiveSchema)
     return skeleton !== '{}' ? skeleton : '{\n\n}'
   }
 
