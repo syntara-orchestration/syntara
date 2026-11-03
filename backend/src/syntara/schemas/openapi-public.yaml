@@ -34074,6 +34074,12 @@ components:
               format: uuid
             - type: 'null'
           title: Retried From Execution Id
+        retry_kind:
+          anyOf:
+            - type: string
+            - type: 'null'
+          description: 'Type of retry execution: ''plain'' (retry_execution), ''from_failure'' (retry_from_failure), ''unknown'' (legacy), or null (not a retry)'
+          title: Retry Kind
         trigger_type:
           anyOf:
             - type: string

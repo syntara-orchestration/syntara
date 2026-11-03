@@ -10,7 +10,7 @@ Adds retry_kind column to executions table for durable retry classification.
 No backfill: Existing retry rows remain NULL until reclassified.
 
 Revision ID: 06e992801958
-Revises: 9b749f9b023e
+Revises: e7f4a1b2c3d4
 Create Date: 2026-11-03 09:30:57.579620
 
 """
@@ -22,7 +22,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "06e992801958"
-down_revision: str | Sequence[str] | None = "9b749f9b023e"
+down_revision: str | Sequence[str] | None = "e7f4a1b2c3d4"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
