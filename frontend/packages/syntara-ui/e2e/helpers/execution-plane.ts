@@ -20,46 +20,59 @@ export async function isExecutionPlaneListReachable(app: Page): Promise<boolean>
   }
 }
 
-type CreateExecutionTargetBody = {
-  name: string
-  namespace?: string
-  is_default?: boolean
+/** True when exactly one OpenShift integration exists (create form cluster binding). */
+export async function hasSingleOpenShiftIntegration(app: Page): Promise<boolean> {
+  const token = await getAuthToken(app)
+  if (!token) return false
+
+  try {
+    const url = new URL(
+      '/api/v1/integrations?integration_type=openshift&limit=2&include_total=true',
+      appBaseUrl
+    ).toString()
+    const response = await app.request.get(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!response.ok()) return false
+    const body = (await response.json()) as { resources?: unknown[]; total?: number }
+    const count = body.total ?? body.resources?.length ?? 0
+    return count === 1
+  } catch {
+    return false
+  }
 }
 
-type CreatedExecutionTarget = {
-  id: string
-  name: string
-}
-
-/** Create an execution target via the facade POST (for self-contained E2E cleanup). */
+/** Creates an execution target via the facade API. Caller must delete the returned id. */
 export async function createExecutionTargetViaApi(
   app: Page,
-  body: CreateExecutionTargetBody
-): Promise<CreatedExecutionTarget | null> {
+  input: { name: string; namespace?: string }
+): Promise<{ id: string; name: string }> {
   const token = await getAuthToken(app)
-  if (!token) return null
+  if (!token) {
+    throw new Error('Missing auth token; cannot create execution target via API')
+  }
 
   const url = new URL('/api/execution_plane/v1/execution_targets', appBaseUrl).toString()
   const response = await app.request.post(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
+    headers: { Authorization: `Bearer ${token}` },
     data: {
-      name: body.name,
+      name: input.name,
       placement: {
         type: 'kubernetes',
-        namespace: body.namespace ?? 'e2e-execution',
+        namespace: input.namespace ?? 'aao-execution',
         node_selectors: [],
-        tolerations: [],
       },
-      is_default: body.is_default ?? false,
     },
   })
-  if (!response.ok()) return null
-  const json = (await response.json()) as { id?: string; name?: string }
-  if (!json.id || !json.name) return null
-  return { id: json.id, name: json.name }
+
+  if (!response.ok()) {
+    throw new Error(`Failed to create execution target via API: ${String(response.status())} ${await response.text()}`)
+  }
+
+  const body = (await response.json()) as { id?: string; name?: string }
+  if (!body.id) {
+    throw new Error('Create execution target response missing id')
+  }
+
+  return { id: body.id, name: body.name ?? input.name }
 }
 
 /** Best-effort DELETE for E2E cleanup. */

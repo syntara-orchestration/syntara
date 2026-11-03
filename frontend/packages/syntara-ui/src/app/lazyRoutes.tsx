@@ -22,6 +22,11 @@ export const SettingsCategoryRoute = lazy(() =>
 export const Glossary = lazy(() => import('../routes/documentation/glossary/Glossary'))
 export const Approvals = lazy(() => import('../routes/approvals/Approvals'))
 export const ExecutionPlane = lazy(() => import('../routes/execution-plane/ExecutionPlane'))
+export const CreateExecutionTarget = lazy(() =>
+  import('../routes/execution-plane/CreateExecutionTarget').then((m) => ({
+    default: m.CreateExecutionTarget,
+  }))
+)
 export const ExecutionTargetDetail = lazy(() => import('../routes/execution-plane/ExecutionTargetDetail'))
 export const AccessManagement = lazy(() =>
   import('../routes/access-management/AccessManagement').then((m) => ({ default: m.AccessManagement }))

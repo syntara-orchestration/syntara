@@ -200,6 +200,16 @@ function getUsernameFromRequest(request: Request): string {
   return 'admin'
 }
 
+/** Matches can_i: admin/demo (and other default-allow personas) may write; auditor is read-only. */
+function canWriteExecutionTarget(username: string): boolean {
+  return username === 'admin' || username === 'demo'
+}
+
+/** Matches can_i: admin/demo/auditor may read. */
+function canReadExecutionTarget(username: string): boolean {
+  return username === 'admin' || username === 'demo' || username === 'auditor'
+}
+
 const randomCharacters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
 const randomCharactersLowercase = 'abcdefghijklmnopqrstuvwxyz0123456789'
 
@@ -427,9 +437,8 @@ export const handlers = [
 
   http.get('/api/execution_plane/v1/execution_targets', ({ request }) => {
     const username = getUsernameFromRequest(request)
-    // Match backend role conventions: only admin/auditor have execution_target:read
-    // (project-admin / padmin are denied — same as can_i without a project grant).
-    if (username !== 'admin' && username !== 'auditor') {
+    // Align with can_i: admin/demo/auditor may read (viewer/user/project personas denied).
+    if (!canReadExecutionTarget(username)) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/forbidden',
@@ -539,7 +548,7 @@ export const handlers = [
 
   http.get('/api/execution_plane/v1/execution_targets/:target_id', ({ request, params }) => {
     const username = getUsernameFromRequest(request)
-    if (username !== 'admin' && username !== 'auditor') {
+    if (!canReadExecutionTarget(username)) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/forbidden',
@@ -568,13 +577,10 @@ export const handlers = [
     return HttpResponse.json(target)
   }),
 
-  /**
-   * Minimal POST for E2E self-containment (create-then-delete). The Create PR owns
-   * the full form-oriented handler; merge should keep the richer create validation.
-   */
   http.post('/api/execution_plane/v1/execution_targets', async ({ request }) => {
     const username = getUsernameFromRequest(request)
-    if (username !== 'admin') {
+    // Align with can_i (admin/demo allowed); otherwise create form is reachable then POST 403s.
+    if (!canWriteExecutionTarget(username)) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/forbidden',
@@ -589,12 +595,19 @@ export const handlers = [
 
     const body = (await request.json()) as {
       name?: string
-      placement?: { namespace?: string; node_selectors?: string[]; tolerations?: string[] }
+      placement?: {
+        type?: 'kubernetes'
+        namespace?: string
+        node_selectors?: string[]
+        tolerations?: string[]
+      }
       labels?: Record<string, string>
       is_default?: boolean
     }
+
     const name = body.name?.trim() ?? ''
     const namespace = body.placement?.namespace?.trim() ?? ''
+
     if (!name || !namespace) {
       return HttpResponse.json(
         {
@@ -608,15 +621,45 @@ export const handlers = [
       )
     }
 
-    const seedClusterId = executionTargets[0]?.cluster_id ?? 'b1000000-0000-4000-8000-000000000001'
-    const seedEndpoint = executionTargets[0]?.endpoint ?? 'https://api.openshift.example.com:6443'
+    if (executionTargets.some((target) => target.name.toLowerCase() === name.toLowerCase())) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: `An execution target named "${name}" already exists`,
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    const openshiftIntegrations = integrations.filter((item) => item.integration_type === IntegrationTypeEnum.OPENSHIFT)
+    if (openshiftIntegrations.length !== 1) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Expected exactly one installed Execution Plane cluster',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    // length === 1 was asserted above
+    const openshiftIntegration = openshiftIntegrations[0]!
     const id = uuidv4()
     const created = {
       id,
-      cluster_id: seedClusterId,
+      cluster_id: openshiftIntegration.id,
       name,
       backend_type: 'kubernetes',
-      endpoint: seedEndpoint,
+      endpoint:
+        openshiftIntegration.configuration && 'base_url' in openshiftIntegration.configuration
+          ? String(openshiftIntegration.configuration.base_url)
+          : 'https://api.openshift.example.com:6443',
       placement: {
         type: 'kubernetes' as const,
         namespace,
@@ -627,14 +670,21 @@ export const handlers = [
       enabled: true,
       is_default: body.is_default ?? false,
       status_message: null,
-      labels: body.labels ?? {},
+      labels: {
+        ...(body.labels ?? {}),
+        integration_id: openshiftIntegration.id,
+      },
       created_at: mockDate.now,
       last_ran_at: null,
     }
+
     executionTargets.unshift(created)
+
     return HttpResponse.json(created, {
       status: 201,
-      headers: { Location: `/api/execution_plane/v1/execution_targets/${id}` },
+      headers: {
+        Location: `/api/execution_plane/v1/execution_targets/${id}`,
+      },
     })
   }),
 
@@ -646,7 +696,7 @@ export const handlers = [
    */
   http.delete('/api/execution_plane/v1/execution_targets/:target_id', ({ request, params }) => {
     const username = getUsernameFromRequest(request)
-    if (username !== 'admin') {
+    if (!canWriteExecutionTarget(username)) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/forbidden',

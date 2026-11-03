@@ -24,6 +24,7 @@ import {
   breadcrumbsUserDetailEarlyShell,
   breadcrumbsUserFormLoading,
   breadcrumbsIntegrationDetail,
+  breadcrumbsConfigureExecutionTarget,
   breadcrumbsExecutionTargetDetail,
   breadcrumbsExecutionTargetDetailEarlyShell,
   breadcrumbsServiceAccountDetail,
@@ -102,6 +103,10 @@ describe('breadcrumbBuilders', () => {
     expect(breadcrumbsExecutionTargetDetailEarlyShell()).toEqual([
       { label: 'Execution Plane', href: AppRoute.ExecutionPlane.Root },
       { label: 'Execution target details' },
+    ])
+    expect(breadcrumbsConfigureExecutionTarget()).toEqual([
+      { label: 'Execution Plane', href: AppRoute.ExecutionPlane.Root },
+      { label: 'Configure execution target' },
     ])
   })
 

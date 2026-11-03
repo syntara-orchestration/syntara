@@ -1,11 +1,14 @@
-import { Truncate } from '@patternfly/react-core'
+import { Button, Content, StackItem, Truncate } from '@patternfly/react-core'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ThProps } from '@patternfly/react-table'
 import type { ExecutionPlaneAPI } from '@syntara/contracts'
+import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { executionPlaneClient } from '../../client'
+import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
@@ -103,6 +106,7 @@ function ExecutionPlaneTableContent({
 }
 
 export default function ExecutionPlane() {
+  const navigate = useNavigate()
   const docLink = useDocLink('executionPlane')
   const permissions = useExecutionTargetPermissions()
 
@@ -150,6 +154,10 @@ export default function ExecutionPlane() {
 
   const isEmpty = results.length === 0
 
+  const handleConfigure = permissions.canCreate
+    ? () => detachPromise(navigate({ to: AppRoute.ExecutionPlane.Create }))
+    : undefined
+
   return (
     <SynPage>
       <SynPageTitle segments={['Execution Plane']} />
@@ -157,6 +165,11 @@ export default function ExecutionPlane() {
 
       <SynPageBody>
         <SynListPanel>
+          <StackItem>
+            <Content>
+              Configure execution plane workers, groups, and connectivity for on-cluster workload execution.
+            </Content>
+          </StackItem>
           <SynListPanelView
             isPending={query.isPending}
             error={query.error}
@@ -173,6 +186,18 @@ export default function ExecutionPlane() {
                   filterDefinitions={filterFieldDefinitions}
                   onFilterChange={handleFilterChange}
                   clearAllFilters={handleClearAllFilters}
+                  actions={
+                    <DisabledWithTooltip isDisabled={!permissions.canCreate} content={permissions.tooltips.create}>
+                      <Button
+                        variant="primary"
+                        icon={<RhUiAddIcon />}
+                        isAriaDisabled={!permissions.canCreate}
+                        onClick={handleConfigure}
+                      >
+                        Configure execution target
+                      </Button>
+                    </DisabledWithTooltip>
+                  }
                 />
               ) : undefined
             }
