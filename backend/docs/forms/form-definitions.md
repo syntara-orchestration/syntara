@@ -75,9 +75,9 @@ Validation findings use `form_prompt_configuration` for form prompts and
 ### When submitting a form
 
 Both form prompts and form triggers use `validate_form_submission()` in
-`forms/validators/submission.py` to check and normalize answers. Form prompts validate against
-their saved form snapshots; form triggers validate against the form definition in the workflow
-version.
+`forms/validators/submission.py` to check and normalize answers. A prompt submission is checked
+against the form definition saved with that prompt. A trigger submission is checked against the
+form definition in the workflow version selected for the execution.
 
 The submission validator also applies field-specific checks: it validates email formatting and
 rejects impossible calendar dates or invalid IANA timezone names.
