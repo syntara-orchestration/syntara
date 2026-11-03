@@ -12,6 +12,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { cleanupPersona, createPersona, loginViaUI, PERSONA_ACTIONS, type Persona } from '../authorization/fixtures'
 import { test, expect, toAppUrl, type Page } from '../fixtures'
 import { WCAG_TAGS } from '../fixtures/accessibility'
+import { layoutCanvas } from '../helpers/canvas-interaction'
 import { buildUniqueName } from '../helpers/workflows'
 import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
 import {
@@ -133,6 +134,15 @@ async function openRetryPanel(app: Page): Promise<void> {
   await expect(retryFromFailureButton).toBeEnabled()
   await retryFromFailureButton.click()
   await expect(app.getByRole('complementary', { name: 'Retry run from failure review' })).toBeVisible()
+}
+
+async function clickCanvasStepHeading(app: Page, node: ReturnType<Page['getByTestId']>, heading: string): Promise<void> {
+  const step = node.getByRole('heading', { name: heading, level: 2 })
+  await expect(async () => {
+    await layoutCanvas(app)
+    await expect(step).toBeVisible({ timeout: 5_000 })
+    await step.click({ timeout: 5_000 })
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
 
 async function getEligibleRetryPointIds(app: Page, executionId: string): Promise<string[]> {
@@ -337,10 +347,7 @@ test.describe('Retry from failure — real backend', () => {
     await openExecutionDetail(app, run.executionId)
     const branchANode = app.getByTestId('rf__node-branch_a')
     const branchBNode = app.getByTestId('rf__node-branch_b')
-    await expect(branchANode).toBeVisible()
-    await expect(branchBNode).toBeVisible()
-    const failedStep = branchBNode.getByRole('heading', { name: 'Branch B', level: 2 })
-    await failedStep.click()
+    await clickCanvasStepHeading(app, branchBNode, 'Branch B')
     await openRetryPanel(app)
 
     const panel = app.getByRole('complementary', { name: 'Retry run from failure review' })
@@ -354,7 +361,7 @@ test.describe('Retry from failure — real backend', () => {
     await expect(branchAOrigin).toBeAttached()
     await expect(branchBOrigin).toBeAttached()
 
-    await branchANode.getByRole('heading', { name: 'Branch A', level: 2 }).click()
+    await clickCanvasStepHeading(app, branchANode, 'Branch A')
     await expect(allPoints).toBeChecked()
     await expect(choosePoints).not.toBeChecked()
     await expect(branchAOrigin).toBeAttached()
