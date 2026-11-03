@@ -31,7 +31,15 @@ vi.mock('../../client', () => ({
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
-  return { ...actual, useNavigate: () => vi.fn() }
+  return {
+    ...actual,
+    Link: ({ to, children, ...rest }: { to: string; children?: ReactNode } & Record<string, unknown>) => (
+      <a href={to} {...rest}>
+        {children}
+      </a>
+    ),
+    useNavigate: () => vi.fn(),
+  }
 })
 
 const mockUseSubWorkflowChildData = vi.fn()
@@ -808,7 +816,7 @@ describe('NodeExecutionDetailsPanel', () => {
       // Child-activities panel (tab content) is not rendered on the default tab.
       expect(screen.queryByRole('button', { name: /View child execution/i })).not.toBeInTheDocument()
       // Contextual link to the child run, in the selected-activity header.
-      expect(screen.getByRole('button', { name: /View sub-workflow run: Child WF/i })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /View sub-workflow run: Child WF/i })).toBeInTheDocument()
       expect(screen.getByText('Output view:')).toBeInTheDocument()
     })
 
@@ -841,7 +849,7 @@ describe('NodeExecutionDetailsPanel', () => {
       render(<NodeExecutionDetailsPanel {...defaultProps} nodeType="script" />, { wrapper })
 
       expect(screen.queryByRole('tab', { name: 'Child activities' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /View sub-workflow run/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /View sub-workflow run/i })).not.toBeInTheDocument()
     })
   })
 })

@@ -45,6 +45,7 @@ export type ChildWorkflowSelectorProps = {
   errorMessage: string
   errorVariant: 'danger' | 'warning'
   onRetry: () => void
+  hasProject: boolean
   label?: string
   labelHelp?: ReactElement
   triggerLabelHelp?: ReactElement
@@ -348,6 +349,7 @@ export function ChildWorkflowSelector({
   errorMessage,
   errorVariant,
   onRetry,
+  hasProject,
   label = 'Workflow',
   labelHelp,
   triggerLabelHelp,
@@ -463,6 +465,7 @@ export function ChildWorkflowSelector({
           hasOptions={options.length > 0}
           showEligibilityHelp={showEligibilityHelp}
           hasSearchTerm={Boolean(filterValue.trim())}
+          hasProject={hasProject}
           onRetry={onRetry}
         />
       </StackItem>

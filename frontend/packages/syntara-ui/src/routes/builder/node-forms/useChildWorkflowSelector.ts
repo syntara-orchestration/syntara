@@ -299,6 +299,7 @@ export function useChildWorkflowSelector({
     retryFailedLookups,
     searchTerm,
     setSearchTerm,
+    hasProject: projectId !== null,
   }
 }
 

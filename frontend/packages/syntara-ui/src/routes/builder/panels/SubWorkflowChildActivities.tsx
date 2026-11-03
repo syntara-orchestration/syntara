@@ -19,27 +19,11 @@ import { useState, type ReactNode } from 'react'
 
 import { executionsClient } from '../../../client'
 import { SynCodeBlock } from '../../../components/details/SynCodeBlock'
-import { formatElapsedTime } from '../../../utils/dateUtils'
+import { formatDateTime, formatElapsedTime } from '../../../utils/dateUtils'
+import { detachPromise } from '../../../utils/detachPromise'
+import { ActivityStatusLabel, StatusLabel } from '../ExecutionStatus'
 
 import { type ChildExecution, useChildExecutions } from './hooks/useChildExecutions'
-
-type LabelColor = 'green' | 'red' | 'orange' | 'blue' | 'grey' | 'purple'
-
-function statusColor(status: string | null | undefined): LabelColor {
-  switch (status ?? '') {
-    case 'completed':
-      return 'green'
-    case 'failed':
-    case 'completed_with_errors':
-      return 'red'
-    case 'cancelled':
-      return 'orange'
-    case 'running':
-      return 'blue'
-    default:
-      return 'grey'
-  }
-}
 
 function formatDuration(startedAt: string | null | undefined, completedAt: string | null | undefined): string | null {
   if (!startedAt || !completedAt) return null
@@ -90,9 +74,7 @@ function ChildActivityRow({
         </Label>
       </FlexItem>
       <FlexItem>
-        <Label isCompact color={statusColor(activity.status)}>
-          {activity.status}
-        </Label>
+        <ActivityStatusLabel status={activity.status} nodeType={activity.node_type} />
       </FlexItem>
       {duration && (
         <FlexItem>
@@ -148,7 +130,7 @@ function ChildActivitiesList({ childExecutionId }: Readonly<{ childExecutionId: 
   const query = executionsClient.useQuery(
     'get',
     '/executions/{execution_id}/activities',
-    { params: { path: { execution_id: childExecutionId }, query: { limit: 100 } } },
+    { params: { path: { execution_id: childExecutionId }, query: { limit: 100, include_total: true } } },
     { enabled: Boolean(childExecutionId) }
   )
 
@@ -156,10 +138,17 @@ function ChildActivitiesList({ childExecutionId }: Readonly<{ childExecutionId: 
     return <Spinner size="md" aria-label="Loading child activities" />
   }
   if (query.isError) {
-    return <Alert variant="warning" isInline isPlain title="Couldn't load child activities" />
+    return (
+      <Alert variant="warning" isInline isPlain title="Couldn't load child activities">
+        <Button variant="link" isInline onClick={() => detachPromise(query.refetch())}>
+          Retry
+        </Button>
+      </Alert>
+    )
   }
 
   const activities = query.data?.resources ?? []
+  const total = query.data?.total ?? null
   if (activities.length === 0) {
     return <Content component={ContentVariants.small}>No activities recorded for this child yet.</Content>
   }
@@ -196,6 +185,13 @@ function ChildActivitiesList({ childExecutionId }: Readonly<{ childExecutionId: 
           </ExpandableSection>
         </StackItem>
       )}
+      {total != null && total > activities.length && (
+        <StackItem>
+          <Content component={ContentVariants.small}>
+            Showing {activities.length} of {total} activities.
+          </Content>
+        </StackItem>
+      )}
     </Stack>
   )
 }
@@ -215,14 +211,17 @@ function ChildExecutionSection({ child }: Readonly<{ child: ChildExecution }>) {
               <strong>{child.workflow_name ?? 'Child workflow'}</strong>
             </FlexItem>
             <FlexItem>
-              <Label isCompact color={statusColor(child.status)}>
-                {child.status}
-              </Label>
+              <StatusLabel status={child.status} />
             </FlexItem>
-            {typeof child.workflow_version === 'number' && (
+            {(child.workflow_version_name ||
+              child.workflow_version_created_at ||
+              typeof child.workflow_version === 'number') && (
               <FlexItem>
                 <Label isCompact color="blue">
-                  v{child.workflow_version}
+                  {child.workflow_version_name ??
+                    (child.workflow_version_created_at
+                      ? formatDateTime(child.workflow_version_created_at)
+                      : `v${child.workflow_version}`)}
                 </Label>
               </FlexItem>
             )}
@@ -261,7 +260,7 @@ export function SubWorkflowChildActivities({
   parentExecutionId,
   nodeId,
 }: Readonly<{ parentExecutionId: string; nodeId: string }>) {
-  const { children, isLoading, isError } = useChildExecutions(parentExecutionId, nodeId)
+  const { children, total, hasMore, isLoading, isError, refetch } = useChildExecutions(parentExecutionId, nodeId)
 
   if (isLoading) {
     return (
@@ -271,7 +270,13 @@ export function SubWorkflowChildActivities({
     )
   }
   if (isError) {
-    return <Alert variant="warning" isInline title="Couldn't load the child execution(s)." />
+    return (
+      <Alert variant="warning" isInline title="Couldn't load the child execution(s).">
+        <Button variant="link" isInline onClick={refetch}>
+          Retry
+        </Button>
+      </Alert>
+    )
   }
   if (children.length === 0) {
     return (
@@ -288,6 +293,20 @@ export function SubWorkflowChildActivities({
       {children.map((child) => (
         <ChildExecutionSection key={child.id} child={child} />
       ))}
+      {hasMore && (
+        <StackItem>
+          <Alert
+            variant="info"
+            isInline
+            isPlain
+            title={
+              total != null
+                ? `Showing the first ${children.length} of ${total} child runs.`
+                : `Showing the first ${children.length} child runs; more may exist.`
+            }
+          />
+        </StackItem>
+      )}
     </Stack>
   )
 }

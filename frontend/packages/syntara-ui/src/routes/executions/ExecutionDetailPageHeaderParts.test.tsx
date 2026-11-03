@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -39,7 +40,15 @@ vi.mock('../../providers/alerts/AlertContext', () => ({
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
-  return { ...actual, useNavigate: () => vi.fn() }
+  return {
+    ...actual,
+    Link: ({ to, children, ...rest }: { to: string; children?: ReactNode } & Record<string, unknown>) => (
+      <a href={to} {...rest}>
+        {children}
+      </a>
+    ),
+    useNavigate: () => vi.fn(),
+  }
 })
 
 beforeEach(() => {
@@ -212,7 +221,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
     } as never
     render(<ExecutionDetailTitleRowAddons execution={execution} />)
     expect(screen.getByTestId('view-parent-run')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'View parent run' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'View parent run' })).toBeInTheDocument()
   })
 
   it('does not render a View parent run link for a top-level execution', () => {

@@ -38,6 +38,7 @@ function buildProps(overrides: Partial<ChildWorkflowSelectorProps> = {}): ChildW
     errorMessage: 'Unable to verify eligible workflows.',
     errorVariant: 'danger',
     onRetry: vi.fn(),
+    hasProject: true,
     ...overrides,
   }
 }
@@ -213,14 +214,7 @@ describe('ChildWorkflowSelector', () => {
     const onRetry = vi.fn()
     render(<ChildWorkflowSelector {...buildProps({ options: [], onRetry })} />)
 
-    expect(
-      screen.getByText(
-        /This picker shows enabled, published workflows in this project that have a Sub-workflow Trigger/
-      )
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(/add a Sub-workflow Trigger to a child workflow in this project and publish it/)
-    ).toBeInTheDocument()
+    expect(screen.getByText('No eligible workflows found.')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Refresh workflows' }))
     expect(onRetry).toHaveBeenCalledOnce()
@@ -236,11 +230,6 @@ describe('ChildWorkflowSelector', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/No workflows match your search/)).toBeInTheDocument()
-      expect(
-        screen.getByText(
-          /This picker shows enabled, published workflows in this project that have a Sub-workflow Trigger/
-        )
-      ).toBeInTheDocument()
     })
 
     expect(screen.queryByRole('button', { name: 'Refresh workflows' })).not.toBeInTheDocument()

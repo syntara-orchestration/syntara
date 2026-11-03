@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -15,7 +16,15 @@ vi.mock('./ExecutionStatus', () => ({
 const mockNavigate = vi.fn()
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
-  return { ...actual, useNavigate: () => mockNavigate }
+  return {
+    ...actual,
+    Link: ({ to, children, ...rest }: { to: string; children?: ReactNode } & Record<string, unknown>) => (
+      <a href={to} {...rest}>
+        {children}
+      </a>
+    ),
+    useNavigate: () => mockNavigate,
+  }
 })
 
 function state(id: string, overrides: Partial<ActivityState> = {}): [string, ActivityState] {
@@ -90,9 +99,7 @@ describe('CompactActivityList', () => {
     expect(screen.getByText('pending')).toBeInTheDocument()
   })
 
-  it('renders a View sub-workflow run link for a sub_workflow row and navigates', async () => {
-    const user = userEvent.setup()
-    mockNavigate.mockClear()
+  it('renders a View sub-workflow run link for a sub_workflow row', () => {
     const swOrder: ActivityOrderItem[] = [{ id: 'run_child', name: 'Dispatch', type: 'sub_workflow' }]
     const swStates = new Map([
       state('run_child', {
@@ -102,15 +109,13 @@ describe('CompactActivityList', () => {
     ])
     render(<CompactActivityList activityStates={swStates} activityOrder={swOrder} />)
 
-    const link = screen.getByRole('button', { name: /View sub-workflow run: Child WF/i })
-    expect(link).toBeInTheDocument()
-    await user.click(link)
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/executions/$executionId', params: { executionId: 'child-9' } })
+    const link = screen.getByRole('link', { name: /View sub-workflow run: Child WF/i })
+    expect(link).toHaveAttribute('href', '/executions/child-9')
   })
 
   it('does not render a sub-workflow link for non sub_workflow rows', () => {
     render(<CompactActivityList activityStates={states} activityOrder={order} />)
-    expect(screen.queryByRole('button', { name: /View sub-workflow run/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /View sub-workflow run/i })).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {
