@@ -108,7 +108,7 @@ function buildStoreNameMap(
   return { nameMap, typeMap }
 }
 
-function buildDefinitionNameMap(def: WorkflowDefShape | null | undefined): {
+export function buildDefinitionNameMap(def: WorkflowDefShape | null | undefined): {
   nameMap: Map<string, string>
   typeMap: Map<string, string>
 } {

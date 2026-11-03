@@ -23,6 +23,7 @@ vi.mock('@tanstack/react-router', () => ({
 
 const CHILDREN = '/executions/{execution_id}/children'
 const ACTIVITIES = '/executions/{execution_id}/activities'
+const DETAIL = '/executions/{execution_id}'
 
 const child = {
   id: 'exec-nested-leaf-001',
@@ -57,14 +58,18 @@ const activities = {
 function setQueries(options: {
   children?: { data?: unknown; isLoading?: boolean; isError?: boolean }
   activities?: { data?: unknown; isLoading?: boolean; isError?: boolean }
+  detail?: { data?: unknown; isLoading?: boolean; isError?: boolean }
 }) {
-  const { children: childrenQuery, activities: activitiesQuery } = options
+  const { children: childrenQuery, activities: activitiesQuery, detail: detailQuery } = options
   mockUseQuery.mockImplementation((_method: string, path: string) => {
     if (path === CHILDREN) {
       return { data: undefined, isLoading: false, isError: false, ...childrenQuery }
     }
     if (path === ACTIVITIES) {
       return { data: undefined, isLoading: false, isError: false, ...activitiesQuery }
+    }
+    if (path === DETAIL) {
+      return { data: undefined, isLoading: false, isError: false, ...detailQuery }
     }
     return { data: undefined, isLoading: false, isError: false }
   })
@@ -126,6 +131,31 @@ describe('SubWorkflowChildActivities', () => {
 
     await userEvent.click(screen.getByText('send_notification'))
     expect(screen.getByText(/del-nested-001/)).toBeInTheDocument()
+  })
+
+  it('resolves child activity node ids to friendly step names, keeping the id as detail', () => {
+    setQueries({
+      children: { data: { resources: [child] } },
+      activities: { data: activities },
+      detail: {
+        data: {
+          workflow_definition: {
+            nodes: [
+              { id: 'format_message', name: 'Format Message', type: 'script' },
+              { id: 'send_notification', name: 'Send Notification', type: 'http_request' },
+            ],
+          },
+        },
+      },
+    })
+    renderPanel()
+
+    // Friendly step names from the child workflow definition are shown...
+    expect(screen.getByText('Format Message')).toBeInTheDocument()
+    expect(screen.getByText('Send Notification')).toBeInTheDocument()
+    // ...and the raw node ids remain as secondary diagnostic detail.
+    expect(screen.getByText('format_message')).toBeInTheDocument()
+    expect(screen.getByText('send_notification')).toBeInTheDocument()
   })
 
   it('handles an activity with no output_data', async () => {
