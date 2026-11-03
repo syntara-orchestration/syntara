@@ -1,4 +1,13 @@
-import { SelectList, SelectOption, Stack, StackItem, type MenuToggleElement } from '@patternfly/react-core'
+import {
+  Flex,
+  FlexItem,
+  SelectList,
+  SelectOption,
+  Stack,
+  StackItem,
+  type MenuToggleElement,
+} from '@patternfly/react-core'
+import { IntegrationStatusEnum } from '@syntara/contracts'
 import { useCallback, useState, type Ref } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
@@ -7,6 +16,7 @@ import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
+import { StatusLabel } from '../../configuration/integrations/StatusLabel'
 import { IntegrationRequiredHelper } from '../components/IntegrationRequiredHelper'
 import { TypeaheadMenuToggle } from '../components/TypeaheadMenuToggle'
 
@@ -98,8 +108,20 @@ export function KafkaIntegrationField({
             >
               <SelectList aria-label="Kafka Integrations">
                 {visible.map((item) => (
-                  <SelectOption key={item.id} value={item.id} isSelected={item.id === field.value}>
-                    {item.name}
+                  <SelectOption
+                    key={item.id}
+                    value={item.id}
+                    isSelected={item.id === field.value}
+                    description={
+                      item.validation_status === IntegrationStatusEnum.ERROR ? item.validation_error : undefined
+                    }
+                  >
+                    <Flex alignItems={{ default: 'alignItemsCenter' }}>
+                      <FlexItem>{item.name}</FlexItem>
+                      <FlexItem>
+                        <StatusLabel status={item.validation_status ?? IntegrationStatusEnum.UNKNOWN} />
+                      </FlexItem>
+                    </Flex>
                   </SelectOption>
                 ))}
                 {!query.isPending && !query.isError && !visible.length && (

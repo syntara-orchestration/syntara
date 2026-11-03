@@ -291,6 +291,12 @@ describe('Kafka Subscribe form', () => {
     expect(screen.queryByText(/Integration validation:/)).not.toBeInTheDocument()
     expect(screen.queryByText('Connection check failed')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Change' })).toBeInTheDocument()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('textbox', { name: 'Kafka Integration' }))
+    const options = within(screen.getByRole('listbox', { name: 'Kafka Integrations' }))
+    expect(options.getByText(status[0].toUpperCase() + status.slice(1))).toBeInTheDocument()
+    if (status === 'error') expect(options.getByText('Connection check failed')).toBeInTheDocument()
+    expect(screen.queryByText(/Integration validation:/)).not.toBeInTheDocument()
   })
 
   it('blocks submitting and preflight for an unavailable saved Integration', async () => {
@@ -350,7 +356,7 @@ describe('Kafka Subscribe form', () => {
     await user.click(input)
     await user.type(input, 'not found')
     expect(screen.getByRole('option', { name: 'No matching Kafka Integrations' })).toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: 'Orders Kafka' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /Orders Kafka/ })).not.toBeInTheDocument()
   })
 
   it('keeps the Integration menu open and restores options after clearing its filter', async () => {
@@ -363,7 +369,7 @@ describe('Kafka Subscribe form', () => {
     await user.click(screen.getByRole('button', { name: 'Clear filter' }))
 
     expect(screen.getByRole('listbox', { name: 'Kafka Integrations' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Orders Kafka' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Orders Kafka/ })).toBeInTheDocument()
     expect(input).toHaveValue('')
     expect(input).toHaveFocus()
   })
@@ -375,7 +381,7 @@ describe('Kafka Subscribe form', () => {
     await waitFor(() => expect(toggle).toBeEnabled())
     await user.click(toggle)
     expect(
-      within(screen.getByRole('listbox', { name: 'Kafka Integrations' })).getByRole('option', { name: 'Orders Kafka' })
+      within(screen.getByRole('listbox', { name: 'Kafka Integrations' })).getByRole('option', { name: /Orders Kafka/ })
     ).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
   })
