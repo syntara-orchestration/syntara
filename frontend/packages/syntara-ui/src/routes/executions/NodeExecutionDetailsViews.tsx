@@ -11,6 +11,8 @@ import {
   ToggleGroupItem,
 } from '@patternfly/react-core'
 
+import { HelpPopover } from '../../components/expressions/HelpPopover'
+
 import styles from './NodeExecutionDetailsPanel.module.css'
 
 function buildOutputHint(
@@ -18,14 +20,14 @@ function buildOutputHint(
   subWorkflowData: Readonly<{ isLoading: boolean; isTruncated: boolean; isError: boolean }>
 ): string {
   if (outputMode !== 'composed') {
-    return 'The exact value persisted on this node and available to downstream steps.'
+    return 'The stored value used by downstream steps.'
   }
   const notes = [
     subWorkflowData.isLoading ? ' Loading child activities…' : '',
     subWorkflowData.isTruncated ? ' Showing first 100 activities per child.' : '',
     subWorkflowData.isError ? ' Some child activities could not be loaded.' : '',
   ].join('')
-  return `child_activities are composed from the child execution for inspection — not stored on this node's output.${notes}`
+  return `Child execution and activity details for inspection — not saved on this step or passed downstream.${notes}`
 }
 
 export function SubWorkflowOutputView({
@@ -46,20 +48,27 @@ export function SubWorkflowOutputView({
           </Content>
         </FlexItem>
         <FlexItem>
-          <ToggleGroup aria-label="Output view">
+          <ToggleGroup aria-label="Output view" isCompact>
             <ToggleGroupItem
-              text="Composed"
+              text="With child data"
               buttonId="sub-wf-output-composed"
               isSelected={outputMode === 'composed'}
               onChange={() => onOutputModeChange('composed')}
             />
             <ToggleGroupItem
-              text="Persisted"
+              text="Saved output"
               buttonId="sub-wf-output-persisted"
               isSelected={outputMode === 'persisted'}
               onChange={() => onOutputModeChange('persisted')}
             />
           </ToggleGroup>
+        </FlexItem>
+        <FlexItem>
+          <HelpPopover
+            ariaLabel="About output views"
+            headerContent="About output views"
+            bodyContent="With child data adds child execution and activity details for inspection; child activity data is not saved on this step or passed downstream. Saved output shows the stored value used by downstream steps."
+          />
         </FlexItem>
         <FlexItem flex={{ default: 'flex_1' }}>
           <Content

@@ -807,7 +807,7 @@ describe('NodeExecutionDetailsPanel', () => {
       })
     })
 
-    it('defaults to Input/Output with a Composed output view and a contextual header link', () => {
+    it('defaults to Input/Output with the output-view toggle and a contextual header link', () => {
       render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
 
       expect(screen.getByRole('tab', { name: 'Input/Output' })).toBeInTheDocument()
@@ -818,19 +818,20 @@ describe('NodeExecutionDetailsPanel', () => {
       // Contextual link to the child run, in the selected-activity header.
       expect(screen.getByRole('link', { name: /View sub-workflow run: Child WF/i })).toBeInTheDocument()
       expect(screen.getByText('Output view:')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'About output views' })).toBeInTheDocument()
     })
 
-    it('composes the child activities into the Output panel (Composed view)', () => {
+    it('composes the child activities into the Output panel (With child data view)', async () => {
       render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
+
+      await userEvent.click(screen.getByRole('button', { name: 'With child data' }))
 
       expect(screen.getAllByText(/child_activities/).length).toBeGreaterThan(0)
       expect(screen.getAllByText(/child out/).length).toBeGreaterThan(0)
     })
 
-    it('shows the raw persisted output when toggled to Persisted', async () => {
+    it('shows the saved (persisted) output by default', () => {
       render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
-
-      await userEvent.click(screen.getByRole('button', { name: 'Persisted' }))
 
       expect(screen.getAllByText(/child_execution_id/).length).toBeGreaterThan(0)
       expect(screen.queryAllByText(/child_activities/)).toHaveLength(0)
