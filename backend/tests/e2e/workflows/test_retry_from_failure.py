@@ -263,7 +263,15 @@ def _wait_for_activity_ids(
             for activity_id in required_ids
             if activity_id in rows and not _is_terminal_activity(rows[activity_id])
         )
-        return f"Execution {current.id} is missing activity rows: {missing}; non-terminal: {pending}"
+        stdout_missing = {
+            activity_id: str(_activity_output(rows[activity_id]).get("stdout", ""))
+            for activity_id, snippet in stdout_snippets.items()
+            if activity_id in rows and snippet not in str(_activity_output(rows[activity_id]).get("stdout", ""))
+        }
+        return (
+            f"Execution {current.id} is missing activity rows: {missing}; "
+            f"non-terminal: {pending}; stdout still missing: {stdout_missing}"
+        )
 
     return _wait_until(
         lambda: syntara_api.executions.get(execution_id=execution.id, include="activities").assert_and_get(),
@@ -438,6 +446,7 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
         project_id=first_project_id,
     )
     assert source.status == ExecutionStatus.FAILED
+    source = _wait_for_activity_ids(syntara_api, source, {"producer", "repair", "trigger"})
     source_activities = _activities_by_id(source)
     assert source_activities["producer"].status == "completed"
     assert source_activities["repair"].status == "failed"
@@ -468,6 +477,12 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
 
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
+    final = _wait_for_activity_ids(
+        syntara_api,
+        final,
+        {"producer", "repair", "consumer", "trigger"},
+        required_stdouts={"consumer": "retry-only"},
+    )
     retry_activities = _activities_by_id(final)
     retry_activity_executions = _wait_for_activity_executions(
         syntara_api,
@@ -577,6 +592,7 @@ def test_retry_handles_an_unselected_branch_without_replay_output(
         project_id=first_project_id,
     )
     assert source.status == ExecutionStatus.FAILED
+    source = _wait_for_activity_ids(syntara_api, source, {"condition", "taken_branch"})
     source_activities = _activities_by_id(source)
     assert source_activities["taken_branch"].status == "failed"
 
@@ -595,6 +611,7 @@ def test_retry_handles_an_unselected_branch_without_replay_output(
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
 
+    final = _wait_for_activity_ids(syntara_api, final, {"taken_branch"}, required_stdouts={"taken_branch": "recovered"})
     retry_activities = _activities_by_id(final)
     assert retry_activities["taken_branch"].status == "completed"
     untaken_retry = retry_activities.get("untaken_branch")
@@ -633,6 +650,7 @@ def test_retry_replays_converge_when_branch_state_matches_source(
         project_id=first_project_id,
     )
     assert source.status == ExecutionStatus.FAILED
+    source = _wait_for_activity_ids(syntara_api, source, {"branch_a", "branch_b", "join", "repair"})
     source_activities = _activities_by_id(source)
     assert source_activities["join"].status == "completed"
     assert source_activities["repair"].status == "failed"
@@ -645,6 +663,7 @@ def test_retry_replays_converge_when_branch_state_matches_source(
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
+    final = _wait_for_activity_ids(syntara_api, final, {"branch_a", "branch_b", "join", "repair"})
     retry_activities = _activities_by_id(final)
 
     assert retry_activities["join"].status == "completed"
@@ -693,6 +712,9 @@ def test_retry_reexecutes_converge_after_repaired_branch_changes_gate_state(
         project_id=first_project_id,
     )
     assert source.status == ExecutionStatus.FAILED
+    source = _wait_for_activity_ids(
+        syntara_api, source, {"repair_branch", "after_repair", "stable_branch", "join", "consumer"}
+    )
     source_activities = _activities_by_id(source)
     assert source_activities["repair_branch"].status == "failed"
 
@@ -704,6 +726,12 @@ def test_retry_reexecutes_converge_after_repaired_branch_changes_gate_state(
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
+    final = _wait_for_activity_ids(
+        syntara_api,
+        final,
+        {"repair_branch", "after_repair", "stable_branch", "join", "consumer"},
+        required_stdouts={"consumer": "repaired-branch"},
+    )
     retry_activities = _activities_by_id(final)
 
     assert retry_activities["join"].status == "completed"
@@ -753,6 +781,7 @@ def test_retry_any_converge_does_not_wait_for_an_unnecessary_slow_branch(
         project_id=first_project_id,
     )
     assert source.status == ExecutionStatus.FAILED
+    source = _wait_for_activity_ids(syntara_api, source, {"fast_a", "fast_b", "join", "repair"})
     source_activities = _activities_by_id(source)
     assert source_activities["fast_a"].status == "completed"
     assert source_activities["fast_b"].status == "completed"
@@ -770,6 +799,7 @@ def test_retry_any_converge_does_not_wait_for_an_unnecessary_slow_branch(
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
 
+    final = _wait_for_activity_ids(syntara_api, final, {"fast_a", "fast_b", "join", "repair"})
     retry_activities = _activities_by_id(final)
     assert retry_activities["fast_a"].status == "completed"
     assert retry_activities["fast_b"].status == "completed"
@@ -1168,6 +1198,12 @@ def test_retry_can_select_a_subset_of_parallel_failed_branches(
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
     assert final.status == ExecutionStatus.FAILED
+    final = _wait_for_activity_ids(
+        syntara_api,
+        final,
+        {"failure_a", "after_a", "failure_b"},
+        required_stdouts={"failure_a": "fixed-a", "after_a": "after-a"},
+    )
     retry_activities = _activities_by_id(final)
     assert retry_activities["failure_a"].status == "completed"
     assert retry_activities["after_a"].status == "completed"
@@ -1202,6 +1238,17 @@ def test_retry_accepts_multiple_selected_parallel_failure_points(
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
+    final = _wait_for_activity_ids(
+        syntara_api,
+        final,
+        {"failure_a", "failure_b", "after_a", "after_b"},
+        required_stdouts={
+            "failure_a": "fixed-a",
+            "failure_b": "fixed-b",
+            "after_a": "after-a",
+            "after_b": "after-b",
+        },
+    )
     retry_activities = _activities_by_id(final)
     assert retry_activities["failure_a"].status == "completed"
     assert retry_activities["failure_b"].status == "completed"
@@ -1233,6 +1280,7 @@ def test_retry_input_overrides_are_run_local_and_reject_unknown_keys(
         project_id=project_id,
     )
     assert source.status == ExecutionStatus.FAILED
+    source = _wait_for_activity_ids(syntara_api, source, {"failure"})
 
     run_user_id, run_username, run_password = create_user(syntara_api, "retry-run-user")
     run_role = create_project_role(syntara_api, project_id, "retry-run-user", _RETRY_RUN_POLICIES)
