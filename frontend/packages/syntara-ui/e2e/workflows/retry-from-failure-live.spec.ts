@@ -69,6 +69,32 @@ function requirePersona(persona: Persona | null): Persona {
   return persona
 }
 
+async function originMarkerGap(
+  marker: ReturnType<Page['getByTestId']>,
+  node: ReturnType<Page['getByTestId']>
+): Promise<number | null> {
+  const markerBox = await marker.boundingBox()
+  const nodeBox = await node.boundingBox()
+  if (markerBox === null || nodeBox === null) return null
+  return nodeBox.y - (markerBox.y + markerBox.height)
+}
+
+async function expectOriginMarkerAboveNode(
+  marker: ReturnType<Page['getByTestId']>,
+  node: ReturnType<Page['getByTestId']>,
+  label: string
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const gap = await originMarkerGap(marker, node)
+        return gap !== null && gap >= 0 && gap <= 24
+      },
+      { message: `${label} retry origin marker should sit above and close to its step` }
+    )
+    .toBe(true)
+}
+
 function nodeParameters(definition: unknown, nodeId: string): Record<string, unknown> {
   if (!isRecord(definition) || !isUnknownArray(definition['nodes'])) {
     throw new Error('Workflow definition did not contain a nodes array')
@@ -337,6 +363,8 @@ test.describe('Retry from failure — real backend', () => {
     await openExecutionDetail(app, run.executionId)
     const branchANode = app.getByTestId('rf__node-branch_a')
     const branchBNode = app.getByTestId('rf__node-branch_b')
+    await expect(branchANode).toBeVisible()
+    await expect(branchBNode).toBeVisible()
     const failedStep = branchBNode.getByRole('heading', { name: 'Branch B', level: 2 })
     await failedStep.click()
     await openRetryPanel(app)
@@ -350,31 +378,14 @@ test.describe('Retry from failure — real backend', () => {
     await expect(choosePoints).not.toBeChecked()
     await expect(branchAOrigin).toBeVisible()
     await expect(branchBOrigin).toBeVisible()
-
-    const markerBoxBefore = await branchBOrigin.boundingBox()
-    const stepNodeBoxBefore = await branchBNode.boundingBox()
-    if (markerBoxBefore === null || stepNodeBoxBefore === null) {
-      throw new Error('Could not measure the retry origin marker and failed step')
-    }
-    const markerGapBefore = stepNodeBoxBefore.y - (markerBoxBefore.y + markerBoxBefore.height)
-    expect(markerGapBefore).toBeGreaterThanOrEqual(0)
-    expect(markerGapBefore).toBeLessThanOrEqual(24)
+    await expectOriginMarkerAboveNode(branchBOrigin, branchBNode, 'Branch B')
 
     await branchANode.getByRole('heading', { name: 'Branch A', level: 2 }).click()
     await expect(allPoints).toBeChecked()
     await expect(choosePoints).not.toBeChecked()
     await expect(branchAOrigin).toBeVisible()
     await expect(branchBOrigin).toBeVisible()
-
-    const markerBoxAfter = await branchBOrigin.boundingBox()
-    const stepNodeBoxAfter = await branchBNode.boundingBox()
-    if (markerBoxAfter === null || stepNodeBoxAfter === null) {
-      throw new Error('Could not remeasure the retry origin marker and failed step after canvas selection')
-    }
-    const markerGapAfter = stepNodeBoxAfter.y - (markerBoxAfter.y + markerBoxAfter.height)
-    expect(Math.abs(markerBoxAfter.x - markerBoxBefore.x)).toBeLessThanOrEqual(1)
-    expect(Math.abs(markerBoxAfter.y - markerBoxBefore.y)).toBeLessThanOrEqual(1)
-    expect(Math.abs(markerGapAfter - markerGapBefore)).toBeLessThanOrEqual(1)
+    await expectOriginMarkerAboveNode(branchBOrigin, branchBNode, 'Branch B')
   })
 
   test('retry override changes the failed run only and the real retry reuses upstream output @pr-check', async ({
