@@ -6,7 +6,7 @@ import type { KebabAction } from '../../components/SynKebabMenu'
 
 import type { ExecutionTargetPermissions } from './useExecutionTargetPermissions'
 
-type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
+type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
 
 export function buildExecutionTargetDeleteAction(
   target: ExecutionTarget,

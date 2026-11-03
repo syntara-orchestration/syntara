@@ -31,7 +31,7 @@ const target = {
   id: 'et-002',
   cluster_id: 'cl-002',
   name: 'Staging OpenShift',
-  backend_type: 'kubernetes',
+  backend_type: 'kubernetes' as const,
   endpoint: 'https://api.staging.example.com',
   placement: {
     type: 'kubernetes' as const,
@@ -39,7 +39,7 @@ const target = {
     node_selectors: [] as string[],
     tolerations: [] as string[],
   },
-  status: 'active',
+  status: 'active' as const,
   enabled: true,
   is_default: false,
   status_message: null,

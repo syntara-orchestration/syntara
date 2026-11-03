@@ -27,7 +27,7 @@ _TARGET_1: dict[str, Any] = {
     "id": "7beaf7e4-0000-4000-8000-000000000001",
     "cluster_id": "7beaf7e4-0000-4000-8000-000000000002",
     "name": "workers-1",
-    "backend_type": "vanilla_k8s",
+    "backend_type": "kubernetes",
     "endpoint": "https://cluster.example",
     "placement": {
         "type": "kubernetes",
@@ -38,8 +38,10 @@ _TARGET_1: dict[str, Any] = {
     "status": "active",
     "enabled": True,
     "is_default": True,
+    "status_message": None,
     "labels": {},
     "created_at": "2026-10-01T00:00:00Z",
+    "last_ran_at": None,
 }
 
 _TARGET_2: dict[str, Any] = {
@@ -56,6 +58,8 @@ _WORK_ITEM_1: dict[str, Any] = {
     "created_at": "2026-10-01T00:00:00Z",
     "claimed_at": None,
     "completed_at": None,
+    "resource_cleanup_status": "completed",
+    "resource_cleanup_error": None,
 }
 
 
@@ -364,7 +368,7 @@ async def test_get_list_forwards_query_values_unchanged(
     [
         {"labels[env]": "", "labels[region]": "west"},
         {"name[contains]": "worker", "enabled": "false", "is_default": "true"},
-        {"sort": "name", "cluster_id": "aaaaaaaa-0000-4000-8000-000000000001", "backend_type": "vanilla_k8s"},
+        {"sort": "name", "cluster_id": "aaaaaaaa-0000-4000-8000-000000000001", "backend_type": "kubernetes"},
     ],
     ids=lambda query: f"GET /execution_targets {query}",
 )

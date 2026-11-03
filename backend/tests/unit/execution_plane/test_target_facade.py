@@ -23,7 +23,7 @@ TARGET = {
     "id": str(TARGET_ID),
     "cluster_id": str(CLUSTER_ID),
     "name": "batch",
-    "backend_type": "vanilla_k8s",
+    "backend_type": "kubernetes",
     "endpoint": "https://cluster.example",
     "placement": PLACEMENT,
     "status": "active",
@@ -31,6 +31,8 @@ TARGET = {
     "is_default": False,
     "labels": {},
     "created_at": "2026-10-01T00:00:00Z",
+    "status_message": None,
+    "last_ran_at": None,
     "api_key": "must-not-leak",
 }
 

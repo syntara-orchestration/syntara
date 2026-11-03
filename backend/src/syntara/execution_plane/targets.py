@@ -1,16 +1,17 @@
 """Translate AO target CRUD into EP commands without storing target state in AO."""
 
-from typing import Annotated, Literal, Self
 from uuid import UUID, uuid4
 
 from execution_plane_client.commands.base import CommandPayload
 from execution_plane_client.commands.results import TargetHealthCommandResult, TransportReceipt
-from execution_plane_client.commands.targets import KubernetesPlacement as CommandKubernetesPlacement
 from execution_plane_client.commands.targets import TargetDelete, TargetHealth, TargetRegister, TargetUpdate
+from execution_plane_client.models.execution_target import (
+    ExecutionTargetCreate,
+    ExecutionTargetHealthResult,
+    ExecutionTargetUpdate,
+)
 from fastapi import HTTPException, status
-from pydantic import model_validator
-from pydantic.json_schema import SkipJsonSchema
-from sqlmodel import Field, SQLModel
+from sqlmodel import SQLModel
 
 from syntara.execution_plane.client import (
     EP_AUDIENCE,
@@ -18,58 +19,6 @@ from syntara.execution_plane.client import (
     ExecutionPlaneHttpClient,
     ExecutionPlaneRejectedError,
 )
-
-
-class KubernetesTargetPlacement(CommandKubernetesPlacement):
-    """Validated Kubernetes placement for writes, using EP's shared command contract."""
-
-
-class ExecutionTargetCreate(SQLModel):
-    """A Kubernetes target on the single cluster provisioned at installation."""
-
-    model_config = {"extra": "forbid"}
-
-    name: str = Field(min_length=1, max_length=255)
-    placement: KubernetesTargetPlacement
-    labels: dict[str, str] = Field(default_factory=dict)
-    is_default: bool = False
-
-
-class ExecutionTargetUpdate(SQLModel):
-    """Patch mutable target fields. Placement requires a namespace; omitted selectors are retained."""
-
-    model_config = {"extra": "forbid", "json_schema_extra": {"minProperties": 1}}
-
-    name: Annotated[str, Field(min_length=1, max_length=255)] | SkipJsonSchema[None] = None
-    placement: KubernetesTargetPlacement | SkipJsonSchema[None] = None
-    labels: dict[str, str] | SkipJsonSchema[None] = None
-    is_default: bool | SkipJsonSchema[None] = None
-    enabled: bool | SkipJsonSchema[None] = None
-
-    @model_validator(mode="after")
-    def check_fields(self) -> Self:
-        """Reject empty patches and clearing required values before sending a command."""
-        if not self.model_fields_set or any(getattr(self, key) is None for key in self.model_fields_set):
-            message = "Supply at least one target field; target fields cannot be null"
-            raise ValueError(message)
-        return self
-
-
-class ExecutionTargetDeleteAccepted(SQLModel):
-    """EP accepted deletion; draining and physical removal happen independently."""
-
-    id: UUID
-    accepted: Literal[True] = True
-
-
-class ExecutionTargetHealthResult(SQLModel):
-    """AO's shallow view of an EP on-demand target health probe."""
-
-    model_config = {"extra": "forbid"}
-
-    healthy: bool
-    message: str | None = None
-    skipped: bool = False
 
 
 class _InstalledCluster(SQLModel):
@@ -124,7 +73,7 @@ async def create_target(client: ExecutionPlaneHttpClient, data: ExecutionTargetC
         resource_id=target_id,
         cluster_id=cluster.id,
         name=data.name,
-        backend_type="vanilla_k8s",
+        backend_type="kubernetes",
         endpoint=cluster.endpoint,
         credential_ref=UUID(int=0),  # Kubernetes execution uses the cluster's credential reference.
         placement=data.placement,

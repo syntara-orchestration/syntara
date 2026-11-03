@@ -8,7 +8,7 @@ import type { DialogState } from '../../hooks/useDialogState'
 
 import { ExecutionTargetDialogs } from './ExecutionTargetDialogs'
 
-type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
+type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
 
 function createDeleteDialog(item: ExecutionTarget | null = null, isOpen = false): DialogState<ExecutionTarget> {
   return {

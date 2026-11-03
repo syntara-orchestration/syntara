@@ -43,7 +43,7 @@ import { NodeSelectorsCell } from './NodeSelectorsCell'
 import { useExecutionTargetActions } from './useExecutionTargetActions'
 import { useExecutionTargetPermissions } from './useExecutionTargetPermissions'
 
-type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
+type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
 
 function ExecutionTargetDetailEarlyShell({ children }: Readonly<{ children: ReactNode }>) {
   return (

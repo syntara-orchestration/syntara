@@ -121,6 +121,12 @@ export type webhooks = Record<string, never>
 export interface components {
   schemas: {
     /**
+     * BackendType
+     * @description Supported execution target backends.
+     * @enum {string}
+     */
+    BackendType: 'kubernetes' | 'openshell'
+    /**
      * Command
      * @description One versioned operation; participants persist only its domain effects.
      */
@@ -209,51 +215,8 @@ export interface components {
       accepted?: true
     }
     /**
-     * ExecutionTargetFacadeRead
-     * @description Safe target fields available to AO's authorized management API.
-     */
-    ExecutionTargetFacadeRead: {
-      /**
-       * Id
-       * Format: uuid
-       */
-      id: string
-      /**
-       * Cluster Id
-       * Format: uuid
-       */
-      cluster_id: string
-      /** Name */
-      name: string
-      /** Backend Type */
-      backend_type: string
-      /** Endpoint */
-      endpoint: string
-      /** Placement */
-      placement: components['schemas']['KubernetesPlacement'] | components['schemas']['RHELPlacement']
-      /** Status */
-      status: string
-      /** Enabled */
-      enabled: boolean
-      /** Is Default */
-      is_default: boolean
-      /** Status Message */
-      status_message?: string | null
-      /** Labels */
-      labels: {
-        [key: string]: string
-      }
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string
-      /** Last Ran At */
-      last_ran_at?: string | null
-    }
-    /**
      * ExecutionTargetHealthResult
-     * @description AO's shallow view of an EP on-demand target health probe.
+     * @description Shallow view of an EP on-demand target health probe.
      */
     ExecutionTargetHealthResult: {
       /** Healthy */
@@ -267,22 +230,49 @@ export interface components {
       skipped?: boolean
     }
     /**
-     * ExecutionTargetListResponse
-     * @description Paginated list response for ExecutionTarget.
+     * ExecutionTargetRead
+     * @description Safe execution-target representation without management credentials.
      */
-    ExecutionTargetListResponse: {
-      /** Resources */
-      resources: components['schemas']['ExecutionTargetFacadeRead'][]
-      /** Next */
-      next?: string | null
-      /** Prev */
-      prev?: string | null
-      /** Total */
-      total?: number | null
+    ExecutionTargetRead: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Cluster Id
+       * Format: uuid
+       */
+      cluster_id: string
+      /** Name */
+      name: string
+      backend_type: components['schemas']['BackendType']
+      /** Endpoint */
+      endpoint: string
+      /** Placement */
+      placement: components['schemas']['KubernetesPlacement'] | components['schemas']['RHELPlacement']
+      status: components['schemas']['TargetStatus']
+      /** Enabled */
+      enabled: boolean
+      /** Is Default */
+      is_default: boolean
+      /** Status Message */
+      status_message: string | null
+      /** Labels */
+      labels: {
+        [key: string]: string
+      }
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Last Ran At */
+      last_ran_at: string | null
     }
     /**
      * ExecutionTargetUpdate
-     * @description Patch mutable target fields. Placement requires a namespace; omitted selectors are retained.
+     * @description Patch mutable target fields; placement requires a namespace.
      */
     ExecutionTargetUpdate: {
       /** Name */
@@ -305,7 +295,7 @@ export interface components {
     }
     /**
      * KubernetesPlacement
-     * @description Kubernetes scheduling metadata returned by the Execution Plane.
+     * @description Metadata required to place workers on Kubernetes.
      */
     KubernetesPlacement: {
       /**
@@ -313,7 +303,10 @@ export interface components {
        * @enum {string}
        */
       type: 'kubernetes'
-      /** Namespace */
+      /**
+       * Namespace
+       * @description Kubernetes namespace reserved for execution workloads
+       */
       namespace: string
       /** Node Selectors */
       node_selectors?: string[]
@@ -322,7 +315,7 @@ export interface components {
     }
     /**
      * KubernetesTargetPlacement
-     * @description Validated Kubernetes placement for writes, using EP's shared command contract.
+     * @description Validated Kubernetes placement for target-management writes.
      */
     KubernetesTargetPlacement: {
       /**
@@ -373,7 +366,7 @@ export interface components {
     }
     /**
      * RHELPlacement
-     * @description RHEL placement marker returned by the Execution Plane.
+     * @description Placeholder for RHEL-specific execution-target metadata.
      */
     RHELPlacement: {
       /**
@@ -398,6 +391,28 @@ export interface components {
       resource_key?: string | null
       /** Revision */
       revision?: number | null
+    }
+    /** ResourcesResponse[ExecutionTargetRead] */
+    ResourcesResponse_ExecutionTargetRead_: {
+      /** Resources */
+      resources: components['schemas']['ExecutionTargetRead'][]
+      /** Next */
+      next?: string | null
+      /** Prev */
+      prev?: string | null
+      /** Total */
+      total?: number | null
+    }
+    /** ResourcesResponse[WorkItemRead] */
+    ResourcesResponse_WorkItemRead_: {
+      /** Resources */
+      resources: components['schemas']['WorkItemRead'][]
+      /** Next */
+      next?: string | null
+      /** Prev */
+      prev?: string | null
+      /** Total */
+      total?: number | null
     }
     /**
      * TargetHealthCommandResult
@@ -425,6 +440,12 @@ export interface components {
        */
       skipped?: boolean
     }
+    /**
+     * TargetStatus
+     * @description Lifecycle states of an execution target.
+     * @enum {string}
+     */
+    TargetStatus: 'registering' | 'validating' | 'bootstrapping' | 'active' | 'degraded' | 'draining' | 'failed'
     /**
      * TransportReceipt
      * @description Receipt of a handled request, without a persisted command record.
@@ -461,45 +482,56 @@ export interface components {
       ctx?: Record<string, never>
     }
     /**
-     * WorkItemFacadeRead
-     * @description Safe work state; internal tokens and storage metadata stay private.
+     * WorkItemRead
+     * @description Safe work-item representation; excludes credentials and persistence internals.
      */
-    WorkItemFacadeRead: {
+    WorkItemRead: {
       /**
        * Id
        * Format: uuid
        */
       id: string
-      /** Status */
-      status: string
+      status: components['schemas']['WorkItemStatus']
       /** Result */
-      result?: {
+      result: {
         [key: string]: unknown
       } | null
+      /**
+       * Result Omitted
+       * @default false
+       */
+      result_omitted?: boolean
+      /** Result Size Bytes */
+      result_size_bytes?: number | null
       /**
        * Created At
        * Format: date-time
        */
       created_at: string
       /** Claimed At */
-      claimed_at?: string | null
+      claimed_at: string | null
       /** Completed At */
-      completed_at?: string | null
+      completed_at: string | null
+      /** Resource Cleanup Status */
+      resource_cleanup_status: string
+      /** Resource Cleanup Error */
+      resource_cleanup_error: string | null
     }
     /**
-     * WorkItemListResponse
-     * @description Paginated list response for WorkItem.
+     * WorkItemStatus
+     * @description Lifecycle states of a dispatched work item.
+     * @enum {string}
      */
-    WorkItemListResponse: {
-      /** Resources */
-      resources: components['schemas']['WorkItemFacadeRead'][]
-      /** Next */
-      next?: string | null
-      /** Prev */
-      prev?: string | null
-      /** Total */
-      total?: number | null
-    }
+    WorkItemStatus:
+      | 'pending'
+      | 'claimed'
+      | 'dispatched'
+      | 'running'
+      | 'cancel_requested'
+      | 'reconciliation_required'
+      | 'completed'
+      | 'failed'
+      | 'cancelled'
   }
   responses: never
   parameters: never
@@ -512,13 +544,28 @@ export interface operations {
   list_execution_targets: {
     parameters: {
       query?: {
-        /** @description Maximum number of results per page */
         limit?: number
-        /** @description Pagination cursor from previous response */
         cursor?: string | null
-        /** @description Sort parameter (e.g., 'name', '-created_at') */
-        sort?: string | null
-        /** @description Include total count in response (expensive) */
+        /** @description Execution-target sort field; oldest first by default. */
+        sort?:
+          | 'id'
+          | '-id'
+          | 'created_at'
+          | '-created_at'
+          | 'name'
+          | '-name'
+          | 'endpoint'
+          | '-endpoint'
+          | 'status'
+          | '-status'
+          | 'backend_type'
+          | '-backend_type'
+          | 'cluster_id'
+          | '-cluster_id'
+          | 'enabled'
+          | '-enabled'
+          | 'is_default'
+          | '-is_default'
         include_total?: boolean
         /** @description Target UUID; id[in]=uuid1,uuid2 for membership */
         id?: string | null
@@ -555,7 +602,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['ExecutionTargetListResponse']
+          'application/json': components['schemas']['ResourcesResponse_ExecutionTargetRead_']
         }
       }
       /** @description Validation Error */
@@ -604,7 +651,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['ExecutionTargetFacadeRead']
+          'application/json': components['schemas']['ExecutionTargetRead']
         }
       }
       /** @description Execution target or installed cluster not found */
@@ -663,7 +710,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['ExecutionTargetFacadeRead']
+          'application/json': components['schemas']['ExecutionTargetRead']
         }
       }
       /** @description Execution target or installed cluster not found */
@@ -785,7 +832,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['ExecutionTargetFacadeRead']
+          'application/json': components['schemas']['ExecutionTargetRead']
         }
       }
       /** @description Execution target or installed cluster not found */
@@ -889,13 +936,18 @@ export interface operations {
   list_work_items: {
     parameters: {
       query?: {
-        /** @description Maximum number of results per page */
         limit?: number
-        /** @description Pagination cursor from previous response */
         cursor?: string | null
-        /** @description Sort parameter (e.g., 'name', '-created_at') */
-        sort?: string | null
-        /** @description Include total count in response (expensive) */
+        /** @description Work-item sort field; newest first by default. */
+        sort?:
+          | 'created_at'
+          | '-created_at'
+          | 'status'
+          | '-status'
+          | 'resource_cleanup_status'
+          | '-resource_cleanup_status'
+          | 'id'
+          | '-id'
         include_total?: boolean
         /** @description Work UUID; id[in]=uuid1,uuid2 for membership */
         id?: string | null
@@ -924,7 +976,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['WorkItemListResponse']
+          'application/json': components['schemas']['ResourcesResponse_WorkItemRead_']
         }
       }
       /** @description Validation Error */

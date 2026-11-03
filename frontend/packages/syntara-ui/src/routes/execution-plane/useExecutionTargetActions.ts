@@ -5,7 +5,7 @@ import { executionPlaneClient } from '../../client'
 import { useDeleteAction } from '../../hooks/useDeleteAction'
 import { useDialogState } from '../../hooks/useDialogState'
 
-type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
+type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
 
 type DeleteParams = {
   params: { path: { target_id: string } }
