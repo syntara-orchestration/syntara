@@ -35598,7 +35598,8 @@
                   "type": "null"
                 }
               ],
-              "title": "Node Id"
+              "title": "Node Id",
+              "x-query-param": true
             }
           }
         ],

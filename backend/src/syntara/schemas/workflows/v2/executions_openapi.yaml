@@ -335,6 +335,7 @@ paths:
               - type: string
               - type: 'null'
             title: Node Id
+            x-query-param: true
       responses:
         '200':
           description: Successful Response
