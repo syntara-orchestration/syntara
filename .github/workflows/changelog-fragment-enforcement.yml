@@ -1,0 +1,24 @@
+---
+# Walk phase: new capability — changelog fragment enforcement.
+# Consumes reusable workflow from ansible/actions (PR #167).
+# Jira: AAP-97532 (AC4), AAP-92950
+name: "OpenAPI: Changelog Fragment Enforcement"
+
+on:
+  pull_request:
+    branches: [devel, early-access]
+    paths:
+      - 'backend/src/syntara/schemas/openapi.yaml'
+      - 'changelogs/fragments/**'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  enforce:
+    # djyasin/actions for test; production: ansible/actions@<tag>
+    uses: djyasin/actions/.github/workflows/openapi-changelog-fragment.yml@feat/changelog-fragment-enforcement # PR #167
+    with:
+      spec-paths: "backend/src/syntara/schemas/openapi.yaml"
+      fragment-dir: "changelogs/fragments"

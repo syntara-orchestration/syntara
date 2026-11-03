@@ -1,10 +1,7 @@
 ---
-# Post OpenAPI breaking-changes and contract-regeneration PR comments.
-#
-# The analysis runs inside the "CI Backend" pull_request workflow, which has
-# read-only permissions for fork PRs.  This workflow_run trigger fires in the
-# context of the base repo with write access, so it can post comments on any
-# PR — including those from forks.
+# Walk phase: consumes reusable comment workflow from ansible/actions (PR #161).
+# Replaces the inlined crawl-phase comment scripts.
+# Jira: AAP-97532 (AC1)
 name: OpenAPI Breaking Changes Comment
 
 on:
@@ -12,66 +9,11 @@ on:
     workflows: ["OpenAPI Breaking Changes"]
     types: [completed]
 
+permissions:
+  pull-requests: write
+  actions: read
+
 jobs:
   comment:
-    runs-on: ubuntu-24.04
-    if: github.event.workflow_run.event == 'pull_request'
-    permissions:
-      pull-requests: write
-      contents: read
-      actions: read
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-
-      - name: Download OpenAPI check results
-        id: download
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: openapi-check-results
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ github.token }}
-        continue-on-error: true
-
-      - name: Skip if no results
-        if: steps.download.outcome == 'failure'
-        run: echo "No openapi-check-results artifact — spec was not changed. Nothing to do."
-
-      - name: Read PR number
-        if: steps.download.outcome == 'success'
-        id: pr
-        run: |
-          PR_NUMBER=$(cat pr-number.txt)
-          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Python
-        if: steps.download.outcome == 'success'
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
-        with:
-          python-version: "3.12"
-
-      - name: Post breaking changes comment
-        if: steps.download.outcome == 'success'
-        run: |
-          if [ -f breaking-results.json ]; then
-            ./scripts/openapi/post-breaking-changes-comment.py \
-              --results breaking-results.json \
-              --pr-number "$PR_NUMBER"
-          fi
-        working-directory: backend
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
-
-      - name: Post contract regeneration comment
-        if: steps.download.outcome == 'success'
-        run: |
-          if [ -f contract-regeneration-results.json ]; then
-            ./scripts/openapi/post-contract-regeneration-comment.py \
-              --results contract-regeneration-results.json \
-              --pr-number "$PR_NUMBER"
-          fi
-        working-directory: backend
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ steps.pr.outputs.number }}
+    # djyasin/actions for test; production: ansible/actions@<tag>
+    uses: djyasin/actions/.github/workflows/oasdiff-post-breaking-change-comment.yml@feat/oasdiff-breaking-change-detection # PR #161
