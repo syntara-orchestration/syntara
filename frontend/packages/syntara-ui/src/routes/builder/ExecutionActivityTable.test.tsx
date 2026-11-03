@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -14,7 +14,15 @@ vi.mock('./ExecutionStatus', () => ({
 const mockNavigate = vi.fn()
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-router')>()
-  return { ...actual, useNavigate: () => mockNavigate }
+  return {
+    ...actual,
+    Link: ({ to, children, ...rest }: { to: string; children?: ReactNode } & Record<string, unknown>) => (
+      <a href={to} {...rest}>
+        {children}
+      </a>
+    ),
+    useNavigate: () => mockNavigate,
+  }
 })
 
 const T0 = '2024-01-01T00:00:00Z'
@@ -237,12 +245,13 @@ describe('ExecutionActivityTable', () => {
         order: [{ id: 'run_child', name: 'Run Child', type: 'sub_workflow' }],
       })
 
-      expect(screen.getByRole('button', { name: /View sub-workflow run: Notify Child/i })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /View sub-workflow run: Notify Child/i })).toHaveAttribute(
+        'href',
+        '/executions/child-123'
+      )
     })
 
-    it('navigates to the child execution when the link is clicked', async () => {
-      const user = userEvent.setup()
-      mockNavigate.mockClear()
+    it('links to the child execution', () => {
       renderTable({
         states: new Map([
           state('run_child', {
@@ -253,12 +262,10 @@ describe('ExecutionActivityTable', () => {
         order: [{ id: 'run_child', name: 'Run Child', type: 'sub_workflow' }],
       })
 
-      await user.click(screen.getByRole('button', { name: /View sub-workflow run/i }))
-
-      expect(mockNavigate).toHaveBeenCalledWith({
-        to: '/executions/$executionId',
-        params: { executionId: 'child-123' },
-      })
+      expect(screen.getByRole('link', { name: /View sub-workflow run/i })).toHaveAttribute(
+        'href',
+        '/executions/child-123'
+      )
     })
 
     it('shows no link for a sub_workflow row without a child execution id', () => {
@@ -267,7 +274,7 @@ describe('ExecutionActivityTable', () => {
         order: [{ id: 'run_child', name: 'Run Child', type: 'sub_workflow' }],
       })
 
-      expect(screen.queryByRole('button', { name: /View sub-workflow run/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /View sub-workflow run/i })).not.toBeInTheDocument()
     })
 
     it('shows no sub-workflow link for non sub_workflow rows', () => {
@@ -281,7 +288,7 @@ describe('ExecutionActivityTable', () => {
         order: [{ id: 'task-1', name: 'A Script', type: 'script' }],
       })
 
-      expect(screen.queryByRole('button', { name: /View sub-workflow run/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /View sub-workflow run/i })).not.toBeInTheDocument()
     })
   })
 })

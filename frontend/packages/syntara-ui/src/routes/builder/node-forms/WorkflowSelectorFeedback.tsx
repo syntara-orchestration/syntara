@@ -1,9 +1,8 @@
 import { Alert, Button, HelperText, HelperTextItem } from '@patternfly/react-core'
 
-const ELIGIBILITY_HELP_TEXT_NO_SEARCH =
-  'This picker shows enabled, published workflows in this project that have a Sub-workflow Trigger. To make one eligible, add a Sub-workflow Trigger to a child workflow in this project and publish it, then refresh workflows.'
-const ELIGIBILITY_HELP_TEXT_WITH_SEARCH =
-  'No workflows match your search. This picker shows enabled, published workflows in this project that have a Sub-workflow Trigger.'
+const ELIGIBILITY_HELP_TEXT_NO_SEARCH = 'No eligible workflows found.'
+const ELIGIBILITY_HELP_TEXT_WITH_SEARCH = 'No workflows match your search.'
+const NO_PROJECT_TEXT = 'Select a project to choose a child workflow.'
 
 export function WorkflowSelectorFeedback({
   workflowError,
@@ -13,6 +12,7 @@ export function WorkflowSelectorFeedback({
   hasOptions,
   showEligibilityHelp,
   hasSearchTerm,
+  hasProject,
   onRetry,
 }: Readonly<{
   workflowError?: string
@@ -22,6 +22,7 @@ export function WorkflowSelectorFeedback({
   hasOptions: boolean
   showEligibilityHelp: boolean
   hasSearchTerm: boolean
+  hasProject: boolean
   onRetry: () => void
 }>) {
   const eligibilityHelpText = hasSearchTerm ? ELIGIBILITY_HELP_TEXT_WITH_SEARCH : ELIGIBILITY_HELP_TEXT_NO_SEARCH
@@ -42,12 +43,17 @@ export function WorkflowSelectorFeedback({
           </Button>
         </Alert>
       )}
-      {showEligibilityHelp && (
+      {showEligibilityHelp && !hasProject && (
+        <HelperText>
+          <HelperTextItem>{NO_PROJECT_TEXT}</HelperTextItem>
+        </HelperText>
+      )}
+      {showEligibilityHelp && hasProject && (
         <HelperText>
           <HelperTextItem>{eligibilityHelpText}</HelperTextItem>
         </HelperText>
       )}
-      {showEligibilityHelp && !hasSearchTerm && (
+      {showEligibilityHelp && hasProject && !hasSearchTerm && (
         <Button variant="link" type="button" onClick={onRetry}>
           Refresh workflows
         </Button>
