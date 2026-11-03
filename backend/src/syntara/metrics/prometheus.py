@@ -57,7 +57,7 @@ class OrchestratorPrometheusMetrics:
 
     """
 
-    def __init__(self, registry: CollectorRegistry | None = None) -> None:  # noqa: PLR0915
+    def __init__(self, registry: CollectorRegistry | None = None) -> None:
         """Initialise metrics and bind them to *registry*."""
         self.registry = registry or CollectorRegistry()
 
