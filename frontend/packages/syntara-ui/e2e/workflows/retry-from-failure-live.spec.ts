@@ -141,7 +141,13 @@ async function clickCanvasStepHeading(
   node: ReturnType<Page['getByTestId']>,
   heading: string
 ): Promise<void> {
-  const step = node.getByRole('heading', { name: heading, level: 2 })
+  // Fit view is required so React Flow CSS transforms put the node on-screen, but it can
+  // drop scale to ≤ 0.5. SynStep then unmounts the h2 and renders a semantic-zoom tile
+  // whose accessible name is "${title}, ${typeLabel}" (Script nodes use "Script").
+  const expandedHeading = node.getByRole('heading', { name: heading, level: 2 })
+  const semanticZoomTile = node.getByRole('button', { name: `${heading}, Script` })
+  const step = expandedHeading.or(semanticZoomTile)
+  await expect(node).toBeVisible({ timeout: 15_000 })
   await expect(async () => {
     await layoutCanvas(app)
     await expect(step).toBeVisible({ timeout: 5_000 })
