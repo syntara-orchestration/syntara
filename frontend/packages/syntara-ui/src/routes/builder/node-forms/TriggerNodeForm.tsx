@@ -461,6 +461,7 @@ function TriggerNodeFormContent(props: TriggerNodeFormProps) {
   const form = useSynForm({
     schema,
     defaultValues,
+    mode: defaultValues.triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE ? 'onBlur' : undefined,
   })
 
   const {

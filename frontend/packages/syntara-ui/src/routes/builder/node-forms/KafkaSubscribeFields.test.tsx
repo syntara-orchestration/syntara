@@ -299,6 +299,28 @@ describe('Kafka Subscribe form', () => {
     expect(screen.queryByText(/Integration validation:/)).not.toBeInTheDocument()
   })
 
+  it('validates Topic on blur before submission and accepts an empty draft topic', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    renderKafka(onSubmit)
+    const topic = screen.getByRole('textbox', { name: 'Topic' })
+    await user.clear(topic)
+    await user.type(topic, 'orders.*')
+    await user.tab()
+    expect(await screen.findByText(/Enter one exact Kafka topic/)).toBeInTheDocument()
+    expect(topic).toHaveAttribute('aria-invalid', 'true')
+    expect(topic).toHaveAccessibleDescription(/Enter one exact Kafka topic/)
+    expect(onSubmit).not.toHaveBeenCalled()
+    await user.clear(topic)
+    await user.type(topic, 'orders.created')
+    await user.tab()
+    await waitFor(() => expect(topic).not.toHaveAttribute('aria-invalid', 'true'))
+    await user.clear(topic)
+    await user.tab()
+    await waitFor(() => expect(topic).not.toHaveAttribute('aria-invalid', 'true'))
+    expect(screen.queryByText(/Enter one exact Kafka topic/)).not.toBeInTheDocument()
+  })
+
   it('blocks submitting and preflight for an unavailable saved Integration', async () => {
     vi.mocked(integrationsFetchClient.GET).mockResolvedValue({ data: { resources: [] }, response: new Response() })
     const onSubmit = vi.fn()
