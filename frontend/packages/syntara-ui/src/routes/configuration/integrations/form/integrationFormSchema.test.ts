@@ -268,7 +268,7 @@ describe('integrationFormSchema', () => {
       })
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error.issues.some((i) => i.message === 'Cluster URL is required')).toBe(true)
+        expect(result.error.issues.some((i) => i.message === 'API endpoint is required')).toBe(true)
       }
     })
 

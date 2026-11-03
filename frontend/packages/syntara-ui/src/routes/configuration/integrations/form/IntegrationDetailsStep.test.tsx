@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { SynForm } from '../../../../components/forms/SynForm'
-import { EXECUTION_PLANE_SINGLETON_HELP } from '../integrationFieldHelpText'
+import { EXECUTION_PLANE_SCOPE_HELP, EXECUTION_PLANE_SINGLETON_HELP } from '../integrationFieldHelpText'
 
 import { IntegrationDetailsStep } from './IntegrationDetailsStep'
 import { getDefaultConfiguration, type IntegrationFormData } from './integrationFormSchema'
@@ -107,6 +107,10 @@ function TestWrapper({
       setValue('configuration', getDefaultConfiguration(newType), { shouldValidate: false })
       setValue('integration_type', newType as IntegrationFormData['integration_type'])
       setValue('management_credential_id', null)
+      if (newType === IntegrationTypeEnum.OPENSHIFT) {
+        setValue('scope', 'global')
+        setValue('project_ids', [])
+      }
       onTypeChangeProp(newType)
     },
     [setValue, onTypeChangeProp]
@@ -211,7 +215,7 @@ describe('IntegrationDetailsStep', () => {
       expect(screen.queryByText(EXECUTION_PLANE_SINGLETON_HELP)).not.toBeInTheDocument()
 
       await user.click(option)
-      expect(screen.getByRole('textbox', { name: /cluster name/i })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: /connection name/i })).toBeInTheDocument()
     })
 
     it('disables the option with helper text when an openshift integration exists', async () => {
@@ -244,7 +248,7 @@ describe('IntegrationDetailsStep', () => {
       await user.click(screen.getByRole('option', { name: /Execution plane infrastructure/i }))
 
       expect(screen.getByRole('button', { name: 'MCP Server' })).toBeInTheDocument()
-      expect(screen.queryByRole('textbox', { name: /cluster name/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /connection name/i })).not.toBeInTheDocument()
     })
 
     it('leaves other integration type options enabled when openshift exists', async () => {
@@ -293,28 +297,53 @@ describe('IntegrationDetailsStep', () => {
   })
 
   describe('OpenShift', () => {
-    it('uses Cluster name label and placeholder', () => {
+    it('uses Cluster details title and provisioning description', () => {
       render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
 
-      const nameField = screen.getByRole('textbox', { name: /cluster name/i })
+      expect(screen.getByText('Cluster details')).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          /The customer provisions the OpenShift namespace and service account\. An admin then configures this integration and an execution target\./
+        )
+      ).toBeInTheDocument()
+    })
+
+    it('shows Infrastructure type as plain OpenShift text', () => {
+      render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
+
+      expect(screen.queryByRole('textbox', { name: /infrastructure type/i })).not.toBeInTheDocument()
+      expect(screen.getByText('OpenShift')).toBeInTheDocument()
+    })
+
+    it('uses Connection name label and placeholder', () => {
+      render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
+
+      const nameField = screen.getByRole('textbox', { name: /connection name/i })
       expect(nameField).toBeInTheDocument()
-      expect(nameField).toHaveAttribute('placeholder', 'Enter cluster name')
+      expect(nameField).toHaveAttribute('placeholder', 'ocp-us-east-prod')
     })
 
-    it('renders Cluster URL field with OpenShift placeholder', () => {
+    it('renders API endpoint field with OpenShift placeholder', () => {
       render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
 
-      const clusterUrl = screen.getByRole('textbox', { name: /cluster url/i })
-      expect(clusterUrl).toBeInTheDocument()
-      expect(clusterUrl).toHaveAttribute('placeholder', 'https://api.example.com:6443')
+      const apiEndpoint = screen.getByRole('textbox', { name: /api endpoint/i })
+      expect(apiEndpoint).toBeInTheDocument()
+      expect(apiEndpoint).toHaveAttribute('placeholder', 'https://api.your-cluster.example.com:6443')
     })
 
-    it('renders required Namespace field', () => {
+    it('hides Description and Namespace fields', () => {
       render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
 
-      const namespace = screen.getByRole('textbox', { name: /namespace/i })
-      expect(namespace).toBeInTheDocument()
-      expect(namespace).toHaveAttribute('placeholder', 'default')
+      expect(screen.queryByRole('textbox', { name: /^description$/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /namespace/i })).not.toBeInTheDocument()
+    })
+
+    it('shows locked Global scope text with execution-plane helper text', () => {
+      render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
+
+      expect(screen.queryByRole('switch', { name: /integration scope/i })).not.toBeInTheDocument()
+      expect(screen.getByText('Global')).toBeInTheDocument()
+      expect(screen.getByText(EXECUTION_PLANE_SCOPE_HELP)).toBeInTheDocument()
     })
 
     it('does not show API URL label for OpenShift', () => {

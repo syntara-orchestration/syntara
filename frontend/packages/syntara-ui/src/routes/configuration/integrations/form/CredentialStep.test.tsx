@@ -108,6 +108,57 @@ describe('CredentialStep', () => {
     expect(screen.getByText(/verify that the LLM provider is reachable/i)).toBeInTheDocument()
   })
 
+  describe('OpenShift authentication', () => {
+    it('renders Authentication title and service account copy', () => {
+      render(
+        <TestWrapper
+          credentialId={null}
+          integrationTypeValue={IntegrationTypeEnum.OPENSHIFT}
+          isTesting={false}
+          onTestConnection={vi.fn()}
+          onCredentialChange={vi.fn()}
+        />
+      )
+
+      expect(screen.getByText('Authentication')).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          /Use a service account token to authenticate to the cluster API\. Credentials are stored encrypted in the platform credential store\./
+        )
+      ).toBeInTheDocument()
+      expect(screen.getByText('Service account token')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'More info for Service account token' })).toBeInTheDocument()
+    })
+
+    it('passes HTTP Bearer Token credential types', () => {
+      render(
+        <TestWrapper
+          credentialId={null}
+          integrationTypeValue={IntegrationTypeEnum.OPENSHIFT}
+          isTesting={false}
+          onTestConnection={vi.fn()}
+          onCredentialChange={vi.fn()}
+        />
+      )
+
+      expect(screen.getByTestId('credential-selector')).toHaveAttribute('data-compatible-types', 'HTTP Bearer Token')
+    })
+
+    it('disables test connection when no credential is selected', () => {
+      render(
+        <TestWrapper
+          credentialId={null}
+          integrationTypeValue={IntegrationTypeEnum.OPENSHIFT}
+          isTesting={false}
+          onTestConnection={vi.fn()}
+          onCredentialChange={vi.fn()}
+        />
+      )
+
+      expect(screen.getByRole('button', { name: 'Test connection' })).toHaveAttribute('aria-disabled', 'true')
+    })
+  })
+
   it('passes the same health check credential label help for LLM provider', () => {
     render(
       <TestWrapper

@@ -303,6 +303,7 @@ export function IntegrationForm() {
   const [isDetailsStepValid, setIsDetailsStepValid] = useState(false)
   const { showAlert } = useAlerts()
   const isLLM = integrationTypeValue === IntegrationTypeEnum.LLM_PROVIDER
+  const isOpenShift = integrationTypeValue === IntegrationTypeEnum.OPENSHIFT
   const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integrationTypeValue)
 
   const onTypeChange = useCallback(
@@ -310,6 +311,10 @@ export function IntegrationForm() {
       setValue('configuration', getDefaultConfiguration(newType), { shouldValidate: false })
       setValue('integration_type', newType as IntegrationFormData['integration_type'])
       setValue('management_credential_id', null)
+      if (newType === IntegrationTypeEnum.OPENSHIFT) {
+        setValue('scope', 'global')
+        setValue('project_ids', [])
+      }
       resetTestState()
       setIsDetailsStepValid(false)
     },
@@ -374,7 +379,11 @@ export function IntegrationForm() {
                 <IntegrationDetailsStep setValue={setValue} onTypeChange={onTypeChange} />
               </WizardStep>
 
-              <WizardStep name="Connection credential" id="credential" navItem={{ isDisabled: !isDetailsStepValid }}>
+              <WizardStep
+                name={isOpenShift ? 'Authentication' : 'Connection credential'}
+                id="credential"
+                navItem={{ isDisabled: !isDetailsStepValid }}
+              >
                 <CredentialStep
                   setValue={setValue}
                   credentialId={credentialId}

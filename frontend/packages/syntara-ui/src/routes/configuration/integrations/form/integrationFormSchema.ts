@@ -106,7 +106,7 @@ const openshiftSchema = z.object({
   configuration: z
     .object({
       integration_type: z.literal(IntegrationTypeEnum.OPENSHIFT),
-      base_url: z.string().min(1, 'Cluster URL is required').url('Cluster URL must be a valid URL'),
+      base_url: z.string().min(1, 'API endpoint is required').url('API endpoint must be a valid URL'),
       namespace: z
         .string()
         .min(1, 'Namespace is required')
