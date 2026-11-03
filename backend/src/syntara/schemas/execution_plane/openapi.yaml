@@ -26,7 +26,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExecutionTargetFacadeRead'
+                $ref: '#/components/schemas/ExecutionTargetRead'
           headers:
             Location:
               description: AO target detail path
@@ -65,10 +65,8 @@ paths:
             type: integer
             maximum: 100
             exclusiveMinimum: 0
-            description: Maximum number of results per page
             default: 20
             title: Limit
-          description: Maximum number of results per page
         - name: cursor
           in: query
           required: false
@@ -76,29 +74,42 @@ paths:
             anyOf:
               - type: string
               - type: 'null'
-            description: Pagination cursor from previous response
             title: Cursor
-          description: Pagination cursor from previous response
         - name: sort
           in: query
           required: false
           schema:
-            anyOf:
-              - type: string
-                pattern: ^-?[a-z][a-z0-9_]*$
-              - type: 'null'
-            description: Sort parameter (e.g., 'name', '-created_at')
+            enum:
+              - id
+              - -id
+              - created_at
+              - -created_at
+              - name
+              - -name
+              - endpoint
+              - -endpoint
+              - status
+              - -status
+              - backend_type
+              - -backend_type
+              - cluster_id
+              - -cluster_id
+              - enabled
+              - -enabled
+              - is_default
+              - -is_default
+            type: string
+            description: Execution-target sort field; oldest first by default.
+            default: created_at
             title: Sort
-          description: Sort parameter (e.g., 'name', '-created_at')
+          description: Execution-target sort field; oldest first by default.
         - name: include_total
           in: query
           required: false
           schema:
             type: boolean
-            description: Include total count in response (expensive)
             default: false
             title: Include Total
-          description: Include total count in response (expensive)
         - name: id
           in: query
           required: false
@@ -215,7 +226,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExecutionTargetListResponse'
+                $ref: '#/components/schemas/ResourcesResponse_ExecutionTargetRead_'
         '502':
           description: Invalid Execution Plane response
         '503':
@@ -252,7 +263,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExecutionTargetFacadeRead'
+                $ref: '#/components/schemas/ExecutionTargetRead'
         '404':
           description: Execution target or installed cluster not found
         '409':
@@ -298,7 +309,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ExecutionTargetFacadeRead'
+                $ref: '#/components/schemas/ExecutionTargetRead'
         '404':
           description: Execution target or installed cluster not found
         '409':
@@ -414,10 +425,8 @@ paths:
             type: integer
             maximum: 100
             exclusiveMinimum: 0
-            description: Maximum number of results per page
             default: 20
             title: Limit
-          description: Maximum number of results per page
         - name: cursor
           in: query
           required: false
@@ -425,29 +434,32 @@ paths:
             anyOf:
               - type: string
               - type: 'null'
-            description: Pagination cursor from previous response
             title: Cursor
-          description: Pagination cursor from previous response
         - name: sort
           in: query
           required: false
           schema:
-            anyOf:
-              - type: string
-                pattern: ^-?[a-z][a-z0-9_]*$
-              - type: 'null'
-            description: Sort parameter (e.g., 'name', '-created_at')
+            enum:
+              - created_at
+              - -created_at
+              - status
+              - -status
+              - resource_cleanup_status
+              - -resource_cleanup_status
+              - id
+              - -id
+            type: string
+            description: Work-item sort field; newest first by default.
+            default: -created_at
             title: Sort
-          description: Sort parameter (e.g., 'name', '-created_at')
+          description: Work-item sort field; newest first by default.
         - name: include_total
           in: query
           required: false
           schema:
             type: boolean
-            description: Include total count in response (expensive)
             default: false
             title: Include Total
-          description: Include total count in response (expensive)
         - name: id
           in: query
           required: false
@@ -524,7 +536,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkItemListResponse'
+                $ref: '#/components/schemas/ResourcesResponse_WorkItemRead_'
         '502':
           description: Invalid Execution Plane response
         '503':
@@ -569,6 +581,13 @@ paths:
         action: null
 components:
   schemas:
+    BackendType:
+      type: string
+      enum:
+        - kubernetes
+        - openshell
+      title: BackendType
+      description: Supported execution target backends.
     Command:
       properties:
         command_id:
@@ -685,7 +704,27 @@ components:
         - id
       title: ExecutionTargetDeleteAccepted
       description: EP accepted deletion; draining and physical removal happen independently.
-    ExecutionTargetFacadeRead:
+    ExecutionTargetHealthResult:
+      properties:
+        healthy:
+          type: boolean
+          title: Healthy
+        message:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Message
+        skipped:
+          type: boolean
+          title: Skipped
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+        - healthy
+      title: ExecutionTargetHealthResult
+      description: Shallow view of an EP on-demand target health probe.
+    ExecutionTargetRead:
       properties:
         id:
           type: string
@@ -699,8 +738,7 @@ components:
           type: string
           title: Name
         backend_type:
-          type: string
-          title: Backend Type
+          $ref: '#/components/schemas/BackendType'
         endpoint:
           type: string
           title: Endpoint
@@ -715,8 +753,7 @@ components:
               kubernetes: '#/components/schemas/KubernetesPlacement'
               rhel: '#/components/schemas/RHELPlacement'
         status:
-          type: string
-          title: Status
+          $ref: '#/components/schemas/TargetStatus'
         enabled:
           type: boolean
           title: Enabled
@@ -754,57 +791,12 @@ components:
         - status
         - enabled
         - is_default
+        - status_message
         - labels
         - created_at
-      title: ExecutionTargetFacadeRead
-      description: Safe target fields available to AO's authorized management API.
-    ExecutionTargetHealthResult:
-      properties:
-        healthy:
-          type: boolean
-          title: Healthy
-        message:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Message
-        skipped:
-          type: boolean
-          title: Skipped
-          default: false
-      additionalProperties: false
-      type: object
-      required:
-        - healthy
-      title: ExecutionTargetHealthResult
-      description: AO's shallow view of an EP on-demand target health probe.
-    ExecutionTargetListResponse:
-      properties:
-        resources:
-          items:
-            $ref: '#/components/schemas/ExecutionTargetFacadeRead'
-          type: array
-          title: Resources
-        next:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Next
-        prev:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Prev
-        total:
-          anyOf:
-            - type: integer
-            - type: 'null'
-          title: Total
-      type: object
-      required:
-        - resources
-      title: ExecutionTargetListResponse
-      description: Paginated list response for ExecutionTarget.
+        - last_ran_at
+      title: ExecutionTargetRead
+      description: Safe execution-target representation without management credentials.
     ExecutionTargetUpdate:
       properties:
         name:
@@ -830,7 +822,7 @@ components:
       type: object
       minProperties: 1
       title: ExecutionTargetUpdate
-      description: Patch mutable target fields. Placement requires a namespace; omitted selectors are retained.
+      description: Patch mutable target fields; placement requires a namespace.
     HTTPValidationError:
       properties:
         detail:
@@ -846,12 +838,14 @@ components:
           type: string
           const: kubernetes
           title: Type
+          default: kubernetes
         namespace:
           type: string
           maxLength: 63
           minLength: 1
           pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
           title: Namespace
+          description: Kubernetes namespace reserved for execution workloads
         node_selectors:
           items:
             type: string
@@ -864,10 +858,9 @@ components:
           title: Tolerations
       type: object
       required:
-        - type
         - namespace
       title: KubernetesPlacement
-      description: Kubernetes scheduling metadata returned by the Execution Plane.
+      description: Metadata required to place workers on Kubernetes.
     KubernetesTargetPlacement:
       properties:
         type:
@@ -896,7 +889,7 @@ components:
       required:
         - namespace
       title: KubernetesTargetPlacement
-      description: Validated Kubernetes placement for writes, using EP's shared command contract.
+      description: Validated Kubernetes placement for target-management writes.
     MessageEnvelope:
       properties:
         message_id:
@@ -950,11 +943,10 @@ components:
           type: string
           const: rhel
           title: Type
+          default: rhel
       type: object
-      required:
-        - type
       title: RHELPlacement
-      description: RHEL placement marker returned by the Execution Plane.
+      description: Placeholder for RHEL-specific execution-target metadata.
     ResourceReference:
       properties:
         kind:
@@ -986,6 +978,58 @@ components:
         - resource_id
       title: ResourceReference
       description: Safe reference from a command to a participant-owned resource.
+    ResourcesResponse_ExecutionTargetRead_:
+      properties:
+        resources:
+          items:
+            $ref: '#/components/schemas/ExecutionTargetRead'
+          type: array
+          title: Resources
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+        total:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Total
+      type: object
+      required:
+        - resources
+      title: ResourcesResponse[ExecutionTargetRead]
+    ResourcesResponse_WorkItemRead_:
+      properties:
+        resources:
+          items:
+            $ref: '#/components/schemas/WorkItemRead'
+          type: array
+          title: Resources
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+        total:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Total
+      type: object
+      required:
+        - resources
+      title: ResourcesResponse[WorkItemRead]
     TargetHealthCommandResult:
       properties:
         command_type:
@@ -1016,6 +1060,18 @@ components:
         - healthy
       title: TargetHealthCommandResult
       description: Typed result returned for an execution-target health command.
+    TargetStatus:
+      type: string
+      enum:
+        - registering
+        - validating
+        - bootstrapping
+        - active
+        - degraded
+        - draining
+        - failed
+      title: TargetStatus
+      description: Lifecycle states of an execution target.
     TransportReceipt:
       properties:
         received:
@@ -1075,21 +1131,29 @@ components:
         - msg
         - type
       title: ValidationError
-    WorkItemFacadeRead:
+    WorkItemRead:
       properties:
         id:
           type: string
           format: uuid
           title: Id
         status:
-          type: string
-          title: Status
+          $ref: '#/components/schemas/WorkItemStatus'
         result:
           anyOf:
             - additionalProperties: true
               type: object
             - type: 'null'
           title: Result
+        result_omitted:
+          type: boolean
+          title: Result Omitted
+          default: false
+        result_size_bytes:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Result Size Bytes
         created_at:
           type: string
           format: date-time
@@ -1106,40 +1170,40 @@ components:
               format: date-time
             - type: 'null'
           title: Completed At
+        resource_cleanup_status:
+          type: string
+          title: Resource Cleanup Status
+        resource_cleanup_error:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Resource Cleanup Error
       type: object
       required:
         - id
         - status
+        - result
         - created_at
-      title: WorkItemFacadeRead
-      description: Safe work state; internal tokens and storage metadata stay private.
-    WorkItemListResponse:
-      properties:
-        resources:
-          items:
-            $ref: '#/components/schemas/WorkItemFacadeRead'
-          type: array
-          title: Resources
-        next:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Next
-        prev:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Prev
-        total:
-          anyOf:
-            - type: integer
-            - type: 'null'
-          title: Total
-      type: object
-      required:
-        - resources
-      title: WorkItemListResponse
-      description: Paginated list response for WorkItem.
+        - claimed_at
+        - completed_at
+        - resource_cleanup_status
+        - resource_cleanup_error
+      title: WorkItemRead
+      description: Safe work-item representation; excludes credentials and persistence internals.
+    WorkItemStatus:
+      type: string
+      enum:
+        - pending
+        - claimed
+        - dispatched
+        - running
+        - cancel_requested
+        - reconciliation_required
+        - completed
+        - failed
+        - cancelled
+      title: WorkItemStatus
+      description: Lifecycle states of a dispatched work item.
   securitySchemes:
     bearerAuth:
       type: http
