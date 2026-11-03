@@ -350,6 +350,36 @@ describe('IntegrationDetailsStep', () => {
 
       expect(screen.queryByRole('textbox', { name: /^api url$/i })).not.toBeInTheDocument()
     })
+
+    it('has no accessibility violations with OpenShift selected', async () => {
+      const { container } = render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
+
+      let results: Awaited<ReturnType<typeof axe>>
+      await act(async () => {
+        results = await axe(container)
+      })
+      expect(results!).toHaveNoViolations()
+    })
+
+    it('has no accessibility violations with disabled Execution plane option shown', async () => {
+      mockUseOpenShiftIntegrationExists.mockReturnValue({
+        exists: true,
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      })
+      const user = userEvent.setup()
+      const { container } = render(<TestWrapper />)
+
+      await user.click(screen.getByRole('button', { name: 'MCP Server' }))
+      expect(screen.getByRole('option', { name: /Execution plane infrastructure/i })).toBeDisabled()
+
+      let results: Awaited<ReturnType<typeof axe>>
+      await act(async () => {
+        results = await axe(container)
+      })
+      expect(results!).toHaveNoViolations()
+    })
   })
 
   describe('type change', () => {
