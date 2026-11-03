@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { formDefinitionSchema } from '../../../forms'
+import { formDefinitionBuilderFormFieldSchema } from '../../../forms'
 
 import { optionalNumber } from './shared/formSchemaUtils'
 import { nodeSettingsSchema } from './shared/nodeSettingsSchema'
@@ -11,7 +11,7 @@ const MAX_RESPONDER_GROUPS = 50
 export const formPromptFormSchema = z.object({
   name: z.string(),
   message: z.string().max(2000).nullable().optional(),
-  form_definition: formDefinitionSchema,
+  form_definition: formDefinitionBuilderFormFieldSchema,
   responder_users: z
     .array(z.string())
     .max(MAX_RESPONDER_USERS, `Cannot select more than ${MAX_RESPONDER_USERS} users`)

@@ -1,4 +1,5 @@
 import type { FormDefinitionFieldServerError } from '../../../components/forms/formFieldBuilder/formDefinitionFieldServerError'
+import { humanizeFormDefinitionIssueMessage } from '../../../forms'
 import type { TriggerFormData } from '../node-forms/triggerFormSchema'
 
 import { mapFormTriggerValidationFieldPath } from './mapFormTriggerValidationFieldPath'
@@ -19,7 +20,10 @@ export function partitionFormTriggerServerValidationErrors(errors?: ReadonlyArra
   for (const err of errors ?? []) {
     const formField = parseFormTriggerFormDefinitionFieldPath(err.fieldPath, err.message)
     if (formField) {
-      formFieldErrors.push(formField)
+      formFieldErrors.push({
+        ...formField,
+        message: humanizeFormDefinitionIssueMessage(err.message, err.fieldPath, { includeFieldLocation: false }),
+      })
       continue
     }
     const field = mapFormTriggerValidationFieldPath(err.fieldPath)

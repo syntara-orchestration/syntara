@@ -9,15 +9,30 @@ export {
 } from './formConstants'
 export { FormFieldTypeEnum, FORM_FIELD_TYPE_VALUES, type FormFieldType } from './formFieldTypeEnum'
 export { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE } from './dateFieldValidationMessages'
+export {
+  humanizeFormDefinitionIssueMessage,
+  parseFormDefinitionErrorLocation,
+  type FormDefinitionErrorLocation,
+  type HumanizeFormDefinitionIssueMessageOptions,
+} from './formDefinitionValidationMessage'
+export {
+  humanizeFormDefinitionValidationError,
+  humanizeFormDefinitionValidationErrors,
+} from './humanizeFormDefinitionValidationError'
+export { FORM_PREVIEW_INCOMPLETE_TOOLTIP, isFormDefinitionReadyForPreview } from './isFormDefinitionReadyForPreview'
 export { prepareFormDefinitionForCommit, sanitizeDateFieldForApi } from './dateFieldUtils'
 export {
+  formDefinitionBuilderSchema,
+  formDefinitionBuilderFormFieldSchema,
   formDefinitionSchema,
   formFieldSchema,
   parseFormDefinition,
   safeParseFormDefinition,
+  type FormDefinitionBuilderSchemaInput,
   type FormDefinitionSchemaInput,
   type FormFieldSchemaInput,
 } from './formDefinitionSchema'
+export { serializeFormDefinitionForStorage } from './formDefinitionStorage'
 export {
   assertValidFormDefinition,
   validateFormDefinitionDefaults,

@@ -55,7 +55,7 @@ export function FormFieldBuilderCard({
   const valueNameLooksGenerated =
     field.value_name === autoValueName || field.value_name === slugifyLabelToValueNameBase(field.label)
 
-  const handleLabelChange = (nextLabel: string) => {
+  const syncValueNameForLabel = (nextLabel: string) => {
     const current = getValues(`fields.${index}`)
     const otherNames = (getValues('fields') ?? []).map((f, i) => (i === index ? '' : f.value_name)).filter(Boolean)
     const previousAuto = labelToValueName(current.label, otherNames)
@@ -64,7 +64,6 @@ export function FormFieldBuilderCard({
       current.value_name === previousAuto ||
       current.value_name === slugifyLabelToValueNameBase(current.label)
 
-    setValue(`fields.${index}.label`, nextLabel, { shouldValidate: false })
     if (shouldAutoRename) {
       setValue(`fields.${index}.value_name`, labelToValueName(nextLabel, otherNames), { shouldValidate: false })
     }
@@ -131,7 +130,7 @@ export function FormFieldBuilderCard({
                         idPrefix={idPrefix}
                         fieldType={field.type}
                         isDisabled={isDisabled}
-                        onLabelChange={handleLabelChange}
+                        onLabelChange={syncValueNameForLabel}
                       />
                     </FlexItem>
                   </Flex>
