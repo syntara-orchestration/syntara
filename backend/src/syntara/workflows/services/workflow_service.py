@@ -1071,6 +1071,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             workflow_id=workflow.id,
             published_version_id=published_version.id,
             published_version=published_version.version,
+            published_version_name=published_version.name,
+            published_version_created_at=published_version.created_at,
             is_eligible=bool(invocation_triggers),
             triggers=invocation_triggers,
         )
