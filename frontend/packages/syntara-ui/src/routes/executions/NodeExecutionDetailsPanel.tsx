@@ -451,7 +451,7 @@ export function NodeExecutionDetailsPanel({
   // Display-time enrichment for sub-workflow nodes: fetch the child execution(s)
   // and their persisted activities (read-only; shared cache with the Child
   // activities tab). Disabled for non-sub-workflow nodes via the undefined parent id.
-  const [outputMode, setOutputMode] = useState<'composed' | 'persisted'>('composed')
+  const [outputMode, setOutputMode] = useState<'composed' | 'persisted'>('persisted')
   const subWorkflowData = useSubWorkflowChildData(isSubWorkflowNode ? executionId : undefined, nodeId)
   const enrichedOutput = useMemo(
     () =>
