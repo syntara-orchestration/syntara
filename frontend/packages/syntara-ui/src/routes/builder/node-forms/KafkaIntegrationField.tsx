@@ -1,12 +1,4 @@
-import {
-  Content,
-  ContentVariants,
-  SelectList,
-  SelectOption,
-  Stack,
-  StackItem,
-  type MenuToggleElement,
-} from '@patternfly/react-core'
+import { SelectList, SelectOption, Stack, StackItem, type MenuToggleElement } from '@patternfly/react-core'
 import { useCallback, useState, type Ref } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
@@ -15,14 +7,13 @@ import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
-import { StatusLabel } from '../../configuration/integrations/StatusLabel'
 import { IntegrationRequiredHelper } from '../components/IntegrationRequiredHelper'
 import { TypeaheadMenuToggle } from '../components/TypeaheadMenuToggle'
 
 import type { TriggerFormData } from './triggerFormSchema'
 import { kafkaResourceErrors, type KafkaSubscribeResources } from './useKafkaSubscribeResources'
 
-/** Integration health describes the management connection, not runtime credential access. */
+/** Select a usable Integration independently of runtime credential authentication. */
 export function KafkaIntegrationField({
   isDisabled,
   resources,
@@ -137,15 +128,6 @@ export function KafkaIntegrationField({
             integrationLabel="a Kafka Integration"
             actionLabel="a Kafka Integration can be selected"
           />
-        </StackItem>
-      )}
-      {selected && (
-        <StackItem>
-          <Content component={ContentVariants.p}>
-            Integration validation:{' '}
-            <StatusLabel status={selected.validation_status ?? 'unknown'} errorMessage={selected.validation_error} />.
-            This describes the managed connection, not the selected runtime credential’s access.
-          </Content>
         </StackItem>
       )}
     </Stack>

@@ -144,7 +144,7 @@ describe('Kafka Subscribe form', () => {
     )
     expect(screen.getByText(/platform supplies the workflow execution identity automatically/)).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: /service account|execution account/i })).not.toBeInTheDocument()
-    expect(screen.getByText('Available')).toBeInTheDocument()
+    expect(screen.queryByText(/Integration validation:/)).not.toBeInTheDocument()
   })
 
   it('submits Kafka fields without webhook authorization or schedule settings', async () => {
@@ -279,17 +279,18 @@ describe('Kafka Subscribe form', () => {
     expect(await screen.findByText(/Select an available Kafka Integration/)).toBeInTheDocument()
   })
 
-  it('uses the Integration status presentation and exposes failure detail', async () => {
+  it.each(['unknown', 'error', 'available'] as const)('omits persistent Integration health for %s', async (status) => {
     vi.mocked(integrationsFetchClient.GET).mockResolvedValue({
       data: {
-        resources: [{ ...integration, validation_status: 'error', validation_error: 'Connection check failed' }],
+        resources: [{ ...integration, validation_status: status, validation_error: 'Connection check failed' }],
       },
       response: new Response(),
     })
-    const user = userEvent.setup()
     renderKafka()
-    await user.hover(await screen.findByText('Error'))
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Connection check failed')
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveValue('Orders Kafka'))
+    expect(screen.queryByText(/Integration validation:/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Connection check failed')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Change' })).toBeInTheDocument()
   })
 
   it('blocks submitting and preflight for an unavailable saved Integration', async () => {
@@ -317,7 +318,7 @@ describe('Kafka Subscribe form', () => {
     })
     const onSubmit = vi.fn()
     renderKafka(onSubmit)
-    await screen.findByText('Available')
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveValue('Orders Kafka'))
     await submitForm()
     expect(onSubmit).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Test runtime access' })).toHaveAttribute('aria-disabled', 'true')
@@ -327,7 +328,7 @@ describe('Kafka Subscribe form', () => {
     const onSubmit = vi.fn()
     const user = userEvent.setup()
     renderKafka(onSubmit)
-    await screen.findByText('Available')
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveValue('Orders Kafka'))
     await user.clear(screen.getByRole('textbox', { name: 'Topic' }))
     await user.click(screen.getByRole('button', { name: 'Change' }))
     await user.clear(screen.getByRole('textbox', { name: 'Kafka runtime credential' }))

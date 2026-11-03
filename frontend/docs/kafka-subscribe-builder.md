@@ -113,9 +113,11 @@ picker closes.
 The Integration and runtime credential selectors support search and clearing.
 Credential creation is available when permitted. Loading supporting credential
 types is not displayed as an empty result. Selector and bootstrap-server errors
-are programmatically associated with their controls. Integration health is shown
-using the existing status label only after selection, separately from runtime
-access. Sanitized preflight error codes are displayed for diagnosis.
+are programmatically associated with their controls. The builder does not display
+a persistent Integration health line. Credential setup uses AAP-style warning and
+check icons for missing and configured credentials; configured does not mean
+runtime access has been verified. Sanitized preflight error codes are displayed
+for diagnosis.
 
 Delivery defaults are available under **Show message delivery details**; preflight
 scope is available in contextual help. Trigger output references use the Kafka
