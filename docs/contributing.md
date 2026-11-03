@@ -52,7 +52,8 @@ See [AI_POLICY.md](https://github.com/syntara-orchestration/syntara/blob/devel/.
 4. Open a pull request targeting `devel` — the PR template will guide you through the checklist
 5. Link any related issues in the PR description
 
-If your PR addresses a Jira work item, link it in the PR description. PRs that
+If your PR addresses a Jira work item, reference its key in the PR description
+(e.g. `Related to AAP-12345`). Use the plain key only, not a Jira URL. PRs that
 don't reference a Jira work item are considered community contributions and
 should have the `community` label. Please add it, or ask a maintainer to add it
 if you don't have permission to manage labels.
@@ -222,7 +223,15 @@ make docs-build   # Validate with mkdocs build --strict (same check CI runs)
 
 ## Commit Conventions
 
-Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
+Use [Conventional Commits](https://www.conventionalcommits.org/) for commit subjects and pull request titles: `<type>(<scope>): <description>`, e.g. `fix(auth): handle expired tokens`.
+
+- Common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
+- `scope` is optional. When you leave it out, leave out the parentheses too, e.g. `fix: handle expired tokens`.
+- Never use square brackets in the subject (`fix[auth]: …` or `[AAP-12345] fix: …`). Reference the Jira key in the PR description.
+
+## No Jira References in Code or Docs
+
+Jira is internal, so don't put Jira issue keys (e.g. `AAP-12345`) or Jira URLs in code comments, docstrings, `TODO`s, test names, skip reasons, log/error messages, or documentation. Explain the reason in plain language instead. The PR description must still reference the Jira work item the PR addresses, by plain key only and never by URL (see above). Keys are also fine in branch names and commit message bodies/footers.
 
 ## Developer Certificate of Origin
 

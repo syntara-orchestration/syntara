@@ -288,9 +288,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch devel branch for OpenAPI comparison
+      - name: Fetch pull-request base branch for OpenAPI comparison
         if: github.event_name != 'merge_group'
-        run: git fetch origin devel
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          base_ref="${GITHUB_BASE_REF:-devel}"
+          git fetch origin "$base_ref"
+          echo "OPENAPI_BASE_REF=$base_ref" >> "$GITHUB_ENV"
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -322,7 +328,7 @@ jobs:
         run: ./scripts/openapi/resolve-merge-group-pr-labels.py
         working-directory: backend
 
-      - name: Check OpenAPI breaking changes against devel
+      - name: Check OpenAPI breaking changes against pull-request base
         if: github.event_name != 'merge_group'
         run: make check-openapi-breaking-pre-commit
         working-directory: backend
@@ -942,7 +948,8 @@ jobs:
   konflux-backend-gate:
     name: (Backend) Konflux Gate
     # Tekton PAC only fires on pull_request events (not merge_group or push).
-    if: github.event_name == 'pull_request'
+    # Konflux gates are not required for the execution-plane feature branch.
+    if: github.event_name == 'pull_request' && github.base_ref != 'feat/ANSTRAT-1803'
     permissions:
       checks: read
     runs-on: ubuntu-24.04
@@ -958,7 +965,8 @@ jobs:
   konflux-api-tests-gate:
     name: (Backend) Konflux API Tests Gate
     # Tekton PAC only fires on pull_request events (not merge_group or push).
-    if: github.event_name == 'pull_request'
+    # Konflux gates are not required for the execution-plane feature branch.
+    if: github.event_name == 'pull_request' && github.base_ref != 'feat/ANSTRAT-1803'
     permissions:
       checks: read
     runs-on: ubuntu-24.04
@@ -1008,9 +1016,6 @@ jobs:
     if: always()
     steps:
       - name: Check required jobs passed
-        env:
-          # Konflux API tests run on feature-base PRs for signal; failures do not block merge.
-          FEATURE_BASE_PR: ${{ github.event_name == 'pull_request' && (startsWith(github.base_ref, 'feature/') || startsWith(github.base_ref, 'feat/')) }}
         run: |
           # If no backend changes, pass immediately
           if [[ "${{ needs.changes.outputs.backend }}" == "false" ]]; then
@@ -1050,12 +1055,6 @@ jobs:
               snyk-sca)              result="${{ needs.snyk-sca.result }}" ;;
             esac
             echo "$job: $result"
-            if [[ "$FEATURE_BASE_PR" == "true" && "$job" == "konflux-api-tests-gate" ]]; then
-              if [[ "$result" == "failure" ]]; then
-                echo "::warning::konflux-api-tests-gate failed on a feature-base PR (informational only)"
-              fi
-              continue
-            fi
             if [[ ! "$result" =~ ^($ok)$ ]]; then
               echo "::error::Required job '$job' has result '$result'"
               exit 1

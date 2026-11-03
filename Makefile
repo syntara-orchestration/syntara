@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 .PHONY: help install format lint test test-all typecheck dev gen-contracts \
        services-up services-down services-logs secrets db-migrate db-seed admin-password setup sync \
        pre-commit-install docs-serve docs-build
@@ -17,15 +19,39 @@ pre-commit-install: ## Install pre-commit hooks
 	uv run pre-commit install
 	uv run pre-commit install --hook-type commit-msg
 
-dev: ## Start backend API, Temporal workers, and frontend dev servers
-	$(MAKE) -C backend dev &
-	$(MAKE) -C backend worker-run &
-	$(MAKE) -C backend background-worker-run &
+dev: ## Start AO and the standalone EP API/worker from their separate checkouts
+	@pids=""; \
+	run_backend_target() { \
+		target="$$1"; \
+		trap 'kill -TERM "$$child" 2>/dev/null || true; wait "$$child" 2>/dev/null || true; exit 0' INT TERM; \
+		$(MAKE) -C backend "$$target" 2> >(sed -E '/^make\[[0-9]+\]: \*\*\* \[Makefile:[0-9]+: (dev|worker-run|background-worker-run|ep-api-run|ep-worker-run)\] Error (130|143)$$/d' >&2) & \
+		child=$$!; \
+		wait "$$child"; \
+		status=$$?; \
+		trap - INT TERM; \
+		return "$$status"; \
+	}; \
+	cleanup() { \
+		status=$${1:-$$?}; \
+		trap - INT TERM EXIT; \
+		for pid in $$pids; do kill -TERM "$$pid" 2>/dev/null || true; done; \
+		wait 2>/dev/null || true; \
+		exit $$status; \
+	}; \
+	trap 'cleanup 0' INT TERM; \
+	trap cleanup EXIT; \
+	$(MAKE) -C backend ep-migrate || exit $$?; \
+	run_backend_target dev & pids="$$pids $$!"; \
+	run_backend_target worker-run & pids="$$pids $$!"; \
+	run_backend_target background-worker-run & pids="$$pids $$!"; \
+	run_backend_target ep-api-run & pids="$$pids $$!"; \
+	run_backend_target ep-worker-run & pids="$$pids $$!"; \
 	cd frontend && VITE_API_URL=https://localhost:8000 npm run start
 
-setup: _ensure-env install secrets certs build-images services-up db-migrate db-seed admin-password ## One-shot bootstrap: install, secrets, certs, services, migrations, seed
+
+setup: _ensure-env install secrets certs build-images services-up db-migrate db-seed admin-password ## One-shot bootstrap: install, secrets, certs, services, migrations, and seed data
 	@echo ""
-	@echo "Setup complete. Run 'make dev' to start the development servers."
+	@echo "Setup complete. Run 'make dev' to start AO and the standalone EP API/worker."
 
 _ensure-env:
 	@if [ ! -f backend/.env ]; then \
@@ -80,6 +106,7 @@ build-images: ## Build container images
 
 db-migrate: ## Run database migrations
 	cd backend && APP_ADMIN_PASSWORD_PATH=.secrets/admin-password uv run alembic upgrade head
+	$(MAKE) -C backend ep-migrate
 
 db-seed: ## Seed the database with required data
 	$(MAKE) -C backend db-seed
@@ -91,6 +118,9 @@ admin-password: ## Sync bootstrap admin password from .secrets/admin-password in
 
 gen-contracts: ## Regenerate TypeScript types from backend OpenAPI specs
 	cd frontend/packages/syntara-contracts && npm run gen:local
+
+check-openapi-breaking-pre-commit: ## Check OpenAPI breaking changes against the pull-request base
+	$(MAKE) -C backend check-openapi-breaking-pre-commit
 
 # --- Standards checks (removed from pre-commit, run in CI) ---
 

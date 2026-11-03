@@ -7,8 +7,8 @@ import { useMockDataStore } from '../../../stores/useMockDataStore'
 import { InputPanel } from './InputPanel'
 
 const mockUseUpstreamNodes = vi.fn<(...args: unknown[]) => { id: string; name: string; type: string }[]>()
-vi.mock('./hooks/useUpstreamNodes', () => ({
-  useUpstreamNodes: (...args: unknown[]) =>
+vi.mock('./hooks/useUpstreamSteps', () => ({
+  useUpstreamSteps: (...args: unknown[]) =>
     mockUseUpstreamNodes(...args) as { id: string; name: string; type: string }[],
 }))
 

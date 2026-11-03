@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
+    "check:jira-references": "tsx src/check-jira-references.ts",
+    "check:pr-description": "tsx src/check-pr-description.ts",
+    "check:pr-title": "tsx src/check-pr-title.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "notify:dequeue-burst": "tsx src/dequeue-burst-alert.ts",

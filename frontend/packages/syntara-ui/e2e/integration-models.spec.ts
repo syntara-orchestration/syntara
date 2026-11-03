@@ -9,7 +9,7 @@
  * - Remove default model via kebab menu
  * - Filter models by name
  * - Save models and verify persistence on revisit
- * - Allow-list changes propagate to the Agent node model selector (Test 15)
+ * - Allow-list changes propagate to the Agent step model selector (Test 15)
  *
  * Edge cases:
  * - Filter with no results shows empty filter state
@@ -324,12 +324,12 @@ test.describe('LLM Provider Models Tab', () => {
     }
   })
 
-  test('allow-list and default changes propagate to agent node model selector', async ({ app }) => {
+  test('allow-list and default changes propagate to agent step model selector', async ({ app }) => {
     const name = buildUniqueName('e2e-llm-propagate')
     const integration = await createLLMIntegration(app, name)
 
     try {
-      // 1. Open workflow builder, add an Agent node, verify initial model state
+      // 1. Open workflow builder, add an Agent step, verify initial model state
       await startWorkflowWithTrigger(app)
 
       const panel = await clickAddConnectedStep(app)

@@ -3,10 +3,15 @@
 
 from __future__ import annotations
 
+import json
+import os
+import re
 import sys
+import tarfile
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 SECTIONS_TO_REMOVE = {
     "[project.optional-dependencies]",
@@ -70,8 +75,46 @@ def _finalize_output(out: list[str], state: _SanitizeState) -> None:
         out.extend(["[tool.uv]\n", LINUX_ONLY_ENV])
 
 
+def _prefetched_client_source(pyproject_path: Path) -> str | None:
+    """Point uv at the client's project inside Hermeto's full Git archive."""
+    metadata = tomllib.loads(pyproject_path.read_text())
+    source = metadata.get("tool", {}).get("uv", {}).get("sources", {}).get("execution-plane-client", {})
+    if "git" not in source:
+        return None
+    repository = Path(urlsplit(source["git"]).path).stem
+    lock = tomllib.loads(pyproject_path.with_name("uv.lock").read_text())
+    locked_source = next(
+        (
+            package.get("source", {}).get("git", "")
+            for package in lock.get("package", [])
+            if package.get("name") == "execution-plane-client"
+        ),
+        "",
+    )
+    commit = urlsplit(locked_source).fragment
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        msg = "execution-plane-client must have a resolved Git commit in uv.lock"
+        raise ValueError(msg)
+    archive_path = Path(os.environ["PIP_FIND_LINKS"]) / f"{repository}-gitcommit-{commit}.tar.gz"
+    subdirectory = Path(source["subdirectory"])
+    if subdirectory.is_absolute() or ".." in subdirectory.parts:
+        msg = "Client subdirectory must stay inside the prefetched repository"
+        raise ValueError(msg)
+    extracted = pyproject_path.resolve().parent / ".hermetic-sources" / "execution-plane-client"
+    prefix = f"app/{subdirectory.as_posix()}/"
+    with tarfile.open(archive_path, "r:gz") as archive:
+        members = [member for member in archive.getmembers() if member.name.startswith(prefix)]
+        archive.extractall(extracted, members=members, filter="data")
+    project = extracted / "app" / subdirectory
+    if not (project / "pyproject.toml").is_file():
+        msg = "Prefetched archive does not contain the execution-plane-client project"
+        raise ValueError(msg)
+    return f"execution-plane-client = {{ path = {json.dumps(str(project))} }}\n"
+
+
 def sanitize_pyproject(pyproject_path: Path) -> None:
     """Remove non-hermetic metadata and enforce Linux-only uv environments."""
+    client_source = _prefetched_client_source(pyproject_path)
     lines = pyproject_path.read_text().splitlines(keepends=True)
     out: list[str] = []
     i = 0
@@ -89,6 +132,18 @@ def sanitize_pyproject(pyproject_path: Path) -> None:
             _handle_table_header(stripped, out, state)
 
         if state.in_uv_sources and stripped.startswith("external-services"):
+            i += 1
+            continue
+
+        if state.in_uv_sources and stripped.startswith("execution-plane-client =") and client_source is not None:
+            out.append(client_source)
+            i += 1
+            continue
+
+        # Konflux prefetches this VCS dependency from requirements.txt as a
+        # local source archive. Drop the Git source override so the offline
+        # lock resolves that prefetched execution-plane==version artifact.
+        if state.in_uv_sources and stripped.startswith("execution-plane ="):
             i += 1
             continue
 

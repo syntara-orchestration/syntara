@@ -98,7 +98,7 @@ class PeriodicWorker:
             access.
         callback: Async work function called each cycle. Receives the
             session_factory (which may be ``None``) so it can open its own
-            database sessions when needed.
+            database sessions when needed. Its return value is ignored.
         cleanup_callback: Optional async function called during stop() for
             resource cleanup (e.g., flushing buffers).
         coordinate: Whether to acquire an advisory lock before running the
@@ -116,7 +116,7 @@ class PeriodicWorker:
         name: str,
         interval_seconds: float,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
-        callback: Callable[[Any], Awaitable[None]],
+        callback: Callable[[Any], Awaitable[object]],
         cleanup_callback: Callable[[], Awaitable[None]] | None = None,
         coordinate: bool = True,
     ) -> None:

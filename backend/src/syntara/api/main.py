@@ -33,6 +33,7 @@ from syntara.api.constants import (
     API_V1_PATH_PREFIX,
     API_V1_VERSION,
 )
+from syntara.api.execution_plane_facade import router as ep_router
 from syntara.audit.lifecycle import start_audit_subsystems, stop_audit_subsystems
 from syntara.audit.middleware import AuditMiddleware
 from syntara.audit.registration import discover_and_register_all_handlers
@@ -72,6 +73,7 @@ from syntara.core.models.user import User
 from syntara.core.router_discovery import _get_lock_file_path, discover_and_register_routers, iter_api_routes
 from syntara.core.websocket.manager import get_connection_lifecycle_manager
 from syntara.core.websocket.router import build_websocket_router
+from syntara.execution_plane.bridge import router as ep_completion_router
 from syntara.files.health import validate_file_storage_at_startup
 from syntara.files.workers.file_cleanup import get_multipart_cleanup_worker
 from syntara.metrics.cleanup import get_metrics_cleanup_worker
@@ -216,6 +218,18 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     else:
         logger.warning("Router discovery disabled - no routers will be automatically registered")
 
+    # ========================================================================
+    # EXECUTION PLANE API FACADE
+    # ------------------------------------------------------------------------
+    # Syntara owns public authorization. Execution Plane reads and mutations
+    # cross its versioned HTTP contract through the AO-owned adapter. The
+    # inbound EP completion callback is a separate concern and lives in its
+    # own router alongside the facade.
+    # ------------------------------------------------------------------------
+    app.include_router(ep_router)
+    app.include_router(ep_completion_router)
+    # ========================================================================
+
     # Register WebSocket router manually (excluded from router discovery)
     # WebSocket routers use AsyncAPI specification instead of OpenAPI,
     # so they're excluded from the OpenAPI-based validation system and
@@ -224,7 +238,7 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     app.include_router(ws_router)
 
     # Build the resource_actions registry by introspecting all registered
-    # routes and merging with BUILTIN_POLICIES.  Must run after all routers
+    # routes and merging with BUILTIN_POLICIES. Must run after all routers
     # (including WebSocket) are registered.
     from syntara.authz.resource_actions import build_resource_actions  # noqa: PLC0415
 

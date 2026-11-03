@@ -74,6 +74,7 @@ def _make_workflow(
     wf._cof_failed_nodes = set()
     init_workflow_runtime(wf)
     wf.execution_id = "test-execution-id"
+    wf._project_id = ""
     wf._created_by_user_id = ""
     wf.request_id = None
     wf.pre_resolved_outputs = {}

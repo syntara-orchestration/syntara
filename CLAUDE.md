@@ -106,6 +106,40 @@ make gen-contracts
 
 When a backend PR changes API schemas, run this and include the regenerated types in the same PR. The gen scripts read directly from the local tree — no cross-repo cloning.
 
+## Commit Messages and PR Titles
+
+Commit subjects **and pull request titles** must follow [Conventional Commits](https://www.conventionalcommits.org/). The `conventional-pre-commit` hook enforces this for commit messages. PR titles become the squash-merge commit subject, so they must use the same format.
+
+```
+<type>(<scope>): <description>
+```
+
+- `type` is one of: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+- `scope` is optional. If you include it, wrap it in **parentheses**, e.g. `fix(auth): handle expired tokens`. If you leave it out, leave out the parentheses too, e.g. `fix: handle expired tokens`. Never write empty `()`.
+- **Never use square brackets** in the subject: `fix[auth]: …` and `[AAP-12345] fix: …` are invalid. Reference the Jira key in the PR description instead (see below).
+- Add `!` before the colon for breaking changes, e.g. `feat(api)!: drop v1 endpoints`.
+- Write the description in the imperative mood, lowercase, with no trailing period. Keep the whole subject to 72 characters or fewer.
+
+Automated or agent-generated PRs (including bug-resolution pipelines) must check or normalize the title against this format before opening the PR.
+
+**Enforced in CI** by the `PR title` check in the `PR Metadata` workflow (`.github/workflows/pr-metadata.yml`). Structural problems fail the check, and a suggested fix is posted when one is safe. Length, casing and trailing-period issues are warnings only.
+
+## No Jira References in Code or Docs
+
+Code and docs in this repo are read by people who can't open the internal Jira, so Jira references must not appear in source files or documentation.
+
+- **Do not put** Jira issue keys (e.g. `AAP-12345`, `ANSTRAT-1934`), Jira URLs or phrases like "per the Jira ticket" in:
+  - code comments, docstrings and `TODO`/`FIXME` notes
+  - test names, test descriptions and `pytest.skip`/`test.skip` reasons
+  - log, error and user-facing messages
+  - Markdown docs, ADRs and skill files
+- **Instead**, explain the *why* in plain language, e.g. `# Retry once: the upstream API returns 409 while the lock is released`, not `# Workaround for AAP-12345`.
+- **The PR description must reference the Jira work item** the PR addresses **by its plain key**, e.g. `Related to AAP-12345` (see the General Checklist in the PR template). Never paste a Jira URL; the `PR description` check in the `PR Metadata` workflow fails when it finds one. PRs without one count as community contributions and get the `community` label. Jira keys are also fine in branch names and commit message bodies/footers (e.g. `Refs: AAP-12345`), but not in the commit subject or PR title (see above).
+
+This applies to code written by hand, by agents, and by automated pipelines (including the agentic bug-resolution pipeline). Pipelines can keep tracking issues in Jira, but generated code and docs must contain no Jira references.
+
+**Enforced in CI** by the `Jira References` workflow (`.github/workflows/jira-references.yml`). It scans only the PR diff, never the PR description, and fails when lines *added* by the PR contain `AAP-`/`ANSTRAT-` keys or Jira URLs (the hosts are listed in `JIRA_HOSTS` in `.github/scripts/src/lib/jira.ts`). Don't write Jira URLs anywhere in the repo, not even as examples. Existing references only need cleaning up when you touch those lines. Use a placeholder such as `PROJ-123` for examples. The few paths allowed to contain plain keys are listed in `JIRA_CHECK_EXCLUDED_PATHS` in `.github/scripts/src/lib/jira.ts`; those paths are still checked for Jira URLs.
+
 ## Cross-Cutting Concerns
 
 ### Full-Stack PRs
@@ -134,14 +168,14 @@ For a known flaky test that needs temporary quarantine from the pipeline, see
 
 **Key Konflux constraints:**
 - Does **not** set `CI=true` — guards like `test.skip(!!process.env.CI, ...)` have no effect.
-- The Temporal worker runs in a separate network namespace; it may not reach external URLs (e.g. httpbin.org) even when the test runner can.
+- The Temporal worker runs in a separate network namespace; it may not reach external URLs even when the test runner can. E2E HTTP Request tests therefore use the in-cluster httpbin Service (`http://httpbin:8080`) that [aap-dev](https://github.com/ansible/aap-dev) deploys next to AO. `HTTPBIN_URL` defaults to that URL when `KUBERNETES_SERVICE_HOST` is set; local and GitHub CI still default to `https://httpbin.org`.
+- That in-cluster URL is HTTP because aap-dev's go-httpbin Service has no TLS. That is an accepted trade-off for ephemeral CI: the cluster is torn down after the run, traffic stays on the cluster overlay, and credentials sent to httpbin are synthetic E2E fixtures, not production secrets. Do not add TLS or NetworkPolicies just for this test fixture.
+- `http://httpbin:8080` resolves to a ClusterIP. Workflow HTTP Request nodes SSRF-block private IPs unless `httpbin` is on `spec.workflowHttpRequestAllowedHosts` (`APP_WORKFLOW_HTTP_REQUEST_ALLOWED_HOSTS` on the worker). aap-dev's AO CR already lists it. A Konflux `configure-ao` step that replaces that list with only `myao-backend` produces `error: "SSRF blocked: private IP range"` (no `status_code`) and must not be treated as a connectivity skip.
 - Cluster load causes 30-second timeouts and transient 502 Bad Gateway responses.
 
 #### Backend pytest skip patterns (`backend/tests/e2e/`)
 
-**`@requires_httpbin` class marker**: Applied at class level when all tests in a class call httpbin. Skip fires if httpbin is unreachable from the *test runner*. This does not handle the case where the backend Temporal worker can't reach httpbin.
-
-**Graceful skip for backend connectivity failures**: When the Temporal worker can't reach an external URL, the execution completes with `status == FAILED` but the activity output contains no `status_code` (only an `error: "HTTP request failed: ReadTimeout"` key). Add a skip guard:
+**Graceful skip for backend connectivity failures**: When the Temporal worker can't reach an external URL, the execution completes with `status == FAILED` but the activity output contains no `status_code` (only an `error: "HTTP request failed: ReadTimeout"` key). Add a skip guard. If `error` is `"SSRF blocked: private IP range"`, that is an allowlist misconfiguration (`httpbin` missing from `workflowHttpRequestAllowedHosts`), not a connectivity skip — fix CI rather than skipping.
 
 ```python
 if execution.status == ExecutionStatus.FAILED:

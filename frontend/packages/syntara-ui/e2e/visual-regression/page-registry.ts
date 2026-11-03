@@ -55,7 +55,7 @@ export type PageEntry = {
   perceptual?: boolean
   /**
    * When `perceptual` is true, mask `.react-flow` (default). Set to `false` when the
-   * screenshot subject is `NodeEditorOverlay` (step/trigger forms): that overlay is
+   * screenshot subject is `StepEditorOverlay` (step/trigger forms): that overlay is
    * `position:absolute; inset:0` over the same box as `.react-flow`, so a canvas mask
    * paints solid grey over the form and `--update-snapshots` commits empty baselines.
    */
@@ -71,7 +71,7 @@ export type PageEntry = {
  * `.react-flow` with a solid rectangle — node/edge layout and `fitView()` are
  * not pixel-deterministic. Use for any page that renders a ReactFlow canvas
  * (builder, execution visualizer, etc.). Set `maskCanvas: false` when the
- * subject is `NodeEditorOverlay` (see `PageEntry.maskCanvas`).
+ * subject is `StepEditorOverlay` (see `PageEntry.maskCanvas`).
  */
 export type CanvasPageEntry = PageEntry & {
   perceptual: true
@@ -220,6 +220,41 @@ export const pages: PageEntry[] = [
     },
   },
   ...approvalInteractivePages,
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // EXECUTION PLANE
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    section: 'execution-plane',
+    name: 'execution-plane-list',
+    path: AppRoute.ExecutionPlane.Root,
+    waitFor: async (page) => {
+      await expect(page.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+      await expect(page.locator('table tbody tr').first()).toBeVisible()
+    },
+  },
+  {
+    section: 'execution-plane',
+    name: 'execution-plane-list-empty-filter',
+    path: AppRoute.ExecutionPlane.Root,
+    waitFor: async (page) => {
+      await expect(page.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+      await expect(page.locator('table tbody tr').first()).toBeVisible()
+    },
+    setup: async (page) => {
+      await applyNameFilter(page, 'zzz-no-match-zzz')
+      await expect(page.getByText(/No results found|Adjust your filters/i)).toBeVisible()
+    },
+  },
+  {
+    section: 'execution-plane',
+    name: 'execution-target-detail',
+    path: AppRoute.ExecutionPlane.Detail.replace(':executionTargetId', 'a1000000-0000-4000-8000-000000000001'),
+    waitFor: async (page) => {
+      await expect(page.getByRole('heading', { level: 1, name: 'Prod OpenShift West' })).toBeVisible()
+      await expect(page.getByText('Execution namespace')).toBeVisible()
+    },
+  },
 
   // ══════════════════════════════════════════════════════════════════════════
   // ACCESS MANAGEMENT — Users

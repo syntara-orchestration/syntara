@@ -19,7 +19,7 @@
  */
 
 import { test, expect, toAppUrl } from '../fixtures'
-import { addManualTrigger, addScriptNode } from '../helpers/v2-nodes'
+import { addManualTrigger, addScriptStep } from '../helpers/v2-steps'
 import { buildUniqueName, deleteWorkflow, selectProjectIfRequired } from '../helpers/workflows'
 import { ensureProject } from '../utils/api'
 
@@ -32,7 +32,7 @@ test.describe('Manual Trigger', () => {
 
     try {
       await addManualTrigger(app, 'Start workflow')
-      await addScriptNode(app, 'Process data', 'print("processing")')
+      await addScriptStep(app, 'Process data', 'print("processing")')
 
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
@@ -101,7 +101,7 @@ test.describe('Manual Trigger', () => {
     await ensureProject(app)
     await app.goto(toAppUrl('/workflow-builder/new'))
 
-    await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Manual trigger' }).click()
 
     const nameInput = app.getByRole('textbox', { name: 'Name', exact: true })

@@ -261,7 +261,67 @@ describe('useExecutionApprovals', () => {
     await waitFor(() => {
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Failed to load approval',
-        description: 'Network error',
+        description: 'Could not load approval details. Please try again.',
+      })
+    })
+  })
+
+  it.each([
+    {
+      label: '404 status',
+      rejection: { response: { status: 404 } },
+      description: 'This approval is no longer available. It may have been resolved or deleted.',
+    },
+    {
+      label: '403 status',
+      rejection: { response: { status: 403 } },
+      description: 'You do not have permission to view this approval.',
+    },
+    {
+      label: 'APPROVAL_NOT_FOUND code',
+      rejection: { code: 'APPROVAL_NOT_FOUND' },
+      description: 'This approval is no longer available. It may have been resolved or deleted.',
+    },
+  ])('handleNodeClick shows mapped message when fetch fails with $label', async ({ rejection, description }) => {
+    const mockFetchApprovals = vi.fn().mockRejectedValue(rejection)
+    const mockShowError = vi.fn()
+
+    const { useAlerts } = await import('../../../providers/alerts')
+    vi.mocked(useAlerts).mockReturnValue({
+      showInfo: vi.fn(),
+      showError: mockShowError,
+      showAlert: vi.fn(),
+      showSuccess: vi.fn(),
+      showWarning: vi.fn(),
+      dismissAlert: vi.fn(),
+      clearAllAlerts: vi.fn(),
+    })
+
+    const { useFetchPendingApprovals } = await import('./useFetchPendingApprovals')
+    vi.mocked(useFetchPendingApprovals).mockReturnValue({
+      isLoading: false,
+      fetchApprovals: mockFetchApprovals,
+      clear: vi.fn(),
+    })
+
+    const { result } = renderHook(() => useExecutionApprovals('exec-1'))
+
+    const node: ExecutionNode = {
+      id: 'node-1',
+      type: FlowNodeType.APPROVAL,
+      data: {
+        __executionState: { status: ACTIVITY_STATUS.WAITING },
+      },
+    }
+
+    act(() => {
+      result.current.handleNodeClick({} as React.MouseEvent, node)
+    })
+
+    await waitFor(() => {
+      expect(mockShowError).toHaveBeenCalledWith({
+        title: 'Failed to load approval',
+        description,
       })
     })
   })

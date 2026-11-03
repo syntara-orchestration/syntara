@@ -14,6 +14,7 @@ import {
   WorkflowVersionStatusEnum,
 } from '@syntara/contracts'
 import { credentials, credentialTypes, credentialWorkflows } from './resources/credentials'
+import { executionTargets } from './resources/executionTargets'
 import { integrations } from './resources/integrations'
 import { models } from './resources/models'
 import { workflows } from './resources/workflows'
@@ -423,6 +424,149 @@ export const handlers = [
   }),
 
   // ── Integrations ──────────────────────────────────────────────────────────
+
+  http.get('/api/execution_plane/v1/execution_targets', ({ request }) => {
+    const username = getUsernameFromRequest(request)
+    // Match backend role conventions: only admin/auditor have execution_target:read
+    // (project-admin / padmin are denied — same as can_i without a project grant).
+    if (username !== 'admin' && username !== 'auditor') {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:read',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const url = new URL(request.url)
+    const id = url.searchParams.get('id')
+    const clusterId = url.searchParams.get('cluster_id')
+    const nameContains = url.searchParams.get('name[contains]')
+    const statusEq = url.searchParams.get('status')
+    const statusIn = url.searchParams.get('status[in]')
+    const enabledParam = url.searchParams.get('enabled')
+    const lastRanAtGte = url.searchParams.get('last_ran_at[gte]')
+    const lastRanAtLte = url.searchParams.get('last_ran_at[lte]')
+    const sort = url.searchParams.get('sort')
+    const cursor = url.searchParams.get('cursor')
+    const parsedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 20
+    const includeTotal = url.searchParams.get('include_total') === 'true'
+
+    let filtered = [...executionTargets]
+    if (id) {
+      filtered = filtered.filter((target) => target.id === id)
+    }
+    if (clusterId) {
+      filtered = filtered.filter((target) => target.cluster_id === clusterId)
+    }
+    if (nameContains) {
+      const lower = nameContains.toLowerCase()
+      filtered = filtered.filter((target) => target.name.toLowerCase().includes(lower))
+    }
+    if (statusIn) {
+      const allowed = new Set(
+        statusIn
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      )
+      filtered = filtered.filter((target) => allowed.has(target.status))
+    } else if (statusEq) {
+      filtered = filtered.filter((target) => target.status === statusEq)
+    }
+    if (enabledParam !== null) {
+      const enabled = enabledParam === 'true'
+      filtered = filtered.filter((target) => target.enabled === enabled)
+    }
+    if (lastRanAtGte) {
+      const gteMs = Date.parse(lastRanAtGte)
+      if (!Number.isNaN(gteMs)) {
+        filtered = filtered.filter((target) => {
+          if (!target.last_ran_at) return false
+          return Date.parse(target.last_ran_at) >= gteMs
+        })
+      }
+    }
+    if (lastRanAtLte) {
+      const lteMs = Date.parse(lastRanAtLte)
+      if (!Number.isNaN(lteMs)) {
+        filtered = filtered.filter((target) => {
+          if (!target.last_ran_at) return false
+          return Date.parse(target.last_ran_at) <= lteMs
+        })
+      }
+    }
+
+    if (sort) {
+      const isDesc = sort.startsWith('-')
+      const field = isDesc ? sort.slice(1) : sort
+      // Fields the UI exposes as sortable; unknown values are ignored
+      filtered.sort((a, b) => {
+        let aVal: string
+        let bVal: string
+        switch (field) {
+          case 'name':
+            aVal = a.name
+            bVal = b.name
+            break
+          case 'cluster_id':
+            aVal = a.cluster_id
+            bVal = b.cluster_id
+            break
+          case 'status':
+            aVal = a.status
+            bVal = b.status
+            break
+          case 'enabled':
+            aVal = a.enabled ? '1' : '0'
+            bVal = b.enabled ? '1' : '0'
+            break
+          default:
+            return 0
+        }
+        const cmp = aVal.localeCompare(bVal)
+        return isDesc ? -cmp : cmp
+      })
+    }
+
+    return HttpResponse.json(paginate(filtered, cursor, limit, includeTotal))
+  }),
+
+  http.get('/api/execution_plane/v1/execution_targets/:target_id', ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (username !== 'admin' && username !== 'auditor') {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:read',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const target = executionTargets.find((item) => item.id === params.target_id)
+    if (!target) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: `Execution target ${params.target_id as string} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+    return HttpResponse.json(target)
+  }),
 
   http.get('/api/v1/integrations', ({ request }) => {
     const url = new URL(request.url)
@@ -5371,6 +5515,8 @@ export const handlers = [
       if (WRITE_ACTIONS.has(action)) {
         allowed = false
       } else if (resourceType === 'user_identity') {
+        allowed = false
+      } else if (resourceType === 'authz' && action === 'query') {
         allowed = false
       }
     } else if (username === 'padmin' || username === 'project-admin') {

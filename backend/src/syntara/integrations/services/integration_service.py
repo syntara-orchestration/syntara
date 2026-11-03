@@ -23,6 +23,8 @@ from syntara.core.services.secret_service import SecretService
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.credentials.exceptions import CredentialDisabledError
 from syntara.credentials.lib.injector_resolver import InjectorResolver
+from syntara.execution_plane.cluster_sync_commands import delete_integration_cluster
+from syntara.execution_plane.integration_sync import reconcile_saved_integration
 from syntara.integrations.adapters.factory import create_health_check_adapter
 from syntara.integrations.adapters.protocol import (
     DiscoveredLLMModel,
@@ -114,7 +116,14 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         user: User,
         secret_service: SecretService | None = None,
     ) -> None:
-        """Initialize with database session, current user, and optional secret service."""
+        """Initialize with database session, current user, and optional services.
+
+        Args:
+            session: SQLModel async database session
+            user: Current authenticated user
+            secret_service: Optional SecretService for credential decryption
+
+        """
         super().__init__(session, user, convert_resource_mixin=IntegrationConvertResourceMixin())
         self._secret_service = secret_service
 
@@ -213,7 +222,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             Integration.id == integration_id,  # type: ignore[arg-type]
         )
         if for_update:
-            query = query.with_for_update()
+            query = query.with_for_update().execution_options(populate_existing=True)
         result = await self.session.exec(query)
         integration = result.one_or_none()
 
@@ -297,7 +306,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
 
     async def assign_project(self, integration_id: UUID, project_id: UUID) -> IntegrationProjectAssignmentRead:
         """Assign a project to a project-scoped integration."""
-        integration = await self._get_or_raise(integration_id)
+        integration = await self._get_or_raise(integration_id, for_update=True)
         if integration.scope != IntegrationScope.PROJECT:
             raise IntegrationScopeError(
                 integration_id,
@@ -315,6 +324,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
         ).one_or_none()
 
+        created = existing is None
         if existing is None:
             existing = IntegrationProjectAssignment(
                 integration_id=integration_id,
@@ -324,6 +334,8 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             await self.session.flush()
 
         await self.session.commit()
+        if created:
+            await reconcile_saved_integration(self.session, integration)
         return IntegrationProjectAssignmentRead(
             project_id=project_id,
             project_name=project.name if project else str(project_id),
@@ -332,18 +344,28 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
 
     async def unassign_project(self, integration_id: UUID, project_id: UUID) -> None:
         """Remove a project assignment from an integration."""
-        integration = await self._get_or_raise(integration_id)
+        integration = await self._get_or_raise(integration_id, for_update=True)
         if integration.scope != IntegrationScope.PROJECT:
             raise IntegrationScopeError(
                 integration_id,
                 f"Cannot unassign projects from a {integration.scope.value}-scoped integration",
             )
+        existing = (
+            await self.session.exec(
+                select(IntegrationProjectAssignment).where(
+                    IntegrationProjectAssignment.integration_id == integration_id,
+                    IntegrationProjectAssignment.project_id == project_id,
+                )
+            )
+        ).one_or_none()
         stmt = delete(IntegrationProjectAssignment).where(
             IntegrationProjectAssignment.integration_id == integration_id,  # type: ignore[arg-type]
             IntegrationProjectAssignment.project_id == project_id,  # type: ignore[arg-type]
         )
         await self.session.exec(stmt)
         await self.session.commit()
+        if existing is not None:
+            await reconcile_saved_integration(self.session, integration)
 
     async def list_assigned_projects(
         self,
@@ -465,8 +487,8 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
 
         self._validate_discovered_resources(data)
         await self._sync_initial_resources(integration, data)
-
         await self.session.commit()
+        await reconcile_saved_integration(self.session, integration)
 
         result = await self._to_read_with_counts(integration)
         AuditEventDispatcher.dispatch(
@@ -633,7 +655,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
     async def update_integration(self, integration_id: UUID, data: IntegrationUpdate) -> IntegrationRead:
         """Apply partial updates to an integration."""
         try:
-            integration = await self._get_or_raise(integration_id)
+            integration = await self._get_or_raise(integration_id, for_update=True)
         except IntegrationNotFoundError:
             AuditEventDispatcher.dispatch(
                 IntegrationUpdateEvent(
@@ -677,7 +699,10 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
             await self._handle_integrity_error(e, integration_name)
 
+        ep_fields = {"name", "configuration", "management_credential_id", "enabled", "scope", "labels"}
         await self.session.commit()
+        if data.model_fields_set & ep_fields:
+            await reconcile_saved_integration(self.session, integration)
 
         result = await self._to_read_with_counts(integration)
         AuditEventDispatcher.dispatch(
@@ -858,13 +883,12 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         integration.validation_error = None
         await self.session.commit()
 
-        timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
-        # Re-check at call time (defense in depth): the stored base_url passed the write-time
-        # check, but DNS could have been re-pointed to a private/metadata target since.
-        self._validate_configuration_ssrf(integration.configuration)
-        adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
-
         try:
+            timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
+            # Re-check at call time (defense in depth): the stored base_url passed the write-time
+            # check, but DNS could have been re-pointed to a private/metadata target since.
+            self._validate_configuration_ssrf(integration.configuration)
+            adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
             result = await adapter.validate(resolved_credential, timeout_seconds)
 
             integration = await self._get_or_raise(integration_id, for_update=True)
@@ -1000,14 +1024,13 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         integration.refresh_error = None
         await self.session.commit()
 
-        timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
-        # Re-check at call time (defense in depth): the stored base_url passed the write-time
-        # check, but DNS could have been re-pointed to a private/metadata target since.
-        self._validate_configuration_ssrf(integration.configuration)
-        adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
-
         synced = updated = missing = 0
         try:
+            timeout_seconds: int = await get_runtime_settings().get("integrations.connection_test_timeout_seconds")
+            # Re-check at call time (defense in depth): the stored base_url passed the write-time
+            # check, but DNS could have been re-pointed to a private/metadata target since.
+            self._validate_configuration_ssrf(integration.configuration)
+            adapter = create_health_check_adapter(integration.integration_type, integration.configuration)
             discover_result = await adapter.discover(resolved_credential, timeout_seconds)
 
             if not discover_result.success:
@@ -1212,7 +1235,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
     async def delete_integration(self, integration_id: UUID) -> None:
         """Hard-delete an integration and all linked resources."""
         try:
-            integration = await self._get_or_raise(integration_id)
+            integration = await self._get_or_raise(integration_id, for_update=True)
         except IntegrationNotFoundError:
             AuditEventDispatcher.dispatch(
                 IntegrationDeleteEvent(
@@ -1225,6 +1248,8 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
 
         integration_name = integration.name
         tools_count = await self._count_linked_tools(integration_id)
+
+        await delete_integration_cluster(self.session, integration)
 
         await self._hard_delete_linked_tool_params(integration_id)
         await self._hard_delete_linked_tools(integration_id)

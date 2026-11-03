@@ -1,0 +1,37 @@
+{
+  "name": "openshift-script-e2e",
+  "description": "Example script workflow routed to an explicit OpenShift execution target",
+  "project_id": "00000000-0000-0000-0000-000000000002",
+  "workflow_definition": {
+    "name": "openshift-script-e2e",
+    "schema_version": "2.0.0",
+    "triggers": [
+      {
+        "id": "trigger",
+        "type": "manual_trigger",
+        "parameters": {}
+      }
+    ],
+    "nodes": [
+      {
+        "id": "script_node",
+        "name": "Hello OpenShift",
+        "type": "script",
+        "parameters": {
+          "language": "bash",
+          "code": "echo \"hello from the script workload on OpenShift\"",
+          "execution_profile": {
+            "type": "execution_target",
+            "execution_target_id": "00000000-0000-0000-0000-000000000003"
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": "trigger",
+        "to": "script_node"
+      }
+    ]
+  }
+}

@@ -59,6 +59,7 @@ def _make_workflow(
     wf.pre_resolved_outputs = pre_resolved_outputs if pre_resolved_outputs is not None else {}
     wf.stop_after_nodes = stop_after_nodes if stop_after_nodes is not None else set()
     wf.execution_id = "test-exec-id"
+    wf._project_id = ""
     wf.request_id = None
     return wf
 

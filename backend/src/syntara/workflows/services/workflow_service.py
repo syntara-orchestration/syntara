@@ -212,7 +212,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if current_version:
             try:
                 stored_normalized = WorkflowDefinition.model_validate(current_version.workflow_definition).model_dump(
-                    exclude_defaults=True
+                    mode="json", exclude_defaults=True
                 )
             except Exception:  # noqa: BLE001
                 stored_normalized = current_version.workflow_definition

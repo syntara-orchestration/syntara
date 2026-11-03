@@ -2164,8 +2164,36 @@ components:
         - credential_id
       title: IntegrationConnectionConfig
       description: "Execution credential override for one integration.\n\n\nWhen included in AgenticExecutorParameters.integration_connections, this credential\n\nis used for calls against that integration instead of the integration's\n\nmanagement credential."
+    ExecutionTargetProfile:
+      properties:
+        type:
+          type: string
+          const: execution_target
+          title: Type
+        execution_target_id:
+          type: string
+          format: uuid
+          title: Execution Target Id
+          description: UUID of the Execution Plane execution target selected for this workload.
+      type: object
+      required:
+        - type
+        - execution_target_id
+      title: ExecutionTargetProfile
+      description: Execution Plane profile that selects a specific Execution Target.
     ScriptExecutorParameters:
       properties:
+        execution_profile:
+          anyOf:
+            - oneOf:
+                - $ref: '#/components/schemas/ExecutionTargetProfile'
+              discriminator:
+                propertyName: type
+                mapping:
+                  execution_target: '#/components/schemas/ExecutionTargetProfile'
+            - type: 'null'
+          title: Execution Profile
+          description: Execution Plane placement profile for this workload.
         language:
           $ref: '#/components/schemas/ScriptLanguage'
         code:

@@ -1,0 +1,7 @@
+{
+  "name": "script-e2e-target",
+  "placement": {
+    "namespace": "syntara-script-e2e"
+  },
+  "is_default": false
+}

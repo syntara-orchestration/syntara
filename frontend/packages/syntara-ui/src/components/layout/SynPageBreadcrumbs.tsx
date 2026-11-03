@@ -1,19 +1,43 @@
-import { Breadcrumb, BreadcrumbItem } from '@patternfly/react-core'
-import type { BreadcrumbItemRenderArgs } from '@patternfly/react-core'
+import { Breadcrumb, BreadcrumbItem, Truncate } from '@patternfly/react-core'
+import type { BreadcrumbItemRenderArgs, TooltipProps } from '@patternfly/react-core'
 import { Link } from '@tanstack/react-router'
 import { useSyncExternalStore } from 'react'
 
 import type { AppBreadcrumbItem } from '../../app/breadcrumbs/appBreadcrumbItem'
 
+import styles from './SynPageBreadcrumbs.module.css'
 import { SynPageBreadcrumbsCollapsedMiddle } from './SynPageBreadcrumbsCollapsedMiddle'
 
 export type { AppBreadcrumbItem }
 
+const breadcrumbTruncateTooltipProps = {
+  enableFlip: true,
+  maxWidth: 'min(100vw - 2rem, 24rem)',
+  position: 'bottom',
+} satisfies Omit<TooltipProps, 'content'>
+
+function BreadcrumbTruncatedLabel({
+  label,
+  testId = 'breadcrumb-truncated-label',
+}: Readonly<{
+  label: string
+  testId?: string
+}>) {
+  return (
+    <Truncate
+      content={label}
+      className={styles.truncatedLabel}
+      data-testid={testId}
+      tooltipProps={breadcrumbTruncateTooltipProps}
+    />
+  )
+}
+
 function renderBreadcrumbLink(href: string, label: string) {
   return ({ className, ariaCurrent }: BreadcrumbItemRenderArgs) => (
     // TanStack Router expects literal route strings; breadcrumb hrefs are dynamic
-    <Link to={href} className={className} aria-current={ariaCurrent}>
-      {label}
+    <Link to={href} className={`${className ?? ''} ${styles.segmentLink}`} aria-current={ariaCurrent}>
+      <BreadcrumbTruncatedLabel label={label} />
     </Link>
   )
 }
@@ -41,6 +65,10 @@ function useNarrowViewportForBreadcrumb() {
   return useSyncExternalStore(subscribeNarrowMedia, getNarrowMediaSnapshot, getNarrowMediaServerSnapshot)
 }
 
+function BreadcrumbCurrentLabel({ label }: Readonly<{ label: string }>) {
+  return <BreadcrumbTruncatedLabel label={label} testId="breadcrumb-current-segment" />
+}
+
 type SynPageBreadcrumbsProps = Readonly<{
   /** Ordered breadcrumb segments. Requires at least two items to render. */
   items: readonly AppBreadcrumbItem[]
@@ -62,7 +90,7 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
   const collapseMiddle = isNarrow && middle.length >= 2
 
   return (
-    <Breadcrumb aria-label="Breadcrumb">
+    <Breadcrumb aria-label="Breadcrumb" className={styles.breadcrumb}>
       {collapseMiddle ? (
         <>
           {first.href ? (
@@ -71,7 +99,9 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
             <BreadcrumbItem isActive>{first.label}</BreadcrumbItem>
           )}
           <SynPageBreadcrumbsCollapsedMiddle middleItems={middle} />
-          <BreadcrumbItem isActive>{last.label}</BreadcrumbItem>
+          <BreadcrumbItem isActive>
+            <BreadcrumbCurrentLabel label={last.label} />
+          </BreadcrumbItem>
         </>
       ) : (
         items.map((item, index) => {
@@ -80,7 +110,7 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
           if (isLast) {
             return (
               <BreadcrumbItem key={itemKey} isActive>
-                {item.label}
+                <BreadcrumbCurrentLabel label={item.label} />
               </BreadcrumbItem>
             )
           }
@@ -89,7 +119,7 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
           }
           return (
             <BreadcrumbItem key={itemKey} isActive>
-              {item.label}
+              <BreadcrumbTruncatedLabel label={item.label} />
             </BreadcrumbItem>
           )
         })

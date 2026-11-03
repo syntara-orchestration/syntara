@@ -20,18 +20,22 @@ See [backend/README.md](backend/README.md) and [frontend/README.md](frontend/REA
 - **Python 3.12+** and [uv](https://docs.astral.sh/uv/) (backend)
 - **Node.js 22+** and npm (frontend)
 - **Podman** or Docker (container-based development)
+- **kubectl** and either [Kind](https://kind.sigs.k8s.io/) or [Minikube](https://minikube.sigs.k8s.io/) (Execution Plane development)
 - **Make** (orchestration)
 
 ## Quick Start
 
 ```bash
-# One-time setup: install deps, generate secrets + TLS certs, build images, start services, migrate, seed
+# One-time setup: install deps, generate secrets + TLS certs, build images,
+# start infrastructure, migrate, and seed
 make setup
 
-# Start full-stack development (backend API + frontend UI)
+# Host-based development: create/register the local EP cluster, then start
+# the API, frontend, and standalone EP worker
 make dev
 
-# Or use containers for the full stack
+# Or register the local EP cluster and run the full stack with a containerized
+# EP worker
 make -C backend run-all
 ```
 
@@ -40,7 +44,7 @@ make -C backend run-all
 | Command | Description |
 |---|---|
 | `make install` | Install backend and frontend dependencies |
-| `make dev` | Start backend and frontend dev servers |
+| `make dev` | Create/register the local EP cluster and start the backend, frontend, and standalone EP worker |
 | `make test` | Run backend and frontend tests |
 | `make test-all` | Run all tests including integration |
 | `make lint` | Lint both codebases |

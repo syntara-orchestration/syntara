@@ -1,7 +1,7 @@
 """Add OpenShift to the integration discriminator PostgreSQL enum.
 
 Revision ID: 8fe7495a14dc
-Revises: e7f4a1b2c3d4
+Revises: d5b8c2f04e71
 Create Date: 2026-09-23 13:11:39.630834
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy import text
 
 # revision identifiers, used by Alembic.
 revision: str = "8fe7495a14dc"
-down_revision: str | Sequence[str] | None = "e7f4a1b2c3d4"
+down_revision: str | Sequence[str] | None = "d5b8c2f04e71"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

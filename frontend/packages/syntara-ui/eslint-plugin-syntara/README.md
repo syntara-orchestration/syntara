@@ -198,7 +198,7 @@ export default function Workflows() {
 }
 ```
 
-The rule only fires on files with a `default export` (i.e. page components) and is scoped via `eslint.config.js` to the explicit list of route-level page files. Sub-components and test files are not checked.
+The rule only fires on files with a default export, including a local alias such as `export { Page as default }`, and is scoped via `eslint.config.js` to the explicit list of route-level page files. Sub-components and test files are not checked.
 
 ## Contributing
 

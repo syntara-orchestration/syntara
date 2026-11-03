@@ -117,7 +117,7 @@ make build-images
 ```
 
 ```bash
-# Start all services (API, UI, Database, Temporal, Worker)
+# Start the full stack, including the separate EP API and worker containers
 make run-all
 ```
 
@@ -126,13 +126,8 @@ make run-all
 # Install dependencies and setup project
 make install
 
-# Start the database (Terminal 1)
-make db-run
-
-# Start the cache/Redis (Terminal 2 — required for authentication)
-make cache-run
-
-# Start the development server (Terminal 3)
+# Start supporting services, then start AO and the standalone EP API/worker.
+make services-up
 make dev
 
 # Run tests
@@ -143,6 +138,152 @@ make lint
 ```
 
 > **Note:** The API server requires Redis (`make cache-run`) for authentication and streaming. Authorization is evaluated in-process via regopy from `src/syntara/authz/rego/authz.rego`.
+
+### Execution Plane development
+
+Execution Plane is an independent service in the public
+[syntara-execution-plane repository](https://github.com/syntara-orchestration/syntara-execution-plane).
+AO installs the separate `execution-plane-client` contract library from the
+upstream `v0.1.4` Git tag declared in `pyproject.toml`. `uv.lock` records the resolved
+commit for reproducibility; `make install` fetches it automatically.
+`make sync-requirements` exports hashed packages to `requirements.txt` and pinned
+Git packages to `requirements-vcs.txt` for Hermeto's separate prefetch passes.
+Offline builds extract the client package from that prefetched Git archive.
+It does not install or import the EP implementation package. The optional sibling
+checkout is used only when developing both services locally or building a local
+container image; deployed AO instances consume the configured EP image and API.
+
+The first iteration can keep one PostgreSQL server, but it creates a separate
+`execution_plane` database with dedicated migration and runtime roles. Configure
+`EP_REPOSITORY` if the EP checkout is not at `../syntara-execution-plane`.
+
+For host-based local development, start the supporting containers and then run
+from the Syntara repository root:
+
+```bash
+make services-up
+make dev
+```
+
+`make dev` runs the AO API/workers and starts the EP API and worker from their
+separate repositories. The EP worker delivers completion commands back to AO over
+the configured mTLS callback. Set `APP_EP_API_URL` and the EP runtime/migration
+database URLs in the backend environment when using a non-default setup.
+
+For the complete containerized stack, build the local images and run:
+
+```bash
+make build-images
+make -C backend run-all
+```
+
+The compose file consumes one EP image for its independent migration job, API,
+and worker containers. Production deployments should configure `EP_IMAGE` to an
+immutable image tag or digest published by the EP repository; they do not need
+the EP source checkout. The EP repository contains its own compose and Kubernetes
+base manifests and owns EP migrations, runtime configuration, and release assets.
+
+#### Running locally with a kind-hosted Kubernetes target
+
+The EP API and worker can run in the Syntara Podman stack while the EP worker
+dispatches workloads to a local [kind](https://kind.sigs.k8s.io/) cluster. This
+requires the Syntara and `syntara-execution-plane` repositories to be checked
+out as sibling directories:
+
+```text
+<workspace>/syntara/
+<workspace>/syntara-execution-plane/
+```
+
+Create the kind cluster and its workload namespace and ServiceAccount from the
+`syntara-execution-plane` checkout:
+
+```bash
+cd ../syntara-execution-plane
+kind create cluster --name ep
+kubectl config view --minify --raw \
+  -o jsonpath={.clusters[0].cluster.server}
+kubectl apply -f deploy/kubernetes/execution-target/rbac.yaml
+kubectl create token syntara-dispatcher -n execution-plane --duration=48h
+kubectl config view --minify --raw \
+  -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 -d
+make image
+```
+
+The `kubectl config view` server value is useful for host-side diagnostics, but
+do not use its `https://127.0.0.1:<port>` value as the Syntara Integration
+endpoint. The EP worker runs in a Podman container and reaches kind through the
+kind network. For the cluster above, use:
+
+```text
+https://ep-control-plane:6443
+```
+
+From the Syntara checkout, initialize the application and start the kind-aware
+full stack:
+
+```bash
+cd ../syntara
+export EP_IMAGE='localhost/execution-plane:dev'
+export APP_INTEGRATION_URL_ALLOWED_HOSTS='["ep-control-plane", "mcp-server"]'
+make setup
+make -C backend run-all-kind
+```
+
+`run-all-kind` applies `podman-compose.kind-demo.override.yml`. The override
+attaches `syntara`, `temporal-worker`, `temporal-background-worker` (all needed
+for Integration endpoint validation), and `execution-plane-worker` to the
+external `kind` network while retaining the normal project network for database
+and Temporal connectivity. Recreate the stack after changing the override or
+the Integration endpoint.
+
+When registering the OpenShift Integration in Syntara, use:
+
+| Field | Value |
+|---|---|
+| Endpoint | `https://ep-control-plane:6443` |
+| Namespace | `execution-plane` |
+| Credential | The `syntara-dispatcher` ServiceAccount token |
+| CA certificate | The decoded `certificate-authority-data` from kind |
+
+The Integration endpoint hostname must match the kind cluster container name.
+For a differently named cluster, replace `ep-control-plane` with the
+corresponding `<cluster-name>-control-plane` container name and update
+`APP_INTEGRATION_URL_ALLOWED_HOSTS` accordingly.
+
+For placeholder OpenShift seed payloads and the pinned SDK-native script workload,
+see [the script E2E setup guide](samples/openshift-script-e2e/README.md).
+
+### Execution Plane ownership and acceptance
+
+AO owns its HTTP client, authorization, integration-sync outbox, and Temporal
+activity completion. EP owns its HTTP API, database, cluster
+credentials, accepted work, execution state, and completion-event outbox. The two
+services have separate database URLs and database roles; the EP runtime has no AO
+database or Temporal configuration.
+
+AO constructs typed commands using `execution-plane-client` and sends their
+`to_message()` envelopes to `POST /v1/commands`. Work uses the ActivityExecution
+UUID as its command UUID. Receipts acknowledge handling; AO queries the work
+resource for state and recovers that same resource after a duplicate submission.
+
+`ExecutionPlaneIntegrationSync` remains the durable integration outbox. Each row
+sends a `ClusterRegister` command with its stable row UUID, creation time, and
+source revision. Full desired state, including disabled deletion records, allows
+EP's ClusterBinding reconciler to handle creation, updates and deletion even
+when requests arrive out of order. Observed status comes from `/v1/clusters/{id}`.
+
+The `/api/execution_plane/v1/commands` callback URL accepts
+`work.execute.completed` command envelopes. AO verifies the EP certificate and
+participant identities, resolves the parent work UUID to its Temporal activity,
+and returns a matching `TransportReceipt`. No command history is persisted.
+
+The current script executor still runs scripts as child processes in the EP worker
+container. Production readiness therefore requires the separate workload-pod
+backend, network-policy enforcement, database grant verification, and end-to-end
+recovery checks described in `execution-plane-service-isolation-plan.md`. The
+manifests establish independent API, worker, and migration deployments, but do
+not by themselves satisfy that workload isolation gate.
 
 ### Database Setup
 
@@ -224,7 +365,7 @@ make temporal-run
 # Press Ctrl+C to stop
 ```
 
-**Start all services** (database + temporal + temporal UI + worker in background - recommended):
+**Start infrastructure services** (database + cache + Temporal + Syntara workers in background):
 ```bash
 make services-run
 # View logs: make services-logs
@@ -282,6 +423,10 @@ The `podman-compose.yml` defines the following services:
 | **temporal** | Temporal workflow engine | 7233 | `temporalio/auto-setup:1.25.1` |
 | **temporal-ui** | Temporal web UI (dev only) | 8081 | `temporalio/ui:2.31.2` |
 | **temporal-worker** | Temporal workflow worker | - | Built from `containers/syntara/Containerfile` |
+| **execution-plane-db-init** | Creates the EP database and separate database roles | - | PostgreSQL image |
+| **execution-plane-migrate** | EP-owned schema migration job | - | Published or locally built EP image |
+| **execution-plane-api** | Versioned EP HTTP API | 8001 | Published or locally built EP image |
+| **execution-plane-worker** | EP controller and completion delivery | - | Published or locally built EP image |
 | **syntara** | Syntara API service | 8000 | Built from `containers/syntara/Containerfile` |
 | **syntara-ui** | Syntara web interface | 8080 | Built from `../frontend/packages/syntara-ui/Containerfile` |
 
@@ -295,6 +440,10 @@ make build-images
 **Start all services** (foreground):
 ```bash
 make run-all
+# This expects the database and supporting services to be available, runs
+# migrations and seed data, creates/registers the local Kind or Minikube
+# cluster, and starts the containerized Execution Plane worker with the full
+# stack.
 # Access:
 # - API: http://localhost:8000
 # - UI: http://localhost:8080
@@ -304,7 +453,7 @@ make run-all
 
 **Start all services** (background):
 ```bash
-make services-run         # Start all services
+make services-run         # Start infrastructure services only
 make services-logs        # View logs from all services
 make services-stop        # Stop all services
 make services-clean       # Stop and remove all data (destructive)
@@ -550,6 +699,12 @@ make test-e2e
 If `APP_BASE_URL` is not set, the target automatically starts the database and dev server, waits for the API to be ready, runs the tests, then tears everything down. If `APP_BASE_URL` is already set, it runs the tests against that instance directly.
 
 > **Note:** The E2E tests use an auto-generated Python API client. If you change the OpenAPI schema, regenerate the client with `make generate-api-client` before running E2E tests.
+
+AO tests own the AO persistence and HTTP adapter boundary. EP persistence, migrations,
+and worker behavior are tested in the standalone execution-plane repository. A
+cross-service PostgreSQL recovery and real-cluster acceptance run remains a release
+gate; the AO unit/integration suite is not evidence of the production isolation
+boundary.
 
 ### Syntara Test SDK
 

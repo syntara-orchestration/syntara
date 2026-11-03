@@ -5,6 +5,7 @@ const LABEL_ACCESS_MANAGEMENT = 'Access management'
 const LABEL_IDENTITY_PROVIDERS = 'Identity providers'
 const LABEL_CONFIGURATION = 'Configuration'
 const LABEL_APPROVALS = 'Approvals'
+const LABEL_EXECUTION_PLANE = 'Execution Plane'
 
 function crumbAccessManagement(): AppBreadcrumbItem {
   return { label: LABEL_ACCESS_MANAGEMENT, href: AppRoute.AccessManagement.Root }
@@ -44,6 +45,11 @@ function crumbSettings(): AppBreadcrumbItem {
 
 function crumbApprovals(): AppBreadcrumbItem {
   return { label: LABEL_APPROVALS, href: AppRoute.Approvals.Root }
+}
+
+/** Section label only — there is no separate Execution Plane hub page. */
+function crumbExecutionPlane(): AppBreadcrumbItem {
+  return { label: LABEL_EXECUTION_PLANE, href: AppRoute.ExecutionPlane.Root }
 }
 
 function projectDetailTabLabel(tab: string): string {
@@ -155,6 +161,14 @@ export function breadcrumbsCredentialEarlyShell(currentLabel: string): AppBreadc
 /** Generic two-item trail: parent link + current page label (e.g. loading / error titles). */
 export function breadcrumbsApprovalsPage(currentLabel: string): AppBreadcrumbItem[] {
   return [crumbApprovals(), { label: currentLabel }]
+}
+
+export function breadcrumbsExecutionTargetDetail(targetName: string): AppBreadcrumbItem[] {
+  return [crumbExecutionPlane(), { label: targetName }]
+}
+
+export function breadcrumbsExecutionTargetDetailEarlyShell(): AppBreadcrumbItem[] {
+  return [crumbExecutionPlane(), { label: 'Execution target details' }]
 }
 
 export function breadcrumbsUserFormLoading(currentLabel: string): AppBreadcrumbItem[] {

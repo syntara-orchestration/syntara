@@ -137,7 +137,7 @@ class TestExpressionResolution:
 
         # Expected Result 1: Execution completes successfully
         assert final_execution.status == ExecutionStatus.COMPLETED, (
-            f"Execution should complete successfully, got: {final_execution.status}"
+            f"Execution should complete successfully, got: {final_execution.status}: {final_execution.error_details}"
         )
 
         # Expected Result 2: Both nodes executed successfully
@@ -262,7 +262,7 @@ class TestExpressionResolution:
 
         # Verify execution completed
         assert final_execution.status == ExecutionStatus.COMPLETED, (
-            f"Execution should complete successfully, got: {final_execution.status}"
+            f"Execution should complete successfully, got: {final_execution.status}: {final_execution.error_details}"
         )
 
         # Verify both nodes completed
@@ -391,7 +391,7 @@ class TestExpressionResolution:
 
         # Verify execution completed
         assert final_execution.status == ExecutionStatus.COMPLETED, (
-            f"Execution should complete successfully, got: {final_execution.status}"
+            f"Execution should complete successfully, got: {final_execution.status}: {final_execution.error_details}"
         )
 
         # Verify node received resolved input values

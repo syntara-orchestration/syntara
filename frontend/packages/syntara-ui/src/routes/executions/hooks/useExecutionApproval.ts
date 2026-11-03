@@ -5,7 +5,7 @@ import { FlowNodeType } from '../../../constants'
 import { detachPromise } from '../../../utils/detachPromise'
 import { ACTIVITY_STATUS } from '../../builder/utils/executionState/executionHelpers'
 
-import { useFetchApprovalForNode } from './useFetchApprovalForNode'
+import { useFetchApprovalForStep } from './useFetchApprovalForStep'
 
 export type ExecutionNode = { id: string; type?: string; data: Record<string, unknown> }
 
@@ -28,7 +28,7 @@ type UseExecutionApprovalResult = {
   /** Set the pending approval directly (used by auto-detection). */
   setPendingApproval: (approval: Approval | null) => void
   /** Fetch the approval for a specific node ID. */
-  fetchForNode: (approvalNodeId: string) => Promise<Approval | null>
+  fetchForStep: (approvalNodeId: string) => Promise<Approval | null>
 }
 
 /**
@@ -38,7 +38,7 @@ type UseExecutionApprovalResult = {
  */
 export function useExecutionApproval(executionId: string | undefined): UseExecutionApprovalResult {
   const [pendingApproval, setPendingApproval] = useState<Approval | null>(null)
-  const { fetchForNode, clear, isLoading } = useFetchApprovalForNode(executionId ?? '')
+  const { fetchForStep, clear, isLoading } = useFetchApprovalForStep(executionId ?? '')
   const executionIdRef = useRef(executionId)
   const latestNodeIdRef = useRef<string | null>(null)
 
@@ -59,7 +59,7 @@ export function useExecutionApproval(executionId: string | undefined): UseExecut
       latestNodeIdRef.current = node.id
       const capturedExecutionId = executionIdRef.current
       detachPromise(
-        fetchForNode(node.id)
+        fetchForStep(node.id)
           .then((approval) => {
             if (approval && executionIdRef.current === capturedExecutionId && latestNodeIdRef.current === node.id) {
               setPendingApproval(approval)
@@ -70,7 +70,7 @@ export function useExecutionApproval(executionId: string | undefined): UseExecut
           })
       )
     },
-    [fetchForNode, pendingApproval]
+    [fetchForStep, pendingApproval]
   )
 
   const clearPendingApproval = useCallback(() => {
@@ -79,5 +79,5 @@ export function useExecutionApproval(executionId: string | undefined): UseExecut
     clear()
   }, [clear])
 
-  return { pendingApproval, isLoading, handleNodeClick, clearPendingApproval, setPendingApproval, fetchForNode }
+  return { pendingApproval, isLoading, handleNodeClick, clearPendingApproval, setPendingApproval, fetchForStep }
 }
