@@ -785,3 +785,31 @@ Code quality and coverage are tracked via SonarCloud. SonarCloud analysis runs a
 - 📖 **[Developer Getting Started Guide](docs/developer-getting-started.md)** - Architecture deep dive with examples
 - 📖 **[Development with Worktrees Guide](docs/development-with-worktrees.md)** - Parallel development setup
 - 📖 **[Architecture Decision Records](docs/decision-records.md)** - Design rationale and decisions
+
+### Script execution on OpenShift
+
+Script activities submit a single-use pod directly to the Kubernetes API. The
+script node still accepts `language`, `code`, and `environment`, and returns
+`return_code`, `stdout`, `stderr`, and `stdout_json` with existing output mappings
+and failure handling. No user script runs on the Temporal worker.
+
+Create an enabled OpenShift integration with a verified HTTPS API URL, namespace
+(for example `script-step-2523`), and management bearer-token credential. Configure
+the Temporal worker with:
+
+```dotenv
+APP_SCRIPT_NODES_ENABLED=true
+APP_SCRIPT_OPENSHIFT_INTEGRATION_ID=<integration UUID>
+APP_SCRIPT_OPENSHIFT_IMAGE=quay.io/pjohari/syntara-node-script@sha256:a18617479a99fb46bd62f4f8c712eef764f73410adf2718bc2c00e0f28cf1280
+```
+
+The credential needs create/get/delete access to pods and get access to pods/log
+in that namespace. This default integration is selected by the worker operator
+and shared by script nodes dispatched to that worker. Script pods receive no
+cluster token. Pods use restricted security settings, bounded CPU/memory, a hard
+execution deadline, and deletion on completion, failure, or cancellation. If the
+worker crashes, the Kubernetes deadline stops the pod; administrators can delete
+any terminated orphan pods. Execution uses the image's Python executor through a
+single-use entrypoint override rather than starting its gRPC server. The image
+must contain `syntara_node_script.executor`; the pinned image requires amd64 nodes.
+There is no fallback to executing scripts on the worker when configuration is missing.

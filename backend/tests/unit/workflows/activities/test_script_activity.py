@@ -3,7 +3,7 @@
 import asyncio
 import sys
 from collections.abc import Generator
-from typing import ClassVar
+from typing import Any, ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -43,6 +43,22 @@ def _mock_activity_context() -> Generator[MagicMock, None, None]:
 def mock_activity_info(_mock_activity_context: MagicMock) -> MagicMock:
     """Expose the mock so tests can customise attempt number etc."""
     return _mock_activity_context
+
+
+@pytest.fixture(autouse=True)
+def _remote_execution_boundary() -> Generator[None, None, None]:
+    """Exercise legacy output/error cases with a local substitute for the remote boundary.
+
+    The OpenShift adapter and actual dispatch are tested separately in test_openshift_script.
+    """
+    from syntara.workflows.workflow_engine.activities.script_activity import _execute_script_common
+
+    async def execute(language, code, environment, timeout_seconds, max_output_bytes) -> dict[str, Any]:
+        command = ["bash", "-c", code] if language == "bash" else [sys.executable, "-c", code]
+        return await _execute_script_common(command, environment, timeout_seconds, max_output_bytes)
+
+    with patch("syntara.workflows.workflow_engine.activities.script_activity.execute_openshift_script", execute):
+        yield
 
 
 class TestBashScriptExecution:

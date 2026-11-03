@@ -1,7 +1,7 @@
 """Script activity executors for bash and Python.
 
 This module provides functionality to execute bash and Python scripts as workflow activities.
-Scripts run in isolated subprocesses with timeout and error handling.
+Scripts run in isolated OpenShift pods with timeout and error handling.
 """
 
 import asyncio
@@ -9,7 +9,6 @@ import contextlib
 import json
 import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +25,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
 )
 
 from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError
+from .openshift_script import execute_openshift_script
 
 SAFE_ENV_ALLOWLIST: frozenset[str] = frozenset(
     {
@@ -448,15 +448,8 @@ async def execute_script_activity(  # noqa: C901
 ) -> dict[str, Any]:
     """Execute a script for V2 workflows (unified bash/python activity).
 
-    SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python)
-    directly in the Temporal worker process without additional sandboxing. Enabling this
-    grants any user with workflow:create + execution:run permissions the ability
-    to run arbitrary commands on the worker infrastructure, with access to all
-    environment variables.
-    Enabling Script Node is not recommended for production deployments.
-
-    This activity handles both bash and python scripts based on the 'language'
-    field in config, delegating to the appropriate helper function.
+    The worker submits and monitors an OpenShift pod using its configured default
+    integration. User code executes inside the script image, outside the worker.
 
     Returns normalized structure with output portion (no control needed for executor nodes).
     Output mapping is applied internally before returning to avoid storing suppressed fields in Temporal.
@@ -504,16 +497,9 @@ async def execute_script_activity(  # noqa: C901
             input_config.get(constants.ENGINE_MAX_OUTPUT_BYTES_KEY, constants.DEFAULT_MAX_OUTPUT_BYTES)
         )
 
-        # Inject subprocess memory limit from the container's cgroup limit
-        cgroup_limit = _get_cgroup_memory_limit()
-        if cgroup_limit:
-            code = _prepend_memory_limit(code, language, int(cgroup_limit * 0.75))
-
-        # Build command based on language
-        command = ["bash", "-c", code] if language == "bash" else [sys.executable, "-c", code]
-
-        # Execute script
-        result = await _execute_script_common(command, environment, timeout, max_output_bytes)
+        result = await execute_openshift_script(language, code, environment, timeout, max_output_bytes)
+        if result["return_code"] != 0:
+            _raise_script_error(result["return_code"], result["stdout"], result["stderr"])
 
         # For Python scripts, try to parse stdout as JSON
         if language == "python" and result["stdout"].strip():
