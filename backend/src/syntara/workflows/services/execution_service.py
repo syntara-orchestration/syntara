@@ -1225,23 +1225,13 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         result = await session.exec(
             select(ActivityExecution)
             .where(ActivityExecution.execution_id == execution_id)
-            .where(ActivityExecution.status.in_([ActivityStatus.FAILED, ActivityStatus.ERROR]))  # type: ignore[attr-defined]
+            .where(ActivityExecution.status == ActivityStatus.FAILED)
         )
         failed_activities = result.all()
 
-        failed_types = set()
+        failed_types: set[str] = set()
         for activity in failed_activities:
-            if activity.activity_name:
-                # Extract node type from activity name (strip loop iteration suffixes)
-                # Activity names include loop iterations, we want the base type
-                base_name = (
-                    activity.activity_name.split("#iter-")[0]
-                    if "#iter-" in activity.activity_name
-                    else activity.activity_name
-                )
-                # Normalize to snake_case, lowercase
-                normalized = base_name.lower().replace("-", "_")
-                failed_types.add(normalized)
+            failed_types.add(activity.node_type.value)
 
         # Sort deterministically and bound to 50 entries
         return sorted(failed_types)[:50]
@@ -1325,10 +1315,13 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                 retried_from_execution_id=original.id,
                 retry_kind=RetryKind.PLAIN.value,
             )
-            # Record accepted after successful persistence
-            self._record_retry_request(RetryKind.PLAIN.value, "accepted")
+        except Exception:
+            # Record rejected on any failure (Temporal, concurrency, persistence)
+            self._record_retry_request(RetryKind.PLAIN.value, "rejected")
+            raise
 
-            # Emit retry requested event for telemetry
+        self._record_retry_request(RetryKind.PLAIN.value, "accepted")
+        try:
             from syntara.audit.emitter import request_id_context_var  # noqa: PLC0415
             from syntara.workflows.audit.retry_requested import WorkflowRetryRequestedEvent  # noqa: PLC0415
 
@@ -1340,12 +1333,10 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                     request_id=request_id_context_var.get(),
                 )
             )
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to emit retry telemetry after persistence", exc_info=True)
 
-            return new_execution
-        except Exception:
-            # Record rejected on any failure (Temporal, concurrency, persistence)
-            self._record_retry_request(RetryKind.PLAIN.value, "rejected")
-            raise
+        return new_execution
 
     @staticmethod
     def _to_preview_response(validation: RetryValidation) -> RetryFromFailureValidationResponse:
@@ -1506,10 +1497,13 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                 eligible_point_ids=validation.eligible_point_ids,
                 input_parameter_overrides=validated_overrides,
             )
-            # Record accepted after successful persistence
-            self._record_retry_request(RetryKind.FROM_FAILURE.value, "accepted")
+        except Exception:
+            # Record rejected on any failure (Temporal, concurrency, persistence)
+            self._record_retry_request(RetryKind.FROM_FAILURE.value, "rejected")
+            raise
 
-            # Emit retry requested event for telemetry with failed step types
+        self._record_retry_request(RetryKind.FROM_FAILURE.value, "accepted")
+        try:
             from syntara.audit.emitter import request_id_context_var  # noqa: PLC0415
             from syntara.workflows.audit.retry_requested import WorkflowRetryRequestedEvent  # noqa: PLC0415
 
@@ -1530,9 +1524,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                     request_id=request_id_context_var.get(),
                 )
             )
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to emit retry telemetry after persistence", exc_info=True)
 
-            return new_execution
-        except Exception:
-            # Record rejected on any failure (Temporal, concurrency, persistence)
-            self._record_retry_request(RetryKind.FROM_FAILURE.value, "rejected")
-            raise
+        return new_execution

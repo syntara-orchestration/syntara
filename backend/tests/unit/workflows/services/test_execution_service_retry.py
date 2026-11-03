@@ -11,10 +11,12 @@ from syntara.workflows.exceptions import (
     ExecutionNotFoundError,
     ExecutionNotRetryableError,
 )
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionMode, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.execution_service import ExecutionService
+from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 
@@ -78,6 +80,12 @@ def _mock_session_with_two_queries(
     return mock_session, add_mock
 
 
+def _raise_for_retry_requested(event: object) -> None:
+    """Simulate telemetry failure without affecting lifecycle events."""
+    if event.__class__.__name__ == "WorkflowRetryRequestedEvent":
+        raise RuntimeError from None
+
+
 class TestRetryExecution:
     """Test retry_execution method."""
 
@@ -119,6 +127,10 @@ class TestRetryExecution:
                 return_value="Author",
             ),
             patch.object(service, "convert_resource_mixin") as mock_convert,
+            patch(
+                "syntara.workflows.services.execution_service.AuditEventDispatcher.dispatch",
+                side_effect=_raise_for_retry_requested,
+            ),
         ):
             mock_convert.convert_resource.return_value = Mock()
             await service.retry_execution(execution.id)
@@ -303,3 +315,28 @@ class TestRetryExecution:
         mock_temporal.cancel_workflow.assert_awaited_once_with(
             temporal_workflow_id=temporal_result.temporal_workflow_id
         )
+
+
+class TestFailedStepTypes:
+    """Test failed-step telemetry normalization."""
+
+    @pytest.mark.asyncio
+    async def test_uses_failed_activity_node_types(self) -> None:
+        failed_script = Mock(spec=ActivityExecution)
+        failed_script.status = ActivityStatus.FAILED
+        failed_script.activity_name = "workflow-node-id"
+        failed_script.node_type = NodeType.SCRIPT
+
+        failed_http = Mock(spec=ActivityExecution)
+        failed_http.status = ActivityStatus.FAILED
+        failed_http.activity_name = "another-node-id#iter-1"
+        failed_http.node_type = NodeType.HTTP_REQUEST
+
+        result = Mock()
+        result.all.return_value = [failed_script, failed_http]
+        session = Mock(spec=AsyncSession)
+        session.exec = AsyncMock(return_value=result)
+
+        step_types = await ExecutionService._get_failed_step_types(session, uuid4())
+
+        assert step_types == ["http_request", "script"]
