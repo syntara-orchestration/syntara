@@ -6,7 +6,7 @@ name: OpenAPI Breaking Changes
 
 on:
   pull_request:
-    branches: [devel, early-access]
+    branches: [devel, early-access, AAP-97532/**]
     paths:
       - 'backend/src/syntara/schemas/openapi.yaml'
       - '.github/workflows/openapi-breaking-changes*.yml'

@@ -6,7 +6,7 @@ name: "OpenAPI: Changelog Fragment Enforcement"
 
 on:
   pull_request:
-    branches: [devel, early-access]
+    branches: [devel, early-access, AAP-97532/**]
     paths:
       - 'backend/src/syntara/schemas/openapi.yaml'
       - 'changelogs/fragments/**'
