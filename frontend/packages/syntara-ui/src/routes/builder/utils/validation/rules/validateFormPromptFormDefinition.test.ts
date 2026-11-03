@@ -37,7 +37,7 @@ describe('validateFormPromptFormDefinition', () => {
     expect(errors).toHaveLength(1)
     expect(errors[0].rule).toBe('form-prompt-form-definition')
     expect(errors[0].nodeId).toBe('form-1')
-    expect(errors[0].id).toBe('form-prompt-definition-form-1')
+    expect(errors[0].id).toBe('form-prompt-definition-form-1-0')
     expect(errors[0].message).toContain('Survey')
   })
 

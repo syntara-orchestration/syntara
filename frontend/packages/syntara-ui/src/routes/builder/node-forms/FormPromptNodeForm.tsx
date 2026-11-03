@@ -1,14 +1,21 @@
 import { Alert, Button, Content, FormGroup, Stack, StackItem, TextArea, Title } from '@patternfly/react-core'
 import type { Activity } from '@syntara/contracts'
-import type { ReactNode } from 'react'
-import { use, useEffect, useMemo, useState } from 'react'
-import { Controller, FormProvider, useForm, useFormContext, useWatch } from 'react-hook-form'
+import type { FormEvent, ReactNode } from 'react'
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Controller, FormProvider, useFormContext, useWatch } from 'react-hook-form'
 
+import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
+import type { FormDefinitionFieldServerError } from '../../../components/forms/formFieldBuilder/formDefinitionFieldServerError'
 import { SynFormFieldBuilder } from '../../../components/forms/SynFormFieldBuilder'
+import { FORM_PREVIEW_INCOMPLETE_TOOLTIP, isFormDefinitionReadyForPreview } from '../../../forms'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
+import { detachPromise } from '../../../utils/detachPromise'
+import { useEffectiveFormDefinitionServerValidationErrors } from '../hooks/useEffectiveFormDefinitionServerValidationErrors'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
+import { partitionFormTriggerServerValidationErrors } from '../utils/partitionFormTriggerServerValidationErrors'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { ApproverMultiSelect } from './ApproverMultiSelect'
@@ -32,7 +39,10 @@ import {
 } from './formPromptResponderConstants'
 import { FormPromptTimeoutSection } from './FormPromptTimeoutSection'
 import { ActivityNameField } from './shared/ActivityNameField'
-import { zodResolver } from './shared/formSchemaUtils'
+import {
+  FormFieldBuilderCommitRefContext,
+  type FormFieldBuilderCommitHandlers,
+} from './shared/formFieldBuilderCommitRefContext'
 import { nodeHelp } from './shared/nodeFieldHelp'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
@@ -64,6 +74,7 @@ type FormPromptNodeFormProps = {
   initialData?: Partial<FormPromptFormSubmitData>
   onHeaderContentChange?: (content: ReactNode | null) => void
   projectId?: string
+  serverValidationErrors?: ReadonlyArray<{ fieldPath?: string | null; message: string }>
 }
 
 type ResponderUser = Readonly<{ id: string; username: string }>
@@ -166,15 +177,18 @@ function ResponderGroupsSelect({
 function FormPromptFormFields({
   onHeaderContentChange,
   projectId,
+  serverFieldErrors,
 }: Readonly<{
   onHeaderContentChange?: (content: ReactNode | null) => void
   projectId?: string
+  serverFieldErrors?: ReadonlyArray<FormDefinitionFieldServerError>
 }>) {
   const isVersionView = useIsVersionView()
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const { register, control, setValue } = useFormContext<FormPromptFormData>()
   const formDefinition = useWatch({ control, name: 'form_definition' })
   const message = useWatch({ control, name: 'message' })
+  const builderCommitRef = use(FormFieldBuilderCommitRefContext)
   const storeProjectId = useWorkflowStore((state) => state.projectId)
   const effectiveProjectId = projectId ?? storeProjectId
   const {
@@ -196,6 +210,19 @@ function FormPromptFormFields({
     }
   }, [nameField, onHeaderContentChange])
 
+  const registerBuilderCommit = useCallback(
+    (handlers: FormFieldBuilderCommitHandlers | null) => {
+      if (builderCommitRef) {
+        builderCommitRef.current = handlers
+      }
+    },
+    [builderCommitRef]
+  )
+
+  const resolvedDefinition = formDefinition ?? createEmptyFormDefinition()
+  const previewReady = useMemo(() => isFormDefinitionReadyForPreview(resolvedDefinition), [resolvedDefinition])
+  const previewBlocked = isVersionView || !previewReady
+
   const parametersContent = (
     <Stack hasGutter>
       <StackItem>
@@ -204,15 +231,17 @@ function FormPromptFormFields({
         </Alert>
       </StackItem>
       <StackItem>
-        <Button
-          variant="link"
-          isInline
-          className={nodeFormStyles.previewFormLink}
-          onClick={() => setIsPreviewOpen(true)}
-          isDisabled={isVersionView}
-        >
-          Preview form
-        </Button>
+        <DisabledWithTooltip isDisabled={!isVersionView && !previewReady} content={FORM_PREVIEW_INCOMPLETE_TOOLTIP}>
+          <Button
+            variant="link"
+            isInline
+            className={nodeFormStyles.previewFormLink}
+            isAriaDisabled={previewBlocked}
+            onClick={previewBlocked ? undefined : () => setIsPreviewOpen(true)}
+          >
+            Preview form
+          </Button>
+        </DisabledWithTooltip>
       </StackItem>
       <StackItem>
         <FormGroup
@@ -281,13 +310,16 @@ function FormPromptFormFields({
       <StackItem>
         <SynFormFieldBuilder
           designOnly
-          value={formDefinition ?? createEmptyFormDefinition()}
+          draftMode
+          serverFieldErrors={serverFieldErrors}
+          value={resolvedDefinition}
           onChange={(definition) =>
             setValue('form_definition', definition, {
               shouldDirty: true,
-              shouldValidate: true,
+              shouldValidate: false,
             })
           }
+          registerCommit={registerBuilderCommit}
           isDisabled={isVersionView}
         />
       </StackItem>
@@ -315,7 +347,7 @@ function FormPromptFormFields({
       <FormPromptPreviewModal
         isOpen={isPreviewOpen}
         onClose={() => setIsPreviewOpen(false)}
-        formDefinition={formDefinition ?? createEmptyFormDefinition()}
+        formDefinition={resolvedDefinition}
         message={message}
       />
     </>
@@ -323,27 +355,70 @@ function FormPromptFormFields({
 }
 
 export function FormPromptNodeForm(props: FormPromptNodeFormProps) {
+  const { onSubmit, initialData, onHeaderContentChange, projectId, serverValidationErrors } = props
   const { defaults } = useWorkflowEngineDefaults()
-  const defaultValues = getFormPromptNodeFormDefaultValues(props.initialData)
+  const defaultValues = getFormPromptNodeFormDefaultValues(initialData)
   const systemContinueOnFailure = defaults?.continueOnFailure ?? null
+  const builderHandlersRef = useRef<FormFieldBuilderCommitHandlers | null>(null)
 
-  const handleSubmit = (data: FormPromptFormData) => {
-    props.onSubmit(mapFormPromptFormDataToSubmit(data, systemContinueOnFailure))
-  }
-
-  const methods = useForm<FormPromptFormData>({
-    resolver: zodResolver(formPromptFormSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: formPromptFormSchema,
     defaultValues,
   })
 
+  const formDefinition = useWatch({ control: form.control, name: 'form_definition' })
+  const readPreparedFormDefinition = useCallback(() => builderHandlersRef.current?.readPreparedDefinition(), [])
+  const effectiveServerValidationErrors = useEffectiveFormDefinitionServerValidationErrors(
+    formDefinition,
+    serverValidationErrors,
+    { readPreparedDefinition: readPreparedFormDefinition }
+  )
+
+  const formDefinitionFieldErrors = useMemo(
+    () => partitionFormTriggerServerValidationErrors(effectiveServerValidationErrors).formFieldErrors,
+    [effectiveServerValidationErrors]
+  )
+
+  const syncFormDefinitionFromBuilder = useCallback(() => {
+    const handlers = builderHandlersRef.current
+    if (!handlers) {
+      return
+    }
+    handlers.flush()
+    const prepared = handlers.readPreparedDefinition()
+    form.setValue('form_definition', prepared, { shouldDirty: true, shouldValidate: false })
+  }, [form])
+
+  const handleSubmit = useCallback(
+    (data: FormPromptFormData) => {
+      onSubmit(mapFormPromptFormDataToSubmit(data, systemContinueOnFailure))
+    },
+    [onSubmit, systemContinueOnFailure]
+  )
+
+  const submitWithFlush = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      syncFormDefinitionFromBuilder()
+      detachPromise(form.handleSubmit(handleSubmit)(event))
+    },
+    [form, handleSubmit, syncFormDefinitionFromBuilder]
+  )
+
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, methods, handleSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit, syncFormDefinitionFromBuilder)
 
   return (
-    <FormProvider {...methods}>
-      <NodeFormContainer formId="form-prompt-node-form" onSubmit={methods.handleSubmit(handleSubmit)}>
-        <FormPromptFormFields onHeaderContentChange={props.onHeaderContentChange} projectId={props.projectId} />
-      </NodeFormContainer>
-    </FormProvider>
+    <FormFieldBuilderCommitRefContext.Provider value={builderHandlersRef}>
+      <FormProvider {...form}>
+        <NodeFormContainer formId="form-prompt-node-form" onSubmit={submitWithFlush}>
+          <FormPromptFormFields
+            onHeaderContentChange={onHeaderContentChange}
+            projectId={projectId}
+            serverFieldErrors={formDefinitionFieldErrors}
+          />
+        </NodeFormContainer>
+      </FormProvider>
+    </FormFieldBuilderCommitRefContext.Provider>
   )
 }

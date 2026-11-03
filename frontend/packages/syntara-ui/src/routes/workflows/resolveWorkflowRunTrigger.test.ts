@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { workflowFetchClient } from '../../client'
 
-import { resolveWorkflowRunTrigger } from './resolveWorkflowRunTrigger'
+import { resolveWorkflowListRunTrigger, resolveWorkflowRunTrigger } from './resolveWorkflowRunTrigger'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -251,6 +251,88 @@ describe('resolveWorkflowRunTrigger', () => {
     const result = await resolveWorkflowRunTrigger(mockWorkflow())
     expect(result?.triggerNodeId).toBe('form-1')
     expect(result?.triggerType).toBe('form_trigger')
+  })
+
+  it('returns chooseFormStep when multiple form steps require input', async () => {
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(
+      mockGetResponse({
+        id: 'wf-1',
+        current_version: 1,
+        published_version_number: 1,
+        version: {
+          workflow_definition: {
+            triggers: [
+              {
+                id: 'form-a',
+                name: 'Alpha',
+                type: 'form_trigger',
+                parameters: {
+                  form_definition: {
+                    fields: [{ type: 'text', value_name: 'a', label: 'A', required: true }],
+                  },
+                },
+              },
+              {
+                id: 'form-b',
+                name: 'Beta',
+                type: 'form_trigger',
+                parameters: {
+                  form_definition: {
+                    fields: [{ type: 'text', value_name: 'b', label: 'B', required: true }],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      })
+    )
+
+    await expect(resolveWorkflowListRunTrigger(mockWorkflow())).resolves.toEqual({
+      kind: 'chooseFormStep',
+      triggers: [
+        expect.objectContaining({ triggerNodeId: 'form-a', triggerName: 'Alpha' }),
+        expect.objectContaining({ triggerNodeId: 'form-b', triggerName: 'Beta' }),
+      ],
+    })
+  })
+
+  it('throws when resolveWorkflowRunTrigger is used for multiple form steps', async () => {
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(
+      mockGetResponse({
+        id: 'wf-1',
+        current_version: 1,
+        published_version_number: 1,
+        version: {
+          workflow_definition: {
+            triggers: [
+              {
+                id: 'form-a',
+                name: 'Alpha',
+                type: 'form_trigger',
+                parameters: {
+                  form_definition: {
+                    fields: [{ type: 'text', value_name: 'a', label: 'A', required: true }],
+                  },
+                },
+              },
+              {
+                id: 'form-b',
+                name: 'Beta',
+                type: 'form_trigger',
+                parameters: {
+                  form_definition: {
+                    fields: [{ type: 'text', value_name: 'b', label: 'B', required: true }],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      })
+    )
+
+    await expect(resolveWorkflowRunTrigger(mockWorkflow())).rejects.toThrow(/multiple form steps/i)
   })
 
   it('parses form trigger presentation from parameters', async () => {

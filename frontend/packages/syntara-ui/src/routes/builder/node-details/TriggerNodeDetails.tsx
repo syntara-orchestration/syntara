@@ -4,19 +4,21 @@ import {
   ScheduleTypeEnum,
   TriggerTypeEnum,
   WEBHOOK_TRIGGER_TYPES,
+  type FormDefinition,
 } from '@syntara/contracts'
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 
+import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import type { Trigger } from '../../../stores/workflowStoreTypes'
 import { parseJsonSchema } from '../../../utils/jsonSafeParse'
 import { isValidWebhookPath, normalizeWebhookPath } from '../../../utils/webhookPath'
-import type { ValidationError } from '../builderReducer'
 import type { TriggerFormData } from '../node-forms/TriggerNodeForm'
 import { TriggerNodeForm } from '../node-forms/TriggerNodeForm'
+import { isStoredFormDefinitionValid } from '../utils/clearNodeValidationErrors'
 import { buildFormTriggerActivityParameters } from '../utils/formTriggerActivityParameters'
-import { readStoredFormDefinition } from '../utils/readStoredFormDefinition'
+import { readDraftFormDefinitionFromParameters, readStoredFormDefinition } from '../utils/readStoredFormDefinition'
 
 /**
  * Deep equality check for triggers to prevent marking workflow dirty when no changes are made.
@@ -194,15 +196,12 @@ function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: stri
     )
   }
   if (data.triggerType === TriggerTypeEnum.FORM_TRIGGER) {
-    if (!data.form_definition) {
-      throw new Error('Add at least one form field')
-    }
     return {
       id: trigger.id ?? 'form',
       type: TriggerTypeEnum.FORM_TRIGGER,
       name: name ?? 'Form trigger',
       parameters: buildFormTriggerActivityParameters({
-        form_definition: data.form_definition,
+        form_definition: data.form_definition ?? createEmptyFormDefinition(),
         message: data.message,
         submit_label: data.submit_label,
         success_message: data.success_message,
@@ -244,7 +243,8 @@ function mapFormTriggerInitialData(trigger: Trigger): TriggerFormData {
   return {
     name: trigger.name,
     triggerType: TriggerTypeEnum.FORM_TRIGGER,
-    form_definition: readStoredFormDefinition(params),
+    form_definition:
+      readDraftFormDefinitionFromParameters(params) ?? readStoredFormDefinition(params) ?? createEmptyFormDefinition(),
     message: (params.message as string | undefined) ?? '',
     submit_label: (params.submit_label as string | undefined) ?? '',
     success_message: (params.success_message as string | undefined) ?? '',
@@ -290,7 +290,8 @@ type TriggerNodeDetailsProps = Readonly<{
   triggerIndex: number
   onClose: () => void
   onHeaderContentChange?: (content: ReactNode | null) => void
-  serverValidationErrors?: ValidationError[]
+  serverValidationErrors?: ReadonlyArray<{ fieldPath?: string | null; message: string }>
+  onFormDefinitionCommitted?: (nodeId: string, formDefinition: FormDefinition) => void
 }>
 
 export function TriggerNodeDetails({
@@ -299,6 +300,7 @@ export function TriggerNodeDetails({
   onClose,
   onHeaderContentChange,
   serverValidationErrors,
+  onFormDefinitionCommitted,
 }: TriggerNodeDetailsProps) {
   const { showError } = useAlerts()
   // Use action accessor - component won't re-render when store state changes
@@ -306,12 +308,28 @@ export function TriggerNodeDetails({
 
   const initialData = useMemo(() => mapTriggerToInitialFormData(trigger), [trigger])
 
+  useEffect(() => {
+    if (trigger.type !== TriggerTypeEnum.FORM_TRIGGER) {
+      return
+    }
+    const definition = initialData.form_definition
+    if (!definition || !isStoredFormDefinitionValid(definition)) {
+      return
+    }
+    // Clear stale verify findings when reopening a trigger whose saved definition is already valid.
+    onFormDefinitionCommitted?.(trigger.id, definition)
+  }, [initialData.form_definition, onFormDefinitionCommitted, trigger.id, trigger.type])
+
   const handleSubmit = (data: TriggerFormData) => {
     try {
       const name = data.name?.trim() || trigger.name
       const updatedTrigger = buildUpdatedTrigger(data, trigger, name)
 
       // Only update if the trigger actually changed
+      if (data.triggerType === TriggerTypeEnum.FORM_TRIGGER && data.form_definition) {
+        onFormDefinitionCommitted?.(trigger.id, data.form_definition)
+      }
+
       if (!triggersEqual(trigger, updatedTrigger)) {
         updateTrigger(triggerIndex, updatedTrigger)
       }

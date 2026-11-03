@@ -1,15 +1,18 @@
-import type { Activity } from '@syntara/contracts'
+import type { Activity, FormDefinition } from '@syntara/contracts'
 import type { ReactNode } from 'react'
+import { useEffect, useMemo } from 'react'
 
+import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { FormPromptFormSubmitData } from '../node-forms/FormPromptNodeForm'
 import { FormPromptNodeForm } from '../node-forms/FormPromptNodeForm'
 import { formPromptStoredParametersSchema } from '../node-forms/formPromptNodeFormSchema'
 import { persistNodeSettings } from '../node-forms/shared/nodeSettingsSchema'
+import { isStoredFormDefinitionValid } from '../utils/clearNodeValidationErrors'
 import { buildFormPromptActivityParameters } from '../utils/formPromptActivityParameters'
 import { formPromptFallbackDecisionFromBehavior } from '../utils/formPromptFallbackBehavior'
-import { readStoredFormDefinition } from '../utils/readStoredFormDefinition'
+import { readDraftFormDefinitionFromParameters, readStoredFormDefinition } from '../utils/readStoredFormDefinition'
 
 type FormPromptNodeDetailsProps = {
   taskData: Activity
@@ -17,6 +20,8 @@ type FormPromptNodeDetailsProps = {
   onClose: () => void
   onHeaderContentChange?: (content: ReactNode | null) => void
   projectId?: string
+  serverValidationErrors?: ReadonlyArray<{ fieldPath?: string | null; message: string }>
+  onFormDefinitionCommitted?: (nodeId: string, formDefinition: FormDefinition) => void
 }
 
 export function FormPromptNodeDetails({
@@ -25,14 +30,36 @@ export function FormPromptNodeDetails({
   onClose,
   onHeaderContentChange,
   projectId,
+  serverValidationErrors,
+  onFormDefinitionCommitted,
 }: Readonly<FormPromptNodeDetailsProps>) {
   const { showError } = useAlerts()
   const updateActivity = useWorkflowStore((state) => state.updateActivity)
+  const activityParametersFromStore = useWorkflowStore(
+    (state) => state.currentWorkflow?.workflow?.activities?.find((activity) => activity.id === nodeId)?.parameters
+  )
 
-  const rawParameters = taskData.parameters ?? {}
+  const rawParameters = useMemo(
+    () => activityParametersFromStore ?? taskData.parameters ?? {},
+    [activityParametersFromStore, taskData.parameters]
+  )
   const parsedParameters = formPromptStoredParametersSchema.safeParse(rawParameters)
   const parameters = parsedParameters.success ? parsedParameters.data : {}
-  const storedFormDefinition = parameters.form_definition ?? readStoredFormDefinition(rawParameters)
+  const storedFormDefinition: FormDefinition = useMemo(() => {
+    return (
+      readDraftFormDefinitionFromParameters(rawParameters) ??
+      readStoredFormDefinition(rawParameters) ??
+      createEmptyFormDefinition()
+    )
+  }, [rawParameters])
+
+  useEffect(() => {
+    if (!isStoredFormDefinitionValid(storedFormDefinition)) {
+      return
+    }
+    // Clear stale verify findings when reopening a step whose saved definition is already valid.
+    onFormDefinitionCommitted?.(nodeId, storedFormDefinition)
+  }, [nodeId, onFormDefinitionCommitted, storedFormDefinition])
 
   const initialData: Partial<FormPromptFormSubmitData> = {
     name: taskData.name,
@@ -60,6 +87,7 @@ export function FormPromptNodeDetails({
         parameters: buildFormPromptActivityParameters(data),
         settings: persistNodeSettings(data.settings),
       })
+      onFormDefinitionCommitted?.(nodeId, data.form_definition)
       onClose()
     } catch (error) {
       showError({
@@ -82,6 +110,7 @@ export function FormPromptNodeDetails({
       initialData={initialData}
       onHeaderContentChange={onHeaderContentChange}
       projectId={projectId}
+      serverValidationErrors={serverValidationErrors}
     />
   )
 }

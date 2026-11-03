@@ -4,6 +4,7 @@ import { workflowFetchClient } from '../../client'
 import { activitiesReferenceTrigger } from '../builder/utils/triggerReferenceCheck'
 
 import {
+  formTriggerRequiresInputCollection,
   isFormTriggerType,
   readFormTriggerPresentation,
   type FormTriggerPresentation,
@@ -73,11 +74,12 @@ function buildRunTrigger(trigger: TriggerLike, triggers: TriggerLike[], definiti
   }
 }
 
-/**
- * Resolve the first trigger from the workflow's published definition for a list-page run.
- * Prefers the published version when it differs from the current draft.
- */
-export async function resolveWorkflowRunTrigger(workflow: Workflow): Promise<WorkflowRunTrigger | null> {
+type LoadedWorkflowRunDefinition = {
+  definition: unknown
+  triggersWithId: (TriggerLike & { id: string })[]
+}
+
+async function loadWorkflowRunDefinition(workflow: Workflow): Promise<LoadedWorkflowRunDefinition | null> {
   if (!workflow.id) return null
 
   const { data: detail, error } = await workflowFetchClient.GET('/workflows/{workflow_id}', {
@@ -109,8 +111,58 @@ export async function resolveWorkflowRunTrigger(workflow: Workflow): Promise<Wor
   }
 
   const triggersWithId = (triggers ?? []).filter((t): t is TriggerLike & { id: string } => Boolean(t.id))
+  return { definition, triggersWithId }
+}
+
+export type WorkflowListRunTriggerResolution =
+  { kind: 'single'; trigger: WorkflowRunTrigger } | { kind: 'chooseFormStep'; triggers: WorkflowRunTrigger[] }
+
+function listFormStepsRequiringInput(
+  triggersWithId: (TriggerLike & { id: string })[],
+  definition: unknown
+): WorkflowRunTrigger[] {
+  return triggersWithId
+    .filter((trigger) => isFormTriggerType(trigger.type))
+    .map((trigger) => buildRunTrigger(trigger, triggersWithId, definition))
+    .filter((trigger) => formTriggerRequiresInputCollection(trigger.formTrigger))
+}
+
+/**
+ * Resolve how to start a workflow run from the workflows list.
+ * When multiple form steps require input, the caller must show a form-step picker.
+ */
+export async function resolveWorkflowListRunTrigger(
+  workflow: Workflow
+): Promise<WorkflowListRunTriggerResolution | null> {
+  const loaded = await loadWorkflowRunDefinition(workflow)
+  if (!loaded) return null
+
+  const { definition, triggersWithId } = loaded
+  if (triggersWithId.length === 0) return null
+
+  const formStepsRequiringInput = listFormStepsRequiringInput(triggersWithId, definition)
+  if (formStepsRequiringInput.length >= 2) {
+    return { kind: 'chooseFormStep', triggers: formStepsRequiringInput }
+  }
+
   const trigger = triggersWithId.find((t) => isFormTriggerType(t.type)) ?? triggersWithId[0]
   if (!trigger?.id) return null
 
-  return buildRunTrigger(trigger, triggersWithId, definition)
+  return { kind: 'single', trigger: buildRunTrigger(trigger, triggersWithId, definition) }
+}
+
+/**
+ * Resolve the first trigger from the workflow's published definition for a list-page run.
+ * Prefers the published version when it differs from the current draft.
+ */
+const MULTIPLE_FORM_STEPS_RUN_ERROR =
+  'This workflow has multiple form steps. Run it from the workflows list and choose which form step to run.'
+
+export async function resolveWorkflowRunTrigger(workflow: Workflow): Promise<WorkflowRunTrigger | null> {
+  const resolution = await resolveWorkflowListRunTrigger(workflow)
+  if (!resolution) return null
+  if (resolution.kind === 'chooseFormStep') {
+    throw new Error(MULTIPLE_FORM_STEPS_RUN_ERROR)
+  }
+  return resolution.trigger
 }

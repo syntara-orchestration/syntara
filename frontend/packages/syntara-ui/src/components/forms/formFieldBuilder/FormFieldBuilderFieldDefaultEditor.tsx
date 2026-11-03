@@ -3,7 +3,7 @@ import type { FormDefinition, FormField } from '@syntara/contracts'
 import { Controller, useFormContext } from 'react-hook-form'
 
 import { FormFieldTypeEnum } from '../../../forms'
-import { FormFieldHintOrError } from '../../FormFieldError'
+import { FormFieldError, FormFieldHintOrError } from '../../FormFieldError'
 import { SynTextField } from '../SynTextField'
 
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
@@ -47,17 +47,20 @@ export function FormFieldBuilderFieldDefaultEditor({
         <Controller
           control={control}
           name={`fields.${index}.default`}
-          render={({ field: rhfField }) => (
-            <Checkbox
-              id={`${idPrefix}-default`}
-              label={FORM_FIELD_BUILDER_INITIAL_ANSWER_CHECKBOX_LABEL}
-              isChecked={Boolean(rhfField.value)}
-              isDisabled={isDisabled}
-              onChange={(_event, checked) => {
-                rhfField.onChange(checked)
-                commit()
-              }}
-            />
+          render={({ field: rhfField, fieldState }) => (
+            <>
+              <Checkbox
+                id={`${idPrefix}-default`}
+                label={FORM_FIELD_BUILDER_INITIAL_ANSWER_CHECKBOX_LABEL}
+                isChecked={Boolean(rhfField.value)}
+                isDisabled={isDisabled}
+                onChange={(_event, checked) => {
+                  rhfField.onChange(checked)
+                  commit()
+                }}
+              />
+              <FormFieldError error={fieldState.error} />
+            </>
           )}
         />
       </FormGroup>
@@ -69,7 +72,7 @@ export function FormFieldBuilderFieldDefaultEditor({
       <Controller
         control={control}
         name={`fields.${index}.default`}
-        render={({ field: rhfField }) => (
+        render={({ field: rhfField, fieldState }) => (
           <FormGroup
             label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
             fieldId={`${idPrefix}-default`}
@@ -80,6 +83,7 @@ export function FormFieldBuilderFieldDefaultEditor({
               type="number"
               aria-label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
               placeholder={examples.defaultValue}
+              validated={fieldState.error ? 'error' : 'default'}
               isDisabled={isDisabled}
               value={
                 typeof rhfField.value === 'number' || typeof rhfField.value === 'string' ? String(rhfField.value) : ''
@@ -96,6 +100,7 @@ export function FormFieldBuilderFieldDefaultEditor({
               }}
               onBlur={rhfField.onBlur}
             />
+            <FormFieldError error={fieldState.error} />
           </FormGroup>
         )}
       />

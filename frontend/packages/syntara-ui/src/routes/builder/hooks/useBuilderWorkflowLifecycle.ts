@@ -52,7 +52,8 @@ export function useBuilderWorkflowLifecycle(options: {
   const queryClient = useQueryClient()
 
   const hasLoadedRef = useRef(false)
-  const prevWorkflowIdRef = useRef(workflowId)
+  /** Start null so the first mount after leaving the builder always clears stale store data. */
+  const prevWorkflowIdRef = useRef<string | null>(null)
   const hasInitedNewWorkflowRef = useRef(false)
   const hasAppliedDefaultNameRef = useRef(false)
   const hasRefetchedWorkflowsOnceRef = useRef(false)

@@ -1,14 +1,17 @@
 import { TriggerTypeEnum } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useRef } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
+import { FORM_PREVIEW_INCOMPLETE_TOOLTIP, FormFieldTypeEnum } from '../../../forms'
 import { VersionViewContext } from '../VersionViewContext'
 
 import { FormTriggerConfigurationFields } from './FormTriggerConfigurationFields'
+import { TriggerFormFieldBuilderCommitRefContext } from './triggerFormFieldBuilderCommitContext'
 import type { TriggerFormData } from './triggerFormSchema'
 
 vi.mock('../../../components/forms/SynFormFieldBuilder', () => ({
@@ -24,16 +27,21 @@ vi.mock('./FormPresentationOptionsSection', () => ({
   FormPresentationOptionsSection: () => <div data-testid="presentation-options" />,
 }))
 
-type RenderFieldsOptions = {
-  formDefinitionError?: { message?: string }
+const validPreviewFormDefinition = {
+  fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name' }],
 }
 
-function renderFields(options: RenderFieldsOptions = {}) {
+const incompletePreviewFormDefinition = {
+  fields: [{ type: FormFieldTypeEnum.TEXT, value_name: '', label: '' }],
+}
+
+function renderFields(formDefinition = createEmptyFormDefinition()) {
   function Wrapper() {
+    const builderCommitRef = useRef(null)
     const methods = useForm<TriggerFormData>({
       defaultValues: {
         triggerType: TriggerTypeEnum.FORM_TRIGGER,
-        form_definition: createEmptyFormDefinition(),
+        form_definition: formDefinition,
         message: '',
         submit_label: '',
         success_message: '',
@@ -42,9 +50,11 @@ function renderFields(options: RenderFieldsOptions = {}) {
     })
     return (
       <VersionViewContext value={false}>
-        <FormProvider {...methods}>
-          <FormTriggerConfigurationFields formDefinitionError={options.formDefinitionError} />
-        </FormProvider>
+        <TriggerFormFieldBuilderCommitRefContext.Provider value={builderCommitRef}>
+          <FormProvider {...methods}>
+            <FormTriggerConfigurationFields />
+          </FormProvider>
+        </TriggerFormFieldBuilderCommitRefContext.Provider>
       </VersionViewContext>
     )
   }
@@ -59,7 +69,7 @@ describe('FormTriggerConfigurationFields', () => {
 
   it('renders form trigger guidance, field builder, and preview entry point', async () => {
     const user = userEvent.setup()
-    renderFields()
+    renderFields(validPreviewFormDefinition)
 
     expect(screen.getByText('Form trigger')).toBeInTheDocument()
     expect(screen.getByTestId('syn-form-field-builder')).toBeInTheDocument()
@@ -69,9 +79,18 @@ describe('FormTriggerConfigurationFields', () => {
     expect(screen.getByTestId('form-preview-modal')).toBeInTheDocument()
   })
 
-  it('shows form definition validation error from publish', () => {
-    renderFields({ formDefinitionError: { message: 'Add at least one form field.' } })
+  it('keeps preview control focusable with tooltip when the form definition is incomplete', async () => {
+    const user = userEvent.setup()
+    renderFields(incompletePreviewFormDefinition)
 
-    expect(screen.getByText('Add at least one form field.')).toBeInTheDocument()
+    const previewButton = screen.getByRole('button', { name: 'Preview form' })
+    expect(previewButton).toHaveAttribute('aria-disabled', 'true')
+    expect(previewButton).not.toBeDisabled()
+
+    await user.hover(previewButton)
+    expect(await screen.findByText(FORM_PREVIEW_INCOMPLETE_TOOLTIP)).toBeInTheDocument()
+
+    await user.click(previewButton)
+    expect(screen.queryByTestId('form-preview-modal')).not.toBeInTheDocument()
   })
 })

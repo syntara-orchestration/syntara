@@ -1,8 +1,9 @@
-import { Flex, FlexItem, FormGroup, TextInput } from '@patternfly/react-core'
+import { Flex, FlexItem, TextInput } from '@patternfly/react-core'
 import type { FormDefinition } from '@syntara/contracts'
-import { Controller, useFormContext } from 'react-hook-form'
+import { useFormContext } from 'react-hook-form'
 
 import { FormFieldTypeEnum } from '../../../forms'
+import { SynFormField } from '../SynFormField'
 
 import { formFieldBuilderLabelHelp } from './formFieldBuilderFieldHelp'
 
@@ -11,7 +12,8 @@ type FormFieldBuilderCardHeaderLabelProps = {
   idPrefix: string
   fieldType: FormDefinition['fields'][number]['type']
   isDisabled?: boolean
-  onLabelChange: (value: string) => void
+  /** Called after the label value changes so the parent can sync generated value names. */
+  onLabelChange: (nextLabel: string) => void
 }
 
 export function FormFieldBuilderCardHeaderLabel({
@@ -23,45 +25,43 @@ export function FormFieldBuilderCardHeaderLabel({
 }: Readonly<FormFieldBuilderCardHeaderLabelProps>) {
   const { control } = useFormContext<FormDefinition>()
   const isCheckboxField = fieldType === FormFieldTypeEnum.CHECKBOX
+  const checkboxLabelHelp = formFieldBuilderLabelHelp('checkboxLabel', 'Checkbox label')
 
-  return (
-    <Controller
+  const labelField = (
+    <SynFormField
       control={control}
       name={`fields.${index}.label`}
-      render={({ field: rhfField, fieldState }) => {
-        const labelInput = (
-          <TextInput
-            id={`${idPrefix}-label`}
-            aria-label={isCheckboxField ? 'Checkbox label' : 'Field label'}
-            value={rhfField.value ?? ''}
-            validated={fieldState.error ? 'error' : 'default'}
-            isDisabled={isDisabled}
-            onChange={(_event, value) => onLabelChange(value)}
-            onBlur={rhfField.onBlur}
-          />
-        )
+      label={isCheckboxField ? 'Checkbox label' : 'Field label'}
+      fieldId={`${idPrefix}-label`}
+      isRequired={!isCheckboxField}
+      hideFormGroupLabel={isCheckboxField}
+      labelHelp={isCheckboxField ? undefined : formFieldBuilderLabelHelp('label', 'Field label')}
+    >
+      {({ field, fieldState }) => (
+        <TextInput
+          id={`${idPrefix}-label`}
+          aria-label={isCheckboxField ? 'Checkbox label' : 'Field label'}
+          value={field.value ?? ''}
+          validated={fieldState.error ? 'error' : 'default'}
+          isDisabled={isDisabled}
+          onChange={(_event, value) => {
+            field.onChange(value)
+            onLabelChange(value)
+          }}
+          onBlur={field.onBlur}
+        />
+      )}
+    </SynFormField>
+  )
 
-        if (isCheckboxField) {
-          const labelHelp = formFieldBuilderLabelHelp('checkboxLabel', 'Checkbox label')
-          return (
-            <Flex alignItems={{ default: 'alignItemsFlexStart' }} gap={{ default: 'gapSm' }}>
-              <FlexItem grow={{ default: 'grow' }}>{labelInput}</FlexItem>
-              {labelHelp ? <FlexItem>{labelHelp}</FlexItem> : null}
-            </Flex>
-          )
-        }
+  if (!isCheckboxField) {
+    return labelField
+  }
 
-        return (
-          <FormGroup
-            label="Field label"
-            fieldId={`${idPrefix}-label`}
-            isRequired
-            labelHelp={formFieldBuilderLabelHelp('label', 'Field label')}
-          >
-            {labelInput}
-          </FormGroup>
-        )
-      }}
-    />
+  return (
+    <Flex alignItems={{ default: 'alignItemsFlexStart' }} gap={{ default: 'gapSm' }}>
+      <FlexItem grow={{ default: 'grow' }}>{labelField}</FlexItem>
+      {checkboxLabelHelp ? <FlexItem>{checkboxLabelHelp}</FlexItem> : null}
+    </Flex>
   )
 }
