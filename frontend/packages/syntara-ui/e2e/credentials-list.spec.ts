@@ -95,7 +95,7 @@ test.describe('Credentials Empty State', () => {
 // Test 3: Table Display and Sorting
 // ---------------------------------------------------------------------------
 test.describe('Table Display and Sorting', () => {
-  test('table displays all 6 column headers and supports sort toggle', async ({ app }) => {
+  test('table displays column headers and supports name sort toggle', async ({ app }) => {
     const credNames: string[] = []
     for (let i = 0; i < 3; i++) {
       const { name } = await createTestCredential(app, { prefix: `e2e-sort-${String(i)}` })
@@ -107,29 +107,27 @@ test.describe('Table Display and Sorting', () => {
       await filterCredentialByName(app, 'e2e-sort-')
 
       const table = app.getByRole('grid', { name: 'Credentials table' })
-      const hasTable = await table
-        .waitFor({ state: 'visible', timeout: 5000 })
-        .then(() => true)
-        .catch(() => false)
-      expect(hasTable, 'No credential data available; seed data required').toBeTruthy()
+      await expect(table).toBeVisible({ timeout: 30_000 })
+      await expect(table.getByRole('row', { name: new RegExp(credNames[0]) })).toBeVisible({ timeout: 30_000 })
 
       await expect(table.getByRole('columnheader', { name: 'Name' })).toBeVisible()
       await expect(table.getByRole('columnheader', { name: 'Type' })).toBeVisible()
       await expect(table.getByRole('columnheader', { name: 'Workflows' })).toBeVisible()
+      await expect(table.getByRole('columnheader', { name: 'Integrations' })).toBeVisible()
       await expect(table.getByRole('columnheader', { name: 'Created' })).toBeVisible()
       await expect(table.getByRole('columnheader', { name: 'Last modified' })).toBeVisible()
       await expect(table.getByRole('columnheader', { name: 'State' })).toBeVisible()
 
       const nameHeader = table.getByRole('columnheader', { name: 'Name' })
-      const currentSort = await nameHeader.getAttribute('aria-sort')
+      const sortButton = nameHeader.getByRole('button')
+      await nameHeader.scrollIntoViewIfNeeded()
 
-      await nameHeader.getByRole('button').click()
-      const firstClick = currentSort === 'ascending' ? 'descending' : 'ascending'
-      await expect(nameHeader).toHaveAttribute('aria-sort', firstClick)
+      // Default list sort is Created (desc); first Name click should sort ascending.
+      await sortButton.click()
+      await expect(nameHeader).toHaveAttribute('aria-sort', 'ascending', { timeout: 15_000 })
 
-      await nameHeader.getByRole('button').click()
-      const secondClick = firstClick === 'ascending' ? 'descending' : 'ascending'
-      await expect(nameHeader).toHaveAttribute('aria-sort', secondClick)
+      await sortButton.click()
+      await expect(nameHeader).toHaveAttribute('aria-sort', 'descending', { timeout: 15_000 })
     } finally {
       for (const name of credNames) {
         await deleteCredentialByName(app, name)
@@ -145,11 +143,7 @@ test.describe('Cursor-Based Pagination', () => {
   test.beforeEach(async ({ app }) => {
     await goToCredentialsList(app)
     const table = app.getByRole('grid', { name: 'Credentials table' })
-    const hasTable = await table
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false)
-    expect(hasTable, 'No credential data available; seed data required').toBeTruthy()
+    await expect(table).toBeVisible({ timeout: 30_000 })
   })
 
   test('pagination footer displays credential count', async ({ app }) => {
@@ -290,14 +284,14 @@ test.describe('Kebab Menu Delete Action', () => {
       const row = app.getByRole('row', { name: new RegExp(credName) })
       await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
 
-      await app.getByRole('menuitem', { name: 'Delete' }).click()
+      await app.getByRole('menuitem', { name: 'Delete credential' }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByText(new RegExp(`"${credName}"`))).toBeVisible()
       await expect(dialog.getByText(/cannot be undone/)).toBeVisible()
 
-      const deleteBtn = dialog.getByRole('button', { name: 'Delete' })
+      const deleteBtn = dialog.getByRole('button', { name: 'Delete credential' })
       await expect(deleteBtn).toBeVisible()
       await expect(deleteBtn).toBeDisabled()
 
@@ -323,7 +317,7 @@ test.describe('Kebab Menu Delete Action', () => {
 
       const row = app.getByRole('row', { name: new RegExp(credName) })
       await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
-      await app.getByRole('menuitem', { name: 'Delete' }).click()
+      await app.getByRole('menuitem', { name: 'Delete credential' }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()

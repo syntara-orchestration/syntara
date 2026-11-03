@@ -1,7 +1,28 @@
 ---
 version: 2
 updates:
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: "uv"
+    directory: "/docs"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
     schedule:
       interval: "weekly"
+      day: "wednesday"
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 1
+    labels:
+      - "docs"
+      - "dependencies"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"

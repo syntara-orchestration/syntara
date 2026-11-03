@@ -2,13 +2,13 @@
  * E2E Tests (UI-20): Execution — Manual Run from Canvas
  *
  * Objective: Verify that a workflow can be manually run from the builder canvas,
- * that the live run details panel appears, and that node status badges update
+ * that the live run details panel appears, and that step status badges update
  * in real time as Temporal executes the workflow.
  *
  * Test coverage:
  * - Clicking Run and confirming opens the "Run details" panel
- * - Node status badges show Success after execution completes
- * - Failed nodes show an error status badge
+ * - Step status badges show Success after execution completes
+ * - Failed steps show an error status badge
  */
 
 import { type Page } from '../fixtures'
@@ -34,13 +34,15 @@ test.skip('clicking Run and confirming opens the live run details panel', async 
   test.setTimeout(120_000)
   const workflowName = buildUniqueName('e2e-manual-run')
   // validateMinimumWorkflow requires: trigger + at least one node + an edge connecting them
-  const { id: workflowId } = await createWorkflowViaApi(
+  const { id: workflowId } = await createWorkflowViaApi({
     app,
-    workflowName,
-    [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    [{ id: 'action_1', type: 'script', name: 'Test step', parameters: { language: 'python', code: "print('hi')" } }],
-    [{ from: 'trigger_1', to: 'action_1' }]
-  )
+    name: workflowName,
+    triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    nodes: [
+      { id: 'action_1', type: 'script', name: 'Test step', parameters: { language: 'python', code: "print('hi')" } },
+    ],
+    edges: [{ from: 'trigger_1', to: 'action_1' }],
+  })
   try {
     await openBuilderById(app, workflowId)
     await expect(app.getByText('Manual trigger')).toBeVisible({ timeout: 30_000 })
@@ -58,14 +60,14 @@ test.skip('clicking Run and confirming opens the live run details panel', async 
   }
 })
 
-test.skip('node status badges show success after execution completes', async ({ app }) => {
+test.skip('step status badges show success after execution completes', async ({ app }) => {
   test.setTimeout(120_000)
   const workflowName = buildUniqueName('e2e-manual-run-badge')
-  const { id: workflowId } = await createWorkflowViaApi(
+  const { id: workflowId } = await createWorkflowViaApi({
     app,
-    workflowName,
-    [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    [
+    name: workflowName,
+    triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    nodes: [
       {
         id: 'action_1',
         type: 'script',
@@ -73,8 +75,8 @@ test.skip('node status badges show success after execution completes', async ({ 
         parameters: { language: 'python', code: "print('hi')" },
       },
     ],
-    [{ from: 'trigger_1', to: 'action_1' }]
-  )
+    edges: [{ from: 'trigger_1', to: 'action_1' }],
+  })
   try {
     await openBuilderById(app, workflowId)
     await expect(app.getByText('Manual trigger')).toBeVisible({ timeout: 30_000 })
@@ -88,14 +90,14 @@ test.skip('node status badges show success after execution completes', async ({ 
   }
 })
 
-test.skip('failed nodes show an error status badge', async ({ app }) => {
+test.skip('failed steps show an error status badge', async ({ app }) => {
   test.setTimeout(120_000)
   const workflowName = buildUniqueName('e2e-manual-run-fail')
-  const { id: workflowId } = await createWorkflowViaApi(
+  const { id: workflowId } = await createWorkflowViaApi({
     app,
-    workflowName,
-    [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    [
+    name: workflowName,
+    triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    nodes: [
       {
         id: 'action_1',
         type: 'script',
@@ -103,8 +105,8 @@ test.skip('failed nodes show an error status badge', async ({ app }) => {
         parameters: { language: 'python', code: 'raise Exception("fail")' },
       },
     ],
-    [{ from: 'trigger_1', to: 'action_1' }]
-  )
+    edges: [{ from: 'trigger_1', to: 'action_1' }],
+  })
   try {
     await openBuilderById(app, workflowId)
     await expect(app.getByText('Manual trigger')).toBeVisible({ timeout: 30_000 })
@@ -112,7 +114,7 @@ test.skip('failed nodes show an error status badge', async ({ app }) => {
     await app.getByRole('button', { name: 'Run' }).click()
     await app.getByRole('dialog').getByRole('button', { name: 'Run now' }).click()
 
-    // Failed node shows an error badge
+    // Failed step shows an error badge
     await waitForBadge(app, 'Error')
   } finally {
     await deleteWorkflowViaApi(app, workflowId)

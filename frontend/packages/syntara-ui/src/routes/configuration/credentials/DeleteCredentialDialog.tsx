@@ -50,7 +50,7 @@ export function DeleteCredentialDialog({
       onClose={onClose}
       onConfirm={onConfirm}
       title="Delete credential?"
-      confirmLabel={hasBlockingIntegrations ? 'Detach integrations first' : 'Delete'}
+      confirmLabel={hasBlockingIntegrations ? 'Detach integrations first' : 'Delete credential'}
       confirmVariant="danger"
       titleIconVariant="warning"
       confirmLoading={isLoading || isLoadingChecks}

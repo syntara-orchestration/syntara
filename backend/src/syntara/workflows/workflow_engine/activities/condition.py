@@ -1,5 +1,6 @@
 """Condition node activity for v2 workflows."""
 
+import asyncio
 from typing import Any
 
 from temporalio import activity
@@ -58,8 +59,12 @@ async def condition(
         raise ApplicationError(msg, type="ConfigError", non_retryable=True)
 
     try:
-        # NEW: Use unified context-aware evaluator (Tier 2)
-        evaluated_result = safe_eval_with_namespace(condition_expr, namespace)
+        # Use unified context-aware evaluator (Tier 2). Offloaded to a worker
+        # thread because the `matches` operator runs a bounded subprocess
+        # (see unified_eval._re_search_bounded); running it inline would block
+        # this async activity's shared event loop, stalling every other activity
+        # and Temporal's own polling/heartbeat coroutines on the worker.
+        evaluated_result = await asyncio.to_thread(safe_eval_with_namespace, condition_expr, namespace)
 
         output = ConditionOutput(evaluated_result=evaluated_result)
 

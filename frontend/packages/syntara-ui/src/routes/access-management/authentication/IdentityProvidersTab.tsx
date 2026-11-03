@@ -49,13 +49,19 @@ function tooltipWhenDenied(allowed: boolean, text: string) {
   return allowed ? undefined : { content: text }
 }
 
-function getRowActions(
-  provider: IdentityProvider,
-  onDelete: (provider: IdentityProvider) => void,
-  onRevoke: (provider: IdentityProvider) => void,
-  permissions: ReturnType<typeof useIdentityProviderPermissions>,
+function getRowActions({
+  provider,
+  onDelete,
+  onRevoke,
+  permissions,
+  onNavigate,
+}: {
+  provider: IdentityProvider
+  onDelete: (provider: IdentityProvider) => void
+  onRevoke: (provider: IdentityProvider) => void
+  permissions: ReturnType<typeof useIdentityProviderPermissions>
   onNavigate: (path: string) => void
-): KebabAction[] {
+}): KebabAction[] {
   const { id } = provider
   const canEdit = permissions.canUpdate && !!id
   const canDel = permissions.canDelete && !!id
@@ -91,7 +97,7 @@ function getRowActions(
     { key: 'sep-delete', isSeparator: true },
     {
       key: 'delete',
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete provider</IconLabel>,
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete identity provider</IconLabel>,
       isDanger: true,
       isDisabled: !id,
       isAriaDisabled: !permissions.canDelete,
@@ -192,9 +198,13 @@ function ProviderRow({
       </Td>
       <Td isActionCell>
         <SynKebabMenu
-          actions={getRowActions(provider, onDelete, onRevoke, permissions, (path) =>
-            detachPromise(navigate({ to: path }))
-          )}
+          actions={getRowActions({
+            provider,
+            onDelete,
+            onRevoke,
+            permissions,
+            onNavigate: (path) => detachPromise(navigate({ to: path })),
+          })}
           aria-label={`Actions for ${provider.name}`}
         />
       </Td>
@@ -341,11 +351,19 @@ export function IdentityProvidersTab({ onHeaderToolbarStateChange }: Readonly<Id
           <SynListPanelTable caption="Identity providers table" footer={getFooterProps(query.data)}>
             <Thead>
               <Tr>
-                <Th sort={getSortParams(0)}>Name</Th>
-                <Th sort={getSortParams(1)}>Issuer URL</Th>
-                <Th sort={getSortParams(2)}>Client ID</Th>
-                <Th sort={getSortParams(3)}>State</Th>
-                <Th screenReaderText="Actions" />
+                <Th width={25} sort={getSortParams(0)}>
+                  Name
+                </Th>
+                <Th width={25} sort={getSortParams(1)}>
+                  Issuer URL
+                </Th>
+                <Th width={20} sort={getSortParams(2)}>
+                  Client ID
+                </Th>
+                <Th width={15} sort={getSortParams(3)}>
+                  State
+                </Th>
+                <Th width={10} screenReaderText="Actions" />
               </Tr>
             </Thead>
             <Tbody>

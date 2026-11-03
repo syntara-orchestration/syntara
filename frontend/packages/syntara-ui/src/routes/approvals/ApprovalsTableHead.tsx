@@ -82,7 +82,9 @@ export function ApprovalsTableHead(props: Readonly<ApprovalsTableHeadProps>) {
         <Th modifier="nowrap" sort={getSortParams('name')}>
           Approval name
         </Th>
-        <Th modifier="nowrap">Workflow</Th>
+        <Th modifier="nowrap" sort={getSortParams('workflow_name')}>
+          Workflow
+        </Th>
         <Th modifier="nowrap" sort={getSortParams('created_at')}>
           Approval initiated
         </Th>

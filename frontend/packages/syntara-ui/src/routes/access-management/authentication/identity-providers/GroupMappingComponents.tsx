@@ -21,18 +21,20 @@ import {
 import { RhUiAddIcon, RhUiEditIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { Tbody } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
-import { Controller, type Control, type FieldError, type FieldErrors } from 'react-hook-form'
+import type { Control, FieldError, FieldErrors } from 'react-hook-form'
 
 import { FilterBar } from '../../../../components/filters/FilterBar'
+import { FormFieldHintOrError } from '../../../../components/FormFieldError'
+import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
 import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
 import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
+import { useClientPagination } from '../../../../hooks/useClientPagination'
 import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../../types/filters'
 import { APP_TITLE } from '../../../../utils/appTitle'
 
-import { HintOrError } from './formFieldHelpers'
 import type { GroupMappingEditFormValues } from './groupMappingEditFormSchema'
 import { EditMappingRow, MappingRow } from './groupMappingFields'
 import { GroupMappingTableHead } from './groupMappingTableHead'
@@ -96,7 +98,7 @@ export function EmptyMappingState({ onTestSignIn, onAddManually }: Readonly<Empt
         <EmptyStateFooter>
           <EmptyStateActions>
             {onTestSignIn && (
-              <Button variant="primary" onClick={onTestSignIn}>
+              <Button variant="primary" icon={<RhUiSyncIcon />} onClick={onTestSignIn}>
                 Discover groups
               </Button>
             )}
@@ -125,28 +127,27 @@ export function AdvancedSection({ control, defaultExpression, idpType, rawClaims
       <Form>
         <Stack hasGutter>
           <StackItem>
-            <Controller
+            <SynFormField<GroupMappingEditFormValues, 'expression'>
               name="expression"
               control={control}
-              render={({ field, fieldState }) => (
+              label="Group extraction expression"
+              fieldId="jmespath-expression-tab"
+              labelHelp={idpHelp.groupExtractionExpression}
+              hideFooter
+            >
+              {({ field, fieldState }) => (
                 <Stack hasGutter>
                   <StackItem>
-                    <FormGroup
-                      label="Group extraction expression"
-                      fieldId="jmespath-expression-tab"
-                      labelHelp={idpHelp.groupExtractionExpression}
-                    >
-                      <TextInput
-                        id="jmespath-expression-tab"
-                        placeholder="groups[*]"
-                        validated={fieldState.error ? 'error' : 'default'}
-                        {...field}
-                      />
-                      <HintOrError
-                        error={fieldState.error}
-                        hint="JMESPath expression to extract group values from the ID token. Changes are included when you click Save mapping."
-                      />
-                    </FormGroup>
+                    <TextInput
+                      id="jmespath-expression-tab"
+                      placeholder="groups[*]"
+                      validated={fieldState.error ? 'error' : 'default'}
+                      {...field}
+                    />
+                    <FormFieldHintOrError
+                      error={fieldState.error}
+                      hint="JMESPath expression to extract group values from the ID token. Changes are included when you click Save mapping."
+                    />
                   </StackItem>
                   {defaultExpression && field.value !== defaultExpression && (
                     <StackItem>
@@ -157,7 +158,7 @@ export function AdvancedSection({ control, defaultExpression, idpType, rawClaims
                   )}
                 </Stack>
               )}
-            />
+            </SynFormField>
           </StackItem>
           {rawClaims && (
             <StackItem>
@@ -369,23 +370,20 @@ export type ReadOnlyViewProps = {
 
 export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<ReadOnlyViewProps>) {
   const [filters, setFilters] = useState<FilterConfig[]>([])
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
+  const { paginate, getFooterProps, resetPage } = useClientPagination()
 
   const clearFiltersAndPage = useCallback(() => {
     setFilters([])
-    setPage(1)
-  }, [])
+    resetPage()
+  }, [resetPage])
 
-  const handleFilterChange = useCallback((next: FilterConfig[]) => {
-    setFilters(next)
-    setPage(1)
-  }, [])
-
-  const handlePerPageChange = useCallback((newPerPage: number) => {
-    setPerPage(newPerPage)
-    setPage(1)
-  }, [])
+  const handleFilterChange = useCallback(
+    (next: FilterConfig[]) => {
+      setFilters(next)
+      resetPage()
+    },
+    [resetPage]
+  )
 
   const filterTerm = useMemo(() => {
     const keywordFilter = filters.find((f) => f.key === 'keyword')
@@ -403,10 +401,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
     })
   }, [entries, filterTerm, mappedGroups])
 
-  const paginatedEntries = useMemo(() => {
-    const start = (page - 1) * perPage
-    return filteredEntries.slice(start, start + perPage)
-  }, [filteredEntries, page, perPage])
+  const paginatedEntries = useMemo(() => paginate(filteredEntries), [filteredEntries, paginate])
 
   /** Defensive: parent normally switches to empty state before rendering read-only with zero rows */
   if (entries.length === 0) {
@@ -434,15 +429,7 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
         <SynScrollableTableContainer
           caption="Group mappings"
           variant="compact"
-          footer={{
-            page,
-            perPage,
-            total: filteredEntries.length,
-            hasNext: page * perPage < filteredEntries.length,
-            onPrev: () => setPage((p) => Math.max(1, p - 1)),
-            onNext: () => setPage((p) => p + 1),
-            onPerPageChange: handlePerPageChange,
-          }}
+          footer={getFooterProps(filteredEntries.length)}
         >
           <GroupMappingTableHead showActionsColumn={false} />
           <Tbody>

@@ -185,7 +185,13 @@ export function ServiceAccountsTab() {
   const serviceAccounts = query.data?.resources ?? []
   const refetch = useCallback(() => detachPromise(query.refetch()), [query])
 
-  useCursorReset(serviceAccounts.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: serviceAccounts.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: query.isFetching,
+    resetPagination,
+  })
 
   const createDialog = useDialogState()
   const deleteDialog = useDialogState<ServiceAccountRead>()
@@ -294,12 +300,18 @@ export function ServiceAccountsTab() {
             <SynListPanelTable caption="Service accounts" footer={getFooterProps(query.data)}>
               <Thead>
                 <Tr>
-                  <Th sort={getSortParams(0)}>Name</Th>
-                  <Th>Owning project</Th>
-                  <Th sort={getSortParams(1)}>Created</Th>
-                  <Th sort={getSortParams(2)}>Last authenticated</Th>
-                  <Th>State</Th>
-                  <Th screenReaderText="Actions" />
+                  <Th width={20} sort={getSortParams(0)}>
+                    Name
+                  </Th>
+                  <Th width={20}>Owning project</Th>
+                  <Th width={20} sort={getSortParams(1)}>
+                    Created
+                  </Th>
+                  <Th width={20} sort={getSortParams(2)}>
+                    Last authenticated
+                  </Th>
+                  <Th width={10}>State</Th>
+                  <Th width={10} screenReaderText="Actions" />
                 </Tr>
               </Thead>
               <ServiceAccountTableBody
@@ -334,7 +346,7 @@ export function ServiceAccountsTab() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete service account?"
-        confirmLabel="Delete"
+        confirmLabel="Delete service account"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{
@@ -350,7 +362,7 @@ export function ServiceAccountsTab() {
         onClose={disableDialog.close}
         onConfirm={handleDisable}
         title="Disable service account?"
-        confirmLabel="Disable"
+        confirmLabel="Disable service account"
         confirmVariant="primary"
       >
         You are about to disable the service account <strong>{disableDialog.item?.name}</strong>. You can re-enable the

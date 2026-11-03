@@ -20,12 +20,7 @@ function UserClaimWrapper({
   return (
     <FormProvider {...methods}>
       <form>
-        <UserClaimMappingFields
-          control={methods.control}
-          claimsSupported={claimsSupported}
-          claimAliases={claimAliases}
-          isReadOnly={isReadOnly}
-        />
+        <UserClaimMappingFields claimsSupported={claimsSupported} claimAliases={claimAliases} isReadOnly={isReadOnly} />
       </form>
     </FormProvider>
   )

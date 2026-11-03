@@ -10,7 +10,7 @@ function makeNode(id: string, type = 'task'): NodeType {
 }
 
 function makeEdge(id: string, source: string, target: string, sourceHandle: string): EdgeType {
-  return { id, source, target, sourceHandle } as unknown as EdgeType
+  return { id, source, target, sourceHandle }
 }
 
 describe('getLoopBodyMap', () => {
@@ -157,7 +157,7 @@ describe('getLoopBodyMap', () => {
       makeEdge('e-inner-done', 'inner-loop', 'outer-loop', 'done'),
     ]
     // Simulate loop-back: done target uses the end handle on the parent loop
-    edges[2] = { ...edges[2], targetHandle: 'end' } as EdgeType
+    edges[2] = { ...edges[2], targetHandle: 'end' }
 
     const result = getLoopBodyMap(nodes, edges, { includeDoneBranch: true })
 

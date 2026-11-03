@@ -1,6 +1,6 @@
 import { Alert, Divider, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { executionsClient } from '../../client'
 import { FilterBar } from '../../components/filters/FilterBar'
@@ -11,7 +11,7 @@ import { useElapsedTime } from '../../hooks/useElapsedTime'
 import type { FilterConfig } from '../../types/filters'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
-import { NodeExecutionDetailsPanel } from '../executions/NodeExecutionDetailsPanel'
+import { StepExecutionDetailsPanel } from '../executions/StepExecutionDetailsPanel'
 import type { ActivityState } from '../workflows/execution/types'
 import {
   useExecutionStore,
@@ -63,7 +63,7 @@ type ThreePanelLayoutProps = {
   onFilterChange: (filters: FilterConfig[]) => void
   selectedNodeId: string | null
   detailNodeId: string | null
-  displayNodeName: string | null
+  displayStepName: string | null
   executionId: string
   selectedNodeState?: ActivityState
   selectedNodeType?: string
@@ -86,7 +86,7 @@ function ThreePanelLayout({
   onFilterChange,
   selectedNodeId,
   detailNodeId,
-  displayNodeName,
+  displayStepName,
   executionId,
   selectedNodeState,
   selectedNodeType,
@@ -127,12 +127,16 @@ function ThreePanelLayout({
       >
         <FlexItem className={styles.activityList}>
           {showFilters && (
-            <section className={styles.filterBarWrapper} aria-label="Activity filter">
+            <section
+              className={`${styles.filterBarWrapper} ${styles.filterBarWrapperInActivityList}`}
+              aria-label="Activity filter"
+            >
               <FilterBar
                 fieldDefinitions={ACTIVITY_FILTER_DEFINITIONS}
                 filters={filters}
                 onFilterChange={onFilterChange}
                 isCompact
+                className={styles.filterBar}
               />
             </section>
           )}
@@ -154,14 +158,14 @@ function ThreePanelLayout({
 
         <Divider orientation={{ default: 'vertical' }} />
 
-        <FlexItem flex={{ default: 'flex_1' }} className={styles.nodeDetailsPane}>
-          {detailNodeId && displayNodeName ? (
-            <NodeExecutionDetailsPanel
-              nodeId={detailNodeId}
-              nodeName={displayNodeName}
+        <FlexItem flex={{ default: 'flex_1' }} className={styles.stepDetailsPane}>
+          {detailNodeId && displayStepName ? (
+            <StepExecutionDetailsPanel
+              stepId={detailNodeId}
+              stepName={displayStepName}
               executionId={executionId}
-              nodeState={selectedNodeState}
-              nodeType={selectedNodeType}
+              stepState={selectedNodeState}
+              stepType={selectedNodeType}
             />
           ) : (
             <NoSelectionState />
@@ -262,6 +266,7 @@ function SinglePanelLayout({
                 filters={filters}
                 onFilterChange={onFilterChange}
                 isCompact
+                className={styles.filterBar}
               />
             </section>
           </StackItem>
@@ -353,7 +358,7 @@ export function ExecutionDetailsPanel({
   const hasFilteredOutActivities = hasActiveFilters && activityOrder.length > 0
   const showFilters = activityOrder.length > 0 || hasActiveFilters
 
-  const { resolvedNodeId, effectiveKey, displayNodeName, selectedNodeState, selectedNodeType, handleRowClick } =
+  const { resolvedNodeId, effectiveKey, displayStepName, selectedNodeState, selectedNodeType, handleRowClick } =
     useSelectedActivity({
       selectedNodeId,
       selectedNodeNameProp,
@@ -362,6 +367,17 @@ export function ExecutionDetailsPanel({
       nameMap,
       onNodeSelect,
     })
+
+  const handleViewModeChange = useCallback(
+    (mode: ViewMode) => {
+      setViewMode(mode)
+      if (mode === 'details' && effectiveKey === null && filteredActivityOrder.length > 0) {
+        const first = filteredActivityOrder[0]
+        handleRowClick(first.id, first.name ?? first.id)
+      }
+    },
+    [effectiveKey, filteredActivityOrder, handleRowClick]
+  )
 
   const queryState = useQueryState(executionQuery, {
     title: 'Error loading execution',
@@ -386,12 +402,12 @@ export function ExecutionDetailsPanel({
         onFilterChange={handleFilterChange}
         selectedNodeId={resolvedNodeId}
         detailNodeId={effectiveKey}
-        displayNodeName={displayNodeName}
+        displayStepName={displayStepName}
         executionId={executionId}
         selectedNodeState={selectedNodeState}
         selectedNodeType={selectedNodeType}
         viewMode={viewMode}
-        onViewModeChange={setViewMode}
+        onViewModeChange={handleViewModeChange}
         onRowClick={handleRowClick}
         headerLabel={headerLabel}
         onClosePanel={onClosePanel}
@@ -413,7 +429,7 @@ export function ExecutionDetailsPanel({
       onFilterChange={handleFilterChange}
       now={now}
       viewMode={viewMode}
-      onViewModeChange={setViewMode}
+      onViewModeChange={handleViewModeChange}
       onRowClick={handleRowClick}
       selectedNodeId={resolvedNodeId}
       headerLabel={headerLabel}

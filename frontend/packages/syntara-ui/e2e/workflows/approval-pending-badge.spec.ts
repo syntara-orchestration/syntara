@@ -1,6 +1,6 @@
 import { type Page } from '../fixtures'
 import { test, expect } from '../fixtures'
-import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
+import { addApprovalStepWithBranch } from '../helpers/v2-steps'
 import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder, deleteWorkflow } from '../helpers/workflows'
 
@@ -32,8 +32,8 @@ async function createPendingApproval(
   if (!workflowId) throw new Error('Failed to extract workflow ID')
 
   // Add approval node and save
-  await addApprovalNodeWithBranch(app, approvalName)
-  await app.getByRole('button', { name: 'Save', exact: true }).click()
+  await addApprovalStepWithBranch(app, approvalName)
+  await app.getByRole('button', { name: 'Save workflow' }).click()
   await runWorkflowFromBuilder(app)
 
   // Extract execution ID from URL

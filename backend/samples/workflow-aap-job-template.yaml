@@ -11,7 +11,7 @@ description: |
   1. Create a Job Template in AAP based on samples/playbooks/test-aap-parameters.yml
   2. Note the Job Template ID from AAP
   3. Configure AAP credentials (.env file):
-     - APP_AAP_BASE_URL=https://your-aap-controller.example.com
+     - APP_AAP_BASE_URL=https://gateway.aap.example.com
      - APP_AAP_TOKEN=your_api_token (or username/password)
   4. Ensure the Job Template has access to an inventory with target hosts
 triggers:

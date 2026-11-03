@@ -1,10 +1,10 @@
 ---
 openapi: 3.1.0
 info:
-  title: Orchestrator Approvals API
+  title: Syntara Approvals API
   version: 1.0.0
   description: |
-    Human-in-the-loop approval API for the Orchestrator platform.
+    Human-in-the-loop approval API for the Syntara platform.
 
     This API provides endpoints for managing approval requests that pause
     automated processes pending human authorization. Approvals can be
@@ -438,6 +438,7 @@ components:
                 - $ref: "#/components/schemas/UserReference"
                 - type: "null"
               description: User who made the decision
+              readOnly: true
             decided_at:
               anyOf:
                 - format: date-time
@@ -789,6 +790,7 @@ components:
             - $ref: "#/components/schemas/UserReference"
             - type: "null"
           description: User who made the decision (if successful)
+          readOnly: true
         decision_notes:
           anyOf:
             - type: string

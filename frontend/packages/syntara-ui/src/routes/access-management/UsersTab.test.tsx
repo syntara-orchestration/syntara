@@ -175,12 +175,12 @@ describe('UsersTab Component', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
 
     vi.mocked(adminClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
   })
 
   describe('Built-in Administrator Account', () => {
@@ -250,7 +250,7 @@ describe('UsersTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<UsersTab />, { wrapper })
 
@@ -450,7 +450,7 @@ describe('UsersTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<UsersTab />, { wrapper })
 
@@ -630,7 +630,7 @@ describe('UsersTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<UsersTab />, { wrapper })
 
@@ -646,7 +646,7 @@ describe('UsersTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<UsersTab />, { wrapper })
 
@@ -662,7 +662,7 @@ describe('UsersTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<UsersTab />, { wrapper })
 
@@ -757,12 +757,12 @@ describe('UsersTab Component', () => {
         error: null,
         isFetching: false,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<UsersTab />, { wrapper })
 
@@ -772,7 +772,7 @@ describe('UsersTab Component', () => {
       await user.click(deleteOption)
 
       await user.click(screen.getByRole('checkbox'))
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete user' })
       await user.click(deleteButton)
 
       expect(mockDeleteMutate).toHaveBeenCalled()
@@ -792,12 +792,12 @@ describe('UsersTab Component', () => {
         error: null,
         isFetching: false,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<UsersTab />, { wrapper })
 
@@ -807,7 +807,7 @@ describe('UsersTab Component', () => {
       await user.click(deleteOption)
 
       await user.click(screen.getByRole('checkbox'))
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete user' })
       await user.click(deleteButton)
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as { onSuccess: () => void; onSettled: () => void }
@@ -857,12 +857,12 @@ describe('UsersTab Component', () => {
         error: null,
         isFetching: false,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(accessClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<UsersTab />, { wrapper })
 
@@ -872,7 +872,7 @@ describe('UsersTab Component', () => {
       await user.click(deleteOption)
 
       await user.click(screen.getByRole('checkbox'))
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete user' })
       await user.click(deleteButton)
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as {
@@ -899,7 +899,7 @@ describe('UsersTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<UsersTab />, { wrapper })
 

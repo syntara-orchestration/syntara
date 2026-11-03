@@ -3,6 +3,7 @@ import { RhUiCheckCircleIcon, RhUiCloseCircleIcon, RhUiMinusCircleIcon, RhUiSync
 import { IntegrationStatusEnum } from '@syntara/contracts'
 
 import { SynLabel } from '../../../components/labels/SynLabel'
+import { capitalize } from '../../../utils/capitalize'
 
 type IntegrationStatus = (typeof IntegrationStatusEnum)[keyof typeof IntegrationStatusEnum]
 
@@ -29,7 +30,7 @@ export function StatusLabel({ status, errorMessage }: StatusLabelProps) {
   const integrationStatus = status as IntegrationStatus
   const Icon = statusIcons[integrationStatus] || RhUiCloseCircleIcon
   const labelStatus = statusMap[integrationStatus] || 'custom'
-  const capitalizedStatus = status.charAt(0).toUpperCase() + status.slice(1)
+  const capitalizedStatus = capitalize(status)
 
   const hasTooltip = integrationStatus === IntegrationStatusEnum.ERROR && errorMessage
 

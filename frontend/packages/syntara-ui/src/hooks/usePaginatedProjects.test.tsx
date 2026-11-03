@@ -57,7 +57,7 @@ describe('usePaginatedProjects', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     queryClient.clear()
-    vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1) as never)
+    vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1))
   })
 
   afterEach(() => {
@@ -92,7 +92,7 @@ describe('usePaginatedProjects', () => {
         isPending: true,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const { result } = renderHook(() => usePaginatedProjects(), { wrapper })
 
@@ -213,11 +213,11 @@ describe('usePaginatedProjects', () => {
 
   describe('clearTypeaheadOnly', () => {
     it('clears filter text without collapsing merged pages', () => {
-      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1, 'cursor-2') as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1, 'cursor-2'))
       const { result, rerender } = renderHook(() => usePaginatedProjects(), { wrapper })
 
       act(() => result.current.loadMore())
-      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page2) as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page2))
       rerender()
 
       expect(result.current.projects).toHaveLength(4)
@@ -233,7 +233,7 @@ describe('usePaginatedProjects', () => {
 
   describe('hasMore and loadMore', () => {
     it('hasMore is true when query returns a next cursor', () => {
-      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1, 'cursor-2') as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1, 'cursor-2'))
       const { result } = renderHook(() => usePaginatedProjects(), { wrapper })
 
       expect(result.current.hasMore).toBe(true)
@@ -251,7 +251,7 @@ describe('usePaginatedProjects', () => {
     })
 
     it('accumulates page 2 projects after loadMore', () => {
-      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1, 'cursor-2') as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1, 'cursor-2'))
       const { result, rerender } = renderHook(() => usePaginatedProjects(), { wrapper })
 
       act(() => {
@@ -259,14 +259,14 @@ describe('usePaginatedProjects', () => {
       })
 
       // Simulate the query returning page 2 after the cursor is set
-      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page2) as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page2))
       rerender()
 
       expect(result.current.projects).toEqual([...page1, ...page2])
     })
 
     it('deduplicates projects that appear in both extraPages and the new page', () => {
-      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1, 'cursor-2') as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1, 'cursor-2'))
       const { result, rerender } = renderHook(() => usePaginatedProjects(), { wrapper })
 
       act(() => {
@@ -275,7 +275,7 @@ describe('usePaginatedProjects', () => {
 
       // page 2 overlaps: p1 is a duplicate
       const overlapPage = [page1[0], ...page2]
-      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(overlapPage) as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(overlapPage))
       rerender()
 
       const ids = result.current.projects.map((p) => p.id)
@@ -288,7 +288,7 @@ describe('usePaginatedProjects', () => {
 
   describe('isLoadingMore', () => {
     it('is true when a cursor is set and the query is still fetching', () => {
-      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1, 'cursor-2') as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1, 'cursor-2'))
       const { result, rerender } = renderHook(() => usePaginatedProjects(), { wrapper })
 
       act(() => {
@@ -296,7 +296,7 @@ describe('usePaginatedProjects', () => {
       })
 
       // Simulate in-flight refetch with the cursor
-      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1, 'cursor-2', true) as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(makeQueryData(page1, 'cursor-2', true))
       rerender()
 
       expect(result.current.isLoadingMore).toBe(true)

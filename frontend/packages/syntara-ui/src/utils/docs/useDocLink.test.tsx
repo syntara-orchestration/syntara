@@ -36,7 +36,7 @@ describe('resolveDocUrl', () => {
         mode: 'community',
         version: '2.5',
         config: { communityBaseUrl: COMMUNITY_README, version: '2.5' },
-        urls: docsUrls as Record<DocKey, string>,
+        urls: docsUrls,
       })
     ).toBe(COMMUNITY_README)
   })
@@ -47,7 +47,7 @@ describe('resolveDocUrl', () => {
         mode: 'extended',
         version: '2.5',
         config: { communityBaseUrl: COMMUNITY_README, version: '2.5' },
-        urls: docsUrls as Record<DocKey, string>,
+        urls: docsUrls,
       })
     ).toBe(COMMUNITY_README)
   })

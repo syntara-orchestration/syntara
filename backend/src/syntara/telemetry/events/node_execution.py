@@ -10,15 +10,13 @@ import hashlib
 import json
 import re
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from uuid import UUID  # noqa: TC003
 
 from pydantic import field_validator
 from sqlmodel import Field
 
-if TYPE_CHECKING:
-    from uuid import UUID
-
 from syntara.telemetry.events.base import BaseTelemetryEvent
+from syntara.workflows.models.execution import ExecutionMode  # noqa: TC001
 from syntara.workflows.workflow_engine.models.workflow_definition import (  # noqa: TC001
     ActivityTerminalStatus,
     NodeType,
@@ -32,19 +30,25 @@ class NodeExecutionEvent(BaseTelemetryEvent):
 
     Attributes:
         workflow_execution_id: Links to parent workflow execution (UUID v4).
+        workflow_id: Parent workflow identifier (UUID v4).
         node_type: Type of node executed.
         node_hash: SHA-256 hash of node definition.
         status: Node execution outcome.
+        mode: Execution mode of the parent run (standard, test, debug).
         inbound_nodes: Optional array of node hashes that led to this node.
         outbound_nodes: Optional array of node hashes triggered by this node.
         error_type: Categorized error type if node failed, null otherwise.
 
     """
 
-    workflow_execution_id: str = Field(description="Unique workflow execution identifier (UUID v4)")
+    workflow_execution_id: UUID = Field(description="Unique workflow execution identifier (UUID v4)")
+    workflow_id: UUID | None = Field(default=None, description="Parent workflow identifier (UUID v4)")
     node_type: NodeType
     node_hash: str = Field(description="SHA-256 hash of node definition")
     status: ActivityTerminalStatus
+    mode: ExecutionMode | None = Field(
+        default=None, description="Execution mode of the parent run (standard, test, debug)"
+    )
     duration_ms: int | None = Field(
         default=None,
         description="Node execution duration in milliseconds",
@@ -91,11 +95,13 @@ class NodeExecutionEventBuilder:
 
     def build_event(
         self,
-        execution_id: str,
+        execution_id: UUID,
         node_type: NodeType,
         node_def: dict[str, object],
         status: ActivityTerminalStatus,
         entitlement_id: str,
+        workflow_id: UUID | None = None,
+        mode: ExecutionMode | None = None,
         duration_ms: int | None = None,
         inbound_nodes: list[str] | None = None,
         outbound_nodes: list[str] | None = None,
@@ -110,6 +116,8 @@ class NodeExecutionEventBuilder:
             node_def: Node definition dictionary for hash calculation.
             status: Node execution outcome.
             entitlement_id: Installation entitlement identifier.
+            workflow_id: Parent workflow identifier (UUID v4).
+            mode: Execution mode of the parent run (standard, test, debug).
             duration_ms: Node execution duration in milliseconds.
             inbound_nodes: Optional array of preceding node hashes.
             outbound_nodes: Optional array of following node hashes.
@@ -124,9 +132,11 @@ class NodeExecutionEventBuilder:
         node_hash = self._calculate_definition_hash(canonical_json)
         return NodeExecutionEvent(
             workflow_execution_id=execution_id,
+            workflow_id=workflow_id,
             node_type=node_type,
             node_hash=node_hash,
             status=status,
+            mode=mode,
             duration_ms=duration_ms,
             inbound_nodes=inbound_nodes,
             outbound_nodes=outbound_nodes,

@@ -27,13 +27,13 @@ vi.mock('../utils/filterHelpers', () => ({
 
 type SetNodesFn = React.Dispatch<React.SetStateAction<NodeType[]>>
 type SetEdgesFn = React.Dispatch<React.SetStateAction<EdgeType[]>>
-type OnAddNodeFn = (
-  sourceNodeId: string,
-  targetNodeId?: string,
-  edgeId?: string,
-  sourceHandle?: string,
+type OnAddNodeFn = (options: {
+  sourceNodeId: string
+  targetNodeId?: string
+  edgeId?: string
+  sourceHandle?: string
   desiredPosition?: { x: number; y: number }
-) => void
+}) => void
 
 describe('useButtonEdgeMaintenance', () => {
   const mockSetNodes = vi.fn<SetNodesFn>()
@@ -189,9 +189,7 @@ describe('useButtonEdgeMaintenance', () => {
     let capturedEdges: unknown[] = []
     mockSetEdges.mockImplementation((updater) => {
       if (typeof updater === 'function') {
-        capturedEdges = updater([
-          { id: 'edge-1', source: 'node-1', target: 'node-2', sourceHandle: 'source' },
-        ] as unknown as EdgeType[])
+        capturedEdges = updater([{ id: 'edge-1', source: 'node-1', target: 'node-2', sourceHandle: 'source' }])
       }
       return capturedEdges
     })
@@ -354,8 +352,7 @@ describe('useButtonEdgeMaintenance', () => {
     // Regression test: Verify loop handle yOffset is 30
     const allNodes = nodesCalls.flat()
     const loopPlaceholder = allNodes.find((n) => (n as { id: string }).id === 'placeholder-loop-1-loop') as
-      | { position: { x: number; y: number } }
-      | undefined
+      { position: { x: number; y: number } } | undefined
     expect(loopPlaceholder).toBeDefined()
     expect(loopPlaceholder?.position.y).toBe(130) // node.y (100) + yOffset (30)
   })
@@ -834,7 +831,7 @@ describe('useButtonEdgeMaintenance', () => {
             targetHandle: 'target',
             data: { isActive: false },
           },
-        ] as unknown as EdgeType[])
+        ])
         edgesCalls.push(result)
         return result
       }
@@ -888,7 +885,7 @@ describe('useButtonEdgeMaintenance', () => {
             targetHandle: 'target',
             data: { isActive: false },
           },
-        ] as unknown as EdgeType[])
+        ])
         edgesCalls.push(result)
         return result
       }
@@ -1014,17 +1011,19 @@ describe('useButtonEdgeMaintenance', () => {
   it('resets signature when transitioning from execution to edit mode', () => {
     const nodes = [{ id: 'node-1', type: 'task', position: { x: 100, y: 100 } }] as never[]
     const edges = [] as never[]
+    type StatusProps = { executionStatus: string | null }
+    const initialProps: StatusProps = { executionStatus: 'running' }
 
     // Start in execution mode
     const { rerender } = renderHook(
-      ({ executionStatus }: { executionStatus: string | null }) =>
+      ({ executionStatus }: StatusProps) =>
         useButtonEdgeMaintenance({
           ...defaultOptions,
           nodes,
           edges,
           executionStatus,
         }),
-      { initialProps: { executionStatus: 'running' as string | null } }
+      { initialProps }
     )
 
     // In execution mode, no button edges should be created

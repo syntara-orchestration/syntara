@@ -1,6 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useCallback } from 'react'
-import { useForm, type DefaultValues, type FieldValues, type Resolver, type UseFormReturn } from 'react-hook-form'
+import {
+  useForm,
+  type DefaultValues,
+  type FieldValues,
+  type Mode,
+  type Resolver,
+  type UseFormProps,
+  type UseFormReturn,
+} from 'react-hook-form'
 import type { ZodType } from 'zod'
 
 import { useFormMutationErrorHandler } from './useFormMutationErrorHandler'
@@ -13,6 +21,21 @@ export type UseSynFormOptions<T extends FieldValues> = {
   schema: ZodType<T>
   /** Initial field values on first mount. */
   defaultValues: DefaultValues<T>
+  /**
+   * External values to keep the form in sync (RHF `values` prop). Use for edit
+   * forms that hydrate from a query so fields do not flash empty before reset.
+   */
+  values?: T
+  /** Passed through to RHF `useForm` when using the `values` prop (e.g. `keepDirtyValues`). */
+  resetOptions?: UseFormProps<T>['resetOptions']
+  /**
+   * RHF validation trigger mode. Defaults to RHF's own default (`'onSubmit'`).
+   * Use `'onBlur'` for forms that should surface field errors as the user tabs
+   * away, ahead of a manual `trigger()` call (e.g. wizard step navigation).
+   */
+  mode?: Mode
+  /** RHF re-validation mode (e.g. `onChange` for builder node editors). */
+  reValidateMode?: UseFormProps<T>['reValidateMode']
   /** Called after `reset()` when `handleClose` is invoked. */
   onClose?: () => void
 }
@@ -83,11 +106,19 @@ export type UseSynFormReturn<T extends FieldValues> = UseFormReturn<T> & {
 export function useSynForm<T extends FieldValues>({
   schema,
   defaultValues,
+  values,
+  resetOptions,
+  mode,
+  reValidateMode,
   onClose,
 }: UseSynFormOptions<T>): UseSynFormReturn<T> {
   const form = useForm<T>({
     resolver: zodResolver(schema as ZodResolverSchema, undefined, { mode: 'sync' }) as Resolver<T>,
     defaultValues,
+    values,
+    ...(resetOptions !== undefined ? { resetOptions } : {}),
+    ...(mode !== undefined ? { mode } : {}),
+    ...(reValidateMode !== undefined ? { reValidateMode } : {}),
   })
 
   const { reset, setError } = form
@@ -99,5 +130,11 @@ export function useSynForm<T extends FieldValues>({
     onClose?.()
   }, [reset, onClose])
 
-  return { ...form, handleError, handleClose }
+  // Mutate the stable object RHF's useForm() returns instead of spreading into a
+  // new object each render. useForm() keeps the same object reference across
+  // renders (only formState is swapped in-place); spreading would return a new
+  // object every render, which breaks RHF's read-tracking for formState fields
+  // that are only ever read outside of render (e.g. inside an async submit
+  // handler or a test's waitFor callback).
+  return Object.assign(form, { handleError, handleClose })
 }

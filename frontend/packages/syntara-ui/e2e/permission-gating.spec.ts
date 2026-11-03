@@ -15,9 +15,12 @@
  * - viewer:  read-only on workflow, execution, approval, credential
  * - auditor: read-only on all resources except user_identity
  * - user:    read on workflow, execution, approval, credential, user, group, role, policy, authz
+ * - project-admin: project-scoped create/update/delete/run on assigned project
  */
 
+import { loginAsUser } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
+import { clickMainNavEntry, expectDockedNavGroupChildLinks, mainNavGroup, mainNavigation } from './helpers/docked-nav'
 import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
@@ -38,7 +41,9 @@ import {
   findProjectIdByName,
   findWorkflowIdByName,
   getAuthToken,
+  publishWorkflowViaApi,
 } from './utils/api'
+import { generatePassword, type RoleSetupResult } from './utils/roleSetup'
 
 const AM_URL = '/system-administration/access-management'
 const AUTH_URL = '/system-administration/authentication'
@@ -71,6 +76,94 @@ async function deleteTestWorkflow(adminApp: Page, workflowId: string): Promise<v
   await apiRequest(adminApp, 'delete', `/workflows/${workflowId}`)
 }
 
+type ProjectAdminWorkflowSetup = {
+  id: string
+  name: string
+  projectId?: string
+  userId?: string
+  username?: string
+  password?: string
+}
+
+async function createPublishedWorkflowForProjectAdmin(
+  adminApp: Page,
+  roleSetup: RoleSetupResult | null
+): Promise<ProjectAdminWorkflowSetup> {
+  const name = buildUniqueName('e2e-padmin-wf')
+  let createdProjectId: string | undefined
+  let createdUserId: string | undefined
+  let projectId: string | undefined
+  let workflowId: string | undefined
+  let username: string | undefined
+  let password: string | undefined
+
+  try {
+    if (roleSetup) {
+      username = buildUniqueName('e2e-padmin-user')
+      password = generatePassword()
+      const user = await createUserViaApi(adminApp, { username, password })
+      if (!user) throw new Error('createPublishedWorkflowForProjectAdmin: user creation failed')
+      createdUserId = user.id
+
+      const projectName = buildUniqueName('e2e-padmin-proj')
+      const projectResp = await apiRequest(adminApp, 'post', '/projects', {
+        data: { name: projectName, description: 'E2E project-admin kebab test' },
+      })
+      if (!projectResp.ok()) throw new Error(`Project creation failed: ${projectResp.status()}`)
+      const project = (await projectResp.json()) as { id: string }
+      createdProjectId = project.id
+      const assignmentResp = await apiRequest(adminApp, 'post', `/projects/${project.id}/role_assignments`, {
+        data: { principal_id: user.id, role_name: 'project-admin' },
+      })
+      if (!assignmentResp.ok()) {
+        throw new Error(`Project-admin assignment failed: ${assignmentResp.status()}`)
+      }
+      projectId = project.id
+    } else {
+      projectId = (await ensureProject(adminApp))?.id
+    }
+    if (!projectId) throw new Error('createPublishedWorkflowForProjectAdmin: could not resolve project')
+
+    const resp = await apiRequest(adminApp, 'post', '/workflows', {
+      data: {
+        name,
+        project_id: projectId,
+        workflow_definition: {
+          schema_version: '2.0.0',
+          name,
+          triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+          nodes: [
+            {
+              id: 'node_1',
+              type: 'script',
+              name: 'E2E admin step',
+              parameters: { language: 'python', code: 'print("e2e")' },
+            },
+          ],
+          edges: [{ from: 'trigger_1', to: 'node_1' }],
+        },
+      },
+    })
+    if (!resp.ok()) throw new Error(`Workflow creation failed: ${resp.status()}`)
+    const body = (await resp.json()) as { id: string; current_version: number }
+    workflowId = body.id
+    await publishWorkflowViaApi(adminApp, body.id, body.current_version)
+    return {
+      id: body.id,
+      name,
+      projectId: createdProjectId,
+      userId: createdUserId,
+      username,
+      password,
+    }
+  } catch (error) {
+    if (workflowId) await deleteTestWorkflow(adminApp, workflowId)
+    if (createdProjectId) await apiRequest(adminApp, 'delete', `/projects/${createdProjectId}`)
+    if (createdUserId) await deleteUserViaApi(adminApp, createdUserId)
+    throw error
+  }
+}
+
 async function createTestCredential(adminApp: Page): Promise<{ id: string; name: string }> {
   const project = await ensureProject(adminApp)
   if (!project) throw new Error('ensureProject failed')
@@ -84,69 +177,72 @@ async function createTestCredential(adminApp: Page): Promise<{ id: string; name:
 
 test.describe('Permission gating — Navigation visibility', () => {
   test('admin sees all navigation items', async ({ app }) => {
-    const nav = app.getByRole('navigation', { name: 'Main navigation' })
+    const nav = mainNavigation(app)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
 
-    const configItem = nav.getByLabel('Configuration')
-    await expect(configItem).toBeVisible()
-    await configItem.click()
-    await expect(app.getByRole('menuitem', { name: 'Integrations' })).toBeVisible()
-    await expect(app.getByRole('menuitem', { name: 'Credentials' })).toBeVisible()
-    await app.keyboard.press('Escape')
-    // Wait for the Configuration flyout to fully close before opening the next one
-    await expect(app.getByRole('menuitem', { name: 'Integrations' })).toBeHidden()
+    await expect(mainNavGroup(app, 'Configuration')).toBeVisible()
+    await expectDockedNavGroupChildLinks(app, 'Configuration', ['Integrations', 'Credentials'], 'Integrations')
 
-    const sysAdminItem = nav.getByLabel('System Administration')
-    await expect(sysAdminItem).toBeVisible()
-    await sysAdminItem.click()
-    await expect(app.getByRole('menuitem', { name: 'Access Management' })).toBeVisible()
-    await expect(app.getByRole('menuitem', { name: 'Identity Providers' })).toBeVisible()
-    await expect(app.getByRole('menuitem', { name: 'Settings' })).toBeVisible()
+    await expect(mainNavGroup(app, 'System Administration')).toBeVisible()
+    await expectDockedNavGroupChildLinks(
+      app,
+      'System Administration',
+      ['Access Management', 'Identity Providers', 'Settings'],
+      'Access Management'
+    )
   })
 
   test('viewer sees only operational items — no System Administration', async ({ viewerApp }) => {
-    const nav = viewerApp.getByRole('navigation', { name: 'Main navigation' })
+    const nav = mainNavigation(viewerApp)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
-    await expect(nav.getByLabel('Configuration')).toBeVisible()
+    await expect(mainNavGroup(viewerApp, 'Configuration')).toBeVisible()
 
-    await expect(nav.getByLabel('System Administration')).not.toBeVisible()
+    await expect(mainNavGroup(viewerApp, 'System Administration')).not.toBeVisible()
   })
 
   test('auditor sees all navigation items', async ({ auditorApp }) => {
-    const nav = auditorApp.getByRole('navigation', { name: 'Main navigation' })
+    const nav = mainNavigation(auditorApp)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
-    await expect(nav.getByLabel('Configuration')).toBeVisible()
+    await expect(mainNavGroup(auditorApp, 'Configuration')).toBeVisible()
 
-    const sysAdminItem = nav.getByLabel('System Administration')
-    await expect(sysAdminItem).toBeVisible()
-    await sysAdminItem.click()
-    await expect(auditorApp.getByRole('menuitem', { name: 'Access Management' })).toBeVisible()
-    await expect(auditorApp.getByRole('menuitem', { name: 'Identity Providers' })).toBeVisible()
-    await expect(auditorApp.getByRole('menuitem', { name: 'Settings' })).toBeVisible()
+    await expect(mainNavGroup(auditorApp, 'System Administration')).toBeVisible()
+    await expectDockedNavGroupChildLinks(
+      auditorApp,
+      'System Administration',
+      ['Access Management', 'Identity Providers', 'Settings'],
+      'Access Management'
+    )
   })
 
   test('user sees Access Management but not Identity Providers or Settings', async ({ userApp }) => {
-    const nav = userApp.getByRole('navigation', { name: 'Main navigation' })
+    const nav = mainNavigation(userApp)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
-    await expect(nav.getByLabel('Configuration')).toBeVisible()
 
-    // When only one SA child is visible (Access Management), the nav renders
-    // a direct link instead of a flyout dropdown.
-    const sysAdminLink = nav.getByLabel('System Administration')
-    await expect(sysAdminLink).toBeVisible()
-    await sysAdminLink.click()
+    // User has credential read only (no integration) → Configuration is a single nav link.
+    await expect(mainNavGroup(userApp, 'Configuration')).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Integrations', exact: true })).not.toBeVisible()
+
+    await expect(mainNavGroup(userApp, 'Identity Providers')).not.toBeVisible()
+    await expect(mainNavGroup(userApp, 'Settings')).not.toBeVisible()
+
+    // Only Access Management under SA → single "System Administration" link (no expand toggle).
+    await expect(mainNavGroup(userApp, 'System Administration')).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Identity Providers', exact: true })).not.toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Settings', exact: true })).not.toBeVisible()
+
+    await clickMainNavEntry(userApp, 'System Administration')
     await expect(userApp.getByRole('heading', { name: 'Access Management' })).toBeVisible()
   })
 })
@@ -466,6 +562,72 @@ test.describe('Permission gating — Workflow actions', () => {
     }
   })
 
+  test('project-admin: All projects kebab edit/run/publish/unpublish/delete are enabled', async ({
+    app,
+    projectAdminApp,
+    roleSetup,
+  }) => {
+    let workflowId: string | undefined
+    let projectId: string | undefined
+    let userId: string | undefined
+    try {
+      const workflow = await createPublishedWorkflowForProjectAdmin(app, roleSetup)
+      workflowId = workflow.id
+      projectId = workflow.projectId
+      userId = workflow.userId
+
+      if (workflow.username && workflow.password) {
+        await loginAsUser(projectAdminApp, { username: workflow.username, password: workflow.password })
+      }
+
+      await projectAdminApp.goto(toAppUrl('/workflows'))
+      await expect(projectAdminApp.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
+      await expect(projectAdminApp.getByPlaceholder('All projects')).toBeVisible()
+
+      const createButton = projectAdminApp.getByRole('button', { name: /Create workflow/i })
+      await expect(createButton).toBeVisible()
+      await expect(createButton).not.toHaveAttribute('aria-disabled', 'true')
+
+      await filterWorkflowsByName(projectAdminApp, workflow.name)
+
+      const workflowRow = projectAdminApp
+        .getByRole('grid', { name: 'Workflows table' })
+        .getByRole('row', { name: new RegExp(workflow.name) })
+      await expect(workflowRow).toBeVisible({ timeout: 15_000 })
+      // A forced click skips every actionability wait, so it lands even while the
+      // list query is replacing the row — the handler never runs, the menu stays
+      // shut, and each assertion below fails on a missing `menuitem`.
+      await openRowKebab(workflowRow, /Edit workflow/i)
+
+      await expect(projectAdminApp.getByRole('menuitem', { name: /Edit workflow/i })).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+        { timeout: 20_000 }
+      )
+      await expect(projectAdminApp.getByRole('menuitem', { name: /Run published version/i })).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+        { timeout: 20_000 }
+      )
+      await expect(projectAdminApp.getByRole('menuitem', { name: /^Publish workflow$/i })).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+      await expect(projectAdminApp.getByRole('menuitem', { name: /Unpublish workflow/i })).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+      await expect(projectAdminApp.getByRole('menuitem', { name: /Delete workflow/i })).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    } finally {
+      if (workflowId) await deleteTestWorkflow(app, workflowId)
+      if (projectId) await apiRequest(app, 'delete', `/projects/${projectId}`)
+      if (userId) await deleteUserViaApi(app, userId)
+    }
+  })
+
   test('viewer: workflow row action tooltip explains the denial', async ({ app, viewerApp }) => {
     const workflow = await createTestWorkflow(app)
 
@@ -473,12 +635,13 @@ test.describe('Permission gating — Workflow actions', () => {
       await viewerApp.goto(toAppUrl('/workflows'))
       await expect(viewerApp.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
+      await filterWorkflowsByName(viewerApp, workflow.name)
+
       const workflowRow = viewerApp
         .getByRole('grid', { name: 'Workflows table' })
         .getByRole('row', { name: new RegExp(workflow.name) })
       await expect(workflowRow).toBeVisible({ timeout: 15_000 })
-      const kebab = workflowRow.getByRole('button', { name: /Actions|Kebab toggle/i })
-      await kebab.click()
+      await openRowKebab(workflowRow, /Edit workflow/i)
 
       const editItem = viewerApp.getByRole('menuitem', { name: /Edit workflow/i })
       await expect(editItem).toBeVisible()
@@ -654,14 +817,23 @@ test.describe('Permission gating — Project actions', () => {
       if (!createWorkflowResp.ok()) throw new Error('Workflow creation failed')
       const workflow = (await createWorkflowResp.json()) as { id: string }
 
-      // Viewer cannot select individual projects — dropdown only shows "All projects"
+      // Viewer lacks project update/delete — header project kebab must stay hidden even when
+      // a project is selected (mock API lists all projects; real backend may hide options).
       await viewerApp.goto(toAppUrl('/workflows'))
-      const projectSelector = viewerApp.getByRole('textbox', { name: 'Project' })
+      const projectSelector = viewerApp.getByTestId('page-header').getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
-      await expect(viewerApp.getByRole('option', { name: 'All projects' })).toBeVisible()
-      await expect(viewerApp.getByRole('option', { name: projectName })).not.toBeVisible()
-      await expect(viewerApp.getByRole('option', { name: project.id })).not.toBeVisible()
-      await viewerApp.keyboard.press('Escape')
+      await projectSelector.fill(projectName)
+      const projectOption = viewerApp.getByRole('option', { name: projectName })
+      const optionVisible = await projectOption.isVisible({ timeout: 10_000 }).catch(() => false)
+      if (optionVisible && (await projectOption.isEnabled())) {
+        await projectOption.click()
+        await expect(viewerApp.getByRole('button', { name: 'Project actions' })).not.toBeVisible()
+      } else {
+        // Real backend: option missing or aria-disabled (no project:read) — cannot select a project.
+        if (optionVisible) await expect(projectOption).toHaveAttribute('aria-disabled', 'true')
+        await expect(viewerApp.getByRole('option', { name: 'All projects' })).toBeVisible()
+        await viewerApp.keyboard.press('Escape')
+      }
 
       // Clean up
       await apiRequest(app, 'delete', `/workflows/${workflow.id}`)

@@ -6,6 +6,7 @@ import pytest
 
 from syntara.telemetry.client import TelemetryClientRegistry
 from syntara.telemetry.events.workflow_execution import WorkflowExecutionStartEvent
+from tests.unit.telemetry.conftest import VALID_WORKFLOW_EXECUTION_ID
 
 
 class TestTelemetryClientRegistry:
@@ -70,7 +71,7 @@ class TestTelemetryClientRegistry:
         )
 
         event = WorkflowExecutionStartEvent(
-            workflow_execution_id="test-correlation-id",
+            workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,
             entitlement_id="test-user",
         )
 
@@ -101,7 +102,7 @@ class TestTelemetryClientRegistry:
         registry.initialize(write_key="test-key")
 
         event = WorkflowExecutionStartEvent(
-            workflow_execution_id="test-id",
+            workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,
             entitlement_id="",
         )
 

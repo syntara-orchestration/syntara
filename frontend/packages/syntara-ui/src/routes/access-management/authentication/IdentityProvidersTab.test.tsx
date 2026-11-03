@@ -89,14 +89,14 @@ function setupProviders(providers = [mockProvider]) {
     error: null,
     isPending: false,
     refetch: vi.fn(),
-  } as never)
+  })
   vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
-  } as never)
+  })
   vi.mocked(adminClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
 }
 
 function setupEmptyProviders() {
@@ -110,7 +110,7 @@ describe('IdentityProvidersTab', () => {
     vi.mocked(adminClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
   })
 
   describe('loading state', () => {
@@ -122,10 +122,10 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: true,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -142,10 +142,10 @@ describe('IdentityProvidersTab', () => {
         error: new Error('Network error'),
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -164,10 +164,10 @@ describe('IdentityProvidersTab', () => {
         error: retryableError,
         isPending: false,
         refetch: mockRefetch,
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -335,10 +335,10 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -366,7 +366,7 @@ describe('IdentityProvidersTab', () => {
       await user.click(actionsButton)
 
       // Click delete
-      await user.click(screen.getByText('Delete provider'))
+      await user.click(screen.getByText('Delete identity provider'))
 
       // Delete dialog should appear
       expect(screen.getByText('Delete identity provider?')).toBeInTheDocument()
@@ -380,7 +380,7 @@ describe('IdentityProvidersTab', () => {
 
       const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
-      await user.click(screen.getByText('Delete provider'))
+      await user.click(screen.getByText('Delete identity provider'))
 
       expect(screen.getByText(/Remove all user identities linked to this provider/)).toBeInTheDocument()
       expect(screen.getByText(/Revoke active sessions authenticated via this provider/)).toBeInTheDocument()
@@ -396,7 +396,7 @@ describe('IdentityProvidersTab', () => {
       // Open delete dialog
       const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
-      await user.click(screen.getByText('Delete provider'))
+      await user.click(screen.getByText('Delete identity provider'))
 
       // Cancel
       await user.click(screen.getByText('Cancel'))
@@ -415,7 +415,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (path === '/identity_providers/{provider_id}' && _method === 'delete') {
           return { mutate: mockDeleteMutate }
@@ -428,14 +428,14 @@ describe('IdentityProvidersTab', () => {
       // Open delete dialog
       const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
-      await user.click(screen.getByText('Delete provider'))
+      await user.click(screen.getByText('Delete identity provider'))
 
       // Check the acknowledgement checkbox before clicking Delete
       const dialog = screen.getByRole('dialog')
       await user.click(within(dialog).getByRole('checkbox'))
 
       // Confirm delete — target the button inside the modal dialog
-      await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+      await user.click(within(dialog).getByRole('button', { name: 'Delete identity provider' }))
 
       expect(mockDeleteMutate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -461,7 +461,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: mockRefetch,
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (path === '/identity_providers/{provider_id}' && _method === 'delete') {
           return { mutate: mockDeleteMutate }
@@ -474,11 +474,11 @@ describe('IdentityProvidersTab', () => {
       // Open delete dialog and confirm
       const actionsButton = screen.getByRole('button', { name: /^Actions for / })
       await user.click(actionsButton)
-      await user.click(screen.getByText('Delete provider'))
+      await user.click(screen.getByText('Delete identity provider'))
       const dialog = screen.getByRole('dialog')
       // Check the acknowledgement checkbox before clicking Delete
       await user.click(within(dialog).getByRole('checkbox'))
-      await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+      await user.click(within(dialog).getByRole('button', { name: 'Delete identity provider' }))
 
       // Simulate onSuccess and onSettled callbacks from useDeleteAction
       act(() => {
@@ -557,14 +557,14 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
       vi.mocked(adminClient.useMutation).mockReturnValue({
         mutate: mockRevokeMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -592,10 +592,10 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -617,7 +617,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -630,7 +630,7 @@ describe('IdentityProvidersTab', () => {
       const toggle = screen.getByRole('switch', { name: /Toggle Azure AD/i })
       await user.click(toggle)
 
-      await user.click(screen.getByRole('button', { name: 'Disable' }))
+      await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
 
       expect(mockPatchMutate).toHaveBeenCalledWith(
         { params: { path: { provider_id: 'provider-1' } }, body: { enabled: false } },
@@ -653,7 +653,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -688,7 +688,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: mockRefetch,
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -721,7 +721,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: mockRefetch,
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -733,7 +733,7 @@ describe('IdentityProvidersTab', () => {
 
       const toggle = screen.getByRole('switch', { name: /Toggle Azure AD/i })
       await user.click(toggle)
-      await user.click(screen.getByRole('button', { name: 'Disable' }))
+      await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
 
       act(() => {
         getMutationCallbacks(mockPatchMutate).onSuccess?.()
@@ -753,7 +753,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -765,7 +765,7 @@ describe('IdentityProvidersTab', () => {
 
       const toggle = screen.getByRole('switch', { name: /Toggle Azure AD/i })
       await user.click(toggle)
-      await user.click(screen.getByRole('button', { name: 'Disable' }))
+      await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
 
       act(() => {
         getMutationCallbacks(mockPatchMutate).onError?.(new Error('Server error'))
@@ -785,7 +785,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -814,7 +814,7 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockImplementation(((_method: string, path: string) => {
         if (_method === 'patch' && path === '/identity_providers/{provider_id}') {
           return { mutate: mockPatchMutate }
@@ -854,10 +854,10 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 
@@ -877,10 +877,10 @@ describe('IdentityProvidersTab', () => {
         error: null,
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
       vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
         mutate: vi.fn(),
-      } as never)
+      })
 
       render(<IdentityProvidersTab />, { wrapper })
 

@@ -43,10 +43,15 @@ export default meta
 type Story = StoryObj<typeof SynKebabMenu>
 
 const defaultActions: KebabAction[] = [
-  { key: 'edit', title: <IconLabel icon={<RhUiEditIcon />}>Edit</IconLabel>, onClick: fn() },
-  { key: 'duplicate', title: <IconLabel icon={<RhUiDuplicateIcon />}>Duplicate</IconLabel>, onClick: fn() },
+  { key: 'edit', title: <IconLabel icon={<RhUiEditIcon />}>Edit resource</IconLabel>, onClick: fn() },
+  { key: 'duplicate', title: <IconLabel icon={<RhUiDuplicateIcon />}>Duplicate resource</IconLabel>, onClick: fn() },
   { key: 'sep', isSeparator: true },
-  { key: 'delete', title: <IconLabel icon={<RhUiTrashIcon />}>Delete</IconLabel>, isDanger: true, onClick: fn() },
+  {
+    key: 'delete',
+    title: <IconLabel icon={<RhUiTrashIcon />}>Delete resource</IconLabel>,
+    isDanger: true,
+    onClick: fn(),
+  },
 ]
 
 export const Default: Story = {
@@ -58,14 +63,14 @@ export const WithDisabledItems: Story = {
     actions: [
       {
         key: 'edit',
-        title: <IconLabel icon={<RhUiEditIcon />}>Edit</IconLabel>,
+        title: <IconLabel icon={<RhUiEditIcon />}>Edit resource</IconLabel>,
         isAriaDisabled: true,
         tooltipProps: { content: 'You do not have permission to edit this resource (requires resource:update)' },
       },
       { key: 'sep', isSeparator: true },
       {
         key: 'delete',
-        title: <IconLabel icon={<RhUiTrashIcon />}>Delete</IconLabel>,
+        title: <IconLabel icon={<RhUiTrashIcon />}>Delete resource</IconLabel>,
         isDanger: true,
         isAriaDisabled: true,
         tooltipProps: { content: 'You do not have permission to delete this resource (requires resource:delete)' },
@@ -78,9 +83,9 @@ export const WithDisabledItems: Story = {
 export const AllEnabled: Story = {
   args: {
     actions: [
-      { key: 'edit', title: 'Edit', onClick: fn() },
-      { key: 'duplicate', title: 'Duplicate', onClick: fn() },
-      { key: 'export', title: 'Export', onClick: fn() },
+      { key: 'edit', title: 'Edit resource', onClick: fn() },
+      { key: 'duplicate', title: 'Duplicate resource', onClick: fn() },
+      { key: 'export', title: 'Export resource', onClick: fn() },
     ],
     'aria-label': 'Actions (all enabled)',
   },

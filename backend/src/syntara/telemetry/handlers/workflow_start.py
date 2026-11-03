@@ -35,9 +35,14 @@ class WorkflowStartTelemetryHandler(AuditEventHandler[WorkflowStartEvent]):
 
             registry.send_event(
                 WorkflowExecutionStartEvent(
-                    workflow_execution_id=str(event.execution_id),
+                    workflow_execution_id=event.execution_id,
+                    workflow_id=event.workflow_id,
                     trigger_type=event.trigger_type,
                     interface=event.interface,
+                    mode=event.mode,
+                    workflow_version=event.workflow_version,
+                    used_published=event.used_published,
+                    is_retry=event.is_retry,
                     entitlement_id=registry.entitlement_id,
                     request_id=event.request_id,
                 )

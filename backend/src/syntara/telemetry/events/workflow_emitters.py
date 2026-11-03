@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from syntara.workflows.models.activity_execution import ActivityExecution
+    from syntara.workflows.models.execution import ExecutionMode
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -41,6 +42,8 @@ def emit_activities(
     activity_definitions_map: dict[str, dict[str, Any]],
     updated_activities: list[tuple[ActivityExecution, dict[str, Any]]],
     *,
+    workflow_id: UUID | None = None,
+    mode: ExecutionMode | None = None,
     request_id: UUID | None = None,
 ) -> None:
     """Emit activity telemetry for updated activities.
@@ -53,6 +56,8 @@ def emit_activities(
         execution_id: Database execution ID.
         activity_definitions_map: Map of activity ID to activity definition from workflow.
         updated_activities: List of (activity, old_values) tuples for activities that were updated.
+        workflow_id: Parent workflow ID (for telemetry correlation).
+        mode: Execution mode of the parent run (standard, test, debug).
         request_id: Optional X-Request-Id from the originating HTTP request.
 
     """
@@ -76,9 +81,11 @@ def emit_activities(
             AuditEventDispatcher.dispatch(
                 NodeExecutedEvent(
                     execution_id=execution_id,
+                    workflow_id=workflow_id,
                     node_type=node_type,
                     node_def=activity_def,
                     status=telemetry_status,
+                    mode=mode,
                     duration_ms=duration_ms,
                     error_type=error_type,
                     request_id=request_id,

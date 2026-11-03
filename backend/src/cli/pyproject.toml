@@ -1,7 +1,7 @@
 [project]
 name = "orchestrator-cli"
 version = "0.1.0"
-description = "Command-line client for the Orchestrator API"
+description = "Command-line client for the Automation Orchestrator API"
 license = "Apache-2.0"
 authors = []
 requires-python = ">=3.10"

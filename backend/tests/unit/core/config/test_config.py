@@ -9,6 +9,7 @@ import pytest
 from pydantic import HttpUrl, ValidationError
 
 from syntara.core.config.base import Settings
+from syntara.core.constants import RequestLimits
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -326,6 +327,20 @@ class TestServerSettings:
         monkeypatch.setenv("APP_PRODUCT_NAME", "Bad<Name>!")
         with pytest.raises(ValidationError, match="pattern"):
             Settings(_env_file=None)
+
+    def test_otel_service_name_derives_from_product_name(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """otel_service_name is slugified from product_name when not explicitly set."""
+        monkeypatch.setenv("APP_PRODUCT_NAME", "Automation Orchestrator")
+        monkeypatch.delenv("APP_OTEL_SERVICE_NAME", raising=False)
+        settings = Settings(_env_file=None)
+        assert settings.otel_service_name == "automation-orchestrator"
+
+    def test_explicit_default_otel_service_name_is_preserved(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An explicit OTEL service name matching the default is not derived over."""
+        monkeypatch.setenv("APP_PRODUCT_NAME", "Automation Orchestrator")
+        monkeypatch.setenv("APP_OTEL_SERVICE_NAME", "syntara")
+        settings = Settings(_env_file=None)
+        assert settings.otel_service_name == "syntara"
 
     def test_server_settings_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test server settings can be configured via environment."""
@@ -699,6 +714,55 @@ class TestCorsProductionValidation:
         monkeypatch.setenv("APP_SERVER_SCHEME", "http")
         settings = Settings()
         assert settings.cookie_secure is False
+
+
+# =============================================================================
+# Multipart Body Limit Validation Tests
+# =============================================================================
+
+
+class TestMultipartBodyLimitValidation:
+    """Tests for startup warning when upload settings exceed the multipart ceiling."""
+
+    def test_warns_when_computed_multipart_limit_exceeds_ceiling(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APP_FILE_UPLOAD_MAX_SIZE_MB", "500")
+        monkeypatch.setenv("APP_FILE_UPLOAD_MAX_FILES", "100")
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            Settings()
+
+        multipart_warnings = [x for x in w if "Request body: file upload settings would allow" in str(x.message)]
+        assert len(multipart_warnings) == 1
+
+    def test_no_warning_when_computed_multipart_limit_within_ceiling(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("APP_FILE_UPLOAD_MAX_SIZE_MB", "10")
+        monkeypatch.setenv("APP_FILE_UPLOAD_MAX_FILES", "10")
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            Settings()
+
+        multipart_warnings = [x for x in w if "Request body: file upload settings would allow" in str(x.message)]
+        assert len(multipart_warnings) == 0
+
+    def test_no_warning_when_computed_multipart_limit_equals_ceiling(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Exactly at the ceiling is allowed; only values above it warn."""
+        ceiling_mb = RequestLimits.MAX_MULTIPART_BODY_BYTES // (1024 * 1024)
+        # (19 * 10 + 1) = 191 MB; (20 * 10 + 1) = 201 MB when ceiling is 200 MB.
+        monkeypatch.setenv("APP_FILE_UPLOAD_MAX_SIZE_MB", "19")
+        monkeypatch.setenv("APP_FILE_UPLOAD_MAX_FILES", "10")
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            settings = Settings()
+
+        assert (
+            settings.file_upload_max_size_mb * settings.file_upload_max_files + 1
+        ) * 1024 * 1024 <= RequestLimits.MAX_MULTIPART_BODY_BYTES
+        assert ceiling_mb == 200
+        multipart_warnings = [x for x in w if "Request body: file upload settings would allow" in str(x.message)]
+        assert len(multipart_warnings) == 0
 
 
 # =============================================================================

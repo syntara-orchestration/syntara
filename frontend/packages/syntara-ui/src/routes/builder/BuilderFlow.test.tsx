@@ -14,7 +14,7 @@ function resetStoreState() {
     workflowVersion: 1,
     _positionUndoVersion: 0,
     edges: [] as Array<Record<string, unknown>>,
-    nodePositions: {} as Record<string, { x: number; y: number }>,
+    nodePositions: {},
     triggers: [] as Array<Record<string, unknown>>,
     activities: [] as Array<Record<string, unknown>>,
   }
@@ -59,6 +59,8 @@ vi.mock('@xyflow/react', () => ({
     getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
     getNode: vi.fn(),
   }),
+  useStore: (selector: (state: { transform: [number, number, number]; nodes: unknown[] }) => unknown) =>
+    selector({ transform: [0, 0, 1], nodes: [] }),
   useUpdateNodeInternals: () => vi.fn(),
 }))
 

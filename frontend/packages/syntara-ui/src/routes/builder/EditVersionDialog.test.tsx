@@ -38,7 +38,7 @@ describe('EditVersionDialog', () => {
     const nameInput = screen.getByRole('textbox', { name: 'Version name' })
     await user.clear(nameInput)
     await user.type(nameInput, 'Updated name')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save version' }))
 
     expect(defaultProps.onSave).toHaveBeenCalledWith('Updated name', 'Initial release')
   })
@@ -47,7 +47,7 @@ describe('EditVersionDialog', () => {
     const user = userEvent.setup()
     render(<EditVersionDialog {...defaultProps} initialName="" initialDescription="" />)
 
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save version' }))
 
     expect(defaultProps.onSave).toHaveBeenCalledWith(null, null)
   })
@@ -80,7 +80,7 @@ describe('EditVersionDialog', () => {
     const user = userEvent.setup()
     render(<EditVersionDialog {...defaultProps} initialName="   " initialDescription="   " />)
 
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save version' }))
 
     expect(defaultProps.onSave).toHaveBeenCalledWith(null, null)
   })
@@ -92,7 +92,7 @@ describe('EditVersionDialog', () => {
     const descInput = screen.getByRole('textbox', { name: 'Description' })
     await user.clear(descInput)
     await user.type(descInput, 'Updated description')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save version' }))
 
     expect(defaultProps.onSave).toHaveBeenCalledWith('v1.0 release', 'Updated description')
   })
@@ -111,7 +111,7 @@ describe('EditVersionDialog', () => {
     const nameInput = screen.getByRole('textbox', { name: 'Version name' })
     await user.click(nameInput)
     await user.paste('x'.repeat(256))
-    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await user.click(screen.getByRole('button', { name: 'Save version' }))
 
     expect(defaultProps.onSave).not.toHaveBeenCalled()
     expect(screen.getByText(/255 character/i)).toBeInTheDocument()

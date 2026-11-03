@@ -6,7 +6,7 @@ import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
 
 type UseAutoApprovalDetectionOptions = {
   executionId: string | undefined
-  fetchForNode: (approvalNodeId: string) => Promise<Approval | null>
+  fetchForStep: (approvalNodeId: string) => Promise<Approval | null>
   onApprovalDetected: (approval: Approval) => void
 }
 
@@ -20,7 +20,7 @@ type UseAutoApprovalDetectionOptions = {
  */
 export function useAutoApprovalDetection({
   executionId,
-  fetchForNode,
+  fetchForStep,
   onApprovalDetected,
 }: UseAutoApprovalDetectionOptions): void {
   const detectedNodeIds = useRef(new Set<string>())
@@ -51,7 +51,7 @@ export function useAutoApprovalDetection({
       fetchingRef.current = true
       const generation = generationRef.current
 
-      fetchForNode(nodeId)
+      fetchForStep(nodeId)
         .then((approval) => {
           if (generation !== generationRef.current) return
           if (approval) {
@@ -71,7 +71,7 @@ export function useAutoApprovalDetection({
         })
       break
     }
-  }, [executionId, fetchForNode, onApprovalDetected])
+  }, [executionId, fetchForStep, onApprovalDetected])
 
   useEffect(() => {
     scanRef.current = checkAndFetch

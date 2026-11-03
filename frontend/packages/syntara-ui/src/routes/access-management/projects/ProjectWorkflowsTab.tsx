@@ -47,7 +47,13 @@ export function ProjectWorkflowsTab({ projectId, isBuiltin = false }: Readonly<P
     projectSelectorReady: Boolean(projectId),
   })
 
-  useCursorReset(workflows.length, hasActiveFilters, cursor, workflowsQuery.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: workflows.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: workflowsQuery.isFetching,
+    resetPagination,
+  })
 
   const canCreate = permissions.canCreate && !isBuiltin
 
@@ -58,7 +64,6 @@ export function ProjectWorkflowsTab({ projectId, isBuiltin = false }: Readonly<P
       isPending={workflowsQuery.isPending}
       error={workflowsQuery.error}
       onRetry={() => detachPromise(workflowsQuery.refetch())}
-      isFetching={workflowsQuery.isFetching}
       sortedWorkflows={workflows}
       hasActiveFilters={hasActiveFilters}
       filters={filters}

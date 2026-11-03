@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom'
 
 import { FlowNodeType } from '../../../constants'
 import type { ButtonEdgePlaceholderNode, NodeType } from '../../workflows/canvas/nodes/NodeType'
-import type { FlowPosition } from '../types'
+import type { OnAddNodeFromEdge } from '../types'
 import { filterButtonEdges, filterRealNodes, isPlaceholderNode, isRealEdge } from '../utils/filterHelpers'
 import type { EdgeType } from '../utils/workflowToGraph'
 
@@ -21,13 +21,7 @@ type UseButtonEdgeMaintenanceOptions = {
   isInitialized: boolean
   activeEdgeButtonNodeId: string | null
   activeEdgeButtonHandle: string | null
-  onAddNodeFromEdge?: (
-    sourceNodeId: string,
-    targetNodeId?: string,
-    edgeId?: string,
-    sourceHandle?: string,
-    desiredPosition?: FlowPosition
-  ) => void
+  onAddNodeFromEdge?: OnAddNodeFromEdge
   pendingEdge: { sourceNodeId: string; sourceHandle?: string; x: number; y: number } | null
   setNodes: React.Dispatch<React.SetStateAction<NodeType[]>>
   setEdges: React.Dispatch<React.SetStateAction<EdgeType[]>>

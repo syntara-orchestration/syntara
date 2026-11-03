@@ -49,7 +49,7 @@ Each page area has a dedicated `use*Permissions` hook that aggregates multiple `
 
 | Hook                             | File                                                                        | Permissions checked                                                                                                                                                                                                                   |
 | -------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `useWorkflowPermissions`         | `routes/workflows/useWorkflowPermissions.ts`                                | create via `check_any_project` when no project selected; update/delete/run use `resourceProject` or system-scoped `can_i`                                                                                                             |
+| `useWorkflowPermissions`         | `routes/workflows/useWorkflowPermissions.ts`                                | toolbar create via `check_any_project` when no project selected; row update/delete/run (and duplicate create) with `workflow.project_id` when the kebab opens                                                                         |
 | `useCredentialPermissions`       | `routes/configuration/credentials/useCredentialPermissions.ts`              | create via `check_any_project` when no project selected; update/delete use `resourceProject` or system-scoped `can_i`. Detail page passes `enabled: false` until `project_id` is known. Per-row `resourceProject` in list table body. |
 | `useBuilderPermissions`          | `routes/builder/useBuilderPermissions.ts`                                   | create/update/delete/run with `resourceProject`; new workflows use `check_any_project` for create                                                                                                                                     |
 | `useCredentialDetailPermissions` | `routes/configuration/credentials/useCredentialDetailPermissions.ts`        | `workflow:read`                                                                                                                                                                                                                       |
@@ -69,8 +69,8 @@ Each page area has a dedicated `use*Permissions` hook that aggregates multiple `
 | `useApprovalPermissions`         | `routes/approvals/useApprovalPermissions.ts`                                | `approval:read`, `approval:decide`                                                                                                                                                                                                    |
 | `useApprovalDecideProjects`      | `routes/approvals/useApprovalDecideProjects.ts`                             | `approval:decide` (via `what_can_i`, project-scoped)                                                                                                                                                                                  |
 | `useCanDecideApproval`           | `routes/approvals/useCanDecideApproval.ts`                                  | Checks if user can decide specific approval (approver list + group membership)                                                                                                                                                        |
-| `useApprovalDecideUsers`         | `routes/builder/node-forms/useApprovalDecideUsers.ts`                       | `approval:decide` (via `who_can`, all authorized users)                                                                                                                                                                               |
-| `useApprovalDecideGroups`        | `routes/builder/node-forms/useApprovalDecideGroups.ts`                      | All groups (MVP: no filtering, see hook docs for limitations)                                                                                                                                                                         |
+| `useApprovalDecideUsers`         | `routes/builder/step-forms/useApprovalDecideUsers.ts`                       | `approval:decide` (via `who_can`, all authorized users)                                                                                                                                                                               |
+| `useApprovalDecideGroups`        | `routes/builder/step-forms/useApprovalDecideGroups.ts`                      | All groups (MVP: no filtering, see hook docs for limitations)                                                                                                                                                                         |
 
 ## UI Gating Components
 
@@ -189,7 +189,7 @@ The workflow builder uses a unique gating pattern: instead of hiding or disablin
 
 When `canEdit` is false, the builder:
 
-- Disables the canvas (no adding/moving/deleting nodes)
+- Disables the canvas (no adding/moving/deleting steps)
 - Disables Save, Publish/Unpublish buttons with tooltips
 - Disables the workflow name input
 - Run and Delete buttons are gated independently via `canRun` and `canDelete`

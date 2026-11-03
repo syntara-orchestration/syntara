@@ -37,7 +37,7 @@ describe('groupFilters', () => {
       const clearAllFilters = vi.fn()
       const setAllFilters = vi.fn()
 
-      const handler = createFilterChangeHandler('some-cursor', resetCursor, clearAllFilters, setAllFilters)
+      const handler = createFilterChangeHandler({ cursor: 'some-cursor', resetCursor, clearAllFilters, setAllFilters })
 
       handler([{ key: 'name', operator: 'contains', value: 'test' }])
 
@@ -50,7 +50,7 @@ describe('groupFilters', () => {
       const clearAllFilters = vi.fn()
       const setAllFilters = vi.fn()
 
-      const handler = createFilterChangeHandler(null, resetCursor, clearAllFilters, setAllFilters)
+      const handler = createFilterChangeHandler({ cursor: null, resetCursor, clearAllFilters, setAllFilters })
 
       handler([])
 
@@ -63,7 +63,7 @@ describe('groupFilters', () => {
       const clearAllFilters = vi.fn()
       const setAllFilters = vi.fn()
 
-      const handler = createFilterChangeHandler(null, resetCursor, clearAllFilters, setAllFilters)
+      const handler = createFilterChangeHandler({ cursor: null, resetCursor, clearAllFilters, setAllFilters })
 
       handler([{ key: 'name', operator: 'contains', value: 'test' }])
 

@@ -3,7 +3,7 @@ name: CI Backend
 
 on:
   pull_request:
-    branches: [devel, early-access]
+    branches: [devel, early-access, 'feature/*', 'feature/**/*', 'feat/*', 'feat/**/*']
   merge_group:
     branches: [devel, early-access]
   push:
@@ -16,7 +16,7 @@ concurrency:
 jobs:
   changes:
     name: (Backend) Detect Changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       backend: ${{ steps.check.outputs.backend }}
       backend_py: ${{ steps.check.outputs.backend_py }}
@@ -81,7 +81,7 @@ jobs:
     name: (Backend) API Spec Validation
     needs: changes
     if: needs.changes.outputs.backend_py == 'true' || needs.changes.outputs.backend_yaml == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -103,7 +103,7 @@ jobs:
     name: (Backend) API Spec Bundle
     needs: changes
     if: needs.changes.outputs.backend_py == 'true' || needs.changes.outputs.backend_yaml == 'true' || needs.changes.outputs.backend_schema == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -140,7 +140,7 @@ jobs:
     name: (Backend) API Spec Drift
     needs: changes
     if: needs.changes.outputs.backend_py == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -162,7 +162,7 @@ jobs:
     name: (Backend) Generate API Client
     needs: changes
     if: needs.changes.outputs.backend_py == 'true' || needs.changes.outputs.backend_yaml == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -191,7 +191,7 @@ jobs:
     name: (Backend) Check API Paths
     needs: changes
     if: needs.changes.outputs.backend_py == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -213,7 +213,7 @@ jobs:
     name: (Backend) Check Dead Code
     needs: changes
     if: needs.changes.outputs.backend_py == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -235,7 +235,7 @@ jobs:
     name: (Backend) Check Import Cycles
     needs: changes
     if: needs.changes.outputs.backend_py == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -257,7 +257,7 @@ jobs:
     name: (Backend) Check Orphan Modules
     needs: changes
     if: needs.changes.outputs.backend_py == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -279,13 +279,17 @@ jobs:
     name: (Backend) Check OpenAPI Breaking Changes
     needs: changes
     if: needs.changes.outputs.backend_schema == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
           fetch-depth: 0
 
       - name: Fetch devel branch for OpenAPI comparison
+        if: github.event_name != 'merge_group'
         run: git fetch origin devel
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
@@ -298,17 +302,56 @@ jobs:
         run: make install
         working-directory: backend
 
+      - name: Resolve pull-request labels
+        if: github.event_name != 'merge_group'
+        id: pr-labels
+        env:
+          PR_LABELS_FROM_EVENT: ${{ github.event_name == 'pull_request' && toJSON(github.event.pull_request.labels.*.name) || '[]' }}
+        run: |
+          set -euo pipefail
+          labels="$(jq -c . <<< "$PR_LABELS_FROM_EVENT")"
+          printf 'labels=%s\n' "$labels" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve merge-group pull-request labels
+        if: github.event_name == 'merge_group'
+        id: merge-group-pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref }}
+          MERGE_GROUP_BASE_REF: ${{ github.event.merge_group.base_ref }}
+        run: ./scripts/openapi/resolve-merge-group-pr-labels.py
+        working-directory: backend
+
       - name: Check OpenAPI breaking changes against devel
+        if: github.event_name != 'merge_group'
         run: make check-openapi-breaking-pre-commit
         working-directory: backend
         env:
-          OPENAPI_PR_LABELS: ${{ github.event_name == 'pull_request' && toJSON(github.event.pull_request.labels.*.name) || '' }}
+          OPENAPI_PR_LABELS: ${{ steps.pr-labels.outputs.labels }}
+
+      - name: Install oasdiff
+        if: github.event_name == 'merge_group'
+        run: ./scripts/openapi/install-oasdiff.sh
+        working-directory: backend
+
+      - name: Check merge-group OpenAPI changes for current PR
+        if: github.event_name == 'merge_group'
+        env:
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha || '' }}
+          OPENAPI_PR_LABELS: ${{ steps.merge-group-pr.outputs.labels }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MERGE_GROUP_HEAD_SHA"
+          git cat-file -e "${MERGE_GROUP_BASE_SHA}^{commit}"
+          make check-openapi-breaking OPENAPI_BASE_REF="$MERGE_GROUP_BASE_SHA"
+        working-directory: backend
 
   verify-test-structure:
     name: (Backend) Verify Test Structure
     needs: changes
     if: needs.changes.outputs.backend_py == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
@@ -330,7 +373,7 @@ jobs:
     name: (Backend) mypy
     needs: changes
     if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -355,7 +398,7 @@ jobs:
     name: (Backend) check-migrations
     needs: changes
     if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     env:
       DOCKER_HOST: unix:///var/run/docker.sock
@@ -378,7 +421,7 @@ jobs:
     name: (Backend) Unit Tests
     needs: changes
     if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       matrix:
@@ -420,7 +463,7 @@ jobs:
     name: (Backend) CLI Tests
     needs: changes
     if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       matrix:
@@ -522,7 +565,7 @@ jobs:
     name: (Backend) Test Podman Compose E2E
     needs: changes
     if: needs.changes.outputs.backend == 'true' && github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
       SYNTARA_XFAIL_SOURCE: https://raw.githubusercontent.com/syntara-orchestration/syntara-ci/refs/heads/main/
@@ -658,7 +701,7 @@ jobs:
 
   combine:
     name: (Backend) Combine Test Reports
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - changes
       - test-unit
@@ -781,7 +824,7 @@ jobs:
       success()
       && github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -814,7 +857,7 @@ jobs:
     if: >-
       success()
       && github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -842,7 +885,7 @@ jobs:
     if: github.event_name != 'push'
     permissions:
       checks: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Wait for shared checks
@@ -902,7 +945,7 @@ jobs:
     if: github.event_name == 'pull_request'
     permissions:
       checks: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -918,7 +961,7 @@ jobs:
     if: github.event_name == 'pull_request'
     permissions:
       checks: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -939,7 +982,7 @@ jobs:
 
   required-checks:
     name: (Backend) Required Checks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - changes
       - api-spec-validation

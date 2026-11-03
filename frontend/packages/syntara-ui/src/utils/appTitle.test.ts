@@ -33,7 +33,7 @@ describe('APP_TITLE module', () => {
   })
 
   it('ignores VITE_APP_TITLE when VITE_EXTENDED is unset', async () => {
-    vi.stubEnv('VITE_EXTENDED', undefined as unknown as string)
+    vi.stubEnv('VITE_EXTENDED', undefined)
     vi.stubEnv('VITE_APP_TITLE', 'Custom Extended Title')
     vi.resetModules()
     const mod = (await import('./appTitle')) as { APP_TITLE: string }
@@ -50,7 +50,7 @@ describe('APP_TITLE module', () => {
 
   it('falls back to Syntara when extended but title is missing', async () => {
     vi.stubEnv('VITE_EXTENDED', 'true')
-    vi.stubEnv('VITE_APP_TITLE', undefined as unknown as string)
+    vi.stubEnv('VITE_APP_TITLE', undefined)
     vi.resetModules()
     const mod = (await import('./appTitle')) as { APP_TITLE: string }
     expect(mod.APP_TITLE).toBe('Syntara')
@@ -64,16 +64,16 @@ describe('CI upstream mode (VITE_APP_TITLE unset)', () => {
   })
 
   it('resolves community title when neither VITE_EXTENDED nor VITE_APP_TITLE is set', async () => {
-    vi.stubEnv('VITE_EXTENDED', undefined as unknown as string)
-    vi.stubEnv('VITE_APP_TITLE', undefined as unknown as string)
+    vi.stubEnv('VITE_EXTENDED', undefined)
+    vi.stubEnv('VITE_APP_TITLE', undefined)
     vi.resetModules()
     const mod = (await import('./appTitle')) as { APP_TITLE: string }
     expect(mod.APP_TITLE).toBe('Syntara')
   })
 
   it('resolveAppTitle returns Syntara with all defaults', async () => {
-    vi.stubEnv('VITE_EXTENDED', undefined as unknown as string)
-    vi.stubEnv('VITE_APP_TITLE', undefined as unknown as string)
+    vi.stubEnv('VITE_EXTENDED', undefined)
+    vi.stubEnv('VITE_APP_TITLE', undefined)
     vi.resetModules()
     const { resolveAppTitle } = (await import('./appTitle')) as {
       resolveAppTitle: (extended?: boolean, title?: string) => string

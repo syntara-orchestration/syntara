@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 
 import { useAlerts } from '../providers/alerts'
 import { getErrorMessage } from '../utils/apiErrors'
+import { capitalize } from '../utils/capitalize'
 
 type UseDeleteActionOptions<T, P = unknown> = {
   /** Function that performs the delete mutation */
@@ -74,12 +75,13 @@ export function useDeleteAction<T, P = unknown>({
 
       const itemName = getItemName(item)
       const params = buildParams(item)
+      const capitalizedEntityLabel = capitalize(entityLabel)
 
       deleteFn(params, {
         onSuccess: () => {
           showAlert({
-            title: successTitle ?? `${entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1)} deleted`,
-            description: `${entityLabel.charAt(0).toUpperCase() + entityLabel.slice(1)} "${itemName}" has been deleted successfully.`,
+            title: successTitle ?? `${capitalizedEntityLabel} deleted`,
+            description: `${capitalizedEntityLabel} "${itemName}" has been deleted successfully.`,
             variant: 'success',
             autoDismiss: true,
           })

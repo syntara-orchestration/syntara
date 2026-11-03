@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 from uuid import UUID
 
 from attrs import define as _attrs_define
@@ -10,6 +10,10 @@ from attrs import field as _attrs_field
 from dateutil.parser import isoparse
 
 from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.user_reference import UserReference
+
 
 T = TypeVar("T", bound="CredentialWorkflowRef")
 
@@ -21,7 +25,7 @@ class CredentialWorkflowRef:
     Attributes:
         id (UUID):
         name (str):
-        created_by (None | str | Unset | UUID): Username or UUID of the workflow creator
+        created_by (None | Unset | UserReference): User who created the workflow
         created_at (datetime.datetime | None | Unset): Timestamp when the workflow was created
         description (None | str | Unset):
         last_execution_at (datetime.datetime | None | Unset): Timestamp of the most recent execution
@@ -31,7 +35,7 @@ class CredentialWorkflowRef:
 
     id: UUID
     name: str
-    created_by: None | str | Unset | UUID = UNSET
+    created_by: None | Unset | UserReference = UNSET
     created_at: datetime.datetime | None | Unset = UNSET
     description: None | str | Unset = UNSET
     last_execution_at: datetime.datetime | None | Unset = UNSET
@@ -40,15 +44,17 @@ class CredentialWorkflowRef:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.user_reference import UserReference
+
         id = str(self.id)
 
         name = self.name
 
-        created_by: None | str | Unset
+        created_by: dict[str, Any] | None | Unset
         if isinstance(self.created_by, Unset):
             created_by = UNSET
-        elif isinstance(self.created_by, UUID):
-            created_by = str(self.created_by)
+        elif isinstance(self.created_by, UserReference):
+            created_by = self.created_by.to_dict()
         else:
             created_by = self.created_by
 
@@ -109,25 +115,27 @@ class CredentialWorkflowRef:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.user_reference import UserReference
+
         d = dict(src_dict)
         id = UUID(d.pop("id"))
 
         name = d.pop("name")
 
-        def _parse_created_by(data: object) -> None | str | Unset | UUID:
+        def _parse_created_by(data: object) -> None | Unset | UserReference:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
             try:
-                if not isinstance(data, str):
+                if not isinstance(data, dict):
                     raise TypeError()
-                created_by_type_1 = UUID(data)
+                created_by_type_0 = UserReference.from_dict(data)
 
-                return created_by_type_1
+                return created_by_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(None | str | Unset | UUID, data)
+            return cast(None | Unset | UserReference, data)
 
         created_by = _parse_created_by(d.pop("created_by", UNSET))
 

@@ -21,8 +21,8 @@ export type PaginationFooterProps = Required<Pick<PaginationProps, 'page' | 'per
 /**
  * A compact, bottom-aligned PatternFly pagination control for list pages.
  *
- * Pair with `useCursorPagination` (cursor-based APIs) or manage `page` / `perPage`
- * state manually (client-side pagination over a full dataset).
+ * Pair with `useCursorPagination` (cursor-based APIs) or `useClientPagination`
+ * (in-memory datasets filtered/sorted in the browser).
  *
  * When the API returns a known `total`, pass it directly. When the total is
  * unavailable (cursor-based APIs), omit it or pass `null` — the component

@@ -12,6 +12,7 @@
  */
 
 import { test, expect, toAppUrl } from '../fixtures'
+import { USER_DETAIL_HREF_PATTERN } from '../helpers/userLinks'
 import { buildUniqueName } from '../helpers/workflows'
 import { createWorkflowViaApi, deleteWorkflowViaApi } from '../seeds/resources'
 import { ensureProject } from '../utils/api'
@@ -73,6 +74,46 @@ test.describe('Workflows Table - Display and Navigation', () => {
 
       await expect(app).toHaveURL(/workflow-builder\/(?!new)/)
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName)
+    } finally {
+      await deleteWorkflowViaApi(app, workflow.id)
+    }
+  })
+
+  test('Created at column shows linked username', async ({ app }) => {
+    const project = await ensureProject(app)
+    const workflowName = buildUniqueName('e2e-userlink')
+    const workflow = await createWorkflowViaApi(app, {
+      name: workflowName,
+      projectId: project?.id,
+    })
+
+    if (!workflow) throw new Error('Failed to create test workflow')
+
+    try {
+      await app.goto(toAppUrl('/workflows'))
+      await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
+
+      await app.getByPlaceholder('Filter by name').fill(workflowName)
+      await app.getByRole('button', { name: 'Apply filter' }).click()
+
+      const table = app.getByRole('grid', { name: 'Workflows table' })
+      const workflowRow = table.getByRole('row', { name: new RegExp(workflowName) })
+      await expect(workflowRow).toBeVisible({ timeout: 15_000 })
+
+      const createdCell = workflowRow.locator('td[data-label="Created at"]')
+      const updatedCell = workflowRow.locator('td[data-label="Updated at"]')
+
+      const createdLink = createdCell.getByRole('link')
+      await expect(createdLink).toBeVisible()
+      await expect(createdLink).toHaveAttribute('href', USER_DETAIL_HREF_PATTERN)
+
+      // New API-created workflows have updated_by=null until the first edit.
+      await expect(updatedCell).toBeVisible()
+      const updatedLink = updatedCell.getByRole('link')
+      const hasUpdatedLink = await updatedLink.isVisible().catch(() => false)
+      if (hasUpdatedLink) {
+        await expect(updatedLink).toHaveAttribute('href', USER_DETAIL_HREF_PATTERN)
+      }
     } finally {
       await deleteWorkflowViaApi(app, workflow.id)
     }

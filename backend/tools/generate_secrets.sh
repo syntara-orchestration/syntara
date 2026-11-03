@@ -43,6 +43,41 @@ check_dependencies() {
     fi
 }
 
+# Returns 0 when password meets validate_password_complexity rules.
+admin_password_meets_complexity() {
+    printf '%s' "$1" |
+        (cd "$PROJECT_ROOT" && uv run python -c '
+import sys
+from syntara.auth.passwords import validate_password_complexity
+
+try:
+    validate_password_complexity(sys.stdin.read())
+except ValueError:
+    raise SystemExit(1)
+')
+}
+
+# Generate a bootstrap admin password that satisfies validate_password_complexity.
+# openssl rand -base64 can miss a class (~0.1% of the time), which flakes CI when
+# orchestrator-admin reset-password validates the secret.
+generate_admin_password() {
+    local password
+    local attempt=0
+    local max_attempts=100
+
+    while ((attempt < max_attempts)); do
+        password=$(openssl rand -base64 24 | tr -d '\n')
+        if admin_password_meets_complexity "$password"; then
+            echo -n "$password"
+            return 0
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    error "Failed to generate admin password meeting complexity requirements after ${max_attempts} attempts"
+    exit 1
+}
+
 # Generate an ES256 (ECDSA P-256) key pair
 generate_key_pair() {
     local key_name="$1"
@@ -125,7 +160,7 @@ main() {
             echo -n "$APP_ADMIN_PASSWORD" > "$SECRETS_DIR/admin-password"
             info "  Using password from APP_ADMIN_PASSWORD env var"
         else
-            openssl rand -base64 24 > "$SECRETS_DIR/admin-password"
+            generate_admin_password > "$SECRETS_DIR/admin-password"
             info "  Generated random password"
         fi
         chmod 600 "$SECRETS_DIR/admin-password"

@@ -4,11 +4,11 @@ import { createRoot } from 'react-dom/client'
 
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ensureDocumentColorScheme } from './providers/theme/colorScheme.js'
-import { registerAllNodes } from './routes/builder/registry/nodes'
+import { registerAllSteps } from './routes/builder/registry/steps'
 import './index.css'
 
 // Register all workflow step types (Add step panel) before app initialization
-registerAllNodes()
+registerAllSteps()
 
 ensureDocumentColorScheme()
 

@@ -10,15 +10,19 @@
     "build": "npm run build --workspace=packages/syntara-ui",
     "test": "npm run build && concurrently --group npm:test:* npm:format:check -c auto && if [ $? -eq 0 ]; then echo 'All Tests Passed: Success' && exit 0; else echo 'Checks failed: Failure' && exit 1; fi",
     "test:ui": "npm run test --prefix packages/syntara-ui",
+    "test:mock-api": "npm run test --prefix packages/syntara-mock-api",
     "test:coverage": "npm run test:coverage --prefix packages/syntara-ui",
     "check": "NODE_OPTIONS='--max-old-space-size=8192' concurrently --group -c auto --names 'mermaid,tsc,lint,format,knip' 'npm run lint:mermaid' 'npm run tsc' 'npm run lint' 'npm run format:check' 'npm run knip'",
     "e2e": "npm run e2e --prefix packages/syntara-ui",
     "e2e:ui": "npm run e2e:ui --prefix packages/syntara-ui",
+    "e2e:a11y-audit": "npm run e2e:a11y-audit --prefix packages/syntara-ui",
     "e2e:visual-regression": "npm run e2e --prefix packages/syntara-ui -- e2e/visual-regression/page-screenshots",
     "e2e:visual-regression:update": "npm run e2e --prefix packages/syntara-ui -- e2e/visual-regression/page-screenshots --update-snapshots",
     "e2e:visual-regression:container": "bash scripts/visual-regression-container.sh",
     "e2e:visual-regression:container:update": "bash scripts/visual-regression-container.sh --update",
-    "check:visual-baselines": "npm exec --prefix packages/syntara-ui tsx -- scripts/check-visual-baselines.ts",
+    "check:visual-baselines": "npm exec --prefix packages/syntara-ui tsx -- scripts/visual-regression/check-visual-baselines.ts",
+    "route-baseline:check": "npm run route-baseline:check --prefix packages/syntara-ui",
+    "route-baseline:update": "npm run route-baseline:update --prefix packages/syntara-ui",
     "knip": "npm run knip --workspaces --if-present",
     "clean": "npm run clean --workspaces --if-present",
     "format": "prettier --write .",
@@ -43,45 +47,51 @@
     "packages/*"
   ],
   "overrides": {
-    "eslint": "^10.9.0",
-    "@eslint/js": "^10.0.1",
-    "brace-expansion": "5.0.9",
-    "dompurify": "3.4.15",
-    "js-yaml": "4.3.2",
-    "lodash": "^4.18.1",
-    "lodash-es": "^4.18.1",
-    "minimatch": "10.2.6",
-    "path-to-regexp@<1.0.0": "0.1.13",
-    "shell-quote": "^1.8.5",
-    "valibot": "^1.4.2",
-    "vite": "^7.3.5",
-    "esbuild": "^0.28.1",
-    "istanbul-lib-processinfo": {
-      "uuid": "^11.1.1"
+    "@chevrotain/cst-dts-gen": {
+      "lodash-es": "^4.18.1"
     },
-    "playwright-core": "1.62.1",
-    "playwright": "1.62.1",
-    "picomatch": "4.0.4",
-    "nanoid": "^3.3.17"
+    "@chevrotain/gast": {
+      "lodash-es": "^4.18.1"
+    },
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "4.3.2"
+    },
+    "@redocly/openapi-core": {
+      "js-yaml": "4.3.2"
+    },
+    "chevrotain": {
+      "lodash-es": "^4.18.1"
+    },
+    "monaco-editor": {
+      "dompurify": "3.4.16"
+    },
+    "vite": "^8.3.1",
+    "playwright-core": "1.63.0",
+    "playwright": "1.63.0",
+    "qs": "^6.16.0",
+    "seroval": "^1.6.8"
   },
   "devDependencies": {
     "@emnapi/core": "2.0.0-alpha.3",
     "@emnapi/runtime": "2.0.0-alpha.3",
-    "@testing-library/dom": "^10.4.1",
-    "@vitest/coverage-v8": "^4.1.10",
-    "concurrently": "^10.0.4",
+    "@testing-library/dom": "^10.4.2",
+    "@vitest/coverage-v8": "^5.0.3",
+    "concurrently": "^10.0.6",
+    "eslint": "10.12.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-no-only-tests": "^3.4.0",
-    "happy-dom": "^20.11.2",
-    "mermaid": "^11.16.0",
-    "prettier": "3.8.4",
-    "vitest": "^4.1.10"
+    "happy-dom": "^20.14.5",
+    "mermaid": "^12.0.0",
+    "msw": "2.15.0",
+    "prettier": "3.9.9",
+    "vitest": "^5.0.3"
   },
   "os": [
     "darwin",
     "linux",
-    "windows"
+    "windows",
+    "win32"
   ],
   "cpu": [
     "x64",

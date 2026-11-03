@@ -8,6 +8,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
 import { approvalsClient, executionsClient, workflowClient } from '../../client'
 import { AlertProvider } from '../../providers/alerts'
+import { FeatureFlagsProvider } from '../../providers/feature-flags-provider'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { routerTestState } from '../../test/setup'
 
@@ -77,9 +78,11 @@ const queryClient = new QueryClient({
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>
-    <AlertProvider>
-      <ReactFlowProvider>{children}</ReactFlowProvider>
-    </AlertProvider>
+    <FeatureFlagsProvider>
+      <AlertProvider>
+        <ReactFlowProvider>{children}</ReactFlowProvider>
+      </AlertProvider>
+    </FeatureFlagsProvider>
   </QueryClientProvider>
 )
 
@@ -93,7 +96,7 @@ const mockWorkflow: WorkflowWithVersion = {
   is_enabled: true,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
-  created_by: 'user-1',
+  created_by: { id: 'u-1', name: 'user-1', type: 'user' },
   is_builtin: false,
   current_version: 1,
   version: {
@@ -115,7 +118,7 @@ const mockWorkflow: WorkflowWithVersion = {
       ],
       edges: [],
     },
-    created_by: 'user-1',
+    created_by: { id: 'user-1', name: 'user-1', type: 'user' },
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
   },
@@ -180,12 +183,12 @@ describe('BuilderContent - Duplicate Workflow', () => {
       error: null,
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     vi.mocked(executionsClient.useMutation).mockReturnValue({
       mutate: mockExecuteMutate,
       isPending: false,
-    } as never)
+    })
 
     vi.mocked(approvalsClient.useQuery).mockReturnValue({
       data: undefined,
@@ -193,7 +196,7 @@ describe('BuilderContent - Duplicate Workflow', () => {
       error: null,
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     vi.mocked(workflowClient.useMutation).mockImplementation((method: string, path: string) => {
       if (method === 'post' && path === '/workflows') {
@@ -233,8 +236,7 @@ describe('BuilderContent - Duplicate Workflow', () => {
     await waitFor(() => expect(mockDuplicateMutate).toHaveBeenCalled())
 
     const callArgs = mockDuplicateMutate.mock.calls[0]?.[0] as
-      | { body: { name: string; description: string; project_id: string; labels: Record<string, string> } }
-      | undefined
+      { body: { name: string; description: string; project_id: string; labels: Record<string, string> } } | undefined
     expect(callArgs).toBeDefined()
     expect(callArgs?.body.name).toContain('Test Workflow - duplicate-')
     expect(callArgs?.body.description).toBe('Test Description')

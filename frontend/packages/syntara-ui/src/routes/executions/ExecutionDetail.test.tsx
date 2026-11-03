@@ -1,15 +1,27 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useParams, useRouterState } from '@tanstack/react-router'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render as testingLibraryRender, screen, waitFor } from '@testing-library/react'
+import type { RenderOptions } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { executionsClient } from '../../client'
+import { FeatureFlagsProvider } from '../../providers/feature-flags-provider'
+import { capitalize } from '../../utils/capitalize'
 import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
 import ExecutionDetail from './ExecutionDetail'
-import { useExecutionNodeClick } from './hooks/useExecutionNodeClick'
+import { useExecutionStepClick } from './hooks/useExecutionStepClick'
+
+const FeatureFlagsTestWrapper = ({ children }: { children: ReactNode }) => (
+  <FeatureFlagsProvider>{children}</FeatureFlagsProvider>
+)
+
+function render(ui: ReactNode, options?: RenderOptions) {
+  return testingLibraryRender(ui, { ...options, wrapper: FeatureFlagsTestWrapper })
+}
 
 // Create mock functions
 const mockNavigate = vi.fn()
@@ -221,7 +233,7 @@ vi.mock('../builder/WorkflowHistoryCard', () => ({
 // Mock StatusLabel component
 vi.mock('../builder/ExecutionStatus', () => ({
   StatusLabel: ({ status }: { status: string }) => {
-    const capitalizedStatus = status.charAt(0).toUpperCase() + status.slice(1)
+    const capitalizedStatus = capitalize(status)
     return <div>{capitalizedStatus}</div>
   },
 }))
@@ -266,10 +278,10 @@ vi.mock('../../providers/alerts', () => ({
   })),
 }))
 
-// Mock useExecutionNodeClick hook
+// Mock useExecutionStepClick hook
 const mockHandleNodeClick = vi.fn()
-const mockSelectNode = vi.fn()
-const mockDeselectNode = vi.fn()
+const mockSelectStep = vi.fn()
+const mockDeselectStep = vi.fn()
 const mockPendingApproval = {
   id: 'approval-1',
   name: 'Test Approval',
@@ -281,10 +293,10 @@ const mockPendingApproval = {
 
 const mockClearPendingApproval = vi.fn()
 const mockSetPendingApproval = vi.fn()
-const mockFetchForNode = vi.fn()
+const mockFetchForStep = vi.fn()
 
-vi.mock('./hooks/useExecutionNodeClick', () => ({
-  useExecutionNodeClick: vi.fn(() => ({
+vi.mock('./hooks/useExecutionStepClick', () => ({
+  useExecutionStepClick: vi.fn(() => ({
     approvals: [],
     currentIndex: 0,
     currentApproval: null,
@@ -292,11 +304,11 @@ vi.mock('./hooks/useExecutionNodeClick', () => ({
     navigateToIndex: vi.fn(),
     clearApprovals: mockClearPendingApproval,
     setApprovalsAndIndex: mockSetPendingApproval,
-    fetchApprovals: mockFetchForNode,
-    selectedNodeId: null,
-    selectedNodeName: null,
-    selectNode: mockSelectNode,
-    deselectNode: mockDeselectNode,
+    fetchApprovals: mockFetchForStep,
+    selectedStepId: null,
+    selectedStepName: null,
+    selectStep: mockSelectStep,
+    deselectStep: mockDeselectStep,
     handleNodeClick: mockHandleNodeClick,
   })),
 }))
@@ -737,7 +749,7 @@ describe('ExecutionDetail', () => {
 
   describe('Approval Review Side Panel', () => {
     it('opens approval side panel when Review approval is clicked', async () => {
-      vi.mocked(useExecutionNodeClick).mockReturnValue({
+      vi.mocked(useExecutionStepClick).mockReturnValue({
         approvals: [mockPendingApproval] as never,
         currentIndex: 0,
         currentApproval: mockPendingApproval as never,
@@ -745,11 +757,11 @@ describe('ExecutionDetail', () => {
         navigateToIndex: vi.fn(),
         clearApprovals: mockClearPendingApproval,
         setApprovalsAndIndex: mockSetPendingApproval,
-        fetchApprovals: mockFetchForNode,
-        selectedNodeId: null,
-        selectedNodeName: null,
-        selectNode: mockSelectNode,
-        deselectNode: mockDeselectNode,
+        fetchApprovals: mockFetchForStep,
+        selectedStepId: null,
+        selectedStepName: null,
+        selectStep: mockSelectStep,
+        deselectStep: mockDeselectStep,
         handleNodeClick: mockHandleNodeClick,
       })
 
@@ -768,7 +780,7 @@ describe('ExecutionDetail', () => {
     })
 
     it('closes approval side panel when Close is clicked', async () => {
-      vi.mocked(useExecutionNodeClick).mockReturnValue({
+      vi.mocked(useExecutionStepClick).mockReturnValue({
         approvals: [mockPendingApproval] as never,
         currentIndex: 0,
         currentApproval: mockPendingApproval as never,
@@ -776,11 +788,11 @@ describe('ExecutionDetail', () => {
         navigateToIndex: vi.fn(),
         clearApprovals: mockClearPendingApproval,
         setApprovalsAndIndex: mockSetPendingApproval,
-        fetchApprovals: mockFetchForNode,
-        selectedNodeId: null,
-        selectedNodeName: null,
-        selectNode: mockSelectNode,
-        deselectNode: mockDeselectNode,
+        fetchApprovals: mockFetchForStep,
+        selectedStepId: null,
+        selectedStepName: null,
+        selectStep: mockSelectStep,
+        deselectStep: mockDeselectStep,
         handleNodeClick: mockHandleNodeClick,
       })
 
@@ -1206,7 +1218,7 @@ describe('ExecutionDetail', () => {
     })
 
     it('renders approval side panel when approval is open with current approval', async () => {
-      vi.mocked(useExecutionNodeClick).mockReturnValue({
+      vi.mocked(useExecutionStepClick).mockReturnValue({
         approvals: [mockPendingApproval] as never,
         currentIndex: 0,
         currentApproval: mockPendingApproval as never,
@@ -1214,11 +1226,11 @@ describe('ExecutionDetail', () => {
         navigateToIndex: vi.fn(),
         clearApprovals: mockClearPendingApproval,
         setApprovalsAndIndex: mockSetPendingApproval,
-        fetchApprovals: mockFetchForNode,
-        selectedNodeId: null,
-        selectedNodeName: null,
-        selectNode: mockSelectNode,
-        deselectNode: mockDeselectNode,
+        fetchApprovals: mockFetchForStep,
+        selectedStepId: null,
+        selectedStepName: null,
+        selectStep: mockSelectStep,
+        deselectStep: mockDeselectStep,
         handleNodeClick: mockHandleNodeClick,
       })
 

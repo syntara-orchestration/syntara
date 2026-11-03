@@ -20,7 +20,7 @@ jobs:
   cancel-orphans:
     name: Cancel orphaned runs
     if: github.event.ref_type == 'branch' && startsWith(github.event.ref, 'gh-readonly-queue/')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Cancel active runs against deleted queue branch

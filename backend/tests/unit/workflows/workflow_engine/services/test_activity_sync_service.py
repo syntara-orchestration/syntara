@@ -10,6 +10,9 @@ from uuid import UUID, uuid4
 
 import pytest
 from temporalio.api.enums.v1 import EventType
+from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedError
+from temporalio.exceptions import ApplicationError
+from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
@@ -389,6 +392,7 @@ class TestActivityEventProcessing:
         activity_id: str = "test-activity",
         attempt: int = 1,
         failure_message: str | None = None,
+        failure_type: str | None = None,
     ) -> Mock:
         """Create a mock Temporal history event."""
         event = Mock()
@@ -417,7 +421,14 @@ class TestActivityEventProcessing:
         elif event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED:
             attrs = Mock()
             attrs.scheduled_event_id = scheduled_event_id
-            attrs.failure = Mock(message=failure_message) if failure_message else None
+            attrs.failure = (
+                Mock(
+                    message=failure_message,
+                    application_failure_info=Mock(type=failure_type) if failure_type else None,
+                )
+                if failure_message
+                else None
+            )
             event.activity_task_failed_event_attributes = attrs
 
         elif event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT:
@@ -477,6 +488,7 @@ class TestActivityEventProcessing:
         assert update["activity_id"] == "loop-node"
         assert update["_is_loop_iteration"] is True
         assert update["_is_loop_control"] is True
+        assert update["_has_control_data"] is True
         assert update["iteration"] == 0
 
     def test_process_activity_scheduled_extracts_iteration_number(self) -> None:
@@ -506,6 +518,7 @@ class TestActivityEventProcessing:
         assert update["activity_id"] == "action-1"
         assert update["_is_loop_iteration"] is False
         assert update["_is_loop_control"] is False
+        assert update["_has_control_data"] is False
         assert update["iteration"] is None
 
     def test_process_activity_scheduled_loop_iteration_for_re_executed_body_node(self) -> None:
@@ -540,6 +553,7 @@ class TestActivityEventProcessing:
         assert update["activity_id"] == "approval-node"
         assert update["_is_loop_iteration"] is True
         assert update["_is_loop_control"] is False
+        assert update["_has_control_data"] is True
         assert update["iteration"] == 1
 
     def test_process_activity_scheduled_nested_approval_iter_suffix_is_not_loop_control(self) -> None:
@@ -651,6 +665,26 @@ class TestActivityEventProcessing:
         assert self.metadata.pending_activity_updates[1]["status"] == ActivityStatus.FAILED
         assert self.metadata.pending_activity_updates[1]["completed_at"] is not None
         assert self.metadata.pending_activity_updates[1]["error_details"] == expected_error
+
+    def test_process_activity_failed_for_cancelled_invocation(self) -> None:
+        """Invocation cancellation is terminal but should not appear as an activity failure."""
+        self.metadata.pending_activity_updates[1] = {
+            "activity_id": "test-activity",
+            "status": ActivityStatus.RUNNING,
+            "completed_at": None,
+            "error_details": None,
+        }
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
+            event_id=3,
+            scheduled_event_id=1,
+            failure_message="Invocation cancelled",
+            failure_type="InvocationCancelledError",
+        )
+
+        self.service._process_activity_failed(event, self.metadata)
+
+        assert self.metadata.pending_activity_updates[1]["status"] == ActivityStatus.CANCELLED
 
     @pytest.mark.parametrize(
         ("event_type", "expected_status", "expected_error", "failure_message"),
@@ -4177,7 +4211,7 @@ class TestMonitorExecutionRetry:
     """Tests for _monitor_execution retry logic with exponential backoff."""
 
     _SLEEP_PATH = "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep"
-    _RANDOM_PATH = "syntara.workflows.workflow_engine.services.activity_sync_service.random.random"
+    _RANDOM_PATH = "syntara.workflows.workflow_engine.services.activity_sync_monitor.secrets.SystemRandom.random"
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
@@ -4748,6 +4782,10 @@ class TestInitializeMonitoringWorkflowLookup:
         workflow_result = Mock()
         workflow_result.one_or_none.return_value = workflow
 
+        # Mock workflow version number query result (telemetry: workflow_version)
+        version_number_result = Mock()
+        version_number_result.one_or_none.return_value = 1
+
         # Mock workflow version query result (for activity definitions)
         wf_version_result = Mock()
         wf_version_result.one_or_none.return_value = Mock(workflow_definition={"nodes": activity_defs or []})
@@ -4761,13 +4799,14 @@ class TestInitializeMonitoringWorkflowLookup:
         terminal_result.all.return_value = []
 
         mock_session = AsyncMock()
-        # Order: execution query, workflow query, workflow_version query,
-        # activity creation check query, activity index map query,
-        # terminal activity IDs query
+        # Order: execution query, workflow query, workflow version number query,
+        # workflow_version (definitions) query, activity creation check query,
+        # activity index map query, terminal activity IDs query
         mock_session.exec = AsyncMock(
             side_effect=[
                 exec_result,
                 workflow_result,
+                version_number_result,
                 wf_version_result,
                 Mock(one_or_none=Mock(return_value=None)),
                 activity_result,
@@ -5679,3 +5718,454 @@ class TestNonTerminalIoQuerySkip:
 
         mock_query.assert_called_once()
         assert result is not None
+
+
+class TestQueryActivityIoQueryFailure:
+    """A failed Temporal query must be distinguishable from an empty answer."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+
+    @pytest.mark.asyncio
+    async def test_rpc_error_is_reraised(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = RPCError(
+            "worker unreachable", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
+        )
+        activity_data: dict[str, Any] = {"status": ActivityStatus.RUNNING}
+
+        with pytest.raises(RPCError):
+            await self.service._query_activity_io(
+                mock_handle, "my-activity", activity_data, {"invocation_id": "abc-123"}
+            )
+
+    @pytest.mark.asyncio
+    async def test_workflow_query_rejected_error_is_reraised(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = WorkflowQueryRejectedError(WorkflowExecutionStatus.COMPLETED)
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+
+        with pytest.raises(WorkflowQueryRejectedError):
+            await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
+
+    @pytest.mark.asyncio
+    async def test_value_error_is_reraised(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = ValueError("query args mismatch")
+        activity_data: dict[str, Any] = {"status": ActivityStatus.RUNNING}
+
+        with pytest.raises(ValueError, match="query args mismatch"):
+            await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
+
+    @pytest.mark.asyncio
+    async def test_query_failure_is_logged_at_warning_not_debug(self) -> None:
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = RPCError(
+            "worker unreachable", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
+        )
+        activity_data: dict[str, Any] = {"status": ActivityStatus.RUNNING}
+
+        with patch("syntara.workflows.workflow_engine.services.activity_execution_sync.logger") as mock_logger:
+            with pytest.raises(RPCError):
+                await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
+
+        mock_logger.warning.assert_called_once()
+        mock_logger.debug.assert_not_called()
+
+
+class TestResolveActivityIoOnQueryFailure:
+    """_resolve_activity_io must return safe-to-persist I/O when queries fail."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+
+    def _existing_activity(self) -> Mock:
+        activity = Mock(spec=ActivityExecution)
+        activity.input_data = {"param": "already-recorded"}
+        activity.output_data = {"result": "already-recorded"}
+        return activity
+
+    @pytest.mark.asyncio
+    async def test_terminal_query_failure_preserves_existing_io(self) -> None:
+        existing = self._existing_activity()
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED}
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = RPCError(
+            "sticky cache evicted", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
+        )
+
+        input_data, output_data = await self.service._resolve_activity_io(
+            mock_handle, "my-activity", activity_data, existing
+        )
+
+        assert input_data == {"param": "already-recorded"}
+        assert output_data == {"result": "already-recorded"}
+
+    @pytest.mark.asyncio
+    async def test_first_non_terminal_query_failure_preserves_stored_input(self) -> None:
+        existing = self._existing_activity()
+        existing.input_data = {}
+        existing.output_data = None
+        activity_data: dict[str, Any] = {
+            "status": ActivityStatus.RUNNING,
+            "output_data": {"job_id": 42},
+        }
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = RPCError(
+            "worker unreachable", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
+        )
+
+        input_data, output_data = await self.service._resolve_activity_io(
+            mock_handle, "my-activity", activity_data, existing
+        )
+
+        assert input_data == {}
+        assert output_data == {"job_id": 42}
+
+    def test_io_after_query_failure_applies_event_sourced_output_when_stored_empty(self) -> None:
+        existing = self._existing_activity()
+        existing.output_data = None
+
+        input_data, output_data = ActivitySyncService._io_after_query_failure(
+            existing,
+            {"output_data": {"job_id": 42}},
+        )
+
+        assert input_data == {"param": "already-recorded"}
+        assert output_data == {"job_id": 42}
+
+    def test_io_after_query_failure_merges_heartbeat_without_clobbering_stored_output(self) -> None:
+        existing = self._existing_activity()
+        existing.output_data = {"job_id": 42, "result": "complete"}
+
+        input_data, output_data = ActivitySyncService._io_after_query_failure(
+            existing,
+            {"output_data": {"job_id": 7, "job_url": "https://example.com/jobs/7"}},
+        )
+
+        assert input_data == {"param": "already-recorded"}
+        assert output_data == {
+            "job_id": 42,
+            "job_url": "https://example.com/jobs/7",
+            "result": "complete",
+        }
+
+
+class TestResolveActivityControl:
+    """Control resolution must handle workflow-state races without stale loop data."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+
+    @staticmethod
+    def _existing(control_data: dict[str, Any] | None = None) -> Mock:
+        existing = Mock(spec=ActivityExecution)
+        existing.control_data = control_data
+        return existing
+
+    @pytest.mark.asyncio
+    async def test_terminal_query_returns_control_without_update(self) -> None:
+        handle = AsyncMock()
+        handle.query.return_value = {"next_port": "true"}
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "condition-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing(),
+        )
+
+        assert result == {"next_port": "true"}
+        handle.query.assert_awaited_once_with("get_activity_control", "condition-1")
+        handle.execute_update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_control_query_failure_returns_no_control(self) -> None:
+        handle = AsyncMock()
+        handle.query.side_effect = ValueError("query unavailable")
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "condition-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing(),
+        )
+
+        assert result is None
+        handle.execute_update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_terminal_query_race_waits_for_new_loop_control(self) -> None:
+        previous = {"next_port": "iterate", "current_index": 1, "next_index": 2}
+        current = {"next_port": "complete", "current_index": 2, "next_index": 2}
+        handle = AsyncMock()
+        handle.query.return_value = None
+        handle.execute_update.return_value = current
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "loop-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing(previous),
+        )
+
+        assert result == current
+        handle.execute_update.assert_awaited_once_with(
+            "get_activity_control_when_ready",
+            args=["loop-1", previous],
+        )
+
+    @pytest.mark.asyncio
+    async def test_terminal_query_race_waits_for_completed_control_node(self) -> None:
+        current = {"next_port": "false"}
+        handle = AsyncMock()
+        handle.query.return_value = None
+        handle.execute_update.return_value = current
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "condition-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing(),
+        )
+
+        assert result == current
+        handle.execute_update.assert_awaited_once_with(
+            "get_activity_control_when_ready",
+            args=["condition-1", None],
+        )
+
+    @pytest.mark.asyncio
+    async def test_nonterminal_event_preserves_existing_control_without_query(self) -> None:
+        previous = {"next_port": "iterate", "current_index": 1, "next_index": 2}
+        handle = AsyncMock()
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "loop-1",
+            {"status": ActivityStatus.RUNNING},
+            self._existing(previous),
+        )
+
+        assert result == previous
+        handle.query.assert_not_awaited()
+        handle.execute_update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_control_update_failure_returns_no_new_control(self) -> None:
+        handle = AsyncMock()
+        handle.query.return_value = None
+        handle.execute_update.side_effect = RPCError(
+            "workflow unavailable",
+            RPCStatusCode.UNAVAILABLE,
+            b"",
+        )
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "loop-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing({"next_port": "false"}),
+        )
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_non_loop_control_does_not_wait_for_missing_control(self) -> None:
+        handle = AsyncMock()
+        handle.query.return_value = None
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "condition-1",
+            {"status": ActivityStatus.FAILED},
+            self._existing(),
+        )
+
+        assert result is None
+        handle.query.assert_awaited_once_with("get_activity_control", "condition-1")
+        handle.execute_update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_missing_control_update_failure_does_not_raise(self) -> None:
+        handle = AsyncMock()
+        handle.query.return_value = None
+        handle.execute_update.side_effect = RPCError(
+            "workflow not found",
+            RPCStatusCode.NOT_FOUND,
+            b"",
+        )
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "loop-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing({"next_port": "false"}),
+        )
+
+        assert result is None
+        assert handle.query.await_count == 2
+        handle.query.assert_any_await("get_activity_control", "loop-1")
+
+    @pytest.mark.asyncio
+    async def test_control_update_not_found_retries_query(self) -> None:
+        handle = AsyncMock()
+        handle.query.side_effect = [None, {"next_port": "true"}]
+        handle.execute_update.side_effect = RPCError(
+            "workflow execution not found",
+            RPCStatusCode.NOT_FOUND,
+            b"",
+        )
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "condition-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing(),
+        )
+
+        assert result == {"next_port": "true"}
+        assert handle.query.await_count == 2
+        handle.query.assert_any_await("get_activity_control", "condition-1")
+
+    @pytest.mark.asyncio
+    async def test_control_update_timeout_returns_no_control(self) -> None:
+        handle = AsyncMock()
+        handle.query.return_value = None
+        handle.execute_update.side_effect = ApplicationError("control data timeout")
+
+        result = await self.service._resolve_activity_control(
+            handle,
+            "condition-1",
+            {"status": ActivityStatus.COMPLETED},
+            self._existing(),
+        )
+
+        assert result is None
+
+
+class TestActivitySyncPreservesIoOnQueryFailure:
+    """End-to-end regression: a query failure at terminal transition must not erase recorded I/O."""
+
+    def setup_method(self) -> None:
+        self.execution_id = uuid4()
+        self.mock_session_factory = Mock()
+        self.mock_activity_publisher = AsyncMock()
+        self.service = ActivitySyncService(Mock(), self.mock_session_factory, self.mock_activity_publisher)
+
+    def _create_mock_activity_execution(
+        self,
+        activity_name: str = "script-node",
+        status: ActivityStatus = ActivityStatus.RUNNING,
+        input_data: dict[str, Any] | None = None,
+        output_data: dict[str, Any] | None = None,
+    ) -> Mock:
+        activity = Mock()
+        activity.activity_name = activity_name
+        activity.status = status
+        activity.started_at = datetime.now(UTC)
+        activity.completed_at = None
+        activity.error_details = None
+        activity.retry_count = 0
+        activity.input_data = input_data if input_data is not None else {}
+        activity.output_data = output_data
+        activity.iteration = None
+        activity.updated_at = None
+        return activity
+
+    def _mock_session_with_activities(self, activities: list[Mock]) -> Mock:
+        mock_activity_result = Mock()
+        mock_activity_result.all.return_value = activities
+
+        mock_execution = Mock(spec=Execution)
+        mock_execution.id = self.execution_id
+        mock_execution.last_processed_event_id = 0
+        mock_execution_result = Mock()
+        mock_execution_result.one_or_none.return_value = mock_execution
+
+        mock_session = Mock()
+        mock_session.exec = AsyncMock(side_effect=[mock_activity_result, mock_execution_result])
+        mock_session.commit = AsyncMock()
+        mock_session.rollback = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        self.mock_session_factory.return_value = mock_session
+        return mock_session
+
+    @pytest.mark.asyncio
+    async def test_failed_query_at_terminal_transition_preserves_recorded_io(self) -> None:
+        """Recorded I/O survives a query failure at completion."""
+        recorded_input = {"param": "value"}
+        recorded_output = {"result": "already-recorded"}
+        activity = self._create_mock_activity_execution(
+            activity_name="script-node",
+            status=ActivityStatus.RUNNING,
+            input_data=recorded_input,
+            output_data=recorded_output,
+        )
+        self._mock_session_with_activities([activity])
+
+        handle = AsyncMock()
+        handle.query.side_effect = RPCError(
+            "sticky cache evicted", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
+        )
+
+        metadata = create_test_metadata(
+            execution_id=self.execution_id,
+            activity_index_map={"script-node": 0},
+            pending_activity_updates={
+                10: {
+                    "activity_id": "script-node",
+                    "activity_name": "script-node",
+                    "status": ActivityStatus.COMPLETED,
+                    "started_at": datetime.now(UTC),
+                    "completed_at": datetime.now(UTC),
+                    "error_details": None,
+                    "retry_count": 0,
+                },
+            },
+        )
+
+        await self.service._sync_activities_to_db(metadata, handle)
+
+        assert activity.input_data == recorded_input
+        assert activity.output_data == recorded_output
+        # Status still advances to terminal even though the query failed.
+        assert activity.status == ActivityStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_failed_query_on_running_activity_still_persists_heartbeat_partial(self) -> None:
+        """Heartbeat partial output is written even when the workflow query fails."""
+        heartbeat_partial = {"job_id": 42, "job_url": "https://example.com/jobs/42"}
+        activity = self._create_mock_activity_execution(
+            activity_name="script-node",
+            status=ActivityStatus.RUNNING,
+            output_data=None,
+        )
+        self._mock_session_with_activities([activity])
+
+        handle = AsyncMock()
+        handle.query.side_effect = RPCError("worker unreachable", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b"")
+
+        metadata = create_test_metadata(
+            execution_id=self.execution_id,
+            activity_index_map={"script-node": 0},
+            pending_activity_updates={
+                10: {
+                    "activity_id": "script-node",
+                    "activity_name": "script-node",
+                    "status": ActivityStatus.RUNNING,
+                    "started_at": datetime.now(UTC),
+                    "completed_at": None,
+                    "error_details": None,
+                    "retry_count": 0,
+                    "output_data": heartbeat_partial,
+                },
+            },
+        )
+
+        await self.service._sync_activities_to_db(metadata, handle)
+
+        assert activity.output_data == heartbeat_partial
+        assert activity.status == ActivityStatus.RUNNING

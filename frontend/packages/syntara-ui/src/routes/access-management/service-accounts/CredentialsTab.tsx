@@ -258,13 +258,25 @@ function CredentialsTable({
     <>
       <Thead>
         <Tr>
-          <Th sort={getSortParams(0)}>Client ID</Th>
-          <Th sort={getSortParams(1)}>Created</Th>
-          <Th sort={getSortParams(2)}>Last used</Th>
-          <Th sort={getSortParams(3)}>Expires</Th>
-          <Th sort={getSortParams(4)}>State</Th>
-          <Th screenReaderText="Rotation status" />
-          <Th screenReaderText="Actions" />
+          <Th width={20} sort={getSortParams(0)}>
+            Client ID
+          </Th>
+          <Th width={10} sort={getSortParams(1)} modifier="nowrap">
+            Created
+          </Th>
+          <Th width={10} sort={getSortParams(2)} modifier="nowrap">
+            Last used
+          </Th>
+          <Th width={10} sort={getSortParams(3)} modifier="nowrap">
+            Expires
+          </Th>
+          <Th width={15} sort={getSortParams(4)} modifier="nowrap">
+            State
+          </Th>
+          <Th width={25} modifier="nowrap">
+            Rotation
+          </Th>
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       <Tbody>
@@ -282,7 +294,7 @@ function CredentialsTable({
               <DateCell dateString={cred.last_used_at} />
             </Td>
             <Td dataLabel="Expires">{cred.expires_at ? formatExpirationDate(cred.expires_at) : 'Never'}</Td>
-            <Td dataLabel="State">
+            <Td dataLabel="State" modifier="nowrap">
               <Switch
                 id={`cred-state-${cred.id}`}
                 label={cred.status === 'active' ? 'Enabled' : 'Disabled'}
@@ -292,7 +304,7 @@ function CredentialsTable({
                 aria-disabled={!permissions.canUpdate || undefined}
               />
             </Td>
-            <Td dataLabel="Rotation status">
+            <Td dataLabel="Rotation status" modifier="nowrap">
               <RotationGraceIndicator oldSecretValidUntil={cred.old_secret_valid_until} />
             </Td>
             <Td isActionCell>
@@ -359,7 +371,13 @@ export function CredentialsTab({
   const atLimit = totalCredentials >= maxCredentials
   const createDisabledTooltip = getCreateDisabledTooltip(permissions, serviceAccountName, maxCredentials)
 
-  useCursorReset(credentials.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: credentials.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: query.isFetching,
+    resetPagination,
+  })
 
   const actions = useCredentialActions(serviceAccountId, query.refetch, disableDialog.open)
 
@@ -424,7 +442,7 @@ export function CredentialsTab({
         onClose={deleteDialog.close}
         onConfirm={() => actions.handleDeleteConfirm(deleteDialog.item, deleteDialog.close)}
         title="Delete credential?"
-        confirmLabel="Delete"
+        confirmLabel="Delete credential"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{
@@ -440,7 +458,7 @@ export function CredentialsTab({
         onClose={disableDialog.close}
         onConfirm={() => actions.handleDisableConfirm(disableDialog.item, disableDialog.close)}
         title="Disable credential?"
-        confirmLabel="Disable"
+        confirmLabel="Disable credential"
         confirmVariant="primary"
       >
         You are about to disable the credential <strong>{disableDialog.item?.identifier}</strong>. You can re-enable it

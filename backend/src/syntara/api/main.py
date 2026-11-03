@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 import structlog
 import uvicorn
@@ -63,6 +63,11 @@ from syntara.core.error_handlers import (
 )
 from syntara.core.exception_registry import register_exceptions
 from syntara.core.logging.logging import apply_runtime_log_level, build_uvicorn_logging_config
+from syntara.core.middleware.request_body_size import (
+    BodyTooLargeError,
+    RequestBodySizeMiddleware,
+    body_too_large_exception_handler,
+)
 from syntara.core.models.user import User
 from syntara.core.router_discovery import _get_lock_file_path, discover_and_register_routers, iter_api_routes
 from syntara.core.websocket.manager import get_connection_lifecycle_manager
@@ -389,10 +394,21 @@ def swagger_ui_parameters(*, enable_try_it_out: bool) -> dict[str, Any]:
     }
 
 
+def _translate_product_name(value: Any, product_name: str) -> Any:  # noqa: ANN401
+    """Replace product-name references in OpenAPI string values."""
+    if isinstance(value, str):
+        return value.replace("Syntara", product_name)
+    if isinstance(value, dict):
+        return {key: _translate_product_name(item, product_name) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_translate_product_name(item, product_name) for item in value]
+    return value
+
+
 # Create FastAPI application
 _settings = get_settings()
 app = FastAPI(
-    title="Orchestrator API",
+    title=f"{_settings.product_name} API",
     description="A distributed multi-agent workflow orchestration system",
     version=API_V1_VERSION,
     docs_url=None,
@@ -402,6 +418,38 @@ app = FastAPI(
     lifespan=lifespan,
     responses=problem_details_response_map(),
 )
+
+_default_openapi = app.openapi
+app.state.openapi_base_schema = None
+app.state.openapi_product_schema = None
+app.state.openapi_product_name = None
+
+
+def _custom_openapi() -> dict[str, Any]:
+    """Generate and cache an OpenAPI schema translated to the configured product name."""
+    product_name = _settings.product_name
+    if app.state.openapi_product_name != product_name:
+        app.title = f"{product_name} API"
+        app.openapi_schema = None
+        app.state.openapi_base_schema = None
+        app.state.openapi_product_schema = None
+
+    if app.state.openapi_base_schema is not None:
+        app.openapi_schema = app.state.openapi_base_schema
+    base_schema = _default_openapi()
+    if base_schema is not app.state.openapi_base_schema:
+        app.state.openapi_base_schema = base_schema
+        app.state.openapi_product_schema = None
+
+    if app.state.openapi_product_schema is None:
+        app.state.openapi_product_schema = _translate_product_name(base_schema, product_name)
+
+    app.state.openapi_product_name = product_name
+    app.openapi_schema = app.state.openapi_product_schema
+    return cast("dict[str, Any]", app.state.openapi_product_schema)
+
+
+app.openapi = _custom_openapi  # type: ignore[method-assign]
 
 # Configure CORS middleware using centralized settings
 app.add_middleware(
@@ -428,6 +476,9 @@ app.add_middleware(MetricsMiddleware, recorder=get_metrics_recorder())
 # Register audit middleware.
 app.add_middleware(AuditMiddleware, fastapi_app=app)
 
+# Reject oversized request bodies before handlers buffer or parse JSON/multipart bodies.
+app.add_middleware(RequestBodySizeMiddleware)
+
 # Register mTLS client certificate authentication middleware (outermost).
 # Must be outermost to access the raw uvicorn transport for cert extraction.
 app.add_middleware(ClientCertAuthMiddleware)
@@ -450,6 +501,7 @@ app.add_exception_handler(RequestValidationError, validation_error_handler)  # t
 app.add_exception_handler(IntegrityError, integrity_error_handler)  # type: ignore[arg-type]
 app.add_exception_handler(ValueError, value_error_handler)  # type: ignore[arg-type]
 app.add_exception_handler(HTTPException, core_http_exception_handler)  # type: ignore[arg-type]
+app.add_exception_handler(BodyTooLargeError, body_too_large_exception_handler)  # type: ignore[arg-type]
 app.add_exception_handler(Exception, generic_exception_handler)
 
 # Routers are automatically discovered and registered via router_discovery system

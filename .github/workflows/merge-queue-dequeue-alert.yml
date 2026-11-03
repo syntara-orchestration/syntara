@@ -8,7 +8,7 @@ on:
 
 jobs:
   dequeue-burst-detection:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       actions: read
@@ -35,7 +35,7 @@ jobs:
 
       - name: Check for dequeue burst and notify
         if: env.SLACK_CI_MONITORING_WEBHOOK_URL != ''
-        run: npm run check-dequeue-burst
+        run: npm run notify:dequeue-burst
         working-directory: .github/scripts
         env:
           GITHUB_TOKEN: ${{ github.token }}

@@ -1,7 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import type { ComponentProps, MouseEvent, ReactNode } from 'react'
-
-type TanStackTo = ComponentProps<typeof Link>['to']
+import type { MouseEvent, ReactNode } from 'react'
 
 type HistoryListItemLinkProps = Readonly<{
   to: string
@@ -11,12 +9,6 @@ type HistoryListItemLinkProps = Readonly<{
   className?: string
   'aria-label'?: string
   'data-item-id'?: string
-  /**
-   * When true the `<a>` is rendered without PF's `pf-v6-c-simple-list__item-link`
-   * class so it can be absolutely-positioned as an overlay without PF's
-   * `position: relative` fighting the overlay layout.
-   */
-  overlay?: boolean
 }>
 
 function isModifiedClick(event: MouseEvent<HTMLAnchorElement>): boolean {
@@ -36,17 +28,15 @@ export function HistoryListItemLink({
   className,
   'aria-label': ariaLabel,
   'data-item-id': dataItemId,
-  overlay = false,
 }: HistoryListItemLinkProps) {
-  const pfClass = overlay ? '' : 'pf-v6-c-simple-list__item-link'
   const selectedClass = isSelected ? ' pf-m-current' : ''
   const extraClass = className ? ` ${className}` : ''
 
   return (
     <Link
       // TanStack Router expects literal route strings; history hrefs are dynamic
-      to={to as TanStackTo}
-      className={`${pfClass}${selectedClass}${extraClass}`.trim()}
+      to={to}
+      className={`pf-v6-c-simple-list__item-link${selectedClass}${extraClass}`.trim()}
       aria-current={isSelected ? 'page' : undefined}
       aria-label={ariaLabel}
       data-item-id={dataItemId}

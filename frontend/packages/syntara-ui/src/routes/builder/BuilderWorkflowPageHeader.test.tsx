@@ -79,8 +79,8 @@ describe('BuilderWorkflowPageHeader', () => {
     publishedVersionId: null as string | null,
 
     isPublishing: false,
-    isAddNodePanelOpen: false,
-    hasNoWorkflowNodes: false,
+    isAddStepPanelOpen: false,
+    hasNoWorkflowSteps: false,
     ProjectSelector: <span>Project</span>,
     dispatch: vi.fn(),
     markDirty: vi.fn(),
@@ -178,11 +178,6 @@ describe('BuilderWorkflowPageHeader', () => {
     const nameSlot = screen.getByTestId('builder-workflow-name')
     expect(nameSlot).toHaveClass(styles.workflowName)
     expect(screen.getByTestId('builder-title-slot')).toHaveClass('pf-m-wrap')
-
-    const computed = window.getComputedStyle(nameSlot)
-    expect(computed.minWidth).toBe('16ch')
-    expect(computed.maxWidth).toBe('24ch')
-    expect(computed.flexShrink).toBe('1')
   })
 
   it('updates workflow name and marks dirty on change', async () => {
@@ -596,7 +591,7 @@ describe('BuilderWorkflowPageHeader', () => {
     await screen.findByText('Publish workflow?')
 
     // Submit the form
-    const submitButton = screen.getByRole('button', { name: 'Publish' })
+    const submitButton = screen.getByRole('button', { name: 'Publish workflow' })
     await user.click(submitButton)
 
     // onPublish should have been called

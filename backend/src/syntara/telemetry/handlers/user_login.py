@@ -5,16 +5,13 @@ Emits Segment telemetry events on successful authentication:
 - ``new_user`` additionally on the user's first login
 """
 
-import hashlib
-import hmac
-
 import structlog
 
 from syntara.audit.handler import AuditEventHandler
 from syntara.audit.models.audit_event import AuditEvent
 from syntara.auth.audit.user_login import UserLoginEvent
 from syntara.core.config.base import get_settings
-from syntara.telemetry.client import get_telemetry_registry
+from syntara.telemetry.client import get_telemetry_registry, hash_user_id
 from syntara.telemetry.events.new_user import NewUserEvent
 from syntara.telemetry.events.user_login import UserLoginEvent as UserLoginTelemetryEvent
 
@@ -31,11 +28,7 @@ class UserLoginTelemetryHandler(AuditEventHandler[UserLoginEvent]):
             if not registry.is_initialized():
                 return None
 
-            user_id_hash = hmac.new(
-                registry.installation_salt.encode(),
-                str(event.user_id).encode(),
-                hashlib.sha256,
-            ).hexdigest()
+            user_id_hash = hash_user_id(registry.installation_salt, event.user_id)
 
             entitlement_id = registry.entitlement_id
 

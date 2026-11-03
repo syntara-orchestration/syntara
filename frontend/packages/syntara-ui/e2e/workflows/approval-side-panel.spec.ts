@@ -49,7 +49,7 @@ test.describe('Approval Side Panel', () => {
         { from: 'approval_1', to: 'post_1', from_port: 'approved' },
       ]
 
-      const result = await createWorkflowViaApi(page, workflowName, triggers, nodes, edges)
+      const result = await createWorkflowViaApi({ app: page, name: workflowName, triggers, nodes, edges })
       workflowId = result.id
       await publishWorkflowViaApi(page, workflowId, result.versionNumber)
 
@@ -220,13 +220,13 @@ test.describe('Approval Side Panel', () => {
         { from: 'approval_1', to: 'post_1', from_port: 'approved' },
       ]
 
-      const { id: localWorkflowId, versionNumber } = await createWorkflowViaApi(
+      const { id: localWorkflowId, versionNumber } = await createWorkflowViaApi({
         app,
-        localWorkflowName,
+        name: localWorkflowName,
         triggers,
         nodes,
-        edges
-      )
+        edges,
+      })
 
       try {
         await publishWorkflowViaApi(app, localWorkflowId, versionNumber)
@@ -267,13 +267,13 @@ test.describe('Approval Side Panel', () => {
         { from: 'approval_1', to: 'post_1', from_port: 'approved' },
       ]
 
-      const { id: localWorkflowId, versionNumber } = await createWorkflowViaApi(
+      const { id: localWorkflowId, versionNumber } = await createWorkflowViaApi({
         app,
-        localWorkflowName,
+        name: localWorkflowName,
         triggers,
         nodes,
-        edges
-      )
+        edges,
+      })
 
       try {
         await publishWorkflowViaApi(app, localWorkflowId, versionNumber)

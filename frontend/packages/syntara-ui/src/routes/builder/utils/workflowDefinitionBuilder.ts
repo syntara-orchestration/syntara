@@ -195,7 +195,7 @@ function transformConditionForBackend(condition: string | undefined): string | u
  * Consolidates condition, switch, approval, and converge transforms
  * so both `buildWorkflowDefinition` and version-duplication share one path.
  */
-export function transformNodeParameters(type: string, parameters: Record<string, unknown>): Record<string, unknown> {
+export function transformStepParameters(type: string, parameters: Record<string, unknown>): Record<string, unknown> {
   let result = parameters
 
   if ((type === ActivityTypeEnum.CONDITION || type === ActivityTypeEnum.LOOP) && typeof result.condition === 'string') {
@@ -230,21 +230,17 @@ export function transformNodeParameters(type: string, parameters: Record<string,
  * - Converts React Flow handles to V2 port names (loop→iterate, done→complete)
  * - Extracts optional activity inputs using type-safe guards
  *
- * @param workflowName - Workflow name
- * @param workflowDescription - Optional workflow description
- * @param activities - Array of workflow activities (nodes)
- * @param triggers - Array of workflow triggers
- * @param edges - Array of workflow edges (connections)
  * @returns V2 workflow definition ready for API submission
  */
-export function buildWorkflowDefinition(
-  workflowName: string,
-  workflowDescription: string,
-  activities: Activity[],
-  triggers: Activity[],
-  graph: { edges: EdgeConnection[]; nodePositions?: Record<string, { x: number; y: number }> }
-) {
-  const { edges, nodePositions = {} } = graph
+export function buildWorkflowDefinition(params: {
+  workflowName: string
+  workflowDescription: string
+  activities: Activity[]
+  triggers: Activity[]
+  edges: EdgeConnection[]
+  nodePositions?: Record<string, { x: number; y: number }>
+}) {
+  const { workflowName, workflowDescription, activities, triggers, edges, nodePositions = {} } = params
   // SECURITY: Validate and sanitize workflow name and description
   if (!workflowName || workflowName.length > 255) {
     throw new Error('Workflow name is required and must be 255 characters or fewer.')
@@ -290,7 +286,7 @@ export function buildWorkflowDefinition(
       const sanitizedNodeName = a.name?.replace(CONTROL_CHAR_PATTERN, '')
       const inputs = hasInputs(a) ? a.inputs : undefined
 
-      const parameters = transformNodeParameters(a.type, a.parameters ?? {})
+      const parameters = transformStepParameters(a.type, a.parameters ?? {})
 
       return {
         id: a.id,

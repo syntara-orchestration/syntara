@@ -1,6 +1,7 @@
 """Unit tests for WorkflowVersionCreatedEvent model validation."""
 
 import json
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -18,7 +19,7 @@ class TestWorkflowVersionCreatedEventConstruction:
             version=3,
             entitlement_id="",
         )
-        assert event.workflow_id == VALID_WORKFLOW_ID
+        assert str(event.workflow_id) == VALID_WORKFLOW_ID
         assert event.version == 3
 
     def test_version_one(self) -> None:
@@ -60,7 +61,7 @@ class TestWorkflowVersionCreatedEventImmutability:
             entitlement_id="",
         )
         with pytest.raises(ValidationError):
-            event.workflow_id = "new-id"
+            event.workflow_id = uuid4()
 
 
 class TestWorkflowVersionCreatedEventSegmentConversion:
@@ -87,10 +88,22 @@ class TestWorkflowVersionCreatedEventSegmentConversion:
         assert props == {
             "workflow_id": VALID_WORKFLOW_ID,
             "version": 5,
+            "user_id_hash": None,
             "entitlement_id": "ent-123",
             "request_id": None,
             "container_image_version": "img-tag",
         }
+
+    def test_user_id_hash_in_segment_properties(self) -> None:
+        event = WorkflowVersionCreatedEvent(
+            workflow_id=VALID_WORKFLOW_ID,
+            version=2,
+            user_id_hash="deadbeef",
+            entitlement_id="",
+        )
+        props = event.to_segment_event()["properties"]
+        assert isinstance(props, dict)
+        assert props["user_id_hash"] == "deadbeef"
 
     def test_segment_event_is_json_serializable(self) -> None:
         event = WorkflowVersionCreatedEvent(

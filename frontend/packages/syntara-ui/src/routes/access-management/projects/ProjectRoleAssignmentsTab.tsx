@@ -33,6 +33,21 @@ import { AssignProjectRoleModal } from './AssignProjectRoleModal'
 
 const SORT_FIELDS = ['principal_name', 'role_name'] as const
 
+function buildAssignedRolesByPrincipal(assignments: RoleAssignmentRead[]): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>()
+  for (const a of assignments) {
+    const id = a.group_id ?? a.principal_id
+    if (!id) continue
+    const existing = map.get(id)
+    if (existing) {
+      existing.add(a.role_name)
+    } else {
+      map.set(id, new Set([a.role_name]))
+    }
+  }
+  return map
+}
+
 const filterFieldDefinitions: FilterFieldDefinition[] = [
   {
     key: 'principal_name',
@@ -84,11 +99,15 @@ function RoleAssignmentsTable({
     <>
       <Thead>
         <Tr>
-          <Th sort={getSortParams(0)}>Principal name</Th>
-          <Th>Principal type</Th>
-          <Th sort={getSortParams(1)}>Role name</Th>
-          <Th>Policies</Th>
-          <Th screenReaderText="Actions" />
+          <Th width={25} sort={getSortParams(0)}>
+            Principal name
+          </Th>
+          <Th width={25}>Principal type</Th>
+          <Th width={25} sort={getSortParams(1)}>
+            Role name
+          </Th>
+          <Th width={25}>Policies</Th>
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       <Tbody>
@@ -176,7 +195,14 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
 
   const assignments = useMemo(() => query.data?.resources ?? [], [query.data])
 
-  useCursorReset(assignments.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  const isAssignmentsFetching = query.isFetching
+  useCursorReset({
+    itemCount: assignments.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: isAssignmentsFetching,
+    resetPagination,
+  })
 
   const refetch = useCallback(() => detachPromise(query.refetch()), [query])
   const refetchAndInvalidateAuthz = useCallback(() => {
@@ -185,20 +211,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
     detachPromise(queryClient.invalidateQueries({ queryKey: ['role-assignments'] }))
   }, [queryClient, refetch])
 
-  const assignedRolesByPrincipal = useMemo(() => {
-    const map = new Map<string, Set<string>>()
-    for (const a of assignments) {
-      const id = a.group_id ?? a.principal_id
-      if (!id) continue
-      const existing = map.get(id)
-      if (existing) {
-        existing.add(a.role_name)
-      } else {
-        map.set(id, new Set([a.role_name]))
-      }
-    }
-    return map
-  }, [assignments])
+  const assignedRolesByPrincipal = useMemo(() => buildAssignedRolesByPrincipal(assignments), [assignments])
 
   const handleRoleCreated = useCallback(() => {
     detachPromise(queryClient.invalidateQueries({ queryKey: ['all-project-roles', projectId] }))
@@ -333,7 +346,7 @@ export function ProjectRoleAssignmentsTab({ projectId }: Readonly<{ projectId: s
         onClose={() => setAssignmentToUnassign(null)}
         onConfirm={handleUnassign}
         title="Unassign role?"
-        confirmLabel="Unassign"
+        confirmLabel="Unassign role"
         confirmVariant="danger"
         titleIconVariant="warning"
       >

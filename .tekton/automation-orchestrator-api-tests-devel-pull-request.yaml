@@ -10,7 +10,8 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: >-
-      event == "pull_request" && target_branch == "devel" &&
+      event == "pull_request" &&
+      (target_branch == "devel" || target_branch.startsWith("feature/") || target_branch.startsWith("feat/")) &&
       (files.all.exists(x, x.startsWith("backend/")) ||
       ".tekton/automation-orchestrator-api-tests-devel-pull-request.yaml".pathChanged())
   creationTimestamp: null
@@ -41,7 +42,7 @@ spec:
       - name: name
         value: ao-api-tests
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:aab6acb063b7108a554e1406dc6170f2e3d86aef7aa7eef553ee8ccf4d10d4b5
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1
       - name: kind
         value: pipeline
       - name: secret

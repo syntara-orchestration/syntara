@@ -26,6 +26,16 @@ export type SynFormFieldProps<
   /** Marks the field as required with a visual indicator. */
   isRequired?: boolean
   /**
+   * When true, omits the visible `FormGroup` label. Use for controls such as
+   * switches that render their own inline label.
+   */
+  hideFormGroupLabel?: boolean
+  /**
+   * When true, omits the default hint/error footer so the render prop can render
+   * custom validation messaging (for example expression syntax errors).
+   */
+  hideFooter?: boolean
+  /**
    * Popover content shown next to the label via PatternFly `FormGroup.labelHelp`.
    * Must be a `ReactElement` (e.g. a `FieldHelpPopover`) — PF6 does not accept
    * plain nodes.
@@ -67,9 +77,10 @@ export type SynFormFieldProps<
  * Renders the label, optional help popover, the field via render prop, and
  * validation error (or hint) below the field.
  *
- * Prefer the specialised wrappers (`SynTextField`, `SynTextAreaField`) for
- * standard text inputs. Use `SynFormField` directly for custom controls
- * (selects, checkboxes, date pickers, etc.).
+ * Prefer the specialised wrappers (`SynTextField`, `SynTextAreaField`,
+ * `SynSelectField`, `SynMultiSelectField`, `SynSwitchField`, `SynFileField`,
+ * `SynExpressionField`) for standard controls. Use `SynFormField` directly
+ * for bespoke inputs.
  */
 export function SynFormField<
   TFieldValues extends FieldValues = FieldValues,
@@ -80,6 +91,8 @@ export function SynFormField<
   label,
   fieldId,
   isRequired,
+  hideFormGroupLabel,
+  hideFooter,
   labelHelp,
   hint,
   children,
@@ -88,13 +101,19 @@ export function SynFormField<
   const resolvedFieldId = fieldId ?? name
 
   return (
-    <FormGroup label={label} fieldId={resolvedFieldId} isRequired={isRequired} labelHelp={labelHelp}>
+    <FormGroup
+      {...(!hideFormGroupLabel && { label })}
+      fieldId={resolvedFieldId}
+      isRequired={isRequired}
+      labelHelp={labelHelp}
+    >
       {children({ field, fieldState })}
-      {hint ? (
-        <FormFieldHintOrError hint={hint} error={fieldState.error} />
-      ) : (
-        <FormFieldError error={fieldState.error} />
-      )}
+      {!hideFooter &&
+        (hint ? (
+          <FormFieldHintOrError hint={hint} error={fieldState.error} />
+        ) : (
+          <FormFieldError error={fieldState.error} />
+        ))}
     </FormGroup>
   )
 }

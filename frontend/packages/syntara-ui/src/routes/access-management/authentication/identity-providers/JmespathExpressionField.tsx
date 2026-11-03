@@ -1,32 +1,30 @@
-import { Button, FormGroup, TextInput } from '@patternfly/react-core'
-import { Controller, type Control } from 'react-hook-form'
+import { Button, TextInput } from '@patternfly/react-core'
 
-import { HintOrError } from './formFieldHelpers'
+import { FormFieldHintOrError } from '../../../../components/FormFieldError'
+import { SynFormField } from '../../../../components/forms/SynFormField'
+
 import { type IdentityProviderFormData } from './identityProviderFormSchema'
 import { idpHelp } from './idpFieldHelp'
 import { IDP_TYPE_PRESETS } from './idpTypePresets'
 import styles from './JmespathExpressionField.module.css'
 
-export function JmespathExpressionField({
-  control,
-  idpType,
-}: Readonly<{ control: Control<IdentityProviderFormData>; idpType?: string | null }>) {
+export function JmespathExpressionField({ idpType }: Readonly<{ idpType?: string | null }>) {
   const defaultExpression = idpType ? (IDP_TYPE_PRESETS[idpType]?.groupMappingExpression ?? null) : null
 
   return (
-    <Controller
+    <SynFormField<IdentityProviderFormData, 'groupMapping.jmespathExpression'>
       name="groupMapping.jmespathExpression"
-      control={control}
-      render={({ field, fieldState }) => {
+      label="Group extraction expression"
+      fieldId="jmespath-expression"
+      labelHelp={idpHelp.groupExtractionExpression}
+      hideFooter
+    >
+      {({ field, fieldState }) => {
         const currentValue = field.value ?? 'groups[*]'
         const showReset = defaultExpression && currentValue !== defaultExpression
 
         return (
-          <FormGroup
-            label="Group extraction expression"
-            fieldId="jmespath-expression"
-            labelHelp={idpHelp.groupExtractionExpression}
-          >
+          <>
             <TextInput
               id="jmespath-expression"
               placeholder="groups[*]"
@@ -34,7 +32,7 @@ export function JmespathExpressionField({
               {...field}
               value={currentValue}
             />
-            <HintOrError
+            <FormFieldHintOrError
               error={fieldState.error}
               hint="JMESPath expression to extract group values from the ID token. Pre-filled by provider template selection."
             />
@@ -43,9 +41,9 @@ export function JmespathExpressionField({
                 Reset to default for {IDP_TYPE_PRESETS[idpType ?? '']?.label ?? 'this provider'}
               </Button>
             )}
-          </FormGroup>
+          </>
         )
       }}
-    />
+    </SynFormField>
   )
 }

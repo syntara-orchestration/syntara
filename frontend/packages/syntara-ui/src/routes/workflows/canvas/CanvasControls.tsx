@@ -12,7 +12,7 @@ import { Panel, useReactFlow } from '@xyflow/react'
 import React, { useCallback, useRef, useState } from 'react'
 
 import { SynPanel } from '../../../components/layout/SynPanel'
-import { NodeExpandedAllContext } from '../../../components/nodes/NodeExpandedAllContext'
+import { SynStepExpandedAllContext } from '../../../components/steps/SynStepExpandedAllContext'
 
 import { CanvasLegend } from './CanvasLegend'
 
@@ -93,7 +93,7 @@ export function CanvasControls(
   props: Readonly<{ onLayout: (options?: { markDirty?: boolean }) => void; hideLayout?: boolean }>
 ) {
   const { fitView, zoomIn, zoomOut } = useReactFlow()
-  const { expandAllEvent, collapseAllEvent } = React.use(NodeExpandedAllContext)
+  const { expandAllEvent, collapseAllEvent } = React.use(SynStepExpandedAllContext)
 
   return (
     <Panel position="bottom-left">

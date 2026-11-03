@@ -16,7 +16,7 @@ ARG BRANDING=false
 FROM ${DOWNSTREAM_OVERRIDE} AS override
 
 # Build stage
-FROM registry.access.redhat.com/ubi9/nodejs-24:latest@sha256:09ec365eac116f996dd07507784d06f648401c949eb48c40fe2d961341edd3fb AS builder
+FROM registry.access.redhat.com/ubi9/nodejs-24:latest@sha256:ecdcc047222dc57edbdd07879a54b97d7ff9232d740d608e188b41315b5462de AS builder
 
 ARG BRANDING
 
@@ -55,7 +55,7 @@ RUN --mount=from=override,source=/,target=/tmp/override \
 RUN npm run build
 
 # Production stage
-FROM registry.access.redhat.com/ubi9/nginx-124:latest@sha256:3292e9a046b72b18e51229a448f97568a9af26b26bf54488bfd78094800f2e61
+FROM registry.access.redhat.com/ubi9/nginx-124:latest@sha256:f414eb6c23a501c921542b75e30032979640682d8eaa37b500d7d34f4048e5ec
 
 USER 0
 

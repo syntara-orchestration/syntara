@@ -1,5 +1,4 @@
-import { permissionTooltip } from '../../hooks/permissionUtils'
-import { useCanI } from '../../hooks/useCanI'
+import { useCrudResourcePermissions } from '../../hooks/useCrudResourcePermissions'
 
 type ProjectPermissions = {
   canCreate: boolean
@@ -31,29 +30,18 @@ type UseProjectPermissionsOptions = {
  *   (never any-project for destructive UI).
  */
 export function useProjectPermissions(options?: UseProjectPermissionsOptions): ProjectPermissions {
-  const resourceType = 'project' as const
   const resourceProject = options?.resourceProject
   const hasProject = Boolean(resourceProject)
 
-  const { allowed: canCreate, isChecking: isCheckingCreate } = useCanI('create', resourceType)
-  const { allowed: canUpdate, isChecking: isCheckingUpdate } = useCanI('update', resourceType, {
-    resourceProject,
-    enabled: hasProject,
-  })
-  const { allowed: canDelete, isChecking: isCheckingDelete } = useCanI('delete', resourceType, {
-    resourceProject,
-    enabled: hasProject,
-  })
-
-  return {
-    canCreate,
-    canUpdate,
-    canDelete,
-    isLoading: isCheckingCreate || isCheckingUpdate || isCheckingDelete,
-    tooltips: {
-      create: permissionTooltip('create a project', `${resourceType}:create`),
-      update: permissionTooltip('edit this project', `${resourceType}:update`),
-      delete: permissionTooltip('delete this project', `${resourceType}:delete`),
+  return useCrudResourcePermissions({
+    resourceType: 'project',
+    tooltipTargets: {
+      create: 'create a project',
+      update: 'edit this project',
+      delete: 'delete this project',
     },
-  }
+    createCheck: { options: undefined },
+    updateCheck: { options: { resourceProject, enabled: hasProject } },
+    deleteCheck: { options: { resourceProject, enabled: hasProject } },
+  })
 }

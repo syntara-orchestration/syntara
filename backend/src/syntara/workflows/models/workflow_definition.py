@@ -1,7 +1,7 @@
 """Workflow definition schema models for v2 workflows.
 
 This module provides the Pydantic model for workflow definitions that conform to
-the Orchestrator Workflow Engine v2 schema.
+the Syntara Workflow Engine v2 schema.
 """
 
 from typing import Annotated, Any, Literal
@@ -9,6 +9,7 @@ from typing import Annotated, Any, Literal
 from pydantic import Discriminator, Field, field_validator
 from sqlmodel import SQLModel
 
+from syntara.core.constants import JsonbLimits
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     AAPJobTemplateExecutorParameters,
     AAPWorkflowJobTemplateExecutorParameters,
@@ -159,7 +160,7 @@ WorkflowNode = Annotated[_AllNodeTypes, Discriminator("type")]
 
 
 class WorkflowDefinition(SQLModel):
-    """JSON Schema for graph-based workflow definitions in the Orchestrator Workflow Engine v2.
+    """JSON Schema for graph-based workflow definitions in the Syntara Workflow Engine v2.
 
     Attributes:
         schema_version: Schema version that this workflow definition conforms to
@@ -207,9 +208,11 @@ class WorkflowDefinition(SQLModel):
     )
     nodes: list[WorkflowNode] = Field(
         ...,
+        max_length=JsonbLimits.MAX_WORKFLOW_NODES,
         description="Execution and control nodes in the workflow graph",
     )
     edges: list[dict[str, Any]] = Field(
         ...,
+        max_length=JsonbLimits.MAX_WORKFLOW_EDGES,
         description="List of directed edges connecting triggers and nodes in the workflow graph",
     )

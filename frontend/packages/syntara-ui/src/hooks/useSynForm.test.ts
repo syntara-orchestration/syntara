@@ -100,4 +100,43 @@ describe('useSynForm', () => {
     expect(onValid).toHaveBeenCalledOnce()
     expect(onValid.mock.calls[0][0]).toMatchObject({ name: 'My Group', description: '' })
   })
+
+  it('syncs external values via the RHF values prop', () => {
+    const hydratedValues: FormData = { name: 'alice', description: 'admin' }
+    const { result } = renderHook(() =>
+      useSynForm({
+        schema,
+        defaultValues,
+        values: hydratedValues,
+      })
+    )
+
+    expect(result.current.getValues()).toMatchObject(hydratedValues)
+  })
+
+  it('resetOptions keepDirtyValues preserves edited fields when external values update', () => {
+    const { result, rerender } = renderHook(
+      ({ values }: { values: FormData }) =>
+        useSynForm({
+          schema,
+          defaultValues,
+          values,
+          resetOptions: { keepDirtyValues: true },
+        }),
+      {
+        initialProps: {
+          values: { name: 'server', description: 'old' },
+        },
+      }
+    )
+
+    act(() => {
+      result.current.setValue('name', 'user-edit', { shouldDirty: true })
+    })
+
+    rerender({ values: { name: 'server', description: 'new from api' } })
+
+    expect(result.current.getValues('name')).toBe('user-edit')
+    expect(result.current.getValues('description')).toBe('new from api')
+  })
 })

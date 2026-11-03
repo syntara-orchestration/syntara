@@ -1,6 +1,6 @@
 # GitHub Actions Scripts
 
-TypeScript monitoring scripts for the merge queue. Alerts are sent to Slack when the queue stalls or PRs are repeatedly dequeued.
+TypeScript GitHub Actions scripts for merge-queue monitoring, visual-regression review notifications, and PR convention checks.
 
 ## Development
 
@@ -27,8 +27,17 @@ export GITHUB_REPOSITORY="syntara-orchestration/syntara"
 export GITHUB_RUN_ID="123456"
 export GITHUB_HEAD_REF="gh-readonly-queue/devel/pr-123-abc123"
 
-npm run check-dequeue-burst
-npm run check-queue-health
+npm run notify:dequeue-burst
+npm run notify:queue-health
+npm run notify:visual-regression-pr
+```
+
+PR convention checks (no token needed):
+
+```bash
+PR_TITLE="fix(auth): handle expired tokens" npm run check:pr-title
+PR_BODY="$(gh pr view 123 --json body -q .body)" npm run check:pr-description
+DIFF_BASE=origin/devel npm run check:jira-references   # defaults to HEAD^1..HEAD
 ```
 
 ## Testing in CI

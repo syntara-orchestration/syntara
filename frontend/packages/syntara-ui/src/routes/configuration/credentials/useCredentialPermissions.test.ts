@@ -52,7 +52,7 @@ describe('useCredentialPermissions', () => {
   })
 
   it('uses check_any_project for create and system-scoped update/delete without resourceProject', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useCredentialPermissions(), { wrapper: createWrapper() })
 
@@ -183,7 +183,7 @@ describe('useCredentialPermissions', () => {
   })
 
   it('skips all checks and reports isLoading when enabled is false', () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useCredentialPermissions({ enabled: false }), {
       wrapper: createWrapper(),

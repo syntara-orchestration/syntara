@@ -40,49 +40,100 @@ async function getBuilderProjectId(page: Page): Promise<string> {
  * Creates the credential under the workflow's project so the
  * CredentialSelector (which filters by project_id) can find it.
  */
-export async function ensureLlmCredential(page: Page): Promise<{ name: string; id: string }> {
-  const targetProjectId = await getBuilderProjectId(page)
-  const credName = 'e2e-llm-provider'
-
-  // Check if it already exists under the target project
+async function findLlmCredentialForProject(
+  page: Page,
+  credName: string,
+  projectId: string
+): Promise<{ name: string; id: string } | null> {
   const listResp = await apiRequest(page, 'get', `/credentials?name=${encodeURIComponent(credName)}`)
-  if (listResp.ok()) {
-    const body = (await listResp.json()) as { resources?: Array<{ id: string; name: string; project_id?: string }> }
-    const match = body.resources?.find((c) => c.project_id === targetProjectId)
-    if (match) return { name: credName, id: match.id }
+  if (!listResp.ok()) return null
+  const body = (await listResp.json()) as { resources?: Array<{ id: string; name: string; project_id?: string }> }
+  const match = body.resources?.find((c) => c.project_id === projectId)
+  return match ? { name: credName, id: match.id } : null
+}
 
-    // Exists under wrong project — delete so we can recreate under the right one
-    if (body.resources?.length) {
-      await apiRequest(page, 'delete', `/credentials/${body.resources[0].id}`)
-    }
-  }
+const LLM_CREDENTIAL_CREATE_MAX_ATTEMPTS = 4
+const LLM_CREDENTIAL_RETRYABLE_STATUSES = new Set([409, 429, 500, 502, 503, 504])
 
-  // Find LLM Provider credential type
+async function getLlmProviderCredentialTypeId(page: Page): Promise<string> {
   const typesResp = await apiRequest(page, 'get', '/credential_types')
   if (!typesResp.ok()) throw new Error('Could not list credential types')
   const types = (await typesResp.json()) as { resources?: Array<{ id: string; name: string }> }
   const llmType = types.resources?.find((t) => t.name === 'LLM Provider')
   if (!llmType) throw new Error('LLM Provider credential type not found')
+  return llmType.id
+}
 
-  // Create the credential
-  const createResp = await apiRequest(page, 'post', '/credentials', {
-    data: {
-      name: credName,
-      credential_type_id: llmType.id,
-      project_id: targetProjectId,
-      inputs: { api_key: 'sk-ant-e2e-test-key' },
-    },
-  })
-  if (createResp.ok()) {
-    const cred = (await createResp.json()) as { id: string }
-    return { name: credName, id: cred.id }
+/**
+ * Create an LLM Provider credential via the API with MQ-friendly retries.
+ * Use a unique `name` when tests run in parallel (e.g. integration-models).
+ */
+export async function createLlmProviderCredential(
+  page: Page,
+  options: { name: string; projectId: string; apiKey?: string }
+): Promise<{ name: string; id: string }> {
+  const { name: credName, projectId, apiKey = 'sk-e2e-test-key' } = options
+  const llmTypeId = await getLlmProviderCredentialTypeId(page)
+
+  for (let attempt = 1; attempt <= LLM_CREDENTIAL_CREATE_MAX_ATTEMPTS; attempt++) {
+    const createResp = await apiRequest(page, 'post', '/credentials', {
+      data: {
+        name: credName,
+        credential_type_id: llmTypeId,
+        project_id: projectId,
+        inputs: { api_key: apiKey },
+      },
+    })
+
+    if (createResp.ok()) {
+      const cred = (await createResp.json()) as { id: string }
+      return { name: credName, id: cred.id }
+    }
+
+    const status = createResp.status()
+    if (status === 409) {
+      const raced = await findLlmCredentialForProject(page, credName, projectId)
+      if (raced) return raced
+    }
+
+    if (LLM_CREDENTIAL_RETRYABLE_STATUSES.has(status) && attempt < LLM_CREDENTIAL_CREATE_MAX_ATTEMPTS) {
+      await page.waitForTimeout(250 * attempt)
+      continue
+    }
+
+    const text = await createResp.text()
+    throw new Error(`Could not create LLM credential: ${status} ${text}`)
   }
-  throw new Error(`Could not create LLM credential: ${createResp.status()}`)
+
+  throw new Error('Could not create LLM credential: retries exhausted')
+}
+
+export async function ensureLlmCredential(page: Page): Promise<{ name: string; id: string }> {
+  const targetProjectId = await getBuilderProjectId(page)
+  const credName = 'e2e-llm-provider'
+
+  const existing = await findLlmCredentialForProject(page, credName, targetProjectId)
+  if (existing) return existing
+
+  // Exists under wrong project — delete so we can recreate under the right one
+  const listResp = await apiRequest(page, 'get', `/credentials?name=${encodeURIComponent(credName)}`)
+  if (listResp.ok()) {
+    const body = (await listResp.json()) as { resources?: Array<{ id: string; name: string; project_id?: string }> }
+    if (body.resources?.length) {
+      await apiRequest(page, 'delete', `/credentials/${body.resources[0].id}`)
+    }
+  }
+
+  return createLlmProviderCredential(page, {
+    name: credName,
+    projectId: targetProjectId,
+    apiKey: 'sk-ant-e2e-test-key',
+  })
 }
 
 /**
  * Ensure an AAP credential exists via the API.
- * Returns the credential name and id for use in the AAP node form.
+ * Returns the credential name and id for use in the AAP step form.
  */
 export async function ensureAapCredential(page: Page): Promise<{ name: string; id: string }> {
   const targetProjectId = await getBuilderProjectId(page)
@@ -124,7 +175,7 @@ export async function ensureAapCredential(page: Page): Promise<{ name: string; i
 
 /**
  * Ensure an AAP integration exists, backed by an AAP credential.
- * Returns the integration name for selection in the AAP node form.
+ * Returns the integration name for selection in the AAP step form.
  */
 export async function ensureAapIntegration(page: Page): Promise<{ name: string; credName: string }> {
   const cred = await ensureAapCredential(page)

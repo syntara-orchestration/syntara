@@ -3,7 +3,7 @@ import { userEvent } from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { BulkApproveDialog } from './BulkApproveDialog'
+import { BulkApproveDialog } from './BulkDecisionDialog'
 
 describe('BulkApproveDialog', () => {
   const defaultProps = {

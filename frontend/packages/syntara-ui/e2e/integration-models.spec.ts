@@ -8,8 +8,8 @@
  * - Set a model as default via kebab menu
  * - Remove default model via kebab menu
  * - Filter models by name
- * - Save model changes and verify persistence on revisit
- * - Allow-list changes propagate to the Agent node model selector (Test 15)
+ * - Save models and verify persistence on revisit
+ * - Allow-list changes propagate to the Agent step model selector (Test 15)
  *
  * Edge cases:
  * - Filter with no results shows empty filter state
@@ -17,6 +17,7 @@
  */
 import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
+import { createLlmProviderCredential } from './helpers/llm-helpers'
 import { buildUniqueName, clickAddConnectedStep, startWorkflowWithTrigger } from './helpers/workflows'
 import { deleteIntegrationViaApi, type SeededIntegration } from './seeds/resources'
 import { apiRequest, deleteCredentialViaApi, ensureProject } from './utils/api'
@@ -25,23 +26,11 @@ async function ensureLlmCredentialId(app: Page): Promise<string> {
   const project = await ensureProject(app)
   if (!project) throw new Error('Could not ensure project for credential creation')
 
-  const typesResp = await apiRequest(app, 'get', '/credential_types')
-  if (!typesResp.ok()) throw new Error('Could not list credential types')
-  const types = (await typesResp.json()) as { resources?: Array<{ id: string; name: string }> }
-  const llmType = types.resources?.find((t) => t.name === 'LLM Provider')
-  if (!llmType) throw new Error('LLM Provider credential type not found')
-
   const credName = `e2e-llm-models-cred-${Date.now()}`
-  const createResp = await apiRequest(app, 'post', '/credentials', {
-    data: {
-      name: credName,
-      credential_type_id: llmType.id,
-      project_id: project.id,
-      inputs: { api_key: 'sk-e2e-test-key' },
-    },
+  const cred = await createLlmProviderCredential(app, {
+    name: credName,
+    projectId: project.id,
   })
-  if (!createResp.ok()) throw new Error('Could not create LLM credential')
-  const cred = (await createResp.json()) as { id: string }
   return cred.id
 }
 
@@ -115,7 +104,7 @@ test.describe('LLM Provider Models Tab', () => {
 
       const modelsTable = app.locator('[aria-label="Integration models"]')
       await expect(modelsTable).toBeVisible()
-      await expect(app.getByRole('button', { name: 'Save model changes' })).toBeVisible()
+      await expect(app.getByRole('button', { name: 'Save models' })).toBeVisible()
       const checkboxes = modelsTable.getByRole('checkbox')
       const count = await checkboxes.count()
       expect(count).toBeGreaterThan(0)
@@ -242,7 +231,7 @@ test.describe('LLM Provider Models Tab', () => {
       await gammaCheckbox.click()
       await expect(gammaCheckbox).toBeChecked()
 
-      await app.getByRole('button', { name: 'Save model changes' }).click()
+      await app.getByRole('button', { name: 'Save models' }).click()
       await expect(app.getByText('Models updated')).toBeVisible()
 
       await navigateToModelsTab(app, name)
@@ -324,12 +313,12 @@ test.describe('LLM Provider Models Tab', () => {
     }
   })
 
-  test('allow-list and default changes propagate to agent node model selector', async ({ app }) => {
+  test('allow-list and default changes propagate to agent step model selector', async ({ app }) => {
     const name = buildUniqueName('e2e-llm-propagate')
     const integration = await createLLMIntegration(app, name)
 
     try {
-      // 1. Open workflow builder, add an Agent node, verify initial model state
+      // 1. Open workflow builder, add an Agent step, verify initial model state
       await startWorkflowWithTrigger(app)
 
       const panel = await clickAddConnectedStep(app)
@@ -380,7 +369,7 @@ test.describe('LLM Provider Models Tab', () => {
       await expect(gammaRow.getByText('Default')).toBeVisible()
 
       // Save
-      await app.getByRole('button', { name: 'Save model changes' }).click()
+      await app.getByRole('button', { name: 'Save models' }).click()
       await expect(app.getByText('Models updated')).toBeVisible()
 
       // 3. Return to the workflow builder and verify allow-list changes are reflected
@@ -437,7 +426,7 @@ test.describe('LLM Provider Models Tab', () => {
         })
       )
 
-      await app.getByRole('button', { name: 'Save model changes' }).click()
+      await app.getByRole('button', { name: 'Save models' }).click()
       await expect(app.getByText('Failed to update models')).toBeVisible()
     } finally {
       await deleteIntegrationViaApi(app, integration.id)

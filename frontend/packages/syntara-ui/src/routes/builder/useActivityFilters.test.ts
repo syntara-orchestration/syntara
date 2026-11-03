@@ -1,7 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import type { FilterConfig } from '../../types/filters'
 import { FilterOperatorEnum } from '../../types/filters'
 import type { ActivityState } from '../workflows/execution/types'
 
@@ -139,7 +138,7 @@ describe('useActivityFilters', () => {
     const { result } = renderHook(() => useActivityFilters(ACTIVITIES, states))
 
     act(() => {
-      result.current.handleFilterChange([{ key: 'unknown_key', value: 'something' } as FilterConfig])
+      result.current.handleFilterChange([{ key: 'unknown_key', value: 'something' }])
     })
 
     expect(result.current.filteredActivityOrder).toEqual(ACTIVITIES)

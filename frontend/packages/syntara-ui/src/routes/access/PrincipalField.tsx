@@ -1,12 +1,11 @@
-import { FormGroup, FormHelperText, HelperText, HelperTextItem } from '@patternfly/react-core'
-import { Controller, useForm } from 'react-hook-form'
+import type { FieldPath, FieldValues } from 'react-hook-form'
 
-import type { AssignRoleFormData } from './assignRoleSchema'
+import { SynFormField } from '../../components/forms/SynFormField'
+
 import { TypeaheadSelect } from './TypeaheadSelect'
 
-type PrincipalFieldProps = {
-  control: ReturnType<typeof useForm<AssignRoleFormData>>['control']
-  name: 'userId' | 'groupId' | 'serviceAccountId'
+type PrincipalFieldProps<TFieldValues extends FieldValues> = {
+  name: FieldPath<TFieldValues>
   label: string
   fieldId: string
   options: { value: string; label: string }[]
@@ -16,8 +15,7 @@ type PrincipalFieldProps = {
   isLoading?: boolean
 }
 
-export function PrincipalField({
-  control,
+export function PrincipalField<TFieldValues extends FieldValues>({
   name,
   label,
   fieldId,
@@ -26,36 +24,23 @@ export function PrincipalField({
   onSearchChange,
   hasMore,
   isLoading,
-}: Readonly<PrincipalFieldProps>) {
+}: Readonly<PrincipalFieldProps<TFieldValues>>) {
   return (
-    <FormGroup label={label} isRequired fieldId={fieldId}>
-      <Controller
-        name={name}
-        control={control}
-        render={({ field, fieldState }) => (
-          <>
-            <TypeaheadSelect
-              id={fieldId}
-              ariaLabel={label}
-              options={options}
-              selected={field.value ?? ''}
-              onChange={field.onChange}
-              placeholder={placeholder}
-              hasError={!!fieldState.error}
-              onSearchChange={onSearchChange}
-              hasMore={hasMore}
-              isLoading={isLoading}
-            />
-            {fieldState.error && (
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem variant="error">{fieldState.error.message}</HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            )}
-          </>
-        )}
-      />
-    </FormGroup>
+    <SynFormField<TFieldValues, FieldPath<TFieldValues>> name={name} label={label} fieldId={fieldId} isRequired>
+      {({ field, fieldState }) => (
+        <TypeaheadSelect
+          id={fieldId}
+          ariaLabel={label}
+          options={options}
+          selected={field.value ?? ''}
+          onChange={field.onChange}
+          placeholder={placeholder}
+          hasError={!!fieldState.error}
+          onSearchChange={onSearchChange}
+          hasMore={hasMore}
+          isLoading={isLoading}
+        />
+      )}
+    </SynFormField>
   )
 }

@@ -146,18 +146,22 @@ function AssignmentsTableBody({
             }}
             aria-label="Row expansion"
           />
-          <Th sort={getSortParams(1)}>Principal name</Th>
-          <Th sort={getSortParams(2)} modifier="nowrap">
+          <Th width={20} sort={getSortParams(1)}>
+            Principal name
+          </Th>
+          <Th width={15} sort={getSortParams(2)} modifier="nowrap">
             Principal type
           </Th>
-          <Th sort={getSortParams(3)}>Role name</Th>
-          <Th sort={getSortParams(4)} modifier="nowrap">
+          <Th width={15} sort={getSortParams(3)}>
+            Role name
+          </Th>
+          <Th width={15} sort={getSortParams(4)} modifier="nowrap">
             Scope
           </Th>
-          <Th sort={getSortParams(5)} modifier="nowrap">
+          <Th width={15} sort={getSortParams(5)} modifier="nowrap">
             Project
           </Th>
-          <Th screenReaderText="Actions" />
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       {rows.map((row, rowIndex) => {
@@ -262,7 +266,7 @@ export function AssignmentsTab() {
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(rowIds)
   const refetch = useCallback(() => detachPromise(assignmentsQuery.refetch()), [assignmentsQuery])
 
-  useCursorReset(rows.length, hasActiveFilters, cursor, isFetching, resetPagination)
+  useCursorReset({ itemCount: rows.length, hasActiveFilters, cursor, isFetching, resetPagination })
 
   const { mutate: deleteRoleAssignment } = accessClient.useMutation('delete', '/role_assignments/{assignment_id}')
   const { mutate: deleteProjectRoleAssignment } = accessClient.useMutation(
@@ -368,8 +372,8 @@ export function AssignmentsTab() {
           isOpen={deleteDialog.isOpen}
           onClose={deleteDialog.close}
           onConfirm={() => handleDelete(deleteItem)}
-          title="Remove assignment?"
-          confirmLabel="Remove"
+          title="Delete assignment?"
+          confirmLabel="Delete assignment"
           confirmVariant="danger"
           titleIconVariant="warning"
         >

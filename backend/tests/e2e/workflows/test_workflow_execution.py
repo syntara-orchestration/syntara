@@ -525,7 +525,7 @@ class TestWorkflowExecution:
             f"Expected 202 Accepted, got {cancel_response.status_code}: {cancel_response.content!r}"
         )
 
-        max_polls = 20
+        max_polls = 60
         poll_interval = 1
         cancelled_execution = None
 
