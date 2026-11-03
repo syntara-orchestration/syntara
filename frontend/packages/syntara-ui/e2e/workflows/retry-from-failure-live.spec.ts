@@ -136,7 +136,11 @@ async function openRetryPanel(app: Page): Promise<void> {
   await expect(app.getByRole('complementary', { name: 'Retry run from failure review' })).toBeVisible()
 }
 
-async function clickCanvasStepHeading(app: Page, node: ReturnType<Page['getByTestId']>, heading: string): Promise<void> {
+async function clickCanvasStepHeading(
+  app: Page,
+  node: ReturnType<Page['getByTestId']>,
+  heading: string
+): Promise<void> {
   const step = node.getByRole('heading', { name: heading, level: 2 })
   await expect(async () => {
     await layoutCanvas(app)
