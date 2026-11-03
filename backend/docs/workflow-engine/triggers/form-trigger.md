@@ -6,17 +6,22 @@ the form starts the workflow, and downstream nodes can use the submitted values.
 For the shared trigger architecture, including output mapping, namespace registration, and how the
 workflow selects a trigger activity from its node type, see [Trigger System Overview](overview.md).
 
-## How a Form Trigger Works
+## System Architecture
 
-The form is presented before a workflow execution begins. The user submits it through the existing
-`POST /api/v1/executions` endpoint; form triggers have no separate submit endpoint. The API
-validates the answers and starts exactly one execution, with the form-trigger activity as its
-entry node. It does not create a pending form record or pause a workflow while it waits for input.
+Form triggers collect input before the workflow starts. There is no pending response or deadline,
+and the workflow does not pause while waiting for input.
 
-The form definition lives in the workflow version, and the UI renders it from there. There is no
-dedicated form-trigger table, service, or read endpoint.
-The execution stores the validated answers in `input_data`. The trigger activity applies output
-mapping and puts the mapped values under `response_data`, where downstream nodes can use them.
+- **Submission path:** The user submits the form through `POST /api/v1/executions`, the same
+  endpoint used by manual triggers. The API validates the answers and starts one execution, with
+  the form-trigger activity as its entry node.
+- **Form storage:** The definition stays in the workflow version. There is no dedicated
+  form-trigger table, service, or read endpoint.
+- **Domain ownership:** The forms domain provides the shared form field models and validator; the
+  workflows domain owns the form-trigger node and execution path.
+- **Execution data:** The execution stores validated answers in `input_data`. The trigger
+  activity applies output mapping and returns the result under `response_data` for downstream
+  nodes to use.
+
 
 ## Form Definitions, Fields, and Parameters
 
@@ -29,8 +34,7 @@ the full guide, including where the two differ.
 ## Submitting a Form
 
 Before starting the workflow, the executions API validates the answers against the form definition
-and normalizes them for downstream steps. The forms domain owns the field models and shared
-validation; the workflows domain owns the trigger and execution path.
+and normalizes them for downstream steps.
 
 ```mermaid
 sequenceDiagram
