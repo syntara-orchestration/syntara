@@ -8,6 +8,7 @@ import { integrationsClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 import { routerTestState } from '../../../test/setup'
 
+import { OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY } from './form/useOpenShiftIntegrationExists'
 import { useIntegrationActions } from './useIntegrationActions'
 
 vi.mock('../../../client', () => ({
@@ -143,6 +144,7 @@ describe('useIntegrationActions', () => {
         callbacks.onSuccess?.()
         callbacks.onSettled?.()
       })
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
       const { result } = renderHook(() => useIntegrationActions(mockRefetch), { wrapper })
 
@@ -150,6 +152,7 @@ describe('useIntegrationActions', () => {
       act(() => result.current.handleDelete())
 
       expect(mockMutate).toHaveBeenCalled()
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY })
       expect(routerTestState.navigate).toHaveBeenCalled()
     })
   })

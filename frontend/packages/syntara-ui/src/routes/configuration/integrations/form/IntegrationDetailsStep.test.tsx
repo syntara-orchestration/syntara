@@ -1,15 +1,16 @@
-import { IntegrationTypeEnum, LLMProviderHintEnum } from '@syntara/contracts'
+import { IntegrationTypeEnum } from '@syntara/contracts'
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useCallback } from 'react'
 import { useForm } from 'react-hook-form'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { SynForm } from '../../../../components/forms/SynForm'
+import { EXECUTION_PLANE_SINGLETON_HELP } from '../integrationFieldHelpText'
 
 import { IntegrationDetailsStep } from './IntegrationDetailsStep'
-import type { IntegrationFormData } from './integrationFormSchema'
+import { getDefaultConfiguration, type IntegrationFormData } from './integrationFormSchema'
 
 vi.mock('../../../access/useAllProjects', () => {
   const projectsMock = () => ({
@@ -24,13 +25,20 @@ vi.mock('../../../access/useAllProjects', () => {
   return { useAllProjects: projectsMock, useSelectableProjects: projectsMock }
 })
 
-vi.mock('./useOpenShiftIntegrationExists', () => ({
-  useOpenShiftIntegrationExists: () => ({
+const { mockUseOpenShiftIntegrationExists } = vi.hoisted(() => ({
+  mockUseOpenShiftIntegrationExists: vi.fn(() => ({
     exists: false,
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
-  }),
+  })),
+}))
+
+vi.mock('./useOpenShiftIntegrationExists', () => ({
+  useOpenShiftIntegrationExists: () =>
+    mockUseOpenShiftIntegrationExists() as ReturnType<
+      typeof import('./useOpenShiftIntegrationExists').useOpenShiftIntegrationExists
+    >,
   OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY: ['openshift-integration-exists'],
 }))
 
@@ -96,31 +104,7 @@ function TestWrapper({
 
   const onTypeChange = useCallback(
     (newType: string) => {
-      let newConfig: IntegrationFormData['configuration']
-      if (newType === IntegrationTypeEnum.LLM_PROVIDER) {
-        newConfig = {
-          integration_type: 'llm_provider' as const,
-          provider_hint: LLMProviderHintEnum.RED_HAT_AI,
-          base_url: '',
-          allow_http: false,
-          insecure_skip_tls_verify: false,
-        }
-      } else if (newType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM) {
-        newConfig = {
-          integration_type: 'ansible_automation_platform' as const,
-          base_url: '',
-          allow_http: false,
-          insecure_skip_tls_verify: false,
-        }
-      } else {
-        newConfig = {
-          integration_type: 'mcp_server' as const,
-          base_url: '',
-          allow_http: false,
-          insecure_skip_tls_verify: false,
-        }
-      }
-      setValue('configuration', newConfig, { shouldValidate: false })
+      setValue('configuration', getDefaultConfiguration(newType), { shouldValidate: false })
       setValue('integration_type', newType as IntegrationFormData['integration_type'])
       setValue('management_credential_id', null)
       onTypeChangeProp(newType)
@@ -136,6 +120,15 @@ function TestWrapper({
 }
 
 describe('IntegrationDetailsStep', () => {
+  beforeEach(() => {
+    mockUseOpenShiftIntegrationExists.mockReturnValue({
+      exists: false,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    })
+  })
+
   it('renders heading and description', () => {
     render(<TestWrapper />)
 
@@ -204,6 +197,98 @@ describe('IntegrationDetailsStep', () => {
       render(<TestWrapper defaultType={IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM} />)
 
       expect(screen.getByRole('textbox', { name: /server name/i })).toBeInTheDocument()
+    })
+  })
+
+  describe('Execution plane infrastructure singleton', () => {
+    it('keeps the option selectable when no openshift integration exists', async () => {
+      const user = userEvent.setup()
+      render(<TestWrapper />)
+
+      await user.click(screen.getByRole('button', { name: 'MCP Server' }))
+      const option = screen.getByRole('option', { name: /Execution plane infrastructure/i })
+      expect(option).toBeEnabled()
+      expect(screen.queryByText(EXECUTION_PLANE_SINGLETON_HELP)).not.toBeInTheDocument()
+
+      await user.click(option)
+      expect(screen.getByRole('textbox', { name: /cluster name/i })).toBeInTheDocument()
+    })
+
+    it('disables the option with helper text when an openshift integration exists', async () => {
+      mockUseOpenShiftIntegrationExists.mockReturnValue({
+        exists: true,
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      })
+      const user = userEvent.setup()
+      render(<TestWrapper />)
+
+      await user.click(screen.getByRole('button', { name: 'MCP Server' }))
+      const option = screen.getByRole('option', { name: /Execution plane infrastructure/i })
+      expect(option).toBeDisabled()
+      expect(screen.getByText(EXECUTION_PLANE_SINGLETON_HELP)).toBeInTheDocument()
+    })
+
+    it('does not change type when the disabled option is activated', async () => {
+      mockUseOpenShiftIntegrationExists.mockReturnValue({
+        exists: true,
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      })
+      const user = userEvent.setup()
+      render(<TestWrapper />)
+
+      await user.click(screen.getByRole('button', { name: 'MCP Server' }))
+      await user.click(screen.getByRole('option', { name: /Execution plane infrastructure/i }))
+
+      expect(screen.getByRole('button', { name: 'MCP Server' })).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /cluster name/i })).not.toBeInTheDocument()
+    })
+
+    it('leaves other integration type options enabled when openshift exists', async () => {
+      mockUseOpenShiftIntegrationExists.mockReturnValue({
+        exists: true,
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      })
+      const user = userEvent.setup()
+      render(<TestWrapper />)
+
+      await user.click(screen.getByRole('button', { name: 'MCP Server' }))
+      expect(screen.getByRole('option', { name: 'LLM Provider' })).toBeEnabled()
+      expect(screen.getByRole('option', { name: 'Ansible Automation Platform' })).toBeEnabled()
+      expect(screen.getByRole('option', { name: 'MCP Server' })).toBeEnabled()
+    })
+
+    it('re-enables the option after the existing integration is gone', async () => {
+      mockUseOpenShiftIntegrationExists.mockReturnValue({
+        exists: true,
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      })
+      const user = userEvent.setup()
+      const { unmount } = render(<TestWrapper />)
+
+      await user.click(screen.getByRole('button', { name: 'MCP Server' }))
+      expect(screen.getByRole('option', { name: /Execution plane infrastructure/i })).toBeDisabled()
+      unmount()
+
+      mockUseOpenShiftIntegrationExists.mockReturnValue({
+        exists: false,
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      })
+      render(<TestWrapper />)
+
+      await user.click(screen.getByRole('button', { name: 'MCP Server' }))
+      const option = screen.getByRole('option', { name: /Execution plane infrastructure/i })
+      expect(option).toBeEnabled()
+      expect(screen.queryByText(EXECUTION_PLANE_SINGLETON_HELP)).not.toBeInTheDocument()
     })
   })
 

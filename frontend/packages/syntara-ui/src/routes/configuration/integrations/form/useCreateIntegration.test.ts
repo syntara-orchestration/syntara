@@ -60,6 +60,7 @@ describe('useCreateIntegration', () => {
     mockSyncAssignments.mockClear().mockResolvedValue({ added: [], removed: [], errors: [] })
     mockHandleError.mockClear()
     mockHandleError.mockReturnValue(vi.fn())
+    mockInvalidateQueries.mockClear()
   })
 
   it('creates integration with correct body', async () => {
@@ -101,6 +102,21 @@ describe('useCreateIntegration', () => {
     expect(vi.mocked(tanstackRouter.navigate)).toHaveBeenCalledWith(
       expect.objectContaining({ to: '/configuration/integrations' })
     )
+  })
+
+  it('invalidates the openshift existence query after create', async () => {
+    const formData = createTestFormData()
+    const { result } = renderHook(() => useCreateIntegration({ handleError: mockHandleError }))
+
+    act(() => {
+      result.current(formData)
+    })
+
+    await waitFor(() => {
+      expect(mockInvalidateQueries).toHaveBeenCalledWith({
+        queryKey: ['openshift-integration-exists'],
+      })
+    })
   })
 
   it('handles creation error without navigating', async () => {
