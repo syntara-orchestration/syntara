@@ -9,19 +9,18 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 import pytest
-from orchestrator_test_sdk.e2e import unique_name
-from syntara_api_client.models import WorkflowCreate
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from syntara_api_client.api import SyntaraApiRegistry
-    from syntara_api_client.models import WorkflowRead
+    from syntara_api_client.models import WorkflowCreate, WorkflowRead
 
 if not os.environ.get("APP_BASE_URL"):
     pytest.skip("APP_BASE_URL not set — full stack required", allow_module_level=True)
 from ._helpers import (
     assert_consumer_completed,
+    create_form_trigger_workflow,
     submit_form_trigger_and_track,
 )
 from ._telemetry import (
@@ -29,7 +28,6 @@ from ._telemetry import (
     require_segment_server_url,
     wait_for_segment_event,
 )
-from ._workflows import form_trigger_consumer_workflow
 
 _SEGMENT_SERVER_URL = require_segment_server_url()
 
@@ -38,40 +36,6 @@ pytestmark = [pytest.mark.e2e]
 _FIELD_LABEL = "PRIVATE_APPROVAL_REASON_LABEL_97126"
 _OPTIONAL_FIELD_LABEL = "PRIVATE_OPTIONAL_COUNT_LABEL_97126"
 _FIELD_VALUE = "PRIVATE_APPROVAL_REASON_VALUE_97126"
-
-
-def _create_form_trigger_workflow(
-    workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
-    project_id: UUID,
-    *,
-    name_prefix: str,
-) -> WorkflowRead:
-    """Create a telemetry test workflow with one required and one optional field."""
-    name = unique_name(name_prefix)
-    return workflow_factory(
-        WorkflowCreate(
-            name=name,
-            description="E2E: form-trigger submission telemetry",
-            project_id=project_id,
-            workflow_definition=form_trigger_consumer_workflow(
-                name,
-                form_fields=[
-                    {
-                        "type": "text",
-                        "value_name": "reason",
-                        "label": _FIELD_LABEL,
-                        "required": True,
-                    },
-                    {
-                        "type": "number",
-                        "value_name": "optional_count",
-                        "label": _OPTIONAL_FIELD_LABEL,
-                        "required": False,
-                    },
-                ],
-            ),
-        )
-    )
 
 
 class TestFormTriggerTelemetry:
@@ -95,10 +59,25 @@ class TestFormTriggerTelemetry:
         - The event identifies the execution, contains field metadata, and omits submitted data
           and direct submitter identity.
         """
-        workflow = _create_form_trigger_workflow(
+        workflow = create_form_trigger_workflow(
             workflow_factory,
             first_project_id,
             name_prefix="e2e-form-trigger-telemetry",
+            description="E2E: form-trigger submission telemetry",
+            form_fields=[
+                {
+                    "type": "text",
+                    "value_name": "reason",
+                    "label": _FIELD_LABEL,
+                    "required": True,
+                },
+                {
+                    "type": "number",
+                    "value_name": "optional_count",
+                    "label": _OPTIONAL_FIELD_LABEL,
+                    "required": False,
+                },
+            ],
         )
         execution = submit_form_trigger_and_track(
             syntara_api,
