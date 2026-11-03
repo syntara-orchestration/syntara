@@ -31016,13 +31016,6 @@ components:
           format: uri
           title: Base Url
           description: OpenShift Kubernetes API URL
-        namespace:
-          type: string
-          minLength: 1
-          maxLength: 63
-          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-          title: Namespace
-          description: Namespace reserved for future execution workloads
         allow_http:
           type: boolean
           title: Allow Http
@@ -31041,7 +31034,6 @@ components:
           description: PEM-encoded CA certificate to trust for this integration's TLS connections.
       required:
         - base_url
-        - namespace
       title: OpenShiftConfiguration
       type: object
     DiscoveredLLMModel:

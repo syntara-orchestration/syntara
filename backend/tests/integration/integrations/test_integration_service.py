@@ -144,7 +144,6 @@ class TestCreateIntegration:
                 configuration={
                     "integration_type": "openshift",
                     "base_url": "https://api.example.com:6443",
-                    "namespace": "ep-dev-workers",
                 },
                 management_credential_id=credential.id,
             )
@@ -153,7 +152,6 @@ class TestCreateIntegration:
 
         assert reloaded.integration_type == IntegrationType.OPENSHIFT
         assert isinstance(reloaded.configuration, OpenShiftConfiguration)
-        assert reloaded.configuration.namespace == "ep-dev-workers"
         assert reloaded.management_credential_id == credential.id
         assert "execution_target_id" not in reloaded.configuration.model_dump()
 
@@ -724,7 +722,7 @@ class TestCredentialTypeValidation:
             (
                 IntegrationType.OPENSHIFT,
                 "HTTP Bearer Token",
-                {"integration_type": "openshift", "base_url": "https://api.example.com", "namespace": "workers"},
+                {"integration_type": "openshift", "base_url": "https://api.example.com"},
             ),
         ],
     )
