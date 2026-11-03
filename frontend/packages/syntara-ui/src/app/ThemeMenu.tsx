@@ -150,7 +150,9 @@ export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
         className={styles.themeMenu}
         isScrollable={false}
         popperProps={{
-          placement: 'right-start',
+          // right-end opens upward from the dock so the menu clears the viewport bottom.
+          placement: 'right-end',
+          offset: [-12, 8],
           preventOverflow: true,
           enableFlip: true,
           width: 'max-content',

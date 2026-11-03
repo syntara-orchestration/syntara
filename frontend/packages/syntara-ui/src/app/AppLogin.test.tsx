@@ -52,7 +52,6 @@ function renderWithAlerts(ui: React.ReactNode, colorScheme: ColorSchemeContextVa
     colorScheme,
     colorSchemePreference: colorScheme,
     setColorScheme: vi.fn(),
-    toggleColorScheme: vi.fn(),
     contrastMode: 'glass',
     contrastPreference: 'system',
     setContrastMode: vi.fn(),

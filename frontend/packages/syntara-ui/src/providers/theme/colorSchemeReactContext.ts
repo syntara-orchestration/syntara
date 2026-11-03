@@ -10,7 +10,6 @@ export type ColorSchemeContextValue = {
   /** Stored color-scheme choice, or `system` when nothing is stored. */
   colorSchemePreference: ColorSchemePreference
   setColorScheme: (preference: ColorSchemePreference) => void
-  toggleColorScheme: () => void
   /** Resolved contrast treatment on `<html>`. */
   contrastMode: ContrastMode
   /** Stored contrast choice, or `system` when nothing is stored. */

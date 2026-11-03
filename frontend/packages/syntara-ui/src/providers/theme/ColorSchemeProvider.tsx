@@ -66,10 +66,6 @@ export function ColorSchemeProvider(props: Readonly<{ children: ReactNode }>) {
     setContrastMode(resolved)
   }, [])
 
-  const toggleColorScheme = useCallback(() => {
-    commitColorScheme(colorScheme === 'dark' ? 'light' : 'dark')
-  }, [colorScheme, commitColorScheme])
-
   useEffect(() => {
     const syncColorScheme = () => {
       const preference = preferenceOrSystem(readStoredColorSchemePreference())
@@ -147,20 +143,11 @@ export function ColorSchemeProvider(props: Readonly<{ children: ReactNode }>) {
       colorScheme,
       colorSchemePreference,
       setColorScheme: commitColorScheme,
-      toggleColorScheme,
       contrastMode,
       contrastPreference,
       setContrastMode: commitContrastMode,
     }),
-    [
-      colorScheme,
-      colorSchemePreference,
-      commitColorScheme,
-      toggleColorScheme,
-      contrastMode,
-      contrastPreference,
-      commitContrastMode,
-    ]
+    [colorScheme, colorSchemePreference, commitColorScheme, contrastMode, contrastPreference, commitContrastMode]
   )
 
   return <ColorSchemeContext.Provider value={value}>{props.children}</ColorSchemeContext.Provider>

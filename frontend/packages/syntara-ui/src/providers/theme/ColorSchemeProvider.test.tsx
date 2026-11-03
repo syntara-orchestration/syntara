@@ -9,15 +9,8 @@ import { CONTRAST_MODE_STORAGE_KEY } from './contrastMode'
 import { useColorScheme } from './useColorScheme'
 
 function SchemeProbe() {
-  const {
-    colorScheme,
-    colorSchemePreference,
-    setColorScheme,
-    toggleColorScheme,
-    contrastMode,
-    contrastPreference,
-    setContrastMode,
-  } = useColorScheme()
+  const { colorScheme, colorSchemePreference, setColorScheme, contrastMode, contrastPreference, setContrastMode } =
+    useColorScheme()
   return (
     <div>
       <p>Scheme: {colorScheme}</p>
@@ -32,9 +25,6 @@ function SchemeProbe() {
       </button>
       <button type="button" onClick={() => setColorScheme('system')}>
         Set system scheme
-      </button>
-      <button type="button" onClick={toggleColorScheme}>
-        Toggle
       </button>
       <button type="button" onClick={() => setContrastMode('high-contrast')}>
         Set high contrast
@@ -146,34 +136,6 @@ describe('ColorSchemeProvider', () => {
     expect(localStorage.getItem(COLOR_SCHEME_STORAGE_KEY)).toBe('dark')
     expect(document.documentElement.classList.contains('pf-v6-theme-dark')).toBe(true)
     expect(screen.getByText('Scheme: dark')).toBeInTheDocument()
-  })
-
-  it('toggleColorScheme switches from dark to light', async () => {
-    const user = userEvent.setup()
-    render(
-      <ColorSchemeProvider>
-        <SchemeProbe />
-      </ColorSchemeProvider>
-    )
-    await user.click(screen.getByRole('button', { name: 'Toggle' }))
-    expect(screen.getByText('Scheme: light')).toBeInTheDocument()
-    expect(localStorage.getItem(COLOR_SCHEME_STORAGE_KEY)).toBe('light')
-  })
-
-  it('toggleColorScheme switches between light and dark', async () => {
-    const user = userEvent.setup()
-    localStorage.setItem(COLOR_SCHEME_STORAGE_KEY, 'light')
-    document.documentElement.classList.remove('pf-v6-theme-dark')
-    render(
-      <ColorSchemeProvider>
-        <SchemeProbe />
-      </ColorSchemeProvider>
-    )
-    expect(screen.getByText('Scheme: light')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Toggle' }))
-    expect(screen.getByText('Scheme: dark')).toBeInTheDocument()
-    expect(localStorage.getItem(COLOR_SCHEME_STORAGE_KEY)).toBe('dark')
-    expect(document.documentElement.classList.contains('pf-v6-theme-dark')).toBe(true)
   })
 
   it('syncs from storage event when key matches', async () => {
