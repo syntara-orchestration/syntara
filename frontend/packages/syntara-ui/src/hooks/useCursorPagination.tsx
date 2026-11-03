@@ -152,7 +152,14 @@ export function useCursorPagination(options: UseCursorPaginationOptions = {}): U
   })
 
   const handleFilterChange = useMemo(
-    () => createFilterChangeHandler(cursor, resetPagination, clearAllFilters, setAllFilters, transformFilters),
+    () =>
+      createFilterChangeHandler({
+        cursor,
+        resetCursor: resetPagination,
+        clearAllFilters,
+        setAllFilters,
+        transformFilters,
+      }),
     [cursor, resetPagination, clearAllFilters, setAllFilters, transformFilters]
   )
 
@@ -269,13 +276,19 @@ export function useCursorPagination(options: UseCursorPaginationOptions = {}): U
  *
  * Use this in list views after getting query results.
  */
-export function useCursorReset(
-  itemCount: number,
-  hasActiveFilters: boolean,
-  cursor: string | null,
-  isFetching: boolean,
+export function useCursorReset({
+  itemCount,
+  hasActiveFilters,
+  cursor,
+  isFetching,
+  resetPagination,
+}: {
+  itemCount: number
+  hasActiveFilters: boolean
+  cursor: string | null
+  isFetching: boolean
   resetPagination: () => void
-): void {
+}): void {
   useEffect(() => {
     if (itemCount === 0 && !hasActiveFilters && cursor && !isFetching) {
       resetPagination()

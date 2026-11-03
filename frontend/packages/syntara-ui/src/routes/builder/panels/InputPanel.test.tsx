@@ -12,8 +12,8 @@ function renderWithProvider(ui: React.ReactElement) {
 }
 
 const mockUseUpstreamNodes = vi.fn<(...args: unknown[]) => { id: string; name: string; type: string }[]>()
-vi.mock('./hooks/useUpstreamNodes', () => ({
-  useUpstreamNodes: (...args: unknown[]) =>
+vi.mock('./hooks/useUpstreamSteps', () => ({
+  useUpstreamSteps: (...args: unknown[]) =>
     mockUseUpstreamNodes(...args) as { id: string; name: string; type: string }[],
 }))
 
@@ -157,7 +157,7 @@ describe('InputPanel', () => {
     expect(screen.getByRole('heading', { name: 'Input' })).toBeInTheDocument()
   })
 
-  it('passes the nodeId to useUpstreamNodes', () => {
+  it('passes the nodeId to useUpstreamSteps', () => {
     mockUseUpstreamNodes.mockReturnValue([])
 
     render(<InputPanel nodeId="test-node-42" />)
@@ -1142,6 +1142,25 @@ describe('InputPanel', () => {
 
       // Should display the pinned output mock as input
       expect(screen.getByText('mocked_value')).toBeInTheDocument()
+    })
+
+    it('updates existing node inputs when an upstream output mock changes', () => {
+      mockUseUpstreamNodes.mockReturnValue(upstreamNodes)
+      const staleExecutionData = { 'upstream-1': { mocked_field: 'stale-execution-value' } }
+
+      const { rerender } = render(<InputPanel nodeId="node-1" executionData={staleExecutionData} />)
+
+      expect(screen.getByText('stale-execution-value')).toBeInTheDocument()
+
+      mockPinnedData = {
+        'upstream-1': {
+          outputMock: { mocked_field: 'freshly-pinned-value' },
+        },
+      }
+      rerender(<InputPanel nodeId="node-1" executionData={staleExecutionData} />)
+
+      expect(screen.getByText('freshly-pinned-value')).toBeInTheDocument()
+      expect(screen.queryByText('stale-execution-value')).not.toBeInTheDocument()
     })
   })
 

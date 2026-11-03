@@ -141,7 +141,7 @@ test.describe('Credential Selector — Error State', () => {
 
     try {
       await app.goto(toAppUrl('/workflow-builder/new'))
-      await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+      await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
       await selectProjectIfRequired(app)
 
@@ -189,7 +189,7 @@ test.describe('Alert Notifications', () => {
       await app.getByRole('menuitem', { name: /Delete/ }).click()
       const deleteDialog = app.getByRole('dialog')
       await deleteDialog.getByRole('checkbox').click()
-      await deleteDialog.getByRole('button', { name: 'Delete' }).click()
+      await deleteDialog.getByRole('button', { name: 'Delete credential' }).click()
       await expect(app.getByText('Credential deleted')).toBeVisible()
 
       await expect(app.getByText('Credential deleted')).not.toBeVisible({ timeout: 12_000 })

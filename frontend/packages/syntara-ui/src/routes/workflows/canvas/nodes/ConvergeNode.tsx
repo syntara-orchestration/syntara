@@ -4,17 +4,17 @@ import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynDetail } from '../../../../components/details/SynDetail'
 import { SynDetailList } from '../../../../components/details/SynDetailList'
-import { NodeBody } from '../../../../components/nodes/NodeBody'
-import { NodeComponent } from '../../../../components/nodes/NodeComponent'
-import { RegistryNodeId } from '../../../../constants'
+import { SynStep } from '../../../../components/steps/SynStep'
+import { SynStepBody } from '../../../../components/steps/SynStepBody'
+import { RegistryStepId } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
-import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
+import { getStepTypeColor } from '../stepTypeColors'
 
-import { StandardNodeHeader } from './common/StandardNodeHeader'
-import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
-import { nodeMetadata } from './nodeMetadata'
-import { renderNodeIcon } from './renderNodeIcon'
+import { StandardStepHeader } from './common/StandardStepHeader'
+import { StepMenuCategory, useStepMenuActions } from './hooks/useStepMenuActions'
+import { renderStepIcon } from './renderStepIcon'
+import { stepMetadata } from './stepMetadata'
 
 function getStrategyLabel(strategy?: 'all' | 'any', nRequired?: number): string {
   if (strategy !== 'any') return 'All'
@@ -23,17 +23,14 @@ function getStrategyLabel(strategy?: 'all' | 'any', nRequired?: number): string 
 
 export type ConvergeNode = { type: 'converge' } & Node<ConvergeActivity>
 
-export function ConvergeNodeComponent(props: NodeProps<ConvergeNode>) {
-  const metadata = nodeMetadata.converge
-  const iconNode = renderNodeIcon(
-    metadata.icon,
-    RegistryNodeId.LOGIC_CONVERGE,
-    'canvas',
-    getNodeTypeColor(ActivityTypeEnum.CONVERGE)
-  )
-  const menuActions = useNodeMenuActions({
+export function ConvergeStepComponent(props: NodeProps<ConvergeNode>) {
+  const metadata = stepMetadata.converge
+  const iconColor = getStepTypeColor(ActivityTypeEnum.CONVERGE)
+  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_CONVERGE, 'canvas', iconColor)
+  const semanticZoomIcon = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_CONVERGE, 'semanticZoom', iconColor)
+  const menuActions = useStepMenuActions({
     nodeId: props.data.id,
-    nodeType: MenuNodeType.CONTROL_FLOW,
+    stepCategory: StepMenuCategory.CONTROL_FLOW,
   })
   const config = (props.data.parameters ?? {}) as { strategy?: 'all' | 'any'; n_required?: number }
   const strategyLabel = getStrategyLabel(config.strategy, config.n_required)
@@ -49,18 +46,20 @@ export function ConvergeNodeComponent(props: NodeProps<ConvergeNode>) {
     | undefined
 
   return (
-    <NodeComponent
+    <SynStep
       className={metadata.className}
       nodeProps={props}
       executionState={executionState}
-      topBarColor={getNodeTypeColor('converge')}
-      rootTestId="converge-node"
+      topBarColor={getStepTypeColor('converge')}
+      rootTestId="converge-step"
       semanticZoomSummary={{
         title: semanticZoomActivityTitle(props.data.name, `Untitled ${metadata.label}`),
         typeLabel: metadata.label,
       }}
+      semanticZoomIcon={semanticZoomIcon}
+      semanticZoomMenuActions={menuActions}
     >
-      <StandardNodeHeader
+      <StandardStepHeader
         icon={iconNode}
         title={props.data.name}
         subtitle={metadata.label}
@@ -68,12 +67,12 @@ export function ConvergeNodeComponent(props: NodeProps<ConvergeNode>) {
         menuActions={menuActions}
       />
       <Flex justifyContent={{ default: 'justifyContentFlexStart' }} style={{ overflow: 'hidden' }}>
-        <NodeBody>
-          <SynDetailList data-testid="converge-node-details">
+        <SynStepBody>
+          <SynDetailList data-testid="converge-step-details">
             <SynDetail label="Type">{strategyLabel}</SynDetail>
           </SynDetailList>
-        </NodeBody>
+        </SynStepBody>
       </Flex>
-    </NodeComponent>
+    </SynStep>
   )
 }

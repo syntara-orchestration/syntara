@@ -2,6 +2,7 @@ import { RhUiDislikeFillIcon, RhUiLikeFillIcon, RhUiWarningFillIcon } from '@pat
 import type { ApprovalStatus } from '@syntara/contracts'
 
 import { SynLabel } from '../../components/labels/SynLabel'
+import { capitalize } from '../../utils/capitalize'
 
 const statusMap: Record<ApprovalStatus, 'info' | 'success' | 'danger' | 'warning'> = {
   pending: 'warning',
@@ -25,7 +26,7 @@ export function ApprovalStatusBadges(props: Readonly<{ status?: ApprovalStatus |
   }
 
   const IconComponent = statusIcons[props.status]
-  const capitalizedStatus = props.status.charAt(0).toUpperCase() + props.status.slice(1)
+  const capitalizedStatus = capitalize(props.status)
 
   return (
     <SynLabel variant="outline" status={statusMap[props.status]} icon={<IconComponent />}>

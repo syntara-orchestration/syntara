@@ -74,9 +74,9 @@ test.describe('User Detail — Identity Controls (UI-24)', () => {
 
     // Open the kebab menu and click Connect to trigger the conversion warning dialog (isLocalUser=true)
     await kebabButton.click()
-    await app.getByRole('menuitem', { name: 'Connect' }).click()
+    await app.getByRole('menuitem', { name: 'Connect identity' }).click()
     await expect(app.getByRole('dialog', { name: 'Link identity provider?' })).toBeVisible()
     await expect(app.getByText('Your password will be permanently removed')).toBeVisible()
-    await expect(app.getByRole('button', { name: 'Convert and link' })).toBeVisible()
+    await expect(app.getByRole('button', { name: 'Convert and link identity' })).toBeVisible()
   })
 })

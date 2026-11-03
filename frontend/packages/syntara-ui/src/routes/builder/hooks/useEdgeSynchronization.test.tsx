@@ -31,7 +31,7 @@ describe('useEdgeSynchronization', () => {
 
     renderHook(() =>
       useEdgeSynchronization({
-        edges: edges as never[],
+        edges: edges,
         isInitialized: false,
         setStoredEdges: mockSetStoredEdges,
         workflowVersion: 1,
@@ -46,7 +46,7 @@ describe('useEdgeSynchronization', () => {
 
     renderHook(() =>
       useEdgeSynchronization({
-        edges: edges as never[],
+        edges: edges,
         isInitialized: true,
         setStoredEdges: mockSetStoredEdges,
         workflowVersion: 1,
@@ -65,7 +65,7 @@ describe('useEdgeSynchronization', () => {
     const { rerender } = renderHook(
       ({ edges }) =>
         useEdgeSynchronization({
-          edges: edges as never[],
+          edges: edges,
           isInitialized: true,
           setStoredEdges: mockSetStoredEdges,
           workflowVersion: 1,
@@ -96,7 +96,7 @@ describe('useEdgeSynchronization', () => {
     const { rerender } = renderHook(
       ({ edges }) =>
         useEdgeSynchronization({
-          edges: edges as never[],
+          edges: edges,
           isInitialized: true,
           setStoredEdges: mockSetStoredEdges,
           workflowVersion: 1,
@@ -124,7 +124,7 @@ describe('useEdgeSynchronization', () => {
 
     const { result } = renderHook(() =>
       useEdgeSynchronization({
-        edges: edges as never[],
+        edges: edges,
         isInitialized: true,
         setStoredEdges: mockSetStoredEdges,
         workflowVersion: 1,
@@ -141,7 +141,7 @@ describe('useEdgeSynchronization', () => {
     const { rerender } = renderHook(
       ({ edges }) =>
         useEdgeSynchronization({
-          edges: edges as never[],
+          edges: edges,
           isInitialized: true,
           setStoredEdges: mockSetStoredEdges,
           workflowVersion: 1,
@@ -170,7 +170,7 @@ describe('useEdgeSynchronization', () => {
     const { rerender } = renderHook(
       ({ edges }) =>
         useEdgeSynchronization({
-          edges: edges as never[],
+          edges: edges,
           isInitialized: true,
           setStoredEdges: mockSetStoredEdges,
           workflowVersion: 1,
@@ -201,7 +201,7 @@ describe('useEdgeSynchronization', () => {
     const { rerender } = renderHook(
       ({ edges }) =>
         useEdgeSynchronization({
-          edges: edges as never[],
+          edges: edges,
           isInitialized: true,
           setStoredEdges: mockSetStoredEdges,
           workflowVersion: 1,
@@ -232,7 +232,7 @@ describe('useEdgeSynchronization', () => {
     const { rerender } = renderHook(
       ({ edges }) =>
         useEdgeSynchronization({
-          edges: edges as never[],
+          edges: edges,
           isInitialized: true,
           setStoredEdges: mockSetStoredEdges,
           workflowVersion: 1,
@@ -260,7 +260,7 @@ describe('useEdgeSynchronization', () => {
     const { result, rerender } = renderHook(
       ({ edges }) =>
         useEdgeSynchronization({
-          edges: edges as never[],
+          edges: edges,
           isInitialized: true,
           setStoredEdges: mockSetStoredEdges,
           workflowVersion: 1,
@@ -297,7 +297,7 @@ describe('useEdgeSynchronization', () => {
     const { rerender } = renderHook(
       ({ edges }) =>
         useEdgeSynchronization({
-          edges: edges as never[],
+          edges: edges,
           isInitialized: true,
           setStoredEdges: mockSetStoredEdges,
           workflowVersion: 1,

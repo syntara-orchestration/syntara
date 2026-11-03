@@ -21,7 +21,7 @@ Syntara UI is a React-based application for building and managing complex automa
 
 ### Technology Stack
 
-- **Frontend**: React 19, TypeScript, Wouter
+- **Frontend**: React 19, TypeScript, TanStack Router
 - **Styling**: PatternFly 6
 - **State Management**: TanStack Query (server state), Zustand (client state)
 - **API Integration**: openapi-fetch, openapi-react-query
@@ -70,10 +70,16 @@ npm start
 
 ### Key Architectural Patterns
 
-- Centralized routing: path constants in `src/app/AppRoute.tsx`, route mapping in `src/app/AppRouter.tsx`
+- Routing: route definitions in `src/app/routes/` are assembled by `src/app/tanstackRouteTree.tsx` and mounted through TanStack Router's `RouterProvider`. `src/app/AppRoute.tsx` holds reusable path strings, while `src/app/navigationItems.tsx` defines navigation and its permission visibility.
 - Lazy-loaded components
 - Type-safe API calls
 - Automatic memoization via React Compiler
+
+When upgrading UI dependencies, keep the root overrides in `package.json` in
+sync: `vite` must match the UI's Vite version (`@vitejs/plugin-react` 6 requires
+Vite 8), and `playwright`/`playwright-core` must match `@playwright/test`. React
+Compiler runs through `@rolldown/plugin-babel` with `reactCompilerPreset()` in
+both Vite and Vitest configurations.
 
 ## Updating API Contracts
 
@@ -382,4 +388,4 @@ See [docs/zustand-architecture.md](docs/zustand-architecture.md) for the complet
 | Error handling                | [docs/error-handling.md](docs/error-handling.md)                                           |
 | Workflow loading & saving     | [docs/workflow-loading-saving.md](docs/workflow-loading-saving.md)                         |
 | Testing guide                 | [packages/syntara-ui/TESTING.md](packages/syntara-ui/TESTING.md)                           |
-| Contributing guidelines       | [CONTRIBUTING.md](CONTRIBUTING.md)                                                         |
+| Contributing guidelines       | [Frontend contributor guide](../docs/frontend-contributing.md)                             |

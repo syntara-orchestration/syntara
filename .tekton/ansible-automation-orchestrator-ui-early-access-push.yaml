@@ -32,7 +32,7 @@ spec:
     value: frontend
   - name: build-args
     value:
-      - DESCRIPTION_LABEL=Syntara UI
+      - DESCRIPTION_LABEL=Automation Orchestrator UI
       - REDHAT_COMPONENT=ansible-automation-orchestrator-ui-container
       - IMAGE_NAME=ansible-automation-platform/automation-orchestrator-ui-rhel9
       - MAINTAINER=Ansible Automation Platform Productization Team

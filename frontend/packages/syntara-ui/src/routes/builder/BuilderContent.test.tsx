@@ -9,9 +9,11 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { approvalsClient, executionsClient, workflowClient, workflowFetchClient } from '../../client'
 import * as useCursorPaginationModule from '../../hooks/useCursorPagination'
 import { AlertProvider } from '../../providers/alerts'
+import { FeatureFlagsProvider } from '../../providers/feature-flags-provider'
 import { ColorSchemeProvider } from '../../providers/theme/ColorSchemeProvider'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { routerTestState } from '../../test/setup'
+import { toFeatureFlagKey } from '../../utils/feature-flags'
 import { transformExecutionStatusFilter } from '../executions/executionFilters'
 
 type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
@@ -86,6 +88,10 @@ vi.mock('./useBuilderPermissions', () => ({
   useBuilderPermissions: () => mockBuilderPermissions,
 }))
 
+vi.mock('../../hooks/useCanI', () => ({
+  useCanI: vi.fn(() => ({ allowed: true, isChecking: false, isError: false })),
+}))
+
 import { BuilderContent } from './BuilderContent'
 
 const queryClient = new QueryClient({
@@ -96,13 +102,17 @@ const queryClient = new QueryClient({
   },
 })
 
+const workflowBuilderQolStorageKey = toFeatureFlagKey('workflow_builder_qol')
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>
-    <AlertProvider>
-      <ColorSchemeProvider>
-        <ReactFlowProvider>{children}</ReactFlowProvider>
-      </ColorSchemeProvider>
-    </AlertProvider>
+    <FeatureFlagsProvider>
+      <AlertProvider>
+        <ColorSchemeProvider>
+          <ReactFlowProvider>{children}</ReactFlowProvider>
+        </ColorSchemeProvider>
+      </AlertProvider>
+    </FeatureFlagsProvider>
   </QueryClientProvider>
 )
 
@@ -114,6 +124,16 @@ async function renderBuilder(props: BuilderContentProps) {
     expect(screen.getByPlaceholderText('Workflow name')).toBeInTheDocument()
   })
   return view
+}
+
+async function renderBuilderWithStoredFeatureFlag(storedValue: string | null, props: BuilderContentProps) {
+  if (storedValue === null) {
+    globalThis.localStorage.removeItem(workflowBuilderQolStorageKey)
+  } else {
+    globalThis.localStorage.setItem(workflowBuilderQolStorageKey, storedValue)
+  }
+
+  await renderBuilder(props)
 }
 
 async function clickKebabItem(name: RegExp | string) {
@@ -135,7 +155,7 @@ describe('BuilderContent', () => {
     labels: {},
     created_at: '2023-01-01T00:00:00Z',
     updated_at: '2023-01-02T00:00:00Z',
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
     current_version: 1,
     version: {
       workflow_definition: {
@@ -246,6 +266,7 @@ describe('BuilderContent', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    globalThis.localStorage.removeItem(workflowBuilderQolStorageKey)
     queryClient.clear()
 
     vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: vi.fn() })
@@ -301,7 +322,7 @@ describe('BuilderContent', () => {
     vi.mocked(executionsClient.useMutation).mockReturnValue(createMockMutation())
 
     vi.mocked(workflowFetchClient.GET).mockResolvedValue({
-      data: { current_version: 1, version: { version: 1 } } as WorkflowWithVersion,
+      data: { current_version: 1, version: { version: 1 } },
       error: undefined,
       response: new Response(),
     })
@@ -313,6 +334,7 @@ describe('BuilderContent', () => {
   })
 
   afterEach(() => {
+    globalThis.localStorage.removeItem(workflowBuilderQolStorageKey)
     vi.restoreAllMocks()
   })
 
@@ -328,6 +350,38 @@ describe('BuilderContent', () => {
           extraParams: { workflow_id: 'workflow-1' },
         })
       )
+    })
+  })
+
+  describe('workflow builder feature flag proof of concept', () => {
+    it('does not render the proof of concept when the flag is missing', async () => {
+      await renderBuilderWithStoredFeatureFlag(null, {
+        workflow: mockWorkflow,
+        isNew: false,
+        workflowId: 'workflow-1',
+      })
+
+      expect(screen.queryByText('workflow_builder_qol is enabled (test proof of concept)')).not.toBeInTheDocument()
+    })
+
+    it('does not render the proof of concept when the flag has an invalid value', async () => {
+      await renderBuilderWithStoredFeatureFlag('yes', {
+        workflow: mockWorkflow,
+        isNew: false,
+        workflowId: 'workflow-1',
+      })
+
+      expect(screen.queryByText('workflow_builder_qol is enabled (test proof of concept)')).not.toBeInTheDocument()
+    })
+
+    it('renders the proof of concept when the flag is enabled', async () => {
+      await renderBuilderWithStoredFeatureFlag('true', {
+        workflow: mockWorkflow,
+        isNew: false,
+        workflowId: 'workflow-1',
+      })
+
+      expect(screen.getByText('workflow_builder_qol is enabled (test proof of concept)')).toBeInTheDocument()
     })
   })
 
@@ -714,8 +768,9 @@ describe('BuilderContent', () => {
       await user.click(screen.getByRole('button', { name: 'Run' }))
 
       await waitFor(() => {
-        expect(screen.getByText(/Run Test Workflow\?/)).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: 'Run now' })).toBeInTheDocument()
+        const dialog = screen.getByRole('dialog')
+        expect(within(dialog).getByRole('heading', { name: 'Run workflow?' })).toBeInTheDocument()
+        expect(within(dialog).getByRole('button', { name: 'Run now' })).toBeInTheDocument()
       })
     })
 
@@ -727,12 +782,12 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
 
       await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
       await waitFor(() => {
-        expect(screen.queryByText(/Run Test Workflow\?/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Run workflow\?/)).not.toBeInTheDocument()
       })
     })
 
@@ -759,7 +814,7 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
       await user.click(screen.getByRole('button', { name: 'Run' }))
@@ -793,7 +848,7 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
       await user.click(screen.getByRole('button', { name: 'Run' }))
@@ -811,12 +866,12 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
 
       await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
       await waitFor(() => {
-        expect(screen.queryByText(/Run Test Workflow\?/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Run workflow\?/)).not.toBeInTheDocument()
       })
     })
 
@@ -829,7 +884,7 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
 
@@ -1112,7 +1167,7 @@ describe('BuilderContent', () => {
       })
     })
 
-    it('navigates to execution page on execution selection', async () => {
+    it('keeps run history open when navigating from builder history to an execution', async () => {
       vi.mocked(executionsClient.useQuery).mockImplementation((method, path) => {
         if (method === 'get' && path === '/executions') {
           return {
@@ -1154,7 +1209,7 @@ describe('BuilderContent', () => {
       expect(row).toBeInTheDocument()
       await user.click(row)
       await waitFor(() => {
-        expect(mockRequestNavigation).toHaveBeenCalledWith('/executions/exec-1')
+        expect(mockRequestNavigation).toHaveBeenCalledWith('/executions/exec-1?history=open')
       })
     })
   })
@@ -1269,7 +1324,7 @@ describe('BuilderContent', () => {
           name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
         })
       )
-      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
 
       await waitFor(() => {
         expect(mockDeleteMutate).toHaveBeenCalled()
@@ -1303,7 +1358,7 @@ describe('BuilderContent', () => {
           name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
         })
       )
-      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
 
       await waitFor(() => {
         expect(mockDeleteMutate).toHaveBeenCalled()
@@ -1522,7 +1577,7 @@ describe('BuilderContent', () => {
         act(() => {
           useWorkflowStore.getState().markDirty()
         })
-        const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent
+        const event = new Event('beforeunload', { cancelable: true })
         act(() => {
           handler(event)
         })
@@ -1554,8 +1609,8 @@ describe('BuilderContent', () => {
   // ============================================================================
 
   describe('Context Providers', () => {
-    it('provides NodeExpandedAllContext to children', async () => {
-      // The component provides NodeExpandedAllContext
+    it('provides SynStepExpandedAllContext to children', async () => {
+      // The component provides SynStepExpandedAllContext
       await renderBuilder({ workflow: mockWorkflow, isNew: false, workflowId: 'workflow-1' })
       expect(screen.getByPlaceholderText('Workflow name')).toBeInTheDocument()
     })
@@ -1586,7 +1641,7 @@ describe('BuilderContent', () => {
       }
 
       await renderBuilder({
-        workflow: workflowNoDescription as WorkflowWithVersion,
+        workflow: workflowNoDescription,
         isNew: false,
         workflowId: 'workflow-1',
       })
@@ -2223,7 +2278,7 @@ describe('BuilderContent', () => {
       })
 
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
       await user.click(screen.getByRole('button', { name: 'Run' }))
@@ -2451,7 +2506,7 @@ describe('BuilderContent', () => {
           name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
         })
       )
-      await user.click(screen.getByRole('button', { name: 'Delete' }))
+      await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
 
       await waitFor(() => {
         expect(mockDeleteMutate).toHaveBeenCalled()
@@ -2484,7 +2539,7 @@ describe('BuilderContent', () => {
 
       // Click Run → confirmation dialog → input modal → confirm
       await user.click(screen.getByRole('button', { name: 'Run' }))
-      await screen.findByText(/Run Test Workflow\?/)
+      await screen.findByText(/Run workflow\?/)
       await user.click(screen.getByRole('button', { name: 'Run now' }))
       await screen.findByText(/Set mock output data for/)
       await user.click(screen.getByRole('button', { name: 'Run' }))
@@ -2912,8 +2967,7 @@ describe('BuilderContent', () => {
         change_description: 'Second version',
         status: 'draft',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'sarah.chen',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen', type: 'user' },
       },
       {
         id: 'ver-1',
@@ -2925,8 +2979,7 @@ describe('BuilderContent', () => {
         change_description: 'First version',
         status: 'published',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'marcus.williams',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'marcus.williams', type: 'user' },
       },
     ]
 
@@ -3118,7 +3171,7 @@ describe('BuilderContent', () => {
       })
 
       const user = userEvent.setup()
-      await user.click(screen.getByRole('button', { name: 'Collapse version history' }))
+      await user.click(screen.getByRole('button', { name: 'Close version history' }))
 
       await waitFor(() => {
         expect(screen.queryByRole('heading', { level: 2, name: 'Version history' })).not.toBeInTheDocument()
@@ -3149,7 +3202,7 @@ describe('BuilderContent', () => {
         ...mockWorkflow.version,
         version: 3,
       },
-    } as unknown as WorkflowWithVersion
+    }
 
     function setupConflictOnSave() {
       const mockUpdateMutate = vi.fn((_params: unknown, callbacks?: MutationCallbacks) => {
@@ -3386,8 +3439,7 @@ describe('BuilderContent', () => {
         change_description: 'Second version',
         status: 'draft',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'sarah.chen',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen', type: 'user' },
       },
       {
         id: 'ver-1',
@@ -3399,8 +3451,7 @@ describe('BuilderContent', () => {
         change_description: 'First version',
         status: 'published',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'marcus.williams',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'marcus.williams', type: 'user' },
       },
     ]
 
@@ -3481,8 +3532,7 @@ describe('BuilderContent', () => {
         change_description: 'Second version',
         status: 'draft',
         name: null,
-        created_by: 'user-1',
-        created_by_username: 'sarah.chen',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'sarah.chen', type: 'user' },
       },
     ]
 
@@ -3518,7 +3568,7 @@ describe('BuilderContent', () => {
       const workflowWithProject = {
         ...mockWorkflow,
         project_id: 'project-1',
-      } as unknown as WorkflowWithVersion
+      }
 
       await renderBuilder({ workflow: workflowWithProject, isNew: false, workflowId: 'workflow-1' })
 
@@ -3554,7 +3604,7 @@ describe('BuilderContent', () => {
       const workflowWithProject = {
         ...mockWorkflow,
         project_id: 'project-1',
-      } as unknown as WorkflowWithVersion
+      }
 
       await renderBuilder({ workflow: workflowWithProject, isNew: false, workflowId: 'workflow-1' })
 
@@ -3581,7 +3631,7 @@ describe('BuilderContent', () => {
       const workflowWithProject = {
         ...mockWorkflow,
         project_id: 'project-1',
-      } as unknown as WorkflowWithVersion
+      }
 
       await renderBuilder({ workflow: workflowWithProject, isNew: false, workflowId: 'workflow-1' })
 

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { BrandProvider } from '../providers/brand'
 
@@ -19,12 +19,15 @@ describe('AppMobileMasthead', () => {
     vi.clearAllMocks()
     mockUseDockState.mockReturnValue({
       isDockExpanded: false,
-      isDockTextExpanded: false,
+      isDockOverlay: false,
       isMobile: true,
       dockedToggleRef: { current: null },
       mobileToggleRef: { current: null },
       onToggleDock: vi.fn(),
       onMobileToggle: mockOnMobileToggle,
+      isNavGroupExpanded: () => false,
+      onExpandNavGroup: vi.fn(),
+      onNavSelect: vi.fn(),
     })
   })
 
@@ -72,12 +75,15 @@ describe('AppMobileMasthead', () => {
   it('renders correctly when dock is expanded', () => {
     mockUseDockState.mockReturnValue({
       isDockExpanded: true,
-      isDockTextExpanded: false,
+      isDockOverlay: false,
       isMobile: true,
       dockedToggleRef: { current: null },
       mobileToggleRef: { current: null },
       onToggleDock: vi.fn(),
       onMobileToggle: mockOnMobileToggle,
+      isNavGroupExpanded: () => false,
+      onExpandNavGroup: vi.fn(),
+      onNavSelect: vi.fn(),
     })
     render(
       <BrandProvider>

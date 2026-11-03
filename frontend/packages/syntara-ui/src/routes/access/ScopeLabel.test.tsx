@@ -3,8 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { routerTestState } from '../../test/setup'
-
 import { PolicyTypeLabel, ProjectLabel, ScopeLabel } from './ScopeLabel'
 
 const projectNameMap = new Map([
@@ -100,21 +98,19 @@ describe('ProjectLabel', () => {
     const user = userEvent.setup()
     render(<ProjectLabel projectId="proj-1" projectNameMap={projectNameMap} />)
 
-    const button = screen.getByRole('button', { name: /alpha project/i })
-    expect(button).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /alpha project/i })
+    expect(link).toBeInTheDocument()
 
     await user.tab()
-    expect(button).toHaveFocus()
+    expect(link).toHaveFocus()
   })
 
-  it('navigates to the project detail page on click', async () => {
-    const user = userEvent.setup()
+  it('links to the project detail page', () => {
     render(<ProjectLabel projectId="proj-1" projectNameMap={projectNameMap} />)
 
-    await user.click(screen.getByRole('button', { name: /alpha project/i }))
-
-    expect(routerTestState.navigate).toHaveBeenCalledWith(
-      expect.objectContaining({ to: expect.stringContaining('proj-1') as string })
+    expect(screen.getByRole('link', { name: /alpha project/i })).toHaveAttribute(
+      'href',
+      '/system-administration/access-management/projects/proj-1'
     )
   })
 })

@@ -48,7 +48,7 @@ const EXECUTION = {
     status: 'running',
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
-    created_by: 'user-1',
+    created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
     updated_by: null,
     completed_at: null,
     input_data: {},
@@ -68,7 +68,12 @@ const EXECUTION = {
 }
 
 vi.mock('../../client', () => ({
-  executionsClient: { useQuery: vi.fn(() => EXECUTION) },
+  executionsClient: {
+    useQuery: vi.fn(() => ({
+      ...EXECUTION,
+      refetch: vi.fn(),
+    })),
+  },
   authMiddleware: { onRequest: vi.fn() },
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
@@ -112,13 +117,13 @@ describe('ExecutionDetailsPanel', () => {
       vi.mocked(executionsClient.useQuery).mockReturnValue({
         ...EXECUTION,
         data: { ...EXECUTION.data, status: 'completed', completed_at: '2024-01-01T00:05:00Z' },
-      } as never)
+      })
 
       const { container } = renderPanel(WORKFLOW_DEF)
 
       expect(container.textContent).toContain(' - ')
 
-      vi.mocked(executionsClient.useQuery).mockReturnValue(EXECUTION as never)
+      vi.mocked(executionsClient.useQuery).mockReturnValue(EXECUTION)
     })
 
     it('shows elapsed time that ticks while running', () => {
@@ -297,14 +302,31 @@ describe('ExecutionDetailsPanel', () => {
       expect(screen.getByText('Process data')).toBeInTheDocument()
     })
 
-    it('switches to Details mode showing no-selection state', async () => {
+    it('selects the first activity by default when switching to Details mode', async () => {
       const user = userEvent.setup()
       renderPanel(WORKFLOW_DEF)
 
       await user.click(screen.getByRole('tab', { name: 'Details' }))
 
       expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
-      expect(screen.getByText(/Select a step/)).toBeInTheDocument()
+      expect(screen.queryByText(/Select a step/)).not.toBeInTheDocument()
+      expect(screen.getAllByText('Process data').length).toBeGreaterThanOrEqual(1)
+    })
+
+    it('keeps the selected activity when switching between Overview and Details tabs', async () => {
+      const user = userEvent.setup()
+      renderPanel(WORKFLOW_DEF)
+
+      await user.click(screen.getByRole('tab', { name: 'Details' }))
+
+      const activityList = screen.getByRole('grid', { name: 'Activity list' })
+      await user.click(within(activityList).getByText('Send notification'))
+
+      await user.click(screen.getByRole('tab', { name: 'Overview' }))
+      await user.click(screen.getByRole('tab', { name: 'Details' }))
+
+      expect(screen.getAllByText('Send notification').length).toBeGreaterThanOrEqual(1)
+      expect(screen.queryByText(/Select a step/)).not.toBeInTheDocument()
     })
 
     it('switches back to Overview mode', async () => {
@@ -372,8 +394,9 @@ describe('ExecutionDetailsPanel', () => {
 
       await user.click(screen.getByRole('tab', { name: 'Details' }))
 
-      expect(screen.getByText('Process data')).toBeInTheDocument()
-      expect(screen.queryByText('Send notification')).not.toBeInTheDocument()
+      const activityList = screen.getByRole('grid', { name: 'Activity list' })
+      expect(within(activityList).getByText('Process data')).toBeInTheDocument()
+      expect(within(activityList).queryByText('Send notification')).not.toBeInTheDocument()
     })
   })
 

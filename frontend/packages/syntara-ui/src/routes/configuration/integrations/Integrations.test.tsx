@@ -37,10 +37,6 @@ vi.mock('../../../hooks/useFilterState', async (importOriginal) => {
 const mockSearchParams = new URLSearchParams()
 const mockSetSearchParams = vi.fn()
 
-vi.mock('wouter', () => ({
-  useLocation: () => ['/configuration/integrations', routerTestState.navigate],
-}))
-
 vi.mock('../../../hooks/routing/useLocation', () => ({
   useLocation: () => '/configuration/integrations',
 }))
@@ -177,7 +173,7 @@ describe('Integrations Component', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     vi.mocked(integrationsClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
@@ -196,7 +192,7 @@ describe('Integrations Component', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
   })
 
   describe('Rendering', () => {
@@ -298,7 +294,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<Integrations />, { wrapper })
 
@@ -317,7 +313,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<Integrations />, { wrapper })
 
@@ -415,7 +411,7 @@ describe('Integrations Component', () => {
       // Validate dialog should open
       await waitFor(
         () => {
-          expect(screen.getByText(/validate integration/i)).toBeInTheDocument()
+          expect(screen.getByRole('heading', { name: /validate integration/i })).toBeInTheDocument()
         },
         { timeout: 10_000 }
       )
@@ -435,7 +431,7 @@ describe('Integrations Component', () => {
 
       // Delete dialog should open with integration name in body
       await waitFor(() => {
-        expect(screen.getByText(/delete integration/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /delete integration/i })).toBeInTheDocument()
       })
       const dialog = screen.getByRole('dialog')
       expect(within(dialog).getByText(/This cannot be undone/)).toBeInTheDocument()
@@ -976,7 +972,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
         if (path.includes('validate')) {
@@ -994,7 +990,7 @@ describe('Integrations Component', () => {
       await user.click(validateOption)
 
       // Click Validate button in dialog
-      const validateButton = await screen.findByRole('button', { name: 'Validate' })
+      const validateButton = await screen.findByRole('button', { name: 'Validate integration' })
       await user.click(validateButton)
 
       // Verify mutation was called with integration_id (first row is ID 1 from API order)
@@ -1014,7 +1010,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
         if (path.includes('validate')) {
@@ -1032,7 +1028,7 @@ describe('Integrations Component', () => {
       await user.click(validateOption)
 
       // Click Validate
-      const validateButton = await screen.findByRole('button', { name: 'Validate' })
+      const validateButton = await screen.findByRole('button', { name: 'Validate integration' })
       await user.click(validateButton)
 
       // Simulate successful mutation with success: true
@@ -1045,7 +1041,7 @@ describe('Integrations Component', () => {
 
       // Dialog should close (Validate button no longer visible)
       await waitFor(() => {
-        expect(screen.queryByRole('button', { name: 'Validate' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Validate integration' })).not.toBeInTheDocument()
       })
       expect(mockRefetch).toHaveBeenCalled()
     })
@@ -1070,14 +1066,14 @@ describe('Integrations Component', () => {
           isError: false,
           error: null,
           refetch: mockRefetch,
-        } as never)
+        })
         .mockReturnValue({
           data: { resources: updatedIntegrations },
           isPending: false,
           isError: false,
           error: null,
           refetch: mockRefetch,
-        } as never)
+        })
 
       vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
         if (path.includes('validate')) {
@@ -1097,7 +1093,7 @@ describe('Integrations Component', () => {
       const validateOption = await screen.findByRole('menuitem', { name: /validate integration/i })
       await user.click(validateOption)
 
-      const validateButton = await screen.findByRole('button', { name: 'Validate' })
+      const validateButton = await screen.findByRole('button', { name: 'Validate integration' })
       await user.click(validateButton)
 
       // Simulate successful validation — triggers refetch
@@ -1130,7 +1126,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(integrationsClient.useMutation).mockImplementation((_method: string, path: string) => {
         if (path.includes('validate')) {
@@ -1148,7 +1144,7 @@ describe('Integrations Component', () => {
       await user.click(validateOption)
 
       // Click Validate
-      const validateButton = await screen.findByRole('button', { name: 'Validate' })
+      const validateButton = await screen.findByRole('button', { name: 'Validate integration' })
       await user.click(validateButton)
 
       // Simulate HTTP 200 with success: false
@@ -1170,7 +1166,7 @@ describe('Integrations Component', () => {
       })
 
       // Dialog should close
-      expect(screen.queryByRole('button', { name: 'Validate' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Validate integration' })).not.toBeInTheDocument()
       // Should still refetch to update provider status
       expect(mockRefetch).toHaveBeenCalled()
     })
@@ -1195,7 +1191,7 @@ describe('Integrations Component', () => {
       await user.click(validateOption)
 
       // Click Validate
-      const validateButton = await screen.findByRole('button', { name: 'Validate' })
+      const validateButton = await screen.findByRole('button', { name: 'Validate integration' })
       await user.click(validateButton)
 
       // Simulate failed mutation
@@ -1207,7 +1203,7 @@ describe('Integrations Component', () => {
 
       // Dialog should close
       await waitFor(() => {
-        expect(screen.queryByRole('button', { name: 'Validate' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Validate integration' })).not.toBeInTheDocument()
       })
     })
 
@@ -1223,7 +1219,7 @@ describe('Integrations Component', () => {
 
       // Verify dialog is open
       await waitFor(() => {
-        expect(screen.getByText(/validate integration/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /validate integration/i })).toBeInTheDocument()
       })
 
       // Click Cancel
@@ -1250,7 +1246,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(integrationsClient.useMutation).mockImplementation((method: string) => {
         if (method === 'delete') {
@@ -1271,7 +1267,7 @@ describe('Integrations Component', () => {
       await user.click(screen.getByRole('checkbox'))
 
       // Click Delete button in dialog
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete integration' })
       await user.click(deleteButton)
 
       // Verify mutation was called (first row is ID 1 from API order)
@@ -1291,7 +1287,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(integrationsClient.useMutation).mockImplementation((method: string) => {
         if (method === 'delete') {
@@ -1312,7 +1308,7 @@ describe('Integrations Component', () => {
       await user.click(screen.getByRole('checkbox'))
 
       // Click Delete
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete integration' })
       await user.click(deleteButton)
 
       // Simulate successful mutation
@@ -1324,7 +1320,7 @@ describe('Integrations Component', () => {
 
       // Dialog should close and navigate to list
       await waitFor(() => {
-        expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Delete integration' })).not.toBeInTheDocument()
       })
       expect(routerTestState.navigate).toHaveBeenCalled()
     })
@@ -1352,7 +1348,7 @@ describe('Integrations Component', () => {
       await user.click(screen.getByRole('checkbox'))
 
       // Click Delete
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete integration' })
       await user.click(deleteButton)
 
       // Simulate failed mutation
@@ -1364,7 +1360,7 @@ describe('Integrations Component', () => {
 
       // Dialog should close
       await waitFor(() => {
-        expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Delete integration' })).not.toBeInTheDocument()
       })
     })
 
@@ -1380,7 +1376,7 @@ describe('Integrations Component', () => {
 
       // Verify dialog is open
       await waitFor(() => {
-        expect(screen.getByText(/delete integration/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /delete integration/i })).toBeInTheDocument()
       })
 
       // Click Cancel
@@ -1424,7 +1420,7 @@ describe('Integrations Component', () => {
       await user.click(switches[0])
 
       await waitFor(() => {
-        expect(screen.getByText(/disable integration/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /disable integration/i })).toBeInTheDocument()
       })
     })
 
@@ -1452,7 +1448,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Integrations />, { wrapper })
@@ -1488,9 +1484,9 @@ describe('Integrations Component', () => {
 
       // Confirm disable
       await waitFor(() => {
-        expect(screen.getByText(/disable integration/i)).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: /disable integration/i })).toBeInTheDocument()
       })
-      const disableButton = screen.getByRole('button', { name: 'Disable' })
+      const disableButton = screen.getByRole('button', { name: 'Disable integration' })
       await user.click(disableButton)
 
       expect(mockPatchMutate).toHaveBeenCalledWith(
@@ -1525,7 +1521,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       // Make patch call onError
       mockPatchMutate.mockImplementation((_variables: unknown, options?: { onError?: (error: unknown) => void }) => {
@@ -1557,7 +1553,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<Integrations />, { wrapper })
 
@@ -1630,7 +1626,7 @@ describe('Integrations Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<Integrations />, { wrapper })
 

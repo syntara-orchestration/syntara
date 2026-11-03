@@ -24,7 +24,7 @@ function mockWorkflow(overrides: Partial<Workflow> = {}): Workflow {
     is_enabled: true,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
-    created_by: 'test-user',
+    created_by: { id: 'u-1', name: 'test-user', type: 'user' },
     project_id: 'proj-1',
     published_version_id: 'pub-1',
     published_version_number: 1,
@@ -32,8 +32,12 @@ function mockWorkflow(overrides: Partial<Workflow> = {}): Workflow {
   }
 }
 
-function mockGetResponse(data: Record<string, unknown> | undefined, error?: Record<string, unknown>) {
-  return { data, error, response: new Response() } as never
+function mockGetResponse(
+  data: Record<string, unknown> | undefined,
+  error?: Record<string, unknown>,
+  status = data && !error ? 200 : 500
+) {
+  return { data, error, response: new Response(null, { status }) } as never
 }
 
 describe('resolveWorkflowRunTrigger', () => {
@@ -46,10 +50,10 @@ describe('resolveWorkflowRunTrigger', () => {
     expect(workflowFetchClient.GET).not.toHaveBeenCalled()
   })
 
-  it('returns null when workflow fetch fails', async () => {
-    vi.mocked(workflowFetchClient.GET).mockResolvedValue(mockGetResponse(undefined, { detail: 'not found' }))
+  it('throws when workflow fetch fails', async () => {
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(mockGetResponse(undefined, { detail: 'not found' }, 404))
 
-    await expect(resolveWorkflowRunTrigger(mockWorkflow())).resolves.toBeNull()
+    await expect(resolveWorkflowRunTrigger(mockWorkflow())).rejects.toMatchObject({ status: 404 })
   })
 
   it('returns the first trigger from the current version when it matches published', async () => {
@@ -85,7 +89,7 @@ describe('resolveWorkflowRunTrigger', () => {
   })
 
   it('fetches the published version when it differs from the current draft', async () => {
-    vi.mocked(workflowFetchClient.GET).mockImplementation(((path: string) => {
+    vi.mocked(workflowFetchClient.GET).mockImplementation((path: string) => {
       if (path === '/workflows/{workflow_id}/versions/{version}') {
         return Promise.resolve(
           mockGetResponse({
@@ -113,7 +117,7 @@ describe('resolveWorkflowRunTrigger', () => {
           },
         })
       )
-    }) as never)
+    })
 
     await expect(resolveWorkflowRunTrigger(mockWorkflow({ published_version_number: 1 }))).resolves.toEqual({
       triggerNodeId: 'published-trigger',
@@ -164,7 +168,7 @@ describe('resolveWorkflowRunTrigger', () => {
   })
 
   it('keeps draft triggers when published version fetch fails', async () => {
-    vi.mocked(workflowFetchClient.GET).mockImplementation(((path: string) => {
+    vi.mocked(workflowFetchClient.GET).mockImplementation((path: string) => {
       if (path === '/workflows/{workflow_id}/versions/{version}') {
         return Promise.resolve(mockGetResponse(undefined, { detail: 'not found' }))
       }
@@ -180,7 +184,7 @@ describe('resolveWorkflowRunTrigger', () => {
           },
         })
       )
-    }) as never)
+    })
 
     await expect(resolveWorkflowRunTrigger(mockWorkflow({ published_version_number: 1 }))).resolves.toEqual({
       triggerNodeId: 'draft-trigger',

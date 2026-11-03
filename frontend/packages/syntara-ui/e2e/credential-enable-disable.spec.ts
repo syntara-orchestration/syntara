@@ -57,7 +57,7 @@ test.describe('Credential Enable/Disable State Management', () => {
       await filterCredentialByName(app, name)
       const row = app.getByRole('row', { name: new RegExp(name) })
       const dialog = await openDisableDialogFromRow(app, row)
-      await dialog.getByRole('button', { name: 'Disable' }).click()
+      await dialog.getByRole('button', { name: 'Disable credential' }).click()
 
       await expect(dialog).not.toBeVisible()
       await expect(listRowToggle(row)).not.toBeChecked()
@@ -108,7 +108,7 @@ test.describe('Credential Enable/Disable State Management', () => {
 
       const dialog = app.getByRole('dialog')
       await waitForDisableDialogReady(dialog)
-      await dialog.getByRole('button', { name: 'Disable' }).click()
+      await dialog.getByRole('button', { name: 'Disable credential' }).click()
 
       await expect(detailPageToggle(app)).not.toBeChecked()
     } finally {
@@ -127,7 +127,7 @@ test.describe('Credential Enable/Disable State Management', () => {
       await detailPageToggle(app).click({ force: true })
       const dialog = app.getByRole('dialog')
       await waitForDisableDialogReady(dialog)
-      await dialog.getByRole('button', { name: 'Disable' }).click()
+      await dialog.getByRole('button', { name: 'Disable credential' }).click()
 
       await expect(detailPageToggle(app)).not.toBeChecked()
       await expect(detailsTab.getByText('Disabled')).toBeVisible()

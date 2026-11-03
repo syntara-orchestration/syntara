@@ -14,44 +14,50 @@ import type { FilterConfig } from '../types/filters'
  * - setAllFilters() preserves non-filter URL params, but cursor wouldn't be there anyway
  * - This keeps URLs clean and bookmarkable while maintaining pagination state
  *
- * @param cursor - Current pagination cursor value from component state
- * @param resetCursor - Function to reset the pagination cursor to null
- * @param clearAllFilters - Function to clear all active filters
- * @param setAllFilters - Function to set all filters atomically
- * @param transformFilters - Optional function to transform filters before applying (e.g., convert string to boolean)
+ * @param options.cursor - Current pagination cursor value from component state
+ * @param options.resetCursor - Function to reset the pagination cursor to null
+ * @param options.clearAllFilters - Function to clear all active filters
+ * @param options.setAllFilters - Function to set all filters atomically
+ * @param options.transformFilters - Optional function to transform filters before applying (e.g., convert string to boolean)
  * @returns Filter change handler function
  *
  * @example
  * // Basic usage (Integrations, Integration Tools)
- * const handleFilterChange = createFilterChangeHandler(
+ * const handleFilterChange = createFilterChangeHandler({
  *   cursor,
- *   () => setCursor(null),
+ *   resetCursor: () => setCursor(null),
  *   clearAllFilters,
- *   setAllFilters
- * )
+ *   setAllFilters,
+ * })
  *
  * @example
  * // With value transformation (Workflows - convert is_enabled string to boolean)
- * const handleFilterChange = createFilterChangeHandler(
+ * const handleFilterChange = createFilterChangeHandler({
  *   cursor,
- *   () => dispatch({ type: 'SET_CURSOR', payload: null }),
+ *   resetCursor: () => dispatch({ type: 'SET_CURSOR', payload: null }),
  *   clearAllFilters,
  *   setAllFilters,
- *   (filters) => filters.map((filter) => {
+ *   transformFilters: (filters) => filters.map((filter) => {
  *     if (filter.key === 'is_enabled' && typeof filter.value === 'string') {
  *       return { ...filter, value: filter.value === 'true' }
  *     }
  *     return filter
- *   })
- * )
+ *   }),
+ * })
  */
-export const createFilterChangeHandler = (
-  cursor: string | null,
-  resetCursor: () => void,
-  clearAllFilters: () => void,
-  setAllFilters: (filters: FilterConfig[]) => void,
+export const createFilterChangeHandler = ({
+  cursor,
+  resetCursor,
+  clearAllFilters,
+  setAllFilters,
+  transformFilters,
+}: {
+  cursor: string | null
+  resetCursor: () => void
+  clearAllFilters: () => void
+  setAllFilters: (filters: FilterConfig[]) => void
   transformFilters?: (filters: FilterConfig[]) => FilterConfig[]
-) => {
+}) => {
   return (newFilters: FilterConfig[]) => {
     // Reset to first page when filters change
     if (cursor) {

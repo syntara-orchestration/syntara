@@ -32,9 +32,9 @@ class TestWorkflowVersionExportedTelemetryHandler:
         registry.send_event.assert_called_once()
         event = registry.send_event.call_args[0][0]
         assert isinstance(event, WorkflowVersionExportedTelemetryEvent)
-        assert event.workflow_id == str(workflow_id)
+        assert event.workflow_id == workflow_id
         assert event.version == 5
-        assert event.workflow_name == "test-wf"
+        assert "workflow_name" not in event.model_dump()
         assert event.entitlement_id == "ent-test-export"
 
     @patch("syntara.telemetry.handlers.workflow_version_exported.get_telemetry_registry")

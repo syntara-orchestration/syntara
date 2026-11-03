@@ -1,5 +1,4 @@
-import { permissionTooltip } from '../../hooks/permissionUtils'
-import { useCanI } from '../../hooks/useCanI'
+import { useCrudResourcePermissions } from '../../hooks/useCrudResourcePermissions'
 
 type RolePermissions = {
   canCreate: boolean
@@ -29,21 +28,18 @@ type UseRolePermissionsOptions = {
  * Roles hub (system-scoped `can_i` only).
  */
 export function useRolePermissions(options?: UseRolePermissionsOptions): RolePermissions {
-  const resourceType = 'role' as const
-  const canIOptions = options?.resourceProject ? { resourceProject: options.resourceProject } : undefined
-  const { allowed: canCreate, isChecking: isCheckingCreate } = useCanI('create', resourceType, canIOptions)
-  const { allowed: canUpdate, isChecking: isCheckingUpdate } = useCanI('update', resourceType, canIOptions)
-  const { allowed: canDelete, isChecking: isCheckingDelete } = useCanI('delete', resourceType, canIOptions)
+  const resourceProject = options?.resourceProject
+  const scopedOptions = resourceProject ? { resourceProject } : undefined
 
-  return {
-    canCreate,
-    canUpdate,
-    canDelete,
-    isLoading: isCheckingCreate || isCheckingUpdate || isCheckingDelete,
-    tooltips: {
-      create: permissionTooltip('create a role', `${resourceType}:create`),
-      update: permissionTooltip('edit this role', `${resourceType}:update`),
-      delete: permissionTooltip('delete this role', `${resourceType}:delete`),
+  return useCrudResourcePermissions({
+    resourceType: 'role',
+    tooltipTargets: {
+      create: 'create a role',
+      update: 'edit this role',
+      delete: 'delete this role',
     },
-  }
+    createCheck: { options: scopedOptions },
+    updateCheck: { options: scopedOptions },
+    deleteCheck: { options: scopedOptions },
+  })
 }

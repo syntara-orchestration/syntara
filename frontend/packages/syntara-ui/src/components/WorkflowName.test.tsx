@@ -21,7 +21,7 @@ describe('WorkflowName', () => {
       data: { id: 'workflow-1', name: 'Test Workflow' },
       isLoading: false,
       isError: false,
-    } as never)
+    })
 
     render(<WorkflowName workflowId="workflow-1" />)
 
@@ -33,7 +33,7 @@ describe('WorkflowName', () => {
       data: undefined,
       isLoading: true,
       isError: false,
-    } as never)
+    })
 
     render(<WorkflowName workflowId="workflow-1" />)
 
@@ -45,7 +45,7 @@ describe('WorkflowName', () => {
       data: undefined,
       isLoading: false,
       isError: true,
-    } as never)
+    })
 
     render(<WorkflowName workflowId="workflow-1" />)
 
@@ -57,7 +57,7 @@ describe('WorkflowName', () => {
       data: undefined,
       isLoading: true,
       isError: false,
-    } as never)
+    })
 
     render(<WorkflowName workflowId="workflow-1" fallback="Loading..." />)
 
@@ -69,7 +69,7 @@ describe('WorkflowName', () => {
       data: { id: 'workflow-1' },
       isLoading: false,
       isError: false,
-    } as never)
+    })
 
     render(<WorkflowName workflowId="workflow-1" />)
 

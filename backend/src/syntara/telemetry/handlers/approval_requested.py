@@ -35,7 +35,7 @@ class ApprovalRequestedTelemetryHandler(AuditEventHandler[ApprovalRequestedEvent
 
             registry.send_event(
                 ApprovalRequestedTelemetryEvent(
-                    workflow_execution_id=str(event.execution_id),
+                    workflow_execution_id=event.execution_id,
                     approval_node_id=event.approval_node_id,
                     entitlement_id=registry.entitlement_id,
                 )

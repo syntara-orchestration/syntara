@@ -1,4 +1,4 @@
-import Dagre from '@dagrejs/dagre'
+import Dagre, { type Graph } from '@dagrejs/dagre'
 import { ActivityTypeEnum, EdgeHandleEnum } from '@syntara/contracts'
 
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
@@ -23,7 +23,7 @@ function isDagreNodeLabel(value: unknown): value is DagreNodeLabel {
  * Type-safe wrapper around dagre's `graph.node()` which is typed as `any`.
  * After `Dagre.layout()`, every node label is guaranteed to carry x/y coords.
  */
-function getNodeLabel(g: Dagre.graphlib.Graph, nodeId: string): DagreNodeLabel {
+function getNodeLabel(g: Graph, nodeId: string): DagreNodeLabel {
   const raw: unknown = g.node(nodeId)
   if (!isDagreNodeLabel(raw)) {
     throw new Error(`Missing Dagre coordinates for node "${nodeId}"`)
@@ -55,7 +55,7 @@ type BodyNodeWithPosition = {
 function calculateLoopBodyPositions(
   loopBodies: Map<string, string[]>,
   realNodes: NodeType[],
-  g: Dagre.graphlib.Graph
+  g: Graph
 ): Map<string, LoopBodyPosition> {
   const loopBodyPositions = new Map<string, LoopBodyPosition>()
 
@@ -214,7 +214,7 @@ type BranchPositionContext = {
   baseY: number
   nodeHeight: number
   branchNodeOrdering: Map<string, BranchOrdering>
-  g: Dagre.graphlib.Graph
+  g: Graph
 }
 
 /**

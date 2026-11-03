@@ -22,7 +22,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.repository == 'syntara-orchestration/syntara'
     permissions:
       contents: read

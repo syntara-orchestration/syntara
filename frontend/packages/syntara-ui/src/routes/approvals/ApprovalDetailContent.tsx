@@ -7,11 +7,9 @@ import {
   DescriptionListGroup,
   DescriptionListTerm,
   Divider,
-  FormGroup,
   Split,
   Stack,
   StackItem,
-  TextInput,
 } from '@patternfly/react-core'
 import { RhUiBackwardsIcon, RhUiDislikeIcon, RhUiLikeIcon } from '@patternfly/react-icons'
 import type { Approval } from '@syntara/contracts'
@@ -21,15 +19,20 @@ import { useState } from 'react'
 import { approvalsClient } from '../../client'
 import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
+import { SynForm } from '../../components/forms/SynForm'
+import { SynTextAreaField } from '../../components/forms/SynTextAreaField'
 import { DateCell } from '../../components/table/DateCell'
 import { permissionTooltip } from '../../hooks/permissionUtils'
 import { useMutationErrorHandler } from '../../hooks/useMutationErrorHandler'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
+import { useSynForm, type UseSynFormReturn } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
+import { APPROVAL_NOTES_MAX_LENGTH } from '../executions/approvalDecisionSchema'
 
 import styles from './ApprovalDetailContent.module.css'
 import { lookupMapByApprovalNodeId } from './approvalNodeId'
 import { getNotesLabel } from './approvalNotes'
+import { approvalNotesOnlySchema, type ApprovalNotesOnlyFormData } from './approvalNoteSchema'
 import { getApprovalPromptFromRecord } from './approvalPrompt'
 import { ApprovalStatusBadges } from './approvalUtils'
 import { buildWorkflowBuilderLink } from './buildWorkflowBuilderLink'
@@ -134,16 +137,14 @@ function DecisionButtons({
 }
 
 function PendingDecisionForm({
+  form,
   pendingDecision,
-  pendingReason,
   isSubmitting,
-  onReasonChange,
   onUndo,
 }: Readonly<{
+  form: UseSynFormReturn<{ notes: string }>
   pendingDecision: 'approved' | 'rejected'
-  pendingReason: string
   isSubmitting: boolean
-  onReasonChange: (value: string) => void
   onUndo: () => void
 }>) {
   const decisionCopy = getDecisionCopy(pendingDecision)
@@ -160,14 +161,14 @@ function PendingDecisionForm({
           onClick={onUndo}
         />
       </Split>
-      <FormGroup isInline label={decisionCopy.label}>
-        <TextInput
-          aria-label={decisionCopy.label}
-          value={pendingReason}
-          onChange={(_e, value: string) => onReasonChange(value)}
+      <SynForm form={form}>
+        <SynTextAreaField
+          name="notes"
+          label={decisionCopy.label}
           placeholder={`Explain the reason for ${decisionCopy.verb} this workflow step.`}
+          maxLength={APPROVAL_NOTES_MAX_LENGTH}
         />
-      </FormGroup>
+      </SynForm>
     </Stack>
   )
 }
@@ -262,8 +263,13 @@ export function ApprovalDetailContent({
   const canDecide = hasRbacPermission && canDecideBasedOnApproverList
   const isCheckingPermission = isLoadingDecideProjects || isCheckingApproverList
 
+  const notesForm = useSynForm({
+    schema: approvalNotesOnlySchema,
+    defaultValues: { notes: '' },
+  })
+  const { handleSubmit: submitNotesForm, reset: resetNotes } = notesForm
+
   const [pendingDecision, setPendingDecision] = useState<'approved' | 'rejected' | undefined>(undefined)
-  const [pendingReason, setPendingReason] = useState('')
 
   const approvalStatus = approval.status ?? 'pending'
   const isPending = approvalStatus === 'pending'
@@ -278,13 +284,13 @@ export function ApprovalDetailContent({
   const isSubmitting = decisionMutation.isPending
   const canSubmit = isPending && Boolean(pendingDecision) && !decisionMutation.isSuccess
 
-  const handleSubmit = () => {
+  const submitDecision = (data: ApprovalNotesOnlyFormData) => {
     if (!pendingDecision || !approval.id || isSubmitting) return
 
     decisionMutation.mutate(
       {
         params: { path: { approval_id: approval.id } },
-        body: { status: pendingDecision, notes: pendingReason.trim() || null },
+        body: { status: pendingDecision, notes: data.notes.trim() || null },
       },
       {
         onSuccess: async () => {
@@ -293,7 +299,7 @@ export function ApprovalDetailContent({
             description: 'The approval decision has been recorded.',
           })
           setPendingDecision(undefined)
-          setPendingReason('')
+          resetNotes({ notes: '' })
 
           // Wait for queries to refetch before calling onDecisionSubmitted
           // This ensures the execution state and canvas update before we fetch the next approval
@@ -340,19 +346,27 @@ export function ApprovalDetailContent({
           isCheckingPermission={isCheckingPermission}
           isSubmitting={isSubmitting}
           decideTooltip={decideTooltip}
-          onApprove={() => setPendingDecision('approved')}
-          onReject={() => setPendingDecision('rejected')}
+          onApprove={() => {
+            resetNotes({ notes: '' })
+            setPendingDecision('approved')
+          }}
+          onReject={() => {
+            resetNotes({ notes: '' })
+            setPendingDecision('rejected')
+          }}
         />
       )
     }
 
     return (
       <PendingDecisionForm
+        form={notesForm}
         pendingDecision={pendingDecision}
-        pendingReason={pendingReason}
         isSubmitting={isSubmitting}
-        onReasonChange={setPendingReason}
-        onUndo={() => setPendingDecision(undefined)}
+        onUndo={() => {
+          setPendingDecision(undefined)
+          resetNotes({ notes: '' })
+        }}
       />
     )
   }
@@ -364,7 +378,7 @@ export function ApprovalDetailContent({
           <StackItem>{renderDecisionActions()}</StackItem>
           {isPending && pendingDecision && (
             <StackItem>
-              <Button isDisabled={!canSubmit} isLoading={isSubmitting} onClick={handleSubmit}>
+              <Button isDisabled={!canSubmit} isLoading={isSubmitting} onClick={submitNotesForm(submitDecision)}>
                 Submit decision
               </Button>
             </StackItem>

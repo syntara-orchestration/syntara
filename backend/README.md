@@ -159,6 +159,15 @@ make db-run
 make db-clean
 ```
 
+> **Seeding contract:** `python -m syntara.seed` (and any `--only` subset) must be idempotent, and
+> re-runs after the initial seed must converge without duplicates. `--only builtin_workflows` is expected
+> to be re-run after the initial seed from a process that can reach Temporal and runs the current
+> release (an older build re-publishes old definitions as new versions); it re-asserts the seeded
+> baseline via `authz`. A failed schedule sync is a warning by default. With `--strict`, the
+> first built-in seeding error (validation, database, or schedule sync) aborts the command with
+> a non-zero exit. Already committed definitions remain durable; later definitions are left
+> for a subsequent run. Keep new seeders within this contract.
+
 > **Schema baseline:** Alembic history was flattened into a single baseline. Databases
 > created with the old revision chain cannot be upgraded in place — run `make db-clean`
 > (or `podman compose down -v` for the full stack), then bring services back up so
@@ -352,6 +361,12 @@ PODMAN_PROJECT=syntara  # Project name for container orchestration (default: syn
 
 # API Configuration
 APP_API_PORT=8000
+APP_API_MAX_REQUEST_BODY_MB=10  # JSON/text POST/PUT/PATCH body limit in MiB (1-120)
+
+# File Upload Limits
+# Multipart body limit is (APP_FILE_UPLOAD_MAX_SIZE_MB x APP_FILE_UPLOAD_MAX_FILES) + 1 MiB, capped at 200 MiB.
+APP_FILE_UPLOAD_MAX_SIZE_MB=10   # Valid range: 1-500 MiB per file
+APP_FILE_UPLOAD_MAX_FILES=10     # Valid range: 1-100 files per request
 
 # UI Configuration
 APP_API_URL=http://localhost:8000
@@ -397,7 +412,7 @@ Syntara uses LangChain with OpenRouter for intelligent agent responses. The Gene
    cp .env.example .env
 
    # Edit .env (LLM credentials are configured on workflow agentic nodes)
-   APP_OPENROUTER_MODEL=anthropic/claude-sonnet-4  # default model
+   APP_OPENROUTER_MODEL=anthropic/claude-sonnet-4.5  # default model
    APP_OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
    ```
 
@@ -427,7 +442,7 @@ LLM API keys are provided through the credential system — attach an LLM Provid
 credential to the workflow's agentic node. No global API key env var is needed.
 
 **Environment Variables**:
-- `APP_OPENROUTER_MODEL` (default: `anthropic/claude-sonnet-4`)
+- `APP_OPENROUTER_MODEL` (default: `anthropic/claude-sonnet-4.5`)
 - `APP_OPENROUTER_BASE_URL` (default: `https://openrouter.ai/api/v1`)
 
 **Example API Usage**:
@@ -769,4 +784,4 @@ Code quality and coverage are tracked via SonarCloud. SonarCloud analysis runs a
 
 - 📖 **[Developer Getting Started Guide](docs/developer-getting-started.md)** - Architecture deep dive with examples
 - 📖 **[Development with Worktrees Guide](docs/development-with-worktrees.md)** - Parallel development setup
-- 📖 **[Architecture Decision Records](decision-records.md)** - Design rationale and decisions
+- 📖 **[Architecture Decision Records](docs/decision-records.md)** - Design rationale and decisions

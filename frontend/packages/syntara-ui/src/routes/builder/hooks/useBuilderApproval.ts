@@ -48,7 +48,7 @@ export function useBuilderApproval({
     handleNodeClick: handleApprovalNodeClick,
     clearPendingApproval,
     setPendingApproval,
-    fetchForNode,
+    fetchForStep,
   } = useExecutionApproval(mostRecentExecutionId ?? undefined)
 
   const [approvalViewOpen, setApprovalViewOpen] = useState(false)
@@ -76,7 +76,7 @@ export function useBuilderApproval({
 
   useAutoApprovalDetection({
     executionId: isLiveRunActive ? (mostRecentExecutionId ?? undefined) : undefined,
-    fetchForNode,
+    fetchForStep,
     onApprovalDetected: handleApprovalDetected,
   })
 
@@ -106,7 +106,7 @@ export function useBuilderApproval({
       if (showMostRecentRunPanelInEditor) {
         const target = event.target as HTMLElement | null
         const clickedBadge = target?.closest?.(EXECUTION_BADGE_SELECTOR) != null
-        const execNode: ExecutionNode = { id: node.id, type: node.type, data: node.data as Record<string, unknown> }
+        const execNode: ExecutionNode = { id: node.id, type: node.type, data: node.data }
         if (clickedBadge && isWaitingApprovalNode(execNode)) {
           handleApprovalNodeClick(event, execNode)
           setApprovalViewOpen(true)

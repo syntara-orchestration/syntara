@@ -2,7 +2,14 @@ import { generateKeyPairSync } from 'node:crypto'
 
 import { type Page } from './fixtures'
 import { test, expect } from './fixtures'
-import { deleteCredentialByName, goToCredentialsList, selectCredentialType } from './helpers/credentials'
+import {
+  credentialSecretToggle,
+  credentialSecretInput,
+  deleteCredentialByName,
+  goToCredentialsList,
+  selectCredentialType,
+  waitForCredentialFormTypesReady,
+} from './helpers/credentials'
 import { buildUniqueName } from './helpers/workflows'
 
 function generateTestSSHKey(): string {
@@ -27,9 +34,10 @@ test.describe('Dynamic Credential Form Rendering', () => {
   test('HTTP Bearer Token: form renders correct fields', async ({ app }) => {
     const modal = await openCreateModal(app)
     await selectCredentialType(modal, 'HTTP Bearer Token')
+    await waitForCredentialFormTypesReady(modal, 'Token')
 
-    await expect(modal.getByRole('textbox', { name: 'Token' })).toBeVisible()
-    await expect(modal.getByRole('button', { name: /Show secret|Hide secret/ })).toBeVisible()
+    await expect(credentialSecretInput(modal, 'Token')).toBeVisible()
+    await expect(credentialSecretToggle(modal, 'Token')).toBeVisible()
   })
 
   test('HTTP Bearer Token: create credential succeeds', async ({ app }) => {

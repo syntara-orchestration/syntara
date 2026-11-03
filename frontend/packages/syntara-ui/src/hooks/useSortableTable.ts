@@ -1,7 +1,7 @@
 import type { ThProps } from '@patternfly/react-table'
 import { useCallback, useMemo } from 'react'
 
-import type { SortableColumn, SortConfig, SortDirection } from '../types/sorting'
+import type { SortableColumn, SortConfig } from '../types/sorting'
 import { buildSortParam } from '../utils/sortUtils'
 
 import type { UseSortStateOptions, UseSortStateResult } from './useSortState'
@@ -98,7 +98,7 @@ export function useSortableTableControls(
           defaultDirection: 'asc',
         },
         onSort: (_event, _index, direction) => {
-          setSort({ field: columnField, direction: direction as SortDirection })
+          setSort({ field: columnField, direction: direction })
         },
         columnIndex,
       }

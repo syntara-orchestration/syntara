@@ -19,7 +19,7 @@ function isEditableElement(element: Element | null): boolean {
  * redo (Ctrl/Cmd+Shift+Z or Ctrl+Y).
  *
  * Shortcuts are suppressed when focus is inside editable elements
- * (inputs, textareas, contenteditable) or when the node editor overlay is open.
+ * (inputs, textareas, contenteditable) or when the step editor overlay is open.
  */
 export function useUndoRedoKeyboard({ disabled = false }: { disabled?: boolean } = {}) {
   useEffect(() => {

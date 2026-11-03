@@ -2,6 +2,8 @@ import type { Preview } from '@storybook/tanstack-react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useMemo, type ReactNode } from 'react'
 
+// Storybook renders stories in an iframe, outside the routes that normally load React Flow's required canvas styles.
+import '@xyflow/react/dist/style.css'
 import '../src/index.css'
 import { type ColorScheme, applyDocumentColorScheme, resolveColorScheme } from '../src/providers/theme/colorScheme'
 import { ColorSchemeProvider } from '../src/providers/theme/ColorSchemeProvider'

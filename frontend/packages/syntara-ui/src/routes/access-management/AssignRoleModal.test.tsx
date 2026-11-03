@@ -258,7 +258,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByRole('option', { name: /admin-role/i }))
 
       // The Assign button should now show count
-      expect(screen.getByRole('button', { name: /Assign \(1\)/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Assign role/i })).toBeInTheDocument()
 
       // Switch scope to Project
       await user.click(screen.getByRole('button', { name: 'System' }))
@@ -266,7 +266,7 @@ describe('AssignRoleModal', () => {
 
       // After scope change, selected roles should be cleared — button text goes back to just "Assign"
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /^Assign\s*$/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /^Assign role$/i })).toBeInTheDocument()
       })
     })
   })
@@ -334,7 +334,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByPlaceholderText('Search for roles...'))
       await user.click(screen.getByRole('option', { name: /admin-role/i }))
 
-      expect(screen.getByRole('button', { name: /Assign \(1\)/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Assign role/i })).toBeInTheDocument()
     })
   })
 
@@ -365,7 +365,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByPlaceholderText('Search for roles...'))
       await user.click(screen.getByRole('option', { name: /project-admin/i }))
 
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       await waitFor(() => {
         expect(screen.getByText('Project is required')).toBeInTheDocument()
@@ -390,6 +390,25 @@ describe('AssignRoleModal', () => {
         expect(screen.queryByText('Select at least one role')).not.toBeInTheDocument()
       })
     })
+
+    // Selecting a project (which resets roleIds with shouldValidate)
+    // surfaces "Select at least one role" before the user has touched the role
+    // picker at all; selecting a role right after should clear it immediately.
+    it('clears role error after choosing a project and then a role for a service account', async () => {
+      const user = userEvent.setup()
+      await renderModal({ principalType: 'service_account', principalId: 'sa-1' })
+
+      const projectToggle = screen.getByRole('button', { name: 'Select a project...' })
+      await user.click(projectToggle)
+      await user.click(screen.getByRole('option', { name: 'Project Alpha' }))
+
+      await user.click(screen.getByPlaceholderText('Search for roles...'))
+      await user.click(screen.getByRole('option', { name: /project-admin/i }))
+
+      await waitFor(() => {
+        expect(screen.queryByText('Select at least one role')).not.toBeInTheDocument()
+      })
+    })
   })
 
   describe('Form submission', () => {
@@ -405,7 +424,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByRole('option', { name: /admin-role/i }))
 
       // Submit
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
@@ -430,7 +449,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByPlaceholderText('Search for roles...'))
       await user.click(screen.getByRole('option', { name: /admin-role/i }))
 
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
@@ -464,7 +483,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByRole('option', { name: /project-admin/i }))
 
       // Submit
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
@@ -496,7 +515,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByPlaceholderText('Search for roles...'))
       await user.click(screen.getByRole('option', { name: /project-admin/i }))
 
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
@@ -534,7 +553,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByPlaceholderText('Search for roles...'))
       await user.click(screen.getByRole('option', { name: /project-admin/i }))
 
-      const submitButton = screen.getByRole('button', { name: /Assign \(1\)/i })
+      const submitButton = screen.getByRole('button', { name: /Assign role/i })
       expect(submitButton).toBeEnabled()
       await user.click(submitButton)
       expect(mockMutateAsync).not.toHaveBeenCalled()
@@ -551,7 +570,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByRole('option', { name: /admin-role/i }))
 
       // Submit
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       // Should show singular success alert
       await waitFor(() => {
@@ -573,7 +592,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByRole('option', { name: /admin-role/i }))
 
       // Submit
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       // The alert should appear via AlertProvider
       await waitFor(() => {
@@ -634,7 +653,7 @@ describe('AssignRoleModal', () => {
       await user.click(screen.getByRole('option', { name: /project-admin/i }))
 
       // Submit
-      await user.click(screen.getByRole('button', { name: /Assign \(1\)/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({

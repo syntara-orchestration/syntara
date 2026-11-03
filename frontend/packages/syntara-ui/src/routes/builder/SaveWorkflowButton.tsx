@@ -2,8 +2,9 @@ import { Button, Icon, Timestamp, Tooltip } from '@patternfly/react-core'
 import { RhUiSaveFillIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 
-import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { toDisplayDate } from '../../utils/dateUtils'
+
+import styles from './SaveWorkflowButton.module.css'
 
 type SaveWorkflowButtonProps = Readonly<{
   isPending: boolean
@@ -13,7 +14,7 @@ type SaveWorkflowButtonProps = Readonly<{
   onSave: () => void
   canEdit: boolean
   editTooltip: string
-  isNodeEditorOpen?: boolean
+  isStepEditorOpen?: boolean
 }>
 
 export function SaveWorkflowButton({
@@ -24,20 +25,23 @@ export function SaveWorkflowButton({
   onSave,
   canEdit,
   editTooltip,
-  isNodeEditorOpen,
+  isStepEditorOpen,
 }: SaveWorkflowButtonProps) {
-  const isDisabled = !canEdit || isPending || (!isDirty && !isNew) || !!isNodeEditorOpen
+  const isDisabled = !canEdit || isPending || (!isDirty && !isNew) || !!isStepEditorOpen
   const lastSavedDate = toDisplayDate(lastSavedAt)
   const lastSavedText = lastSavedDate ? (
     <>
-      Last saved <Timestamp date={lastSavedDate} dateFormat="medium" timeFormat="medium" />
+      Last saved:{' '}
+      <span className={styles.lastSavedTooltip}>
+        <Timestamp date={lastSavedDate} dateFormat="medium" timeFormat="medium" />
+      </span>
     </>
   ) : null
 
   let disabledTooltip: ReactNode
   if (!canEdit) {
     disabledTooltip = editTooltip
-  } else if (isNodeEditorOpen && lastSavedText) {
+  } else if (isStepEditorOpen && lastSavedText) {
     disabledTooltip = (
       <>
         Finish editing the current step before saving
@@ -45,7 +49,7 @@ export function SaveWorkflowButton({
         {lastSavedText}
       </>
     )
-  } else if (isNodeEditorOpen) {
+  } else if (isStepEditorOpen) {
     disabledTooltip = 'Finish editing the current step before saving'
   } else {
     disabledTooltip = lastSavedText ?? 'Save workflow'
@@ -66,20 +70,13 @@ export function SaveWorkflowButton({
       }
       iconPosition="start"
     >
-      {isPending ? 'Saving...' : 'Save'}
+      {isPending ? 'Saving...' : 'Save workflow'}
     </Button>
   )
 
-  if (isDisabled) {
-    return (
-      <DisabledWithTooltip isDisabled content={disabledTooltip} position="bottom">
-        {button}
-      </DisabledWithTooltip>
-    )
-  }
-
+  // Keep a single Tooltip wrapper so pending/clean transitions do not remount the button tree.
   return (
-    <Tooltip content={enabledTooltip} position="bottom" enableFlip={false}>
+    <Tooltip content={isDisabled ? disabledTooltip : enabledTooltip} position="bottom" enableFlip={false}>
       {button}
     </Tooltip>
   )

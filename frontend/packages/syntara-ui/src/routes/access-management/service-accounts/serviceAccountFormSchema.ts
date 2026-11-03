@@ -2,6 +2,10 @@ import { z } from 'zod'
 
 const namePattern = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/
 
+/** Inline hint shown under the service account name field before validation errors */
+export const SERVICE_ACCOUNT_NAME_HINT =
+  'Lowercase letters, numbers, and hyphens. Must start and end with a letter or number.'
+
 export const createServiceAccountSchema = z.object({
   name: z
     .string()

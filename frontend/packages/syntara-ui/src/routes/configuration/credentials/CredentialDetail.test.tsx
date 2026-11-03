@@ -17,8 +17,8 @@ const { mockNavigate } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
 }))
 
-const wouterMock = vi.hoisted(() => ({
-  credentialId: '1' as string | undefined,
+const routeStateMock = vi.hoisted((): { credentialId: string | undefined } => ({
+  credentialId: '1',
 }))
 
 const mockCredential = {
@@ -99,7 +99,7 @@ vi.mock('@tanstack/react-router', async () => {
     useParams: vi.fn(() => ({ credentialId: '1' })),
     useRouterState: (opts?: { select?: (s: { location: { pathname: string; searchStr: string } }) => unknown }) => {
       const state = {
-        location: { pathname: `/configuration/credentials/${wouterMock.credentialId ?? ''}`, searchStr: '' },
+        location: { pathname: `/configuration/credentials/${routeStateMock.credentialId ?? ''}`, searchStr: '' },
       }
       return opts?.select ? opts.select(state) : state
     },
@@ -229,13 +229,13 @@ describe('CredentialDetail', () => {
   let mockMutate: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
-    wouterMock.credentialId = '1'
+    routeStateMock.credentialId = '1'
     disableCredentialHookMock.reset()
     vi.clearAllMocks()
     queryClient.clear()
     mockMutate = vi.fn()
     vi.mocked(useParams).mockReturnValue({ credentialId: '1' })
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery())
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -566,7 +566,7 @@ describe('CredentialDetail', () => {
 
     const dialog = screen.getByRole('dialog')
     await user.click(within(dialog).getByRole('checkbox'))
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete credential' }))
 
     expect(mockMutate).toHaveBeenCalled()
     expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/configuration/credentials' }))
@@ -591,14 +591,14 @@ describe('CredentialDetail', () => {
 
     const dialog = screen.getByRole('dialog')
     await user.click(within(dialog).getByRole('checkbox'))
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete credential' }))
 
     expect(mockMutate).toHaveBeenCalled()
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 
   it('renders invalid credential shell when route has no credential id', () => {
-    wouterMock.credentialId = undefined
+    routeStateMock.credentialId = undefined
     vi.mocked(useParams).mockReturnValueOnce({ credentialId: undefined as unknown as string })
 
     render(<CredentialDetail />, { wrapper })
@@ -661,7 +661,7 @@ describe('CredentialDetail', () => {
     render(<CredentialDetail />, { wrapper })
 
     expect(screen.getByText('Disable credential?')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable credential' }))
 
     expect(mockMutate).toHaveBeenCalledWith(
       { params: { path: { credential_id: '1' } }, body: { enabled: false } },
@@ -679,7 +679,7 @@ describe('CredentialDetail', () => {
     const user = userEvent.setup()
     render(<CredentialDetail />, { wrapper })
 
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable credential' }))
     expect(mockMutate).toHaveBeenCalled()
   })
 
@@ -695,7 +695,7 @@ describe('CredentialDetail', () => {
     const user = userEvent.setup()
     render(<CredentialDetail />, { wrapper })
 
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable credential' }))
     expect(mockMutate).toHaveBeenCalled()
   })
 
@@ -802,7 +802,7 @@ describe('CredentialDetail', () => {
 
   it('renders em-dash for workflow count when null', () => {
     const credWithNullCount = { ...mockCredential, workflow_count: null }
-    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithNullCount as never))
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithNullCount))
 
     render(<CredentialDetail />, { wrapper })
 
@@ -814,7 +814,7 @@ describe('CredentialDetail', () => {
 
   it('renders workflow count as badge on Workflows tab when greater than zero', async () => {
     const credWithCount = { ...mockCredential, workflow_count: 5 }
-    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithCount as never))
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithCount))
 
     render(<CredentialDetail />, { wrapper })
 
@@ -836,7 +836,7 @@ describe('CredentialDetail', () => {
 
   it('renders em-dash for integration count when null', () => {
     const credWithNullIntegrationCount = { ...mockCredential, integration_count: null }
-    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithNullIntegrationCount as never))
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithNullIntegrationCount))
 
     render(<CredentialDetail />, { wrapper })
 
@@ -846,7 +846,7 @@ describe('CredentialDetail', () => {
 
   it('renders integration count as badge on Integrations tab when greater than zero', async () => {
     const credWithIntegrationCount = { ...mockCredential, integration_count: 7 }
-    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithIntegrationCount as never))
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithIntegrationCount))
 
     render(<CredentialDetail />, { wrapper })
 
@@ -858,7 +858,7 @@ describe('CredentialDetail', () => {
 
   describe('Permission-based tab gating', () => {
     it('hides Workflows tab when workflow:read is denied', async () => {
-      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } } as never)
+      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } })
       render(<CredentialDetail />, { wrapper })
 
       await act(async () => {
@@ -870,7 +870,7 @@ describe('CredentialDetail', () => {
     })
 
     it('shows Workflows tab when workflow:read is granted', async () => {
-      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
       render(<CredentialDetail />, { wrapper })
 
       expect(await screen.findByRole('tab', { name: /Workflows/ })).toBeInTheDocument()

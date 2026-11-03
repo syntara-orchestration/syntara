@@ -178,7 +178,7 @@ export interface components {
        */
       approver_groups?: components['schemas']['ApproverGroupSummary'][]
       /** @description User who made the decision */
-      decided_by?: components['schemas']['UserReference'] | null
+      readonly decided_by?: components['schemas']['UserReference'] | null
       /**
        * Decided At
        * @description When decision was made
@@ -448,7 +448,7 @@ export interface components {
        */
       decided_at?: string | null
       /** @description User who made the decision (if successful) */
-      decided_by?: components['schemas']['UserReference'] | null
+      readonly decided_by?: components['schemas']['UserReference'] | null
       /**
        * Decision Notes
        * @description Notes provided with the decision (echoed back from request)
@@ -518,8 +518,9 @@ export interface components {
     /**
      * UserReference
      * @description Minimal user identification for embedding in other resources.
-     *     This model captures user identity at the time of an action, providing
-     *     a snapshot that doesn't change even if the user's details are updated later.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
      */
     UserReference: {
       /**
@@ -527,8 +528,10 @@ export interface components {
        * @description User's unique identifier
        */
       id: string
-      /** @description User's display name at time of action */
+      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
       name: string
+      /** @description Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor. */
+      type: components['schemas']['UserReferenceType']
     }
     /**
      * ApproverUserSummary
@@ -610,6 +613,16 @@ export interface components {
         [key: string]: string
       }
     }
+    /**
+     * UserReferenceType
+     * @description Kind of principal a UserReference points at.
+     *
+     *     Only ``user`` references have a user detail page. ``deleted_user`` and
+     *     ``deleted_service_account`` mark principals that were hard-deleted but are
+     *     still recorded as the actor.
+     * @enum {string}
+     */
+    UserReferenceType: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' | 'deleted_service_account'
     /**
      * ErrorData
      * @description RFC 9457 Problem Details format for error event data.

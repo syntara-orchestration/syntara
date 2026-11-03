@@ -20,7 +20,7 @@ const SAVE_CLICK_TIMEOUT = 10_000
 /**
  * Budget for the create/update request to come back.
  *
- * Deliberately larger than the 15s URL guard it replaces: `wait-node.spec.ts`
+ * Deliberately larger than the 15s URL guard it replaces: `wait-step.spec.ts`
  * failed honestly at 15s under three workers, which is the save genuinely being
  * slow rather than the gate being wrong.
  */
@@ -80,7 +80,7 @@ export async function clickSaveAndWait(
   { timeout = SAVE_RESPONSE_TIMEOUT }: { timeout?: number } = {}
 ): Promise<void> {
   const wasNew = /\/workflow-builder\/new(?:[?#]|$)/.test(page.url())
-  const saveButton = page.getByRole('button', { name: 'Save', exact: true })
+  const saveButton = page.getByRole('button', { name: 'Save workflow' })
 
   await expect(saveButton).toBeEnabled({ timeout: SAVE_CLICK_TIMEOUT })
 

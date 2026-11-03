@@ -94,7 +94,7 @@ describe('GroupsTab Component', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     vi.mocked(usersClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
@@ -113,7 +113,7 @@ describe('GroupsTab Component', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
   })
 
   describe('Rendering', () => {
@@ -130,6 +130,19 @@ describe('GroupsTab Component', () => {
       expect(screen.getByText('Admins')).toBeInTheDocument()
       expect(screen.getByText('Developers')).toBeInTheDocument()
       expect(screen.getByText('Viewers')).toBeInTheDocument()
+    })
+
+    it('renders group names as links to group detail pages', () => {
+      render(<GroupsTab />, { wrapper })
+
+      expect(screen.getByRole('link', { name: 'Admins' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/groups/g1'
+      )
+      expect(screen.getByRole('link', { name: 'Developers' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/groups/g2'
+      )
     })
 
     it('renders table columns', () => {
@@ -168,7 +181,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -329,7 +342,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -352,7 +365,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -375,7 +388,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -396,7 +409,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -420,7 +433,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -500,7 +513,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -567,12 +580,12 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(usersClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -586,7 +599,7 @@ describe('GroupsTab Component', () => {
       await user.click(screen.getByRole('checkbox'))
 
       // Click Delete button in dialog
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete group' })
       await user.click(deleteButton)
 
       expect(mockDeleteMutate).toHaveBeenCalled()
@@ -607,12 +620,12 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: mockRefetch,
-      } as never)
+      })
 
       vi.mocked(usersClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -626,7 +639,7 @@ describe('GroupsTab Component', () => {
       await user.click(screen.getByRole('checkbox'))
 
       // Click Delete
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete group' })
       await user.click(deleteButton)
 
       // Simulate successful mutation
@@ -650,7 +663,7 @@ describe('GroupsTab Component', () => {
       vi.mocked(usersClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -664,7 +677,7 @@ describe('GroupsTab Component', () => {
       await user.click(screen.getByRole('checkbox'))
 
       // Click Delete
-      const deleteButton = await screen.findByRole('button', { name: 'Delete' })
+      const deleteButton = await screen.findByRole('button', { name: 'Delete group' })
       await user.click(deleteButton)
 
       // Simulate failed mutation
@@ -714,7 +727,7 @@ describe('GroupsTab Component', () => {
       vi.mocked(usersClient.useMutation).mockReturnValue({
         mutate: mockDeleteMutate,
         isPending: false,
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -746,7 +759,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 
@@ -772,7 +785,7 @@ describe('GroupsTab Component', () => {
         error: null,
         isFetching: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<GroupsTab />, { wrapper })
 

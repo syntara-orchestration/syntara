@@ -1,11 +1,14 @@
 /**
  * When the workflow canvas viewport zoom is at or below this scale, nodes render as
- * compact color blocks (similar to PatternFly Topology semantic zoom) with tooltips.
+ * icon-only tiles (similar to PatternFly Topology semantic zoom); name and type show in a tooltip.
  */
 export const SEMANTIC_ZOOM_MAX_SCALE = 0.5
 
-/** Height of the solid color bar in flow coordinates when semantic zoom is active. */
-export const SEMANTIC_ZOOM_BAR_HEIGHT_PX = 28
+/** Square icon tile width/height in flow coordinates when semantic zoom is active. */
+export const SEMANTIC_ZOOM_TILE_SIZE_PX = 224
+
+/** Vertical center of connection handles on the tile (not the label panel). */
+export const SEMANTIC_ZOOM_TILE_HANDLE_TOP_PX = SEMANTIC_ZOOM_TILE_SIZE_PX / 2
 
 /**
  * Primary tooltip/canvas line for semantic zoom: non-empty trimmed `name`, or `whenEmpty`.

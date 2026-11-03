@@ -1,0 +1,16 @@
+.canvasContainer {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.executionSpinner {
+  position: absolute;
+  top: var(--pf-t--global--spacer--md);
+  left: var(--pf-t--global--spacer--md);
+  z-index: 1000;
+}
+
+.executionSpinnerIcon {
+  --pf-v6-c-spinner--Color: var(--pf-t--global--color--brand--default);
+}

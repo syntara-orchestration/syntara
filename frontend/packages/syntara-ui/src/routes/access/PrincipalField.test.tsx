@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useForm } from 'react-hook-form'
+import { FormProvider, useForm } from 'react-hook-form'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -30,28 +30,29 @@ function Wrapper({
   name?: 'userId' | 'groupId' | 'serviceAccountId'
   options?: { value: string; label: string }[]
 }) {
-  const { control, handleSubmit } = useForm<AssignRoleFormData>({
+  const methods = useForm<AssignRoleFormData>({
     resolver: zodResolver(assignRoleSchema),
     defaultValues,
   })
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        detachPromise(handleSubmit(() => {})())
-      }}
-    >
-      <PrincipalField
-        control={control}
-        name={name}
-        label="User"
-        fieldId="user-select"
-        options={options}
-        placeholder="Select a user..."
-      />
-      <button type="submit">Submit</button>
-    </form>
+    <FormProvider {...methods}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          detachPromise(methods.handleSubmit(() => {})())
+        }}
+      >
+        <PrincipalField<AssignRoleFormData>
+          name={name}
+          label="User"
+          fieldId="user-select"
+          options={options}
+          placeholder="Select a user..."
+        />
+        <button type="submit">Submit</button>
+      </form>
+    </FormProvider>
   )
 }
 

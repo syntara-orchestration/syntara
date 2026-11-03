@@ -313,7 +313,7 @@ export function SettingInput({
       return (
         <TextInput
           id={setting.key}
-          value={String(value as string)}
+          value={String(value)}
           readOnlyVariant={readOnlyVariant}
           onChange={(_event, val) => onChange(setting.key, val)}
         />

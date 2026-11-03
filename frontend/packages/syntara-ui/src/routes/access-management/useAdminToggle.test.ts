@@ -65,7 +65,7 @@ function setupMocks({
   vi.mocked(accessClient.useMutation).mockReturnValue({
     mutate: mockMutate,
     isPending: false,
-  } as never)
+  })
   vi.mocked(useActiveAdminCount).mockReturnValue(activeAdminCount)
   vi.mocked(useMutationErrorHandler).mockReturnValue(mockErrorHandler)
   vi.mocked(useAuthStore).mockImplementation((selector: unknown) =>

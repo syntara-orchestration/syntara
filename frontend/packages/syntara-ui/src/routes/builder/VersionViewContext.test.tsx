@@ -1,7 +1,8 @@
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import { VersionViewProvider, useIsVersionView } from './VersionViewContext'
+import { useIsVersionView } from './VersionViewContext'
+import { VersionViewProvider } from './VersionViewProvider'
 
 describe('VersionViewContext', () => {
   it('returns false by default (no provider)', () => {

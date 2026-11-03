@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from 'react'
 import type { ActivityState } from '../../workflows/execution/types'
 import { parseCompositeKey } from '../../workflows/execution/utils/activityState'
 import type { ActivityOrderItem } from '../ExecutionActivityTable'
-import { resolveNodeName } from '../useActivityNameMap'
+import { resolveStepName } from '../useActivityNameMap'
 
 type UseSelectedActivityOptions = {
   selectedNodeId: string | null | undefined
@@ -19,7 +19,13 @@ export function useSelectedActivity(opts: UseSelectedActivityOptions) {
   const [selectedActivityKey, setSelectedActivityKey] = useState<string | null>(null)
   const [prevNodeId, setPrevNodeId] = useState(selectedNodeId)
 
-  const resolvedNodeId = selectedNodeId ?? null
+  const resolvedNodeId = useMemo(() => {
+    if (selectedNodeId != null) return selectedNodeId
+    if (selectedActivityKey) {
+      return parseCompositeKey(selectedActivityKey).baseId
+    }
+    return null
+  }, [selectedNodeId, selectedActivityKey])
 
   if (selectedNodeId !== prevNodeId) {
     setPrevNodeId(selectedNodeId)
@@ -29,16 +35,20 @@ export function useSelectedActivity(opts: UseSelectedActivityOptions) {
   }
 
   const effectiveKey = useMemo(() => {
-    if (selectedActivityKey && selectedNodeId) {
-      const { baseId } = parseCompositeKey(selectedActivityKey)
-      if (baseId === selectedNodeId) return selectedActivityKey
+    if (selectedActivityKey) {
+      if (selectedNodeId) {
+        const { baseId } = parseCompositeKey(selectedActivityKey)
+        if (baseId === selectedNodeId) return selectedActivityKey
+      } else {
+        return selectedActivityKey
+      }
     }
     return selectedNodeId ?? null
   }, [selectedActivityKey, selectedNodeId])
 
   const matchedActivity = useMemo(() => activityOrder.find((a) => a.id === effectiveKey), [activityOrder, effectiveKey])
-  const displayNodeName =
-    selectedNodeNameProp ?? matchedActivity?.name ?? resolveNodeName(nameMap, effectiveKey) ?? null
+  const displayStepName =
+    selectedNodeNameProp ?? matchedActivity?.name ?? resolveStepName(nameMap, effectiveKey) ?? null
   const selectedNodeState = effectiveKey ? activityStates.get(effectiveKey) : undefined
   const selectedNodeType = matchedActivity?.type
 
@@ -51,5 +61,5 @@ export function useSelectedActivity(opts: UseSelectedActivityOptions) {
     [onNodeSelect]
   )
 
-  return { resolvedNodeId, effectiveKey, displayNodeName, selectedNodeState, selectedNodeType, handleRowClick }
+  return { resolvedNodeId, effectiveKey, displayStepName, selectedNodeState, selectedNodeType, handleRowClick }
 }

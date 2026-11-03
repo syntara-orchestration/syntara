@@ -175,7 +175,7 @@ function setupDefaultMocks() {
     refetch: vi.fn(),
   })
 
-  vi.mocked(accessClient.useMutation).mockReturnValue(mockMutationReturn as never)
+  vi.mocked(accessClient.useMutation).mockReturnValue(mockMutationReturn)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -221,7 +221,7 @@ describe('EditAssignmentDialog', () => {
     it('renders Save and Cancel buttons', () => {
       render(<EditAssignmentDialog {...defaultProps} />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save assignment' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
     })
 
@@ -263,7 +263,7 @@ describe('EditAssignmentDialog', () => {
       render(<EditAssignmentDialog {...defaultProps} onClose={onClose} />, { wrapper })
 
       // Submit without changing the role
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(onClose).toHaveBeenCalled()
@@ -285,7 +285,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
@@ -303,7 +303,7 @@ describe('EditAssignmentDialog', () => {
       await user.click(viewerOption)
 
       // Submit
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         // mutateAsync should be called (delete old, create new)
@@ -316,7 +316,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
@@ -334,7 +334,7 @@ describe('EditAssignmentDialog', () => {
       const viewerOption = await screen.findByRole('option', { name: 'Viewer' })
       await user.click(viewerOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(mutateAsyncSpy).toHaveBeenCalled()
@@ -346,7 +346,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onClose = vi.fn()
       const onSuccess = vi.fn()
@@ -363,7 +363,7 @@ describe('EditAssignmentDialog', () => {
       const adminOption = await screen.findByRole('option', { name: 'Admin' })
       await user.click(adminOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(mutateAsyncSpy).toHaveBeenCalled()
@@ -375,7 +375,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onClose = vi.fn()
       const onSuccess = vi.fn()
@@ -391,7 +391,7 @@ describe('EditAssignmentDialog', () => {
       const viewerOption = await screen.findByRole('option', { name: 'Viewer' })
       await user.click(viewerOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(mutateAsyncSpy).toHaveBeenCalled()
@@ -403,7 +403,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
@@ -419,7 +419,7 @@ describe('EditAssignmentDialog', () => {
       const viewerOption = await screen.findByRole('option', { name: 'Viewer' })
       await user.click(viewerOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(onSuccess).toHaveBeenCalled()
@@ -432,7 +432,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue(undefined)
       const user = userEvent.setup()
@@ -443,7 +443,7 @@ describe('EditAssignmentDialog', () => {
       const roleToggle = screen.getByPlaceholderText('Select a role...')
       await user.click(roleToggle)
       await user.click(await screen.findByRole('option', { name: 'Viewer' }))
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['role-assignments'] })
@@ -487,7 +487,7 @@ describe('EditAssignmentDialog', () => {
       const roleToggle = screen.getByPlaceholderText('Select a role...')
       await user.click(roleToggle)
       await user.click(await screen.findByRole('option', { name: 'Viewer' }))
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(screen.getByText('Invalid assignment: missing project ID')).toBeInTheDocument()
@@ -502,7 +502,7 @@ describe('EditAssignmentDialog', () => {
       const roleToggle = screen.getByPlaceholderText('Select a role...')
       await user.click(roleToggle)
       await user.click(await screen.findByRole('option', { name: 'Viewer' }))
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(screen.getByText('Invalid assignment: missing project ID')).toBeInTheDocument()
@@ -514,7 +514,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<EditAssignmentDialog {...defaultProps} row={projectRow} />, { wrapper })
@@ -522,7 +522,7 @@ describe('EditAssignmentDialog', () => {
       const roleToggle = screen.getByPlaceholderText('Select a role...')
       await user.click(roleToggle)
       await user.click(await screen.findByRole('option', { name: 'Viewer' }))
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(screen.getByText(/did not include an assignment id/i)).toBeInTheDocument()
@@ -536,7 +536,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onClose = vi.fn()
       const onSuccess = vi.fn()
@@ -552,7 +552,7 @@ describe('EditAssignmentDialog', () => {
       const viewerOption = await screen.findByRole('option', { name: 'Viewer' })
       await user.click(viewerOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         // mutateAsync was called but failed
@@ -567,7 +567,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
@@ -582,7 +582,7 @@ describe('EditAssignmentDialog', () => {
       const viewerOption = await screen.findByRole('option', { name: 'Viewer' })
       await user.click(viewerOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(mutateAsyncSpy).toHaveBeenCalled()
@@ -601,7 +601,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
@@ -615,7 +615,7 @@ describe('EditAssignmentDialog', () => {
       const adminOption = await screen.findByRole('option', { name: 'Admin' })
       await user.click(adminOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(mutateAsyncSpy).toHaveBeenCalledTimes(3)
@@ -632,7 +632,7 @@ describe('EditAssignmentDialog', () => {
       vi.mocked(accessClient.useMutation).mockReturnValue({
         ...mockMutationReturn,
         mutateAsync: mutateAsyncSpy,
-      } as never)
+      })
 
       const onSuccess = vi.fn()
       const onClose = vi.fn()
@@ -646,7 +646,7 @@ describe('EditAssignmentDialog', () => {
       const viewerOption = await screen.findByRole('option', { name: 'Viewer' })
       await user.click(viewerOption)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save assignment' }))
 
       await waitFor(() => {
         expect(mutateAsyncSpy).toHaveBeenCalledTimes(3)

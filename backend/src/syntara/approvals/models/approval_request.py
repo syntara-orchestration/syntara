@@ -8,8 +8,9 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, ClassVar
 from uuid import UUID
 
-from sqlalchemy import Column, String, UniqueConstraint, text
+from sqlalchemy import Column, String, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import column_property
 from sqlmodel import DateTime, Field, Relationship
 
 from syntara.approvals.models.api_models import (
@@ -23,7 +24,7 @@ from syntara.approvals.models.approval_approvers import ApprovalApproverGroup, A
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base import BaseResource
 from syntara.core.models.pagination import ResourcesResponse
-from syntara.core.models.user_reference import UserReference
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.core.utils.sqlmodel import postgres_enum_column
 
 if TYPE_CHECKING:
@@ -168,6 +169,7 @@ class ApprovalRequest(BaseApprovalRequest, table=True):
     __sortable_fields__: ClassVar[list[str]] = [
         *BaseResource.__sortable_fields__,
         "name",
+        "workflow_name",
         "timeout_at",
         "decided_at",
         "status",
@@ -210,7 +212,15 @@ class ApprovalRequest(BaseApprovalRequest, table=True):
     )
 
 
-class ApprovalRequestRead(BaseApprovalRequest, table=False):
+ApprovalRequest.workflow_name = column_property(
+    func.coalesce(
+        ApprovalRequest.__table__.c.workflow_context["workflow_name"].astext,  # type: ignore[attr-defined]
+        "",
+    )
+)
+
+
+class ApprovalRequestRead(UserReferenceFieldsMixin, BaseApprovalRequest, table=False):
     """ApprovalRequest API response model with typed nested fields.
 
     Overrides the JSONB dict fields from BaseApprovalRequest with typed models
@@ -242,6 +252,8 @@ class ApprovalRequestRead(BaseApprovalRequest, table=False):
         default_factory=list,
         description="Groups whose members can approve this request",
     )
+
+    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("decided_by",)
 
     # Decision field - API returns UserReference object
     decided_by: UserReference | None = Field(

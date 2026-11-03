@@ -289,7 +289,7 @@ describe('Approvals Component', () => {
       error: null,
       isError: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     mockUseProjectSelector.mockReturnValue({
       selectedProject: null,
@@ -308,7 +308,7 @@ describe('Approvals Component', () => {
       error,
       isError: !!error,
       refetch: vi.fn(),
-    } as never)
+    })
   }
 
   it('renders the approvals table with data', () => {
@@ -369,7 +369,7 @@ describe('Approvals Component', () => {
       isError: true,
       error: { message: 'Failed to load', retryable: true },
       refetch: mockRefetch,
-    } as never)
+    })
 
     const user = userEvent.setup()
     render(<Approvals />)
@@ -472,18 +472,15 @@ describe('Approvals Component', () => {
       )
     })
 
-    it('renders sortable headers for name, initiated, actioned, and status', () => {
+    it('renders sortable headers for name, workflow, initiated, actioned, and status', () => {
       mockApprovalsQuery(mockApprovals)
 
       render(<Approvals />)
 
-      for (const name of [/Approval name/i, /Approval initiated/i, /Actioned on/i, /^Status$/i]) {
+      for (const name of [/Approval name/i, /^Workflow$/i, /Approval initiated/i, /Actioned on/i, /^Status$/i]) {
         const header = screen.getByRole('columnheader', { name })
         expect(within(header).getByRole('button')).toBeInTheDocument()
       }
-
-      const workflowHeader = screen.getByRole('columnheader', { name: /^Workflow$/i })
-      expect(within(workflowHeader).queryByRole('button')).not.toBeInTheDocument()
     })
 
     it('writes sort URL param when a column header is clicked', async () => {
@@ -525,6 +522,102 @@ describe('Approvals Component', () => {
 
       await waitFor(() => {
         assertUrlParam(mockSetSearchParams, 'sort', 'name')
+      })
+    })
+
+    it('can sort by workflow_name via the Workflow column', async () => {
+      const user = userEvent.setup()
+      mockApprovalsQuery(mockApprovals)
+
+      render(<Approvals />)
+
+      const workflowHeader = screen.getByRole('columnheader', { name: /^Workflow$/i })
+      await user.click(within(workflowHeader).getByRole('button'))
+
+      await waitFor(() => {
+        assertUrlParam(mockSetSearchParams, 'sort', 'workflow_name')
+      })
+    })
+
+    it('keeps sortable headers on screen while a background refetch is in flight', () => {
+      vi.mocked(approvalsClient.useQuery).mockReturnValue({
+        data: { resources: mockApprovals, next: null, prev: null, total: mockApprovals.length },
+        isPending: false,
+        isFetching: true,
+        error: null,
+        isError: false,
+        refetch: vi.fn(),
+      })
+
+      render(<Approvals />)
+
+      const workflowHeader = screen.getByRole('columnheader', { name: /^Workflow$/i })
+      expect(within(workflowHeader).getByRole('button')).toBeInTheDocument()
+      expect(screen.queryByTestId('loading-state')).not.toBeInTheDocument()
+    })
+
+    it('keeps focus on the workflow sort control during and after a deferred sort refetch', async () => {
+      const user = userEvent.setup()
+      let sortFetchPending = false
+
+      mockSetSearchParams.mockImplementation((next: URLSearchParams | ((prev: URLSearchParams) => URLSearchParams)) => {
+        const resolved = typeof next === 'function' ? next(mockSearchParams) : next
+        for (const key of [...mockSearchParams.keys()]) {
+          mockSearchParams.delete(key)
+        }
+        resolved.forEach((value, key) => {
+          mockSearchParams.set(key, value)
+        })
+      })
+
+      vi.mocked(approvalsClient.useQuery).mockImplementation((_method, _path, options) => {
+        const sort = (options as unknown as { params?: { query?: { sort?: string } } })?.params?.query?.sort
+        const base = {
+          data: { resources: mockApprovals, next: null, prev: null, total: mockApprovals.length },
+          isPending: false,
+          error: null,
+          isError: false,
+          refetch: vi.fn(),
+        }
+        if (sortFetchPending && sort === 'workflow_name') {
+          return {
+            ...base,
+            isFetching: true,
+            isPlaceholderData: true,
+          }
+        }
+        return { ...base, isFetching: false, isPlaceholderData: false }
+      })
+
+      const { rerender } = render(<Approvals />)
+
+      const sortButton = within(screen.getByRole('columnheader', { name: /^Workflow$/i })).getByRole('button')
+      for (let i = 0; i < 40; i += 1) {
+        await user.tab()
+        try {
+          expect(sortButton).toHaveFocus()
+          break
+        } catch {
+          // keep tabbing until the workflow sort control is focused
+        }
+      }
+      expect(sortButton).toHaveFocus()
+
+      sortFetchPending = true
+      await user.keyboard('{Enter}')
+
+      await waitFor(() => {
+        assertUrlParam(mockSetSearchParams, 'sort', 'workflow_name')
+      })
+      rerender(<Approvals />)
+
+      expect(sortButton).toHaveFocus()
+
+      sortFetchPending = false
+      rerender(<Approvals />)
+
+      await waitFor(() => {
+        expect(sortButton).toHaveFocus()
       })
     })
   })
@@ -697,7 +790,7 @@ describe('Approvals Component', () => {
         error: null,
         isError: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<Approvals />)
 
@@ -748,12 +841,33 @@ describe('Approvals Component', () => {
         },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       render(<Approvals />)
 
       expect(screen.getByRole('navigation', { name: /pagination/i })).toBeInTheDocument()
       expect(screen.queryAllByText((_, el) => (el?.textContent ?? '').includes('1 - 20 of 50'))).not.toHaveLength(0)
+    })
+
+    it('disables next page while placeholder data is shown for a pending request', () => {
+      vi.mocked(approvalsClient.useQuery).mockReturnValue({
+        data: {
+          resources: mockApprovals,
+          total: 50,
+          next: 'stale-next-cursor',
+          prev: null,
+        },
+        isPending: false,
+        isFetching: true,
+        isPlaceholderData: true,
+        error: null,
+        isError: false,
+        refetch: vi.fn(),
+      })
+
+      render(<Approvals />)
+
+      expect(screen.getByRole('button', { name: /next/i })).toBeDisabled()
     })
 
     it('handles next page navigation', async () => {
@@ -767,7 +881,7 @@ describe('Approvals Component', () => {
         },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       render(<Approvals />)
 
@@ -788,7 +902,7 @@ describe('Approvals Component', () => {
         },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       render(<Approvals />)
 
@@ -816,7 +930,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       const { rerender } = render(<Approvals />)
 
@@ -850,7 +964,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       // Rerender to trigger useEffect with fetching state
       rerender(<Approvals />)
@@ -879,7 +993,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       rerender(<Approvals />)
 
@@ -918,7 +1032,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       const { rerender } = render(<Approvals />)
 
@@ -949,7 +1063,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       rerender(<Approvals />)
 
@@ -983,7 +1097,7 @@ describe('Approvals Component', () => {
           workflow_id: undefined,
         },
       }
-      mockApprovalsQuery([approvalWithoutWorkflow] as unknown as Approval[])
+      mockApprovalsQuery([approvalWithoutWorkflow])
 
       render(<Approvals />)
 
@@ -1052,7 +1166,7 @@ describe('Approvals Component', () => {
         ...a,
         project_id: i === 0 ? 'proj-1' : 'proj-2',
       }))
-      mockApprovalsQuery(approvalsWithProjects as Approval[])
+      mockApprovalsQuery(approvalsWithProjects)
 
       render(<Approvals />)
 
@@ -1074,7 +1188,7 @@ describe('Approvals Component', () => {
       mockAllProjectsSelector([{ id: 'proj-1', name: 'Project Alpha' }])
 
       const approvalsWithProject = [{ ...mockApprovals[0], project_id: 'proj-1' }]
-      mockApprovalsQuery(approvalsWithProject as Approval[])
+      mockApprovalsQuery(approvalsWithProject)
 
       render(<Approvals />)
 
@@ -1129,7 +1243,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       vi.mocked(approvalsClient.useQuery).mockReturnValue({
         data: undefined,
@@ -1137,7 +1251,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: vi.fn(),
-      } as never)
+      })
 
       render(<Approvals />)
 
@@ -1164,7 +1278,7 @@ describe('Approvals Component', () => {
         isPending: false,
         isError: false,
         error: null,
-      } as never)
+      })
     })
 
     async function selectFirstPendingApproval(user: ReturnType<typeof userEvent.setup>) {
@@ -1231,7 +1345,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Approvals />)
@@ -1261,7 +1375,7 @@ describe('Approvals Component', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Approvals />)

@@ -79,8 +79,8 @@ describe('Executions Component', () => {
       project_id: 'project-1',
       temporal_workflow_id: 'temporal-1',
       status: 'completed',
-      created_by: 'user-1',
-      updated_by: 'user-1',
+      created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
+      updated_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
       completed_at: '2025-01-01T10:30:00Z',
       created_at: '2025-01-01T09:55:00Z',
       updated_at: '2025-01-01T10:30:00Z',
@@ -95,7 +95,7 @@ describe('Executions Component', () => {
       project_id: 'project-1',
       temporal_workflow_id: 'temporal-2',
       status: 'running',
-      created_by: 'user-2',
+      created_by: { id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901', name: 'user-2', type: 'user' },
       updated_by: null,
       completed_at: null,
       created_at: '2025-01-01T10:55:00Z',
@@ -111,8 +111,8 @@ describe('Executions Component', () => {
       project_id: 'project-1',
       temporal_workflow_id: 'temporal-3',
       status: 'failed',
-      created_by: 'user-3',
-      updated_by: 'user-3',
+      created_by: { id: 'c3d4e5f6-a7b8-9012-cdef-123456789012', name: 'user-3', type: 'user' },
+      updated_by: { id: 'c3d4e5f6-a7b8-9012-cdef-123456789012', name: 'user-3', type: 'user' },
       completed_at: '2025-01-01T12:05:00Z',
       created_at: '2025-01-01T11:55:00Z',
       updated_at: '2025-01-01T12:05:00Z',
@@ -129,7 +129,7 @@ describe('Executions Component', () => {
     vi.mocked(executionsClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
 
     // Reset workflowClient mock to default implementation
     vi.mocked(workflowClient.useQuery).mockImplementation(((_method: string, path: string) => {
@@ -163,7 +163,7 @@ describe('Executions Component', () => {
       data: { resources: data },
       isPending,
       error,
-    } as never)
+    })
 
     // Mock the workflows query for fetching workflow names
     vi.mocked(workflowClient.useQuery).mockImplementation(((_method: string, path: string, options?: unknown) => {
@@ -327,7 +327,7 @@ describe('Executions Component', () => {
         project_id: 'project-1',
         temporal_workflow_id: 'temporal-pending',
         status: 'pending',
-        created_by: 'user-1',
+        created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
         updated_by: null,
         completed_at: null,
         created_at: '2025-01-01T09:00:00Z',
@@ -703,7 +703,7 @@ describe('Executions Component', () => {
         data: { resources: [] },
         isPending: false,
         error: null,
-      } as never)
+      })
       // Don't override workflowClient mock - use the one from beforeEach
 
       render(<Executions />, { wrapper: TestWrapper })
@@ -721,7 +721,7 @@ describe('Executions Component', () => {
         data: { resources: [] },
         isPending: false,
         error: null,
-      } as never)
+      })
       vi.mocked(workflowClient.useQuery).mockImplementation(((_method: string, path: string) => {
         if (path === '/workflows') {
           return {
@@ -754,7 +754,7 @@ describe('Executions Component', () => {
         data: { resources: [] },
         isPending: false,
         error: null,
-      } as never)
+      })
       // Don't override workflowClient mock - use the one from beforeEach
 
       render(<Executions />, { wrapper: TestWrapper })
@@ -792,7 +792,7 @@ describe('Executions Component', () => {
         },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       render(<Executions />, { wrapper: TestWrapper })
 
@@ -811,7 +811,7 @@ describe('Executions Component', () => {
         },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Executions />, { wrapper: TestWrapper })
@@ -835,7 +835,7 @@ describe('Executions Component', () => {
         },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Executions />, { wrapper: TestWrapper })
@@ -876,7 +876,7 @@ describe('Executions Component', () => {
         data: { resources: executionsWithProjects },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       vi.mocked(workflowClient.useQuery).mockImplementation(((_method: string, path: string) => {
         if (path === '/workflows') {
@@ -917,7 +917,7 @@ describe('Executions Component', () => {
         data: { resources: executionsWithProjects },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       vi.mocked(workflowClient.useQuery).mockImplementation(((_method: string, path: string) => {
         if (path === '/workflows') {
@@ -967,7 +967,7 @@ describe('Executions Component', () => {
         data: { resources: executionsWithProjects },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       vi.mocked(workflowClient.useQuery).mockImplementation(((_method: string, path: string) => {
         if (path === '/workflows') {
@@ -1028,7 +1028,7 @@ describe('Executions Component', () => {
         data: { resources: [] },
         isPending: false,
         error: null,
-      } as never)
+      })
 
       vi.mocked(workflowClient.useQuery).mockImplementation(((_method: string, path: string) => {
         if (path === '/workflows') {

@@ -1,11 +1,6 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Button,
   Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   MenuToggle,
   type MenuToggleElement,
   Modal,
@@ -14,21 +9,24 @@ import {
   ModalHeader,
   SelectList,
   SelectOption,
-  TextInput,
 } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { Controller, useForm, useWatch, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form'
+import { useWatch } from 'react-hook-form'
 
+import { SynForm } from '../../components/forms/SynForm'
+import { SynFormField } from '../../components/forms/SynFormField'
+import { SynTextField } from '../../components/forms/SynTextField'
 import { SynSelect } from '../../components/SynSelect'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
-import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
+import type { UseSynFormReturn } from '../../hooks/useSynForm'
+import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
 
 import { accessClient } from './accessClient'
 import { accessControlHelp } from './accessControlFieldHelp'
-import { addRoleSchema } from './addRoleSchema'
+import { ROLE_NAME_HINT, addRoleSchema } from './addRoleSchema'
 import type { AddRoleFormData } from './addRoleSchema'
 import { PolicySelect } from './PolicySelect'
 import { TypeaheadSelect } from './TypeaheadSelect'
@@ -76,9 +74,7 @@ function RoleScopeSelect({
 }
 
 type AddRoleFormFieldsProps = {
-  register: UseFormRegister<AddRoleFormData>
-  control: Control<AddRoleFormData>
-  errors: FieldErrors<AddRoleFormData>
+  form: UseSynFormReturn<AddRoleFormData>
   scope: string
   projectId: string
   projectOptions: { value: string; label: string }[]
@@ -87,122 +83,81 @@ type AddRoleFormFieldsProps = {
 }
 
 function AddRoleFormFields({
-  register,
-  control,
-  errors,
+  form,
   scope,
   projectId,
   projectOptions,
   onScopeChange,
   onProjectChange,
 }: Readonly<AddRoleFormFieldsProps>) {
+  const scopeHint =
+    scope === 'system'
+      ? 'System-scoped roles apply across all projects'
+      : 'Project-scoped roles are limited to a specific project'
+
   return (
-    <>
-      <FormGroup label="Name" isRequired fieldId="role-name">
-        <TextInput
-          id="role-name"
-          isRequired
-          aria-label="Role name"
-          validated={errors.name ? 'error' : 'default'}
-          {...register('name')}
-        />
-        {errors.name ? (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem variant="error">{errors.name.message}</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        ) : (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem>Lowercase alphanumeric with hyphens (e.g. my-custom-role)</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
+    <SynForm form={form}>
+      <SynTextField name="name" label="Name" fieldId="role-name" isRequired hint={ROLE_NAME_HINT} />
+      <SynTextField name="description" label="Description" fieldId="role-description" />
+      <SynFormField<AddRoleFormData, 'scope'>
+        name="scope"
+        label="Scope"
+        fieldId="role-scope"
+        isRequired
+        labelHelp={accessControlHelp.scope}
+        hint={scopeHint}
+      >
+        {({ field, fieldState }) => (
+          <RoleScopeSelect
+            value={field.value}
+            onChange={(value) => {
+              field.onChange(value)
+              onScopeChange(value)
+            }}
+            hasError={!!fieldState.error}
+          />
         )}
-      </FormGroup>
-
-      <FormGroup label="Description" fieldId="role-description">
-        <TextInput
-          id="role-description"
-          aria-label="Role description"
-          validated={errors.description ? 'error' : 'default'}
-          {...register('description')}
-        />
-        {errors.description && (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem variant="error">{errors.description.message}</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        )}
-      </FormGroup>
-
-      <FormGroup label="Scope" isRequired fieldId="role-scope" labelHelp={accessControlHelp.scope}>
-        <RoleScopeSelect value={scope} onChange={onScopeChange} hasError={!!errors.scope} />
-        <FormHelperText>
-          <HelperText>
-            <HelperTextItem>
-              {scope === 'system'
-                ? 'System-scoped roles apply across all projects'
-                : 'Project-scoped roles are limited to a specific project'}
-            </HelperTextItem>
-          </HelperText>
-        </FormHelperText>
-      </FormGroup>
+      </SynFormField>
 
       {scope === 'project' && (
-        <FormGroup label="Project" isRequired fieldId="role-project">
-          <TypeaheadSelect
-            id="role-project"
-            ariaLabel="Project"
-            options={projectOptions}
-            selected={projectId}
-            onChange={onProjectChange}
-            placeholder="Select a project..."
-            hasError={!!errors.projectId}
-          />
-          {errors.projectId && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem variant="error">{errors.projectId.message}</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          )}
-        </FormGroup>
-      )}
-
-      <FormGroup label="Policies" isRequired fieldId="role-policies" labelHelp={accessControlHelp.policies}>
-        <Controller
-          name="policies"
-          control={control}
-          render={({ field }) => (
-            <PolicySelect
-              selected={field.value}
-              onChange={field.onChange}
-              hasError={!!errors.policies}
-              scopeProjectId={scope === 'project' ? projectId || null : null}
-              projectEligible={scope === 'project'}
-              isDisabled={scope === 'project' && !projectId}
+        <SynFormField<AddRoleFormData, 'projectId'> name="projectId" label="Project" fieldId="role-project" isRequired>
+          {({ field, fieldState }) => (
+            <TypeaheadSelect
+              id="role-project"
+              ariaLabel="Project"
+              options={projectOptions}
+              selected={projectId}
+              onChange={(value) => {
+                field.onChange(value)
+                onProjectChange(value)
+              }}
+              placeholder="Select a project..."
+              hasError={!!fieldState.error}
             />
           )}
-        />
-        {scope === 'project' && !projectId ? (
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem>Select a project first to see available policies</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        ) : (
-          errors.policies && (
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem variant="error">{errors.policies.message}</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          )
+        </SynFormField>
+      )}
+
+      <SynFormField<AddRoleFormData, 'policies'>
+        name="policies"
+        label="Policies"
+        fieldId="role-policies"
+        isRequired
+        labelHelp={accessControlHelp.policies}
+        hint={scope === 'project' && !projectId ? 'Select a project first to see available policies' : undefined}
+      >
+        {({ field, fieldState }) => (
+          <PolicySelect
+            selected={field.value}
+            onChange={field.onChange}
+            hasError={!!fieldState.error}
+            scopeProjectId={scope === 'project' ? projectId || null : null}
+            projectEligible={scope === 'project'}
+            isDisabled={scope === 'project' && !projectId}
+          />
         )}
-      </FormGroup>
-    </>
+      </SynFormField>
+    </SynForm>
   )
 }
 
@@ -217,15 +172,8 @@ export function AddRoleDialog({ onClose, onSuccess, defaultScope, defaultProject
   const queryClient = useQueryClient()
   const { showSuccess } = useAlerts()
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    setValue,
-    setError,
-    formState: { errors },
-  } = useForm<AddRoleFormData>({
-    resolver: zodResolver(addRoleSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: addRoleSchema,
     defaultValues: {
       name: '',
       description: '',
@@ -233,7 +181,9 @@ export function AddRoleDialog({ onClose, onSuccess, defaultScope, defaultProject
       projectId: defaultProjectId ?? '',
       policies: [],
     },
+    onClose,
   })
+  const { handleSubmit, handleError, handleClose, control, setValue } = form
 
   const scope = useWatch({ control, name: 'scope' })
   const projectId = useWatch({ control, name: 'projectId' })
@@ -258,7 +208,6 @@ export function AddRoleDialog({ onClose, onSuccess, defaultScope, defaultProject
     [allProjects]
   )
 
-  const handleError = useFormMutationErrorHandler<AddRoleFormData>(setError)
   const { mutate: createSystemRole, isPending: isPendingSystem } = accessClient.useMutation('post', '/roles')
   const { mutate: createProjectRole, isPending: isPendingProject } = accessClient.useMutation(
     'post',
@@ -279,13 +228,11 @@ export function AddRoleDialog({ onClose, onSuccess, defaultScope, defaultProject
         ),
       })
       invalidateAuthzCaches(queryClient)
+      handleClose()
       onSuccess()
-      onClose()
     }
     const onMutationError = handleError({ title: 'Failed to create role' })
 
-    // Project-scoped creates must hit the project roles API so project-admins
-    // (role:create:project) succeed — global POST /roles requires system role:create.
     if (data.scope === 'project' && data.projectId) {
       createProjectRole(
         {
@@ -314,14 +261,12 @@ export function AddRoleDialog({ onClose, onSuccess, defaultScope, defaultProject
   }
 
   return (
-    <Modal isOpen onClose={onClose} variant="medium">
+    <Modal isOpen onClose={handleClose} variant="medium">
       <ModalHeader title="Create role" />
       <ModalBody>
         <Form id="add-role-form" onSubmit={handleSubmit(onSubmit)}>
           <AddRoleFormFields
-            register={register}
-            control={control}
-            errors={errors}
+            form={form}
             scope={scope}
             projectId={projectId ?? ''}
             projectOptions={projectOptions}
@@ -331,10 +276,17 @@ export function AddRoleDialog({ onClose, onSuccess, defaultScope, defaultProject
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" form="add-role-form" type="submit" isLoading={isPending} icon={<RhUiAddIcon />}>
+        <Button
+          variant="primary"
+          form="add-role-form"
+          type="submit"
+          isDisabled={isPending}
+          isLoading={isPending}
+          icon={<RhUiAddIcon />}
+        >
           Create role
         </Button>
-        <Button variant="link" onClick={onClose}>
+        <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel
         </Button>
       </ModalFooter>

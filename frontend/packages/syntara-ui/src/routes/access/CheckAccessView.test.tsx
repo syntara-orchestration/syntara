@@ -75,7 +75,7 @@ function mockMutationState(overrides: Record<string, unknown>) {
     variables: undefined,
     isPaused: false,
     ...overrides,
-  } as never)
+  })
 }
 
 /** Helper to fill the form with resource type "project" and action "read" */
@@ -135,7 +135,7 @@ describe('CheckAccessView', () => {
       submittedAt: 0,
       variables: undefined,
       isPaused: false,
-    } as never)
+    })
   })
 
   it('renders the empty state initially', () => {
@@ -143,7 +143,7 @@ describe('CheckAccessView', () => {
 
     expect(screen.getByText('Check access permissions')).toBeInTheDocument()
     expect(
-      screen.getByText('Select a resource type and action, then click Check Access to verify your permissions.')
+      screen.getByText('Select a resource type and action, then click Check access to verify your permissions.')
     ).toBeInTheDocument()
   })
 
@@ -154,13 +154,13 @@ describe('CheckAccessView', () => {
     expect(screen.getByText('Action')).toBeInTheDocument()
     expect(screen.getByText('Resource ID')).toBeInTheDocument()
     expect(screen.getByText('Project')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Check Access' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Check access' })).toBeInTheDocument()
   })
 
-  it('disables Check Access button when form is incomplete', () => {
+  it('disables Check access button when form is incomplete', () => {
     render(<CheckAccessView {...sampleResourceActions} />, { wrapper })
 
-    expect(screen.getByRole('button', { name: 'Check Access' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Check access' })).toBeDisabled()
   })
 
   it('renders resource type options from resource actions', async () => {
@@ -311,7 +311,7 @@ describe('CheckAccessView', () => {
     render(<CheckAccessView {...sampleResourceActions} />, { wrapper })
 
     await fillForm(user)
-    await user.click(screen.getByRole('button', { name: 'Check Access' }))
+    await user.click(screen.getByRole('button', { name: 'Check access' }))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalledWith(

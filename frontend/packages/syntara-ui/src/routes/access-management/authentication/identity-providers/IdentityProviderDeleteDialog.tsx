@@ -30,7 +30,7 @@ export function IdentityProviderDeleteDialog({
       onClose={onClose}
       onConfirm={onConfirm}
       title="Delete identity provider?"
-      confirmLabel="Delete"
+      confirmLabel="Delete identity provider"
       confirmVariant="danger"
       titleIconVariant="warning"
       destructiveAcknowledgement={{

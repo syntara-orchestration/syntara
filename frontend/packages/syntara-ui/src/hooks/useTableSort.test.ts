@@ -57,7 +57,7 @@ describe('useTableSort', () => {
 
       const sortParams = result.current.getSortParams(2)
       act(() => {
-        sortParams?.onSort?.(null as never, 2, 'desc' as SortByDirection, {} as never)
+        sortParams?.onSort?.(null as never, 2, 'desc' as SortByDirection, {})
       })
 
       expect(result.current.activeSortIndex).toBe(2)
@@ -70,7 +70,7 @@ describe('useTableSort', () => {
 
       const sortParams = result.current.getSortParams(1)
       act(() => {
-        sortParams?.onSort?.(null as never, 1, 'desc' as SortByDirection, {} as never)
+        sortParams?.onSort?.(null as never, 1, 'desc' as SortByDirection, {})
       })
 
       expect(onSortChange).toHaveBeenCalledTimes(1)
@@ -82,7 +82,7 @@ describe('useTableSort', () => {
       const sortParams = result.current.getSortParams(1)
       expect(() => {
         act(() => {
-          sortParams?.onSort?.(null as never, 1, 'desc' as SortByDirection, {} as never)
+          sortParams?.onSort?.(null as never, 1, 'desc' as SortByDirection, {})
         })
       }).not.toThrow()
     })

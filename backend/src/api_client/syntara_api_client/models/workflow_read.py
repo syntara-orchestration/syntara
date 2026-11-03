@@ -12,6 +12,7 @@ from dateutil.parser import isoparse
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.user_reference import UserReference
     from ..models.validation_result import ValidationResult
     from ..models.workflow_read_labels import WorkflowReadLabels
 
@@ -30,7 +31,6 @@ class WorkflowRead:
             id (UUID):
             current_version (int):
             is_enabled (bool):
-            created_by (UUID):
             project_id (UUID):
             created_at (datetime.datetime):
             updated_at (datetime.datetime):
@@ -38,6 +38,8 @@ class WorkflowRead:
             labels (WorkflowReadLabels | Unset): Workflow labels
             is_builtin (bool | Unset):  Default: False.
             has_validation_issues (bool | Unset):  Default: False.
+            created_by (None | Unset | UserReference): User who created the workflow
+            updated_by (None | Unset | UserReference): User who last modified the workflow
             published_version_id (None | Unset | UUID):
             published_version_number (int | None | Unset):
             validation_result (None | Unset | ValidationResult): Validation findings from the last save operation. Only
@@ -48,7 +50,6 @@ class WorkflowRead:
     id: UUID
     current_version: int
     is_enabled: bool
-    created_by: UUID
     project_id: UUID
     created_at: datetime.datetime
     updated_at: datetime.datetime
@@ -56,12 +57,15 @@ class WorkflowRead:
     labels: WorkflowReadLabels | Unset = UNSET
     is_builtin: bool | Unset = False
     has_validation_issues: bool | Unset = False
+    created_by: None | Unset | UserReference = UNSET
+    updated_by: None | Unset | UserReference = UNSET
     published_version_id: None | Unset | UUID = UNSET
     published_version_number: int | None | Unset = UNSET
     validation_result: None | Unset | ValidationResult = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.user_reference import UserReference
         from ..models.validation_result import ValidationResult
 
         name = self.name
@@ -71,8 +75,6 @@ class WorkflowRead:
         current_version = self.current_version
 
         is_enabled = self.is_enabled
-
-        created_by = str(self.created_by)
 
         project_id = str(self.project_id)
 
@@ -93,6 +95,22 @@ class WorkflowRead:
         is_builtin = self.is_builtin
 
         has_validation_issues = self.has_validation_issues
+
+        created_by: dict[str, Any] | None | Unset
+        if isinstance(self.created_by, Unset):
+            created_by = UNSET
+        elif isinstance(self.created_by, UserReference):
+            created_by = self.created_by.to_dict()
+        else:
+            created_by = self.created_by
+
+        updated_by: dict[str, Any] | None | Unset
+        if isinstance(self.updated_by, Unset):
+            updated_by = UNSET
+        elif isinstance(self.updated_by, UserReference):
+            updated_by = self.updated_by.to_dict()
+        else:
+            updated_by = self.updated_by
 
         published_version_id: None | str | Unset
         if isinstance(self.published_version_id, Unset):
@@ -124,7 +142,6 @@ class WorkflowRead:
                 "id": id,
                 "current_version": current_version,
                 "is_enabled": is_enabled,
-                "created_by": created_by,
                 "project_id": project_id,
                 "created_at": created_at,
                 "updated_at": updated_at,
@@ -138,6 +155,10 @@ class WorkflowRead:
             field_dict["is_builtin"] = is_builtin
         if has_validation_issues is not UNSET:
             field_dict["has_validation_issues"] = has_validation_issues
+        if created_by is not UNSET:
+            field_dict["created_by"] = created_by
+        if updated_by is not UNSET:
+            field_dict["updated_by"] = updated_by
         if published_version_id is not UNSET:
             field_dict["published_version_id"] = published_version_id
         if published_version_number is not UNSET:
@@ -149,6 +170,7 @@ class WorkflowRead:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.user_reference import UserReference
         from ..models.validation_result import ValidationResult
         from ..models.workflow_read_labels import WorkflowReadLabels
 
@@ -160,8 +182,6 @@ class WorkflowRead:
         current_version = d.pop("current_version")
 
         is_enabled = d.pop("is_enabled")
-
-        created_by = UUID(d.pop("created_by"))
 
         project_id = UUID(d.pop("project_id"))
 
@@ -188,6 +208,40 @@ class WorkflowRead:
         is_builtin = d.pop("is_builtin", UNSET)
 
         has_validation_issues = d.pop("has_validation_issues", UNSET)
+
+        def _parse_created_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                created_by_type_0 = UserReference.from_dict(data)
+
+                return created_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        created_by = _parse_created_by(d.pop("created_by", UNSET))
+
+        def _parse_updated_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                updated_by_type_0 = UserReference.from_dict(data)
+
+                return updated_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        updated_by = _parse_updated_by(d.pop("updated_by", UNSET))
 
         def _parse_published_version_id(data: object) -> None | Unset | UUID:
             if data is None:
@@ -237,7 +291,6 @@ class WorkflowRead:
             id=id,
             current_version=current_version,
             is_enabled=is_enabled,
-            created_by=created_by,
             project_id=project_id,
             created_at=created_at,
             updated_at=updated_at,
@@ -245,6 +298,8 @@ class WorkflowRead:
             labels=labels,
             is_builtin=is_builtin,
             has_validation_issues=has_validation_issues,
+            created_by=created_by,
+            updated_by=updated_by,
             published_version_id=published_version_id,
             published_version_number=published_version_number,
             validation_result=validation_result,

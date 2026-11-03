@@ -29,14 +29,12 @@ export const aapSetupSchema = z
           path: ['admin_password'],
         })
       }
-    } else {
-      if (!data.personal_access_token) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Personal access token is required',
-          path: ['personal_access_token'],
-        })
-      }
+    } else if (!data.personal_access_token) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Personal access token is required',
+        path: ['personal_access_token'],
+      })
     }
   })
 

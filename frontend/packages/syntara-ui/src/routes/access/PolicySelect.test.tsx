@@ -83,16 +83,19 @@ function getInput() {
 describe('PolicySelect', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(accessClient.useQuery).mockReturnValue({
-      data: { resources: mockPolicies },
-      isPending: false,
-      isError: false,
-      error: null,
-      isFetching: false,
-      isLoading: false,
-      refetch: vi.fn(),
-    } as never)
-    vi.mocked(fetchAllPoliciesForSelect).mockResolvedValue(mockPolicies as never)
+    vi.mocked(accessClient.useQuery).mockImplementation((_method, _path, _params, options) => {
+      const enabled = options?.enabled !== false
+      return {
+        data: enabled ? { resources: mockPolicies } : undefined,
+        isPending: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      }
+    })
+    vi.mocked(fetchAllPoliciesForSelect).mockResolvedValue(mockPolicies)
   })
 
   describe('Accessibility', () => {
@@ -138,6 +141,16 @@ describe('PolicySelect', () => {
   })
 
   describe('Dropdown interactions', () => {
+    it('enables the policies query when the dropdown opens', async () => {
+      const user = userEvent.setup()
+      renderPolicySelect()
+
+      await user.click(getInput())
+
+      const lastCall = vi.mocked(accessClient.useQuery).mock.calls.at(-1)
+      expect(lastCall?.[3]).toEqual(expect.objectContaining({ enabled: true }))
+    })
+
     it('opens dropdown and shows policy options when input is clicked', async () => {
       const user = userEvent.setup()
       renderPolicySelect()
@@ -207,7 +220,7 @@ describe('PolicySelect', () => {
         isFetching: true,
         isLoading: true,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       renderPolicySelect()
@@ -228,7 +241,7 @@ describe('PolicySelect', () => {
         isFetching: false,
         isLoading: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       renderPolicySelect()
@@ -343,7 +356,7 @@ describe('PolicySelect', () => {
         isFetching: false,
         isLoading: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       renderPolicySelect()
@@ -367,7 +380,7 @@ describe('PolicySelect', () => {
         isFetching: false,
         isLoading: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       renderPolicySelect()
@@ -420,7 +433,7 @@ describe('PolicySelect', () => {
         isFetching: false,
         isLoading: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const user = userEvent.setup()
       renderPolicySelect({ selected: ['orphan-policy'] })

@@ -49,8 +49,14 @@ vi.mock('../access/useAllProjects', () => ({
 // Mock useProjectSelector — default to a single selected project so that:
 // 1. projectSelectorReady is true (queries are enabled)
 // 2. the flat table body is rendered (most tests expect flat rows)
-const mockUseProjectSelector = vi.fn(() => ({
-  selectedProject: { id: 'proj-default', name: 'Default Project' } as { id: string; name: string } | null,
+type MockProjectSelector = {
+  selectedProject: { id: string; name: string } | null
+  isAllProjects: boolean
+  projects: { id: string; name: string }[]
+  ProjectSelector: null
+}
+const mockUseProjectSelector = vi.fn((): MockProjectSelector => ({
+  selectedProject: { id: 'proj-default', name: 'Default Project' },
   isAllProjects: false,
   projects: [{ id: 'proj-default', name: 'Default Project' }],
   ProjectSelector: null,
@@ -179,7 +185,7 @@ describe('Workflows Component', () => {
       isError: false,
       error: null,
       refetch: vi.fn(),
-    } as never)
+    })
 
     // Then set up workflow query (mockWorkflowQuery will override accessClient.useQuery)
     const defaultQueryReturn = {
@@ -231,7 +237,7 @@ describe('Workflows Component', () => {
     vi.mocked(executionsFetchClient.POST).mockResolvedValue({
       data: { id: 'exec-default' },
       error: undefined,
-    } as never)
+    })
 
     // Mock workflowClient.useMutation for delete workflow
     vi.mocked(workflowClient.useMutation).mockReturnValue({
@@ -361,6 +367,7 @@ describe('Workflows Component', () => {
       const loadingReturn = {
         data: null,
         isPending: true,
+        isLoading: true,
         isError: false,
         error: null,
       }
@@ -371,6 +378,28 @@ describe('Workflows Component', () => {
       // Expect loading state
       const loadingElement = screen.getByTestId('loading-state')
       expect(loadingElement).toBeInTheDocument()
+    })
+
+    it('keeps page header toolbar visible during background refetch', () => {
+      mockWorkflowQuery({
+        data: {
+          resources: mockWorkflows,
+          next: null,
+          prev: null,
+          total: mockWorkflows.length,
+        },
+        isPending: false,
+        isLoading: false,
+        isFetching: true,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<Workflows />, { wrapper })
+
+      expect(screen.getByRole('button', { name: 'Create workflow' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Import workflow' })).toBeInTheDocument()
     })
 
     it('displays error state', () => {
@@ -410,7 +439,7 @@ describe('Workflows Component', () => {
       vi.mocked(executionsFetchClient.POST).mockResolvedValue({
         data: { id: 'exec-123' },
         error: undefined,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
@@ -450,7 +479,7 @@ describe('Workflows Component', () => {
       vi.mocked(executionsFetchClient.POST).mockResolvedValue({
         data: undefined,
         error: { detail: 'Network error' },
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
@@ -490,7 +519,7 @@ describe('Workflows Component', () => {
       vi.mocked(executionsFetchClient.POST).mockResolvedValue({
         data: undefined,
         error: {},
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
@@ -554,10 +583,13 @@ describe('Workflows Component', () => {
 
       // Verify confirmation dialog is shown
       await waitFor(() => {
-        expect(screen.getByText('Run Important Project Workflow?')).toBeInTheDocument()
+        const dialog = screen.getByRole('dialog')
+        expect(within(dialog).getByText('Run workflow?')).toBeInTheDocument()
+        expect(within(dialog).getByText(/You are about to manually run the workflow/)).toBeInTheDocument()
+        expect(within(dialog).getByText('Important Project Workflow')).toBeInTheDocument()
         expect(
-          screen.getByText(
-            /You are about to manually run this workflow. This action will start the workflow immediately, bypassing its normal trigger conditions./
+          within(dialog).getByText(
+            /This action will start the workflow immediately, bypassing its normal trigger conditions./
           )
         ).toBeInTheDocument()
       })
@@ -602,7 +634,7 @@ describe('Workflows Component', () => {
 
       // Verify dialog is closed
       await waitFor(() => {
-        expect(screen.queryByText('Run Important Project Workflow?')).not.toBeInTheDocument()
+        expect(screen.queryByText('Run workflow?')).not.toBeInTheDocument()
       })
     })
 
@@ -633,7 +665,7 @@ describe('Workflows Component', () => {
       vi.mocked(executionsFetchClient.POST).mockResolvedValue({
         data: { id: 'exec-with-inputs' },
         error: undefined,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
@@ -1070,7 +1102,7 @@ describe('Workflows Component', () => {
       })
 
       await user.click(screen.getByRole('checkbox', { name: /I understand this workflow/ }))
-      const deleteButton = screen.getByRole('button', { name: 'Delete' })
+      const deleteButton = screen.getByRole('button', { name: 'Delete workflow' })
       await user.click(deleteButton)
 
       // Verify success
@@ -1137,7 +1169,7 @@ describe('Workflows Component', () => {
       })
 
       await user.click(screen.getByRole('checkbox', { name: /I understand this workflow/ }))
-      const deleteButton = screen.getByRole('button', { name: 'Delete' })
+      const deleteButton = screen.getByRole('button', { name: 'Delete workflow' })
       await user.click(deleteButton)
 
       // Verify error alert
@@ -1270,7 +1302,7 @@ describe('Workflows Component', () => {
       vi.mocked(executionsFetchClient.POST).mockResolvedValue({
         data: { id: 'exec-123' },
         error: undefined,
-      } as never)
+      })
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
@@ -1358,7 +1390,7 @@ describe('Workflows Component', () => {
       })
 
       await user.click(screen.getByRole('checkbox', { name: /I understand this workflow/ }))
-      const deleteButton = screen.getByRole('button', { name: 'Delete' })
+      const deleteButton = screen.getByRole('button', { name: 'Delete workflow' })
       await user.click(deleteButton)
 
       // After onSettled, the delete dialog should be closed
@@ -1422,7 +1454,7 @@ describe('Workflows Component', () => {
       })
 
       await user.click(screen.getByRole('checkbox', { name: /I understand this workflow/ }))
-      const deleteButton = screen.getByRole('button', { name: 'Delete' })
+      const deleteButton = screen.getByRole('button', { name: 'Delete workflow' })
       await user.click(deleteButton)
 
       // After onSettled, the delete dialog should be closed even on error
@@ -1656,7 +1688,11 @@ describe('Workflows Component', () => {
         })
       )
       vi.mocked(workflowFetchClient.POST).mockResolvedValue(
-        mockPostResponse({ id: 'new-id', name: 'test', created_by: 'user-1' })
+        mockPostResponse({
+          id: 'new-id',
+          name: 'test',
+          created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
+        })
       )
 
       await openKebabMenuForFirstRow(user)
@@ -1711,7 +1747,11 @@ describe('Workflows Component', () => {
       )
 
       vi.mocked(workflowFetchClient.POST).mockResolvedValue(
-        mockPostResponse({ id: 'new-id', name: 'Important Project Workflow - duplicate-abc', created_by: 'user-1' })
+        mockPostResponse({
+          id: 'new-id',
+          name: 'Important Project Workflow - duplicate-abc',
+          created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
+        })
       )
 
       await openKebabMenuForFirstRow(user)
@@ -1822,7 +1862,11 @@ describe('Workflows Component', () => {
       )
 
       vi.mocked(workflowFetchClient.POST).mockResolvedValue(
-        mockPostResponse({ id: 'new-id', name: 'test', created_by: 'user-1' })
+        mockPostResponse({
+          id: 'new-id',
+          name: 'test',
+          created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
+        })
       )
 
       await openKebabMenuForFirstRow(user)
@@ -1855,7 +1899,11 @@ describe('Workflows Component', () => {
       )
 
       vi.mocked(workflowFetchClient.POST).mockResolvedValue(
-        mockPostResponse({ id: 'new-id', name: 'test', created_by: 'user-1' })
+        mockPostResponse({
+          id: 'new-id',
+          name: 'test',
+          created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
+        })
       )
 
       await openKebabMenuForFirstRow(user)
@@ -1887,7 +1935,12 @@ describe('Workflows Component', () => {
         })
       )
 
-      vi.mocked(workflowFetchClient.POST).mockResolvedValue(mockPostResponse({ name: 'test', created_by: 'user-1' }))
+      vi.mocked(workflowFetchClient.POST).mockResolvedValue(
+        mockPostResponse({
+          name: 'test',
+          created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
+        })
+      )
 
       await openKebabMenuForFirstRow(user)
 
@@ -2030,7 +2083,11 @@ describe('Workflows Component', () => {
       )
 
       vi.mocked(workflowFetchClient.POST).mockResolvedValue(
-        mockPostResponse({ id: 'new-id', name: 'Workflow with Approval - duplicate-abc', created_by: 'user-1' })
+        mockPostResponse({
+          id: 'new-id',
+          name: 'Workflow with Approval - duplicate-abc',
+          created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
+        })
       )
 
       await openKebabMenuForFirstRow(user)
@@ -2221,7 +2278,7 @@ describe('Workflows Component', () => {
       await openPublishDialogForFirstRow(user)
 
       // Fill form and submit
-      const publishButton = screen.getByRole('button', { name: 'Publish' })
+      const publishButton = screen.getByRole('button', { name: 'Publish workflow' })
       await user.click(publishButton)
 
       await waitFor(() => {
@@ -2289,7 +2346,7 @@ describe('Workflows Component', () => {
       render(<Workflows />, { wrapper })
       await openPublishDialogForFirstRow(user)
 
-      const publishButton = screen.getByRole('button', { name: 'Publish' })
+      const publishButton = screen.getByRole('button', { name: 'Publish workflow' })
       await user.click(publishButton)
 
       await waitFor(() => {
@@ -2352,7 +2409,7 @@ describe('Workflows Component', () => {
       render(<Workflows />, { wrapper })
       await openPublishDialogForFirstRow(user)
 
-      const publishButton = screen.getByRole('button', { name: 'Publish' })
+      const publishButton = screen.getByRole('button', { name: 'Publish workflow' })
       await user.click(publishButton)
 
       // Dialog should close after settled
@@ -2519,7 +2576,7 @@ describe('Workflows Component', () => {
         expect(screen.getByText('Unpublish workflow?')).toBeInTheDocument()
       })
 
-      const unpublishButton = screen.getByRole('button', { name: 'Unpublish' })
+      const unpublishButton = screen.getByRole('button', { name: 'Unpublish workflow' })
       await user.click(unpublishButton)
 
       await waitFor(() => {
@@ -2601,7 +2658,7 @@ describe('Workflows Component', () => {
         expect(screen.getByText('Unpublish workflow?')).toBeInTheDocument()
       })
 
-      const unpublishButton = screen.getByRole('button', { name: 'Unpublish' })
+      const unpublishButton = screen.getByRole('button', { name: 'Unpublish workflow' })
       await user.click(unpublishButton)
 
       await waitFor(() => {
@@ -2681,7 +2738,7 @@ describe('Workflows Component', () => {
         expect(screen.getByText('Unpublish workflow?')).toBeInTheDocument()
       })
 
-      const unpublishButton = screen.getByRole('button', { name: 'Unpublish' })
+      const unpublishButton = screen.getByRole('button', { name: 'Unpublish workflow' })
       await user.click(unpublishButton)
 
       await waitFor(() => {
@@ -2751,10 +2808,14 @@ describe('Workflows Component', () => {
     it('renders sortable headers for name, created, updated, and state', () => {
       render(<Workflows />, { wrapper })
 
-      for (const name of [/Name/i, /Created at/i, /Updated at/i, /^State$/i]) {
+      for (const name of [/Name/i, /Created at/i, /Updated at/i]) {
         const header = screen.getByRole('columnheader', { name })
         expect(within(header).getByRole('button')).toBeInTheDocument()
       }
+
+      const stateHeader = screen.getByRole('columnheader', { name: /State/i })
+      expect(within(stateHeader).getByRole('button', { name: 'State' })).toBeInTheDocument()
+      expect(within(stateHeader).getByRole('button', { name: 'Workflow state help' })).toBeInTheDocument()
 
       const actionsHeader = screen.getByRole('columnheader', { name: 'Actions' })
       expect(within(actionsHeader).queryByRole('button')).not.toBeInTheDocument()
@@ -2776,8 +2837,8 @@ describe('Workflows Component', () => {
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
 
-      const stateHeader = screen.getByRole('columnheader', { name: /^State$/i })
-      await user.click(within(stateHeader).getByRole('button'))
+      const stateHeader = screen.getByRole('columnheader', { name: /State/i })
+      await user.click(within(stateHeader).getByRole('button', { name: 'State' }))
 
       await waitFor(() => {
         assertUrlParam(mockSetSearchParams, 'sort', 'is_enabled')

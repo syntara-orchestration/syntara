@@ -14,11 +14,11 @@ import { buildWorkflowDefinition } from './utils/workflowDefinitionBuilder'
 
 type ValidationFinding = { message: string; node_id?: string | null; severity?: string; field_path?: string | null }
 
-type LookupNodeNameOptions = Readonly<{
+type LookupStepNameOptions = Readonly<{
   activityIdFallback?: boolean
 }>
 
-function lookupNodeName(nodeId: string | null, options?: LookupNodeNameOptions): string | undefined {
+function lookupStepName(nodeId: string | null, options?: LookupStepNameOptions): string | undefined {
   if (!nodeId) return undefined
   const currentWorkflow = useWorkflowStore.getState().currentWorkflow
   const activity = currentWorkflow?.workflow?.activities?.find((item) => item.id === nodeId)
@@ -37,7 +37,7 @@ function mapFindings(findings: ValidationFinding[] | undefined): ValidationError
   return findings.map((f) => {
     const severity: ValidationSeverity = f.severity === 'warning' ? 'warning' : 'error'
     const nodeId = f.node_id ?? null
-    const nodeName = lookupNodeName(nodeId)
+    const nodeName = lookupStepName(nodeId)
     return {
       message: formatValidationFindingMessage(f.message, nodeId, nodeName),
       nodeId,
@@ -175,7 +175,11 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
 
       let definition: ReturnType<typeof buildWorkflowDefinition>
       try {
-        definition = buildWorkflowDefinition(name, description, activities, triggers, {
+        definition = buildWorkflowDefinition({
+          workflowName: name,
+          workflowDescription: description,
+          activities: activities,
+          triggers: triggers,
           edges,
           nodePositions,
         })
@@ -195,7 +199,7 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
       const allFrontendErrors: ValidationError[] = [...frontendResult.errors, ...minimumErrors].map((e) => ({
         message: e.message,
         nodeId: e.nodeId ?? null,
-        nodeName: lookupNodeName(e.nodeId ?? null, { activityIdFallback: true }),
+        nodeName: lookupStepName(e.nodeId ?? null, { activityIdFallback: true }),
         severity: (e.severity ?? 'error') as ValidationSeverity,
       }))
 
@@ -207,7 +211,7 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
           },
         })
         .then((resp) => {
-          processValidateResponse(resp as ValidateResponse, dispatch, {
+          processValidateResponse(resp, dispatch, {
             frontendErrors: allFrontendErrors,
             onValid,
             silent,

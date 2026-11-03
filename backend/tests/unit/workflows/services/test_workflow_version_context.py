@@ -122,59 +122,6 @@ class TestListWorkflowVersionsCursor:
         mock_exec.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_populate_callback_queries_usernames(self, mock_service: WorkflowService) -> None:
-        """populate_version_context queries User for usernames used by convert_version."""
-        workflow_id = uuid4()
-        user_id_1 = uuid4()
-        user_id_2 = uuid4()
-
-        captured = await _capture_callbacks(mock_service, workflow_id)
-        callback: Callable[..., Any] = captured["post_query_callback"]
-
-        v1 = MagicMock()
-        v1.id = uuid4()
-        v1.created_by = user_id_1
-
-        v2 = MagicMock()
-        v2.id = uuid4()
-        v2.created_by = user_id_2
-
-        user_rows = MagicMock()
-        user_rows.__iter__ = MagicMock(return_value=iter([(user_id_1, "alice"), (user_id_2, "bob")]))
-
-        event_rows = MagicMock()
-        event_rows.__iter__ = MagicMock(return_value=iter([]))
-
-        call_count = 0
-
-        async def exec_side_effect(stmt: object) -> MagicMock:
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return user_rows
-            return event_rows
-
-        with patch.object(mock_service.session, "exec", side_effect=exec_side_effect):
-            await callback([v1, v2])
-
-        # Now invoke convert_version; usernames should be mapped
-        converter: Callable[..., Any] = captured["response_type_converter"]
-        mock_version = MagicMock()
-        mock_version.id = uuid4()
-        mock_version.workflow_id = workflow_id
-        mock_version.version = 1
-        mock_version.schema_version = "2.0.0"
-        mock_version.workflow_definition = {"nodes": []}
-        mock_version.change_description = None
-        mock_version.name = None
-        mock_version.created_by = user_id_1
-        mock_version.created_at = MagicMock()
-        mock_version.updated_at = MagicMock()
-
-        result = converter(mock_version)
-        assert result.created_by_username == "alice"
-
-    @pytest.mark.asyncio
     async def test_populate_callback_queries_publish_events(self, mock_service: WorkflowService) -> None:
         """populate_version_context queries events to build ever_published_ids and publish_ts."""
         workflow_id = uuid4()
@@ -190,9 +137,6 @@ class TestListWorkflowVersionsCursor:
         v.id = version_id
         v.created_by = user_id
 
-        user_rows = MagicMock()
-        user_rows.__iter__ = MagicMock(return_value=iter([(user_id, "tester")]))
-
         event_rows = MagicMock()
         event_rows.__iter__ = MagicMock(
             return_value=iter(
@@ -203,16 +147,7 @@ class TestListWorkflowVersionsCursor:
             )
         )
 
-        call_count = 0
-
-        async def exec_side_effect(stmt: object) -> MagicMock:
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return user_rows
-            return event_rows
-
-        with patch.object(mock_service.session, "exec", side_effect=exec_side_effect):
+        with patch.object(mock_service.session, "exec", return_value=event_rows):
             await callback([v])
 
         # Verify via convert_version: the version should have status
@@ -268,37 +203,18 @@ class TestListWorkflowVersionsCursor:
         assert result.status == "published"
 
     @pytest.mark.asyncio
-    async def test_convert_version_sets_username(self, mock_service: WorkflowService) -> None:
-        """convert_version sets created_by_username from the username_map."""
+    async def test_convert_version_leaves_created_by_unresolved(self, mock_service: WorkflowService) -> None:
+        """convert_version passes created_by through as the raw id.
+
+        Resolution to a UserReference happens once in BaseService, after conversion,
+        so the converter itself must not try to look names up.
+        """
         workflow_id = uuid4()
         user_id = uuid4()
 
         captured = await _capture_callbacks(mock_service, workflow_id)
-        callback: Callable[..., Any] = captured["post_query_callback"]
-
-        v = MagicMock()
-        v.id = uuid4()
-        v.created_by = user_id
-
-        user_rows = MagicMock()
-        user_rows.__iter__ = MagicMock(return_value=iter([(user_id, "charlie")]))
-
-        event_rows = MagicMock()
-        event_rows.__iter__ = MagicMock(return_value=iter([]))
-
-        call_count = 0
-
-        async def exec_side_effect(stmt: object) -> MagicMock:
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return user_rows
-            return event_rows
-
-        with patch.object(mock_service.session, "exec", side_effect=exec_side_effect):
-            await callback([v])
-
         converter: Callable[..., Any] = captured["response_type_converter"]
+
         mock_version = MagicMock()
         mock_version.id = uuid4()
         mock_version.workflow_id = workflow_id
@@ -312,31 +228,7 @@ class TestListWorkflowVersionsCursor:
         mock_version.updated_at = MagicMock()
 
         result = converter(mock_version)
-        assert result.created_by_username == "charlie"
-
-    @pytest.mark.asyncio
-    async def test_convert_version_username_none_when_missing(self, mock_service: WorkflowService) -> None:
-        """created_by_username is None when user ID not in username_map."""
-        workflow_id = uuid4()
-        unknown_user_id = uuid4()
-
-        captured = await _capture_callbacks(mock_service, workflow_id)
-        converter: Callable[..., Any] = captured["response_type_converter"]
-
-        mock_version = MagicMock()
-        mock_version.id = uuid4()
-        mock_version.workflow_id = workflow_id
-        mock_version.version = 1
-        mock_version.schema_version = "2.0.0"
-        mock_version.workflow_definition = {}
-        mock_version.change_description = None
-        mock_version.name = None
-        mock_version.created_by = unknown_user_id
-        mock_version.created_at = MagicMock()
-        mock_version.updated_at = MagicMock()
-
-        result = converter(mock_version)
-        assert result.created_by_username is None
+        assert result.created_by == user_id
 
 
 class TestPopulatePublishedVersionNumbers:

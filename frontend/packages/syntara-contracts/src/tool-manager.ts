@@ -86,51 +86,60 @@ export interface components {
      * @enum {string}
      */
     ToolParameterType: 'string' | 'number' | 'boolean' | 'object' | 'array'
-    ToolWithParameters: components['schemas']['UserOwnedResource'] &
-      components['schemas']['NamedResource'] & {
-        /**
-         * Integration Id
-         * Format: uuid
-         * @description UUID of the owning Integration (mcp_server)
-         */
-        integration_id: string
-        /**
-         * Namespaced Name
-         * @description Unique namespaced name for the tool
-         */
-        namespaced_name: string
-        /**
-         * Enabled
-         * @description Whether the tool is enabled
-         * @default true
-         */
-        enabled?: boolean
-        /**
-         * @description Current status of the tool
-         * @default available
-         */
-        status?: components['schemas']['ToolStatus']
-        /**
-         * Last Executed At
-         * @description Timestamp of last execution
-         */
-        last_executed_at?: string | null
-        /**
-         * Last Refreshed At
-         * @description Timestamp of last refresh from provider
-         */
-        last_refreshed_at?: string | null
-        /**
-         * Refresh Error
-         * @description Error message from last refresh attempt
-         */
-        refresh_error?: string | null
-        /**
-         * Parameters
-         * @description Tool parameters
-         */
-        parameters: components['schemas']['ToolParameter'][]
-      }
+    ToolWithParameters: components['schemas']['NamedResource'] & {
+      /**
+       * Created By
+       * @description User who created the tool
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the tool
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
+      /**
+       * Integration Id
+       * Format: uuid
+       * @description UUID of the owning Integration (mcp_server)
+       */
+      integration_id: string
+      /**
+       * Namespaced Name
+       * @description Unique namespaced name for the tool
+       */
+      namespaced_name: string
+      /**
+       * Enabled
+       * @description Whether the tool is enabled
+       * @default true
+       */
+      enabled?: boolean
+      /**
+       * @description Current status of the tool
+       * @default available
+       */
+      status?: components['schemas']['ToolStatus']
+      /**
+       * Last Executed At
+       * @description Timestamp of last execution
+       */
+      last_executed_at?: string | null
+      /**
+       * Last Refreshed At
+       * @description Timestamp of last refresh from provider
+       */
+      last_refreshed_at?: string | null
+      /**
+       * Refresh Error
+       * @description Error message from last refresh attempt
+       */
+      refresh_error?: string | null
+      /**
+       * Parameters
+       * @description Tool parameters
+       */
+      parameters: components['schemas']['ToolParameter'][]
+    }
     ToolParameter: components['schemas']['BaseResource'] & {
       /**
        * Tool Id
@@ -303,21 +312,6 @@ export interface components {
         [key: string]: string
       }
     }
-    UserOwnedResource: components['schemas']['BaseResource'] & {
-      /**
-       * Created By
-       * Format: uuid
-       * @description User (or automation) that created the resource
-       * @example 770e8400-e29b-41d4-a716-446655440000
-       */
-      readonly created_by: string
-      /**
-       * Updated By
-       * @description User (or automation) that last updated the resource
-       * @example 880e8400-e29b-41d4-a716-446655440000
-       */
-      readonly updated_by?: string | null
-    }
     NamedResource: components['schemas']['BaseResource'] & {
       /**
        * Name
@@ -331,6 +325,34 @@ export interface components {
        * @example Handles user authentication and authorization workflows
        */
       description?: string | null
+    }
+    /**
+     * UserReferenceType
+     * @description Kind of principal a UserReference points at.
+     *
+     *     Only ``user`` references have a user detail page. ``deleted_user`` and
+     *     ``deleted_service_account`` mark principals that were hard-deleted but are
+     *     still recorded as the actor.
+     * @enum {string}
+     */
+    UserReferenceType: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' | 'deleted_service_account'
+    /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
+      name: string
+      /** @description Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor. */
+      type: components['schemas']['UserReferenceType']
     }
     /**
      * ErrorData

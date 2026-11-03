@@ -12,7 +12,7 @@ from syntara.telemetry.events.workflow_emitters import (
 )
 from syntara.workflows.audit.node_execution import NodeExecutedEvent
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
-from syntara.workflows.models.execution import ExecutionStatus
+from syntara.workflows.models.execution import ExecutionMode, ExecutionStatus
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     ActivityTerminalStatus,
     WorkflowTerminalStatus,
@@ -67,6 +67,25 @@ class TestEmitActivities:
         assert event.duration_ms is not None
         assert event.error_type is None
         assert event.request_id == request_id
+
+    @patch("syntara.telemetry.events.workflow_emitters.AuditEventDispatcher")
+    def test_forwards_workflow_id_and_mode(self, mock_dispatcher: MagicMock) -> None:
+        """AAP-92215: emit_activities threads workflow_id and mode into the node event."""
+        activity = self._make_activity(status=ActivityStatus.COMPLETED)
+        old_values = {"status": ActivityStatus.RUNNING}
+        workflow_id = uuid4()
+
+        emit_activities(
+            execution_id=uuid4(),
+            activity_definitions_map={"script-1": {"type": "script"}},
+            updated_activities=[(activity, old_values)],
+            workflow_id=workflow_id,
+            mode=ExecutionMode.STANDARD,
+        )
+
+        event = mock_dispatcher.dispatch.call_args[0][0]
+        assert event.workflow_id == workflow_id
+        assert event.mode == ExecutionMode.STANDARD
 
     @patch("syntara.telemetry.events.workflow_emitters.AuditEventDispatcher")
     def test_dispatches_failed_with_error_type(self, mock_dispatcher: MagicMock) -> None:

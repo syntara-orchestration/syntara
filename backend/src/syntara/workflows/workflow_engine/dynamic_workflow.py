@@ -28,6 +28,7 @@ with workflow.unsafe.imports_passed_through():
         DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
         ENGINE_MAX_OUTPUT_BYTES_KEY,
         ENGINE_TIMEOUT_SECONDS_KEY,
+        INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS,
     )
     from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
     from syntara.workflows.workflow_engine.node_settings_resolver import (
@@ -39,7 +40,6 @@ with workflow.unsafe.imports_passed_through():
     )
     from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credential_values, scrub_credentials
     from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
-
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.approval_mixin import WorkflowApprovalMixin
 from syntara.workflows.workflow_engine.converge_mixin import WorkflowConvergeMixin
@@ -281,7 +281,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             # Schedule successors of converge nodes that failed with continue_on_failure
             for node_id in list(self._timed_out_converge_nodes):
                 self._timed_out_converge_nodes.discard(node_id)
-                workflow.logger.info(f"Scheduling successors of CoF-failed converge node {node_id}")
+                workflow.logger.info(f"Scheduling successors of CoF-failed node {node_id}")
                 await self._schedule_successors(node_id, graph, pending_tasks)
 
             if not pending_tasks:
@@ -346,6 +346,18 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if node.type == NodeType.LOOP:
             self.node_control_data[node_id] = {"next_port": "complete"}
 
+    def _extract_failure_output(
+        self, node_id: str, app_error: ApplicationError | None, graph: WorkflowGraph
+    ) -> dict[str, Any]:
+        """Build the namespace entry for a failed or cancelled node."""
+        if app_error is not None:
+            for detail in app_error.details:
+                if isinstance(detail, dict) and "output" in detail:
+                    return cast("dict[str, Any]", detail["output"])
+        node = graph.get_node(node_id)
+        workflow.logger.debug(f"No output in ApplicationError.details for node {node_id}, using empty model")
+        return self._build_empty_node_output(node)
+
     def _handle_node_failure(
         self,
         node_id: str,
@@ -360,24 +372,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         error_message = self._resolve_failure_message(node_id, error, app_error, graph)
         is_cancellation = app_error is not None and app_error.type == "InvocationCancelledError"
 
-        # Extract output from ApplicationError.details if executor attached it
-        namespace_entry: dict[str, Any] = {}
-        if app_error is not None:
-            for detail in app_error.details:
-                if isinstance(detail, dict) and "output" in detail:
-                    namespace_entry = detail["output"]
-                    break
-
-        # If no output from executor (e.g. parameters resolution failed), build empty output from model
-        if not namespace_entry:
-            node = graph.get_node(node_id)
-            workflow.logger.debug(f"No output in ApplicationError.details for node {node_id}, using empty model")
-            namespace_entry = self._build_empty_node_output(node)
+        namespace_entry = self._extract_failure_output(node_id, app_error, graph)
 
         if is_cancellation:
             namespace_entry["status"] = "cancelled"
             self._cancelled_node = node_id
-            # TODO(https://redhat.atlassian.net/browse/AAP-86855): cancelled nodes are not in failed_nodes
+            # TODO: cancelled nodes are not in failed_nodes  # noqa: TD002, TD003
             # or skipped_nodes, so _mark_downstream_as_skipped is a no-op (it
             # requires predecessors in one of those sets), converge ALL-strategy
             # treats the cancelled branch as successful, and
@@ -404,8 +404,63 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         if is_cancellation:
             self._mark_downstream_as_skipped(node_id, graph)
+            return
+
+        self._check_converge_successors(node_id, graph, pending_tasks)
+        if not continue_on_failure:
+            self._propagate_loop_body_failure(node_id, graph, pending_tasks)
+
+    def _propagate_loop_body_failure(
+        self,
+        failed_node_id: str,
+        graph: WorkflowGraph,
+        pending_tasks: dict[str, asyncio.Task[Any]] | None = None,
+    ) -> None:
+        """Mark the parent loop as failed when a body node fails.
+
+        When a body node fails without continue_on_failure the loop cannot
+        complete further iterations.  Marking the loop as failed lets
+        downstream converge nodes see the dead branch instead of waiting
+        indefinitely for the loop to finish iterating.  Recurses upward
+        through nested loops when the parent loop does not absorb the failure.
+
+        Honors the parent loop's own ``continue_on_failure`` setting:
+        when true, the loop is routed to its "complete" port and its
+        successors are scheduled (via ``_timed_out_converge_nodes``)
+        rather than skipped.
+        """
+        parent_loop_id = self.loop_body_map.get(failed_node_id)
+        if parent_loop_id is None or parent_loop_id in self.failed_nodes:
+            return
+
+        loop_node = graph.get_node(parent_loop_id)
+        cof = resolve_continue_on_failure(loop_node, self._runtime_settings)
+
+        error_msg = f"Loop body node '{failed_node_id}' failed"
+        self.failed_nodes[parent_loop_id] = error_msg
+
+        if self.resolver.has_namespace(parent_loop_id):
+            ns = self.resolver.get_namespace(parent_loop_id)
+            if isinstance(ns, dict):
+                ns["status"] = "failed"
+                ns["error"] = error_msg
+
+        if cof:
+            self._cof_failed_nodes.add(parent_loop_id)
+            self.node_control_data[parent_loop_id] = {"next_port": "complete"}
+            self._timed_out_converge_nodes.add(parent_loop_id)
+            workflow.logger.info(
+                f"Loop {parent_loop_id} marked as failed (continue_on_failure) due to body failure: {failed_node_id}"
+            )
         else:
-            self._check_converge_successors(node_id, graph, pending_tasks)
+            if parent_loop_id not in self._converge_branch_nodes:
+                self._has_unhandled_failure = True
+            self._mark_downstream_as_skipped(parent_loop_id, graph)
+            workflow.logger.info(f"Loop {parent_loop_id} marked as failed due to body failure: {failed_node_id}")
+
+        self._check_converge_successors(parent_loop_id, graph, pending_tasks)
+        if not cof:
+            self._propagate_loop_body_failure(parent_loop_id, graph, pending_tasks)
 
     @staticmethod
     def _extract_application_error(error: Exception) -> ApplicationError | None:
@@ -471,9 +526,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 )
             )
         except Exception:  # noqa: BLE001
+            # workflow.logger is a stdlib Logger, so structured fields must go
+            # through extra={}. A bare kwarg raises TypeError here, and because
+            # this runs inside the workflow, that failure fails the workflow task
+            # itself -- Temporal then retries the activation forever and the
+            # execution never leaves RUNNING. Ref: AAP-88614.
             workflow.logger.warning(
                 "Failed to cancel agentic invocations (best-effort)",
-                node_id=node_id,
+                extra={"node_id": node_id},
             )
 
     @staticmethod
@@ -661,9 +721,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     def _setup_loop_namespace(self, loop_node_id: str) -> None:
         """Set up the loop namespace with current iteration data."""
         control_data = self.node_control_data.get(loop_node_id, {})
-        loop_data: dict[str, Any] = {"index": control_data.get("current_index")}
-        if control_data.get("current_item") is not None:
-            loop_data["item"] = control_data["current_item"]
+        current_index = control_data.get("current_index")
+        loop_data: dict[str, Any] = {"index": current_index}
+        loop_state = self.loop_state.get(loop_node_id)
+        if (
+            isinstance(loop_state, ForEachLoopState)
+            and isinstance(current_index, int)
+            and 0 <= current_index < len(loop_state.items)
+        ):
+            loop_data["item"] = loop_state.items[current_index]
 
         if not self.resolver.has_namespace("loop"):
             self.resolver.set_namespace("loop", {})
@@ -721,6 +787,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             return
 
         parent_loop_id = self.loop_body_map[completed_node_id]
+        if parent_loop_id in self.failed_nodes:
+            return
         if self._loop_body_complete(parent_loop_id) and not self._loop_has_pending_nodes(parent_loop_id, pending_tasks):
             self._clear_loop_body(parent_loop_id)
             loop_node = graph.get_node(parent_loop_id)
@@ -751,6 +819,33 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         # No control data = no port-based routing (regular executor node)
         return None
 
+    def _evaluate_predecessor(self, pred_id: str, graph: WorkflowGraph) -> bool | None:
+        """Evaluate a single predecessor for convergence.
+
+        Returns:
+            True if the predecessor counts as completed,
+            False if it is still pending (not yet in a terminal state),
+            None if it should be skipped (already skipped or unreachable).
+
+        """
+        if pred_id in self.skipped_nodes:
+            return None
+
+        if pred_id in self.failed_nodes:
+            if pred_id in self._cof_failed_nodes:
+                return True
+            return None
+
+        if self.resolver.has_namespace(pred_id):
+            return not self._is_loop_still_iterating(pred_id)
+
+        if self._is_unreachable(pred_id, graph):
+            self.skipped_nodes.add(pred_id)
+            workflow.logger.info(f"Node {pred_id} marked as skipped (transitively unreachable)")
+            return None
+
+        return False
+
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool:
         """Check if predecessors of a converge node satisfy its convergence strategy.
 
@@ -776,25 +871,17 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         completed_count = 0
 
         for pred_id in predecessor_ids:
-            if pred_id in self.skipped_nodes:
-                continue
+            if (
+                strategy == ConvergeStrategy.ALL
+                and pred_id in self.failed_nodes
+                and pred_id not in self._cof_failed_nodes
+            ):
+                return False
 
-            if pred_id in self.failed_nodes:
-                if pred_id in self._cof_failed_nodes:
-                    completed_count += 1
-                continue
-
-            if self.resolver.has_namespace(pred_id):
+            result = self._evaluate_predecessor(pred_id, graph)
+            if result is True:
                 completed_count += 1
-                continue
-
-            if self._is_unreachable(pred_id, graph):
-                self.skipped_nodes.add(pred_id)
-                workflow.logger.info(f"Node {pred_id} marked as skipped (transitively unreachable)")
-                continue
-
-            # Predecessor is still running (not yet in a terminal state)
-            if strategy == ConvergeStrategy.ALL:
+            elif result is False and strategy == ConvergeStrategy.ALL:
                 return False
 
         if strategy == ConvergeStrategy.ANY:
@@ -1085,6 +1172,17 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             args.extend(extra_args)
 
         retry_policy = resolve_retry_policy(node, self._runtime_settings)
+        # Temporal delivers cancellation to an activity only through its heartbeats,
+        # and only when the schedule carries a heartbeat_timeout -- otherwise the
+        # beats are dropped and cancelling the workflow leaves a long-running
+        # activity (the agent run) executing until start_to_close_timeout. Only
+        # internal activities heartbeat; giving the others a heartbeat timeout would
+        # fail them spuriously. Ref: AAP-88614.
+        heartbeat_timeout = (
+            timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
+            if node_type == NodeType.INTERNAL_ACTIVITY
+            else None
+        )
         return cast(
             "dict[str, Any]",
             await workflow.execute_activity(
@@ -1092,6 +1190,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 args=args,
                 activity_id=node.id,
                 start_to_close_timeout=timedelta(seconds=timeout_seconds),
+                heartbeat_timeout=heartbeat_timeout,
                 retry_policy=retry_policy,
             ),
         )
@@ -1286,11 +1385,51 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         if loop_type == LoopType.FOR_EACH:
             items = _parse_items(loop_parameters.get("items", []))
+            # Fail fast with an actionable message before ForEachLoopState's own
+            # (opaque) list validation, so a forEach whose items expression resolved
+            # to None or a non-list surfaces a clean, self-explanatory failure
+            # instead of a bare Pydantic ValidationError.
+            self._validate_foreach_items(node, items)
             return ForEachLoopState(items=items)
 
         condition = loop_parameters.get("condition")
         max_iterations = loop_parameters.get("max_iterations")
         return DoWhileLoopState(condition=condition, max_iterations=max_iterations)
+
+    @staticmethod
+    def _validate_foreach_items(node: ActivityNode, items: Any) -> None:  # noqa: ANN401
+        """Validate a forEach loop's resolved ``items`` before iterating.
+
+        Args:
+            node: The loop node being executed.
+            items: The resolved ``items`` value for the forEach loop.
+
+        Raises:
+            ApplicationError: If ``items`` resolved to ``None`` or a non-list value.
+                Always non-retryable — retrying will not change the resolved value; fix the
+                expression or the data it references.
+
+        """
+        if isinstance(items, list):
+            return
+
+        items_expression = node.parameters.get("items") or ""
+        if items is None:
+            msg = (
+                f"forEach loop items expression {items_expression!r} resolved to None. "
+                "Ensure the referenced trigger field or step output exists and resolves "
+                "to a list (empty lists are allowed). "
+                "Check the trigger payload or the output of the upstream step the expression references."
+            )
+        else:
+            max_repr = 300
+            raw = repr(items)
+            truncated = raw[:max_repr] + "…" if len(raw) > max_repr else raw
+            msg = (
+                f"forEach loop items expression {items_expression!r} must resolve to a list, "
+                f"got {type(items).__name__}: {truncated}"
+            )
+        raise ApplicationError(msg, type="ForEachItemsError", non_retryable=True)
 
     async def _execute_node(
         self,
@@ -1621,6 +1760,24 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if data is None:
             return None
         return self._scrub_data(data)
+
+    @workflow.query
+    def get_activity_control(self, activity_id: str) -> dict[str, Any] | None:
+        """Query the effective control data used for activity routing, if present."""
+        return self.node_control_data.get(activity_id)
+
+    @workflow.update
+    async def get_activity_control_when_ready(
+        self,
+        activity_id: str,
+        previous_control: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Wait until an activity's effective routing control is stored or advanced."""
+        await workflow.wait_condition(
+            lambda: (activity_id in self.node_control_data and self.node_control_data[activity_id] != previous_control),
+            timeout=timedelta(seconds=30),
+        )
+        return self.node_control_data[activity_id]
 
     @workflow.update
     async def get_activity_output_when_ready(self, activity_id: str) -> dict[str, Any]:

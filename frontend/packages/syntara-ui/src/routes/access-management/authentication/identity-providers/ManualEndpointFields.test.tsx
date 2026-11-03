@@ -18,7 +18,7 @@ function Wrapper() {
   })
   return (
     <FormProvider {...methods}>
-      <ManualEndpointFields control={methods.control} />
+      <ManualEndpointFields />
     </FormProvider>
   )
 }

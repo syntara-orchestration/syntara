@@ -1,0 +1,6 @@
+.dropTargetActive {
+  outline-width: 2px;
+  outline-style: solid;
+  outline-color: var(--pf-t--global--color--brand--default);
+  outline-offset: -2px;
+}

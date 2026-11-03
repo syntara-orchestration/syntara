@@ -1,13 +1,8 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Button,
   Flex,
   FlexItem,
   Form,
-  FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   Modal,
   ModalBody,
   ModalFooter,
@@ -18,13 +13,14 @@ import {
 import { RhUiAddIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { Group } from '@syntara/contracts'
-import { useMemo, useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
+import { useEffect, useMemo, useState } from 'react'
 import { z } from 'zod'
 
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters'
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPageBody } from '../../../components/layout/SynPage'
@@ -36,8 +32,9 @@ import type { KebabAction } from '../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { LinkCell } from '../../../components/table/LinkCell'
 import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
+import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useFilterState } from '../../../hooks/useFilterState'
-import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
+import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
@@ -101,12 +98,18 @@ function AddToGroupModal({
 }>) {
   const { showSuccess } = useAlerts()
 
-  const { handleSubmit, control, reset, setError } = useForm<AddToGroupFormData>({
-    resolver: zodResolver(addToGroupSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: addToGroupSchema,
     defaultValues: { groupId: '' },
+    onClose,
   })
+  const { handleSubmit, handleError, handleClose, reset } = form
 
-  const handleError = useFormMutationErrorHandler<AddToGroupFormData>(setError)
+  useEffect(() => {
+    if (isOpen) {
+      reset({ groupId: '' })
+    }
+  }, [isOpen, reset])
 
   const { groups: allGroupsForPicker } = useAllGroups()
 
@@ -121,11 +124,6 @@ function AddToGroupModal({
   }, [allGroupsForPicker, existingGroupIds])
 
   const { mutate: addMember, isPending } = accessClient.useMutation('post', '/groups/{group_id}/members')
-
-  const handleClose = () => {
-    reset()
-    onClose()
-  }
 
   const onFormSubmit = (data: AddToGroupFormData) => {
     const group = availableGroups.find((g) => g.value === data.groupId)
@@ -153,37 +151,38 @@ function AddToGroupModal({
       <ModalHeader title="Add to group" />
       <ModalBody>
         <Form id="add-to-group-form" onSubmit={handleSubmit(onFormSubmit)}>
-          <FormGroup label="Group" fieldId="add-to-group-select" isRequired>
-            <Controller
+          <SynForm form={form}>
+            <SynFormField<AddToGroupFormData, 'groupId'>
               name="groupId"
-              control={control}
-              render={({ field, fieldState }) => (
-                <>
-                  <TypeaheadSelect
-                    id="add-to-group-select"
-                    ariaLabel="Select a group"
-                    options={availableGroups}
-                    selected={field.value}
-                    onChange={field.onChange}
-                    placeholder="Search for a group..."
-                    hasError={!!fieldState.error}
-                  />
-                  {fieldState.error && (
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem variant="error">{fieldState.error.message}</HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  )}
-                </>
+              label="Group"
+              fieldId="add-to-group-select"
+              isRequired
+            >
+              {({ field, fieldState }) => (
+                <TypeaheadSelect
+                  id="add-to-group-select"
+                  ariaLabel="Select a group"
+                  options={availableGroups}
+                  selected={field.value}
+                  onChange={field.onChange}
+                  placeholder="Search for a group..."
+                  hasError={!!fieldState.error}
+                />
               )}
-            />
-          </FormGroup>
+            </SynFormField>
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" type="submit" form="add-to-group-form" isDisabled={isPending} isLoading={isPending}>
-          Add
+        <Button
+          variant="primary"
+          type="submit"
+          form="add-to-group-form"
+          isDisabled={isPending}
+          isLoading={isPending}
+          icon={<RhUiAddIcon />}
+        >
+          Add to group
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel
@@ -271,17 +270,12 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
   const [groupToRemove, setGroupToRemove] = useState<GroupInfo | null>(null)
   const { filters, setAllFilters, clearAllFilters } = useFilterState()
   const groupPermissions = useGroupPermissions()
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
+  const { paginate, getFooterProps, resetPage } = useClientPagination()
   const { showAlert } = useAlerts()
 
   const handleFilterChange = (newFilters: typeof filters) => {
     setAllFilters(newFilters)
-    setPage(1)
-  }
-  const handlePerPageChange = (newPerPage: number) => {
-    setPerPage(newPerPage)
-    setPage(1)
+    resetPage()
   }
   const query = accessClient.useQuery('get', '/users/{user_id}/groups', {
     params: { path: { user_id: userId } },
@@ -291,10 +285,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
 
   const filteredGroups = useMemo(() => applyGroupFilters(groups, filters), [groups, filters])
 
-  const paginatedGroups = useMemo(() => {
-    const start = (page - 1) * perPage
-    return filteredGroups.slice(start, start + perPage)
-  }, [filteredGroups, page, perPage])
+  const paginatedGroups = useMemo(() => paginate(filteredGroups), [filteredGroups, paginate])
 
   const { mutate: removeMember } = accessClient.useMutation('delete', '/groups/{group_id}/members/{user_id}')
   const handleRemove = () =>
@@ -346,7 +337,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
                 showClearAll={true}
                 clearAllFilters={() => {
                   clearAllFilters()
-                  setPage(1)
+                  resetPage()
                 }}
               />
             </FlexItem>
@@ -373,23 +364,12 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
             <SynEmptyStateFilter
               clearAllFilters={() => {
                 clearAllFilters()
-                setPage(1)
+                resetPage()
               }}
             />
           </SynPageBody>
         ) : (
-          <SynScrollableTableContainer
-            caption="User groups table"
-            footer={{
-              page,
-              perPage,
-              total: filteredGroups.length,
-              hasNext: page * perPage < filteredGroups.length,
-              onPrev: () => setPage((p) => Math.max(1, p - 1)),
-              onNext: () => setPage((p) => p + 1),
-              onPerPageChange: handlePerPageChange,
-            }}
-          >
+          <SynScrollableTableContainer caption="User groups table" footer={getFooterProps(filteredGroups.length)}>
             <Thead>
               <Tr>
                 <Th>Name</Th>
@@ -450,7 +430,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
         onClose={() => setGroupToRemove(null)}
         onConfirm={handleRemove}
         title="Remove from group?"
-        confirmLabel="Remove"
+        confirmLabel="Remove from group"
         confirmVariant="danger"
         titleIconVariant="warning"
       >

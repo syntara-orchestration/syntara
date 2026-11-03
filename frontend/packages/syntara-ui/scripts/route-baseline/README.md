@@ -1,0 +1,85 @@
+# Route baseline
+
+`manifest.gen.json` is the UI route compatibility contract.
+
+## Commands
+
+```bash
+# Compare live sources to the committed manifest (contract only — fast)
+npm run route-baseline:check
+
+# Regenerate manifest.gen.json after an intentional route change (+ Prettier)
+npm run route-baseline:update
+```
+
+**CI:** `(Frontend) Route Baseline` in `ci-frontend.yml` runs `route-baseline:check`.
+The job is included in `(Frontend) Required Checks`, the required status check for
+frontend CI. When the route-baseline job runs, a failure makes the aggregate
+check fail and blocks the pull request from merging. Change detection skips the
+job when neither frontend code nor contracts changed.
+
+**Layout:** tooling, docs, and `manifest.gen.json` all live in this directory
+(`scripts/route-baseline/`).
+
+**Vitest:** collector / update helpers in this directory run with the normal
+package suite (`npm run vitest` / `npm test`). Those tests use fixtures; they do
+**not** re-assert the live committed manifest.
+
+Commit an updated `manifest.gen.json` in the same PR as the route change.
+
+## Expectation model
+
+The baseline is a **committed contract**, not “routes look fine.”
+
+| Situation                                      | `route-baseline:check` | `route-baseline:update`        |
+| ---------------------------------------------- | ---------------------- | ------------------------------ |
+| Accidental break vs committed manifest         | **Fail**               | N/A — fix the source           |
+| Intentional route change, sources consistent   | **Fail** until regen   | **Succeed**, then check passes |
+| AppRoute/nav out of sync with router           | **Fail** (parity)      | **Refuse** until fixed         |
+| Non-contract change (page copy, search params) | **Pass**               | No-op                          |
+
+**Router-only routes are allowed.** A new `createRoute` without an `AppRoute` /
+nav entry fails check with “Added”, then update succeeds. Hidden/detail URLs do
+not need AppRoute. Incomplete AppRoute-only adds still refuse update.
+
+## When check fails
+
+**Intentional change**
+
+1. From the frontend workspace (or `@syntara/ui` package): `npm run route-baseline:update`
+2. Review `scripts/route-baseline/manifest.gen.json`
+3. Commit the updated manifest in the same PR
+
+**Unintentional drift**
+
+Fix the route sources (`src/app/routes/*`, `AppRoute.tsx`, `navigationItems.tsx`,
+`tanstackRouteTree.tsx`, `App.tsx`, or `routes/__root.ts`), then re-run
+`npm run route-baseline:check`.
+
+## Collector notes
+
+- Redirect targets may be string literals **or** `AppRoute.Foo.Bar` references.
+- The TypeScript compiler API resolves mounted route arrays and `addChildren`
+  calls without executing application modules or importing CSS at runtime.
+- Parent paths resolve recursively across relative imports, aliases, namespace
+  imports, default exports, and named or star re-exports. Parents can be in a
+  different directory. Nesting has no configured depth limit.
+- Pathless layouts preserve their parent's URL; index routes preserve the trailing
+  slash. The root is identified by its factory, not by a variable name.
+- Unresolved references, cycles, dynamic path expressions, and unsupported route
+  factories fail with a source location. Fix the source or add explicit static
+  syntax support; the collector does not guess a URL.
+- Only literal route paths and static route arrays/`addChildren` calls are supported.
+  Module resolution follows relative TypeScript imports, including `.js` specifiers
+  pointing to TypeScript sources and directory index modules. External packages and
+  tsconfig path aliases are not followed for route definitions.
+- Route declarations in unmounted modules under `src/app/routes/` are reported,
+  including modules in subdirectories.
+- Search params, page JSX, and non-redirect `beforeLoad` logic are out of scope.
+
+## Known exception
+
+`/auth/test-signin-callback` is `kind: "app"` — handled in `App.tsx` before the
+router so the identity-provider test-signin popup skips `AppShell`. Planned
+follow-up after the file-based routing migration: move it to a public /
+layout-less TanStack route, or revisit and keep the escape hatch.

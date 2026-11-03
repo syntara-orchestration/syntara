@@ -25,7 +25,7 @@ test.describe('Run Button Visibility', () => {
   test('Run button is visible but disabled on a new empty workflow', async ({ app }) => {
     await ensureProject(app)
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
     await selectProjectIfRequired(app)
 
@@ -38,7 +38,7 @@ test.describe('Run Button Visibility', () => {
     const workflowName = buildUniqueName('e2e-run-btn')
     await ensureProject(app)
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
     try {
       await selectProjectIfRequired(app)
@@ -55,7 +55,7 @@ test.describe('Run Button Visibility', () => {
 
       // Save the workflow
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
 
       // Run button should now be enabled (saved + has trigger)

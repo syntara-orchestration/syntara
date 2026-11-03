@@ -4,13 +4,13 @@
  * Regression tests for credential selection persisting in workflow nodes
  * after save/reload. PR #561 accidentally reverted snake_case field naming
  * in workflowFactories.ts, causing credential_id to be written as
- * credentialId (camelCase) while node details components read credential_id
+ * credentialId (camelCase) while step details components read credential_id
  * (snake_case). The credential selection was silently lost.
  *
  * Critical paths covered:
- * - Task Agent node: credential persists after save/reload
- * - REST API node: credential persists after save/reload
- * - AAP node: credential persists after save/reload
+ * - Task Agent step: credential persists after save/reload
+ * - REST API step: credential persists after save/reload
+ * - AAP step: credential persists after save/reload
  */
 
 import { type Page } from './fixtures'
@@ -25,8 +25,9 @@ import {
 import {
   buildUniqueName,
   clickAddConnectedStep,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   deleteWorkflow,
+  openStepForEditing,
   openWorkflowInBuilder,
   saveWorkflow,
   startWorkflowWithTrigger,
@@ -43,8 +44,20 @@ async function selectCredential(app: Page, credLabel: string, credName: string) 
   await expect(credToggle).toContainText(credName)
 }
 
+async function expectAuthenticationCredential(app: Page, credName: string) {
+  const credToggle = app.getByRole('button', { name: 'Authentication credential', exact: true })
+  await expect(credToggle).toBeEnabled({ timeout: 30_000 })
+  await expect(credToggle).toContainText(credName, { timeout: 30_000 })
+}
+
+async function openApiStepAfterReload(app: Page, stepName: string) {
+  const credentialsLoaded = app.waitForResponse(isCredentialsResponse)
+  await openStepForEditing(app, stepName)
+  await credentialsLoaded
+}
+
 test.describe('Credential Persistence', () => {
-  test.skip('Task Agent node credential persists after save/reload', async ({ app }) => {
+  test.skip('Task Agent step credential persists after save/reload', async ({ app }) => {
     const credName = buildUniqueName('e2e-persist-llm')
     const workflowName = buildUniqueName('e2e-persist-ai')
     const integrationName = buildUniqueName('e2e-llm-integ')
@@ -72,15 +85,14 @@ test.describe('Credential Persistence', () => {
       await selectLlmCredential(app, credName)
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)
-
-      await app.getByText('Test Task Agent').click()
+      await openStepForEditing(app, 'Test Task Agent')
 
       // Wait for the form to render, then for the credential name to resolve
-      const form = app.getByTestId('ai-agent-node-form')
+      const form = app.getByTestId('ai-agent-step-form')
       await expect(form).toBeVisible({ timeout: 10_000 })
       await expect(form.getByText(credName)).toBeVisible({ timeout: 30_000 })
     } finally {
@@ -90,7 +102,7 @@ test.describe('Credential Persistence', () => {
     }
   })
 
-  test('REST API node credential persists after save/reload', async ({ app }) => {
+  test('REST API step credential persists after save/reload', async ({ app }) => {
     const credName = buildUniqueName('e2e-persist-http')
     const workflowName = buildUniqueName('e2e-persist-api')
 
@@ -115,15 +127,12 @@ test.describe('Credential Persistence', () => {
       await selectCredential(app, 'Authentication credential', credName)
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)
-
-      await app.getByText('Test REST API').click()
-
-      const credToggle = app.getByRole('button', { name: 'Authentication credential', exact: true })
-      await expect(credToggle).toContainText(credName, { timeout: 30_000 })
+      await openApiStepAfterReload(app, 'Test REST API')
+      await expectAuthenticationCredential(app, credName)
     } finally {
       await deleteWorkflow(app, workflowName)
       await deleteCredentialByName(app, credName)
@@ -131,8 +140,8 @@ test.describe('Credential Persistence', () => {
   })
 
   // TODO: AAP credential persistence fails — buildAAPConfig writes credentialId (camelCase)
-  // but AAPNodeForm reads credential_id (snake_case). Same class of bug as PR #561.
-  test.fixme('AAP node credential persists after save/reload', async ({ app }) => {
+  // but AAPStepForm reads credential_id (snake_case). Same class of bug as PR #561.
+  test.fixme('AAP step credential persists after save/reload', async ({ app }) => {
     const credName = buildUniqueName('e2e-persist-aap')
     const workflowName = buildUniqueName('e2e-persist-aap-wf')
 
@@ -171,17 +180,12 @@ test.describe('Credential Persistence', () => {
       }
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
       await saveWorkflow(app, workflowName)
 
       await openWorkflowInBuilder(app, workflowName)
-
-      const reloadedCredentialsLoaded = app.waitForResponse(isCredentialsResponse)
-      await app.getByText('Test AAP Job').click()
-      await reloadedCredentialsLoaded
-
-      const credToggle = app.getByRole('button', { name: 'Authentication credential', exact: true })
-      await expect(credToggle).toContainText(credName, { timeout: 10_000 })
+      await openApiStepAfterReload(app, 'Test AAP Job')
+      await expectAuthenticationCredential(app, credName)
     } finally {
       await deleteWorkflow(app, workflowName)
       await deleteCredentialByName(app, credName)

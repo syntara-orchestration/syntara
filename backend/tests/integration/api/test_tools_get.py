@@ -148,7 +148,7 @@ class TestToolsGetContract:
 
         # Contract: UUID fields must be valid UUID strings
         data = response.json()
-        uuid_fields = ["id", "integration_id", "created_by", "updated_by"]
+        uuid_fields = ["id", "integration_id"]
 
         for field in uuid_fields:
             if data[field] is not None:
@@ -159,6 +159,13 @@ class TestToolsGetContract:
                     UUID(data[field])
                 except ValueError:
                     pytest.fail(f"Field {field} is not a valid UUID: {data[field]}")
+
+        for field in ("created_by", "updated_by"):
+            if data[field] is not None:
+                assert isinstance(data[field], dict)
+                assert "id" in data[field]
+                assert "name" in data[field]
+                UUID(data[field]["id"])
 
     @pytest.mark.asyncio
     async def test_get_tool_namespaced_name_format_contract(self, jwt_client: AsyncClient, test_tool: Tool) -> None:

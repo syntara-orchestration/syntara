@@ -41,7 +41,7 @@ const mockCredential: Credential = {
   inputs: {},
   enabled: true,
   labels: {},
-  created_by: { id: '550e8400-e29b-41d4-a716-446655440001', name: 'user-1' },
+  created_by: { id: '550e8400-e29b-41d4-a716-446655440001', name: 'user-1', type: 'user' },
   project_id: 'proj-1',
   created_at: '2026-03-01T00:00:00Z',
   updated_at: '2026-03-01T00:00:00Z',
