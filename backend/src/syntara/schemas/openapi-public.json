@@ -35583,6 +35583,23 @@
               "title": "Include Total"
             },
             "description": "Include total count in response (expensive)"
+          },
+          {
+            "name": "node_id",
+            "in": "query",
+            "required": false,
+            "description": "Filter by parent sub-workflow node ID.",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Node Id"
+            }
           }
         ],
         "responses": {

@@ -182,9 +182,14 @@ def _parent_workflow_metadata() -> dict[str, Any]:
 def _mock_session_factory() -> Callable[..., contextlib.AbstractAsyncContextManager[_MockSession]]:
     """Build a session factory that returns mock sessions for the setup activity.
 
-    Each call produces fresh sessions so Temporal retries don't exhaust the iterator.
-    Odd calls: session for Workflow/Version query + User query.
-    Even calls: session for Execution idempotency check + create.
+    ``_prepare_child_execution`` opens sessions in this order:
+      Call 1 — idempotency check: ``session.get(Execution, id)`` only.
+      Call 2 — workflow resolution: ``session.exec(select(Workflow, Version))``,
+               ``resolve_user_display_name`` (exec), ``session.add/commit``.
+      Call 3 — ``_persist_parent_node_io``: ``session.exec(select(ActivityExecution))``.
+
+    Every 3rd call (2, 5, 8, …) carries ``exec_results`` for the workflow
+    query; all other calls return a bare session.
     """
     mock_workflow = SimpleNamespace(
         id=_CHILD_WF_ID,
@@ -206,7 +211,7 @@ def _mock_session_factory() -> Callable[..., contextlib.AbstractAsyncContextMana
     async def factory() -> AsyncIterator[_MockSession]:
         nonlocal call_count
         call_count += 1
-        if call_count % 2 == 1:
+        if call_count % 3 == 2:
             yield _MockSession(exec_results=[(mock_workflow, mock_version), None])
         else:
             yield _MockSession()
@@ -238,7 +243,7 @@ def _mock_session_factory_for_def(
     async def factory() -> AsyncIterator[_MockSession]:
         nonlocal call_count
         call_count += 1
-        if call_count % 2 == 1:
+        if call_count % 3 == 2:
             yield _MockSession(exec_results=[(mock_workflow, mock_version), None])
         else:
             yield _MockSession()
@@ -751,7 +756,7 @@ def _recording_session_factory(
     async def factory() -> AsyncIterator[_MockSession]:
         nonlocal call_count
         call_count += 1
-        if call_count % 2 == 1:
+        if call_count % 3 == 2:
             yield _RecordingMockSession(exec_results=[(mock_workflow, mock_version), None])
         else:
             yield _RecordingMockSession()

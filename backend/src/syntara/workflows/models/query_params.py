@@ -30,6 +30,15 @@ class ExecutionListParams(BaseListParams):
     # for complex filtering operations like workflow_id, status, etc.
 
 
+class ChildExecutionListParams(BaseListParams):
+    """Query parameters for child execution list endpoint."""
+
+    node_id: str | None = Field(
+        default=None,
+        description="Filter by parent sub-workflow node ID.",
+    )
+
+
 class ActivityListParams(BaseListParams):
     """Query parameters for activity execution list endpoint."""
 

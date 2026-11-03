@@ -326,6 +326,15 @@ paths:
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/cursorParam
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/sortParam
         - $ref: ../../base/shared-resources.openapi.yaml#/components/parameters/includeTotalParam
+        - name: node_id
+          in: query
+          required: false
+          description: Filter by parent sub-workflow node ID.
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Node Id
       responses:
         '200':
           description: Successful Response

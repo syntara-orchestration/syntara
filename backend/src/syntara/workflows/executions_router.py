@@ -17,7 +17,12 @@ from syntara.authz.models.project import Project
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
-from syntara.workflows.models import ActivitySignalPayload, ExecutionListParams, SignalResponse
+from syntara.workflows.models import (
+    ActivitySignalPayload,
+    ChildExecutionListParams,
+    ExecutionListParams,
+    SignalResponse,
+)
 from syntara.workflows.models.activity_execution import ActivityExecutionListResponse
 from syntara.workflows.models.execution import (
     Execution,
@@ -352,11 +357,10 @@ async def list_execution_activities(
     dependencies=[Depends(_exec_perm_read)],
 )
 async def list_child_executions(
-    request: Request,
     execution_id: UUID,
     service: Annotated[ExecutionService, Depends(get_execution_service)],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("execution", "read"))],
-    params: Annotated[ExecutionListParams, Query()],
+    params: Annotated[ChildExecutionListParams, Query()],
 ) -> ExecutionListResponse:
     """List child (sub-workflow) executions for a parent execution.
 
@@ -366,16 +370,10 @@ async def list_child_executions(
     (a ``for_each`` node spawns one child execution per iteration). Uses the
     standard execution-list pagination; ordering is deterministic (created_at
     with an id tiebreaker).
-
-    ``node_id`` is read from the raw query string (mirroring
-    ``list_execution_activities``): a SQLModel ``Query()`` params container
-    cannot be combined with a separate scalar query parameter without FastAPI
-    treating the container itself as a required scalar.
     """
-    node_id = request.query_params.get("node_id")
     return await service.list_child_executions(
         execution_id,
-        node_id=node_id,
+        node_id=params.node_id,
         limit=params.limit,
         cursor=params.cursor,
         sort=params.sort,

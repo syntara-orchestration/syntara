@@ -13,7 +13,8 @@ from typing import Any, ClassVar, cast
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError, ApplicationError
+from temporalio.exceptions import ActivityError, ApplicationError, ChildWorkflowError, TerminatedError
+from temporalio.exceptions import CancelledError as TemporalCancelledError
 from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 from temporalio.workflow import ParentClosePolicy
 
@@ -1753,30 +1754,64 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             ),
         )
 
-        child_result = await workflow.execute_child_workflow(
-            "orchestrator_workflow",
-            args=[
-                setup_result["workflow_definition"],
-                setup_result["execution_id"],
-                setup_result["trigger_node_id"],
-                setup_result["input_data"],
-                False,
-                None,
-                None,
-                None,
-                setup_result["workflow_metadata"],
-            ],
-            id=setup_result["temporal_workflow_id"],
-            task_queue=setup_result["task_queue"],
-            parent_close_policy=ParentClosePolicy.REQUEST_CANCEL,
-        )
+        try:
+            child_result = await workflow.execute_child_workflow(
+                "orchestrator_workflow",
+                args=[
+                    setup_result["workflow_definition"],
+                    setup_result["execution_id"],
+                    setup_result["trigger_node_id"],
+                    setup_result["input_data"],
+                    False,
+                    None,
+                    None,
+                    None,
+                    setup_result["workflow_metadata"],
+                ],
+                id=setup_result["temporal_workflow_id"],
+                task_queue=setup_result["task_queue"],
+                parent_close_policy=ParentClosePolicy.REQUEST_CANCEL,
+            )
+        except ChildWorkflowError as exc:
+            failure_status = self._classify_child_workflow_failure(exc)
+            output = self._build_sub_workflow_output(setup_result, failure_status)
+            msg = f"Sub-workflow {failure_status}"
+            raise ApplicationError(msg, {"output": output}, type="SubWorkflowFailedError", non_retryable=True) from exc
 
         valid_child_statuses = {"completed", "completed_with_errors", "failed", "cancelled"}
         raw_status = child_result.get("status") if isinstance(child_result, dict) else None
-        child_status = raw_status if raw_status in valid_child_statuses else None
+        child_status: str | None = raw_status if raw_status in valid_child_statuses else None
         is_success = child_status == "completed"
         status_detail = child_status or "returned unexpected status"
-        output = {
+        output = self._build_sub_workflow_output(setup_result, child_status)
+        if is_success:
+            output["StatusCode"] = 0
+            output["StatusMessage"] = "Sub-workflow completed successfully"
+            output["ErrorMessage"] = None
+
+        if not is_success:
+            msg = f"Sub-workflow {status_detail}"
+            raise ApplicationError(msg, {"output": output}, type="SubWorkflowFailedError", non_retryable=True)
+
+        return {"output": output}
+
+    @staticmethod
+    def _classify_child_workflow_failure(exc: ChildWorkflowError) -> str:
+        """Map a ChildWorkflowError cause to a child_status string."""
+        cause = exc.cause
+        if isinstance(cause, TemporalCancelledError):
+            return "cancelled"
+        if isinstance(cause, TemporalTimeoutError):
+            return "timed_out"
+        if isinstance(cause, TerminatedError):
+            return "terminated"
+        return "failed"
+
+    @staticmethod
+    def _build_sub_workflow_output(setup_result: dict[str, Any], child_status: str | None) -> dict[str, Any]:
+        """Build the M1 output dict from setup metadata and child status."""
+        status_detail = child_status or "returned unexpected status"
+        return {
             "Result": {
                 "child_execution_id": setup_result["execution_id"],
                 "child_workflow_id": setup_result.get("child_workflow_id"),
@@ -1785,16 +1820,10 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 "child_status": child_status,
                 "outputs": None,
             },
-            "StatusCode": 0 if is_success else 1,
-            "StatusMessage": ("Sub-workflow completed successfully" if is_success else f"Sub-workflow {status_detail}"),
-            "ErrorMessage": None if is_success else f"Sub-workflow {status_detail}",
+            "StatusCode": 1,
+            "StatusMessage": f"Sub-workflow {status_detail}",
+            "ErrorMessage": f"Sub-workflow {status_detail}",
         }
-
-        if not is_success:
-            msg = f"Sub-workflow {status_detail}"
-            raise ApplicationError(msg, {"output": output}, type="SubWorkflowFailedError", non_retryable=True)
-
-        return {"output": output}
 
     def _process_node_result(self, node: ActivityNode, result: dict[str, Any]) -> dict[str, Any]:
         """Extract control data and output from an activity result."""
