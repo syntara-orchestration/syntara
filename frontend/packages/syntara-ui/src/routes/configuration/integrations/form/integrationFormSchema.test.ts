@@ -42,7 +42,6 @@ const validOpenShiftBase = {
   configuration: {
     integration_type: 'openshift' as const,
     base_url: 'https://api.example.com:6443',
-    namespace: 'default',
     ...securityDefaults,
   },
   scope: 'global' as const,
@@ -251,7 +250,6 @@ describe('integrationFormSchema', () => {
       if (result.success) {
         expect(result.data.name).toBe('Prod Cluster')
         expect(result.data.configuration).toHaveProperty('base_url', 'https://api.example.com:6443')
-        expect(result.data.configuration).toHaveProperty('namespace', 'default')
       }
     })
 
@@ -262,47 +260,12 @@ describe('integrationFormSchema', () => {
         configuration: {
           integration_type: 'openshift' as const,
           base_url: '',
-          namespace: 'default',
           ...securityDefaults,
         },
       })
       expect(result.success).toBe(false)
       if (!result.success) {
         expect(result.error.issues.some((i) => i.message === 'API endpoint is required')).toBe(true)
-      }
-    })
-
-    it('rejects invalid namespace format', () => {
-      const result = integrationFormSchema.safeParse({
-        ...validOpenShiftBase,
-        name: 'Cluster',
-        configuration: {
-          integration_type: 'openshift' as const,
-          base_url: 'https://api.example.com:6443',
-          namespace: 'Invalid_Namespace',
-          ...securityDefaults,
-        },
-      })
-      expect(result.success).toBe(false)
-      if (!result.success) {
-        expect(result.error.issues.some((i) => i.message === 'Invalid namespace format')).toBe(true)
-      }
-    })
-
-    it('rejects empty namespace', () => {
-      const result = integrationFormSchema.safeParse({
-        ...validOpenShiftBase,
-        name: 'Cluster',
-        configuration: {
-          integration_type: 'openshift' as const,
-          base_url: 'https://api.example.com:6443',
-          namespace: '',
-          ...securityDefaults,
-        },
-      })
-      expect(result.success).toBe(false)
-      if (!result.success) {
-        expect(result.error.issues.some((i) => i.message === 'Namespace is required')).toBe(true)
       }
     })
 
@@ -313,7 +276,6 @@ describe('integrationFormSchema', () => {
         configuration: {
           integration_type: 'openshift' as const,
           base_url: 'https://api.example.com:6443',
-          namespace: 'default',
           ...securityDefaults,
           allow_http: true,
         },
@@ -331,7 +293,6 @@ describe('integrationFormSchema', () => {
         configuration: {
           integration_type: 'openshift' as const,
           base_url: 'https://api.example.com:6443',
-          namespace: 'default',
           ...securityDefaults,
           insecure_skip_tls_verify: true,
         },
@@ -349,7 +310,6 @@ describe('integrationFormSchema', () => {
         configuration: {
           integration_type: 'openshift' as const,
           base_url: 'http://api.example.com:6443',
-          namespace: 'default',
           ...securityDefaults,
         },
       })
@@ -477,11 +437,10 @@ describe('integrationFormSchema', () => {
       expect(fields).toContain('configuration.base_url')
     })
 
-    it('returns name, base_url, and namespace for OpenShift', () => {
+    it('returns name and base_url for OpenShift', () => {
       const fields = getStep1Fields(IntegrationTypeEnum.OPENSHIFT)
       expect(fields).toContain('name')
       expect(fields).toContain('configuration.base_url')
-      expect(fields).toContain('configuration.namespace')
     })
 
     it('references valid schema paths that are required for MCP', () => {
@@ -568,7 +527,6 @@ describe('integrationFormSchema', () => {
         {
           integration_type: 'openshift',
           base_url: '',
-          namespace: 'default',
           insecure_skip_tls_verify: false,
           allow_http: false,
           ca_certificate: null,

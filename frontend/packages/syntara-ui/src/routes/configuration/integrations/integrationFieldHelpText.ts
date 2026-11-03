@@ -37,4 +37,4 @@ export const HEALTH_CHECK_CREDENTIAL_HELP =
   'Management credential used for health checks, connection testing, and resource discovery only. Workflow nodes use separate execution credentials configured per integration when a workflow runs.'
 
 export const SERVICE_ACCOUNT_TOKEN_HELP =
-  'Token for a Kubernetes service account with access to the cluster API. Stored encrypted in the platform credential store.'
+  'Bearer token for a service account with access to the OpenShift cluster. Stored encrypted in the platform credential store.'

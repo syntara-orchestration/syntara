@@ -67,7 +67,6 @@ function getDefaultFormValues(defaultType: string): IntegrationFormData {
       configuration: {
         integration_type: IntegrationTypeEnum.OPENSHIFT,
         base_url: '',
-        namespace: 'default',
         allow_http: false,
         insecure_skip_tls_verify: false,
         ca_certificate: null,
