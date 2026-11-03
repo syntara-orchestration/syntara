@@ -13,7 +13,7 @@ import { cleanupPersona, createPersona, loginViaUI, PERSONA_ACTIONS, type Person
 import { test, expect, toAppUrl, type Page } from '../fixtures'
 import { WCAG_TAGS } from '../fixtures/accessibility'
 import { layoutCanvas } from '../helpers/canvas-interaction'
-import { buildUniqueName } from '../helpers/workflows'
+import { buildUniqueName, fillCodeEditor } from '../helpers/workflows'
 import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
 import {
   apiRequest,
@@ -143,13 +143,15 @@ async function clickCanvasStepHeading(
 ): Promise<void> {
   // Fit view is required so React Flow CSS transforms put the node on-screen, but it can
   // drop scale to ≤ 0.5. SynStep then unmounts the h2 and renders a semantic-zoom tile
-  // whose accessible name is "${title}, ${typeLabel}" (Script nodes use "Script").
+  // button named "${title}, ${typeLabel}" — same locator as semantic-zoom.spec.ts.
   const expandedHeading = node.getByRole('heading', { name: heading, level: 2 })
-  const semanticZoomTile = node.getByRole('button', { name: `${heading}, Script` })
+  const semanticZoomTile = app.locator('.react-flow').getByRole('button', { name: `${heading}, Script` })
   const step = expandedHeading.or(semanticZoomTile)
-  await expect(node).toBeVisible({ timeout: 15_000 })
+  await expect(node.or(semanticZoomTile)).toBeAttached({ timeout: 30_000 })
   await expect(async () => {
-    await layoutCanvas(app)
+    if (!(await step.isVisible().catch(() => false))) {
+      await layoutCanvas(app)
+    }
     await expect(step).toBeVisible({ timeout: 5_000 })
     await step.click({ timeout: 5_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
@@ -381,6 +383,8 @@ test.describe('Retry from failure — real backend', () => {
   test('retry override changes the failed run only and the real retry reuses upstream output @pr-check', async ({
     app,
   }) => {
+    // Real retry + Temporal poll can exceed the 60s default after the editor is filled.
+    test.setTimeout(TERMINAL_POLL_TIMEOUT_MS + 60_000)
     const run = requireRun(failedRun, 'Failed run')
     await openExecutionDetail(app, run.executionId)
     await app.getByRole('tab', { name: 'Details' }).click()
@@ -389,9 +393,12 @@ test.describe('Retry from failure — real backend', () => {
 
     await expect(app.getByText(/"code": "exit 1"/, { exact: false })).toBeVisible()
     await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
-
-    const editor = app.getByRole('textbox', { name: /Input parameters for/ })
-    await editor.fill('{"code":"echo retry-recovered"}')
+    await expect(app.getByTestId('inline-code-editor').locator('.view-lines')).toBeVisible()
+    await fillCodeEditor(app, {
+      value: '{"code":"echo retry-recovered"}',
+      label: 'Input parameters for Second Step',
+    })
+    await expect(app.getByTestId('inline-code-editor').locator('.view-lines')).toContainText('echo retry-recovered')
     const retryButton = app.getByRole('button', { name: 'Retry 2 steps' })
     await expect(retryButton).toBeDisabled()
     await app.getByRole('button', { name: 'Save parameters for retry' }).click()
@@ -429,6 +436,7 @@ test.describe('Retry from failure — real backend', () => {
   test('execution operator without workflow edit permission can retry but cannot override inputs', async ({
     browser,
   }) => {
+    test.setTimeout(TERMINAL_POLL_TIMEOUT_MS + 60_000)
     const run = requireRun(failedRun, 'Failed run')
     const persona = requirePersona(noEditPersona)
     const context = await browser.newContext()
