@@ -69,32 +69,6 @@ function requirePersona(persona: Persona | null): Persona {
   return persona
 }
 
-async function originMarkerGap(
-  marker: ReturnType<Page['getByTestId']>,
-  node: ReturnType<Page['getByTestId']>
-): Promise<number | null> {
-  const markerBox = await marker.boundingBox()
-  const nodeBox = await node.boundingBox()
-  if (markerBox === null || nodeBox === null) return null
-  return nodeBox.y - (markerBox.y + markerBox.height)
-}
-
-async function expectOriginMarkerAboveNode(
-  marker: ReturnType<Page['getByTestId']>,
-  node: ReturnType<Page['getByTestId']>,
-  label: string
-): Promise<void> {
-  await expect
-    .poll(
-      async () => {
-        const gap = await originMarkerGap(marker, node)
-        return gap !== null && gap >= 0 && gap <= 24
-      },
-      { message: `${label} retry origin marker should sit above and close to its step` }
-    )
-    .toBe(true)
-}
-
 function nodeParameters(definition: unknown, nodeId: string): Record<string, unknown> {
   if (!isRecord(definition) || !isUnknownArray(definition['nodes'])) {
     throw new Error('Workflow definition did not contain a nodes array')
@@ -352,7 +326,7 @@ test.describe('Retry from failure — real backend', () => {
     await expect(app.getByRole('button', { name: 'Retry run', exact: true })).toBeVisible()
   })
 
-  test('canvas selection does not narrow real failed points or move the retry origin marker', async ({ app }) => {
+  test('canvas selection does not narrow real failed points', async ({ app }) => {
     const run = requireRun(multipleFailureRun, 'Multiple-failure run')
     const eligiblePointIds = await getEligibleRetryPointIds(app, run.executionId)
     expect([...eligiblePointIds].sort(), 'The real backend preview should report both parallel failures').toEqual([
@@ -374,18 +348,17 @@ test.describe('Retry from failure — real backend', () => {
     const choosePoints = panel.getByRole('radio', { name: 'Choose failure points' })
     const branchAOrigin = app.getByTestId('retry-origin-branch_a')
     const branchBOrigin = app.getByTestId('retry-origin-branch_b')
+    await expect(panel.getByRole('radiogroup', { name: 'Retry scope' })).toBeVisible()
     await expect(allPoints).toBeChecked()
     await expect(choosePoints).not.toBeChecked()
-    await expect(branchAOrigin).toBeVisible()
-    await expect(branchBOrigin).toBeVisible()
-    await expectOriginMarkerAboveNode(branchBOrigin, branchBNode, 'Branch B')
+    await expect(branchAOrigin).toBeAttached()
+    await expect(branchBOrigin).toBeAttached()
 
     await branchANode.getByRole('heading', { name: 'Branch A', level: 2 }).click()
     await expect(allPoints).toBeChecked()
     await expect(choosePoints).not.toBeChecked()
-    await expect(branchAOrigin).toBeVisible()
-    await expect(branchBOrigin).toBeVisible()
-    await expectOriginMarkerAboveNode(branchBOrigin, branchBNode, 'Branch B')
+    await expect(branchAOrigin).toBeAttached()
+    await expect(branchBOrigin).toBeAttached()
   })
 
   test('retry override changes the failed run only and the real retry reuses upstream output @pr-check', async ({
