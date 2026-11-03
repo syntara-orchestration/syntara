@@ -28,7 +28,7 @@ type SynScrollableTableContainerProps = {
   isExpandable?: boolean
   /** Opt out of fixed table layout when not expandable */
   useFixedLayout?: boolean
-  /** PatternFly compact table density. Defaults to `true` for resource list tables (AAP-96518). */
+  /** PatternFly compact table density. Defaults to `true` for resource list tables. */
   isCompact?: boolean
   /** Direct PatternFly {@link Table} variant override. Prefer {@link isCompact}. */
   variant?: TableProps['variant']
