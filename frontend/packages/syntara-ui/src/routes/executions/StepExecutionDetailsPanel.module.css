@@ -1,7 +1,6 @@
 .dataPaneTitle {
+  display: block;
   font-weight: var(--pf-t--global--font--weight--body--bold);
-  /* Must match the wider title ("Parameters") so both panes wrap at the same threshold */
-  min-width: 5.5rem;
 }
 
 .auditStrip {
@@ -25,14 +24,48 @@
   padding-bottom: var(--pf-t--global--spacer--sm);
 }
 
+.dataPaneHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--xs);
+}
+
+.dataPaneTitleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--pf-t--global--spacer--sm);
+  min-height: 2.25rem;
+}
+
 .dataPaneControlsWrap {
-  /* Must be >= toggle width + search min-width + gap so inner items never wrap while next to the title */
-  flex: 1 0 30rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.dataPaneControls {
+  --pf-v6-l-flex--FlexWrap: nowrap;
+  min-width: 0;
 }
 
 .searchWrap {
-  /* Forces vertical stacking at very narrow widths (title / search / toggle each on own row) */
-  min-width: 8rem;
+  flex: 1 1 5rem;
+  min-width: 4rem;
+}
+
+.viewToggleWrap {
+  flex: 0 0 auto;
+}
+
+.dataPaneControlsStack {
+  width: 100%;
+}
+
+.dataPaneControlsStack .searchWrap,
+.dataPaneControlsStack .viewToggleWrap {
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
 }
 
 .tabBar {
@@ -42,7 +75,25 @@
 
 .contentContainer {
   height: 100%;
+  min-width: 0;
   overflow: hidden;
+  container-name: data-pane;
+  container-type: inline-size;
+}
+
+@container data-pane (max-width: 15rem) {
+  .dataPaneControls {
+    --pf-v6-l-flex--FlexWrap: wrap;
+  }
+
+  .searchWrap,
+  .viewToggleWrap {
+    flex: 1 0 100%;
+  }
+
+  .searchWrap {
+    min-width: 0;
+  }
 }
 
 .headerRow {
@@ -69,4 +120,30 @@
 .paneItem {
   min-width: 0;
   overflow: hidden;
+}
+
+.retryParametersPane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+
+.retryParametersViewer {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.contentContainer.retryParametersViewer {
+  height: auto;
+}
+
+.retryEditorPane {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
 }

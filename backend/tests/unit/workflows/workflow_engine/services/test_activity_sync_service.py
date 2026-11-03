@@ -19,6 +19,9 @@ from syntara.workflows.models.activity_execution import ActivityExecution, Activ
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
+from syntara.workflows.workflow_engine.services.activity_execution_synchronizer import (
+    ActivityExecutionSynchronizer,
+)
 from syntara.workflows.workflow_engine.services.activity_sync_service import (
     _PENDING_ACTIVITY_STATE_STARTED as STARTED_STATE,
 )
@@ -28,6 +31,7 @@ from syntara.workflows.workflow_engine.services.activity_sync_service import (
     SyntheticActivityStarted,
     SyntheticPartialOutput,
 )
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import retry_loop_record_activity_id
 from syntara.workflows.workflow_engine.utils.timeout_messages import (
     build_timeout_error_message,
     format_timeout_friendly,
@@ -43,6 +47,8 @@ def create_test_metadata(
     pending_sync_event_ids: set[int] | None = None,
     iteration_counters: dict[str, int] | None = None,
     next_activity_index: int | None = None,
+    *,
+    is_retry_from_failure: bool = True,
 ) -> ExecutionMonitorMetadata:
     """Create ExecutionMonitorMetadata for testing with sensible defaults."""
     updates = pending_activity_updates or {}
@@ -53,6 +59,7 @@ def create_test_metadata(
         activity_definitions_map=activity_definitions_map or {},
         activity_index_map=index_map,
         next_activity_index=next_activity_index if next_activity_index is not None else len(index_map),
+        is_retry_from_failure=is_retry_from_failure,
         pending_activity_updates=updates,
         pending_sync_event_ids=pending_sync_event_ids if pending_sync_event_ids is not None else set(updates.keys()),
         iteration_counters=iteration_counters or {},
@@ -474,6 +481,26 @@ class TestActivityEventProcessing:
 
         assert 1 not in self.metadata.pending_activity_updates
 
+    def test_retry_loop_record_event_maps_to_one_logical_loop_row(self) -> None:
+        marker_id = retry_loop_record_activity_id("loop-node")
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=10,
+            activity_id=marker_id,
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        update = self.metadata.pending_activity_updates[10]
+        assert update["activity_id"] == "loop-node"
+        assert update["activity_name"] == "loop-node"
+        assert update["temporal_activity_id"] == marker_id
+        assert update["_is_retry_loop_record_restore"] is True
+        assert update["_is_loop_control"] is True
+        assert update["_is_loop_iteration"] is False
+        assert update["_has_control_data"] is True
+        assert update["iteration"] is None
+
     def test_process_activity_scheduled_sets_loop_flags_for_iter_suffix(self) -> None:
         """An activity with _iter_N suffix is recognized as a loop iteration control node."""
         event = self._create_mock_event(
@@ -572,6 +599,8 @@ class TestActivityEventProcessing:
         assert update["_is_loop_iteration"] is True
         assert update["_is_loop_control"] is False
         assert update["iteration"] == 0
+        assert update["temporal_activity_id"] == "approval-node_iter_1_iter_0"
+        assert update["loop_iteration_path"] == [1, 0]
 
     def test_process_activity_scheduled_loop_type_iter_suffix_is_loop_control(self) -> None:
         """A LOOP-typed node with _iter_N suffix is still classified as loop control."""
@@ -1830,6 +1859,8 @@ class TestActivitySyncTerminalCleanup:
                 return input_data or {}
             if query_name == "get_activity_output":
                 return output_data
+            # Any other query is the replayed-state read, which has nothing to
+            # restore on a run that is not retrying.
             return None
 
         handle.query = AsyncMock(side_effect=mock_query)
@@ -2042,6 +2073,7 @@ class TestLoopIterationSync:
                 return output_data
             return None
 
+        handle.query = AsyncMock(return_value=None)
         handle.execute_update = AsyncMock(side_effect=mock_update)
         return handle
 
@@ -2436,6 +2468,25 @@ class TestGetOrCreateIterationRecord:
         assert original.iteration == 0
         session.add.assert_called_once()
 
+    def test_keeps_the_canonical_temporal_id_for_a_new_nested_iteration(self) -> None:
+        metadata = create_test_metadata(execution_id=uuid4(), activity_index_map={"body-node": 0})
+        original = self._create_mock_activity()
+        existing_activities: dict[str, ActivityExecution] = {"body-node": original}
+        session = Mock()
+
+        result, is_new = ActivitySyncService._get_or_create_iteration_record(
+            "body-node",
+            existing_activities,
+            metadata,
+            session,
+            temporal_activity_id="body-node_iter_2_iter_1",
+        )
+
+        assert is_new is True
+        assert result is not None
+        assert result.activity_name == "body-node#iter-1"
+        assert result.temporal_activity_id == "body-node_iter_2_iter_1"
+
     def test_reuses_non_terminal_iteration_record(self) -> None:
         """Returns existing non-terminal iteration record instead of creating a new one."""
         metadata = create_test_metadata(
@@ -2599,6 +2650,7 @@ class TestSyncNodesToTerminalStatus:
         """Create a mock ActivityExecution database record."""
         activity = Mock()
         activity.activity_name = activity_name
+        activity.temporal_activity_id = activity_name
         activity.status = status
         activity.started_at = None
         activity.completed_at = None
@@ -2649,6 +2701,62 @@ class TestSyncNodesToTerminalStatus:
         assert activity.completed_at is not None
         assert activity.error_details == "Key 'output' not found in namespace path"
         assert result == {"node-A": "Key 'output' not found in namespace path"}
+
+    @pytest.mark.asyncio
+    async def test_retry_converge_failure_uses_current_run_timestamp(self) -> None:
+        """A converge that fails instead of replaying keeps the retry's timestamp."""
+        activity = self._create_mock_activity_execution("converge_1")
+        session = self._session_with_result([activity])
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"converge_1": 0})
+        metadata.is_retry_from_failure = True
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["converge_1"],
+            ActivityStatus.FAILED,
+            error_map={"converge_1": "converge gate failed"},
+        )
+
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.started_at is None
+        assert activity.completed_at is not None
+
+    @pytest.mark.asyncio
+    async def test_loop_converge_failure_uses_current_run_timestamp(self) -> None:
+        """A failed nested converge no longer borrows timestamps from its source row."""
+        activity = self._create_mock_activity_execution("converge_1#iter-2#iter-4")
+        session = self._session_with_result([activity])
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"converge_1": 0})
+        metadata.is_retry_from_failure = True
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["converge_1"],
+            ActivityStatus.FAILED,
+            error_map={"converge_1": "converge gate failed"},
+        )
+
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.started_at is None
+        assert activity.completed_at is not None
+
+    def _session_context(self, session: Mock) -> Mock:
+        context = Mock()
+        context.__aenter__ = AsyncMock(return_value=session)
+        context.__aexit__ = AsyncMock(return_value=False)
+        return context
+
+    @staticmethod
+    def _session_with_result(rows: list[Any]) -> Mock:
+        result = Mock()
+        result.all.return_value = rows
+        session = Mock()
+        session.exec = AsyncMock(return_value=result)
+        session.commit = AsyncMock()
+        session.rollback = AsyncMock()
+        return session
 
     @pytest.mark.asyncio
     async def test_multiple_failed_nodes_all_marked(self) -> None:
@@ -4745,6 +4853,13 @@ class TestInitializeMonitoringWorkflowLookup:
     def setup_method(self) -> None:
         """Set up test fixtures."""
         self.mock_temporal_client = AsyncMock()
+        # `get_workflow_handle` is synchronous on the real Temporal client, so an
+        # AsyncMock would hand back a coroutine. `_initialize_monitoring` asks the
+        # workflow once whether it is replaying, so it needs a real handle whose
+        # `query` is awaitable.
+        handle = Mock()
+        handle.query = AsyncMock(return_value=False)
+        self.mock_temporal_client.get_workflow_handle = Mock(return_value=handle)
         self.mock_session_factory = Mock()
         self.service = ActivitySyncService(self.mock_temporal_client, self.mock_session_factory)
         self.execution_id = uuid4()
@@ -6109,9 +6224,11 @@ class TestActivitySyncPreservesIoOnQueryFailure:
         self._mock_session_with_activities([activity])
 
         handle = AsyncMock()
+        # The replayed-state query fails here, which is what this test is about.
         handle.query.side_effect = RPCError(
             "sticky cache evicted", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b""
         )
+        handle.execute_update = AsyncMock(return_value=None)
 
         metadata = create_test_metadata(
             execution_id=self.execution_id,
@@ -6171,3 +6288,821 @@ class TestActivitySyncPreservesIoOnQueryFailure:
 
         assert activity.output_data == heartbeat_partial
         assert activity.status == ActivityStatus.RUNNING
+
+
+class TestLogicalLoopRecordSync:
+    """A loop's visible ActivityExecution row represents all its iterations."""
+
+    def test_loop_keeps_first_start_and_record_restore_keeps_temporal_row_key(self) -> None:
+        first_started = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        next_started = datetime(2026, 1, 1, 0, 0, 30, tzinfo=UTC)
+        existing = Mock(spec=ActivityExecution)
+        existing.status = ActivityStatus.PENDING
+        existing.started_at = None
+        existing.completed_at = None
+        existing.error_details = None
+        existing.retry_count = 0
+        existing.output_data = None
+        existing.iteration = None
+        existing.temporal_activity_id = "loop-node_iter_0"
+        existing.updated_at = None
+
+        ActivitySyncService._update_activity_record(
+            existing,
+            {
+                "status": ActivityStatus.RUNNING,
+                "started_at": first_started,
+                "completed_at": None,
+                "error_details": None,
+                "retry_count": 0,
+                "iteration": 0,
+                "temporal_activity_id": retry_loop_record_activity_id("loop-node"),
+                "_is_retry_loop_record_restore": True,
+            },
+            {},
+            {},
+            None,
+            is_loop_control=True,
+        )
+
+        assert existing.started_at == first_started
+        assert existing.temporal_activity_id == "loop-node_iter_0"
+
+        ActivitySyncService._update_activity_record(
+            existing,
+            {
+                "status": ActivityStatus.RUNNING,
+                "started_at": next_started,
+                "completed_at": None,
+                "error_details": None,
+                "retry_count": 0,
+                "iteration": 1,
+                "temporal_activity_id": "loop-node_iter_1",
+            },
+            {},
+            {},
+            None,
+            is_loop_control=True,
+        )
+
+        assert existing.started_at == first_started
+        assert existing.temporal_activity_id == "loop-node_iter_1"
+
+
+class TestReplayedNodeStateOverride:
+    """A restored node must report what the source run recorded, not the replay.
+
+    A restored node is replayed under its own id, so the normal event path records
+    it node-by-node from the replay activity's *own* successful completion. As each
+    one completes, the sync service asks the workflow for the recorded state and
+    applies it over the event: the source times, the status the source run ended in,
+    and for a failure the reason it failed. Without the status, a restored skip and
+    an unselected failure would both be written as successful work.
+    """
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.execution_id = uuid4()
+        self.source_times = {
+            "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC).isoformat(),
+            "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC).isoformat(),
+        }
+
+    def _handle(self, returned: object = None, *, queried: object = "unset") -> Mock:
+        """A workflow handle that answers the query, and the update if asked.
+
+        ``queried`` defaults to whatever the update would return, so a test about the
+        update's behaviour keeps exercising the update: the query answers first and
+        the update is the fallback.
+        """
+        handle = Mock()
+        handle.query = AsyncMock(return_value=returned if queried == "unset" else queried)
+        handle.query = AsyncMock(return_value=None)
+        handle.execute_update = AsyncMock(return_value=returned)
+        return handle
+
+    async def test_asks_the_workflow_for_that_one_activity(self) -> None:
+        """One update per activity, carrying that activity's id."""
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        handle = self._handle({**self.source_times, "status": "completed"})
+
+        result = await self.service._replayed_node_timestamps(metadata, handle, "script_1")
+
+        handle.execute_update.assert_awaited_once_with("get_replayed_node_timestamps_when_ready", "script_1")
+        assert result == {
+            "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+            "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            "status": "completed",
+        }
+
+    async def test_the_recorded_status_and_error_survive_the_round_trip(self) -> None:
+        """The workflow's status and error must reach the value applied to the row.
+
+        Regression guard. Resolution used to rebuild the workflow's answer into a
+        fresh timestamps-only dict, so ``status`` and ``error_details`` were dropped
+        between the update and ``_apply_replayed_state`` — which then read ``None``
+        for both and left every restored node persisting as COMPLETED. The unit tests
+        for ``_apply_replayed_state`` built their own dicts, so they never exercised
+        this hop; a real restore of a skipped or unselected failure wrote the wrong
+        status to the database while the workflow's in-memory state stayed correct.
+        """
+        for source_status, error_details in (("skipped", None), ("failed", "exit code 1")):
+            metadata = create_test_metadata(execution_id=self.execution_id)
+            handle = self._handle(
+                {
+                    "started_at": "2026-01-01T00:00:00+00:00",
+                    "completed_at": "2026-01-01T00:00:10+00:00",
+                    "status": source_status,
+                    "error_details": error_details,
+                }
+            )
+            metadata.pending_sync_event_ids = {1}
+            temporal_activity_id = "script_1_iter_2_iter_0"
+            metadata.pending_activity_updates = {
+                1: {
+                    "activity_id": "script_1",
+                    "temporal_activity_id": temporal_activity_id,
+                    "status": ActivityStatus.COMPLETED,
+                }
+            }
+
+            resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+            state = resolved[temporal_activity_id]
+            handle.query.assert_awaited_with("get_replayed_node_timestamps_if_ready", temporal_activity_id)
+            assert state["status"] == source_status, source_status
+            assert state.get("error_details") == error_details, source_status
+
+            activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "event", "completed_at": "event"}
+            self.service._apply_replayed_state(state, activity_data)
+            assert activity_data["status"] == ActivityStatus(source_status), source_status
+            if error_details is not None:
+                assert activity_data["error_details"] == error_details, source_status
+
+    async def test_normal_execution_returns_none_so_temporal_times_are_kept(self) -> None:
+        """A node the workflow did not replay has no source times to apply."""
+        metadata = create_test_metadata(execution_id=self.execution_id)
+
+        assert (
+            await self.service._replayed_node_timestamps(metadata, self._handle(None, queried=None), "script_1") is None
+        )
+
+    async def test_workflow_closed_falls_back_to_temporal_times(self) -> None:
+        """NOT_FOUND means the workflow is gone; the row is still written."""
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        handle = self._handle()
+        handle.query = AsyncMock(return_value=None)
+        handle.execute_update = AsyncMock(
+            side_effect=RPCError("workflow execution not found", RPCStatusCode.NOT_FOUND, b"")
+        )
+
+        assert await self.service._replayed_node_timestamps(metadata, handle, "script_1") is None
+
+    async def test_update_timeout_falls_back_to_temporal_times(self) -> None:
+        """A replay that never reports its times must not lose the node's row."""
+        from temporalio.exceptions import ApplicationError
+
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        handle = self._handle()
+        handle.query = AsyncMock(return_value=None)
+        handle.execute_update = AsyncMock(side_effect=ApplicationError("timeout"))
+
+        assert await self.service._replayed_node_timestamps(metadata, handle, "script_1") is None
+
+    def test_parse_source_timestamp_round_trips_iso(self) -> None:
+        parsed = self.service._parse_source_timestamp("2026-01-01T00:00:00+00:00")
+
+        assert parsed == datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+
+    def test_parse_source_timestamp_handles_none_and_garbage(self) -> None:
+        assert self.service._parse_source_timestamp(None) is None
+        assert self.service._parse_source_timestamp("") is None
+        assert self.service._parse_source_timestamp("not-a-date") is None
+
+    def test_parse_source_timestamp_never_raises_on_a_non_string(self) -> None:
+        """A bad timestamp must not fail the node's sync, whatever shape it arrives in."""
+        assert self.service._parse_source_timestamp(object()) is None  # type: ignore[arg-type]
+
+    def test_apply_swaps_event_times_for_source_times(self) -> None:
+        activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "event", "completed_at": "event"}
+
+        self.service._apply_replayed_state(
+            {
+                "status": "completed",
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            },
+            activity_data,
+        )
+
+        assert activity_data["started_at"] == datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        assert activity_data["completed_at"] == datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC)
+
+    def test_apply_restores_a_skipped_node_as_skipped(self) -> None:
+        """A source skip must not be written as a successful replay.
+
+        The replay activity completes, so the event reports COMPLETED. Writing that
+        would report a node the source run never ran as work this run performed.
+        """
+        activity_data = {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": "event",
+            "completed_at": "event",
+            "error_details": None,
+        }
+
+        self.service._apply_replayed_state(
+            {
+                "status": "skipped",
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 1, 0, tzinfo=UTC),
+            },
+            activity_data,
+        )
+
+        assert activity_data["status"] == ActivityStatus.SKIPPED
+        assert activity_data["completed_at"] == datetime(2026, 1, 1, 0, 1, 0, tzinfo=UTC)
+
+    def test_apply_restores_an_unselected_failure_with_its_reason(self) -> None:
+        """A failure the caller did not select stays a failure, and keeps its error."""
+        activity_data = {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": "event",
+            "completed_at": "event",
+            "error_details": None,
+        }
+
+        self.service._apply_replayed_state(
+            {
+                "status": "failed",
+                "error_details": "exit code 1",
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 2, 0, tzinfo=UTC),
+            },
+            activity_data,
+        )
+
+        assert activity_data["status"] == ActivityStatus.FAILED
+        assert activity_data["error_details"] == "exit code 1"
+        assert activity_data["completed_at"] == datetime(2026, 1, 1, 0, 2, 0, tzinfo=UTC)
+
+    def test_apply_keeps_the_event_status_for_a_non_terminal_source_state(self) -> None:
+        """Only a terminal source status may overwrite what the event reported.
+
+        A node that really executed in this run must never be re-stamped from the
+        source run, however the recorded state arrives.
+        """
+        activity_data = {"status": ActivityStatus.RUNNING, "started_at": "event", "completed_at": None}
+
+        self.service._apply_replayed_state(
+            {
+                "status": "running",
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": None,
+            },
+            activity_data,
+        )
+
+        assert activity_data["status"] == ActivityStatus.RUNNING
+        assert activity_data["completed_at"] is None
+
+    def test_loop_record_restore_can_reset_an_unfinished_loop_to_running(self) -> None:
+        activity_data = {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": "restore-event-start",
+            "completed_at": "restore-event-complete",
+            "error_details": "stale",
+            "_is_retry_loop_record_restore": True,
+        }
+
+        self.service._apply_replayed_state(
+            {
+                "status": "running",
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": None,
+                "error_details": None,
+            },
+            activity_data,
+        )
+
+        assert activity_data["status"] == ActivityStatus.RUNNING
+        assert activity_data["started_at"] == datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+        assert activity_data["completed_at"] is None
+        assert activity_data["error_details"] is None
+
+    def test_apply_keeps_the_event_status_for_an_unrecognised_status(self) -> None:
+        """An unknown status must not fail the node's sync."""
+        activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "event", "completed_at": "event"}
+
+        self.service._apply_replayed_state(
+            {"status": "not-a-status", "started_at": None, "completed_at": None},
+            activity_data,
+        )
+
+        assert activity_data["status"] == ActivityStatus.COMPLETED
+
+    def test_apply_is_a_no_op_for_an_ordinary_execution(self) -> None:
+        activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "event", "completed_at": "event"}
+
+        self.service._apply_replayed_state(None, activity_data)
+
+        assert activity_data == {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": "event",
+            "completed_at": "event",
+        }
+
+
+class TestReplayedTimestampResolution:
+    """Timestamps are resolved once per completed node, before the transaction.
+
+    The workflow update blocks until it can answer. Two things follow from that:
+    it must not be asked about a node that will never have source times, and it
+    must not happen while a database transaction is open.
+
+    Asked only on a retry — ``is_retry`` gates it — and within a retry every
+    completed node is asked. An ordinary node is answered from the workflow's
+    second wait-condition branch without blocking.
+    """
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.execution_id = uuid4()
+        self.source_times = {
+            "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC).isoformat(),
+            "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC).isoformat(),
+        }
+
+    def _metadata(self, entries: list[tuple[int, str, ActivityStatus]]) -> ExecutionMonitorMetadata:
+        metadata = create_test_metadata(execution_id=self.execution_id)
+        for event_id, activity_id, status in entries:
+            metadata.pending_sync_event_ids.add(event_id)
+            metadata.pending_activity_updates[event_id] = {
+                "activity_id": activity_id,
+                "activity_name": activity_id,
+                "status": status,
+                "_is_loop_iteration": False,
+                "_is_loop_control": False,
+            }
+        return metadata
+
+    def _handle(self, returned: object = None, *, queried: object = "unset") -> Mock:
+        """Query-first handle; ``queried=None`` forces the update to be the fallback."""
+        handle = Mock()
+        handle.query = AsyncMock(return_value=returned if queried == "unset" else queried)
+        handle.execute_update = AsyncMock(return_value=returned)
+        return handle
+
+    @pytest.mark.asyncio
+    async def test_a_run_that_is_not_retrying_from_failure_asks_nothing(self) -> None:
+        """The workflow said no once at monitor start, so no per-activity ask follows.
+
+        An update is written to Temporal's history. On an ordinary run, or a
+        whole-execution retry, there is nothing to replay, so asking per node would
+        record a history event per node for a run that replays nothing.
+        """
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        metadata.is_retry_from_failure = False
+        handle = self._handle(self.source_times)
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+        handle.query.assert_not_awaited()
+        handle.execute_update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_the_query_is_tried_before_the_update(self) -> None:
+        """A query reads state the workflow already has and records no history.
+
+        The update is the fallback for the node whose state has not landed yet —
+        which is the only case where waiting is what makes the answer correct.
+        """
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle(self.source_times, queried=self.source_times)
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        handle.query.assert_awaited_once_with("get_replayed_node_timestamps_if_ready", "script_1")
+        handle.execute_update.assert_not_awaited()
+        assert resolved == {
+            "script_1": {
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            }
+        }
+
+    @pytest.mark.asyncio
+    async def test_reexecuted_trigger_uses_source_times_but_keeps_current_outcome(self) -> None:
+        metadata = self._metadata([(1, "trigger", ActivityStatus.COMPLETED)])
+        metadata.activity_definitions_map = {"trigger": {"type": "manual_trigger"}}
+        source = {
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:05:00+00:00",
+        }
+        handle = self._handle(source)
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        assert resolved == {
+            "trigger": {
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            }
+        }
+        activity_data = {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": "retry-start",
+            "completed_at": "retry-end",
+            "output_data": {"fresh": True},
+        }
+        self.service._apply_replayed_state(resolved["trigger"], activity_data)
+
+        assert activity_data == {
+            "status": ActivityStatus.COMPLETED,
+            "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+            "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            "output_data": {"fresh": True},
+        }
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("event_status", [ActivityStatus.COMPLETED, ActivityStatus.FAILED])
+    async def test_converge_rerun_keeps_current_run_timestamps(self, event_status: ActivityStatus) -> None:
+        metadata = self._metadata([(1, "converge_1", event_status)])
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        handle = self._handle()
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        assert resolved == {}
+        self.service.session_factory.assert_not_called()
+        handle.query.assert_not_awaited()
+        handle.execute_update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_replayed_loop_converge_uses_source_times_for_exact_occurrence(self) -> None:
+        temporal_activity_id = "converge_1_iter_2_iter_4"
+        metadata = self._metadata([(1, "converge_1", ActivityStatus.COMPLETED)])
+        metadata.pending_activity_updates[1]["temporal_activity_id"] = temporal_activity_id
+        metadata.pending_activity_updates[1]["_is_loop_iteration"] = True
+        metadata.pending_activity_updates[1]["_is_retry_node_replay"] = True
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        handle = self._handle(self.source_times, queried=self.source_times)
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        assert resolved == {
+            temporal_activity_id: {
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            }
+        }
+        handle.query.assert_awaited_once_with("get_replayed_node_timestamps_if_ready", temporal_activity_id)
+
+    @pytest.mark.asyncio
+    async def test_loop_converge_rerun_keeps_retry_times(self) -> None:
+        metadata = self._metadata([(1, "converge_1", ActivityStatus.COMPLETED)])
+        metadata.pending_activity_updates[1]["temporal_activity_id"] = "converge_1_iter_2_iter_4"
+        metadata.pending_activity_updates[1]["_is_loop_iteration"] = True
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        handle = self._handle()
+        handle.query = AsyncMock(return_value=False)
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+
+        handle.query.assert_not_awaited()
+        self.service.session_factory.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_converge_rerun_does_not_read_source_timestamps(self) -> None:
+        metadata = self._metadata([(1, "converge_1", ActivityStatus.COMPLETED)])
+        metadata.activity_definitions_map = {"converge_1": {"type": NodeType.CONVERGE}}
+        handle = self._handle()
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+        self.service.session_factory.assert_not_called()
+        handle.query.assert_not_awaited()
+        handle.execute_update.assert_not_awaited()
+
+    def test_apply_preserves_explicit_none_for_replayed_timestamps(self) -> None:
+        activity_data = {"status": ActivityStatus.COMPLETED, "started_at": "retry", "completed_at": "retry"}
+
+        self.service._apply_replayed_state(
+            {"started_at": None, "completed_at": None, "_preserve_timestamp_values": True},
+            activity_data,
+        )
+
+        assert activity_data == {"status": ActivityStatus.COMPLETED, "started_at": None, "completed_at": None}
+
+    @pytest.mark.asyncio
+    async def test_the_update_is_used_when_the_query_cannot_answer_yet(self) -> None:
+        """Query returns None for state that has not landed, so the update waits."""
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle(self.source_times, queried=None)
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        handle.query.assert_awaited_once()
+        handle.execute_update.assert_awaited_once_with("get_replayed_node_timestamps_when_ready", "script_1")
+        assert resolved == {
+            "script_1": {
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            }
+        }
+
+    async def test_the_update_is_asked_exactly_once(self) -> None:
+        """A second ask cannot help, so there is no second ask.
+
+        If the update does not return, the fault is in the path that answers it: a
+        closed workflow cannot be asked again, an unreachable one is equally
+        unreachable, and a wait that expired expired because the state was not
+        there — an immediate retry would wait out the same timeout for the same
+        reason. The row keeps this run's times, so the node reports when it was
+        replayed rather than when the work ran.
+        """
+        from temporalio.exceptions import ApplicationError
+
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle(None, queried=None)
+        handle.query = AsyncMock(return_value=None)
+        handle.execute_update = AsyncMock(side_effect=ApplicationError("timeout"))
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        handle.execute_update.assert_awaited_once()
+        assert resolved == {}
+
+    @pytest.mark.asyncio
+    async def test_an_rpc_failure_is_not_retried(self) -> None:
+        """An unreachable workflow is equally unreachable on the second ask."""
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle(None, queried=None)
+        handle.query = AsyncMock(return_value=None)
+        handle.execute_update = AsyncMock(side_effect=RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b""))
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        handle.execute_update.assert_awaited_once()
+        assert resolved == {}
+
+    @pytest.mark.asyncio
+    async def test_an_ordinary_node_is_asked_once(self) -> None:
+        """None is an answer, not a failure — the second branch of the condition.
+
+        A node that really executed inside a retry has no source state, so the
+        workflow returns None at once.
+        """
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle(None, queried=None)
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        handle.execute_update.assert_awaited_once()
+        assert resolved == {}
+
+    @pytest.mark.asyncio
+    async def test_asks_once_per_node_for_its_completed_event(self) -> None:
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle(self.source_times, queried=None)
+
+        resolved = await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        handle.execute_update.assert_awaited_once_with("get_replayed_node_timestamps_when_ready", "script_1")
+        assert resolved == {
+            "script_1": {
+                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 1, 1, 0, 5, 0, tzinfo=UTC),
+            }
+        }
+
+    @pytest.mark.asyncio
+    async def test_only_completed_events_are_asked_about(self) -> None:
+        """A node that did not complete has no source completion time to restore.
+
+        Asking would wait for timestamps that are never coming, stalling the sync
+        for the full timeout on every failed, timed-out or cancelled node.
+        """
+        metadata = self._metadata(
+            [
+                (1, "script_1", ActivityStatus.PENDING),
+                (2, "script_1", ActivityStatus.RUNNING),
+                (3, "script_2", ActivityStatus.FAILED),
+                (4, "script_3", ActivityStatus.CANCELLED),
+                (5, "script_4", ActivityStatus.SKIPPED),
+            ]
+        )
+        handle = self._handle(self.source_times)
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+        handle.execute_update.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_node_is_asked_once_across_repeated_completed_events(self) -> None:
+        metadata = self._metadata(
+            [
+                (1, "script_1", ActivityStatus.COMPLETED),
+                (2, "script_1", ActivityStatus.COMPLETED),
+            ]
+        )
+        handle = self._handle(self.source_times, queried=None)
+
+        await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        handle.execute_update.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_an_ordinary_run_still_asks_and_gets_nothing_back(self) -> None:
+        """Every completed activity asks, retry or not.
+
+        A gate on ``is_retry`` would skip this entirely and remove a request per
+        node from every ordinary run, but it would also make two behaviours out of
+        one path. The workflow answers immediately off a retry — it holds no replay
+        candidates, so the second branch of its wait condition is satisfied — which
+        makes the ask a request rather than a stall.
+        """
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        metadata.is_retry = False
+        handle = self._handle(None)
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+        handle.execute_update.assert_awaited_once_with("get_replayed_node_timestamps_when_ready", "script_1")
+
+    @pytest.mark.asyncio
+    async def test_every_completed_node_is_asked_about(self) -> None:
+        """One rule for both kinds of run: ask each completed node once.
+
+        Within a retry every node still goes through the same path, so there is one
+        rule rather than two that behave differently.
+        """
+        metadata = self._metadata(
+            [
+                (1, "script_1", ActivityStatus.COMPLETED),
+                (2, "script_2", ActivityStatus.FAILED),
+                (3, "script_3", ActivityStatus.RUNNING),
+            ]
+        )
+        metadata.is_retry = True
+        handle = self._handle(self.source_times)
+
+        await self.service._resolve_replayed_timestamps(metadata, handle)
+
+        asked = [call.args[1] for call in handle.query.await_args_list]
+        # Only COMPLETED is asked: a node that failed, timed out or was cancelled
+        # has no source completion time to restore.
+        assert asked == ["script_1"]
+
+    @pytest.mark.asyncio
+    async def test_a_node_the_workflow_does_not_replay_is_left_out_of_the_map(self) -> None:
+        """The workflow reporting "not a replay" means no override, not a failure."""
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+        handle = self._handle(None)
+
+        assert await self.service._resolve_replayed_timestamps(metadata, handle) == {}
+
+    @pytest.mark.asyncio
+    async def test_the_workflow_ask_happens_before_the_transaction_opens(self) -> None:
+        """Ordering, asserted directly: no session is held while the update waits.
+
+        The update blocks until the workflow can answer. If it ran inside the
+        transaction, a pooled connection would be held for that whole wait on
+        every batch containing a completed activity.
+        """
+        order: list[str] = []
+        metadata = self._metadata([(1, "script_1", ActivityStatus.COMPLETED)])
+
+        handle = Mock()
+
+        async def _update(*_args: object, **_kwargs: object) -> dict[str, str]:
+            order.append("workflow-update")
+            return self.source_times
+
+        handle.query = AsyncMock(return_value=None)
+        handle.execute_update = AsyncMock(side_effect=_update)
+
+        class _Session:
+            async def __aenter__(self) -> "_Session":
+                order.append("session-open")
+                return self
+
+            async def __aexit__(self, *_exc: object) -> None:
+                order.append("session-close")
+
+            async def exec(self, *_args: object, **_kwargs: object) -> Mock:
+                return Mock(all=Mock(return_value=[]), one_or_none=Mock(return_value=None))
+
+            async def commit(self) -> None:
+                return None
+
+            async def rollback(self) -> None:
+                return None
+
+        self.service.session_factory = Mock(side_effect=lambda: _Session())
+
+        sync = ActivityExecutionSynchronizer(self.service)
+        with (
+            patch.object(self.service, "_process_single_activity_sync", new=AsyncMock(return_value=None)),
+            patch.object(self.service, "_collect_terminal_activities", return_value=([], [], {})),
+            patch.object(self.service, "_publish_patches_and_emit_telemetry", new=AsyncMock()),
+        ):
+            await sync.sync(metadata, handle)
+
+        assert order[0] == "workflow-update", f"transaction opened first: {order}"
+        assert "session-open" in order
+
+
+class TestInitializeMonitoringSetsRetryFlag:
+    """The real `_initialize_monitoring`, with nothing stubbed at its boundary.
+
+    Every other test in this module mocks `_initialize_monitoring` wholesale and
+    hand-builds `ExecutionMonitorMetadata` with `is_retry_from_failure=True`.
+    That leaves the wiring between the monitor and the flag untested, which is how
+    a defined-but-never-called query helper shipped with the feature inert: the gate
+    in `_resolve_replayed_timestamps` read the field's default `False` on every run.
+    """
+
+    @staticmethod
+    def _session_factory(execution: Execution, workflow: Mock, version: int | None) -> tuple[Mock, AsyncMock]:
+        """Session whose three `exec` calls answer Execution, Workflow, version."""
+        results = []
+        for value in (execution, workflow, version):
+            row = Mock()
+            row.one_or_none.return_value = value
+            results.append(row)
+
+        session = AsyncMock()
+        session.exec = AsyncMock(side_effect=results)
+        session_ctx = AsyncMock()
+        session_ctx.__aenter__ = AsyncMock(return_value=session)
+        session_ctx.__aexit__ = AsyncMock(return_value=False)
+
+        factory = Mock()
+        factory.return_value = session_ctx
+        return factory, session
+
+    @staticmethod
+    def _service(execution: Execution, query_result: object) -> tuple[ActivitySyncService, Mock]:
+        workflow = Mock()
+        workflow.name = "wf"
+        workflow.published_version_id = execution.workflow_version_id
+        session_factory, _ = TestInitializeMonitoringSetsRetryFlag._session_factory(execution, workflow, 7)
+
+        client = Mock()
+        handle = Mock()
+        handle.query = AsyncMock(return_value=query_result)
+        client.get_workflow_handle = Mock(return_value=handle)
+
+        service = ActivitySyncService(client, session_factory)
+        for name, value in (
+            ("_fetch_activity_definitions_map", AsyncMock(return_value={})),
+            ("_create_all_activities_upfront", AsyncMock(return_value=None)),
+            ("_build_activity_index_map", AsyncMock(return_value={})),
+            ("_load_terminal_activity_ids", AsyncMock(return_value=set())),
+        ):
+            setattr(service, name, value)
+        return service, client
+
+    @staticmethod
+    def _execution() -> Execution:
+        return Execution(
+            id=uuid4(),
+            workflow_id=uuid4(),
+            workflow_version_id=uuid4(),
+            temporal_workflow_id="temporal-exec-1",
+            status=ExecutionStatus.RUNNING,
+            created_by=uuid4(),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+
+    async def test_flag_true_when_workflow_reports_retry(self) -> None:
+        service, _ = self._service(self._execution(), query_result=True)
+
+        metadata = await service._initialize_monitoring(uuid4())
+
+        assert metadata.is_retry_from_failure is True, "retry must not restore nothing"
+
+    async def test_flag_false_for_an_ordinary_run(self) -> None:
+        service, _ = self._service(self._execution(), query_result=False)
+
+        metadata = await service._initialize_monitoring(uuid4())
+
+        assert metadata.is_retry_from_failure is False
+
+    async def test_flag_defaults_false_when_the_query_cannot_be_answered(self) -> None:
+        """A closed or pre-query workflow must not be treated as a retry."""
+        service, client = self._service(self._execution(), query_result=True)
+        client.get_workflow_handle().query = AsyncMock(
+            side_effect=WorkflowQueryRejectedError(WorkflowExecutionStatus.COMPLETED)
+        )
+
+        metadata = await service._initialize_monitoring(uuid4())
+
+        assert metadata.is_retry_from_failure is False
+
+    async def test_query_is_asked_once_not_per_node(self) -> None:
+        """The ask writes to Temporal history, so it must not scale with node count."""
+        service, client = self._service(self._execution(), query_result=True)
+        handle = client.get_workflow_handle()
+
+        await service._initialize_monitoring(uuid4())
+
+        handle.query.assert_awaited_once_with("is_retry_from_failure")

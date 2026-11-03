@@ -10,6 +10,7 @@ type ActivityLike = {
   id?: string
   name?: string | null
   type?: string
+  parameters?: Record<string, unknown>
   branches?: (ActivityLike[] | ActivityLike | string)[]
   steps?: ActivityLike[]
   then?: ActivityLike[]
@@ -21,6 +22,7 @@ type ActivityLike = {
 export type WorkflowDefEdge = { from: string; to: string; from_port?: string; to_port?: string }
 
 export type WorkflowDefShape = {
+  triggers?: ActivityLike[]
   workflow?: { activities?: ActivityLike[] }
   /** v2 format stores nodes at top level */
   nodes?: ActivityLike[]
@@ -293,7 +295,7 @@ export function useActivityNameMap(
     return sortActivityOrder(unsorted, workflowDefinition?.edges, activityStates)
   }, [activityStates, nameMap, typeMap, workflowDefinition])
 
-  return { nameMap, activityOrder }
+  return { nameMap, typeMap, activityOrder }
 }
 
 export function resolveStepName(nameMap: Map<string, string>, nodeId?: string | null): string | undefined {

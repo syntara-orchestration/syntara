@@ -88,6 +88,46 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/executions/{execution_id}/retry_from_failure_preview': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Preview retry from failure
+     * @description Report whether an execution can be retried from its failure points, and what would re-run. An optional retry_point_ids query parameter previews a selected subset; when omitted, the preview uses all currently failed nodes. Returns the eligible retry points, the re-run step count for each, the deduplicated total, and completed results retained outside the retry paths. Purely informational: the retry endpoint independently re-validates the selection and any input parameter overrides. Never mutates any state.
+     */
+    get: operations['retry_from_failure_preview']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/executions/{execution_id}/retry_from_failure': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Retry from failure
+     * @description Retry a failed execution from the given failure points, optionally overriding input parameters of the starting nodes for this run only. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying retry context.
+     */
+    post: operations['retry_from_failure']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/executions/{execution_id}/activities': {
     parameters: {
       query?: never
@@ -507,6 +547,83 @@ export interface components {
        * @default false
        */
       use_published?: boolean
+    }
+    /**
+     * RetryFailureRequest
+     * @description Request body for POST /executions/{id}/retry_from_failure.
+     */
+    RetryFailureRequest: {
+      /**
+       * Retry Point Ids
+       * @description Retry points to resume from (node IDs from the source execution). A subset may be passed when multiple parallel branches failed; unselected branches are skipped. Empty selects the default: all currently failed nodes. This is what the caller asks for; the points that will actually run come back as eligible_point_ids on the response, which can differ.
+       */
+      retry_point_ids?: string[]
+      /**
+       * Input Parameter Overrides
+       * @description Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name (SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream outputs are injected, so the supplied value is what executes. Parameter names must already exist on that node in the retained workflow version, and node ids must be among the retry's starting points; anything else is rejected. Overrides apply to this retry run only — the workflow definition is never modified, and a permanent change requires editing, saving, and publishing the workflow.
+       */
+      input_parameter_overrides?: {
+        [key: string]: {
+          [key: string]: unknown
+        }
+      }
+    }
+    /**
+     * RetryFromFailureValidationResponse
+     * @description Retry preview (GET /executions/{id}/retry_from_failure_preview).
+     */
+    RetryFromFailureValidationResponse: {
+      /**
+       * Eligible
+       * @description Whether the retry is allowed to proceed
+       */
+      eligible: boolean
+      /**
+       * Reason
+       * @description Rejection reason when eligible is false, null otherwise
+       */
+      reason?: string | null
+      /**
+       * Eligible Point Ids
+       * @description The retry points that will actually run, after cleanup (trimmed, deduped, sorted). Equal to the requested retry_point_ids except where sanitized nodes are auto-included and superseded failed points are dropped, so it is not always a verbatim echo of the request. On a rejection it reports the pre-expansion selection that was assessed.
+       */
+      eligible_point_ids?: string[]
+      /**
+       * Sanitized Node Ids
+       * @description Upstream nodes with sanitized stored outputs referenced on the retry path. Populated when the verdict rejects; empty on eligible verdicts (see auto_included_node_ids).
+       */
+      sanitized_node_ids?: string[]
+      /**
+       * Auto Included Node Ids
+       * @description Sanitized nodes added as retry points on the default path. Empty on explicit selections, which reject instead.
+       */
+      auto_included_node_ids?: string[]
+      /**
+       * Sanitized Replacements
+       * @description For each currently-failed node, the sanitized nodes it must be replaced by, if any.
+       */
+      sanitized_replacements?: {
+        [key: string]: string[]
+      }
+      /**
+       * Step Count By Eligible Point
+       * @description Re-run step count for each eligible retry point.
+       */
+      step_count_by_eligible_point?: {
+        [key: string]: number
+      }
+      /**
+       * Total Step Count
+       * @description Deduplicated total of steps that will re-run across the eligible points.
+       * @default 0
+       */
+      total_step_count?: number
+      /**
+       * Retained Result Count
+       * @description Number of completed activity results outside the selected retry paths that will be retained.
+       * @default 0
+       */
+      retained_result_count?: number
     }
     /**
      * TestExecutionCreate
@@ -2153,6 +2270,73 @@ export interface operations {
       cookie?: never
     }
     requestBody?: never
+    responses: {
+      /** @description New execution created from retry */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExecutionRead']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  retry_from_failure_preview: {
+    parameters: {
+      query?: {
+        /** @description Optional failure points to preview. Repeat the parameter to preview a subset; omitting it previews all currently failed points. */
+        retry_point_ids?: string[] | null
+      }
+      header?: never
+      path: {
+        execution_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Retry preview */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['RetryFromFailureValidationResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  retry_from_failure: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        execution_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RetryFailureRequest']
+      }
+    }
     responses: {
       /** @description New execution created from retry */
       201: {
