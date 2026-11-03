@@ -1,19 +1,16 @@
-import { Stack, StackItem } from '@patternfly/react-core'
-import { IntegrationTypeEnum } from '@syntara/contracts'
+import { HelperText, HelperTextItem, Stack, StackItem } from '@patternfly/react-core'
 import { use, useEffect, useMemo, type ReactNode } from 'react'
-import { useFormContext } from 'react-hook-form'
 
 import { SynForm } from '../../../components/forms/SynForm'
-import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
 import { SynTextField } from '../../../components/forms/SynTextField'
 import { useSynForm } from '../../../hooks/useSynForm'
-import { CredentialSelector } from '../components/CredentialSelector'
-import { IntegrationSelector } from '../components/IntegrationSelector'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import { useIsVersionView } from '../VersionViewContext'
 
+import { KafkaPublishConnectionFields } from './KafkaPublishConnectionFields'
 import { kafkaPublishFormSchema, type KafkaPublishFormData } from './kafkaPublishFormSchema'
+import { KafkaPublishMessageFields } from './KafkaPublishMessageFields'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
@@ -26,53 +23,23 @@ type KafkaPublishNodeFormProps = {
   projectId?: string
 }
 
+function DeliveryGuidance() {
+  return (
+    <HelperText>
+      <HelperTextItem>
+        Kafka acknowledgment confirms broker receipt. Retries and reruns can publish another copy. Timeout or
+        cancellation may leave delivery unconfirmed.
+      </HelperTextItem>
+    </HelperText>
+  )
+}
+
 function KafkaPublishFields({ projectId }: Readonly<{ projectId?: string }>) {
-  const { setValue } = useFormContext<KafkaPublishFormData>()
   const readOnly = useIsVersionView()
   return (
     <Stack hasGutter>
       <StackItem>
-        <SynFormField<KafkaPublishFormData, 'integration_id'>
-          name="integration_id"
-          label="Kafka integration"
-          hideFormGroupLabel
-        >
-          {({ field }) => (
-            <IntegrationSelector
-              integrationType={IntegrationTypeEnum.KAFKA}
-              label="Kafka integration"
-              fieldId="publish-integration"
-              placeholder="Select a Kafka integration"
-              projectId={projectId}
-              value={field.value}
-              isDisabled={readOnly}
-              onChange={(value) => {
-                field.onChange(value ?? '')
-                setValue('credential_id', '', { shouldDirty: true })
-              }}
-            />
-          )}
-        </SynFormField>
-      </StackItem>
-      <StackItem>
-        <SynFormField<KafkaPublishFormData, 'credential_id'>
-          name="credential_id"
-          label="Runtime credential"
-          hideFormGroupLabel
-        >
-          {({ field, fieldState }) => (
-            <CredentialSelector
-              label="Runtime credential"
-              fieldId="publish-credential"
-              projectId={projectId}
-              compatibleTypeNames={['Kafka']}
-              value={field.value || undefined}
-              onChange={(value) => field.onChange(value ?? '')}
-              errorMessage={fieldState.error?.message}
-              isDisabled={readOnly}
-            />
-          )}
-        </SynFormField>
+        <KafkaPublishConnectionFields projectId={projectId} />
       </StackItem>
       <StackItem>
         <SynTextField
@@ -92,30 +59,16 @@ function KafkaPublishFields({ projectId }: Readonly<{ projectId?: string }>) {
           rows={6}
           isRequired
           isDisabled={readOnly}
-          hint={'Any JSON value, including null. Use ${trigger.payload} to preserve a value from workflow data.'}
-        />
-      </StackItem>
-      <StackItem>
-        <SynTextAreaField
-          name="key"
-          label="Message key"
-          fieldId="publish-key"
-          rows={3}
-          isDisabled={readOnly}
-          hint={'Optional. For example: {"encoding":"utf-8","value":"order-123"}. Use base64 for binary bytes.'}
-        />
-      </StackItem>
-      <StackItem>
-        <SynTextAreaField
-          name="headers"
-          label="Message headers"
-          fieldId="publish-headers"
-          rows={5}
-          isDisabled={readOnly}
           hint={
-            'An ordered JSON list. For example: [{"name":"correlation-id","value":{"encoding":"utf-8","value":"request-123"}}]. Duplicate names and null values are supported.'
+            'JSON value or ${trigger.payload} (declare trigger inputs). Quote strings. null is JSON null, not a tombstone. Arrays are one record. Templates can appear inside JSON.'
           }
         />
+      </StackItem>
+      <StackItem>
+        <KafkaPublishMessageFields />
+      </StackItem>
+      <StackItem>
+        <DeliveryGuidance />
       </StackItem>
     </Stack>
   )
@@ -123,17 +76,21 @@ function KafkaPublishFields({ projectId }: Readonly<{ projectId?: string }>) {
 
 export function KafkaPublishNodeForm(props: Readonly<KafkaPublishNodeFormProps>) {
   const { onHeaderContentChange } = props
-  const form = useSynForm({
+  const form = useSynForm<KafkaPublishFormData>({
     schema: kafkaPublishFormSchema,
     mode: 'onChange',
     defaultValues: {
       name: '',
       integration_id: '',
       credential_id: '',
+      credential_required: true,
+      connection_ready: false,
       topic: '',
       payload: '{}',
-      key: '',
-      headers: '[]',
+      key: { encoding: 'null', value: '' },
+      headers_mode: 'entries',
+      headers: [],
+      headers_template: '',
       settings: {},
       ...props.initialData,
     },
@@ -160,7 +117,16 @@ export function KafkaPublishNodeForm(props: Readonly<KafkaPublishNodeFormProps>)
       <SynForm form={form}>
         <NodeFormTabsLayout
           parametersContent={<KafkaPublishFields projectId={props.projectId} />}
-          settingsContent={<NodeSettingsForm />}
+          settingsContent={
+            <Stack hasGutter>
+              <StackItem>
+                <NodeSettingsForm />
+              </StackItem>
+              <StackItem>
+                <DeliveryGuidance />
+              </StackItem>
+            </Stack>
+          }
         />
       </SynForm>
     </NodeFormContainer>

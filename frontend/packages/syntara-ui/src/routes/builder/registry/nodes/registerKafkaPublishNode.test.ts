@@ -27,10 +27,14 @@ describe('Kafka Publish registration', () => {
         name: 'Publish outcome',
         integration_id: '11111111-1111-4111-8111-111111111111',
         credential_id: '',
+        credential_required: false,
+        connection_ready: true,
         topic: 'outcomes',
         payload: 'false',
-        key: '',
-        headers: '[]',
+        key: { encoding: 'null', value: '' },
+        headers_mode: 'entries',
+        headers: [],
+        headers_template: '',
         settings: { retry_policy: { max_retries: 0 } },
       },
       onSuccess,
@@ -44,5 +48,32 @@ describe('Kafka Publish registration', () => {
     })
     expect(onSuccess).toHaveBeenCalledWith(expect.any(String))
     expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('does not expose message data from unexpected serialization failures', () => {
+    registerKafkaPublishNode()
+    const onError = vi.fn()
+    const onSuccess = vi.fn()
+    NodeRegistry.get(ActivityTypeEnum.KAFKA_PUBLISH)?.onSubmit(
+      {
+        name: 'Publish outcome',
+        integration_id: '11111111-1111-4111-8111-111111111111',
+        credential_id: '',
+        credential_required: false,
+        connection_ready: true,
+        topic: 'outcomes',
+        payload: 'sensitive-message-data is not JSON',
+        key: { encoding: 'null', value: '' },
+        headers_mode: 'entries',
+        headers: [],
+        headers_template: '',
+        settings: {},
+      },
+      onSuccess,
+      onError
+    )
+    expect(onError).toHaveBeenCalledWith('Failed to add Kafka Publish. Check the action configuration.')
+    expect(onSuccess).not.toHaveBeenCalled()
+    expect(addActivity).not.toHaveBeenCalled()
   })
 })
