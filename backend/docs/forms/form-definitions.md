@@ -63,7 +63,7 @@ expressions throughout their parameters.
 
 ## Validation
 
-### When saving a workflow
+### When Saving a Workflow
 
 When a workflow is saved, each field's default is checked as if a user had submitted it. For
 example, a date default must use a valid date and the form's selected components, and a dropdown
@@ -72,7 +72,7 @@ default must match one of its options.
 Validation findings use `form_prompt_configuration` for form prompts and
 `form_trigger_configuration` for form triggers. Drafts can be saved with findings, publishing is blocked until the findings are resolved.
 
-### When submitting a form
+### When Submitting a Form
 
 Both form prompts and form triggers use `validate_form_submission()` in
 `forms/validators/submission.py` to check and normalize answers. A prompt submission is checked

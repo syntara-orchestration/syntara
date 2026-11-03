@@ -270,7 +270,7 @@ history timestamps. Neither metric compares clocks across hosts.
 Errors use RFC 9457 problem details. See [Audit](../audit.md) and
 [Observability](../standards/observability.md).
 
-### Adding a new field type or parameter
+### Adding a New Field Type or Parameter
 
 For steps to add a field type or form parameter, see
 [Extending Forms](form-definitions.md#extending-forms).

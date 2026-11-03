@@ -59,7 +59,7 @@ valid submission, validation normalizes values according to their field definiti
 The API checks the cleaned payload's size after normalization because applying field defaults can
 make it larger than the JSONB limit.
 
-### Reading submitted values
+### Reading Submitted Values
 
 The trigger output places submitted values under `response_data`. Fields can be referenced by downstream nodes at
 `${<trigger_node_id>.response_data.<value_name>}` or
@@ -67,7 +67,7 @@ The trigger output places submitted values under `response_data`. Fields can be 
 response-time metadata. The execution context provides the execution's creator and creation time
 through `workflow_context.execution.created_by` and `workflow_context.execution.created_at`.
 
-### Retrying an execution
+### Retrying an Execution
 
 A retry reuses the original form `input_data` and workflow version, keeping the submission tied to the
 form definition from the original run. The submitter does not have to fill out the form again.
@@ -90,12 +90,12 @@ logged and swallowed so they do not prevent a submission.
 
 ## Extending the Feature
 
-### Adding a new field type or parameter
+### Adding a New Field Type or Parameter
 
 For steps to add a field type or form parameter, see
 [Extending Forms](../../forms/form-definitions.md#extending-forms).
 
-### Adding a trigger type
+### Adding a Trigger Type
 
 The form trigger is an example of a trigger that needs its own config and validation, but no
 service or database table. See [Adding a New Trigger Type](overview.md#adding-a-new-trigger-type).
