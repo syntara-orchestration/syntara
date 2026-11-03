@@ -1,0 +1,17 @@
+.menuWrapper {
+  display: inline-flex;
+  max-width: max-content;
+}
+
+.menuWrapper :global(.pf-v6-c-dropdown) {
+  display: inline-flex;
+  width: auto;
+  max-width: max-content;
+}
+
+/* patternfly-override: icon-only kebab in canvas step header action row */
+.menuToggle {
+  padding: 0;
+  min-width: auto;
+  width: auto;
+}

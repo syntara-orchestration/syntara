@@ -235,7 +235,6 @@ export function SynStep(props: {
         data-testid={props.rootTestId}
         data-syn-step-root=""
         style={panelStyle}
-        tabIndex={isSemanticZoom ? undefined : 0}
       >
         {isSemanticZoom && summary ? (
           <SynStepSemanticZoomBody

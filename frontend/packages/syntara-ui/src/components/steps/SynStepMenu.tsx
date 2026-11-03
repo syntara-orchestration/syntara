@@ -6,6 +6,8 @@ import { isValidElement, useState, type MouseEvent } from 'react'
 import type { StepMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useStepMenuActions'
 import { IconLabel } from '../IconLabel'
 
+import styles from './SynStepMenu.module.css'
+
 type SynStepMenuProps = {
   menuActions: StepMenuAction[]
   className?: string
@@ -33,7 +35,11 @@ export function SynStepMenu(props: Readonly<SynStepMenuProps>) {
   }
 
   return (
-    <div data-testid="step-menu-wrapper" className={`nodrag nopan ${props.className ?? ''}`} style={props.style}>
+    <div
+      data-testid="step-menu-wrapper"
+      className={`nodrag nopan ${styles.menuWrapper} ${props.className ?? ''}`}
+      style={props.style}
+    >
       <Dropdown
         isOpen={isMenuOpen}
         onOpenChange={(isOpen) => setIsMenuOpen(isOpen)}
@@ -54,7 +60,7 @@ export function SynStepMenu(props: Readonly<SynStepMenuProps>) {
             }}
             isExpanded={isMenuOpen}
             aria-label="Step actions menu"
-            className="nodrag nopan"
+            className={`nodrag nopan ${styles.menuToggle}`}
           >
             <RhUiEllipsisVerticalFillIcon />
           </MenuToggle>

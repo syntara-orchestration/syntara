@@ -85,7 +85,7 @@ describe('SynStep semantic zoom', () => {
     expect(screen.getByTestId('semantic-zoom-icon')).toBeInTheDocument()
   })
 
-  it('uses tabIndex 0 on the step panel at full zoom for keyboard focus', () => {
+  it('does not add a second tab stop on the step panel at full zoom', () => {
     viewportState.zoom = 0.75
     renderWithFlow(
       <SynStep
@@ -97,7 +97,7 @@ describe('SynStep semantic zoom', () => {
       </SynStep>
     )
 
-    expect(screen.getByTestId('syn-step-full-zoom')).toHaveAttribute('tabIndex', '0')
+    expect(screen.getByTestId('syn-step-full-zoom')).not.toHaveAttribute('tabIndex')
   })
 
   it('omits panel tabIndex in semantic zoom so focus stays on the compact tile', () => {
@@ -257,20 +257,22 @@ describe('SynStep validation and interaction', () => {
     expect(screen.queryByTestId('validation-error-badge')).not.toBeInTheDocument()
   })
 
-  it('does not open the step from Enter or Space on the focused panel', async () => {
+  it('does not open the step from Enter or Space on the focused node wrapper', async () => {
     const user = userEvent.setup()
     renderWithFlow(
-      <SynStep nodeProps={baseNodeProps} rootTestId="syn-step-panel">
-        <span>Content</span>
-      </SynStep>
+      <button type="button" className="react-flow__node" data-testid="syn-step-node-wrapper">
+        <SynStep nodeProps={baseNodeProps} rootTestId="syn-step-panel">
+          <span>Content</span>
+        </SynStep>
+      </button>
     )
 
-    const panel = screen.getByTestId('syn-step-panel')
-    panel.focus()
+    const nodeWrapper = screen.getByTestId('syn-step-node-wrapper')
+    nodeWrapper.focus()
     await user.keyboard('{Enter}')
     await user.keyboard(' ')
 
-    expect(panel).toHaveFocus()
+    expect(nodeWrapper).toHaveFocus()
   })
 
   it('uses default width for standard nodes', () => {
