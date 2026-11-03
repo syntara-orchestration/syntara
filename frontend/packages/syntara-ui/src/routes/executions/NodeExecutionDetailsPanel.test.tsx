@@ -680,6 +680,30 @@ describe('NodeExecutionDetailsPanel', () => {
       expect(screen.getByText('Parameters')).toBeInTheDocument()
     })
 
+    it('associates the active tab with its content via a labelled tab panel', async () => {
+      const user = userEvent.setup()
+      mockUseQuery.mockReturnValue({
+        data: mockAgenticActivityData,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<NodeExecutionDetailsPanel {...agenticProps} />, { wrapper })
+
+      // The displayed content is exposed as a tab panel labelled by the selected tab,
+      // and the selected tab points back at that panel via aria-controls.
+      const panel = screen.getByRole('tabpanel')
+      const ioTab = screen.getByRole('tab', { name: /Input\/Output/i })
+      expect(panel).toHaveAttribute('aria-labelledby', ioTab.id)
+      expect(ioTab).toHaveAttribute('aria-controls', panel.id)
+
+      // The relationship follows the selection when the active tab changes.
+      await user.click(screen.getByRole('tab', { name: /Agent steps/i }))
+      const agentTab = screen.getByRole('tab', { name: /Agent steps/i })
+      expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', agentTab.id)
+    })
+
     it('renders tools used summary from agentic output_data', () => {
       mockUseQuery.mockReturnValue({
         data: {

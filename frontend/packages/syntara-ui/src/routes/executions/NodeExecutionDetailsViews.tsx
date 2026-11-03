@@ -14,6 +14,7 @@ import {
 import { HelpPopover } from '../../components/expressions/HelpPopover'
 
 import styles from './NodeExecutionDetailsPanel.module.css'
+import { nodeTabPanelId } from './nodeTabPanel'
 
 function buildOutputHint(
   outputMode: 'composed' | 'persisted',
@@ -88,12 +89,16 @@ export function NodeDetailTabBar({
   onTabChange,
   isAgenticNode,
   isSubWorkflowNode,
+  idBase,
 }: Readonly<{
   activeTab: 'io' | 'agent-steps' | 'child-activities'
   onTabChange: (tab: 'io' | 'agent-steps' | 'child-activities') => void
   isAgenticNode: boolean
   isSubWorkflowNode: boolean
+  /** Base id used to derive stable tab-button ids and the shared panel id, so the tab/panel relationship is exposed to assistive tech. */
+  idBase: string
 }>) {
+  const panelId = nodeTabPanelId(idBase)
   return (
     <StackItem className={styles.tabBar}>
       <Tabs
@@ -101,9 +106,28 @@ export function NodeDetailTabBar({
         onSelect={(_e, key) => onTabChange(key as 'io' | 'agent-steps' | 'child-activities')}
         variant="default"
       >
-        <Tab eventKey="io" title={<TabTitleText>Input/Output</TabTitleText>} />
-        {isAgenticNode && <Tab eventKey="agent-steps" title={<TabTitleText>Agent steps</TabTitleText>} />}
-        {isSubWorkflowNode && <Tab eventKey="child-activities" title={<TabTitleText>Child activities</TabTitleText>} />}
+        <Tab
+          id={`${idBase}-io`}
+          tabContentId={panelId}
+          eventKey="io"
+          title={<TabTitleText>Input/Output</TabTitleText>}
+        />
+        {isAgenticNode && (
+          <Tab
+            id={`${idBase}-agent-steps`}
+            tabContentId={panelId}
+            eventKey="agent-steps"
+            title={<TabTitleText>Agent steps</TabTitleText>}
+          />
+        )}
+        {isSubWorkflowNode && (
+          <Tab
+            id={`${idBase}-child-activities`}
+            tabContentId={panelId}
+            eventKey="child-activities"
+            title={<TabTitleText>Child activities</TabTitleText>}
+          />
+        )}
       </Tabs>
     </StackItem>
   )
