@@ -55,16 +55,6 @@ spec:
       value: '{{revision}}'
     - name: ao-pr-number
       value: '{{pull_request_number}}'
-    - name: ao-operator-revision
-      value: AAP-90779-ep-from-source
-    # aap-dev deploys with the execution-target registration hook
-    # (ansible/aap-dev#1141): the integrations-based cluster registration and
-    # execution-target placement replaced konflux-prepare-execution-plane.sh.
-    # Drop this pin once the hook merges on aap-dev main.
-    - name: aap-dev-revision
-      value: goneri/configure-ep-execution-target
-    - name: ao-operator-git-url
-      value: https://github.com/automation-nexus/automation-orchestrator-operator.git
     - name: ep-git-url
       value: https://github.com/syntara-orchestration/syntara-execution-plane.git
     - name: ep-revision
