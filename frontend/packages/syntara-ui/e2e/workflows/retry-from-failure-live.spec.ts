@@ -129,7 +129,9 @@ async function openExecutionDetail(app: Page, executionId: string): Promise<void
 }
 
 async function openRetryPanel(app: Page): Promise<void> {
-  await app.getByRole('button', { name: 'Retry' }).click()
+  const retryToggle = app.getByRole('button', { name: 'Retry' })
+  await expect(retryToggle).toBeVisible()
+  await retryToggle.click()
   const retryFromFailureButton = app.getByTestId('retry-from-failure-button')
   await expect(retryFromFailureButton).toBeEnabled()
   await retryFromFailureButton.click()
@@ -141,17 +143,17 @@ async function clickCanvasStepHeading(
   node: ReturnType<Page['getByTestId']>,
   heading: string
 ): Promise<void> {
-  // Fit view is required so React Flow CSS transforms put the node on-screen, but it can
-  // drop scale to ≤ 0.5. SynStep then unmounts the h2 and renders a semantic-zoom tile
-  // button named "${title}, ${typeLabel}" — same locator as semantic-zoom.spec.ts.
+  // Fit view is required so React Flow CSS transforms put the node on-screen. It can
+  // also drop scale to ≤ 0.5, where SynStep unmounts the h2 and renders a semantic-zoom
+  // tile named "${title}, ${typeLabel}". Click whichever of those is in the DOM.
+  // Always fit: Playwright isVisible() is true for off-screen transformed nodes, so
+  // skipping Fit view makes the later click hang.
   const expandedHeading = node.getByRole('heading', { name: heading, level: 2 })
   const semanticZoomTile = app.locator('.react-flow').getByRole('button', { name: `${heading}, Script` })
   const step = expandedHeading.or(semanticZoomTile)
-  await expect(node.or(semanticZoomTile)).toBeAttached({ timeout: 30_000 })
+  await expect(node).toBeAttached({ timeout: 30_000 })
   await expect(async () => {
-    if (!(await step.isVisible().catch(() => false))) {
-      await layoutCanvas(app)
-    }
+    await layoutCanvas(app)
     await expect(step).toBeVisible({ timeout: 5_000 })
     await step.click({ timeout: 5_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
