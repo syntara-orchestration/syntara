@@ -432,7 +432,8 @@ class RetryFailureRequest(SQLModel):
     retry_point_ids: list[str] = Field(
         default_factory=list,
         description="Retry points to resume from (node IDs from the source execution). "
-        "A subset may be passed when multiple parallel branches failed; unselected branches are skipped. "
+        "A subset may be passed when multiple parallel branches failed; unselected branches reuse "
+        "their recorded output (completed results are retained, unselected failures stay failed). "
         "Empty selects the default: all currently failed nodes. "
         "This is what the caller asks for; the points that will actually run come back as "
         "eligible_point_ids on the response, which can differ.",
