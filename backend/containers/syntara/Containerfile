@@ -160,6 +160,12 @@ RUN python3.12 -c "from zoneinfo import available_timezones; tzs = available_tim
 # Switch back to non-root user (UBI default user)
 USER 1001
 
+# Verify the shared CEL evaluator and native RE2 dependency in the runtime image.
+RUN .venv/bin/python -c 'from syntara.filtering.evaluator import PreparedFilter; \
+    from syntara.filtering.models.result import FilterErrorCode, FilterOutcome; \
+    assert PreparedFilter("input.matches(\"orders-[0-9]+\")").evaluate("orders-42").outcome == FilterOutcome.MATCH; \
+    assert PreparedFilter("input.exists_one(item, item)").evaluate([1]).error_code == FilterErrorCode.WRONG_TYPE'
+
 # Expose API port
 EXPOSE 8000
 
