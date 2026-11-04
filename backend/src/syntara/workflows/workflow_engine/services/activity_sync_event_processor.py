@@ -220,48 +220,81 @@ class ActivitySyncEventProcessorMixin:
         ``terminal_activity_ids`` — the finalizer owns the node's terminal status
         until a reliable logical-node completion signal exists (C3).
 
-        For a non-iterated node the child's identifying metadata from the setup
-        result is surfaced as ``runtime_metadata``. For a ``for_each`` node
-        (N setups -> one aggregate row) ``runtime_metadata`` is intentionally left
-        unset in C2: writing each iteration would silently overwrite the previous
-        one, and the aggregate representation is a deferred decision (C3).
+        The node's ``input_data``/``output_data`` summaries are reconstructed from
+        the setup result payload and persisted via the shared writer (C3: ASS owns
+        this, replacing the activity-side direct writer). For a non-iterated node
+        the child's identifying metadata is also surfaced as ``runtime_metadata``;
+        for a ``for_each`` node (N setups -> one aggregate row) ``runtime_metadata``
+        stays unset (deferred), while I/O follows the last iteration's setup result
+        (preserving prior behaviour).
         """
         update["status"] = ActivityStatus.RUNNING
         update["completed_at"] = None
-        if update.get("_subworkflow_iteration") is None:
-            child_metadata = self._extract_child_runtime_metadata(attrs)
-            if child_metadata is not None:
-                update["runtime_metadata"] = child_metadata
+        setup_result = self._decode_setup_result(attrs)
+        if setup_result is not None:
+            update["_subworkflow_io"] = self._build_subworkflow_io(setup_result)
+            if update.get("_subworkflow_iteration") is None:
+                child_metadata = self._child_runtime_metadata(setup_result)
+                if child_metadata is not None:
+                    update["runtime_metadata"] = child_metadata
         metadata.pending_sync_event_ids.add(scheduled_id)
 
     @staticmethod
-    def _extract_child_runtime_metadata(attrs: Any) -> dict[str, Any] | None:  # noqa: ANN401
-        """Pull the child's identifying metadata from the setup activity result.
+    def _decode_setup_result(attrs: Any) -> dict[str, Any] | None:  # noqa: ANN401
+        """Decode the sub-workflow setup activity's JSON result payload.
 
-        The setup activity returns a JSON dict carrying the child execution and
-        workflow identifiers. Only those UI-relevant identifiers are surfaced as
-        ``runtime_metadata``; the full result (which also carries the child
-        workflow definition) is never stored. Returns ``None`` when the payload is
-        absent, unparseable, or carries none of the expected identifiers.
+        Returns the parsed dict, or ``None`` when the payload is absent or
+        unparseable (defensive: the summaries/metadata are best-effort UI data).
         """
         if not attrs.result or not attrs.result.payloads:
             return None
         try:
             result_data = json.loads(attrs.result.payloads[0].data)
         except Exception:  # noqa: BLE001
-            logger.warning("Failed to parse sub-workflow setup result for runtime_metadata", exc_info=True)
+            logger.warning("Failed to parse sub-workflow setup result", exc_info=True)
             return None
-        if not isinstance(result_data, dict):
-            return None
+        return result_data if isinstance(result_data, dict) else None
+
+    @staticmethod
+    def _child_runtime_metadata(setup_result: dict[str, Any]) -> dict[str, Any] | None:
+        """UI-relevant child identifiers for ``runtime_metadata``.
+
+        Only the identifiers are surfaced; the child workflow definition carried in
+        the setup result is never stored. Returns ``None`` when none are present.
+        """
         child_metadata = {
-            "child_execution_id": result_data.get("execution_id"),
-            "child_workflow_id": result_data.get("child_workflow_id"),
-            "child_workflow_name": result_data.get("child_workflow_name"),
-            "child_workflow_version": result_data.get("child_workflow_version"),
+            "child_execution_id": setup_result.get("execution_id"),
+            "child_workflow_id": setup_result.get("child_workflow_id"),
+            "child_workflow_name": setup_result.get("child_workflow_name"),
+            "child_workflow_version": setup_result.get("child_workflow_version"),
         }
         if all(value is None for value in child_metadata.values()):
             return None
         return child_metadata
+
+    @staticmethod
+    def _build_subworkflow_io(setup_result: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        """Reconstruct the node's ``input_data``/``output_data`` summaries.
+
+        Byte-for-byte the shapes the setup activity used to persist directly: the
+        reference-mode invocation summary and the four-field child summary (same
+        field names, ``.get()`` null behaviour, and ``or {}`` default). The large
+        workflow definition in the result is deliberately not included.
+        """
+        input_data = {
+            "execution_mode": "reference",
+            "workflow_id": setup_result.get("child_workflow_id"),
+            "workflow_name": setup_result.get("child_workflow_name"),
+            "trigger_node_id": setup_result.get("trigger_node_id"),
+            "input_parameters": setup_result.get("input_data") or {},
+        }
+        output_data = {
+            "workflow_id": setup_result.get("child_workflow_id"),
+            "workflow_name": setup_result.get("child_workflow_name"),
+            "child_workflow_version": setup_result.get("child_workflow_version"),
+            "child_execution_id": setup_result.get("execution_id"),
+        }
+        return {"input": input_data, "output": output_data}
 
     def _process_activity_failed(self, event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
         """Process ACTIVITY_TASK_FAILED event."""

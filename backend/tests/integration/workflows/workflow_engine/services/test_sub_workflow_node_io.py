@@ -1,16 +1,19 @@
-"""Persisted input/output for the parent sub-workflow node.
+"""Input/output contract for the parent sub-workflow node (C3: ASS-owned).
 
 A sub-workflow node runs via the setup activity plus a Temporal child workflow,
-so no ACTIVITY_TASK_COMPLETED event carries its input/output and its per-node
-``ActivityExecution`` row would otherwise stay with empty I/O. The setup
-activity therefore writes the node's own invocation metadata (which child, with
-what input, and the resulting child execution id) onto that upfront-created row
-so the execution view's Parameters/Output panes are populated. It must NOT embed
-the child's activities — those are fetched separately by the UI.
+so no ACTIVITY_TASK_COMPLETED event carries its input/output. As of C3 the setup
+activity no longer persists the node row directly; ActivitySyncService
+reconstructs the node's invocation summaries (which child, with what input, and
+the resulting child execution id) from the setup activity's result payload and
+writes them to the upfront-created row. The child's activities are never embedded
+— those are fetched separately by the UI.
 
 These tests drive ``SubWorkflowSetupActivity.run`` directly against the real,
-alembic-built PostgreSQL schema and assert the persisted row for both the fresh
-invocation and the resume (idempotent retry) path.
+alembic-built PostgreSQL schema to confirm (a) the activity no longer writes the
+node row, and (b) its result payload reconstructs the exact input/output
+summaries ActivitySyncService persists, for both the fresh invocation and the
+resume (idempotent retry) path. The ASS write itself is covered by the unit
+suite (``test_subworkflow_setup_sync.py``).
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.workflow_engine.activities.sub_workflow_setup_activity import SubWorkflowSetupActivity
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+from syntara.workflows.workflow_engine.services.activity_sync_event_processor import ActivitySyncEventProcessorMixin
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -129,15 +133,30 @@ async def _read_node_row(factory: async_sessionmaker[AsyncSession], parent_exec_
         ).first()
 
 
+def _assert_summaries_match(result: dict[str, Any], child_id: UUID) -> None:
+    """The activity result reconstructs the exact input/output summaries ASS persists."""
+    io = ActivitySyncEventProcessorMixin._build_subworkflow_io(result)
+    assert io["input"]["execution_mode"] == "reference"
+    assert io["input"]["workflow_id"] == str(child_id)
+    assert io["input"]["trigger_node_id"] == "child_trigger"
+    assert io["input"]["input_parameters"] == {"greeting": "hi"}
+
+    assert io["output"]["child_workflow_version"] == 1
+    assert io["output"]["workflow_id"] == str(child_id)
+    assert io["output"]["child_execution_id"]
+    # The child's activities are never duplicated into the parent node's output.
+    assert "child_activities" not in io["output"]
+
+
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_fresh_invocation_persists_node_io(
+async def test_fresh_invocation_reconstructs_node_io(
     test_db_session: AsyncSession,
     test_db_session_factory: async_sessionmaker[AsyncSession],
     test_user: User,
     test_project_id: UUID,
 ) -> None:
-    """A fresh sub-workflow invocation writes input + output metadata to the node row."""
+    """A fresh invocation leaves the row untouched; its result reconstructs the I/O summaries."""
     child_id = await _create_published_child(
         test_db_session, created_by=test_user.id, project_id=test_project_id, name="child-io"
     )
@@ -146,38 +165,28 @@ async def test_fresh_invocation_persists_node_io(
     )
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
-    await setup.run(_params(child_id, {"greeting": "hi"}), str(parent_exec), _PARENT_NODE_ID, str(test_user.id), 0)
+    result = await setup.run(
+        _params(child_id, {"greeting": "hi"}), str(parent_exec), _PARENT_NODE_ID, str(test_user.id), 0
+    )
 
+    # C3: persistence moved to ActivitySyncService — the activity no longer writes the row.
     row = await _read_node_row(test_db_session_factory, parent_exec)
     assert row is not None
-    assert row.input_data["execution_mode"] == "reference"
-    assert row.input_data["workflow_id"] == str(child_id)
-    assert row.input_data["trigger_node_id"] == "child_trigger"
-    assert row.input_data["input_parameters"] == {"greeting": "hi"}
+    assert row.input_data == {}
+    assert row.output_data is None
 
-    assert row.output_data is not None
-    assert row.output_data["child_workflow_version"] == 1
-    assert row.output_data["workflow_id"] == str(child_id)
-    assert row.output_data["child_execution_id"]
-    # The child's activities are never duplicated into the parent node's output.
-    assert "child_activities" not in row.output_data
-
-    # started_at is stamped at setup (the node emits no ACTIVITY_TASK_COMPLETED
-    # event), while completed_at stays None so the node's duration later spans the
-    # full invocation (through the child wait), not just this setup window.
-    assert row.started_at is not None
-    assert row.completed_at is None
+    _assert_summaries_match(result, child_id)
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_resume_invocation_persists_node_io(
+async def test_resume_invocation_reconstructs_node_io(
     test_db_session: AsyncSession,
     test_db_session_factory: async_sessionmaker[AsyncSession],
     test_user: User,
     test_project_id: UUID,
 ) -> None:
-    """An idempotent-retry (resume) invocation also repopulates the node row I/O."""
+    """An idempotent-retry (resume) invocation returns a result that reconstructs the same I/O."""
     child_id = await _create_published_child(
         test_db_session, created_by=test_user.id, project_id=test_project_id, name="child-io-resume"
     )
@@ -186,46 +195,32 @@ async def test_resume_invocation_persists_node_io(
     )
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
-    # First call creates the child execution and writes I/O.
+    # First call creates the child execution.
     await setup.run(_params(child_id, {"greeting": "hi"}), str(parent_exec), _PARENT_NODE_ID, str(test_user.id), 0)
 
-    # Simulate a stale row, then retry: the child already exists, so the resume path runs.
-    async with test_db_session_factory() as session:
-        row = (
-            await session.exec(
-                select(ActivityExecution).where(
-                    ActivityExecution.execution_id == parent_exec,
-                    ActivityExecution.activity_name == _PARENT_NODE_ID,
-                )
-            )
-        ).first()
-        assert row is not None
-        row.input_data = {}
-        row.output_data = None
-        session.add(row)
-        await session.commit()
+    # Retry: the child already exists, so the resume (pinned-version) path runs.
+    resume_result = await setup.run(
+        _params(child_id, {"greeting": "hi"}), str(parent_exec), _PARENT_NODE_ID, str(test_user.id), 0
+    )
 
-    await setup.run(_params(child_id, {"greeting": "hi"}), str(parent_exec), _PARENT_NODE_ID, str(test_user.id), 0)
-
+    # The activity still does not write the row; the resume result reconstructs the same summaries.
     row = await _read_node_row(test_db_session_factory, parent_exec)
     assert row is not None
-    assert row.input_data["execution_mode"] == "reference"
-    assert row.input_data["input_parameters"] == {"greeting": "hi"}
-    assert row.output_data is not None
-    assert row.output_data["child_execution_id"]
-    # started_at is set once; the resume path must not re-stamp it or null it out.
-    assert row.started_at is not None
+    assert row.input_data == {}
+    assert row.output_data is None
+
+    _assert_summaries_match(resume_result, child_id)
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_missing_node_row_is_noop(
+async def test_missing_node_row_does_not_block_setup(
     test_db_session: AsyncSession,
     test_db_session_factory: async_sessionmaker[AsyncSession],
     test_user: User,
     test_project_id: UUID,
 ) -> None:
-    """If the node row does not exist yet, persistence is a safe no-op (no crash)."""
+    """The setup activity succeeds and returns its result even when no node row exists."""
     child_id = await _create_published_child(
         test_db_session, created_by=test_user.id, project_id=test_project_id, name="child-io-missing"
     )
@@ -264,9 +259,9 @@ async def test_missing_node_row_is_noop(
 
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
-    # Should complete without error even though no node row exists to update.
     result = await setup.run(
         _params(child_id, {"greeting": "hi"}), str(parent_exec), _PARENT_NODE_ID, str(test_user.id), 0
     )
     assert result["child_workflow_version"] == 1
+    # No row was created, and the activity does not create one.
     assert await _read_node_row(test_db_session_factory, parent_exec) is None
