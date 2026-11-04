@@ -39,6 +39,7 @@ describe('useOpenShiftIntegrationExists', () => {
     })
 
     expect(result.current.exists).toBe(false)
+    expect(result.current.isUnavailable).toBe(false)
     expect(integrationsFetchClient.GET).toHaveBeenCalledWith('/integrations', {
       params: {
         query: expect.objectContaining({
@@ -58,14 +59,16 @@ describe('useOpenShiftIntegrationExists', () => {
     })
 
     expect(result.current.exists).toBe(true)
+    expect(result.current.isUnavailable).toBe(true)
   })
 
-  it('returns exists false initially while loading', () => {
+  it('returns exists false and isUnavailable while loading', () => {
     setupMock([])
     const { result } = renderHook(() => useOpenShiftIntegrationExists(), { wrapper })
 
     expect(result.current.exists).toBe(false)
     expect(result.current.isLoading).toBe(true)
+    expect(result.current.isUnavailable).toBe(true)
   })
 
   it('exposes isError when the query fails', async () => {
@@ -83,6 +86,7 @@ describe('useOpenShiftIntegrationExists', () => {
 
     expect(result.current.isError).toBe(true)
     expect(result.current.exists).toBe(false)
+    expect(result.current.isUnavailable).toBe(true)
   })
 
   it('exposes a working refetch function', async () => {

@@ -1,7 +1,7 @@
 /** Help popover body text for integration create/edit form fields. */
 
 export const INTEGRATION_TYPE_HELP =
-  'Registers a connection to an external service. MCP servers expose tools for agent workflows. LLM providers supply models. Automation platform integrations verify gateway connectivity.'
+  'Registers a connection to an external service. MCP servers expose tools for agent workflows. LLM providers supply models. Automation platform integrations verify gateway connectivity. Execution plane infrastructure integrations connect the execution plane to the systems where execution targets run.'
 
 /** Shown on the disabled Execution plane infrastructure type option when one already exists. */
 export const EXECUTION_PLANE_SINGLETON_HELP = 'Only one Execution plane infrastructure integration is supported.'

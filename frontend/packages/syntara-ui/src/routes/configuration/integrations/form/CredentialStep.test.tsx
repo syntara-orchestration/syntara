@@ -3,7 +3,7 @@ import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { SynForm } from '../../../../components/forms/SynForm'
@@ -11,26 +11,31 @@ import { SynForm } from '../../../../components/forms/SynForm'
 import { CredentialStep } from './CredentialStep'
 import type { IntegrationFormData } from './integrationFormSchema'
 
-vi.mock('../../../builder/components/CredentialSelector', () => ({
-  CredentialSelector: ({
-    label,
-    compatibleTypeNames,
-    labelHelp,
-    onChange,
-  }: {
-    label?: string
-    compatibleTypeNames?: string[]
-    labelHelp?: ReactNode
-    onChange?: (id: string | undefined) => void
-  }) => (
-    <div data-testid="credential-selector" data-compatible-types={compatibleTypeNames?.join(',')}>
-      {label}
-      {labelHelp && <span data-testid="label-help">{labelHelp}</span>}
-      <button data-testid="select-credential" onClick={() => onChange?.('cred-123')}>
-        Select
-      </button>
-    </div>
+const { mockCredentialSelector } = vi.hoisted(() => ({
+  mockCredentialSelector: vi.fn(
+    ({
+      label,
+      labelHelp,
+      onChange,
+    }: {
+      label?: string
+      compatibleTypeNames?: string[]
+      labelHelp?: ReactNode
+      onChange?: (id: string | undefined) => void
+    }) => (
+      <div data-testid="credential-selector">
+        {label}
+        {labelHelp && <span data-testid="label-help">{labelHelp}</span>}
+        <button data-testid="select-credential" onClick={() => onChange?.('cred-123')}>
+          Select
+        </button>
+      </div>
+    )
   ),
+}))
+
+vi.mock('../../../builder/components/CredentialSelector', () => ({
+  CredentialSelector: mockCredentialSelector,
 }))
 
 function TestWrapper(props: Omit<Parameters<typeof CredentialStep>[0], 'setValue'>) {
@@ -50,6 +55,10 @@ function TestWrapper(props: Omit<Parameters<typeof CredentialStep>[0], 'setValue
 }
 
 describe('CredentialStep', () => {
+  beforeEach(() => {
+    mockCredentialSelector.mockClear()
+  })
+
   it('renders heading and MCP description by default', () => {
     render(
       <TestWrapper
@@ -141,7 +150,10 @@ describe('CredentialStep', () => {
         />
       )
 
-      expect(screen.getByTestId('credential-selector')).toHaveAttribute('data-compatible-types', 'HTTP Bearer Token')
+      expect(mockCredentialSelector).toHaveBeenCalledWith(
+        expect.objectContaining({ compatibleTypeNames: ['HTTP Bearer Token'] }),
+        undefined
+      )
     })
 
     it('disables test connection when no credential is selected', () => {
@@ -329,7 +341,10 @@ describe('CredentialStep', () => {
         />
       )
 
-      expect(screen.getByTestId('credential-selector')).toHaveAttribute('data-compatible-types', 'LLM Provider')
+      expect(mockCredentialSelector).toHaveBeenCalledWith(
+        expect.objectContaining({ compatibleTypeNames: ['LLM Provider'] }),
+        undefined
+      )
     })
 
     it('passes HTTP Bearer Token credential types when integration type is mcp_server', () => {
@@ -343,7 +358,10 @@ describe('CredentialStep', () => {
         />
       )
 
-      expect(screen.getByTestId('credential-selector')).toHaveAttribute('data-compatible-types', 'HTTP Bearer Token')
+      expect(mockCredentialSelector).toHaveBeenCalledWith(
+        expect.objectContaining({ compatibleTypeNames: ['HTTP Bearer Token'] }),
+        undefined
+      )
     })
 
     it('shows required description text for LLM Provider', () => {

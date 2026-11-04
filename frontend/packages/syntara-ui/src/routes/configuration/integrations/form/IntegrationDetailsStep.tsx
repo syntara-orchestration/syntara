@@ -16,7 +16,7 @@ import {
   Title,
 } from '@patternfly/react-core'
 import { IntegrationTypeEnum } from '@syntara/contracts'
-import { type ReactElement, type ReactNode, type Ref, useCallback, useState } from 'react'
+import { type ReactElement, type ReactNode, type Ref, useCallback, useEffect, useState } from 'react'
 import { useWatch, type UseFormSetValue } from 'react-hook-form'
 
 import { SynFormField } from '../../../../components/forms/SynFormField'
@@ -112,6 +112,7 @@ function IntegrationTypeSelect({
   onSelect,
   renderToggle,
   isOpenShiftDisabled,
+  openShiftDisabledDescription,
 }: Readonly<{
   value: string
   isOpen: boolean
@@ -119,6 +120,8 @@ function IntegrationTypeSelect({
   onSelect: (value: string) => void
   renderToggle: (toggleRef: Ref<MenuToggleElement>) => ReactNode
   isOpenShiftDisabled: boolean
+  /** Shown only when the option is disabled because an EP integration already exists. */
+  openShiftDisabledDescription?: string
 }>) {
   return (
     <SynSelect
@@ -140,7 +143,7 @@ function IntegrationTypeSelect({
               key={opt.value}
               value={opt.value}
               isDisabled={isDisabled}
-              description={isDisabled ? EXECUTION_PLANE_SINGLETON_HELP : undefined}
+              description={isDisabled ? openShiftDisabledDescription : undefined}
             >
               {opt.label}
             </SelectOption>
@@ -307,10 +310,18 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
   })
   const [isTypeOpen, setIsTypeOpen] = useState(false)
   const [isProviderOpen, setIsProviderOpen] = useState(false)
-  const { exists: openShiftExists } = useOpenShiftIntegrationExists()
+  const { exists: openShiftExists, isUnavailable: isOpenShiftUnavailable } = useOpenShiftIntegrationExists()
 
   const isOpenShift = integrationType === IntegrationTypeEnum.OPENSHIFT
   const typeConfig = getTypeConfig(integrationType, providerHint)
+
+  // If a singleton appears after the user already selected EP (e.g. race with another
+  // create), clear the selection so a disabled menu option is not left as the value.
+  useEffect(() => {
+    if (isOpenShift && openShiftExists) {
+      onTypeChange(IntegrationTypeEnum.MCP_SERVER)
+    }
+  }, [isOpenShift, openShiftExists, onTypeChange])
 
   const renderTypeToggle = useCallback(
     (toggleRef: Ref<MenuToggleElement>) => (
@@ -339,12 +350,10 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
   return (
     <>
       <Title headingLevel="h2" size="lg" className={styles.stepTitle}>
-        {isOpenShift ? 'Cluster details' : 'Integration details'}
+        Integration details
       </Title>
       <Content component={ContentVariants.p} className={styles.stepDescription}>
-        {isOpenShift
-          ? 'The customer provisions the OpenShift namespace and service account. An admin then configures this integration and an execution target.'
-          : 'Select an integration type and provide connection details.'}
+        Select an integration type and provide connection details.
       </Content>
       <Form className={styles.stepForm}>
         <SynFormField<IntegrationFormData, 'integration_type'>
@@ -359,11 +368,12 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
               value={field.value}
               isOpen={isTypeOpen}
               onOpenChange={setIsTypeOpen}
-              isOpenShiftDisabled={openShiftExists}
+              isOpenShiftDisabled={isOpenShiftUnavailable}
+              openShiftDisabledDescription={openShiftExists ? EXECUTION_PLANE_SINGLETON_HELP : undefined}
               onSelect={(value) => {
                 const validType = INTEGRATION_TYPE_OPTIONS.find((opt) => opt.value === value)
                 if (!validType) return
-                if (validType.value === IntegrationTypeEnum.OPENSHIFT && openShiftExists) return
+                if (validType.value === IntegrationTypeEnum.OPENSHIFT && isOpenShiftUnavailable) return
                 onTypeChange(validType.value)
                 setIsTypeOpen(false)
               }}

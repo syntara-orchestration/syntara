@@ -53,8 +53,10 @@ vi.mock('./useOpenShiftIntegrationExists', () => ({
     exists: false,
     isLoading: false,
     isError: false,
+    isUnavailable: false,
     refetch: vi.fn(),
   }),
+  fetchOpenShiftIntegrationExists: vi.fn().mockResolvedValue(false),
   OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY: ['openshift-integration-exists'],
 }))
 
