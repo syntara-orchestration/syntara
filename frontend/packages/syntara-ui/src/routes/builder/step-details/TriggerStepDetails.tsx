@@ -4,16 +4,21 @@ import {
   ScheduleTypeEnum,
   TriggerTypeEnum,
   WEBHOOK_TRIGGER_TYPES,
+  type FormDefinition,
 } from '@syntara/contracts'
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 
+import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import type { Trigger } from '../../../stores/workflowStoreTypes'
 import { parseJsonSchema } from '../../../utils/jsonSafeParse'
 import { isValidWebhookPath, normalizeWebhookPath } from '../../../utils/webhookPath'
-import type { TriggerFormData } from '../step-forms/TriggerStepForm'
 import { TriggerStepForm } from '../step-forms/TriggerStepForm'
+import type { TriggerFormData } from '../stepFormTypes'
+import { isStoredFormDefinitionValid } from '../utils/clearNodeValidationErrors'
+import { buildFormTriggerActivityParameters } from '../utils/formTriggerActivityParameters'
+import { readDraftFormDefinitionFromParameters, readStoredFormDefinition } from '../utils/readStoredFormDefinition'
 
 /**
  * Deep equality check for triggers to prevent marking workflow dirty when no changes are made.
@@ -190,7 +195,94 @@ function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: stri
       TriggerTypeEnum.EDA_TRIGGER
     )
   }
+  if (data.triggerType === TriggerTypeEnum.FORM_TRIGGER) {
+    return {
+      id: trigger.id ?? 'form',
+      type: TriggerTypeEnum.FORM_TRIGGER,
+      name: name ?? 'Form trigger',
+      parameters: buildFormTriggerActivityParameters({
+        form_definition: data.form_definition ?? createEmptyFormDefinition(),
+        message: data.message,
+        submit_label: data.submit_label,
+        success_message: data.success_message,
+        css_override: data.css_override,
+      }),
+    }
+  }
   throw new Error('Invalid trigger type')
+}
+
+function mapScheduledTriggerInitialData(trigger: Trigger): TriggerFormData {
+  const scheduleType = (trigger.parameters?.schedule_type as string) ?? ScheduleTypeEnum.INTERVAL
+  const timezone = trigger.parameters?.timezone as string | undefined
+  const missedSchedulePolicy = trigger.parameters?.missed_schedule_policy as MissedSchedulePolicy | undefined
+  const base = {
+    name: trigger.name,
+    triggerType: TriggerTypeEnum.SCHEDULED,
+    timezone,
+    missedSchedulePolicy,
+  }
+
+  if (scheduleType === ScheduleTypeEnum.CRON) {
+    return {
+      ...base,
+      scheduleType: ScheduleTypeEnum.CRON,
+      cron: trigger.parameters?.cron as string | undefined,
+    }
+  }
+
+  return {
+    ...base,
+    scheduleType: ScheduleTypeEnum.INTERVAL,
+    interval: trigger.parameters?.interval as string | undefined,
+  }
+}
+
+function mapFormTriggerInitialData(trigger: Trigger): TriggerFormData {
+  const params = trigger.parameters ?? {}
+  return {
+    name: trigger.name,
+    triggerType: TriggerTypeEnum.FORM_TRIGGER,
+    form_definition:
+      readDraftFormDefinitionFromParameters(params) ?? readStoredFormDefinition(params) ?? createEmptyFormDefinition(),
+    message: (params.message as string | undefined) ?? '',
+    submit_label: (params.submit_label as string | undefined) ?? '',
+    success_message: (params.success_message as string | undefined) ?? '',
+    css_override: (params.css_override as string | undefined) ?? '',
+  }
+}
+
+function mapTriggerToInitialFormData(trigger: Trigger): TriggerFormData {
+  if (trigger.type === TriggerTypeEnum.MANUAL_TRIGGER) {
+    return {
+      name: trigger.name,
+      triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
+      inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
+    }
+  }
+
+  if (trigger.type === TriggerTypeEnum.SCHEDULED) {
+    return mapScheduledTriggerInitialData(trigger)
+  }
+
+  if (WEBHOOK_TRIGGER_TYPES.has(trigger.type)) {
+    return {
+      name: trigger.name,
+      triggerType: trigger.type,
+      webhookPath: (trigger.parameters?.webhook_path as string) ?? '',
+      inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
+      authorizedServiceAccountIds: (trigger.parameters?.authorized_service_account_ids as string[] | undefined) ?? [],
+    }
+  }
+
+  if (trigger.type === TriggerTypeEnum.FORM_TRIGGER) {
+    return mapFormTriggerInitialData(trigger)
+  }
+
+  return {
+    name: trigger.name,
+    triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
+  }
 }
 
 type TriggerStepDetailsProps = Readonly<{
@@ -198,67 +290,35 @@ type TriggerStepDetailsProps = Readonly<{
   triggerIndex: number
   onClose: () => void
   onHeaderContentChange?: (content: ReactNode | null) => void
+  serverValidationErrors?: ReadonlyArray<{ fieldPath?: string | null; message: string }>
+  onFormDefinitionCommitted?: (stepId: string, formDefinition: FormDefinition) => void
 }>
 
-export function TriggerStepDetails({ trigger, triggerIndex, onClose, onHeaderContentChange }: TriggerStepDetailsProps) {
+export function TriggerStepDetails({
+  trigger,
+  triggerIndex,
+  onClose,
+  onHeaderContentChange,
+  serverValidationErrors,
+  onFormDefinitionCommitted,
+}: TriggerStepDetailsProps) {
   const { showError } = useAlerts()
   // Use action accessor - component won't re-render when store state changes
   const { updateTrigger } = useWorkflowStoreActions()
 
-  // Extract initial data from trigger — memoized to avoid new object refs on re-render
-  const initialData = useMemo((): TriggerFormData => {
-    if (trigger.type === TriggerTypeEnum.MANUAL_TRIGGER) {
-      return {
-        name: trigger.name,
-        triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
-        inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
-      }
+  const initialData = useMemo(() => mapTriggerToInitialFormData(trigger), [trigger])
+
+  useEffect(() => {
+    if (trigger.type !== TriggerTypeEnum.FORM_TRIGGER) {
+      return
     }
-
-    if (trigger.type === TriggerTypeEnum.SCHEDULED) {
-      const scheduleType = (trigger.parameters?.schedule_type as string) ?? ScheduleTypeEnum.INTERVAL
-      const timezone = trigger.parameters?.timezone as string | undefined
-      const missedSchedulePolicy = trigger.parameters?.missed_schedule_policy as MissedSchedulePolicy | undefined
-
-      if (scheduleType === ScheduleTypeEnum.INTERVAL) {
-        return {
-          name: trigger.name,
-          triggerType: TriggerTypeEnum.SCHEDULED,
-          scheduleType: ScheduleTypeEnum.INTERVAL,
-          interval: trigger.parameters?.interval as string | undefined,
-          timezone,
-          missedSchedulePolicy,
-        }
-      }
-
-      if (scheduleType === ScheduleTypeEnum.CRON) {
-        return {
-          name: trigger.name,
-          triggerType: TriggerTypeEnum.SCHEDULED,
-          scheduleType: ScheduleTypeEnum.CRON,
-          cron: trigger.parameters?.cron as string | undefined,
-          timezone,
-          missedSchedulePolicy,
-        }
-      }
+    const definition = initialData.form_definition
+    if (!definition || !isStoredFormDefinitionValid(definition)) {
+      return
     }
-
-    if (WEBHOOK_TRIGGER_TYPES.has(trigger.type)) {
-      return {
-        name: trigger.name,
-        triggerType: trigger.type,
-        webhookPath: (trigger.parameters?.webhook_path as string) ?? '',
-        inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
-        authorizedServiceAccountIds: (trigger.parameters?.authorized_service_account_ids as string[] | undefined) ?? [],
-      }
-    }
-
-    // Default fallback
-    return {
-      name: trigger.name,
-      triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
-    }
-  }, [trigger])
+    // Clear stale verify findings when reopening a trigger whose saved definition is already valid.
+    onFormDefinitionCommitted?.(trigger.id, definition)
+  }, [initialData.form_definition, onFormDefinitionCommitted, trigger.id, trigger.type])
 
   const handleSubmit = (data: TriggerFormData) => {
     try {
@@ -266,6 +326,10 @@ export function TriggerStepDetails({ trigger, triggerIndex, onClose, onHeaderCon
       const updatedTrigger = buildUpdatedTrigger(data, trigger, name)
 
       // Only update if the trigger actually changed
+      if (data.triggerType === TriggerTypeEnum.FORM_TRIGGER && data.form_definition) {
+        onFormDefinitionCommitted?.(trigger.id, data.form_definition)
+      }
+
       if (!triggersEqual(trigger, updatedTrigger)) {
         updateTrigger(triggerIndex, updatedTrigger)
       }
@@ -278,7 +342,17 @@ export function TriggerStepDetails({ trigger, triggerIndex, onClose, onHeaderCon
     }
   }
 
+  const formServerErrors = serverValidationErrors?.map((err) => ({
+    fieldPath: err.fieldPath,
+    message: err.message,
+  }))
+
   return (
-    <TriggerStepForm initialData={initialData} onSubmit={handleSubmit} onHeaderContentChange={onHeaderContentChange} />
+    <TriggerStepForm
+      initialData={initialData}
+      onSubmit={handleSubmit}
+      onHeaderContentChange={onHeaderContentChange}
+      serverValidationErrors={formServerErrors}
+    />
   )
 }

@@ -530,7 +530,7 @@ describe('filterUtils', () => {
 
     it('should skip reserved pagination and sort params', () => {
       const searchParams = new URLSearchParams(
-        'sort=-created_at&page=2&perPage=20&cursor=abc&status=failed&history=open'
+        'sort=-created_at&page=2&perPage=20&cursor=abc&status=failed&history=open&form_prompt=fp-1&approval=ap-1'
       )
 
       const result = parseFiltersFromUrl(searchParams)

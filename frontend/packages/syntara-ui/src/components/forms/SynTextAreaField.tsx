@@ -46,6 +46,10 @@ export type SynTextAreaFieldProps<
   isDisabled?: boolean
   /** Accessible name when the visible `FormGroup` label is not exposed to assistive tech. */
   ariaLabel?: string
+  /** Called after the field value changes (user input). */
+  onValueChange?: () => void
+  /** Applied to the PatternFly `TextArea` root (the resizable form-control wrapper in PF6). */
+  className?: string
 }
 
 /**
@@ -82,6 +86,8 @@ export function SynTextAreaField<
   maxLength,
   isDisabled,
   ariaLabel,
+  onValueChange,
+  className,
 }: Readonly<SynTextAreaFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
 
@@ -97,11 +103,15 @@ export function SynTextAreaField<
     >
       {({ field, fieldState }) => (
         <TextArea
+          className={className}
           id={resolvedFieldId}
           placeholder={placeholder}
           validated={fieldState.error ? 'error' : 'default'}
           value={field.value ?? ''}
-          onChange={field.onChange}
+          onChange={(_event, value) => {
+            field.onChange(value)
+            onValueChange?.()
+          }}
           onBlur={field.onBlur}
           name={field.name}
           rows={rows}

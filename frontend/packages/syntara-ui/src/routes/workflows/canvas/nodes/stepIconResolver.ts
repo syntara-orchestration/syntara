@@ -36,6 +36,24 @@ export function getTaskIconDescriptor(taskData: TaskActivity): IconDescriptor {
   return { icon: executorMeta?.icon, id: iconId }
 }
 
+function getTriggerIconDescriptor(triggerType: string | undefined): IconDescriptor {
+  if (triggerType === undefined) {
+    return { icon: stepMetadata.trigger.icon, id: RegistryStepId.TRIGGER_MANUAL }
+  }
+  switch (triggerType) {
+    case TriggerTypeEnum.SCHEDULED:
+      return { icon: stepMetadata.scheduledTrigger.icon, id: RegistryStepId.TRIGGER_SCHEDULED }
+    case TriggerTypeEnum.WEBHOOK_TRIGGER:
+      return { icon: stepMetadata.webhookTrigger.icon, id: RegistryStepId.TRIGGER_WEBHOOK }
+    case TriggerTypeEnum.EDA_TRIGGER:
+      return { icon: stepMetadata.edaTrigger.icon, id: RegistryStepId.TRIGGER_EDA }
+    case TriggerTypeEnum.FORM_TRIGGER:
+      return { icon: stepMetadata.formTrigger.icon, id: RegistryStepId.TRIGGER_FORM }
+    default:
+      return { icon: stepMetadata.trigger.icon, id: RegistryStepId.TRIGGER_MANUAL }
+  }
+}
+
 export function getCanvasStepIconDescriptor(
   node: Pick<Node<NodeType['data']>, 'id' | 'type' | 'data'>,
   currentWorkflow?: { triggers?: Array<{ type?: string }> } | null
@@ -44,16 +62,7 @@ export function getCanvasStepIconDescriptor(
     const triggerIndex = parseTriggerIndex(node.id) ?? 0
     const triggerType =
       currentWorkflow?.triggers?.[triggerIndex]?.type ?? (node.data as { triggerType?: string }).triggerType
-    if (triggerType === TriggerTypeEnum.SCHEDULED) {
-      return { icon: stepMetadata.scheduledTrigger.icon, id: RegistryStepId.TRIGGER_SCHEDULED }
-    }
-    if (triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER) {
-      return { icon: stepMetadata.webhookTrigger.icon, id: RegistryStepId.TRIGGER_WEBHOOK }
-    }
-    if (triggerType === TriggerTypeEnum.EDA_TRIGGER) {
-      return { icon: stepMetadata.edaTrigger.icon, id: RegistryStepId.TRIGGER_EDA }
-    }
-    return { icon: stepMetadata.trigger.icon, id: RegistryStepId.TRIGGER_MANUAL }
+    return getTriggerIconDescriptor(triggerType)
   }
 
   if (node.type === 'condition') {
@@ -74,6 +83,10 @@ export function getCanvasStepIconDescriptor(
 
   if (node.type === 'approval') {
     return { icon: executorMetadata.approval.icon, id: RegistryStepId.APPROVAL }
+  }
+
+  if (node.type === 'form_prompt') {
+    return { icon: stepMetadata.form_prompt.icon, id: RegistryStepId.FORM_PROMPT }
   }
 
   if (node.type === 'wait') {

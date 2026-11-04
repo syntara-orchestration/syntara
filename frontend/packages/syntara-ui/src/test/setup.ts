@@ -11,7 +11,7 @@ import { afterEach, beforeAll, beforeEach, afterAll, expect, vi } from 'vitest'
 // while waiting for transitionend; happy-dom never fires that event, so synchronous
 // "modal is gone" assertions fail unless animations are disabled in tests.
 if (Modal.defaultProps) {
-  Modal.defaultProps.hasAnimations = false
+  ;(Modal.defaultProps as { hasAnimations?: boolean }).hasAnimations = false
 }
 
 const listeners = new Set<() => void>()

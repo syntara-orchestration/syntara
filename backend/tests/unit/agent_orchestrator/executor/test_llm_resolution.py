@@ -99,14 +99,13 @@ class TestResolveLlmModelAndIntegration:
 
     @pytest.mark.asyncio
     async def test_happy_path_no_base_url(self) -> None:
-        """Test for AAP-95495.
+        """OpenAI provider with no stored base_url must use provider default.
 
-        AAP-95495: OpenAI provider with no stored base_url must resolve to
+        When base_url is missing on the integration, resolution must use
         provider.default_base_url (https://api.openai.com/v1), the same way
         LLMProviderAdapter._resolve_base_url() does for validate/discover.
-        Returning None here makes the caller fall back to
-        settings.openrouter_base_url, silently sending the OpenAI API key to
-        openrouter.ai instead.
+        Returning None makes the caller fall back to settings.openrouter_base_url,
+        which can send an OpenAI API key to openrouter.ai instead.
         """
         executor, session = _make_executor()
         mock_model, mock_integration = _mock_model_and_integration(base_url=None)

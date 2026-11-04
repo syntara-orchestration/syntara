@@ -29,6 +29,10 @@ const BRANCHING_HANDLES: Record<string, BranchHandle[]> = {
     { handle: EdgeHandleEnum.APPROVED, label: 'On Approved' },
     { handle: EdgeHandleEnum.REJECTED, label: 'On Rejected' },
   ],
+  [FlowNodeType.FORM_PROMPT]: [
+    { handle: EdgeHandleEnum.SUBMITTED, label: 'Submitted' },
+    { handle: EdgeHandleEnum.FALLBACK, label: 'Fallback' },
+  ],
   [FlowNodeType.LOOP]: [
     { handle: EdgeHandleEnum.LOOP, label: 'In loop' },
     { handle: EdgeHandleEnum.DONE, label: 'On done' },

@@ -5,6 +5,7 @@ import { FlowNodeType } from '../../../../constants'
 import { type ApprovalNode, ApprovalStepComponent } from './ApprovalNode'
 import { type ConditionNode, ConditionStepComponent } from './ConditionNode'
 import { type ConvergeNode, ConvergeStepComponent } from './ConvergeNode'
+import { type FormPromptNode, FormPromptNodeComponent } from './FormPromptNode'
 import { type GenericNode, GenericStepComponent } from './GenericNode'
 import { type LoopNode, LoopStepComponent } from './LoopNode'
 import { type SwitchNode, SwitchStepComponent } from './SwitchNode'
@@ -21,6 +22,7 @@ export type NodeType =
   | TaskNode
   | TaskReversedNode
   | ApprovalNode
+  | FormPromptNode
   | ConditionNode
   | ConvergeNode
   | LoopNode
@@ -34,6 +36,7 @@ export const nodeTypes: NodeTypes = {
   [FlowNodeType.TASK]: TaskStepComponent,
   [FlowNodeType.TASK_REVERSED]: TaskReversedStepComponent,
   [FlowNodeType.APPROVAL]: ApprovalStepComponent,
+  [FlowNodeType.FORM_PROMPT]: FormPromptNodeComponent,
   [FlowNodeType.CONDITION]: ConditionStepComponent,
   [FlowNodeType.CONVERGE]: ConvergeStepComponent,
   [FlowNodeType.LOOP]: LoopStepComponent,

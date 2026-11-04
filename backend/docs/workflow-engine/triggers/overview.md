@@ -1,8 +1,8 @@
 # Trigger System Architecture
 
-Triggers are the entry points that start workflow executions. Every workflow has at least one trigger node, and the trigger type determines how the workflow is activated — by a user, an HTTP request, or a schedule.
+Triggers are the entry points that start workflow executions. Every workflow has at least one trigger node, and the trigger type determines how the workflow is activated — by a user, an HTTP request, a form submission, or a schedule.
 
-All four trigger types (manual, webhook, EDA, scheduled) converge on the same execution path once they enter the workflow engine. This document explains that shared architecture. Per-trigger-type details are in the companion docs:
+Trigger types converge on the same execution path once they enter the workflow engine. This document explains that shared architecture. Per-trigger-type details are in the companion docs:
 
 - [Manual Trigger](manual-trigger.md) — user-initiated via API
 - [Webhook Triggers](webhook-triggers.md) — HTTP webhooks and EDA events
@@ -15,7 +15,7 @@ Three distinct entry paths converge at the same Temporal workflow:
 ```mermaid
 flowchart TD
     subgraph Entry Points
-        A["User: POST /api/v1/executions"]
+        A["User: POST /api/v1/executions (manual or form)"]
         B["External System: POST /api/v1/webhooks/{webhook_path}"]
         C["Temporal Schedule fires"]
     end
@@ -35,7 +35,7 @@ flowchart TD
     NS --> NEXT["Schedule successor nodes"]
 ```
 
-**Manual and webhook/EDA paths** both flow through `ExecutionService.create_execution()`, which resolves the trigger node, validates input against the trigger's `input_schema`, starts the Temporal workflow, and then creates the `Execution` database record.
+**Manual, Form, and webhook/EDA paths** flow through `ExecutionService.create_execution()`, which resolves the selected trigger, validates its input according to that trigger's contract, starts the Temporal workflow, and then creates the `Execution` database record. Manual, Webhook, and EDA triggers can use `input_schema`; Form Triggers use `form_definition` and form submission validation.
 
 **Scheduled triggers** bypass `ExecutionService` because there's no incoming request — the Temporal Schedule directly starts a launcher workflow (`ScheduledWorkflowLauncher`) whose activity replicates the same create-execution logic.
 
@@ -45,9 +45,11 @@ Once inside the Temporal workflow, all triggers follow the same path through `_e
 
 ### Validation happens before Temporal
 
-All input validation (JSON Schema, payload size checks) runs in the API/router layer *before* the Temporal workflow starts. The trigger activities themselves are pure pass-throughs — they receive pre-validated input and apply output mapping. This keeps activities simple and idempotent.
+Input validation and payload-size checks run before Temporal starts. Manual, Webhook, and EDA triggers may validate incoming JSON with `input_schema` (JSON Schema Draft-07); Form Triggers instead validate `input_data` against `parameters.form_definition` using the shared form validator.
 
-Any trigger type can define an `input_schema` (JSON Schema Draft-07) to validate incoming data. The schema validator (in `json_schema_validation.py`) rejects schemas containing `$ref` references (SSRF prevention — arbitrary URLs could be fetched during validation) and ReDoS-vulnerable regex patterns in `pattern` fields.
+The schema validator in `json_schema_validation.py` rejects schemas containing `$ref` references (SSRF prevention — arbitrary URLs could be fetched during validation) and ReDoS-vulnerable regex patterns in `pattern` fields.
+
+The trigger activities themselves remain pass-throughs — they receive validated input and apply output mapping. This keeps activities simple and idempotent.
 
 ### Two-phase execution creation
 

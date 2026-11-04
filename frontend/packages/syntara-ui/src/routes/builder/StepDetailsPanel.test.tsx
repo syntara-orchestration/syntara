@@ -666,6 +666,40 @@ describe('StepDetailsPanel', () => {
     expect(screen.getByText('Job Template Form')).toBeInTheDocument()
   })
 
+  it('resolves approval subtype form id under human tasks in add mode', async () => {
+    const user = userEvent.setup()
+    const mockOnSubmit = vi.fn((_data, onSuccess: (nodeId?: string) => void) => onSuccess('new-approval'))
+    const form = document.createElement('form')
+    form.id = 'approval-step-form'
+    const requestSubmit = vi.spyOn(form, 'requestSubmit')
+    document.body.append(form)
+
+    mockStepRegistryGet.mockReturnValue({
+      id: 'human-tasks',
+      label: 'Human tasks',
+      icon: () => <div>HumanTasksIcon</div>,
+      category: 'human_tasks',
+      subtypes: [
+        {
+          id: 'approval',
+          label: 'Approval',
+          formComponent: () => <form id="approval-step-form" data-testid="approval-form" />,
+        },
+      ],
+      formComponent: () => <div>Human tasks form</div>,
+      onSubmit: mockOnSubmit,
+    })
+
+    render(
+      <StepDetailsPanel mode="add" stepTypeId="human-tasks" stepSubtypeId="approval" onClose={mockOnClose} />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+
+    expect(requestSubmit).toHaveBeenCalled()
+    form.remove()
+  })
+
   it('renders empty parameters when selected node is not found in add mode', () => {
     mockStepRegistryGet.mockReturnValue(null)
 

@@ -6,6 +6,7 @@ import type {
   CredentialsAPI,
   ExecutionsAPI,
   FilesAPI,
+  FormsAPI,
   IdentityProvidersAPI,
   IntegrationsAPI,
   SettingsAPI,
@@ -129,6 +130,12 @@ const approvalsFetchClient = createFetchClient<ApprovalsAPI.paths>({ baseUrl: '/
 approvalsFetchClient.use(interfaceTagMiddleware)
 approvalsFetchClient.use(authMiddleware)
 export const approvalsClient = createClient(approvalsFetchClient)
+
+const formsFetchClient = createFetchClient<FormsAPI.paths>({ baseUrl: '/api/v1/' })
+formsFetchClient.use(interfaceTagMiddleware)
+formsFetchClient.use(authMiddleware)
+export { formsFetchClient }
+export const formsClient = createClient(formsFetchClient)
 
 const settingsFetchClient = createFetchClient<SettingsAPI.paths>({ baseUrl: '/api/v1/' })
 settingsFetchClient.use(interfaceTagMiddleware)

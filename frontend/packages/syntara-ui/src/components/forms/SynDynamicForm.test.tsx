@@ -1,0 +1,489 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
+import { describe, expect, it, vi } from 'vitest'
+import { axe } from 'vitest-axe'
+
+import { FormFieldTypeEnum, parseFormDefinition } from '../../forms'
+
+import { invalidDynamicFormDefinition, sampleDynamicFormDefinition } from './dynamicForm/synDynamicFormFixtures'
+import { SynDynamicForm } from './SynDynamicForm'
+
+const staticPriorityOptions = {
+  source: 'static' as const,
+  values: [
+    { display_label: 'Low', value: 'low' },
+    { display_label: 'High', value: 'high' },
+  ],
+}
+const NUMBER_FIELD_LABEL = 'Count'
+
+function renderWithQueryClient(ui: ReactNode) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  const view = render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+  return {
+    ...view,
+    rerender: (next: ReactNode) =>
+      view.rerender(<QueryClientProvider client={queryClient}>{next}</QueryClientProvider>),
+  }
+}
+
+describe('SynDynamicForm', () => {
+  it('renders fields from the definition', () => {
+    renderWithQueryClient(
+      <SynDynamicForm definition={sampleDynamicFormDefinition} onSubmit={vi.fn()} hideSubmitButton />
+    )
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Email' })).toBeInTheDocument()
+    const subscribe = screen.getByRole('checkbox', { name: 'Subscribe to updates' })
+    expect(subscribe).toBeInTheDocument()
+    expect(subscribe).toBeRequired()
+  })
+
+  it('shows SynErrorState for invalid definition defaults', () => {
+    renderWithQueryClient(<SynDynamicForm definition={invalidDynamicFormDefinition} onSubmit={vi.fn()} />)
+
+    expect(screen.getByRole('heading', { name: 'Invalid form configuration' })).toBeInTheDocument()
+  })
+
+  it('submits coerced values when valid', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const minimal = parseFormDefinition({
+      fields: [
+        { type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name', required: true },
+        { type: FormFieldTypeEnum.CHECKBOX, value_name: 'agree', label: 'Agree', required: true },
+      ],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={minimal} onSubmit={onSubmit} submitLabel="Send" />)
+
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Ada')
+    await user.click(screen.getByRole('checkbox', { name: 'Agree' }))
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ name: 'Ada', agree: true })
+    })
+  })
+
+  it('shows field errors when submission is invalid', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const onValidationError = vi.fn()
+
+    const minimal = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name', required: true }],
+    })
+
+    renderWithQueryClient(
+      <SynDynamicForm
+        definition={minimal}
+        onSubmit={onSubmit}
+        onValidationError={onValidationError}
+        submitLabel="Send"
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).not.toHaveBeenCalled()
+      expect(onValidationError).toHaveBeenCalled()
+      expect(screen.getByText('This field is required')).toBeInTheDocument()
+    })
+  })
+
+  it('rejects a cleared required field instead of restoring its default', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [
+        { type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name', required: true, default: 'Prefilled' },
+      ],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const name = screen.getByRole('textbox', { name: 'Name' })
+    expect(name).toHaveValue('Prefilled')
+
+    await user.clear(name)
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).not.toHaveBeenCalled()
+      expect(screen.getByText('This field is required')).toBeInTheDocument()
+    })
+  })
+
+  it('submits number, date, textarea, and static select fields', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [
+        { type: FormFieldTypeEnum.NUMBER, value_name: 'count', label: 'Count', default: 3, required: true },
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'start',
+          label: 'Start',
+          default: { date: '2026-02-01' },
+          required: true,
+        },
+        { type: FormFieldTypeEnum.TEXTAREA, value_name: 'notes', label: 'Notes', required: true },
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'priority',
+          label: 'Priority',
+          required: true,
+          options: staticPriorityOptions,
+        },
+      ],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    await user.type(screen.getByRole('textbox', { name: 'Notes' }), 'hello')
+
+    await user.click(screen.getByRole('button', { name: 'Priority' }))
+    await user.click(await screen.findByRole('option', { name: 'High' }))
+
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        count: 3,
+        start: { date: '2026-02-01' },
+        notes: 'hello',
+        priority: 'high',
+      })
+    })
+  })
+
+  it('keeps a number field empty after clearing and blurring it', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [
+        { type: FormFieldTypeEnum.NUMBER, value_name: 'count', label: 'Count', default: 5 },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name', required: true },
+      ],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const count = screen.getByRole('spinbutton', { name: 'Count' })
+    expect(count).toHaveValue(5)
+
+    await user.clear(count)
+    expect(count).toHaveValue(null)
+
+    await user.type(count, '5')
+    expect(count).toHaveValue(5)
+
+    await user.clear(count)
+    await user.tab()
+    expect(count).toHaveValue(null)
+
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Ada')
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ count: null, name: 'Ada' })
+    })
+  })
+
+  it.each([
+    { buttonLabel: 'Plus', expectedValue: 1 },
+    { buttonLabel: 'Minus', expectedValue: -1 },
+  ])('applies $buttonLabel to an empty number field from zero', async ({ buttonLabel, expectedValue }) => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.NUMBER, value_name: 'count', label: NUMBER_FIELD_LABEL }],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const count = screen.getByRole('spinbutton', { name: NUMBER_FIELD_LABEL })
+    expect(count).toHaveValue(null)
+
+    await user.click(screen.getByRole('button', { name: buttonLabel }))
+    expect(count).toHaveValue(expectedValue)
+
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ count: expectedValue })
+    })
+  })
+
+  it('accepts a negative number typed into a number field', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.NUMBER, value_name: 'offset', label: 'Offset', default: 0 }],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={onSubmit} submitLabel="Send" />)
+
+    const offset = screen.getByRole('spinbutton', { name: 'Offset' })
+    await user.clear(offset)
+    await user.type(offset, '-12')
+    expect(offset).toHaveValue(-12)
+
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ offset: -12 })
+    })
+  })
+
+  it('preserves other date components when a component changes', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'schedule',
+          label: 'Schedule',
+          include_date: false,
+          include_time: true,
+          include_timezone: true,
+        },
+      ],
+    })
+
+    renderWithQueryClient(
+      <SynDynamicForm
+        definition={definition}
+        initialValues={{ schedule: { time: '08:30', timezone: 'UTC' } }}
+        onSubmit={onSubmit}
+      />
+    )
+
+    await user.click(screen.getByRole('textbox', { name: 'Schedule time zone' }))
+    await user.type(screen.getByRole('textbox', { name: 'Schedule time zone' }), 'Europe/Paris')
+    await user.click(await screen.findByRole('option', { name: 'Europe/Paris' }))
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ schedule: { time: '08:30', timezone: 'Europe/Paris' } })
+    })
+  })
+
+  it('clears a date value when its only included component is emptied', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'zone',
+          label: 'Zone',
+          include_date: false,
+          include_time: false,
+          include_timezone: true,
+        },
+      ],
+    })
+
+    renderWithQueryClient(
+      <SynDynamicForm definition={definition} initialValues={{ zone: { timezone: 'UTC' } }} onSubmit={onSubmit} />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Clear time zone' }))
+    await user.click(screen.getByRole('button', { name: 'Submit' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ zone: '' })
+    })
+  })
+
+  it('submits multi-select values from initialValues', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.MULTI_SELECT,
+          value_name: 'tags',
+          label: 'Tags',
+          required: true,
+          options: staticPriorityOptions,
+        },
+      ],
+    })
+
+    renderWithQueryClient(
+      <SynDynamicForm
+        definition={definition}
+        initialValues={{ tags: ['low', 'high'] }}
+        onSubmit={onSubmit}
+        submitLabel="Send"
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ tags: ['low', 'high'] })
+    })
+  })
+
+  it('loads dynamic options via TanStack Query', async () => {
+    const user = userEvent.setup()
+    const resolveDynamicOptions = vi.fn().mockResolvedValue([
+      { label: 'US East', value: 'use1' },
+      { label: 'EU West', value: 'euw1' },
+    ])
+
+    const definition = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: { source: 'dynamic', expression: '${nodes.x}', label_key: 'label', value_key: 'value' },
+        },
+      ],
+    })
+
+    renderWithQueryClient(
+      <SynDynamicForm
+        definition={definition}
+        onSubmit={vi.fn()}
+        resolveDynamicOptions={resolveDynamicOptions}
+        hideSubmitButton
+      />
+    )
+
+    await waitFor(() => {
+      expect(resolveDynamicOptions).toHaveBeenCalled()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Region' }))
+    expect(await screen.findByRole('option', { name: 'US East' })).toBeInTheDocument()
+  })
+
+  it('maps dynamic option records using label_key and value_key', async () => {
+    const user = userEvent.setup()
+    const resolveDynamicOptions = vi.fn().mockResolvedValue([{ name: 'US East', id: 'use1' }])
+
+    const definition = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: {
+            source: 'dynamic',
+            expression: '${nodes.upstream.regions}',
+            label_key: 'name',
+            value_key: 'id',
+          },
+        },
+      ],
+    })
+
+    renderWithQueryClient(
+      <SynDynamicForm
+        definition={definition}
+        onSubmit={vi.fn()}
+        resolveDynamicOptions={resolveDynamicOptions}
+        hideSubmitButton
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Region' }))
+    expect(await screen.findByRole('option', { name: 'US East' })).toBeInTheDocument()
+  })
+
+  it('renders workflow-resolved dynamic options without a client resolver', async () => {
+    const user = userEvent.setup()
+
+    const definition = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.DROPDOWN,
+          value_name: 'region',
+          label: 'Region',
+          options: {
+            source: 'dynamic_resolved',
+            values: [
+              { display_label: 'US East', value: 'use1' },
+              { display_label: 'EU West', value: 'euw1' },
+            ],
+          },
+        },
+      ],
+    })
+
+    renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={vi.fn()} hideSubmitButton />)
+
+    await user.click(screen.getByRole('button', { name: 'Region' }))
+    expect(await screen.findByRole('option', { name: 'US East' })).toBeInTheDocument()
+  })
+
+  it('has no accessibility violations on initial render', async () => {
+    const { container } = renderWithQueryClient(
+      <SynDynamicForm
+        definition={sampleDynamicFormDefinition}
+        description="Please complete the form."
+        onSubmit={vi.fn()}
+        submitLabel="Submit form"
+      />
+    )
+
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('has no accessibility violations when validation errors are shown', async () => {
+    const user = userEvent.setup()
+    const { container } = renderWithQueryClient(
+      <SynDynamicForm
+        definition={parseFormDefinition({
+          fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name', required: true }],
+        })}
+        onSubmit={vi.fn()}
+        submitLabel="Submit form"
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Submit form' }))
+    await screen.findByText('This field is required')
+
+    const results = await axe(container)
+    expect(results).toHaveNoViolations()
+  })
+
+  it('keeps user input when an equivalent definition object is passed again', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name' }],
+    })
+    const { rerender } = renderWithQueryClient(
+      <SynDynamicForm definition={definition} onSubmit={onSubmit} hideSubmitButton />
+    )
+
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'kept')
+
+    const equivalentDefinition = parseFormDefinition(JSON.parse(JSON.stringify(definition)) as typeof definition)
+    rerender(<SynDynamicForm definition={equivalentDefinition} onSubmit={onSubmit} hideSubmitButton />)
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('kept')
+  })
+})

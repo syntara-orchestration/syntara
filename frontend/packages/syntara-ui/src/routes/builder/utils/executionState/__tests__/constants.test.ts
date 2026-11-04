@@ -12,7 +12,17 @@ import {
 describe('constants', () => {
   describe('BRANCH_HANDLES', () => {
     it('contains all branch handle values', () => {
-      expect(BRANCH_HANDLES).toEqual(['true', 'false', 'approved', 'rejected', 'done', 'loop', 'default'])
+      expect(BRANCH_HANDLES).toEqual([
+        'true',
+        'false',
+        'approved',
+        'rejected',
+        'submitted',
+        'fallback',
+        'done',
+        'loop',
+        'default',
+      ])
     })
   })
 

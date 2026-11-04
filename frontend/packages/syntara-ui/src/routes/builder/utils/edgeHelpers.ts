@@ -28,6 +28,8 @@ const v2PortHandles: Set<string> = new Set([
   EdgeHandleEnum.FALSE,
   EdgeHandleEnum.APPROVED,
   EdgeHandleEnum.REJECTED,
+  EdgeHandleEnum.SUBMITTED,
+  EdgeHandleEnum.FALLBACK,
   EdgeHandleEnum.LOOP,
   EdgeHandleEnum.DONE,
   EdgeHandleEnum.END,
@@ -82,6 +84,10 @@ export function isApprovalHandle(handle: string | undefined): boolean {
   return !!handle && ([EdgeHandleEnum.APPROVED, EdgeHandleEnum.REJECTED] as string[]).includes(handle)
 }
 
+export function isFormPromptHandle(handle: string | undefined): boolean {
+  return !!handle && ([EdgeHandleEnum.SUBMITTED, EdgeHandleEnum.FALLBACK] as string[]).includes(handle)
+}
+
 /**
  * Checks if a handle is a loop handle (loop/done).
  */
@@ -101,7 +107,13 @@ function isSwitchHandle(handle: string | undefined): boolean {
  * Branch handles include condition (true/false), approval (approved/rejected), loop (loop/done), and switch (case_N/default) handles.
  */
 export function isBranchHandle(handle: string | undefined): boolean {
-  return isConditionalHandle(handle) || isApprovalHandle(handle) || isLoopHandle(handle) || isSwitchHandle(handle)
+  return (
+    isConditionalHandle(handle) ||
+    isApprovalHandle(handle) ||
+    isFormPromptHandle(handle) ||
+    isLoopHandle(handle) ||
+    isSwitchHandle(handle)
+  )
 }
 
 /**

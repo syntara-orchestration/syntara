@@ -43,4 +43,14 @@ export {
   createServiceAccountViaApi,
   deleteServiceAccountViaApi,
 } from './api-rbac'
-export { pollExecutionStatus, pollApprovalVisible } from './api-executions'
+export {
+  pollExecutionStatus,
+  pollApprovalVisible,
+  pollApprovalStatusForExecution,
+  pollApprovalStatusById,
+  pollPendingApprovalForExecution,
+  pollExecutionTerminalAfterReject,
+  pollFormPromptVisible,
+  cancelExecutionViaApi,
+  TERMINAL_EXECUTION_STATUSES,
+} from './api-executions'

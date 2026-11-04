@@ -22,6 +22,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     ApprovalOutput,
     ConditionOutput,
     ConvergeOutput,
+    FormPromptOutput,
     HttpRequestOutput,
     LoopOutput,
     NodeOutput,
@@ -427,6 +428,35 @@ class TestWaitOutputDefaults:
         assert output.dump() == {}
 
 
+class TestFormPromptOutputDefaults:
+    """Verify FormPromptOutput field defaults."""
+
+    def test_all_fields_default_to_none(self) -> None:
+        output = FormPromptOutput()
+        assert output.status is None
+        assert output.outcome is None
+        assert output.response_data is None
+        assert output.responded_by is None
+        assert output.responded_at is None
+        assert output.prompt_id is None
+
+    def test_populated(self) -> None:
+        output = FormPromptOutput(
+            status=ActivityTerminalStatus.COMPLETED,
+            outcome="submitted",
+            response_data={"field1": "value1"},
+            responded_by="jsmith",
+            responded_at="2026-09-14T10:00:00+00:00",
+            prompt_id="prompt-123",
+        )
+        assert output.status == ActivityTerminalStatus.COMPLETED
+        assert output.outcome == "submitted"
+        assert output.response_data == {"field1": "value1"}
+        assert output.responded_by == "jsmith"
+        assert output.responded_at == "2026-09-14T10:00:00+00:00"
+        assert output.prompt_id == "prompt-123"
+
+
 class TestNodeOutputModelsRegistry:
     """Verify NODE_OUTPUT_MODELS registry is complete and correct."""
 
@@ -438,6 +468,7 @@ class TestNodeOutputModelsRegistry:
             NodeType.AAP_WORKFLOW_JOB_TEMPLATE,
             NodeType.AGENTIC,
             NodeType.APPROVAL,
+            NodeType.FORM_PROMPT,
             NodeType.CONDITION,
             NodeType.SWITCH,
             NodeType.CONVERGE,

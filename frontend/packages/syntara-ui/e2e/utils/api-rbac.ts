@@ -166,7 +166,7 @@ export async function findIdentityProviderByName(app: Page, name: string): Promi
 /** Create a user via the API. Returns the user or null. */
 export async function createUserViaApi(
   app: Page,
-  options: { username: string; email?: string; password: string }
+  options: { username: string; email?: string; password: string; groupNames?: string[] }
 ): Promise<{ id: string; username: string } | null> {
   try {
     const token = await getAuthToken(app)
@@ -178,6 +178,7 @@ export async function createUserViaApi(
         email: options.email ?? `${options.username}@e2e.example.com`,
         first_name: options.username,
         password: options.password,
+        ...(options.groupNames !== undefined ? { group_names: options.groupNames } : {}),
       },
     })
     if (!resp.ok()) {

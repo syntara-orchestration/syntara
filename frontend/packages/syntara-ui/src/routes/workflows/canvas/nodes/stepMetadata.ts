@@ -11,7 +11,9 @@ import {
   RhUiUserCheckIcon,
   RhUiTreeViewIcon,
   RhUiClockIcon,
+  RhUiDocumentIcon,
   RhUiSettingsIcon,
+  RhUiTaskIcon,
 } from '@patternfly/react-icons'
 import type { ComponentType } from 'react'
 
@@ -53,6 +55,12 @@ export const stepMetadata: Record<string, StepMetadata> = {
     disableTarget: true,
     expandable: false,
   },
+  formTrigger: {
+    icon: RhUiDocumentIcon,
+    label: 'Trigger',
+    disableTarget: true,
+    expandable: false,
+  },
   task: {
     label: 'Task',
     expandable: true,
@@ -89,6 +97,11 @@ export const stepMetadata: Record<string, StepMetadata> = {
     label: 'Approval',
     expandable: false,
   },
+  form_prompt: {
+    icon: RhUiTaskIcon,
+    label: 'Form',
+    expandable: false,
+  },
 }
 
 type ExecutorDisplayMetadata = { icon: ComponentType<{ className?: string }>; label: string }
@@ -109,5 +122,6 @@ export const executorMetadata: Record<string, ExecutorDisplayMetadata> = {
   /** Internal key from detectTaskExecutorType (agentic + ansible connector prompt), not an API executor string */
   aap: aapJobExecutorDisplay,
   approval: { icon: RhUiUserCheckIcon, label: 'Approval' },
+  form_prompt: { icon: RhUiTaskIcon, label: 'Form' },
   internal_activity: { icon: RhUiSettingsIcon, label: 'System' },
 }

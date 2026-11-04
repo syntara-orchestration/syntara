@@ -738,3 +738,88 @@ export async function expectAiAgentIntegrationGroupsVisible(page: Page, integrat
     }
   }).toPass({ timeout: 60_000, intervals: [500, 1_000, 2_000] })
 }
+
+// Form prompt / human tasks E2E helpers
+
+export async function addFormPromptNode(page: Page, name: string) {
+  await openFormPromptCreateForm(page)
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await closeStepEditorPanel(page)
+}
+
+/**
+ * Enable continue-on-failure and route timeouts to the fallback branch (form_prompt Parameters tab).
+ * Call while the form_prompt node editor is open.
+ */
+
+
+export async function addFormPromptNodeWithSubmittedBranch(page: Page, name: string) {
+  await addFormPromptNode(page, name)
+  await expect(page.getByText(name)).toBeVisible({ timeout: 5000 })
+
+  await triggerLayout(page)
+  await addScriptOnHandle(page, 'submitted', `${name} submitted path`, 'print("submitted")')
+
+  // Fallback is optional and requires configureFormPromptFallbackRouting before connecting that handle.
+}
+
+// ---------------------------------------------------------------------------
+// Control flow nodes
+// ---------------------------------------------------------------------------
+
+/**
+ * Add a conditional node (v2 type: "condition") using the visual expression builder.
+ * @param page - Playwright page object
+ * @param name - Node name
+ * @param config - Condition configuration
+ * @param config.field - Field name to compare (e.g., "status")
+ * @param config.operator - Comparison operator (default: "is equal to")
+ * @param config.value - Value to compare against
+ */
+
+
+export async function configureFormPromptFallbackRouting(page: Page) {
+  const enableLink = page.getByRole('button', { name: 'Enable continue on failure' })
+  if (await enableLink.isVisible().catch(() => false)) {
+    await enableLink.click()
+  }
+  const fallbackToggle = page.getByRole('button', { name: 'Fallback decision', exact: true })
+  await expect(fallbackToggle).toBeEnabled({ timeout: 10_000 })
+  await fallbackToggle.click()
+  const visibleFallbackOption = page.getByRole('option', { name: 'Fallback path (default)' }).filter({ visible: true })
+  await expect(visibleFallbackOption).toHaveCount(1, { timeout: 10_000 })
+  await visibleFallbackOption.click()
+}
+
+/**
+ * Add a form prompt with a script step on the submitted branch (minimum wiring for save with default timeout behavior).
+ */
+
+
+export async function openFormPromptCreateForm(page: Page) {
+  await openAddStepPanel(page)
+  await selectHumanTaskStep(page, 'Form')
+  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(nameInput).toBeVisible({ timeout: 10_000 })
+}
+
+/** Add a form prompt node (Human tasks → Form) without completing branches. */
+
+
+export async function selectHumanTaskStep(page: Page, stepName: 'Approval' | 'Form') {
+  const panel = addStepPanel(page)
+  await panel.getByRole('button', { name: 'Human tasks', exact: true }).click()
+  const humanTaskPanel = page.getByRole('region', { name: /select a human task step/i })
+  await expect(humanTaskPanel).toBeVisible({ timeout: 10_000 })
+  await humanTaskPanel.getByRole('button', { name: stepName, exact: true }).click()
+}
+
+// ---------------------------------------------------------------------------
+// Trigger
+// ---------------------------------------------------------------------------
+
+/** Click "Add connected step" on an edge and wait for the add-node panel. */
+
+
+export const addScriptOnHandle = addScriptStepOnHandle

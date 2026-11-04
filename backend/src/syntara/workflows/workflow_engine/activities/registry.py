@@ -26,6 +26,13 @@ from syntara.workflows.workflow_engine.activities.condition import condition
 from syntara.workflows.workflow_engine.activities.converge import converge
 from syntara.workflows.workflow_engine.activities.credential_resolution_activity import resolve_workflow_credentials
 from syntara.workflows.workflow_engine.activities.eda_trigger import eda_trigger
+from syntara.workflows.workflow_engine.activities.form_prompt_activity import (
+    cancel_form_prompts_activity,
+    create_form_prompt_activity,
+    expire_form_prompts_activity,
+    fail_detached_form_prompt_activity,
+)
+from syntara.workflows.workflow_engine.activities.form_trigger import form_trigger
 from syntara.workflows.workflow_engine.activities.http_request_activity import execute_http_request_activity
 from syntara.workflows.workflow_engine.activities.integration_resolution_activity import resolve_workflow_integration
 from syntara.workflows.workflow_engine.activities.integration_scope_activity import validate_node_references
@@ -55,10 +62,15 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     create_approval_request_activity,
     expire_approval_requests_activity,
     fail_detached_approval_activity,
+    cancel_form_prompts_activity,
+    create_form_prompt_activity,
+    expire_form_prompts_activity,
+    fail_detached_form_prompt_activity,
     resolve_approvers_activity,
     condition,
     converge,
     eda_trigger,
+    form_trigger,
     switch,
     execute_http_request_activity,
     execute_internal_activity,

@@ -7,9 +7,13 @@ import pytest
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
+    ValidationResult,
     ValidationSeverity,
 )
-from syntara.workflows.validators.workflow_definition import WorkflowValidator, _best_branch_messages
+from syntara.workflows.validators.workflow_definition import (
+    WorkflowValidator,
+    _best_branch_messages,
+)
 
 
 @pytest.fixture
@@ -512,6 +516,128 @@ class TestCollectFindings:
         assert "'parameters' is a required property" in messages
         assert "'language' is a required property" in messages
         assert "'code' is a required property" in messages
+
+    @staticmethod
+    def _schema_violations(result: ValidationResult, node_id: str) -> list[tuple[str, str | None]]:
+        """Return ``(message, field_path)`` for a node's schema findings, in report order."""
+        return [
+            (finding.message, finding.field_path)
+            for finding in result.findings
+            if finding.node_id == node_id and finding.category == ValidationCategory.schema_violation
+        ]
+
+    @pytest.mark.parametrize(
+        ("node_type", "expected"),
+        [
+            ("agentic", [("'prompt' is a required property", "parameters")]),
+            (
+                "script",
+                [
+                    ("'language' is a required property", "parameters"),
+                    ("'code' is a required property", "parameters"),
+                ],
+            ),
+            (
+                "http_request",
+                [
+                    ("'method' is a required property", "parameters"),
+                    ("'url' is a required property", "parameters"),
+                ],
+            ),
+            ("internal_activity", [("'activity' is a required property", "parameters")]),
+            ("form_prompt", [("Field required", "parameters.form_definition")]),
+        ],
+    )
+    def test_empty_parameters_reports_only_that_node_types_required_fields(
+        self,
+        validator: WorkflowValidator,
+        node_type: str,
+        expected: list[tuple[str, str | None]],
+    ) -> None:
+        """Each executor reports its own required parameters and nothing from sibling oneOf branches.
+
+        Exact equality is the point: it proves both that the real errors survive and
+        that no other executor's requirements leak onto the node.
+        """
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "test",
+            "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [{"id": "n1", "type": node_type, "parameters": {}}],
+            "edges": [{"from": "t1", "to": "n1"}],
+        }
+
+        result = validator.collect_findings(definition)
+
+        assert self._schema_violations(result, "n1") == expected
+
+    @pytest.mark.parametrize(
+        ("node_type", "valid_parameters", "expected"),
+        [
+            (
+                "script",
+                {"language": "python", "code": "pass"},
+                [("Additional properties are not allowed ('bogus', 'prompt' were unexpected)", "parameters")],
+            ),
+            (
+                "http_request",
+                {"method": "GET", "url": "https://example.com"},
+                [("Additional properties are not allowed ('bogus', 'prompt' were unexpected)", "parameters")],
+            ),
+            (
+                "form_prompt",
+                {"form_definition": {"fields": [{"value_name": "a", "type": "text", "label": "A"}]}},
+                [
+                    # The form prompt model pass reports each rejected key against its own path.
+                    ("Extra inputs are not permitted", "parameters.prompt"),
+                    ("Extra inputs are not permitted", "parameters.bogus"),
+                ],
+            ),
+        ],
+    )
+    def test_cross_type_parameter_keys_are_rejected_against_the_nodes_own_schema(
+        self,
+        validator: WorkflowValidator,
+        node_type: str,
+        valid_parameters: dict[str, Any],
+        expected: list[tuple[str, str | None]],
+    ) -> None:
+        """A leaked key from another step type is rejected, not treated as that type's schema.
+
+        ``prompt`` stands in for the original report: a form_prompt node carrying an
+        agentic/approval leftover must not be validated as an agentic node.
+        """
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "test",
+            "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [
+                {
+                    "id": "n1",
+                    "type": node_type,
+                    "name": "Step",
+                    "parameters": {**valid_parameters, "prompt": "leaked", "bogus": 1},
+                }
+            ],
+            "edges": [{"from": "t1", "to": "n1"}],
+        }
+
+        result = validator.collect_findings(definition)
+
+        assert self._schema_violations(result, "n1") == expected
+
+    def test_unknown_node_type_surfaces_type_discriminator_messages(self, validator: WorkflowValidator) -> None:
+        """Invalid node types must not lose all type-const hints to the misleading-message filter."""
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "test",
+            "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [{"id": "n1", "type": "not_a_real_executor", "name": "Bad"}],
+            "edges": [{"from": "t1", "to": "n1"}],
+        }
+        result = validator.collect_findings(definition)
+        messages = [f.message for f in result.findings if f.node_id == "n1"]
+        assert any(" was expected" in m for m in messages)
 
     def test_schema_version_finding(self, validator: WorkflowValidator) -> None:
         definition: dict[str, Any] = {"schema_version": "1.0.0", "triggers": [], "nodes": [], "edges": []}

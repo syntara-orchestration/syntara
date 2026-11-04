@@ -56,6 +56,11 @@ describe('ActivityStatusLabel', () => {
     expect(screen.getByText('Waiting for approval')).toBeInTheDocument()
   })
 
+  it('renders "waiting" as "Waiting for input" for form prompt nodes', () => {
+    render(<ActivityStatusLabel status="waiting" nodeType="form_prompt" />)
+    expect(screen.getByText('Waiting for input')).toBeInTheDocument()
+  })
+
   it('renders "waiting" as "Waiting for approval" when nodeType is undefined', () => {
     render(<ActivityStatusLabel status="waiting" nodeType={undefined} />)
     expect(screen.getByText('Waiting for approval')).toBeInTheDocument()

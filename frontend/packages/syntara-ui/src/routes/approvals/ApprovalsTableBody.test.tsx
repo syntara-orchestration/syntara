@@ -130,7 +130,13 @@ describe('FlatApprovalsTableBody', () => {
         <Table aria-label="Approvals" isExpandable>
           <FlatApprovalsTableBody
             {...defaultProps}
-            approvals={[makeApproval({ workflowId: undefined, workflowName: undefined })]}
+            approvals={[
+              makeApproval({
+                workflowId: undefined,
+                workflowName: undefined,
+                decision_notes: 'No workflow linked',
+              }),
+            ]}
           />
         </Table>
       </Wrapper>

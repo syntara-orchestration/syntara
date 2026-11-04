@@ -179,7 +179,7 @@ class TestCancelExecution:
         )
 
         with patch(
-            "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
+            "syntara.workflows.services.execution_service.cancel_invocations_for_execution",
             new_callable=AsyncMock,
             return_value=[],
         ) as mock_cancel:

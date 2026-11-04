@@ -23,7 +23,7 @@ info:
     - Format: `{"key": "value"}` (both key and value must be strings)
     - Use cases: environment tags, team ownership, priority levels, cost centers
     - Queryable: Filter resources by label selectors in list endpoints
-  version: 2.0.0
+  version: 2.0.2
   contact:
     name: Syntara Team
 

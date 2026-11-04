@@ -19,6 +19,9 @@ Both systems follow the fire-and-forget principle: observability code MUST NEVER
 
 **Endpoint:** `/metrics` (OpenMetrics/Prometheus format)
 
+Temporal workers also expose `/metrics` on the configured `metrics_worker_port`. The
+worker registry includes Python process metrics and the worker's `MetricsRecorder` metrics.
+
 **Components:**
 - `MetricsRecorder` - Central recording API
 - `MetricsStore` - In-memory retention (configurable, default 24h)
@@ -30,6 +33,8 @@ Both systems follow the fire-and-forget principle: observability code MUST NEVER
 - HTTP error rates (classified by type: timeout, rate_limit, validation, internal)
 - LLM call duration, token usage (input/output), Time-To-First-Token (TTFT)
 - Workflow execution duration, completion rate
+- Form prompt submission handoff and workflow resume dispatch latency
+- Form trigger submission latency
 - Activity execution success rate
 - Database query response time, connection pool utilization
 - Tool execution duration and success rate
@@ -50,6 +55,7 @@ Both systems follow the fire-and-forget principle: observability code MUST NEVER
 
 **Events collected:**
 - Workflow execution (start, completion with status/duration/error, `workflow_id`, `mode`, `workflow_version`, `used_published`, `is_retry`). On `workflow_execution_completed`, engine-level timeouts set `error_type="WorkflowTimedOut"` rather than the generic `ActivityExecutionError` used for other failures, so `timeout_count` is derivable from the completion event alone.
+- Form trigger submission (`form_trigger_submitted`: `workflow_execution_id`, `trigger_node_id`, configured `field_count`, and unique `field_types`; field labels and submitted values are excluded)
 - Activity execution (type, status, duration, error type, `workflow_id`, `mode`)
 - Workflow version operations (created, restored, published, unpublished, exported; save/publish carry `user_id_hash`, publish carries `published_version_id`)
 - API calls (endpoint, method, status, response time, payload size)

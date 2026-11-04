@@ -1,9 +1,8 @@
-import type { Approval } from '@syntara/contracts'
 import { useCallback, useMemo } from 'react'
 
-type UseApprovalNavigationResult = {
-  /** The current approval. */
-  current: Approval | null
+type UseApprovalNavigationResult<T> = {
+  /** The current item in the navigable list. */
+  current: T | null
   /** The current index (0-based). */
   currentIndex: number
   /** Total number of approvals. */
@@ -22,11 +21,11 @@ type UseApprovalNavigationResult = {
  * Encapsulates approval navigation logic with bounds checking.
  * Provides prev/next handlers and flags for button disabled states.
  */
-export function useApprovalNavigation(
+export function useApprovalNavigation<T>(
   currentIndex: number,
   onNavigate: (index: number) => void,
-  approvals: Approval[] = []
-): UseApprovalNavigationResult {
+  approvals: readonly T[] = []
+): UseApprovalNavigationResult<T> {
   const total = approvals.length
   const current = approvals[currentIndex] ?? null
   const hasPrev = currentIndex > 0

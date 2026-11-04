@@ -45,6 +45,7 @@ const ROLE_PROFILES: Record<string, RoleProfile> = {
       'workflow:read:any',
       'execution:read:any',
       'approval:read:any',
+      'form_prompt:read:any',
       'credential:read:any',
       'integration:read:any',
     ],

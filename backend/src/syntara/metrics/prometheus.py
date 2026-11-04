@@ -224,6 +224,30 @@ class OrchestratorPrometheusMetrics:
             registry=self.registry,
         )
 
+        self.form_prompt_submission_handoff_seconds = Histogram(
+            "orchestrator_form_prompt_submission_handoff_seconds",
+            "Seconds to hand an accepted form prompt submission to Temporal, including signal retries",
+            ["component"],
+            buckets=LATENCY_BUCKETS_FAST,
+            registry=self.registry,
+        )
+
+        self.form_trigger_submission_start_seconds = Histogram(
+            "orchestrator_form_trigger_submission_start_seconds",
+            "Seconds from form trigger submission reaching ExecutionService to the started execution being committed",
+            ["component"],
+            buckets=LATENCY_BUCKETS_MEDIUM,
+            registry=self.registry,
+        )
+
+        self.form_prompt_resume_dispatch_seconds = Histogram(
+            "orchestrator_form_prompt_resume_dispatch_seconds",
+            "Seconds from the Temporal form prompt activity completion to the workflow task that resumes it",
+            ["component"],
+            buckets=LATENCY_BUCKETS_FAST,
+            registry=self.registry,
+        )
+
         self.temporal_execution_service_duration_seconds = Histogram(
             "orchestrator_temporal_execution_service_duration_seconds",
             "Temporal client start_workflow RPC duration including network and server startup",

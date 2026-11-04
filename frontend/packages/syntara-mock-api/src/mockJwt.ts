@@ -14,6 +14,20 @@ export type JwtClaims = {
   role?: string
 }
 
+/** User IDs aligned with GET /auth/me and frontend e2e mockJwt.ts */
+export const MOCK_USER_ID_BY_USERNAME: Record<string, string> = {
+  admin: 'user-admin',
+  demo: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+  auditor: 'a0d1t0r0-0000-0000-0000-000000000000',
+  viewer: 'v13w3r00-0000-0000-0000-000000000000',
+  user: 'us3r0000-0000-0000-0000-000000000000',
+  'project-admin': 'pr0j4dm1-0000-0000-0000-000000000000',
+}
+
+export function mockUserIdForUsername(username: string): string {
+  return MOCK_USER_ID_BY_USERNAME[username] ?? `user-${username}`
+}
+
 /**
  * Generate a mock JWT token with the given claims.
  *

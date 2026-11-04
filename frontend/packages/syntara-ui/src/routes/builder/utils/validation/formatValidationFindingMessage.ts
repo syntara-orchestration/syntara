@@ -15,7 +15,9 @@ export function formatValidationFindingMessage(
     return message
   }
 
-  let formatted = message.includes(nodeId) ? message.split(nodeId).join(nodeName) : message
+  const escapedId = nodeId.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
+  const idPattern = new RegExp(String.raw`\b${escapedId}\b`, 'g')
+  let formatted = message.replace(idPattern, nodeName)
 
   const nodeQuoted = `Node '${nodeName}'`
   if (formatted.startsWith(nodeQuoted)) {

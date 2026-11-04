@@ -11,11 +11,12 @@ import {
   StackItem,
 } from '@patternfly/react-core'
 import { MissedSchedulePolicyEnum, ScheduleTypeEnum, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
-import type { ReactNode } from 'react'
-import { useCallback, use, useEffect, useMemo, useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
+import type { FormDefinitionFieldServerError } from '../../../components/forms/formFieldBuilder/formDefinitionFieldServerError'
 import { ScheduleBuilderFields } from '../../../components/forms/ScheduleBuilderFields'
 import {
   CRON_EXPRESSION_HELP,
@@ -27,18 +28,26 @@ import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynTextField } from '../../../components/forms/SynTextField'
 import { SynSelect } from '../../../components/SynSelect'
 import { useSynForm } from '../../../hooks/useSynForm'
-import { getDefaultRepeatingInterval } from '../../../utils/triggerFormatting'
-import { generateWebhookPath } from '../../../utils/webhookPath'
+import { detachPromise } from '../../../utils/detachPromise'
+import { useEffectiveFormDefinitionServerValidationErrors } from '../hooks/useEffectiveFormDefinitionServerValidationErrors'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
+import { partitionFormTriggerServerValidationErrors } from '../utils/partitionFormTriggerServerValidationErrors'
 import { useIsVersionView } from '../VersionViewContext'
 
+import { buildTriggerFormDefaults } from './buildTriggerFormDefaults'
 import { EdaFields } from './EdaTriggerFields'
+import { FormTriggerConfigurationFields } from './FormTriggerConfigurationFields'
 import { ManualTriggerFields } from './ManualTriggerFields'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { StepFormContainer } from './shared/StepFormContainer'
 import stepFormStyles from './shared/stepFormStyles.module.css'
 import { StepFormTabsLayout } from './shared/StepFormTabsLayout'
+import {
+  TriggerFormFieldBuilderCommitRefContext,
+  type TriggerFormFieldBuilderCommitHandlers,
+} from './triggerFormFieldBuilderCommitContext'
 import { normalizeWebhookPath, triggerFormSchema, type TriggerFormData } from './triggerFormSchema'
+import { useApplyServerValidationToTriggerForm } from './useApplyServerValidationToTriggerForm'
 import { WebhookFields } from './WebhookTriggerFields'
 
 const executionConflictLabelHelp = (
@@ -51,47 +60,11 @@ const cronExpressionLabelHelp = <FieldHelpPopover headerContent="Cron expression
 
 export type { TriggerFormData }
 
-function resolveBrowserTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone
-  } catch {
-    return 'UTC'
-  }
-}
-
-function buildTriggerFormDefaults(initialData?: Partial<TriggerFormData>): TriggerFormData {
-  const values: TriggerFormData = {
-    name: '',
-    triggerType: initialData?.triggerType ?? TriggerTypeEnum.MANUAL_TRIGGER,
-    scheduleType: ScheduleTypeEnum.INTERVAL,
-    interval: '',
-    cron: '',
-    timezone: resolveBrowserTimezone(),
-    missedSchedulePolicy: MissedSchedulePolicyEnum.SKIP,
-    inputSchema: '',
-    webhookPath: '',
-    ...initialData,
-  }
-
-  if (WEBHOOK_TRIGGER_TYPES.has(values.triggerType) && !values.webhookPath) {
-    values.webhookPath = generateWebhookPath()
-  }
-
-  if (
-    values.triggerType === TriggerTypeEnum.SCHEDULED &&
-    values.scheduleType === ScheduleTypeEnum.INTERVAL &&
-    !values.interval?.trim()
-  ) {
-    values.interval = getDefaultRepeatingInterval(values.timezone ?? 'UTC')
-  }
-
-  return values
-}
-
 type TriggerStepFormProps = Readonly<{
   onSubmit: (data: TriggerFormData) => void
   initialData?: Partial<TriggerFormData>
   onHeaderContentChange?: (content: ReactNode | null) => void
+  serverValidationErrors?: ReadonlyArray<{ fieldPath?: string | null; message: string }>
 }>
 
 // ── Execution conflict policy options ────────────────────────────────────
@@ -269,13 +242,19 @@ function ScheduleIntervalFields({
 function TriggerFormFields({
   onHeaderContentChange,
   validationErrors,
+  formDefinitionFieldErrors,
 }: Readonly<{
   onHeaderContentChange?: (content: ReactNode | null) => void
+  formDefinitionFieldErrors?: ReadonlyArray<FormDefinitionFieldServerError>
   validationErrors?: {
     interval?: { message?: string }
     cron?: { message?: string }
     inputSchema?: { message?: string }
     webhookPath?: { message?: string }
+    form_definition?: { message?: string }
+    message?: { message?: string }
+    submit_label?: { message?: string }
+    success_message?: { message?: string }
   }
 }>) {
   const isVersionView = useIsVersionView()
@@ -315,7 +294,7 @@ function TriggerFormFields({
   }, [nameField, onHeaderContentChange])
 
   const parametersContent = (
-    <Stack hasGutter>
+    <Stack hasGutter className={stepFormStyles.nodeFormParametersStack}>
       <input type="hidden" {...register('triggerType')} />
 
       {triggerType === TriggerTypeEnum.MANUAL_TRIGGER && (
@@ -420,52 +399,120 @@ function TriggerFormFields({
           </Stack>
         </fieldset>
       )}
+
+      {triggerType === TriggerTypeEnum.FORM_TRIGGER && (
+        <StackItem className={stepFormStyles.formTriggerParameters}>
+          <FormTriggerConfigurationFields
+            formDefinitionError={errors.form_definition}
+            serverFieldErrors={formDefinitionFieldErrors}
+          />
+        </StackItem>
+      )}
     </Stack>
   )
 
   return <StepFormTabsLayout parametersContent={parametersContent} hideSettingsTab />
 }
 
-export function TriggerStepForm(props: TriggerStepFormProps) {
-  const [defaultValues] = useState<TriggerFormData>(() => buildTriggerFormDefaults(props.initialData))
+export function TriggerStepForm({
+  onSubmit,
+  initialData,
+  onHeaderContentChange,
+  serverValidationErrors,
+}: TriggerStepFormProps) {
+  const [defaultValues] = useState<TriggerFormData>(() => buildTriggerFormDefaults(initialData))
+  const builderHandlersRef = useRef<TriggerFormFieldBuilderCommitHandlers | null>(null)
 
   const form = useSynForm({
     schema: triggerFormSchema,
     defaultValues,
   })
 
+  const triggerType = useWatch({ control: form.control, name: 'triggerType' })
+  const formDefinition = useWatch({ control: form.control, name: 'form_definition' })
+  const readPreparedFormDefinition = useCallback(() => builderHandlersRef.current?.readPreparedDefinition(), [])
+  const effectiveServerValidationErrors = useEffectiveFormDefinitionServerValidationErrors(
+    formDefinition,
+    serverValidationErrors,
+    {
+      applyFormDefinitionValidityCheck: triggerType === TriggerTypeEnum.FORM_TRIGGER,
+      readPreparedDefinition: readPreparedFormDefinition,
+    }
+  )
+
+  const formDefinitionFieldErrors = useMemo(
+    () => partitionFormTriggerServerValidationErrors(effectiveServerValidationErrors).formFieldErrors,
+    [effectiveServerValidationErrors]
+  )
+
+  useApplyServerValidationToTriggerForm(form, effectiveServerValidationErrors)
+
   const {
     formState: { errors },
   } = form
 
-  const handleSubmit = (data: TriggerFormData) => {
-    const isManual = data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER
-    const isScheduled = data.triggerType === TriggerTypeEnum.SCHEDULED
-    const isWebhookStyle = WEBHOOK_TRIGGER_TYPES.has(data.triggerType)
-
-    const cleanedData: TriggerFormData = {
-      name: data.name,
-      triggerType: data.triggerType,
-      inputSchema: isManual || isWebhookStyle ? data.inputSchema : undefined,
-      scheduleType: isScheduled ? data.scheduleType : undefined,
-      interval: isScheduled && data.scheduleType === ScheduleTypeEnum.INTERVAL ? data.interval : undefined,
-      cron: isScheduled && data.scheduleType === ScheduleTypeEnum.CRON ? data.cron : undefined,
-      timezone: isScheduled ? data.timezone : undefined,
-      missedSchedulePolicy: isScheduled ? data.missedSchedulePolicy : undefined,
-      webhookPath: isWebhookStyle ? normalizeWebhookPath(data.webhookPath ?? '') : undefined,
-      authorizedServiceAccountIds: isWebhookStyle ? data.authorizedServiceAccountIds : undefined,
+  const syncFormDefinitionFromBuilder = useCallback(() => {
+    const handlers = builderHandlersRef.current
+    if (!handlers) {
+      return
     }
-    props.onSubmit(cleanedData)
-  }
+    handlers.flush()
+    const prepared = handlers.readPreparedDefinition()
+    form.setValue('form_definition', prepared, { shouldDirty: true, shouldValidate: false })
+  }, [form])
+
+  const handleSubmit = useCallback(
+    (data: TriggerFormData) => {
+      const isManual = data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER
+      const isScheduled = data.triggerType === TriggerTypeEnum.SCHEDULED
+      const isWebhookStyle = WEBHOOK_TRIGGER_TYPES.has(data.triggerType)
+      const isFormTrigger = data.triggerType === TriggerTypeEnum.FORM_TRIGGER
+
+      const cleanedData: TriggerFormData = {
+        name: data.name,
+        triggerType: data.triggerType,
+        inputSchema: isManual || isWebhookStyle ? data.inputSchema : undefined,
+        scheduleType: isScheduled ? data.scheduleType : undefined,
+        interval: isScheduled && data.scheduleType === ScheduleTypeEnum.INTERVAL ? data.interval : undefined,
+        cron: isScheduled && data.scheduleType === ScheduleTypeEnum.CRON ? data.cron : undefined,
+        timezone: isScheduled ? data.timezone : undefined,
+        missedSchedulePolicy: isScheduled ? data.missedSchedulePolicy : undefined,
+        webhookPath: isWebhookStyle ? normalizeWebhookPath(data.webhookPath ?? '') : undefined,
+        authorizedServiceAccountIds: isWebhookStyle ? data.authorizedServiceAccountIds : undefined,
+        form_definition: isFormTrigger ? data.form_definition : undefined,
+        message: isFormTrigger ? data.message : undefined,
+        submit_label: isFormTrigger ? data.submit_label : undefined,
+        success_message: isFormTrigger ? data.success_message : undefined,
+        css_override: isFormTrigger ? data.css_override : undefined,
+      }
+      onSubmit(cleanedData)
+    },
+    [onSubmit]
+  )
+
+  const submitWithFlush = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      syncFormDefinitionFromBuilder()
+      detachPromise(form.handleSubmit(handleSubmit)(event))
+    },
+    [form, handleSubmit, syncFormDefinitionFromBuilder]
+  )
 
   const autoSubmitRef = use(StepEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit, syncFormDefinitionFromBuilder)
 
   return (
-    <StepFormContainer formId="trigger-step-form" onSubmit={form.handleSubmit(handleSubmit)}>
-      <SynForm form={form}>
-        <TriggerFormFields onHeaderContentChange={props.onHeaderContentChange} validationErrors={errors} />
-      </SynForm>
-    </StepFormContainer>
+    <TriggerFormFieldBuilderCommitRefContext.Provider value={builderHandlersRef}>
+      <StepFormContainer formId="trigger-step-form" onSubmit={submitWithFlush}>
+        <SynForm form={form}>
+          <TriggerFormFields
+            onHeaderContentChange={onHeaderContentChange}
+            validationErrors={errors}
+            formDefinitionFieldErrors={formDefinitionFieldErrors}
+          />
+        </SynForm>
+      </StepFormContainer>
+    </TriggerFormFieldBuilderCommitRefContext.Provider>
   )
 }

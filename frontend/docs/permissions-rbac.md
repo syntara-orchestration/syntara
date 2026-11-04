@@ -271,3 +271,10 @@ Settings gating is functionally complete. Minor gap: no loading spinner during i
 ### Transfer Identity wizard
 
 No `routePermission` on route. When gated, add `routePermission` with `user_identity:attach`.
+
+<!-- merged from feature branch -->
+
+| `useApprovalDecideUsers`         | `routes/builder/node-forms/useApprovalDecideUsers.ts`                       | `approval:decide` (via `who_can`, all authorized users)                                                                                                                                                                               |
+| `useFormPromptSubmitUsers`       | `routes/builder/node-forms/useFormPromptSubmitUsers.ts`                     | `form_prompt:submit` (via `who_can`, project-scoped authorized users)                                                                                                                                                                 |
+| `useApprovalDecideGroups`        | `routes/builder/node-forms/useApprovalDecideGroups.ts`                      | All groups (MVP: no filtering, see hook docs for limitations)                                                                                                                                                                         |
+- Disables the canvas (no adding/moving/deleting nodes)

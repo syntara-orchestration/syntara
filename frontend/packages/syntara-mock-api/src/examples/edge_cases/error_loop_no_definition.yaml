@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: error-loop-no-definition
 description: Test error when loop activity has no loop definition
 

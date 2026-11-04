@@ -113,7 +113,7 @@ describe('useWorkflowGraphInit', () => {
     expect(result.current.edges).toHaveLength(1)
   })
 
-  it('waits for edges when workflow has activities but edges are empty', () => {
+  it('initializes nodes when activities exist but edges are not ready yet', () => {
     const { result } = renderHook(() =>
       useWorkflowGraphInit({
         workflowId: 'wf-1',
@@ -123,7 +123,7 @@ describe('useWorkflowGraphInit', () => {
       })
     )
 
-    expect(result.current.nodes).toHaveLength(0)
-    expect(result.current.isInitializedRef.current).toBe(false)
+    expect(result.current.nodes).toHaveLength(2)
+    expect(result.current.isInitializedRef.current).toBe(true)
   })
 })

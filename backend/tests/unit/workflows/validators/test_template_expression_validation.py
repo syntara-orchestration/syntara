@@ -569,6 +569,74 @@ class TestExtractElementExpressions:
 class TestTriggerExpressions:
     """Expressions in triggers are validated alongside nodes."""
 
+    @pytest.mark.parametrize(
+        ("parameters", "expected_path"),
+        [
+            (
+                {
+                    "form_definition": {"fields": [{"type": "text", "value_name": "reason", "label": "Reason"}]},
+                    "message": "${upstream.value}",
+                },
+                "parameters.message",
+            ),
+            (
+                {
+                    "form_definition": {
+                        "fields": [{"type": "text", "value_name": "reason", "label": "${upstream.label}"}]
+                    }
+                },
+                "parameters.form_definition.fields[0].label",
+            ),
+            (
+                {
+                    "form_definition": {
+                        "fields": [
+                            {
+                                "type": "text",
+                                "value_name": "reason",
+                                "label": "Reason",
+                                "default": "${upstream.default}",
+                            }
+                        ]
+                    }
+                },
+                "parameters.form_definition.fields[0].default",
+            ),
+            (
+                {
+                    "form_definition": {
+                        "fields": [
+                            {
+                                "type": "dropdown",
+                                "value_name": "region",
+                                "label": "Region",
+                                "options": {
+                                    "source": "static",
+                                    "values": [{"display_label": "${upstream.label}", "value": "east"}],
+                                },
+                            }
+                        ]
+                    }
+                },
+                "parameters.form_definition.fields[0].options.values[0].display_label",
+            ),
+        ],
+    )
+    def test_form_trigger_template_expressions_are_rejected_with_paths(
+        self, parameters: dict[str, Any], expected_path: str
+    ) -> None:
+        definition = _base_definition(
+            triggers=[{"id": "form", "type": "form_trigger", "parameters": parameters}],
+        )
+
+        findings = check_template_expressions(definition, {"form"})
+
+        assert len(findings) == 1
+        assert findings[0].category == ValidationCategory.schema_violation
+        assert findings[0].node_id == "form"
+        assert findings[0].field_path == expected_path
+        assert "no upstream node" in findings[0].message
+
     def test_invalid_expression_in_trigger(self) -> None:
         defn = _base_definition(
             triggers=[

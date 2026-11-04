@@ -35,7 +35,8 @@ vi.mock('../../utils/apiErrors', () => ({
   getErrorMessage: (err: unknown) => (err instanceof Error ? err.message : 'Unknown error'),
 }))
 
-const mockValidateWorkflow = vi.fn<() => { errors: Array<{ message: string; nodeId?: string; severity?: string }> }>()
+const mockValidateWorkflow =
+  vi.fn<() => { errors: Array<{ message: string; nodeId?: string; severity?: string; rule?: string }> }>()
 const mockValidateMinimum = vi.fn<() => Array<{ message: string; nodeId?: string; severity?: string }>>()
 
 vi.mock('./utils/validation', () => ({
@@ -44,6 +45,10 @@ vi.mock('./utils/validation', () => ({
 
 vi.mock('./utils/validation/rules/validateMinimumWorkflow', () => ({
   validateMinimumWorkflow: () => mockValidateMinimum(),
+}))
+
+vi.mock('./hooks/useWorkflowEngineDefaults', () => ({
+  useWorkflowEngineDefaults: () => ({ defaults: { continueOnFailure: false }, isLoading: false }),
 }))
 
 vi.mock('./utils/workflowDefinitionBuilder', () => ({
@@ -61,8 +66,8 @@ beforeEach(() => {
 })
 
 describe('useWorkflowVerification', () => {
-  function renderVerificationHook() {
-    return renderHook(() => useWorkflowVerification({ dispatch: mockDispatch }))
+  function renderVerificationHook(options?: { beforeVerify?: () => Promise<boolean> }) {
+    return renderHook(() => useWorkflowVerification({ dispatch: mockDispatch, beforeVerify: options?.beforeVerify }))
   }
 
   const workflowState = {
@@ -88,6 +93,39 @@ describe('useWorkflowVerification', () => {
 
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'SET_KEBAB_OPEN', payload: false })
     expect(mockPost).not.toHaveBeenCalled()
+  })
+
+  it('skips verification when beforeVerify returns false', async () => {
+    const beforeVerify = vi.fn().mockResolvedValue(false)
+    mockGetState.mockReturnValue(workflowState)
+    const { result } = renderVerificationHook({ beforeVerify })
+
+    act(() => result.current.handleVerify())
+
+    await waitFor(() => {
+      expect(beforeVerify).toHaveBeenCalledOnce()
+    })
+    expect(mockPost).not.toHaveBeenCalled()
+    expect(mockDispatch).toHaveBeenCalledWith({ type: 'SET_KEBAB_OPEN', payload: false })
+  })
+
+  it('runs verification after beforeVerify returns true', async () => {
+    const beforeVerify = vi.fn().mockResolvedValue(true)
+    mockGetState.mockReturnValue(workflowState)
+    mockBuildDefinition.mockReturnValue({ nodes: [], edges: [], triggers: [] })
+    mockPost.mockResolvedValue({
+      data: { is_valid: true, findings: [] },
+      error: undefined,
+      response: { ok: true },
+    })
+    const { result } = renderVerificationHook({ beforeVerify })
+
+    act(() => result.current.handleVerify())
+
+    await waitFor(() => {
+      expect(beforeVerify).toHaveBeenCalledOnce()
+      expect(mockPost).toHaveBeenCalled()
+    })
   })
 
   it('clears stale validation errors before starting verification', async () => {
@@ -848,6 +886,75 @@ describe('frontend and backend error merging', () => {
       )
       expect(setCall).toBeDefined()
       expect(mockSetValidationErrorCount).toHaveBeenCalledWith(1)
+    })
+  })
+
+  it('handleVerifySilent records form step findings for the Run gate', async () => {
+    mockGetState.mockReturnValue(workflowState)
+    mockBuildDefinition.mockReturnValue({ nodes: [], edges: [], triggers: [] })
+    mockValidateWorkflow.mockReturnValue({
+      errors: [
+        {
+          message: 'Form "Survey": Value name is required',
+          nodeId: 'form-1',
+          severity: 'error',
+          rule: 'form-prompt-form-definition',
+        },
+      ],
+    })
+    mockPost.mockResolvedValue({
+      data: { is_valid: true, findings: [] },
+      error: undefined,
+      response: { ok: true },
+    })
+
+    const { result } = renderVerificationHook()
+
+    act(() => result.current.handleVerifySilent())
+
+    await waitFor(() => {
+      expect(mockSetValidationErrorCount).toHaveBeenCalledWith(1)
+      const setCall = mockDispatch.mock.calls.find(
+        (call) => (call[0] as { type: string }).type === 'SET_VALIDATION_ERRORS'
+      )
+      expect(setCall).toBeDefined()
+      const payload = (setCall![0] as { payload: Array<{ message: string; nodeId: string | null }> }).payload
+      expect(payload[0]?.nodeId).toBe('form-1')
+      expect(payload[0]?.message).toContain('Survey')
+      expect(mockShowSuccess).not.toHaveBeenCalled()
+    })
+  })
+
+  it('handleVerifySilent records form trigger findings for the Run gate', async () => {
+    mockGetState.mockReturnValue(workflowState)
+    mockBuildDefinition.mockReturnValue({ nodes: [], edges: [], triggers: [] })
+    mockValidateWorkflow.mockReturnValue({
+      errors: [
+        {
+          message: 'Form trigger "Intake": At least one form field is required',
+          nodeId: 'trigger-1',
+          severity: 'error',
+          rule: 'form-trigger-form-definition',
+        },
+      ],
+    })
+    mockPost.mockResolvedValue({
+      data: { is_valid: true, findings: [] },
+      error: undefined,
+      response: { ok: true },
+    })
+
+    const { result } = renderVerificationHook()
+
+    act(() => result.current.handleVerifySilent())
+
+    await waitFor(() => {
+      expect(mockSetValidationErrorCount).toHaveBeenCalledWith(1)
+      const setCall = mockDispatch.mock.calls.find(
+        (call) => (call[0] as { type: string }).type === 'SET_VALIDATION_ERRORS'
+      )
+      const payload = (setCall![0] as { payload: Array<{ nodeId: string | null }> }).payload
+      expect(payload[0]?.nodeId).toBe('trigger-1')
     })
   })
 })

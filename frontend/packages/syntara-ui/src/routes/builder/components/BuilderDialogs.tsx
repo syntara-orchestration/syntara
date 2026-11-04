@@ -6,6 +6,10 @@ import type { DialogState } from '../../../hooks/useDialogState'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { selectActivities, selectTriggers } from '../../../stores/workflowStoreSelectors'
+import {
+  formTriggerRequiresInputCollection,
+  type FormTriggerPresentation,
+} from '../../workflows/formTrigger/formTriggerRunUtils'
 import { WorkflowDeleteDialog } from '../../workflows/WorkflowDeleteDialog'
 import type { BuilderAction } from '../builderReducer'
 import { useBuilderImportHandlers, type UseBuilderImportHandlersParams } from '../hooks/useBuilderImportHandlers'
@@ -14,10 +18,10 @@ import { activitiesReferenceTrigger, hasNonEmptyInputSchema } from '../utils/tri
 import type { ConflictAction, ConflictInfo } from '../VersionConflictDialog'
 import { VersionConflictDialog } from '../VersionConflictDialog'
 
+import { BuilderRunInputStep } from './BuilderRunInputStep'
 import { ImportConfirmationDialog } from './ImportConfirmationDialog'
 import type { RunStepDialogData, RunStepExecutionCreatedOptions } from './RunStepDialog'
 import { RunStepDialog } from './RunStepDialog'
-import { RunWorkflowModal } from './RunWorkflowModal'
 
 const RUN_CONFIRM_DISMISSED_KEY = 'syntara-run-workflow-confirm-dismissed'
 
@@ -49,6 +53,9 @@ type BuilderDialogsProps = Readonly<{
   triggerName: string
   triggerNodeId?: string
   triggerInputSchema?: Record<string, unknown>
+  formTrigger?: FormTriggerPresentation
+  canRun: boolean
+  runTooltip: string
   pendingImport: PendingImportData | null
   setPendingImport: (data: PendingImportData | null) => void
   importDeps: Omit<
@@ -74,6 +81,7 @@ type BuilderDialogsProps = Readonly<{
 type UseRunConfirmStateParams = {
   confirmDialogOpen: boolean
   showInputDialog: boolean
+  skipRunConfirmation: boolean
   dispatch: Dispatch<BuilderAction>
   handleRunWorkflow: (inputData?: Record<string, unknown>, triggerNodeId?: string) => void
   triggerNodeId?: string
@@ -82,6 +90,7 @@ type UseRunConfirmStateParams = {
 function useRunConfirmState({
   confirmDialogOpen,
   showInputDialog,
+  skipRunConfirmation,
   dispatch,
   handleRunWorkflow,
   triggerNodeId,
@@ -99,7 +108,7 @@ function useRunConfirmState({
     setPrevOpen(false)
   }
 
-  const skipConfirm = confirmDialogOpen && getRunConfirmDismissed()
+  const skipConfirm = confirmDialogOpen && (getRunConfirmDismissed() || skipRunConfirmation)
 
   // Auto-run when confirmation is skipped and no input dialog is needed
   const autoRanRef = useRef(false)
@@ -148,6 +157,9 @@ export function BuilderDialogs({
   triggerName,
   triggerNodeId,
   triggerInputSchema,
+  formTrigger,
+  canRun,
+  runTooltip,
   pendingImport,
   setPendingImport,
   importDeps,
@@ -168,10 +180,20 @@ export function BuilderDialogs({
   const activities = useWorkflowStore(selectActivities)
   const triggers = useWorkflowStore(selectTriggers)
   const triggerNodeIds = useMemo(() => (triggers ?? []).map((t) => t.id).filter(Boolean), [triggers])
-  const showInputDialog =
-    hasNonEmptyInputSchema(triggerInputSchema) || activitiesReferenceTrigger(activities ?? [], triggerNodeIds)
+  const showFormTriggerDialog = formTriggerRequiresInputCollection(formTrigger)
+  const showJsonInputDialog =
+    !showFormTriggerDialog &&
+    (hasNonEmptyInputSchema(triggerInputSchema) || activitiesReferenceTrigger(activities ?? [], triggerNodeIds))
+  const showInputDialog = showFormTriggerDialog || showJsonInputDialog
   const { showConfirmStep, showInputStep, doNotShowAgain, setDoNotShowAgain, closeAll, handleConfirmRun } =
-    useRunConfirmState({ confirmDialogOpen, showInputDialog, dispatch, handleRunWorkflow, triggerNodeId })
+    useRunConfirmState({
+      confirmDialogOpen,
+      showInputDialog,
+      skipRunConfirmation: showFormTriggerDialog,
+      dispatch,
+      handleRunWorkflow,
+      triggerNodeId,
+    })
   return (
     <>
       <SynConfirmationDialog
@@ -202,16 +224,19 @@ export function BuilderDialogs({
           </StackItem>
         </Stack>
       </SynConfirmationDialog>
-      <RunWorkflowModal
-        key={showInputStep ? `open-${triggerNodeId ?? ''}` : 'closed'}
-        isOpen={showInputStep}
-        onClose={closeAll}
-        onConfirm={handleRunWorkflow}
+      <BuilderRunInputStep
+        showInputStep={showInputStep}
+        showFormTriggerDialog={showFormTriggerDialog}
+        formTrigger={formTrigger}
+        workflowId={workflowId}
+        triggerNodeId={triggerNodeId}
         workflowName={workflowName}
         triggerName={triggerName}
-        triggerNodeId={triggerNodeId}
-        inputSchema={triggerInputSchema}
-        workflowId={workflowId}
+        triggerInputSchema={triggerInputSchema}
+        canRun={canRun}
+        runTooltip={runTooltip}
+        onClose={closeAll}
+        onRunWorkflow={handleRunWorkflow}
       />
       <WorkflowDeleteDialog
         isOpen={deleteDialogOpen}

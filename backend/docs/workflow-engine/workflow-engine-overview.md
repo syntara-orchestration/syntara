@@ -30,34 +30,34 @@ There's no explicit "parallel" node type (see the module docstring in `dynamic_w
 `_dispatch_node_to_executor()` is the single dispatch point every node passes through after credential injection. It splits into two shapes:
 
 - **Map-dispatched nodes** (`script`, `http_request`, `condition`, `switch`, `agentic`, `aap_job_template`, `aap_workflow_job_template`) are looked up in `_EXECUTOR_ACTIVITY_MAP` (a `NodeType → ActivityName` mapping) and run through one generic path, `_execute_executor_node()`, which calls `workflow.execute_activity(activity_name, args=[params, outputs], activity_id=node.id, ...)`.
-- **Custom-dispatched nodes** (`approval`, `wait`, `converge`, `loop`) need extra arguments or custom routing logic that the generic path doesn't support, so each gets its own handler method instead of going through the map.
+- **Custom-dispatched nodes** (`approval`, `form_prompt`, `wait`, `converge`, `loop`) need extra arguments or custom routing logic that the generic path doesn't support, so each gets its own handler method instead of going through the map.
 
 Loop *control* activities use Temporal IDs `{loop_id}_iter_{n}`, or `{loop_id}_iter_{outer}_iter_{inner}` when that loop is itself inside another loop, so Temporal never reuses an activity ID when an inner loop resets on the next outer iteration. Approval nodes **inside** a loop body use that same suffix for the Temporal `activity_id` only. The Approvals API `approval_node_id` stays the canvas node ID; `loop_iteration_path` (outermost first) distinguishes iterations, and uniqueness is `(execution_id, approval_node_id, loop_iteration_path)`. The Temporal ID is persisted on the approval row as `temporal_activity_id` so decide/signal never recomputes it. `workflow.patched("loop-iteration-unique-ids")` keeps in-flight pre-upgrade executions on canvas Temporal IDs until those runs drain. Activity sync strips every `_iter_{n}` suffix back to the canvas node ID; only LOOP-typed nodes with that suffix are treated as loop control.
 
 This dispatch axis is orthogonal to whether the activity completes synchronously or asynchronously — `agentic` is map-dispatched but uses async completion (see below), while `loop` and `converge` are custom-dispatched but complete synchronously.
 
-## Why Async Completion via Signals (Approval, Agentic, Wait)
+## Why Async Completion via Signals (Approval, Form Prompt, Agentic, Wait)
 
-These three share a pattern because a plain synchronous Temporal activity would tie up a worker slot for as long as the node takes to resolve — potentially hours for a human approval or a long agent run. Instead, the activity does its setup and calls `activity.raise_complete_async()` (`approval_activity.py`, `agentic_activity.py`, `wait_activity.py`), which leaves the Temporal activity in `STARTED` state without holding a worker.
+These four share a pattern because a plain synchronous Temporal activity would tie up a worker slot for as long as the node takes to resolve — potentially hours for a human approval or form response, or a long agent run. Instead, the activity does its setup and calls `activity.raise_complete_async()` (`approval_activity.py`, `form_prompt_activity.py`, `agentic_activity.py`, `wait_activity.py`), which leaves the Temporal activity in `STARTED` state without holding a worker.
 
 ```mermaid
 sequenceDiagram
     participant WE as Workflow Engine
     participant TA as Temporal Activity
-    participant Ext as External System (Approvals API / Agent Orchestrator)
+    participant Ext as External System (Approvals API / Forms API / Agent Orchestrator)
     WE->>TA: dispatch activity
     TA->>Ext: create request / invoke agent
     TA->>TA: raise_complete_async()
     Note over TA: activity = STARTED, worker slot freed
     Ext->>Ext: human decision / agent run completes
-    Ext->>WE: POST .../signal (service JWT)
+    Ext->>WE: POST .../signal
     WE->>TA: complete_async_activity()
     TA-->>WE: resume workflow
 ```
 
 Completion happens out of band:
 
-- **Approval / Agentic**: an external system calls `POST /executions/{execution_id}/activities/{activity_id}/signal` (`executions_router.py`) → `ExecutionService.handle_activity_callback()` (`execution_service.py`) → `TemporalExecutionService.complete_async_activity()` (`temporal_execution_service.py`) → `temporal_client.get_async_activity_handle(...).complete()`. The callback URL is built by `generate_activity_signal_url()` (`utils/url.py`); see [S2S Certificate Authentication](../s2s-cert-authentication.md) for how internal service calls are authenticated.
+- **Approval / Form Prompt / Agentic**: an external system calls `POST /executions/{execution_id}/activities/{activity_id}/signal` (`executions_router.py`) → `ExecutionService.handle_activity_callback()` (`execution_service.py`) → `TemporalExecutionService.complete_async_activity()` (`temporal_execution_service.py`) → `temporal_client.get_async_activity_handle(...).complete()`. The callback URL is built by `generate_activity_signal_url()` (`utils/url.py`). Approval and Forms API callbacks use the internal S2S HTTP client (mTLS when enabled; see [S2S Certificate Authentication](../s2s-cert-authentication.md)); Agent Orchestrator callbacks use a service JWT (see [Agentic Node](agentic-node.md)).
 - **Wait**: completes on its own via a durable Temporal timer (`workflow.sleep()`) — no external signal involved.
 
 ## Why Fire-and-Poll for AAP Job Template
@@ -125,6 +125,8 @@ Shared infrastructure every node type gets for free, no per-node opt-in required
 - [Switch Node](switch-node.md)
 - [Wait Node](wait-node.md)
 - [Converge Node](converge-node.md)
+- [Form Prompt Overview](../form-prompts/form-prompt-overview.md) — the `form_prompt` node: form definition, async completion, timeout and branch routing
+- [Approval Overview](../approvals/approval-overview.md) — the `approval` node
 - [Node Settings](node-settings.md) — timeout and retry configuration resolution
 - [Retry Policies](retry-policies.md) — retry behavior for transient failures
 - [Workflow Definition Guide](workflow-definition-guide.md) — complete guide to defining V2 workflows

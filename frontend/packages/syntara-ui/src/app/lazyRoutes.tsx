@@ -24,6 +24,7 @@ export const FeatureFlagDemo = lazy(() =>
   import('../routes/feature-flags/feature-flag-demo-page').then((m) => ({ default: m.FeatureFlagDemo }))
 )
 export const Approvals = lazy(() => import('../routes/approvals/Approvals'))
+export const TasksAccessGate = lazy(() => import('../routes/tasks/TasksAccessGate'))
 export const AccessManagement = lazy(() =>
   import('../routes/access-management/AccessManagement').then((m) => ({ default: m.AccessManagement }))
 )

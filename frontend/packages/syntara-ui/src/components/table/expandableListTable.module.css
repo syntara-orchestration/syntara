@@ -1,0 +1,4 @@
+/* Narrow leading columns (row expand, bulk select) so data columns align with standard list tables. */
+.controlCol {
+  width: var(--pf-t--global--spacer--3xl);
+}

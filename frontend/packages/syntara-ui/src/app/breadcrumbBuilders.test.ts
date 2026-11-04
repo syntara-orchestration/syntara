@@ -25,6 +25,7 @@ import {
   breadcrumbsUserFormLoading,
   breadcrumbsIntegrationDetail,
   breadcrumbsServiceAccountDetail,
+  breadcrumbsTasksTab,
 } from './breadcrumbBuilders'
 
 describe('breadcrumbBuilders', () => {
@@ -106,6 +107,14 @@ describe('breadcrumbBuilders', () => {
     expect(breadcrumbsSettingsPage()).toEqual([{ label: 'Settings', href: AppRoute.SystemAdministration.Settings }])
 
     expect(breadcrumbsApprovalsPage('Loading')).toHaveLength(2)
+    expect(breadcrumbsTasksTab('approvals')).toEqual([
+      { label: 'Tasks', href: `${AppRoute.Tasks.Root}/approvals` },
+      { label: 'Approvals' },
+    ])
+    expect(breadcrumbsTasksTab('form-responses')).toEqual([
+      { label: 'Tasks', href: `${AppRoute.Tasks.Root}/approvals` },
+      { label: 'Form responses' },
+    ])
 
     expect(breadcrumbsIntegrationConfigure()).toHaveLength(3)
 

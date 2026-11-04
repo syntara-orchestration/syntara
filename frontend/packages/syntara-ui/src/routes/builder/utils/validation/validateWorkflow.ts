@@ -5,6 +5,10 @@ import type { EdgeConnection } from '../../types/edge'
 
 import { validateConditionConnections } from './rules/validateConditionConnections'
 import { validateConvergeInputs } from './rules/validateConvergeInputs'
+import { validateFormPromptConnections } from './rules/validateFormPromptConnections'
+import { validateFormPromptFallbackBehavior } from './rules/validateFormPromptFallbackBehavior'
+import { validateFormPromptFormDefinition } from './rules/validateFormPromptFormDefinition'
+import { validateFormTriggerFormDefinition } from './rules/validateFormTriggerFormDefinition'
 import { validateLoopNodes } from './rules/validateLoopNodes'
 import { validateNoDanglingNodes } from './rules/validateNoDanglingNodes'
 import { validateNoGenericNodes } from './rules/validateNoGenericNodes'
@@ -17,6 +21,10 @@ import type { ValidationContext, ValidationError, ValidationResult, ValidationRu
 const ERROR_RULES: ValidationRule[] = [
   validateNoDanglingNodes,
   validateConditionConnections,
+  validateFormPromptConnections,
+  validateFormPromptFallbackBehavior,
+  validateFormPromptFormDefinition,
+  validateFormTriggerFormDefinition,
   validateConvergeInputs,
   validateLoopNodes,
   validateNoGenericNodes,

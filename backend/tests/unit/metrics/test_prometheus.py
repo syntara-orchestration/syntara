@@ -48,6 +48,9 @@ class TestMetricDefinitions:
         assert prom.workflow_serialization_duration_seconds is not None
         assert prom.workflow_validation_duration_seconds is not None
         assert prom.workflow_start_latency_seconds is not None
+        assert prom.form_prompt_submission_handoff_seconds is not None
+        assert prom.form_prompt_resume_dispatch_seconds is not None
+        assert prom.form_trigger_submission_start_seconds is not None
         assert prom.tool_execution_duration_seconds is not None
         assert prom.database_query_response_time_seconds is not None
         assert prom.system_e2e_latency_seconds is not None
@@ -126,12 +129,18 @@ class TestPrometheusOutput:
         prom.requests_total.labels(status="success", endpoint="/api", interface="api").inc(10)
         prom.cache_hits_total.inc(5)
         prom.active_workflows.labels(component="temporal_worker").set(3)
+        prom.form_prompt_submission_handoff_seconds.labels(component="api_service").observe(0.025)
+        prom.form_prompt_resume_dispatch_seconds.labels(component="workflow_engine").observe(0.045)
+        prom.form_trigger_submission_start_seconds.labels(component="execution_service").observe(0.25)
 
         output = generate_latest(prom.registry).decode("utf-8")
 
         assert "orchestrator_requests_total" in output
         assert "orchestrator_cache_hits_total" in output
         assert "orchestrator_active_workflows" in output
+        assert "orchestrator_form_prompt_submission_handoff_seconds" in output
+        assert "orchestrator_form_prompt_resume_dispatch_seconds" in output
+        assert "orchestrator_form_trigger_submission_start_seconds" in output
         assert "# HELP" in output
         assert "# TYPE" in output
 

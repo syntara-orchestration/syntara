@@ -34,6 +34,7 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
   const isScheduled = triggerType === TriggerTypeEnum.SCHEDULED
   const isWebhook = triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER
   const isEda = triggerType === TriggerTypeEnum.EDA_TRIGGER
+  const isForm = triggerType === TriggerTypeEnum.FORM_TRIGGER
 
   let metadata = stepMetadata.trigger
   let iconId = 'trigger-manual'
@@ -46,6 +47,9 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
   } else if (isEda) {
     metadata = stepMetadata.edaTrigger
     iconId = 'trigger-eda'
+  } else if (isForm) {
+    metadata = stepMetadata.formTrigger
+    iconId = 'trigger-form'
   }
   const iconColor = getStepTypeColor(FlowNodeType.TRIGGER)
   const iconNode = renderStepIcon(metadata.icon, iconId, 'canvas', iconColor)
@@ -91,6 +95,8 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
     triggerTypeLabel = 'Webhook trigger'
   } else if (isEda) {
     triggerTypeLabel = 'Event-Driven Ansible trigger'
+  } else if (isForm) {
+    triggerTypeLabel = 'Form trigger'
   }
 
   return (
@@ -145,6 +151,7 @@ function TriggerStepDetails(
   const isScheduledTrigger = props.triggerKind === TriggerTypeEnum.SCHEDULED
   const isWebhookTrigger = props.triggerKind === TriggerTypeEnum.WEBHOOK_TRIGGER
   const isEdaTrigger = props.triggerKind === TriggerTypeEnum.EDA_TRIGGER
+  const isFormTrigger = props.triggerKind === TriggerTypeEnum.FORM_TRIGGER
   const normalizedDetails = props.triggerDetails ?? null
   return (
     <>
@@ -176,6 +183,7 @@ function TriggerStepDetails(
           {isEdaTrigger && !normalizedDetails && (
             <Content component={ContentVariants.small}>Event-Driven Ansible trigger</Content>
           )}
+          {isFormTrigger && !normalizedDetails && <Content component={ContentVariants.small}>Form trigger</Content>}
           {normalizedDetails && (
             <Content component={ContentVariants.small} style={{ whiteSpace: 'pre-line', overflowWrap: 'anywhere' }}>
               {normalizedDetails}

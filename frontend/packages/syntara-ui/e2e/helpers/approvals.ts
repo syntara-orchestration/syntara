@@ -3,6 +3,24 @@ import type { Locator } from '@playwright/test'
 import { expect, type Page, toAppUrl } from '../fixtures'
 import { pollApprovalVisible } from '../utils/api'
 
+import { APP_TITLE } from './appTitle'
+
+/** Canonical approvals list URL (Tasks → Approvals tab). Legacy `/approvals` redirects here. */
+export const APPROVALS_LIST_PATH = '/tasks/approvals'
+
+/** Wait for the Tasks page with the Approvals tab list loaded. */
+export async function gotoApprovalsList(app: Page): Promise<void> {
+  await app.goto(toAppUrl(APPROVALS_LIST_PATH))
+  await expect(app.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible({ timeout: 15_000 })
+  await expect(app.getByRole('tab', { name: 'Approvals' })).toBeVisible()
+  await expect(app.getByRole('tabpanel', { name: 'Approvals' })).toBeVisible({ timeout: 15_000 })
+}
+
+/** Document title for the approvals list (Tasks shell, Approvals tab). */
+export async function expectApprovalsListPageTitle(app: Page): Promise<void> {
+  await expect(app).toHaveTitle(`Tasks | ${APP_TITLE}`)
+}
+
 /**
  * Dismisses the "Live updates paused" connection banner if visible.
  * Uses role-based locator to stay off PatternFly class names.
@@ -13,6 +31,11 @@ export async function dismissConnectionBanner(app: Page): Promise<void> {
     await banner.getByRole('button', { name: /close/i }).click()
     await banner.waitFor({ state: 'hidden', timeout: 5_000 })
   }
+}
+
+/** Bulk Approve/Reject controls live in the list toolbar (not the Compass page header). */
+export function getApprovalsBulkToolbar(app: Page, selectedCount: number): Locator {
+  return app.getByRole('toolbar', { name: `${selectedCount} selected` })
 }
 
 /**
@@ -42,14 +65,14 @@ export async function applyApprovalNameFilter(
 /**
  * Waits for the approval review panel to be visible.
  * Verifies both URL navigation to execution detail with approval query param
- * and the "Review Approval" heading visibility.
+ * and the "Review approval" heading visibility.
  *
  * @param app - Playwright Page object
  * @param timeout - Optional timeout in milliseconds (default: 15000)
  */
 export async function waitForApprovalPanel(app: Page, timeout = 15_000): Promise<void> {
   await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=/)
-  await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout })
+  await expect(app.getByRole('heading', { name: 'Review approval' })).toBeVisible({ timeout })
 }
 
 /**
@@ -69,8 +92,7 @@ export async function navigateToApprovalAndOpen(app: Page, approvalName: string)
   // becoming queryable in the listing API (the two are slightly asynchronous on the backend).
   await pollApprovalVisible(app, approvalName)
 
-  await app.goto(toAppUrl('/approvals'))
-  await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+  await gotoApprovalsList(app)
 
   const approvalsTable = app.getByRole('grid', { name: 'Approvals table' })
   await expect(approvalsTable).toBeVisible({ timeout: 15_000 })

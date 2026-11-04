@@ -11,7 +11,7 @@ type UseSelectedActivityOptions = {
   activityStates: Map<string, ActivityState>
   activityOrder: ActivityOrderItem[]
   nameMap: Map<string, string>
-  onNodeSelect?: (nodeId: string, nodeName: string) => void
+  onNodeSelect?: (nodeId: string, nodeName: string, activityKey?: string) => void
 }
 
 export function useSelectedActivity(opts: UseSelectedActivityOptions) {
@@ -56,7 +56,7 @@ export function useSelectedActivity(opts: UseSelectedActivityOptions) {
     (activityKey: string, nodeName: string) => {
       setSelectedActivityKey(activityKey)
       const { baseId } = parseCompositeKey(activityKey)
-      onNodeSelect?.(baseId, nodeName)
+      onNodeSelect?.(baseId, nodeName, activityKey)
     },
     [onNodeSelect]
   )

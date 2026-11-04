@@ -1,6 +1,7 @@
 """State and queue item types used by activity synchronization."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -66,6 +67,9 @@ class ExecutionMonitorMetadata:
     activity_index_map: dict[str, int]
     pending_activity_updates: dict[int, dict[str, Any]]
     pending_sync_event_ids: set[int] = field(default_factory=set)
+    scheduled_form_prompt_activity_ids: dict[int, str] = field(default_factory=dict)
+    pending_form_prompt_completed_at: list[datetime] = field(default_factory=list)
+    last_form_prompt_resume_metric_event_id: int = 0
     terminal_activity_ids: set[str] = field(default_factory=set)
     iteration_counters: dict[str, int] = field(default_factory=dict)
     next_activity_index: int = 0

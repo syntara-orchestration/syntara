@@ -1,4 +1,6 @@
-import { type ScheduleType, TriggerTypeEnum, type Activity } from '@syntara/contracts'
+import { type FormDefinition, type ScheduleType, TriggerTypeEnum, type Activity } from '@syntara/contracts'
+
+import { buildFormTriggerActivityParameters } from '../routes/builder/utils/formTriggerActivityParameters'
 
 // ============================================================================
 // Trigger Factory Functions
@@ -133,4 +135,25 @@ export function createEdaTrigger(options: CreateWebhookTriggerOptions): Activity
     inputSchema,
     authorizedServiceAccountIds,
   })
+}
+
+export type CreateFormTriggerOptions = {
+  id: string
+  name?: string
+  form_definition: FormDefinition
+  message?: string | null
+  submit_label?: string | null
+  success_message?: string | null
+  css_override?: string | null
+}
+
+/** Create a form trigger (v2). */
+export function createFormTrigger(options: CreateFormTriggerOptions): Activity {
+  const { id, name, ...parameterInput } = options
+  return {
+    id,
+    type: TriggerTypeEnum.FORM_TRIGGER,
+    name: name ?? 'Form trigger',
+    parameters: buildFormTriggerActivityParameters(parameterInput),
+  }
 }

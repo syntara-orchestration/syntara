@@ -472,6 +472,38 @@ async def test_who_can_tier1_allows_workflow_editor(
 
 
 @pytest.mark.asyncio
+async def test_who_can_tier1_allows_workflow_editor_form_prompt_submit(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+    auth_as: Callable[[User], None],
+) -> None:
+    """WC-0b2: project workflow editor can query form_prompt:submit with resource_project."""
+    admin = await user_factory(username="admin-wc0b2", email="admin-wc0b2@test.com")
+    editor = await user_factory(username="editor-wc0b2", email="editor-wc0b2@test.com")
+    await make_admin(test_db_session, admin)
+
+    auth_as(admin)
+    response = await auth_client.post("/api/v1/projects", json={"name": "wc-tier1-form-prompt-proj"})
+    assert response.status_code == 201
+    project_name = response.json()["name"]
+    project = (await test_db_session.exec(select(Project).where(Project.name == project_name))).first()
+    assert project is not None
+    await make_project_user(test_db_session, editor, project)
+
+    auth_as(editor)
+    response = await auth_client.post(
+        "/api/v1/authz/who_can",
+        json={
+            "action": "submit",
+            "resource_type": "form_prompt",
+            "resource_project": project_name,
+        },
+    )
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_who_can_tier1_rejects_unlisted_pair(
     auth_client: AsyncClient,
     test_db_session: AsyncSession,

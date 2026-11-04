@@ -1,9 +1,49 @@
 import { type Locator } from '@playwright/test'
 
-import { type Page, expect } from '../fixtures'
+import { type Page, expect, toAppUrl } from '../fixtures'
+
+import { waitForUIReady } from './workflows'
 
 /** Locator scoped to the Compass page-header region (h1, status badges, toolbar). */
 export const pageHeader = (page: Page): Locator => page.locator('.pf-v6-c-compass__main-header')
+
+/** Filter the workflows list to a single row by exact name match. */
+export async function filterWorkflowRowByName(page: Page, workflowName: string): Promise<Locator> {
+  await page.goto(toAppUrl('/workflows'))
+  await page.getByPlaceholder('Filter by name').fill(workflowName)
+  await page.getByRole('button', { name: 'Apply filter' }).click()
+
+  const row = page.getByRole('row', { name: new RegExp(workflowName) })
+  await expect(row).toBeVisible({ timeout: 15_000 })
+  await waitForUIReady(page)
+  return row
+}
+
+type RunPublishedFromListOptions = {
+  /** When true, click Run now and wait for execution detail. Defaults to false (form-trigger path). Manual triggers should pass true or use runPublishedWorkflowFromList. */
+  confirmManualRun?: boolean
+}
+
+/** Kebab → Run published version. Optionally confirms manual run and waits for execution detail. */
+export async function clickRunPublishedVersionFromWorkflowList(
+  page: Page,
+  workflowName: string,
+  options: RunPublishedFromListOptions = {}
+): Promise<void> {
+  const confirmManualRun = options.confirmManualRun ?? false
+  const row = await filterWorkflowRowByName(page, workflowName)
+  await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
+  await page.getByRole('menuitem', { name: 'Run published version' }).click()
+  if (confirmManualRun) {
+    await page.getByRole('button', { name: 'Run now' }).click()
+    await expect(page).toHaveURL(/\/executions\//, { timeout: 30_000 })
+  }
+}
+
+/** Run a published workflow from the Workflows list (kebab → Run published version) and wait for execution detail. */
+export async function runPublishedWorkflowFromList(page: Page, workflowName: string): Promise<void> {
+  await clickRunPublishedVersionFromWorkflowList(page, workflowName, { confirmManualRun: true })
+}
 
 /**
  * Click Run in the workflow builder toolbar and wait for navigation to the

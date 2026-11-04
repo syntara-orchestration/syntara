@@ -64,6 +64,8 @@ export async function createPersona(app: Page, name: string, actions: string[]):
   const user = await createUserViaApi(app, {
     username: name,
     password: E2E_TEST_PASSWORD,
+    // Avoid default `users` + project-user on default project (grants approval/form_prompt read).
+    groupNames: [],
   })
   if (!user) throw new Error(`Failed to create user for persona "${name}"`)
 

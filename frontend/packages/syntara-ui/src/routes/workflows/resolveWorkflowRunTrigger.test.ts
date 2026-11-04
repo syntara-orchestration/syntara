@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { workflowFetchClient } from '../../client'
 
-import { resolveWorkflowRunTrigger } from './resolveWorkflowRunTrigger'
+import { resolveWorkflowListRunTrigger, resolveWorkflowRunTrigger } from './resolveWorkflowRunTrigger'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -84,6 +84,7 @@ describe('resolveWorkflowRunTrigger', () => {
       triggerType: undefined,
       inputSchema: { type: 'object', properties: { version: { type: 'string' } } },
       hasTriggerReferences: false,
+      formTrigger: undefined,
     })
     expect(workflowFetchClient.GET).toHaveBeenCalledTimes(1)
   })
@@ -125,6 +126,7 @@ describe('resolveWorkflowRunTrigger', () => {
       triggerType: undefined,
       inputSchema: { type: 'object', properties: { env: { type: 'string' } } },
       hasTriggerReferences: false,
+      formTrigger: undefined,
     })
     expect(workflowFetchClient.GET).toHaveBeenCalledWith('/workflows/{workflow_id}/versions/{version}', {
       params: { path: { workflow_id: 'wf-1', version: 1 } },
@@ -164,10 +166,11 @@ describe('resolveWorkflowRunTrigger', () => {
       triggerType: undefined,
       inputSchema: undefined,
       hasTriggerReferences: false,
+      formTrigger: undefined,
     })
   })
 
-  it('keeps draft triggers when published version fetch fails', async () => {
+  it('throws when published version fetch fails while draft differs', async () => {
     vi.mocked(workflowFetchClient.GET).mockImplementation((path: string) => {
       if (path === '/workflows/{workflow_id}/versions/{version}') {
         return Promise.resolve(mockGetResponse(undefined, { detail: 'not found' }))
@@ -186,13 +189,9 @@ describe('resolveWorkflowRunTrigger', () => {
       )
     })
 
-    await expect(resolveWorkflowRunTrigger(mockWorkflow({ published_version_number: 1 }))).resolves.toEqual({
-      triggerNodeId: 'draft-trigger',
-      triggerName: 'Draft Trigger',
-      triggerType: undefined,
-      inputSchema: undefined,
-      hasTriggerReferences: false,
-    })
+    await expect(resolveWorkflowRunTrigger(mockWorkflow({ published_version_number: 1 }))).rejects.toThrow(
+      /published workflow version/i
+    )
   })
 
   it('ignores non-object triggers and non-object input_schema values', async () => {
@@ -218,7 +217,161 @@ describe('resolveWorkflowRunTrigger', () => {
       triggerType: undefined,
       inputSchema: undefined,
       hasTriggerReferences: false,
+      formTrigger: undefined,
     })
+  })
+
+  it('prefers a form trigger over an earlier manual trigger', async () => {
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(
+      mockGetResponse({
+        id: 'wf-1',
+        current_version: 1,
+        published_version_number: 1,
+        version: {
+          workflow_definition: {
+            triggers: [
+              {
+                id: 'manual-1',
+                name: 'Manual',
+                type: 'manual_trigger',
+                parameters: { input_schema: { type: 'object', properties: { version: { type: 'string' } } } },
+              },
+              {
+                id: 'form-1',
+                name: 'Intake',
+                type: 'form_trigger',
+                parameters: {
+                  form_definition: {
+                    fields: [{ type: 'text', value_name: 'reason', label: 'Reason', required: true }],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      })
+    )
+
+    const result = await resolveWorkflowRunTrigger(mockWorkflow())
+    expect(result?.triggerNodeId).toBe('form-1')
+    expect(result?.triggerType).toBe('form_trigger')
+  })
+
+  it('returns chooseFormStep when multiple form steps require input', async () => {
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(
+      mockGetResponse({
+        id: 'wf-1',
+        current_version: 1,
+        published_version_number: 1,
+        version: {
+          workflow_definition: {
+            triggers: [
+              {
+                id: 'form-a',
+                name: 'Alpha',
+                type: 'form_trigger',
+                parameters: {
+                  form_definition: {
+                    fields: [{ type: 'text', value_name: 'a', label: 'A', required: true }],
+                  },
+                },
+              },
+              {
+                id: 'form-b',
+                name: 'Beta',
+                type: 'form_trigger',
+                parameters: {
+                  form_definition: {
+                    fields: [{ type: 'text', value_name: 'b', label: 'B', required: true }],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      })
+    )
+
+    await expect(resolveWorkflowListRunTrigger(mockWorkflow())).resolves.toEqual({
+      kind: 'chooseFormStep',
+      triggers: [
+        expect.objectContaining({ triggerNodeId: 'form-a', triggerName: 'Alpha' }),
+        expect.objectContaining({ triggerNodeId: 'form-b', triggerName: 'Beta' }),
+      ],
+    })
+  })
+
+  it('throws when resolveWorkflowRunTrigger is used for multiple form steps', async () => {
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(
+      mockGetResponse({
+        id: 'wf-1',
+        current_version: 1,
+        published_version_number: 1,
+        version: {
+          workflow_definition: {
+            triggers: [
+              {
+                id: 'form-a',
+                name: 'Alpha',
+                type: 'form_trigger',
+                parameters: {
+                  form_definition: {
+                    fields: [{ type: 'text', value_name: 'a', label: 'A', required: true }],
+                  },
+                },
+              },
+              {
+                id: 'form-b',
+                name: 'Beta',
+                type: 'form_trigger',
+                parameters: {
+                  form_definition: {
+                    fields: [{ type: 'text', value_name: 'b', label: 'B', required: true }],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      })
+    )
+
+    await expect(resolveWorkflowRunTrigger(mockWorkflow())).rejects.toThrow(/multiple form steps/i)
+  })
+
+  it('parses form trigger presentation from parameters', async () => {
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(
+      mockGetResponse({
+        id: 'wf-1',
+        current_version: 1,
+        published_version_number: 1,
+        version: {
+          workflow_definition: {
+            triggers: [
+              {
+                id: 'form-1',
+                name: 'Intake',
+                type: 'form_trigger',
+                parameters: {
+                  message: 'Please complete the form',
+                  submit_label: 'Send',
+                  success_message: 'Thanks!',
+                  form_definition: {
+                    fields: [{ type: 'text', value_name: 'reason', label: 'Reason', required: true }],
+                  },
+                },
+              },
+            ],
+          },
+        },
+      })
+    )
+
+    const result = await resolveWorkflowRunTrigger(mockWorkflow())
+    expect(result?.triggerType).toBe('form_trigger')
+    expect(result?.formTrigger?.message).toBe('Please complete the form')
+    expect(result?.formTrigger?.submitLabel).toBe('Send')
+    expect(result?.formTrigger?.definition.fields).toHaveLength(1)
   })
 
   it('returns null when workflow definition has no triggers array', async () => {

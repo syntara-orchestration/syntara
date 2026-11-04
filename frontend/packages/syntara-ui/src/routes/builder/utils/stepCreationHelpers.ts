@@ -1,6 +1,7 @@
 import { generateActivityId } from '../../../utils/generateUUID'
 
 import { getStepDisplayName } from './stepNaming'
+import { getDefaultFormTriggerId } from './triggerIdNaming'
 
 export function buildNamedActivity<TActivity>(
   baseName: string,
@@ -21,6 +22,17 @@ export function buildNamedTrigger<TTrigger>(
 ): { triggerId: string; name: string; trigger: TTrigger } {
   const triggerId = generateActivityId()
   const name = getStepDisplayName(baseName, requestedName)
+  const trigger = buildTrigger(triggerId, name)
+
+  return { triggerId, name, trigger }
+}
+
+export function buildNamedFormTrigger<TTrigger>(
+  requestedName: string | undefined,
+  buildTrigger: (triggerId: string, name: string) => TTrigger
+): { triggerId: string; name: string; trigger: TTrigger } {
+  const triggerId = getDefaultFormTriggerId()
+  const name = getStepDisplayName('Form trigger', requestedName)
   const trigger = buildTrigger(triggerId, name)
 
   return { triggerId, name, trigger }

@@ -6,6 +6,7 @@ import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { OnAddNodeFromEdge } from '../types'
 
 import { EdgeFactory } from './EdgeFactory'
+import { isFormPromptHandle } from './edgeHelpers'
 import { isSwitchCasePort } from './switchCaseHelpers'
 import type { EdgeType } from './workflowToGraph'
 
@@ -14,28 +15,24 @@ const PANEL_CONNECT_RETRY_MS = 50
 
 // v8 ignore start — React Flow wiring; covered by builder E2E / integration flows
 
+function hasBranchPlaceholders(nodes: Node[], sourceId: string, handles: readonly string[]): boolean {
+  return nodes.some((n) => handles.some((handle) => n.id === `placeholder-${sourceId}-${handle}`))
+}
+
 function hasConditionNodePlaceholders(nodes: Node[], sourceId: string): boolean {
-  return nodes.some(
-    (n) =>
-      n.id === `placeholder-${sourceId}-${EdgeHandleEnum.TRUE}` ||
-      n.id === `placeholder-${sourceId}-${EdgeHandleEnum.FALSE}`
-  )
+  return hasBranchPlaceholders(nodes, sourceId, [EdgeHandleEnum.TRUE, EdgeHandleEnum.FALSE])
 }
 
 function hasLoopNodePlaceholders(nodes: Node[], sourceId: string): boolean {
-  return nodes.some(
-    (n) =>
-      n.id === `placeholder-${sourceId}-${EdgeHandleEnum.DONE}` ||
-      n.id === `placeholder-${sourceId}-${EdgeHandleEnum.LOOP}`
-  )
+  return hasBranchPlaceholders(nodes, sourceId, [EdgeHandleEnum.DONE, EdgeHandleEnum.LOOP])
 }
 
 function hasApprovalNodePlaceholders(nodes: Node[], sourceId: string): boolean {
-  return nodes.some(
-    (n) =>
-      n.id === `placeholder-${sourceId}-${EdgeHandleEnum.APPROVED}` ||
-      n.id === `placeholder-${sourceId}-${EdgeHandleEnum.REJECTED}`
-  )
+  return hasBranchPlaceholders(nodes, sourceId, [EdgeHandleEnum.APPROVED, EdgeHandleEnum.REJECTED])
+}
+
+function hasFormPromptNodePlaceholders(nodes: Node[], sourceId: string): boolean {
+  return hasBranchPlaceholders(nodes, sourceId, [EdgeHandleEnum.SUBMITTED, EdgeHandleEnum.FALLBACK])
 }
 
 function removeButtonEdgeClass(nodes: Node[], sourceId: string): Node[] {
@@ -74,6 +71,9 @@ function updateNodesAfterPanelConnect(nds: Node[], sourceId: string, sourcePlace
     return filtered
   }
   if (sourceNode.type === FlowNodeType.APPROVAL && hasApprovalNodePlaceholders(filtered, sourceId)) {
+    return filtered
+  }
+  if (sourceNode.type === FlowNodeType.FORM_PROMPT && hasFormPromptNodePlaceholders(filtered, sourceId)) {
     return filtered
   }
   return removeButtonEdgeClass(filtered, sourceId)
@@ -184,8 +184,9 @@ export function applyConnectFromPanelWhenTargetMeasured(
   const isLoopHandle = srcHandle === EdgeHandleEnum.DONE || srcHandle === EdgeHandleEnum.LOOP
   const isApprovalHandle = srcHandle === EdgeHandleEnum.APPROVED || srcHandle === EdgeHandleEnum.REJECTED
   const isSwitchLikeHandle = isSwitchCasePort(srcHandle) || srcHandle === EdgeHandleEnum.DEFAULT
+  const isFormPromptBranchHandle = isFormPromptHandle(srcHandle ?? undefined)
   const sourcePlaceholderId =
-    isConditionHandle || isLoopHandle || isApprovalHandle || isSwitchLikeHandle
+    isConditionHandle || isLoopHandle || isApprovalHandle || isSwitchLikeHandle || isFormPromptBranchHandle
       ? `placeholder-${sourceId}-${srcHandle}`
       : `placeholder-${sourceId}`
 

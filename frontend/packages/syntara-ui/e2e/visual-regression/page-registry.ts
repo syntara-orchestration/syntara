@@ -20,6 +20,7 @@ import { APP_TITLE } from '../helpers/appTitle'
 import { MOCK_IDENTITY_PROVIDER_ID } from './mock-ids'
 import {
   approvalInteractivePages,
+  formPromptInteractivePages,
   authenticationInteractivePages,
   builderInteractivePages,
   credentialDialogPages,
@@ -195,23 +196,23 @@ export const pages: PageEntry[] = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // APPROVALS
+  // TASKS (approvals + form responses)
   // ══════════════════════════════════════════════════════════════════════════
   {
-    section: 'approvals',
-    name: 'approvals-list',
-    path: AppRoute.Approvals.Root,
+    section: 'tasks',
+    name: 'tasks-approvals-list',
+    path: `${AppRoute.Tasks.Root}/approvals`,
     waitFor: async (page) => {
-      await expect(page.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
     },
   },
   {
-    section: 'approvals',
-    name: 'approvals-list-empty-filter',
-    path: AppRoute.Approvals.Root,
+    section: 'tasks',
+    name: 'tasks-approvals-list-empty-filter',
+    path: `${AppRoute.Tasks.Root}/approvals`,
     waitFor: async (page) => {
-      await expect(page.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
     },
     setup: async (page) => {
@@ -219,6 +220,17 @@ export const pages: PageEntry[] = [
       await expect(page.getByText(/No results found|Adjust your filters/i)).toBeVisible()
     },
   },
+  {
+    section: 'tasks',
+    name: 'tasks-form-responses-list',
+    path: `${AppRoute.Tasks.Root}/form-responses`,
+    waitFor: async (page) => {
+      await expect(page.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
+      await expect(page.getByRole('tab', { name: 'Form responses' })).toBeVisible()
+      await expect(page.locator('table tbody tr').first()).toBeVisible()
+    },
+  },
+  ...formPromptInteractivePages,
   ...approvalInteractivePages,
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1017,11 +1029,11 @@ export const pages: PageEntry[] = [
   },
   {
     section: 'permission-gating',
-    name: 'viewer-approvals-list',
-    path: AppRoute.Approvals.Root,
+    name: 'viewer-tasks-approvals-list',
+    path: `${AppRoute.Tasks.Root}/approvals`,
     role: 'viewer',
     waitFor: async (page) => {
-      await expect(page.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
       await expect(page.getByRole('row').nth(1)).toBeVisible()
     },
   },

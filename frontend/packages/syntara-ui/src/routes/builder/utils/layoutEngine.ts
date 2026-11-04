@@ -160,6 +160,9 @@ function compareBranchHandles(
 ): number {
   if (nodeType === ActivityTypeEnum.CONDITION) return compareTwoWayHandles(a.handle, b.handle, EdgeHandleEnum.TRUE)
   if (nodeType === ActivityTypeEnum.APPROVAL) return compareTwoWayHandles(a.handle, b.handle, EdgeHandleEnum.APPROVED)
+  if (nodeType === ActivityTypeEnum.FORM_PROMPT) {
+    return compareTwoWayHandles(a.handle, b.handle, EdgeHandleEnum.SUBMITTED)
+  }
   if (nodeType === ActivityTypeEnum.SWITCH) return compareSwitchHandles(a.handle, b.handle)
   if (nodeType === ActivityTypeEnum.LOOP) return compareTwoWayHandles(a.handle, b.handle, EdgeHandleEnum.DONE)
   return 0
@@ -182,6 +185,7 @@ function buildBranchNodeOrdering(edges: EdgeType[], realNodes: NodeType[]): Map<
     if (
       node.type === ActivityTypeEnum.CONDITION ||
       node.type === ActivityTypeEnum.APPROVAL ||
+      node.type === ActivityTypeEnum.FORM_PROMPT ||
       node.type === ActivityTypeEnum.SWITCH ||
       node.type === ActivityTypeEnum.LOOP
     ) {

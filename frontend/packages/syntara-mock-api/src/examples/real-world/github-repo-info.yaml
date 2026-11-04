@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: github-repo-info
 description: Fetch GitHub repository information and analyze it
 metadata:

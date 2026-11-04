@@ -1,20 +1,22 @@
-import { RhUiCalendarIcon, RhUiLanguageIcon, RhUiPlayIcon } from '@patternfly/react-icons'
+import { RhUiCalendarIcon, RhUiDocumentIcon, RhUiLanguageIcon, RhUiPlayIcon } from '@patternfly/react-icons'
 import { type ScheduleType, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
 
 import EdaIcon from '../../../../assets/eda.svg?react'
+import { createEmptyFormDefinition } from '../../../../components/forms/formFieldBuilder/createDefaultField'
 import { RegistryStepId } from '../../../../constants'
+import { useWorkflowStore } from '../../../../stores/useWorkflowStore'
 import {
+  createEdaTrigger,
+  createFormTrigger,
   createManualTrigger,
   createScheduledTrigger,
-  createEdaTrigger,
   createWebhookTrigger,
-  useWorkflowStore,
-} from '../../../../stores/useWorkflowStore'
+} from '../../../../stores/workflowFactories'
 import { parseJsonSchema } from '../../../../utils/jsonSafeParse'
 import { normalizeWebhookPath } from '../../../../utils/webhookPath'
 import { TriggerStepForm } from '../../step-forms/TriggerStepForm'
 import type { TriggerFormData } from '../../stepFormTypes'
-import { buildNamedTrigger } from '../../utils/stepCreationHelpers'
+import { buildNamedFormTrigger, buildNamedTrigger } from '../../utils/stepCreationHelpers'
 import { getDefaultStepBaseName } from '../../utils/stepNaming'
 import { createCustomStep } from '../helpers/stepTemplates'
 import { StepRegistry } from '../StepRegistry'
@@ -31,7 +33,7 @@ export default function registerTriggerStep() {
         icon: RhUiPlayIcon,
         category: 'trigger',
         description: 'Start workflow execution with manual, scheduled, or event triggers',
-        keywords: ['start', 'begin', 'manual', 'schedule', 'event', 'webhook', 'api', 'http', 'eda'],
+        keywords: ['start', 'begin', 'manual', 'schedule', 'event', 'webhook', 'api', 'http', 'eda', 'form'],
         order: 100,
         selectionTitle: 'Select a trigger step',
         subtypes: [
@@ -67,11 +69,36 @@ export default function registerTriggerStep() {
             formTitle: 'Configure EDA Trigger',
             initialData: { triggerType: TriggerTypeEnum.EDA_TRIGGER },
           },
+          {
+            id: RegistryStepId.TRIGGER_FORM,
+            label: 'Form trigger',
+            icon: RhUiDocumentIcon,
+            description: 'Workflow will start after a user submits a configured form.',
+            formTitle: 'Configure Form Trigger',
+            initialData: { triggerType: TriggerTypeEnum.FORM_TRIGGER },
+          },
         ],
         formComponent: TriggerStepForm,
       },
       (data, onSuccess, onError) => {
         try {
+          if (data.triggerType === TriggerTypeEnum.FORM_TRIGGER) {
+            const { trigger } = buildNamedFormTrigger(data.name, (triggerId, name) =>
+              createFormTrigger({
+                id: triggerId,
+                name,
+                form_definition: data.form_definition ?? createEmptyFormDefinition(),
+                message: data.message,
+                submit_label: data.submit_label,
+                success_message: data.success_message,
+                css_override: data.css_override,
+              })
+            )
+            useWorkflowStore.getState().addTrigger(trigger)
+            onSuccess()
+            return
+          }
+
           const baseName = getDefaultStepBaseName({ stepTypeId: RegistryStepId.TRIGGER, label: 'Trigger' })
           const { trigger } = buildNamedTrigger(baseName, data.name, (triggerId, name) => {
             if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER) {
