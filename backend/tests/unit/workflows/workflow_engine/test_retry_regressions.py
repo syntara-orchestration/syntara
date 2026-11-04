@@ -333,11 +333,11 @@ def test_unrelated_upstream_node_is_still_restorable() -> None:
 
 
 def test_an_unselected_failure_is_not_reported_as_skipped() -> None:
-    """The failing node itself stays a failure; only its downstream is skipped.
+    """The failing node itself stays a failure; never-ran exclusive work is skipped.
 
     Regression guard. Marking the failing node skipped reported a failure as a clean
-    skip and dropped the reason it failed. What has nothing to run against is
-    everything downstream of it, and that is what gets skipped.
+    skip and dropped the reason it failed. Recorded output on that branch is reused;
+    only exclusive descendants with no source record are skipped here.
     """
     wf = _wf(_retry("b2"))
     wf._retry_source_statuses = {"b1": "failed", "b2": "failed"}
@@ -372,6 +372,108 @@ def test_a_completed_converge_is_retained_but_never_restored() -> None:
     assert "join" not in wf.skipped_nodes
     # Not restorable: a converge must always evaluate its own gate.
     assert not wf._should_restore_node("join", graph)
+
+
+def _parallel_approval_converge_graph() -> WorkflowGraph:
+    """Wait -> east || west approvals -> All join -> wait2.
+
+    The graph Bill's retry demo uses: an unselected approval must reuse its
+    recorded output so the All converge still sees that branch.
+    """
+    backend = InMemoryGraphBackend()
+    _add(backend, "wait", "wait")
+    _add(backend, "east", "approval")
+    _add(backend, "west", "approval")
+    _add(backend, "join", "converge", {"strategy": "all"})
+    _add(backend, "wait2", "wait")
+    _plain(backend, "wait", "east")
+    _plain(backend, "wait", "west")
+    backend.add_edge("east", "join", {"from_port": "approved"})
+    backend.add_edge("west", "join", {"from_port": "approved"})
+    _plain(backend, "join", "wait2")
+    return WorkflowGraph(backend)
+
+
+def _unselected_branch_with_exclusive_child() -> WorkflowGraph:
+    """Build east -> east_post -> join <- west.
+
+    ``east_post`` is exclusive to the unselected failure, so classification used
+    to skip it even when the source run recorded a result.
+    """
+    backend = InMemoryGraphBackend()
+    _add(backend, "east", "script")
+    _add(backend, "east_post", "script")
+    _add(backend, "west", "script")
+    _add(backend, "join", "converge", {"strategy": "all"})
+    _plain(backend, "east", "east_post")
+    _plain(backend, "east_post", "join")
+    _plain(backend, "west", "join")
+    return WorkflowGraph(backend)
+
+
+def test_unselected_completed_approval_is_reused_for_all_converge() -> None:
+    """A completed unselected approval is restored, not skipped, so All can pass."""
+    wf = _wf(_retry("west"))
+    wf._retry_source_statuses = {
+        "wait": "completed",
+        "east": "completed",
+        "west": "failed",
+        "join": "failed",
+        "wait2": "skipped",
+    }
+    graph = _parallel_approval_converge_graph()
+    wf._classify_unselected_branches(graph)
+
+    assert "east" not in wf.skipped_nodes
+    assert "join" not in wf.skipped_nodes
+    assert "wait2" not in wf.skipped_nodes
+    assert wf._should_restore_node("east", graph)
+    assert not wf._should_restore_node("west", graph)
+    assert not wf._should_restore_node("join", graph)
+
+
+def test_unselected_failed_approval_stays_failed_for_all_converge() -> None:
+    """An unselected failed approval is restored as failed so All stays unsatisfied."""
+    wf = _wf(_retry("west"))
+    wf._retry_source_statuses = {
+        "wait": "completed",
+        "east": "failed",
+        "west": "failed",
+        "join": "failed",
+        "wait2": "skipped",
+    }
+    graph = _parallel_approval_converge_graph()
+    wf._classify_unselected_branches(graph)
+
+    assert "east" not in wf.skipped_nodes
+    assert wf._should_restore_node("east", graph)
+    assert "join" not in wf.skipped_nodes
+    assert "wait2" not in wf.skipped_nodes
+
+
+def test_exclusive_recorded_failure_on_unselected_branch_is_reused() -> None:
+    """Exclusive descendants that failed in the source run are restored, not skipped."""
+    wf = _wf(_retry("west"))
+    wf._retry_source_statuses = {"east": "failed", "east_post": "failed", "west": "failed"}
+    graph = _unselected_branch_with_exclusive_child()
+    wf._classify_unselected_branches(graph)
+
+    assert "east" not in wf.skipped_nodes
+    assert "east_post" not in wf.skipped_nodes
+    assert wf._should_restore_node("east_post", graph)
+    assert "join" not in wf.skipped_nodes
+
+
+def test_exclusive_never_ran_descendant_of_unselected_failure_is_skipped() -> None:
+    """Exclusive work with no source record still has nothing to reuse."""
+    wf = _wf(_retry("west"))
+    wf._retry_source_statuses = {"east": "failed", "west": "failed"}
+    graph = _unselected_branch_with_exclusive_child()
+    wf._classify_unselected_branches(graph)
+
+    assert "east" not in wf.skipped_nodes
+    assert "east_post" in wf.skipped_nodes
+    assert "join" not in wf.skipped_nodes
 
 
 class TestNoOverwrittenFailureNamespaceEntry:
