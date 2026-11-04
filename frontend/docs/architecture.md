@@ -644,7 +644,7 @@ The builder edits nodes + edges directly in the Zustand store. On save, `buildWo
 | `utils/buildNestedStructure.ts`                   | Legacy wrapper (identity function in v2 — returns activities as-is)                                                      |
 | `utils/validation/`                               | Validation rules                                                                                                         |
 
-Floating canvas surfaces (controls, step legend, steps on the canvas, undo/redo) use [`SynPanel`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/components/layout/SynPanel.tsx) so they stay readable under the glass theme: compact overlays use `variant="raised"`; large flat panels (for example the step editor shell) use `opaqueFloatingFill` instead of raised chrome.
+Floating canvas surfaces (controls, step legend, steps on the canvas, undo/redo) use [`SynPanel`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/components/layout/SynPanel.tsx) so they stay readable when glass contrast is on: compact overlays use `variant="raised"`; large flat panels (for example the step editor shell) use `opaqueFloatingFill` instead of raised chrome.
 
 ### Builder internals (advanced): registry, edges, and graph semantics
 
