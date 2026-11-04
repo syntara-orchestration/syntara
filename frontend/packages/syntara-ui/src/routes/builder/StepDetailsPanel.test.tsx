@@ -690,9 +690,7 @@ describe('StepDetailsPanel', () => {
       onSubmit: mockOnSubmit,
     })
 
-    render(
-      <StepDetailsPanel mode="add" stepTypeId="human-tasks" stepSubtypeId="approval" onClose={mockOnClose} />
-    )
+    render(<StepDetailsPanel mode="add" stepTypeId="human-tasks" stepSubtypeId="approval" onClose={mockOnClose} />)
 
     await user.click(screen.getByRole('button', { name: 'Create' }))
 

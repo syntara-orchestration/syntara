@@ -753,7 +753,6 @@ export async function addFormPromptNode(page: Page, name: string) {
  * Call while the form_prompt node editor is open.
  */
 
-
 export async function addFormPromptNodeWithSubmittedBranch(page: Page, name: string) {
   await addFormPromptNode(page, name)
   await expect(page.getByText(name)).toBeVisible({ timeout: 5000 })
@@ -778,7 +777,6 @@ export async function addFormPromptNodeWithSubmittedBranch(page: Page, name: str
  * @param config.value - Value to compare against
  */
 
-
 export async function configureFormPromptFallbackRouting(page: Page) {
   const enableLink = page.getByRole('button', { name: 'Enable continue on failure' })
   if (await enableLink.isVisible().catch(() => false)) {
@@ -796,7 +794,6 @@ export async function configureFormPromptFallbackRouting(page: Page) {
  * Add a form prompt with a script step on the submitted branch (minimum wiring for save with default timeout behavior).
  */
 
-
 export async function openFormPromptCreateForm(page: Page) {
   await openAddStepPanel(page)
   await selectHumanTaskStep(page, 'Form')
@@ -805,7 +802,6 @@ export async function openFormPromptCreateForm(page: Page) {
 }
 
 /** Add a form prompt node (Human tasks → Form) without completing branches. */
-
 
 export async function selectHumanTaskStep(page: Page, stepName: 'Approval' | 'Form') {
   const panel = addStepPanel(page)
@@ -820,6 +816,5 @@ export async function selectHumanTaskStep(page: Page, stepName: 'Approval' | 'Fo
 // ---------------------------------------------------------------------------
 
 /** Click "Add connected step" on an edge and wait for the add-node panel. */
-
 
 export const addScriptOnHandle = addScriptStepOnHandle

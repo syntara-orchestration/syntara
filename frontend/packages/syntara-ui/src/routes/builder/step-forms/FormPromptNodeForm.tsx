@@ -353,7 +353,7 @@ function FormPromptFormFields({
   )
 }
 
-export function FormPromptNodeForm(props: FormPromptNodeFormProps) {
+export function FormPromptNodeForm(props: Readonly<FormPromptNodeFormProps>) {
   const { onSubmit, initialData, onHeaderContentChange, projectId, serverValidationErrors } = props
   const { defaults } = useWorkflowEngineDefaults()
   const defaultValues = getFormPromptNodeFormDefaultValues(initialData)

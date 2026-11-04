@@ -58,11 +58,11 @@ function ApprovalsListPanelPage({
   approvalsDocLink,
   ProjectSelector,
   listView,
-}: {
+}: Readonly<{
   approvalsDocLink?: string | null
   ProjectSelector: ReactNode
   listView: ReactNode
-}) {
+}>) {
   return (
     <SynPage>
       <SynPageTitle segments={['Approvals']} />
@@ -288,10 +288,6 @@ export function ApprovalsListPanel({
   }
 
   return (
-    <ApprovalsListPanelPage
-      approvalsDocLink={approvalsDocLink}
-      ProjectSelector={ProjectSelector}
-      listView={listView}
-    />
+    <ApprovalsListPanelPage approvalsDocLink={approvalsDocLink} ProjectSelector={ProjectSelector} listView={listView} />
   )
 }
