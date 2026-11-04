@@ -280,7 +280,7 @@ services:
       #     is available.
       - APP_SCRIPT_NODES_ENABLED=${APP_SCRIPT_NODES_ENABLED:-true}
       - >-
-        APP_NODE_CONTAINER_IMAGES=${APP_NODE_CONTAINER_IMAGES:-{"script":"quay.io/ahetheri/syntara-node-script:migration-test"}}
+        APP_NODE_CONTAINER_IMAGES=${APP_NODE_CONTAINER_IMAGES:-{"script":"localhost/syntara-sdk-script:dev"}}
       - APP_ENV_FILE_PATH=${APP_ENV_FILE_PATH:-.env}
       - APP_FALLBACK_LOG_LEVEL=${APP_FALLBACK_LOG_LEVEL:-INFO}
       - APP_CACHE_HOST=redis

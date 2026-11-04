@@ -23,7 +23,11 @@ EP_IMAGE="${EP_IMAGE:-localhost/execution-plane:latest}"
 EP_REPOSITORY="${EP_REPOSITORY:-../../syntara-execution-plane}"
 EP_API_PORT="${EP_API_PORT:-8001}"
 EP_KIND_CLUSTER="${EP_KIND_CLUSTER:-ep-kind}"
-NODE_IMAGE="${NODE_IMAGE:-quay.io/ahetheri/syntara-node-script:migration-test}"
+# Script-node image: built from the Execution Plane checkout's
+# tests/fixtures/sdk_script fixture, so the node runtime always speaks the
+# workload protocol of the EP source tree being tested. Set NODE_IMAGE to
+# override with a prebuilt image (e.g. the published migration-test tag).
+NODE_IMAGE="${NODE_IMAGE:-localhost/syntara-sdk-script:dev}"
 # Must match the EP API's EP_AO_JWT_ISSUER, which follows AO's jwt_issuer:
 # APP_SERVER_PUBLIC_URL when set (backend/.env wins over the compose default)
 # or the https://0.0.0.0:8000 fallback.
@@ -72,6 +76,7 @@ ${COMPOSE_CMD} --profile telemetry-e2e up -d --force-recreate database \
 
 echo "🚀 Starting remaining services..."
 APP_SCRIPT_NODES_ENABLED=true \
+APP_NODE_CONTAINER_IMAGES="{\"script\":\"${NODE_IMAGE}\"}" \
 APP_SEGMENT_WRITE_KEY=test-e2e-write-key \
 APP_SEGMENT_ENDPOINT="http://mock-segment:9999" \
 APP_SEGMENT_MAX_RETRIES=2 \
@@ -188,7 +193,7 @@ if [[ "${E2E_EP}" == "1" ]]; then
         EP_API_CA_FILE="${BACKEND_DIR}/.secrets/certs/ca.pem" \
         EP_AO_JWT_PRIVATE_KEY_FILE="${BACKEND_DIR}/.secrets/jwt-primary.pem" \
         EP_AO_JWT_ISSUER="${EP_JWT_ISSUER}" \
-        uv run python tools/deploy_kind_execution_target.py \
+        uv run python -m tools.deploy_kind_execution_target \
             --cluster-name "${EP_KIND_CLUSTER}" \
             --api-url "https://localhost:${EP_API_PORT}" \
             --ao-api-url "https://localhost:8000" \
@@ -198,11 +203,28 @@ if [[ "${E2E_EP}" == "1" ]]; then
             --wait-for-api 60
     )
 
-    echo "📦 Pre-pulling ${NODE_IMAGE} on the ${EP_KIND_CLUSTER} node..."
-    if podman exec "${EP_KIND_CLUSTER}-control-plane" crictl pull "${NODE_IMAGE}"; then
-        echo "✅ Node image pre-pulled"
+    SDK_SCRIPT_FIXTURE="${EP_REPOSITORY}/tests/fixtures/sdk_script"
+    if [[ -f "${SDK_SCRIPT_FIXTURE}/Containerfile" ]]; then
+        echo "📦 Building the script-node image from ${SDK_SCRIPT_FIXTURE}..."
+        podman build -t "${NODE_IMAGE}" "${SDK_SCRIPT_FIXTURE}"
+        echo "📦 Loading ${NODE_IMAGE} into the ${EP_KIND_CLUSTER} node..."
+        podman save --output /tmp/syntara-node-image.tar "${NODE_IMAGE}"
+        kind load image-archive /tmp/syntara-node-image.tar --name "${EP_KIND_CLUSTER}"
+        rm -f /tmp/syntara-node-image.tar
+        echo "✅ Script-node image staged on the Kind node"
+    elif podman image exists "${NODE_IMAGE}"; then
+        echo "📦 Loading existing ${NODE_IMAGE} into the ${EP_KIND_CLUSTER} node..."
+        podman save --output /tmp/syntara-node-image.tar "${NODE_IMAGE}"
+        kind load image-archive /tmp/syntara-node-image.tar --name "${EP_KIND_CLUSTER}"
+        rm -f /tmp/syntara-node-image.tar
+        echo "✅ Script-node image staged on the Kind node"
     else
-        echo "⚠️  Pre-pull failed; the Job will pull ${NODE_IMAGE} itself at dispatch time"
+        echo "📦 Pre-pulling ${NODE_IMAGE} on the ${EP_KIND_CLUSTER} node..."
+        if podman exec "${EP_KIND_CLUSTER}-control-plane" crictl pull "${NODE_IMAGE}"; then
+            echo "✅ Node image pre-pulled"
+        else
+            echo "⚠️  Pre-pull failed; the Job will pull ${NODE_IMAGE} itself at dispatch time"
+        fi
     fi
 fi
 
