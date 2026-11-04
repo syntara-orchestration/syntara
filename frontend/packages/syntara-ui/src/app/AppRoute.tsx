@@ -79,4 +79,4 @@ export const AppRoute = {
     FAQ: '/support/faq',
     Glossary: '/support/glossary',
   },
-}
+} as const

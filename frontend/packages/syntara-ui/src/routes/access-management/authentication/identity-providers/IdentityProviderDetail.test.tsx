@@ -154,7 +154,7 @@ describe('IdentityProviderDetail', () => {
     expect(disabledLabels.length).toBeGreaterThan(0)
   })
 
-  it('shows not found state for 404 errors', () => {
+  it('shows not found state with a link back to identity providers for 404 errors', () => {
     const notFoundError = Object.assign(new Error('Not found'), { status: 404 })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(
       mockQueryReturn({ data: undefined, isError: true, error: notFoundError })
@@ -163,11 +163,13 @@ describe('IdentityProviderDetail', () => {
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
     expect(screen.getByText('Identity provider not found')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /back to identity providers/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /back to identity providers/i })).toHaveAttribute(
+      'href',
+      '/system-administration/authentication'
+    )
   })
 
-  it('navigates back when back button is clicked in 404 state', async () => {
-    const user = userEvent.setup()
+  it('preserves the return destination on the 404 back link', () => {
     const notFoundError = Object.assign(new Error('Not found'), { status: 404 })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(
       mockQueryReturn({ data: undefined, isError: true, error: notFoundError })
@@ -175,8 +177,10 @@ describe('IdentityProviderDetail', () => {
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
-    await user.click(screen.getByRole('button', { name: /back to identity providers/i }))
-    expect(routerTestState.navigate).toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: /back to identity providers/i })).toHaveAttribute(
+      'href',
+      '/system-administration/authentication'
+    )
   })
 
   it('calls refetch when retry button is clicked in 404 state', async () => {
@@ -223,14 +227,15 @@ describe('IdentityProviderDetail', () => {
     expect(mockRefetch).toHaveBeenCalled()
   })
 
-  it('navigates to edit page from primary Edit provider button', async () => {
-    const user = userEvent.setup()
+  it('links to the edit page from the primary Edit provider action', () => {
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
-    await user.click(screen.getByRole('button', { name: /edit provider/i }))
-    expect(routerTestState.navigate).toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: /edit provider/i })).toHaveAttribute(
+      'href',
+      `/system-administration/authentication/identity-providers/${VALID_PROVIDER_ID}/edit`
+    )
   })
 
   it('shows manual endpoints when auto_discovery is false', () => {

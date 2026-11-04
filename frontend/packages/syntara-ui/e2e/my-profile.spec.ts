@@ -87,4 +87,21 @@ test.describe('My Profile — user menu navigation', () => {
     await expect(app).toHaveURL(toAppUrl(MY_PROFILE_URL))
     await expect(app.getByRole('heading', { level: 1, name: 'My Profile' })).toBeVisible()
   })
+
+  test('user menu "My Profile" link opens in a new tab on modified click', async ({ app }) => {
+    await app.goto(toAppUrl('/workflows'))
+    await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
+
+    await app.getByRole('button', { name: 'User menu' }).hover()
+    const profileLink = app.getByRole('menuitem', { name: 'My Profile', exact: true })
+    await expect(profileLink).toHaveAttribute('href', MY_PROFILE_URL)
+
+    const openedPagePromise = app.context().waitForEvent('page')
+    await profileLink.click({ modifiers: ['ControlOrMeta'] })
+    const profilePage = await openedPagePromise
+
+    await expect(profilePage).toHaveURL(toAppUrl(MY_PROFILE_URL))
+    await expect(profilePage.getByRole('heading', { level: 1, name: 'My Profile' })).toBeVisible()
+    await expect(app).toHaveURL(toAppUrl('/workflows'))
+  })
 })

@@ -9,6 +9,7 @@ import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynListPanel } from '../../components/panels/list/SynListPanel'
 import { SynKebabMenu } from '../../components/SynKebabMenu'
+import { SynLink } from '../../components/SynLink'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { builtinProjectTooltip } from '../../hooks/permissionUtils'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
@@ -45,7 +46,6 @@ type WorkflowsPageToolbarProps = {
   showWorkflowActions: boolean
   showImportWorkflow: boolean
   onImportClick: () => void
-  onCreateClick: () => void
 }
 
 type WorkflowsRowActionDeps = {
@@ -96,7 +96,6 @@ function WorkflowsPageToolbar({
   showWorkflowActions,
   showImportWorkflow,
   onImportClick,
-  onCreateClick,
 }: WorkflowsPageToolbarProps) {
   return (
     <>
@@ -109,9 +108,15 @@ function WorkflowsPageToolbar({
       )}
       {showWorkflowActions && (
         <DisabledWithTooltip isDisabled={!canCreate} content={createTooltip}>
-          <Button variant="primary" icon={<RhUiAddIcon />} isAriaDisabled={!canCreate} onClick={onCreateClick}>
-            Create workflow
-          </Button>
+          {canCreate ? (
+            <SynLink to="/workflow-builder/new" variant="primary" icon={<RhUiAddIcon />}>
+              Create workflow
+            </SynLink>
+          ) : (
+            <Button variant="primary" icon={<RhUiAddIcon />} isAriaDisabled>
+              Create workflow
+            </Button>
+          )}
         </DisabledWithTooltip>
       )}
       {headerProjectActions.length > 0 && <SynKebabMenu actions={headerProjectActions} aria-label="Project actions" />}
@@ -262,7 +267,6 @@ export default function Workflows() {
                 showWorkflowActions={showWorkflowActions}
                 showImportWorkflow={showImportWorkflow}
                 onImportClick={() => setImportDialogOpen(true)}
-                onCreateClick={() => detachPromise(navigate({ to: '/workflow-builder/new' }))}
               />
             ) : undefined
           }
@@ -280,10 +284,8 @@ export default function Workflows() {
               filterFieldDefinitions={workflowFilterDefinitions}
               onFilterChange={handleFilterChange}
               onClearAllFilters={handleClearAllFilters}
-              onCreateWorkflow={
-                permissions.canCreate && !selectedProject?.is_builtin
-                  ? () => detachPromise(navigate({ to: '/workflow-builder/new' }))
-                  : undefined
+              createWorkflowTo={
+                permissions.canCreate && !selectedProject?.is_builtin ? '/workflow-builder/new' : undefined
               }
               footer={getFooterProps(workflowsQuery.data)}
               getSortParams={getSortParams}

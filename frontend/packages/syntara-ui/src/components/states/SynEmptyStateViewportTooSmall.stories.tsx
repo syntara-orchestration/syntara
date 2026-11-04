@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
-import { fn } from 'storybook/test'
 
 import { SynEmptyStateViewportTooSmall } from './SynEmptyStateViewportTooSmall'
 
@@ -16,9 +15,7 @@ const meta = {
     },
   },
   tags: ['autodocs'],
-  args: {
-    onReturn: fn(),
-  },
+  args: { returnTo: '/workflows' },
 } satisfies Meta<typeof SynEmptyStateViewportTooSmall>
 
 export default meta
