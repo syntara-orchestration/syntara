@@ -243,9 +243,15 @@ class TestExecuteExecutorNodeHeartbeatTimeout:
         assert kwargs["heartbeat_timeout"] == timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
 
     @pytest.mark.asyncio
+    async def test_script_gets_a_heartbeat_timeout(self) -> None:
+        """Script cancellation must reach gRPC Cancel and pod cleanup."""
+        kwargs = await self._schedule(NodeType.SCRIPT)
+        assert kwargs["heartbeat_timeout"] == timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
+
+    @pytest.mark.asyncio
     async def test_non_heartbeating_executors_get_no_heartbeat_timeout(self) -> None:
         """The other executor activities never beat; a timeout would fail them spuriously."""
-        for node_type in (NodeType.HTTP_REQUEST, NodeType.SCRIPT, NodeType.AGENTIC):
+        for node_type in (NodeType.HTTP_REQUEST, NodeType.AGENTIC):
             kwargs = await self._schedule(node_type)
             assert kwargs["heartbeat_timeout"] is None, f"{node_type} must not get a heartbeat timeout"
 
@@ -950,7 +956,9 @@ class TestPerNodeTimeout:
 
         _mock_temporal_workflow.execute_activity.assert_called_once()
         call_kwargs = _mock_temporal_workflow.execute_activity.call_args
-        assert call_kwargs.kwargs["start_to_close_timeout"] == timedelta(seconds=60 + _TEMPORAL_MARGIN)
+        assert call_kwargs.kwargs["start_to_close_timeout"] == timedelta(
+            seconds=60 + OrchestratorWorkflow._SCRIPT_STARTUP_CLEANUP_MARGIN
+        )
 
     @pytest.mark.asyncio
     async def test_default_timeout_used_when_not_specified(
@@ -968,7 +976,10 @@ class TestPerNodeTimeout:
 
         _mock_temporal_workflow.execute_activity.assert_called_once()
         call_kwargs = _mock_temporal_workflow.execute_activity.call_args
-        expected = get_default_timeout(NodeType.SCRIPT, wf._runtime_settings) + _TEMPORAL_MARGIN
+        expected = (
+            get_default_timeout(NodeType.SCRIPT, wf._runtime_settings)
+            + OrchestratorWorkflow._SCRIPT_STARTUP_CLEANUP_MARGIN
+        )
         assert call_kwargs.kwargs["start_to_close_timeout"] == timedelta(seconds=expected)
 
     @pytest.mark.asyncio

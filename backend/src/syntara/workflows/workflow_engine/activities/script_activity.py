@@ -522,7 +522,13 @@ async def execute_script_activity(  # noqa: C901
         )
         return _enforce_payload_limit({"output": output.dump(output_config)})
 
-    except ApplicationError:
+    except ApplicationError as error:
+        if error.type in {"ScriptContainerError", "ScriptContainerProtocolError"}:
+            # Protocol failures may have no business output. Preserve the node's
+            # output schema without inventing an exit code or captured logs.
+            output = ScriptOutput()
+            detail = _enforce_payload_limit({"output": output.dump(output_config)})
+            raise ApplicationError(error.message, detail, type=error.type, non_retryable=error.non_retryable) from None
         raise
     except ScriptExecutionError as e:
         output = ScriptOutput(return_code=e.exit_code, stdout=e.stdout, stderr=e.stderr)

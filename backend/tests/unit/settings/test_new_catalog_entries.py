@@ -59,7 +59,7 @@ class TestNewCatalogEntries:
         assert d.category == SettingCategory.WORKFLOW_EXECUTION
         assert d.value_type == SettingValueType.INTEGER
         assert d.default_value == 1024
-        assert d.validation_schema == {"min": 256, "max": 2048}
+        assert d.validation_schema == {"min": 256, "max": 1024}
 
     def test_workflow_settings_have_min_constraint(self) -> None:
         keys = [

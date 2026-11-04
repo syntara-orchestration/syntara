@@ -671,9 +671,9 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
             "If a script exceeds this timeout, it is terminated and the "
             "activity fails."
         ),
-        helper_text="Minimum 1 second. Default: 300 (5 minutes).",
+        helper_text="Minimum 1 second, maximum 600 seconds. Default: 300 (5 minutes).",
         group=WorkflowEngineGroup.EXECUTION,
-        validation_schema={"min": 1},
+        validation_schema={"min": 1, "max": 600},
     ),
     SettingDefinition(
         key="workflow_engine.script_max_output_kb",
@@ -686,16 +686,16 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
             "This limit applies independently to each stream. Output beyond this "
             "limit is discarded to prevent worker memory exhaustion. The script "
             "continues running until it exits or the timeout fires. "
-            "Temporal imposes a 2 MB payload limit per activity result; combined "
+            "The container ABI imposes a 1 MiB limit per serialized result; combined "
             "stdout, stderr, and metadata must stay under this limit."
         ),
         helper_text=(
-            "Minimum 256 KB, maximum 2048 KB (2 MB). Default: 1024 KB (1 MB). "
+            "Minimum 256 KB, maximum 1024 KB (1 MB). Default: 1024 KB (1 MB). "
             "This is a per-stream limit; if both stdout and stderr are large, "
-            "the combined result may be further truncated to fit Temporal's payload limit."
+            "the combined serialized result must fit the container ABI limit."
         ),
         group=WorkflowEngineGroup.EXECUTION,
-        validation_schema={"min": 256, "max": 2048},
+        validation_schema={"min": 256, "max": 1024},
     ),
     SettingDefinition(
         key="workflow_engine.agentic_timeout_seconds",
