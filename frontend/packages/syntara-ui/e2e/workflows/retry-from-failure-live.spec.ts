@@ -9,7 +9,7 @@
 
 import AxeBuilder from '@axe-core/playwright'
 
-import { cleanupPersona, createPersona, loginViaUI, PERSONA_ACTIONS, type Persona } from '../authorization/fixtures'
+import { cleanupPersona, createPersona, loginAsUser, PERSONA_ACTIONS, type Persona } from '../authorization/fixtures'
 import { test, expect, toAppUrl, type Page } from '../fixtures'
 import { WCAG_TAGS } from '../fixtures/accessibility'
 import { layoutCanvas } from '../helpers/canvas-interaction'
@@ -446,17 +446,20 @@ test.describe('Retry from failure — real backend', () => {
     test.setTimeout(TERMINAL_POLL_TIMEOUT_MS + 60_000)
     const run = requireRun(failedRun, 'Failed run')
     const persona = requirePersona(noEditPersona)
-    const context = await browser.newContext()
+    // Empty session so loginAsUser cannot skip the form on an inherited admin cookie.
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     const page = await context.newPage()
     try {
-      await loginViaUI(page, persona.username, persona.password)
+      await loginAsUser(page, persona)
       await openExecutionDetail(page, run.executionId)
       await selectFailedStepInDetails(page, 'Second Step')
       await openRetryPanel(page)
 
       const panel = page.getByRole('complementary', { name: 'Retry run from failure review' })
       await expect(page.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
-      // The warning is in Run details (RetryInputOverrideDetails), not the retry side panel.
+      await expect(panel.getByRole('button', { name: 'Retry 2 steps' })).toBeVisible()
+      // Warning is in Run details once the retry target mounts, not in the side panel.
+      await expect(page.getByText('Input parameters', { exact: true })).toBeVisible()
       await expect(page.getByText('Workflow edit permission is required to override retry inputs.')).toBeVisible()
       await expect(page.getByRole('button', { name: 'Edit parameters for retry' })).toHaveCount(0)
 
