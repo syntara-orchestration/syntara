@@ -55,10 +55,6 @@ spec:
       value: '{{revision}}'
     - name: ao-pr-number
       value: '{{pull_request_number}}'
-    - name: ao-operator-revision
-      value: AAP-90779-ep-from-source
-    - name: ao-operator-git-url
-      value: https://github.com/automation-nexus/automation-orchestrator-operator.git
     - name: ep-git-url
       value: https://github.com/syntara-orchestration/syntara-execution-plane.git
     - name: ep-revision
