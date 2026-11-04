@@ -1273,7 +1273,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
     async def preview_retry_from_failure(
         self, execution_id: UUID, retry_point_ids: list[str] | None = None
     ) -> RetryFromFailureValidationResponse:
-        """Report whether this execution can be retried, and what would re-run (AAP-92820).
+        """Report whether this execution can be retried, and what would re-run.
 
         Backs ``GET /executions/{id}/retry-from-failure-preview``. Takes no
         input overrides. When ``retry_point_ids`` is omitted, reports the
@@ -1307,7 +1307,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         retry_point_ids: list[str],
         input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
     ) -> ExecutionRead:
-        """Retry an execution from failure points (AAP-92820).
+        """Retry an execution from failure points.
 
         Independently repeats the full validation chain before doing any work
         — never assumes the validate endpoint was called first. On success,
@@ -1315,10 +1315,10 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         ``retried_from_execution_id`` (the same lineage field used by plain
         retries) running the exact workflow version *retained from the
         original run* — later edits to the definition never affect a retry
-        (SDP ANSTRAT-1779 R10) — and triggers a Temporal run carrying
+        (R10) — and triggers a Temporal run carrying
         ``retry_from_execution_id``, the eligible retry points, and any
         validated input parameter overrides for the engine's node
-        classification and parameter application (AAP-92821).
+        classification and parameter application.
 
         Args:
             execution_id: ID of the source (failed) execution
