@@ -11,8 +11,9 @@ import {
   TabTitleText,
 } from '@patternfly/react-core'
 import type { User } from '@syntara/contracts'
-import { useNavigate, useParams } from '@tanstack/react-router'
-import { useMemo } from 'react'
+import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
+import { createContext, use, useMemo } from 'react'
+import type { ReactNode } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsUserDetail } from '../../../app/breadcrumbBuilders'
@@ -194,6 +195,14 @@ function UserDetailsTab({
 }
 
 type UserTab = 'details' | 'groups' | 'identities' | 'roles' | 'permissions' | 'check-access'
+const USER_DETAIL_TAB_PANEL_LABELS: Readonly<Record<UserTab, string>> = {
+  details: 'Details',
+  groups: 'Groups',
+  identities: 'Identities',
+  roles: 'Assignments',
+  permissions: 'Permissions',
+  'check-access': 'Check my access',
+}
 
 function computeVisibleTabs({
   canReadGroups,
@@ -232,15 +241,25 @@ function UserDetailTabBar({
   groupCount,
   identitiesCount,
   roleAssignmentCount,
+  renderPanel,
 }: Readonly<{
   basePath: string
   validTabs: UserTab[]
   groupCount: number
   identitiesCount: number
   roleAssignmentCount: number
+  renderPanel?: (activeTab: string) => ReactNode
 }>) {
   return (
-    <SynListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="User details">
+    <SynListPanelTabs
+      basePath={basePath}
+      defaultTab="details"
+      validTabs={validTabs}
+      aria-label="User details"
+      renderPanel={renderPanel}
+      routePanelLayout="detail"
+      tabPanelLabels={USER_DETAIL_TAB_PANEL_LABELS}
+    >
       <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
       {validTabs.includes('groups') && (
         <Tab
@@ -290,6 +309,7 @@ function UserDetailTabContent({
   currentUserId,
   identitiesData,
   isOwnProfile,
+  isNestedRoute = false,
 }: Readonly<{
   activeTab: string
   validTabs: UserTab[]
@@ -298,6 +318,7 @@ function UserDetailTabContent({
   currentUserId: string | undefined
   identitiesData: Pick<UserIdentity, 'provider_name' | 'identity_provider_id'>[]
   isOwnProfile: boolean
+  isNestedRoute?: boolean
 }>) {
   return (
     <>
@@ -316,14 +337,32 @@ function UserDetailTabContent({
         <RoleAssignmentsPanel
           principalType={RolePrincipalType.USER}
           principalId={userId}
-          tabKey="roles"
-          tabLabel="Assignments"
+          tabKey={isNestedRoute ? undefined : 'roles'}
+          tabLabel={isNestedRoute ? undefined : 'Assignments'}
         />
       )}
       {activeTab === 'permissions' && isOwnProfile && <MyPermissionsView />}
       {activeTab === 'check-access' && isOwnProfile && <UserCheckAccessTab />}
     </>
   )
+}
+
+type UserDetailTabContextValue = {
+  activeTab: string
+  validTabs: UserTab[]
+  userData: User
+  userId: string
+  currentUserId: string | undefined
+  identitiesData: Pick<UserIdentity, 'provider_name' | 'identity_provider_id'>[]
+  isOwnProfile: boolean
+}
+
+const UserDetailTabContext = createContext<UserDetailTabContextValue | null>(null)
+
+export function UserDetailTabRoute() {
+  const context = use(UserDetailTabContext)
+  if (!context) throw new Error('User detail tab routes must be rendered inside UserDetail')
+  return <UserDetailTabContent {...context} isNestedRoute />
 }
 
 export type UserDetailProps = {
@@ -403,6 +442,23 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
     },
   })
 
+  const userData = userQuery.data
+  const tabContextValue = useMemo<UserDetailTabContextValue | null>(
+    () =>
+      userData
+        ? {
+            activeTab,
+            validTabs,
+            userData,
+            userId: userId ?? '',
+            currentUserId,
+            identitiesData,
+            isOwnProfile,
+          }
+        : null,
+    [activeTab, validTabs, userData, userId, currentUserId, identitiesData, isOwnProfile]
+  )
+
   const earlyShell = renderUserDetailEarlyShell({
     isMyProfile: !!isMyProfile,
     isMeQueryPending: meQuery.isPending,
@@ -413,65 +469,68 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
   })
   if (earlyShell) return earlyShell
 
-  const userData = userQuery.data
-  if (!userData) return null
+  if (!userData || !tabContextValue) return null
 
   const displayName = userDisplayName(userData)
   const pageTitle = isMyProfile ? 'My Profile' : displayName
   const userBreadcrumbs = isMyProfile ? [] : breadcrumbsUserDetail(displayName)
-
   return (
-    <SynPage>
-      <SynPageTitle segments={[pageTitle, isMyProfile ? undefined : 'Users']} />
-      <SynPageHeader
-        title={pageTitle}
-        docLink={docLink}
-        breadcrumbs={userBreadcrumbs}
-        titleAddons={
-          !userData.is_enabled ? (
-            <FlexItem>
-              <DisabledBadge />
-            </FlexItem>
-          ) : undefined
-        }
-        toolbar={
-          <UserDetailToolbar
-            permissions={userPermissions}
-            showKebabMenu={!userData.is_builtin}
-            onEdit={navigateEdit}
-            onRevoke={() => revokeDialog.open(userData)}
-            onDelete={() => deleteDialog.open(userData)}
-          />
-        }
-      />
-      <SynPageBody>
-        <SynListPanel>
-          <UserDetailTabBar
-            basePath={basePath}
-            validTabs={validTabs}
-            groupCount={groupCount}
-            identitiesCount={identitiesData.length}
-            roleAssignmentCount={roleAssignmentCount}
-          />
-          <UserDetailTabContent
-            activeTab={activeTab}
-            validTabs={validTabs}
-            userData={userData}
-            userId={userId ?? ''}
-            currentUserId={currentUserId}
-            identitiesData={identitiesData}
-            isOwnProfile={isOwnProfile}
-          />
-        </SynListPanel>
-      </SynPageBody>
+    <UserDetailTabContext.Provider value={tabContextValue}>
+      <SynPage>
+        <SynPageTitle segments={[pageTitle, isMyProfile ? undefined : 'Users']} />
+        <SynPageHeader
+          title={pageTitle}
+          docLink={docLink}
+          breadcrumbs={userBreadcrumbs}
+          titleAddons={
+            !userData.is_enabled ? (
+              <FlexItem>
+                <DisabledBadge />
+              </FlexItem>
+            ) : undefined
+          }
+          toolbar={
+            <UserDetailToolbar
+              permissions={userPermissions}
+              showKebabMenu={!userData.is_builtin}
+              onEdit={navigateEdit}
+              onRevoke={() => revokeDialog.open(userData)}
+              onDelete={() => deleteDialog.open(userData)}
+            />
+          }
+        />
+        <SynPageBody>
+          <SynListPanel>
+            <UserDetailTabBar
+              basePath={basePath}
+              validTabs={validTabs}
+              groupCount={groupCount}
+              identitiesCount={identitiesData.length}
+              roleAssignmentCount={roleAssignmentCount}
+              renderPanel={isMyProfile ? undefined : () => <Outlet />}
+            />
+            {isMyProfile ? (
+              <UserDetailTabContent
+                activeTab={activeTab}
+                validTabs={validTabs}
+                userData={userData}
+                userId={userId ?? ''}
+                currentUserId={currentUserId}
+                identitiesData={identitiesData}
+                isOwnProfile={isOwnProfile}
+              />
+            ) : null}
+          </SynListPanel>
+        </SynPageBody>
 
-      <UserDetailConfirmationDialogs
-        user={userData}
-        revokeDialog={revokeDialog}
-        deleteDialog={deleteDialog}
-        onRevoke={handleRevoke}
-        onDelete={() => handleDelete(deleteDialog.item)}
-      />
-    </SynPage>
+        <UserDetailConfirmationDialogs
+          user={userData}
+          revokeDialog={revokeDialog}
+          deleteDialog={deleteDialog}
+          onRevoke={handleRevoke}
+          onDelete={() => handleDelete(deleteDialog.item)}
+        />
+      </SynPage>
+    </UserDetailTabContext.Provider>
   )
 }

@@ -27,6 +27,35 @@ export const Approvals = lazy(() => import('../routes/approvals/Approvals'))
 export const AccessManagement = lazy(() =>
   import('../routes/access-management/AccessManagement').then((m) => ({ default: m.AccessManagement }))
 )
+export const AccessManagementCheckAccessRoute = lazy(() =>
+  import('../routes/access-management/AccessManagementRouteTabs').then((m) => ({
+    default: m.AccessManagementCheckAccessRoute,
+  }))
+)
+export const AccessManagementTokenRevocationRoute = lazy(() =>
+  import('../routes/access-management/AccessManagementRouteTabs').then((m) => ({
+    default: m.AccessManagementTokenRevocationRoute,
+  }))
+)
+export const UsersTab = lazy(() =>
+  import('../routes/access-management/UsersTab').then((m) => ({ default: m.UsersTab }))
+)
+export const GroupsTab = lazy(() =>
+  import('../routes/access-management/GroupsTab').then((m) => ({ default: m.GroupsTab }))
+)
+export const ProjectsTab = lazy(() =>
+  import('../routes/access-management/ProjectsTab').then((m) => ({ default: m.ProjectsTab }))
+)
+export const PoliciesTab = lazy(() => import('../routes/access/PoliciesTab').then((m) => ({ default: m.PoliciesTab })))
+export const RolesTab = lazy(() => import('../routes/access/RolesTab').then((m) => ({ default: m.RolesTab })))
+export const AssignmentsTab = lazy(() =>
+  import('../routes/access/AssignmentsTab').then((m) => ({ default: m.AssignmentsTab }))
+)
+export const ServiceAccountsTab = lazy(() =>
+  import('../routes/access-management/service-accounts/ServiceAccountsTab').then((m) => ({
+    default: m.ServiceAccountsTab,
+  }))
+)
 export const Authentication = lazy(() => import('../routes/access-management/authentication/Authentication'))
 export const AddIdentityProvider = lazy(() =>
   import('../routes/access-management/authentication/identity-providers/AddIdentityProvider').then((m) => ({
@@ -58,6 +87,11 @@ export const UserDetail = lazy(() =>
     default: m.UserDetail,
   }))
 )
+export const UserDetailTabRoute = lazy(() =>
+  import('../routes/access-management/users/UserDetail').then((m) => ({
+    default: m.UserDetailTabRoute,
+  }))
+)
 export const MyProfile = lazy(() =>
   import('../routes/access-management/users/MyProfile').then((m) => ({
     default: m.MyProfile,
@@ -78,9 +112,58 @@ export const GroupDetail = lazy(() =>
     default: m.GroupDetail,
   }))
 )
+export const GroupDetailDetailsTabRoute = lazy(() =>
+  import('../routes/access-management/groups/GroupDetail').then((m) => ({ default: m.GroupDetailDetailsTabRoute }))
+)
+export const GroupDetailMembersTabRoute = lazy(() =>
+  import('../routes/access-management/groups/GroupDetail').then((m) => ({ default: m.GroupDetailMembersTabRoute }))
+)
+export const GroupDetailAssignmentsTabRoute = lazy(() =>
+  import('../routes/access-management/groups/GroupDetail').then((m) => ({
+    default: m.GroupDetailAssignmentsTabRoute,
+  }))
+)
+export const GroupDetailUnknownTabRoute = lazy(() =>
+  import('../routes/access-management/groups/GroupDetail').then((m) => ({ default: m.GroupDetailUnknownTabRoute }))
+)
 export const ProjectDetail = lazy(() =>
   import('../routes/access-management/projects/ProjectDetail').then((m) => ({
     default: m.ProjectDetail,
+  }))
+)
+export const ProjectDetailDetailsTabRoute = lazy(() =>
+  import('../routes/access-management/projects/ProjectDetail').then((m) => ({
+    default: m.ProjectDetailDetailsTabRoute,
+  }))
+)
+export const ProjectDetailWorkflowsTabRoute = lazy(() =>
+  import('../routes/access-management/projects/ProjectDetail').then((m) => ({
+    default: m.ProjectDetailWorkflowsTabRoute,
+  }))
+)
+export const ProjectDetailAssignmentsTabRoute = lazy(() =>
+  import('../routes/access-management/projects/ProjectDetail').then((m) => ({
+    default: m.ProjectDetailAssignmentsTabRoute,
+  }))
+)
+export const ProjectDetailUnknownTabRoute = lazy(() =>
+  import('../routes/access-management/projects/ProjectDetail').then((m) => ({
+    default: m.ProjectDetailUnknownTabRoute,
+  }))
+)
+export const IdentityProviderDetailsTabRoute = lazy(() =>
+  import('../routes/access-management/authentication/identity-providers/IdentityProviderDetail').then((m) => ({
+    default: m.IdentityProviderDetailsTabRoute,
+  }))
+)
+export const IdentityProviderGroupMappingTabRoute = lazy(() =>
+  import('../routes/access-management/authentication/identity-providers/IdentityProviderDetail').then((m) => ({
+    default: m.IdentityProviderGroupMappingTabRoute,
+  }))
+)
+export const IdentityProviderUnknownTabRoute = lazy(() =>
+  import('../routes/access-management/authentication/identity-providers/IdentityProviderDetail').then((m) => ({
+    default: m.IdentityProviderUnknownTabRoute,
   }))
 )
 export const ServiceAccountDetail = lazy(() =>
@@ -88,5 +171,40 @@ export const ServiceAccountDetail = lazy(() =>
     default: m.ServiceAccountDetail,
   }))
 )
+export const ServiceAccountDetailDetailsTabRoute = lazy(() =>
+  import('../routes/access-management/service-accounts/ServiceAccountDetail').then((m) => ({
+    default: m.ServiceAccountDetailDetailsTabRoute,
+  }))
+)
+export const ServiceAccountDetailCredentialsTabRoute = lazy(() =>
+  import('../routes/access-management/service-accounts/ServiceAccountDetail').then((m) => ({
+    default: m.ServiceAccountDetailCredentialsTabRoute,
+  }))
+)
+export const ServiceAccountDetailAssignmentsTabRoute = lazy(() =>
+  import('../routes/access-management/service-accounts/ServiceAccountDetail').then((m) => ({
+    default: m.ServiceAccountDetailAssignmentsTabRoute,
+  }))
+)
+export const ServiceAccountDetailUnknownTabRoute = lazy(() =>
+  import('../routes/access-management/service-accounts/ServiceAccountDetail').then((m) => ({
+    default: m.ServiceAccountDetailUnknownTabRoute,
+  }))
+)
 export const Credentials = lazy(() => import('../routes/configuration/credentials/Credentials'))
 export const CredentialDetail = lazy(() => import('../routes/configuration/credentials/CredentialDetail'))
+export const CredentialDetailsTabRoute = lazy(() =>
+  import('../routes/configuration/credentials/CredentialDetail').then((m) => ({
+    default: m.CredentialDetailsTabRoute,
+  }))
+)
+export const CredentialWorkflowsTabRoute = lazy(() =>
+  import('../routes/configuration/credentials/CredentialDetail').then((m) => ({
+    default: m.CredentialWorkflowsTabRoute,
+  }))
+)
+export const CredentialIntegrationsTabRoute = lazy(() =>
+  import('../routes/configuration/credentials/CredentialDetail').then((m) => ({
+    default: m.CredentialIntegrationsTabRoute,
+  }))
+)

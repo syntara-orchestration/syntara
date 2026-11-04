@@ -1,5 +1,5 @@
 import { FormGroup } from '@patternfly/react-core'
-import type { ReactElement, ReactNode } from 'react'
+import { useId, type ReactElement, type ReactNode } from 'react'
 import type { Control, ControllerFieldState, ControllerRenderProps, FieldPath, FieldValues } from 'react-hook-form'
 import { useController } from 'react-hook-form'
 
@@ -49,13 +49,16 @@ export type SynFormFieldProps<
   /**
    * Render prop receiving the RHF field and fieldState. Use these to bind the
    * inner input (`value`, `onChange`, `onBlur`, `name`) and set `validated`.
+   * The render props also include a `describedBy` ID when helper text is
+   * rendered; forward it to the control's `aria-describedby` attribute.
    *
    * @example
    * ```tsx
    * <SynFormField name="username" control={control} label="Username">
-   *   {({ field, fieldState }) => (
+   *   {({ field, fieldState, describedBy }) => (
    *     <TextInput
    *       id="username"
+   *       aria-describedby={describedBy}
    *       validated={fieldState.error ? 'error' : 'default'}
    *       value={field.value ?? ''}
    *       onChange={field.onChange}
@@ -69,6 +72,7 @@ export type SynFormFieldProps<
   children: (renderProps: {
     field: ControllerRenderProps<TFieldValues, TName>
     fieldState: ControllerFieldState
+    describedBy: string | undefined
   }) => ReactNode
 }
 
@@ -99,6 +103,9 @@ export function SynFormField<
 }: Readonly<SynFormFieldProps<TFieldValues, TName>>) {
   const { field, fieldState } = useController({ name, control })
   const resolvedFieldId = fieldId ?? name
+  const helperTextId = `${useId()}-helper-text`
+  const hasHelperText = fieldState.error ? Boolean(fieldState.error.message) : Boolean(hint)
+  const describedBy = !hideFooter && hasHelperText ? helperTextId : undefined
 
   return (
     <FormGroup
@@ -107,12 +114,12 @@ export function SynFormField<
       isRequired={isRequired}
       labelHelp={labelHelp}
     >
-      {children({ field, fieldState })}
+      {children({ field, fieldState, describedBy })}
       {!hideFooter &&
         (hint ? (
-          <FormFieldHintOrError hint={hint} error={fieldState.error} />
+          <FormFieldHintOrError id={helperTextId} hint={hint} error={fieldState.error} />
         ) : (
-          <FormFieldError error={fieldState.error} />
+          <FormFieldError id={helperTextId} error={fieldState.error} />
         ))}
     </FormGroup>
   )
