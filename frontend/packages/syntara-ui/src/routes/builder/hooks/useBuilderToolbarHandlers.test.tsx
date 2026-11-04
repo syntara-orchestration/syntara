@@ -27,6 +27,7 @@ vi.mock('../../../stores/useWorkflowStore', () => ({
     getState: vi.fn(),
     temporal: { getState: vi.fn(() => ({ clear: vi.fn() })) },
   },
+  getActivityMetadata: vi.fn(() => undefined),
 }))
 
 type ExecuteWorkflow = UseBuilderToolbarHandlersOptions['executeWorkflow']
@@ -343,6 +344,33 @@ describe('useBuilderToolbarHandlers', () => {
 
     expect(handleSaveWorkflow).toHaveBeenCalledTimes(1)
     expect(executeWorkflow).toHaveBeenCalledTimes(1)
+  })
+
+  it('runs the saved definition without saving local edits in read-only mode', async () => {
+    const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
+    const executeWorkflow = vi.fn()
+    const savedWorkflowDefinition = {
+      triggers: [{ id: 'trigger-1', type: 'manual', parameters: {} }],
+      nodes: [{ id: 'task-1', type: 'action', name: 'Saved task', parameters: {} }],
+      edges: [{ from: 'trigger-1', to: 'task-1' }],
+    }
+
+    const { result } = renderHook(() =>
+      useBuilderToolbarHandlers(
+        buildOptions({
+          isReadOnly: true,
+          savedWorkflowDefinition,
+          handleSaveWorkflow,
+          executeWorkflow,
+          currentWorkflow: null,
+        })
+      )
+    )
+
+    await result.current.handleRunWorkflow()
+
+    expect(handleSaveWorkflow).not.toHaveBeenCalled()
+    expect(executeWorkflow).toHaveBeenCalledOnce()
   })
 
   it('handleDeleteWorkflow does not call deleteWorkflow when workflow is missing', () => {
@@ -772,5 +800,19 @@ describe('useBuilderToolbarHandlers', () => {
       description: 'Failed to delete workflow "My workflow": delete failed',
     })
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_DELETE_DIALOG', payload: false })
+  })
+
+  it('shows blocked step types when workflow deletion is denied', () => {
+    const detail = "You can't delete workflow: Script (write denied)."
+    const deleteWorkflow = vi.fn((...args: Parameters<DeleteWorkflow>) => {
+      args[1]?.onError?.({ cause: { code: 'NODE_KIND_WRITE_DENIED', detail } })
+    }) as MockedFunction<DeleteWorkflow>
+    const showError = vi.fn()
+    const { result } = renderHook(() => useBuilderToolbarHandlers(buildOptions({ deleteWorkflow, showError })))
+    result.current.handleDeleteWorkflow()
+    expect(showError).toHaveBeenCalledWith({
+      title: 'Failed to delete workflow',
+      description: `Failed to delete workflow "My workflow": ${detail}`,
+    })
   })
 })

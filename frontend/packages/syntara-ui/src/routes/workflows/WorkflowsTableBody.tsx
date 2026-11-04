@@ -2,7 +2,8 @@ import { Flex, FlexItem, Truncate } from '@patternfly/react-core'
 import { RhUiCaretDownIcon, RhUiCaretRightIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Tr } from '@patternfly/react-table'
 import type { WorkflowAPI } from '@syntara/contracts'
-import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCallback, useState } from 'react'
 
 import groupedTableStyles from '../../components/groupedTable.module.css'
 import type { KebabAction } from '../../components/SynKebabMenu'
@@ -14,6 +15,7 @@ import type { ProjectRead } from '../access/types'
 import { useProjectPermissions } from '../access-management/useProjectPermissions'
 
 import { buildProjectRowActions, type ProjectRowActionCallbacks } from './projectRowActions'
+import { useStepTypePermissions } from './useStepTypePermissions'
 import { useWorkflowPermissions } from './useWorkflowPermissions'
 import { buildWorkflowRowActions, type WorkflowRowActionCallbacks } from './workflowRowActions'
 
@@ -35,13 +37,34 @@ function WorkflowRow({
   showRowActions = true,
 }: Readonly<WorkflowRowProps>) {
   const [rowChecksEnabled, setRowChecksEnabled] = useState(false)
+  const queryClient = useQueryClient()
+  const retryWorkflowContext = useCallback(
+    () =>
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[0] === 'get' &&
+          typeof query.queryKey[1] === 'string' &&
+          query.queryKey[1].includes('/workflows'),
+      }),
+    [queryClient]
+  )
   const permissions = useWorkflowPermissions({
     resourceProject: workflow.project_id,
     enabled: showRowActions && rowChecksEnabled,
   })
+  const stepTypePermissions = useStepTypePermissions(workflow.step_types, workflow.project_id, {
+    enabled: showRowActions && rowChecksEnabled,
+    retryContext: retryWorkflowContext,
+  })
   const actions =
     showRowActions && rowActionCallbacks
-      ? buildWorkflowRowActions(workflow, permissions, isBuiltinProject, rowActionCallbacks)
+      ? buildWorkflowRowActions({
+          workflow,
+          permissions,
+          isBuiltinProject,
+          callbacks: rowActionCallbacks,
+          stepTypePermissions,
+        })
       : []
 
   return (
@@ -71,9 +94,7 @@ function WorkflowRow({
             <SynKebabMenu
               actions={actions}
               aria-label={`Actions for ${workflow.name}`}
-              onOpenChange={(isOpen) => {
-                if (isOpen) setRowChecksEnabled(true)
-              }}
+              onOpenChange={setRowChecksEnabled}
             />
           )}
         </Td>

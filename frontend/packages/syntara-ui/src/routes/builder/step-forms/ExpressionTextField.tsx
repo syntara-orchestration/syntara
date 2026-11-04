@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import type { FieldValues, Path } from 'react-hook-form'
 
 import { SynExpressionField } from '../../../components/forms/SynExpressionField'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import type { AAPJobTemplateFormData } from './aapJobTemplateSchema'
 import type { AAPWorkflowTemplateFormData } from './aapWorkflowTemplateSchema'
@@ -30,7 +30,7 @@ function GenericExpressionTextField<T extends FieldValues>({
   isRequired,
   labelHelp,
 }: GenericExpressionTextFieldProps<T>) {
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
 
   return (
     <SynExpressionField

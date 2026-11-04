@@ -44,6 +44,8 @@ class WorkflowReadWithVersion:
             updated_by (None | Unset | UserReference): User who last modified the workflow
             published_version_id (None | Unset | UUID):
             published_version_number (int | None | Unset):
+            step_types (list[str] | None | Unset): Sorted distinct step types in the latest draft and published definition;
+                null when version data is unavailable.
             validation_result (None | Unset | ValidationResult): Validation findings from the last save operation. Only
                 included in create/update responses; use has_validation_issues for the durable indicator.
     """
@@ -64,6 +66,7 @@ class WorkflowReadWithVersion:
     updated_by: None | Unset | UserReference = UNSET
     published_version_id: None | Unset | UUID = UNSET
     published_version_number: int | None | Unset = UNSET
+    step_types: list[str] | None | Unset = UNSET
     validation_result: None | Unset | ValidationResult = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -131,6 +134,15 @@ class WorkflowReadWithVersion:
         else:
             published_version_number = self.published_version_number
 
+        step_types: list[str] | None | Unset
+        if isinstance(self.step_types, Unset):
+            step_types = UNSET
+        elif isinstance(self.step_types, list):
+            step_types = self.step_types
+
+        else:
+            step_types = self.step_types
+
         validation_result: dict[str, Any] | None | Unset
         if isinstance(self.validation_result, Unset):
             validation_result = UNSET
@@ -169,6 +181,8 @@ class WorkflowReadWithVersion:
             field_dict["published_version_id"] = published_version_id
         if published_version_number is not UNSET:
             field_dict["published_version_number"] = published_version_number
+        if step_types is not UNSET:
+            field_dict["step_types"] = step_types
         if validation_result is not UNSET:
             field_dict["validation_result"] = validation_result
 
@@ -278,6 +292,23 @@ class WorkflowReadWithVersion:
 
         published_version_number = _parse_published_version_number(d.pop("published_version_number", UNSET))
 
+        def _parse_step_types(data: object) -> list[str] | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                step_types_type_0 = cast(list[str], data)
+
+                return step_types_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(list[str] | None | Unset, data)
+
+        step_types = _parse_step_types(d.pop("step_types", UNSET))
+
         def _parse_validation_result(data: object) -> None | Unset | ValidationResult:
             if data is None:
                 return data
@@ -312,6 +343,7 @@ class WorkflowReadWithVersion:
             updated_by=updated_by,
             published_version_id=published_version_id,
             published_version_number=published_version_number,
+            step_types=step_types,
             validation_result=validation_result,
         )
 

@@ -11,6 +11,8 @@ import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { BuilderAction } from '../builderReducer'
 import { DEFAULT_MAX_WAIT_SECONDS, fetchMaxWaitDuration } from '../step-forms/useMaxWaitDuration'
+import type { EdgeConnection } from '../types/edge'
+import { parseImportedDefinition } from '../utils/parseImportedDefinition'
 import { validateWorkflow } from '../utils/validation'
 import { validateMinimumWorkflow } from '../utils/validation/rules/validateMinimumWorkflow'
 import type { ConflictInfo } from '../VersionConflictDialog'
@@ -51,6 +53,77 @@ async function checkVersionConflictBeforeRun({
   return false
 }
 
+async function stopForVersionConflict(options: {
+  workflowId: string
+  loadedVersion: number | null
+  skipPreflightCheck: boolean
+  onRunConflict?: (info: ConflictInfo) => void
+  loadedVersionName?: string | null
+  loadedVersionCreatedAt?: string | null
+  dispatch: Dispatch<BuilderAction>
+}): Promise<boolean> {
+  if (options.loadedVersion === null || options.skipPreflightCheck || !options.onRunConflict) return false
+  const hasConflict = await checkVersionConflictBeforeRun({
+    workflowId: options.workflowId,
+    loadedVersion: options.loadedVersion,
+    onRunConflict: options.onRunConflict,
+    loadedVersionName: options.loadedVersionName,
+    loadedVersionCreatedAt: options.loadedVersionCreatedAt,
+  })
+  if (hasConflict) options.dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
+  return hasConflict
+}
+
+async function saveBeforeWorkflowRun(
+  isReadOnly: boolean,
+  handleSaveWorkflow: UseBuilderToolbarHandlersOptions['handleSaveWorkflow'],
+  dispatch: Dispatch<BuilderAction>
+): Promise<boolean> {
+  if (isReadOnly) return true
+  try {
+    const saved = await handleSaveWorkflow({ blockOnWarnings: true })
+    if (!saved) dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
+    return saved
+  } catch {
+    dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
+    return false
+  }
+}
+
+type WorkflowRunState = {
+  workflow: WorkflowDefinition
+  edges: EdgeConnection[]
+}
+
+function getWorkflowRunState(
+  isReadOnly: boolean,
+  savedWorkflowDefinition: Record<string, unknown> | undefined,
+  currentWorkflow: WorkflowDefinition | null
+): WorkflowRunState | null {
+  if (isReadOnly) {
+    if (!savedWorkflowDefinition) return null
+    const saved = parseImportedDefinition(savedWorkflowDefinition)
+    return { workflow: saved.workflowDef, edges: saved.edges }
+  }
+  if (!currentWorkflow) return null
+  return { workflow: currentWorkflow, edges: useWorkflowStore.getState().edges }
+}
+
+async function getWorkflowRunValidationError({ workflow, edges }: WorkflowRunState): Promise<string | null> {
+  const activities = workflow.workflow.activities
+  const triggers = workflow.triggers
+  const minimumValidation = validateMinimumWorkflow(activities, edges, triggers)
+  if (minimumValidation.length > 0) {
+    return minimumValidation.map((error) => error.message).join('\n• ')
+  }
+  const validationResult = validateWorkflow(activities, edges, { triggers })
+  if (!validationResult.valid) {
+    return `Workflow validation failed:\n• ${validationResult.errors.map((error) => error.message).join('\n• ')}`
+  }
+  const waitErrors = await validateWaitNodeDurations(activities)
+  return waitErrors.length > 0 ? waitErrors.join('\n• ') : null
+}
+
 type ExecuteWorkflowMutate = (
   variables: { body: { workflow_id: string; input_data?: Record<string, unknown>; trigger_node_id: string } },
   options?: {
@@ -86,6 +159,9 @@ export type UseBuilderToolbarHandlersOptions = {
   loadedVersionName?: string | null
   loadedVersionCreatedAt?: string | null
   onRunConflict?: (info: ConflictInfo) => void
+  isReadOnly?: boolean
+  savedWorkflowDefinition?: Record<string, unknown>
+  canDelete?: boolean
 }
 
 /**
@@ -110,6 +186,9 @@ export function useBuilderToolbarHandlers({
   loadedVersionName,
   loadedVersionCreatedAt,
   onRunConflict,
+  isReadOnly = false,
+  savedWorkflowDefinition,
+  canDelete = true,
 }: UseBuilderToolbarHandlersOptions) {
   const handleRunWorkflow = useCallback(
     async (
@@ -119,66 +198,35 @@ export function useBuilderToolbarHandlers({
     ) => {
       if (!workflow?.id) return
 
-      if (loadedVersion != null && !runOptions?.skipPreflightCheck && onRunConflict) {
-        const hasConflict = await checkVersionConflictBeforeRun({
+      if (
+        await stopForVersionConflict({
           workflowId: workflow.id,
           loadedVersion,
+          skipPreflightCheck: runOptions?.skipPreflightCheck === true,
           onRunConflict,
           loadedVersionName,
           loadedVersionCreatedAt,
+          dispatch,
         })
-        if (hasConflict) {
-          dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
-          return
-        }
-      }
+      )
+        return
 
-      // Always save before running to ensure node positions are persisted.
-      // Auto-layout positions don't mark isDirty, so we save unconditionally.
-      // blockOnWarnings prevents execution when stale tools were auto-cleared.
-      try {
-        const saved = await handleSaveWorkflow({ blockOnWarnings: true })
-        if (!saved) {
-          dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
-          return
-        }
-      } catch {
+      // Auto-layout positions do not mark dirty, so editable runs always save.
+      if (!(await saveBeforeWorkflowRun(isReadOnly, handleSaveWorkflow, dispatch))) return
+
+      const runState = getWorkflowRunState(isReadOnly, savedWorkflowDefinition, currentWorkflow)
+      if (!runState) {
+        showError({
+          title: 'Cannot run workflow',
+          description: isReadOnly ? 'No saved workflow definition is available' : 'No workflow data available',
+        })
         dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
         return
       }
 
-      // Validate workflow has minimum requirements to run (after save)
-      if (!currentWorkflow) {
-        showError({ title: 'Cannot run workflow', description: 'No workflow data available' })
-        dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
-        return
-      }
-
-      const edges = useWorkflowStore.getState().edges
-      const activities = currentWorkflow.workflow.activities
-      const triggers = currentWorkflow.triggers
-
-      // Check minimum workflow requirements (trigger + node + connection)
-      const minimumValidation = validateMinimumWorkflow(activities, edges, triggers)
-      if (minimumValidation.length > 0) {
-        const errorMessages = minimumValidation.map((error) => error.message).join('\n• ')
-        showError({ title: 'Cannot run workflow', description: `${errorMessages}` })
-        dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
-        return
-      }
-
-      // Check all other validation rules (dangling nodes, invalid connections, etc.)
-      const validationResult = validateWorkflow(activities, edges, { triggers })
-      if (!validationResult.valid) {
-        const errorMessages = validationResult.errors.map((error) => error.message).join('\n• ')
-        showError({ title: 'Cannot run workflow', description: `Workflow validation failed:\n• ${errorMessages}` })
-        dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
-        return
-      }
-
-      const waitErrors = await validateWaitNodeDurations(activities)
-      if (waitErrors.length > 0) {
-        showError({ title: 'Cannot run workflow', description: waitErrors.join('\n• ') })
+      const validationError = await getWorkflowRunValidationError(runState)
+      if (validationError) {
+        showError({ title: 'Cannot run workflow', description: validationError })
         dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
         return
       }
@@ -221,11 +269,13 @@ export function useBuilderToolbarHandlers({
       loadedVersionName,
       loadedVersionCreatedAt,
       onRunConflict,
+      isReadOnly,
+      savedWorkflowDefinition,
     ]
   )
 
   const handleDeleteWorkflow = useCallback(() => {
-    if (!workflow?.id) return
+    if (!canDelete || !workflow?.id) return
 
     deleteWorkflow(
       { params: { path: { workflow_id: workflow.id } } },
@@ -244,7 +294,7 @@ export function useBuilderToolbarHandlers({
         },
       }
     )
-  }, [workflow, workflowName, deleteWorkflow, showSuccess, showError, setLocation, dispatch])
+  }, [canDelete, workflow, workflowName, deleteWorkflow, showSuccess, showError, setLocation, dispatch])
 
   const handleToggleDetails = useCallback(() => {
     dispatch({ type: 'TOGGLE_DETAILS' })

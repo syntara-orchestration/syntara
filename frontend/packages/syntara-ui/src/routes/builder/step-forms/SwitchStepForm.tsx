@@ -46,7 +46,7 @@ import { useSynForm } from '../../../hooks/useSynForm'
 import type { Expression } from '../../../utils/expressions/types'
 import { generateUUID } from '../../../utils/generateUUID'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { ActivityNameField } from './shared/ActivityNameField'
 import { PathExpressionHelp } from './shared/PathExpressionHelp'
@@ -288,7 +288,7 @@ function SwitchCaseItem({
 }
 
 function SwitchFormFields({ onHeaderContentChange }: { onHeaderContentChange?: (content: ReactNode | null) => void }) {
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const { control } = useFormContext<SwitchFormData>()
 
   const { fields, append, remove, move } = useFieldArray({ control, name: 'cases' })

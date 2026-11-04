@@ -3,351 +3,39 @@ import {
   Content,
   ContentVariants,
   Divider,
-  Dropdown,
-  DropdownGroup,
-  DropdownItem,
-  DropdownList,
   Flex,
   FlexItem,
   Icon,
-  MenuToggle,
-  type MenuToggleElement,
   SimpleList,
   SimpleListGroup,
   Stack,
   StackItem,
   Title,
   TitleSizes,
-  Tooltip,
 } from '@patternfly/react-core'
-import {
-  RhUiClockIcon,
-  RhUiCloseIcon,
-  RhUiDuplicateIcon,
-  RhUiEditIcon,
-  RhUiEllipsisVerticalFillIcon,
-  RhUiExportIcon,
-  RhUiExternalLinkIcon,
-  RhUiHistoryIcon,
-  RhUiPublishIcon,
-  RhUiUndoIcon,
-} from '@patternfly/react-icons'
+import { RhUiClockIcon, RhUiCloseIcon } from '@patternfly/react-icons'
 import type { WorkflowAPI } from '@syntara/contracts'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
-import { AppRoute } from '../../app/AppRoute'
 import { MultiSelectFilter } from '../../components/filters/MultiSelectFilter'
 import pageMainSlotStyles from '../../components/layout/SynPage.module.css'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
-import { SynLink } from '../../components/SynLink'
-import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { PaginationFooter } from '../../components/table/PaginationFooter'
 import type { FilterConfig } from '../../types/filters'
-import { toLinkedUserId, toUserReferenceName } from '../../utils/userReference'
 
-import { formatHistoryDateTime, getDateGroupLabel } from './historyDateUtils'
-import { resolveVersionStatusForBadge, shouldShowSecondaryVersionDatetime } from './hooks/historyRowModel'
-import { closeWhenDropdownCloses, nextOpenKebabVersionId } from './hooks/versionHistoryHelpers'
+import { getDateGroupLabel } from './historyDateUtils'
+import { nextOpenKebabVersionId } from './hooks/versionHistoryHelpers'
 import styles from './VersionHistoryPanel.module.css'
-import { VersionStatusBadge, type VersionStatus } from './VersionStatusBadge'
+import { VersionRow } from './VersionHistoryRow'
+import { type VersionStatus } from './VersionStatusBadge'
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 
 type VersionGroup = {
   label: string
   items: WorkflowVersion[]
-}
-
-function groupVersionsByDate(versions: WorkflowVersion[]): VersionGroup[] {
-  const map = new Map<string, WorkflowVersion[]>()
-  for (const version of versions) {
-    const label = version.created_at ? getDateGroupLabel(version.created_at) : 'Unknown'
-    if (!map.has(label)) map.set(label, [])
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via map.set(label, []) above
-    map.get(label)!.push(version)
-  }
-  return Array.from(map.entries()).map(([label, items]) => ({ label, items }))
-}
-
-type VersionKebabToggleProps = Readonly<{
-  toggleRef: Ref<MenuToggleElement>
-  isOpen: boolean
-  onToggle: () => void
-  ariaLabel: string
-}>
-
-function VersionKebabToggle({ toggleRef, isOpen, onToggle, ariaLabel }: VersionKebabToggleProps) {
-  return (
-    <MenuToggle
-      ref={toggleRef}
-      variant="plain"
-      onClick={(e) => {
-        e.stopPropagation()
-        onToggle()
-      }}
-      isExpanded={isOpen}
-      aria-label={ariaLabel}
-    >
-      <RhUiEllipsisVerticalFillIcon />
-    </MenuToggle>
-  )
-}
-
-type VersionKebabMenuProps = Readonly<{
-  version: WorkflowVersion
-  isOpen: boolean
-  onToggle: () => void
-  onClose: () => void
-  onRestore: () => void
-  onExport: () => void
-  onOpenInNewWindow: () => void
-  onPublish: () => void
-  onViewRunHistory: () => void
-  hasRunHistory: boolean
-  onEdit: () => void
-  onDuplicate: () => void
-  canEdit: boolean
-  editTooltip?: string
-}>
-
-function VersionKebabMenu({
-  version,
-  isOpen,
-  onToggle,
-  onClose,
-  onRestore,
-  onExport,
-  onOpenInNewWindow,
-  onPublish,
-  onViewRunHistory,
-  hasRunHistory,
-  onEdit,
-  onDuplicate,
-  canEdit,
-  editTooltip,
-}: VersionKebabMenuProps) {
-  const ariaLabel = `Actions for version ${version.version}`
-  const disabledTooltip = !canEdit && editTooltip ? { content: editTooltip } : undefined
-  const isAlreadyPublished = version.status === 'published'
-  const publishTooltip =
-    disabledTooltip ?? (isAlreadyPublished ? { content: 'This version is already published' } : undefined)
-  const renderToggle = (toggleRef: Ref<MenuToggleElement>) => (
-    <VersionKebabToggle toggleRef={toggleRef} isOpen={isOpen} onToggle={onToggle} ariaLabel={ariaLabel} />
-  )
-
-  return (
-    <Dropdown
-      isOpen={isOpen}
-      onSelect={onClose}
-      onOpenChange={(open) => closeWhenDropdownCloses(open, onClose)}
-      toggle={renderToggle}
-      popperProps={{ position: 'end' }}
-    >
-      <DropdownGroup label="Views">
-        <DropdownList>
-          <DropdownItem key="open-new-window" onClick={() => onOpenInNewWindow()} icon={<RhUiExternalLinkIcon />}>
-            Open version in new window
-          </DropdownItem>
-          <DropdownItem
-            key="view-run-history"
-            onClick={hasRunHistory ? () => onViewRunHistory() : undefined}
-            icon={<RhUiHistoryIcon />}
-            isAriaDisabled={!hasRunHistory}
-            tooltipProps={!hasRunHistory ? { content: 'No runs for this version' } : undefined}
-          >
-            View run history of this version
-          </DropdownItem>
-        </DropdownList>
-      </DropdownGroup>
-      <Divider />
-      <DropdownGroup label="Actions">
-        <DropdownList>
-          <DropdownItem
-            key="restore"
-            onClick={canEdit ? () => onRestore() : undefined}
-            icon={<RhUiUndoIcon />}
-            isAriaDisabled={!canEdit}
-            tooltipProps={disabledTooltip}
-          >
-            Restore version
-          </DropdownItem>
-          <DropdownItem
-            key="edit"
-            onClick={canEdit ? () => onEdit() : undefined}
-            icon={<RhUiEditIcon />}
-            isAriaDisabled={!canEdit}
-            tooltipProps={disabledTooltip}
-          >
-            Edit version name and description
-          </DropdownItem>
-          <DropdownItem
-            key="duplicate"
-            onClick={canEdit ? () => onDuplicate() : undefined}
-            icon={<RhUiDuplicateIcon />}
-            isAriaDisabled={!canEdit}
-            tooltipProps={disabledTooltip}
-          >
-            Duplicate as new workflow
-          </DropdownItem>
-          <DropdownItem key="export" onClick={() => onExport()} icon={<RhUiExportIcon />}>
-            Export workflow
-          </DropdownItem>
-          <DropdownItem
-            key="publish"
-            onClick={() => onPublish()}
-            icon={<RhUiPublishIcon />}
-            isAriaDisabled={!canEdit || isAlreadyPublished}
-            tooltipProps={publishTooltip}
-          >
-            Publish this version
-          </DropdownItem>
-        </DropdownList>
-      </DropdownGroup>
-    </Dropdown>
-  )
-}
-
-type VersionRowProps = Readonly<{
-  version: WorkflowVersion
-  onSelect: () => void
-  onRestore: () => void
-  onExport: () => void
-  onOpenInNewWindow: () => void
-  onPublish: () => void
-  onViewRunHistory: () => void
-  hasRunHistory: boolean
-  onEdit: () => void
-  onDuplicate: () => void
-  isSelected?: boolean
-  isKebabOpen: boolean
-  onKebabToggle: () => void
-  onKebabClose: () => void
-  canEdit?: boolean
-  editTooltip?: string
-  scrollRef?: Ref<HTMLSpanElement>
-}>
-
-/** Links a version's creator to their user page. Render only when both id and name are known. */
-function VersionCreatedByLink({ userId, name }: Readonly<{ userId: string; name: string }>) {
-  return (
-    <SynLink to={AppRoute.AccessManagement.UserDetail.replace(':userId', userId)} className={styles.usernameLink}>
-      {name}
-    </SynLink>
-  )
-}
-
-/**
- * Secondary "datetime by creator" line under a version's title. The creator is a
- * link only for live users (see toLinkedUserId); other principals render as text.
- */
-function VersionSecondaryLine({
-  createdAt,
-  createdBy,
-  showDatetime,
-}: Readonly<{
-  createdAt: WorkflowVersion['created_at']
-  createdBy: WorkflowVersion['created_by']
-  showDatetime: boolean
-}>) {
-  const creatorName = toUserReferenceName(createdBy)
-  const creatorId = toLinkedUserId(createdBy)
-  const datetime = showDatetime && createdAt ? <ExecutionTimestamp dateString={createdAt} /> : null
-  if (!datetime && !creatorName) return null
-
-  let creator: ReactNode = null
-  if (creatorName) {
-    creator = creatorId ? <VersionCreatedByLink userId={creatorId} name={creatorName} /> : creatorName
-  }
-
-  return (
-    <Content component={ContentVariants.small} className={styles.secondaryDatetime}>
-      {datetime}
-      {datetime && creator ? ' by ' : null}
-      {creator}
-    </Content>
-  )
-}
-
-function VersionRow({
-  version,
-  onSelect,
-  onRestore,
-  onExport,
-  onOpenInNewWindow,
-  onPublish,
-  onViewRunHistory,
-  hasRunHistory,
-  onEdit,
-  onDuplicate,
-  isSelected,
-  isKebabOpen,
-  onKebabToggle,
-  onKebabClose,
-  canEdit = true,
-  editTooltip,
-  scrollRef,
-}: VersionRowProps) {
-  const badgeStatus = resolveVersionStatusForBadge(version.status)
-  const showSecondaryDatetime = shouldShowSecondaryVersionDatetime(version.name, version.created_at)
-  const rowLabel =
-    version.name || (version.created_at ? formatHistoryDateTime(version.created_at) : `Version ${version.version}`)
-
-  return (
-    // eslint-disable-next-line syntara/prefer-pf-list-components -- SimpleListItem renders a <button> wrapper, causing invalid nested interactive elements (https://github.com/patternfly/patternfly-react/issues/11368)
-    <li className={`pf-v6-c-simple-list__item ${styles.versionRowItem}`}>
-      {/* Row-wide click target. It is a sibling of the row content, never its ancestor, so the
-          creator link and the kebab menu are not interactive elements nested inside a button
-          (same pattern as WorkflowHistoryCard). */}
-      <Tooltip content={rowLabel}>
-        <button
-          type="button"
-          className={`pf-v6-c-simple-list__item-link ${isSelected ? 'pf-m-current' : ''} ${styles.versionRowSelect}`}
-          onClick={onSelect}
-          data-item-id={version.id}
-          aria-label={rowLabel}
-          aria-current={isSelected ? 'true' : undefined}
-        />
-      </Tooltip>
-      <span ref={scrollRef} />
-      <Stack className={styles.versionRowStack}>
-        <FlexItem style={{ minWidth: 0 }}>
-          <Content component={ContentVariants.p} className={styles.versionTimestamp}>
-            {version.name || <ExecutionTimestamp dateString={version.created_at} />}
-          </Content>
-        </FlexItem>
-        <VersionSecondaryLine
-          createdAt={version.created_at}
-          createdBy={version.created_by}
-          showDatetime={showSecondaryDatetime}
-        />
-        {badgeStatus ? (
-          <div className={styles.labelsRow}>
-            <VersionStatusBadge status={badgeStatus} />
-          </div>
-        ) : null}
-      </Stack>
-      <div className={styles.kebabFlexItem}>
-        <VersionKebabMenu
-          version={version}
-          isOpen={isKebabOpen}
-          onToggle={onKebabToggle}
-          onClose={onKebabClose}
-          onRestore={onRestore}
-          onExport={onExport}
-          onOpenInNewWindow={onOpenInNewWindow}
-          onPublish={onPublish}
-          onViewRunHistory={onViewRunHistory}
-          hasRunHistory={hasRunHistory}
-          onEdit={onEdit}
-          onDuplicate={onDuplicate}
-          canEdit={canEdit}
-          editTooltip={editTooltip}
-        />
-      </div>
-    </li>
-  )
 }
 
 type VersionHistoryPanelProps = Readonly<{
@@ -367,6 +55,9 @@ type VersionHistoryPanelProps = Readonly<{
   selectedVersion?: number | null
   canEdit?: boolean
   editTooltip?: string
+  canCreate?: boolean
+  createTooltip?: string
+  projectId?: string
   publishedVersionName?: string | null
   paginationFooterProps?: PaginationFooterProps
 }>
@@ -375,6 +66,17 @@ const STATUS_FILTER_OPTIONS: { label: string; value: string }[] = [
   { label: 'Published', value: 'published' },
   { label: 'Previously published', value: 'previously_published' },
 ]
+
+function groupVersionsByDate(versions: WorkflowVersion[]): VersionGroup[] {
+  const map = new Map<string, WorkflowVersion[]>()
+  for (const version of versions) {
+    const label = version.created_at ? getDateGroupLabel(version.created_at) : 'Unknown'
+    if (!map.has(label)) map.set(label, [])
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: the key was just inserted above
+    map.get(label)!.push(version)
+  }
+  return Array.from(map.entries()).map(([label, items]) => ({ label, items }))
+}
 
 export function VersionHistoryPanel(props: VersionHistoryPanelProps) {
   const {
@@ -394,13 +96,15 @@ export function VersionHistoryPanel(props: VersionHistoryPanelProps) {
     selectedVersion,
     canEdit = true,
     editTooltip,
+    canCreate = canEdit,
+    createTooltip,
+    projectId,
     publishedVersionName,
     paginationFooterProps,
   } = props
 
   const groups = useMemo(() => groupVersionsByDate(versions), [versions])
   const [openKebabVersionId, setOpenKebabVersionId] = useState<string | null>(null)
-
   const selectedRef = useRef<HTMLSpanElement>(null)
   const scrollToSelected = useCallback(() => {
     const li = selectedRef.current?.closest('li')
@@ -444,6 +148,9 @@ export function VersionHistoryPanel(props: VersionHistoryPanelProps) {
                   hasRunHistory={executedVersionNumbers.has(version.version)}
                   onEdit={() => onEditVersion(version)}
                   onDuplicate={() => onDuplicateVersion(version)}
+                  canCreate={canCreate}
+                  createTooltip={createTooltip}
+                  projectId={projectId}
                   isSelected={isActive}
                   isKebabOpen={openKebabVersionId === version.id}
                   onKebabToggle={() => setOpenKebabVersionId(nextOpenKebabVersionId(openKebabVersionId, version.id))}

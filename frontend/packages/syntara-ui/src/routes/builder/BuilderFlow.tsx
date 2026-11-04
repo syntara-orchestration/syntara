@@ -199,7 +199,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
         isValidConnection={isValidConnection}
         disableDeleteKey={disableDeleteKey}
         disableSpacePanning={disableSpacePanning}
-        onLayout={onLayout}
+        onLayout={isReadOnly ? undefined : onLayout}
       />
     </ActiveExecutionContext.Provider>
   )

@@ -6,6 +6,18 @@ import { axe } from 'vitest-axe'
 import { VersionHistoryPanel } from './VersionHistoryPanel'
 import type { VersionStatus } from './VersionStatusBadge'
 
+vi.mock('../workflows/useStepTypePermissions', () => ({
+  getStepTypePermissionMessage: () => 'Step-type permission is required.',
+  getStepTypesFromDefinition: () => [],
+  useStepTypePermissions: () => ({
+    canAuthor: true,
+    blockedStepTypes: [],
+    isChecking: false,
+    isError: false,
+    retry: vi.fn().mockResolvedValue(undefined),
+  }),
+}))
+
 vi.mock('../../components/table/PaginationFooter', () => ({
   PaginationFooter: ({ total, perPage }: { total: number; perPage: number }) => (
     <div data-testid="pagination-footer">{`1 - ${perPage} of ${total}`}</div>

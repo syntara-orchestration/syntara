@@ -82,8 +82,21 @@ const mockBuilderPermissions = vi.hoisted(() => ({
   tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '', create: '' },
 }))
 
+const mockStepTypePermissions = vi.hoisted(() => ({
+  canAuthor: true,
+  blockedStepTypes: [] as { kind: string; label: string }[],
+  isChecking: false,
+  isError: false,
+  retry: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('./useBuilderPermissions', () => ({
   useBuilderPermissions: () => mockBuilderPermissions,
+}))
+
+vi.mock('../workflows/useStepTypePermissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../workflows/useStepTypePermissions')>()),
+  useStepTypePermissions: () => mockStepTypePermissions,
 }))
 
 import { BuilderContent } from './BuilderContent'
@@ -247,6 +260,10 @@ describe('BuilderContent', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     queryClient.clear()
+    mockStepTypePermissions.canAuthor = true
+    mockStepTypePermissions.blockedStepTypes = []
+    mockStepTypePermissions.isChecking = false
+    mockStepTypePermissions.isError = false
 
     vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: vi.fn() })
     vi.mocked(approvalsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })

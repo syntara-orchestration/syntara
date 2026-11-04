@@ -397,7 +397,25 @@ describe('useBuilderVersionHistory', () => {
         result.current.handleConfirmRestore()
       })
 
-      expect(params.showError).toHaveBeenCalledWith({ title: 'Failed to restore version' })
+      expect(params.showError).toHaveBeenCalledWith({
+        title: 'Failed to restore version',
+        description: 'An unexpected error occurred',
+      })
+    })
+
+    it('shows the blocked step types when restore is denied', () => {
+      const detail = "You can't restore workflow: Script (write denied)."
+      mockRestoreMutate.mockImplementation((_params: unknown, callbacks?: { onError?: (error: unknown) => void }) => {
+        callbacks?.onError?.({ cause: { code: 'NODE_KIND_WRITE_DENIED', detail } })
+      })
+      const params = createDefaultParams()
+      const { result } = renderHook(() => useBuilderVersionHistory(params), {
+        wrapper: makeWrapper(queryClient),
+      })
+      act(() => result.current.restoreDialog.open({ version: 2, dateTime: '2026-05-19T14:30:00.000Z' }))
+      act(() => result.current.handleConfirmRestore())
+      expect(params.showError).toHaveBeenCalledWith({ title: 'Failed to restore version', description: detail })
+      expect(params.showSuccess).not.toHaveBeenCalled()
     })
   })
 

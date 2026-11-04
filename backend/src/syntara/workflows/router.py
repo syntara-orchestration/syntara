@@ -330,6 +330,7 @@ async def list_workflows(
         allowed_projects=visibility.to_allowed_projects(),
     )
     await service.populate_published_version_numbers(result.resources)
+    await service.populate_step_types(result.resources)
     return result
 
 

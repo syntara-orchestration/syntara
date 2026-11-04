@@ -10,7 +10,7 @@ import { AAPIntegrationSection } from '../components/AAPIntegrationSection'
 import type { ExpandableCodeEditorHandle } from '../components/ExpandableCodeEditor'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
 import { hasExpressionValue } from '../utils/aapHelpers'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { AAPWorkflowTemplatePromptFields } from './AAPWorkflowTemplatePromptFields'
 import { AAPWorkflowTemplateResourcePickers } from './AAPWorkflowTemplateResourcePickers'
@@ -49,7 +49,7 @@ function AAPFormFields({
   projectId?: string
   extraVarsEditorRef: React.RefObject<ExpandableCodeEditorHandle | null>
 }>) {
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const { control } = useFormContext<AAPWorkflowTemplateFormData>()
 
   const expressionMode = Boolean(useWatch({ name: 'use_input_variables' }))

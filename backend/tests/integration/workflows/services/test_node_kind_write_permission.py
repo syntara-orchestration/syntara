@@ -234,6 +234,56 @@ async def test_published_only_denial_blocks_project_delete(test_db_session, test
     assert await db.get(Project, project.id) is not None
 
 
+async def test_step_type_summary_includes_latest_and_published_versions(
+    test_db_session, test_user, test_project_id, evaluator
+):
+    db = test_db_session
+    draft = create_minimal_workflow_definition(activity_type="wait")
+    published_definition = create_minimal_workflow_definition(activity_type="script")
+    workflow, _ = await _stored_workflow(db, test_user, test_project_id, draft, target=published_definition)
+    published = (
+        await db.exec(
+            select(WorkflowVersion).where(WorkflowVersion.workflow_id == workflow.id, WorkflowVersion.version == 2)
+        )
+    ).one()
+    workflow.published_version_id = published.id
+    workflow.is_enabled = True
+    await db.commit()
+
+    summary = await WorkflowService(db, test_user, evaluator).to_read(workflow)
+
+    assert summary.step_types == ["manual_trigger", "script", "wait"]
+
+
+async def test_missing_current_version_returns_unavailable_step_type_summary(
+    test_db_session, test_user, test_project_id, evaluator
+):
+    workflow, _ = await _stored_workflow(
+        test_db_session, test_user, test_project_id, create_minimal_workflow_definition()
+    )
+    workflow.current_version = 99
+    await test_db_session.commit()
+
+    summary = await WorkflowService(test_db_session, test_user, evaluator).to_read(workflow)
+
+    assert summary.step_types is None
+
+
+async def test_empty_current_definition_returns_empty_step_type_summary(
+    test_db_session, test_user, test_project_id, evaluator
+):
+    workflow, _ = await _stored_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        {"triggers": [], "nodes": []},
+    )
+
+    summary = await WorkflowService(test_db_session, test_user, evaluator).to_read(workflow)
+
+    assert summary.step_types == []
+
+
 async def test_selected_historical_definition_is_checked(test_db_session, test_user, test_project_id, evaluator):
     db = test_db_session
     project = await db.get(Project, test_project_id)

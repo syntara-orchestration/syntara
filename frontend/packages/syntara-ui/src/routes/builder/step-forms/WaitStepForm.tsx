@@ -7,7 +7,7 @@ import { SynForm } from '../../../components/forms/SynForm'
 import { SynFormField } from '../../../components/forms/SynFormField'
 import { useSynForm } from '../../../hooks/useSynForm'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { ActivityNameField } from './shared/ActivityNameField'
 import { DurationInput } from './shared/DurationInput'
@@ -31,7 +31,7 @@ type WaitFormFieldsProps = Readonly<{
 }>
 
 function WaitFormFields({ onHeaderContentChange }: WaitFormFieldsProps) {
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const { control } = useFormContext<WaitFormData>()
 
   const nameField = useMemo(

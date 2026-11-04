@@ -9,6 +9,10 @@ export type BuilderPermissions = {
   canRun: boolean
   canDelete: boolean
   isLoading: boolean
+  stepTypePermissionError?: boolean
+  stepTypePermissionLoading?: boolean
+  blockedStepTypes?: string[]
+  retryStepTypePermissions?: () => Promise<void>
   tooltips: {
     edit: string
     save: string

@@ -4,7 +4,7 @@ import { BaseEdge, EdgeLabelRenderer, useReactFlow } from '@xyflow/react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { setPendingDragHandle } from '../utils/pendingDragHandle'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { BUTTON_EDGE_DEFAULT_STROKE, getButtonEdgeStrokeColor } from './buttonEdgeStrokeColor'
 import { adjustSourceCoordinates, calculateStubTarget } from './edgeUtils'
@@ -82,9 +82,9 @@ export function ButtonEdge(props: ButtonEdgeProps) {
   const { sourceX, sourceY, sourcePosition, style, data, id, source, sourceHandleId } = props
   const [isFocused, setIsFocused] = useState(false)
   const { handleMouseDown, isDragging } = useButtonEdgeDragHandler({ id, source, sourceX, sourceY })
-  const isVersionView = useIsVersionView()
+  const isReadOnly = useIsStepFormReadOnly()
 
-  if (isVersionView) return null
+  if (isReadOnly) return null
 
   const strokeColor = getButtonEdgeStrokeColor(sourceHandleId ?? data?.sourceHandle)
 

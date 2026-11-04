@@ -251,6 +251,13 @@ class WorkflowRead(UserReferenceFieldsMixin, WorkflowBase):
     )
     published_version_id: UUID | None = None
     published_version_number: int | None = None
+    step_types: list[str] | None = Field(
+        default=None,
+        description=(
+            "Sorted distinct step types in the latest draft and published definition; "
+            "null when version data is unavailable."
+        ),
+    )
     created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the workflow")
     updated_by: UserReference | UUID | str | None = Field(
         default=None, description="User who last modified the workflow"

@@ -1298,6 +1298,11 @@ export interface components {
       /** Published Version Number */
       published_version_number?: number | null
       /**
+       * Step Types
+       * @description Sorted distinct step types in the latest draft and published definition; null when version data is unavailable.
+       */
+      step_types?: string[] | null
+      /**
        * Created At
        * Format: date-time
        */

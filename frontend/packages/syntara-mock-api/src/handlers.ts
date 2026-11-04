@@ -26,6 +26,7 @@ import { settings, settingsCategories } from './resources/settings'
 import { revocationState } from './resources/revocation'
 import { identityProviders, type IdentityProvider } from './resources/identityProviders'
 import { validateGroupJmespathExpression } from './utils/jmespathValidation'
+import { getWorkflowStepTypes } from './utils/workflowStepTypes'
 import { users, userIdentities, type UserRead, type UserIdentityRead } from './resources/users'
 import { groups, userGroupMemberships, type GroupRead } from './resources/groups'
 import {
@@ -986,6 +987,7 @@ export const handlers = [
       is_enabled: body.is_enabled ?? false,
       published_version_id: null,
       published_version_number: null,
+      step_types: getWorkflowStepTypes([body.workflow_definition]),
       current_version: 1,
       created_at: now,
       updated_at: now,
@@ -1180,6 +1182,11 @@ export const handlers = [
       deleted_at: null,
       deleted_by: null,
     })
+
+    const publishedDefinition = mutableWorkflow.published_version_id
+      ? versions.find((version) => version.id === mutableWorkflow.published_version_id)?.workflow_definition
+      : undefined
+    mutableWorkflow.step_types = getWorkflowStepTypes([nextDefinition, publishedDefinition])
 
     return HttpResponse.json(workflow)
   }),
@@ -1377,6 +1384,10 @@ export const handlers = [
       storeRecord.status = 'published'
       storeRecord.name = (body?.name as string) ?? null
     }
+    mutableWorkflow.step_types = getWorkflowStepTypes([
+      mutableWorkflow.version?.workflow_definition,
+      versionObj.workflow_definition,
+    ])
 
     return HttpResponse.json({ ...mutableWorkflow, warning: '' })
   }),
@@ -1410,6 +1421,7 @@ export const handlers = [
     for (const v of versions) {
       if (v.status === 'published') v.status = 'previously_published'
     }
+    mutableWorkflow.step_types = getWorkflowStepTypes([mutableWorkflow.version?.workflow_definition])
 
     return HttpResponse.json(mutableWorkflow)
   }),
@@ -5329,6 +5341,7 @@ export const handlers = [
       execution: new Set(['read', 'run']),
       credential: new Set(['read', 'create', 'update', 'delete', 'use']),
       approval: new Set(['read', 'decide']),
+      step_type: new Set(['write']),
     }
 
     const projectUserGrants: Record<string, Set<string>> = {
@@ -5339,6 +5352,7 @@ export const handlers = [
       execution: new Set(['read', 'run']),
       credential: new Set(['read', 'create', 'update', 'use']),
       approval: new Set(['read', 'decide']),
+      step_type: new Set(['write']),
     }
 
     let allowed = true

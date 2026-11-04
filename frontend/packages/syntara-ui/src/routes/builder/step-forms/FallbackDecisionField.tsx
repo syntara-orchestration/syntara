@@ -17,7 +17,7 @@ import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynSelect } from '../../../components/SynSelect'
 import { useEffectiveContinueOnFailure } from '../hooks/useEffectiveContinueOnFailure'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import type { ApprovalFormData } from './approvalFormSchema'
 import styles from './FallbackDecisionField.module.css'
@@ -155,7 +155,7 @@ function FallbackDecisionSelect({ value, onChange, isDisabled, tooltip }: Fallba
  * copy when effective continue on failure is off.
  */
 export function FallbackDecisionField() {
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const { setValue } = useFormContext<ApprovalFormData>()
   const { isEffectivelyEnabled, source } = useEffectiveContinueOnFailure()
 

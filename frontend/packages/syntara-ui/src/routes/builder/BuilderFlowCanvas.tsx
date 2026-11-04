@@ -51,7 +51,7 @@ type BuilderFlowCanvasProps = {
   isValidConnection: (connection: EdgeType | Connection) => boolean
   disableDeleteKey?: boolean
   disableSpacePanning?: boolean
-  onLayout: () => void
+  onLayout?: () => void
 }
 
 type SemanticZoomStoreState = {

@@ -30,7 +30,7 @@ import { useSynForm } from '../../../hooks/useSynForm'
 import { getDefaultRepeatingInterval } from '../../../utils/triggerFormatting'
 import { generateWebhookPath } from '../../../utils/webhookPath'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { EdaFields } from './EdaTriggerFields'
 import { ManualTriggerFields } from './ManualTriggerFields'
@@ -278,7 +278,7 @@ function TriggerFormFields({
     webhookPath?: { message?: string }
   }
 }>) {
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const {
     control,
     register,

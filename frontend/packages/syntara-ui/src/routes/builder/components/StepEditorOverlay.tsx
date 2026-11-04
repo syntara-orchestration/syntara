@@ -27,6 +27,7 @@ type StepEditorOverlayProps = {
   workflowMetadata?: WorkflowMetadata
   onRunStep?: () => void
   onStepAdded?: () => void
+  readOnly?: boolean
 }
 
 export const StepEditorOverlay = memo(function StepEditorOverlay(props: StepEditorOverlayProps) {
@@ -49,7 +50,9 @@ export const StepEditorOverlay = memo(function StepEditorOverlay(props: StepEdit
     workflowMetadata,
     onRunStep,
     onStepAdded,
+    readOnly = false,
   } = props
+  const isReadOnly = readOnly || isVersionView
 
   const stepDocKey = resolveStepDocKey({ mode, stepTypeId, stepSubtypeId, selectedNode })
   // Hook must run unconditionally; ignore the result when this step has no docs.
@@ -83,8 +86,9 @@ export const StepEditorOverlay = memo(function StepEditorOverlay(props: StepEdit
           onAddStep={onAddStep}
           docLink={stepDocLink}
           workflowMetadata={workflowMetadata}
-          onRunStep={isVersionView ? undefined : onRunStep}
-          readOnly={isVersionView}
+          onRunStep={isReadOnly ? undefined : onRunStep}
+          readOnly={isReadOnly}
+          isViewingVersion={isVersionView}
           onStepAdded={onStepAdded}
         />
       </FlexItem>

@@ -18,7 +18,7 @@ import { SynTextField } from '../../../../components/forms/SynTextField'
 import { SynSelect } from '../../../../components/SynSelect'
 import type { TimeoutStepType } from '../../hooks/useWorkflowEngineDefaults'
 import { useWorkflowEngineDefaults } from '../../hooks/useWorkflowEngineDefaults'
-import { useIsVersionView } from '../../VersionViewContext'
+import { useIsStepFormReadOnly } from '../../VersionViewContext'
 
 import { DurationInput } from './DurationInput'
 import { stepHelp } from './stepFieldHelp'
@@ -303,7 +303,7 @@ export function StepSettingsForm({
   continueOnFailureHelp,
   timeoutStepType,
 }: StepSettingsFormProps) {
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const { control, setValue } = useFormContext<FormWithSettings>()
   const retryPolicy = useWatch({ control, name: 'settings.retry_policy' })
   const continueOnFailure = useWatch({ control, name: 'settings.continue_on_failure' })

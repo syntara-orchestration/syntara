@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { BuilderReadOnlyBanner } from './BuilderReadOnlyBanner'
@@ -37,6 +38,39 @@ describe('BuilderReadOnlyBanner', () => {
         'You do not have permission to edit this workflow. Contact your administrator to request access.'
       )
     ).toBeInTheDocument()
+  })
+
+  it('lists blocked step display names without policy details', () => {
+    render(
+      <BuilderReadOnlyBanner
+        canEdit={false}
+        isLoading={false}
+        isBuiltin={false}
+        blockedStepTypes={['Script', 'REST API']}
+      />
+    )
+
+    expect(screen.getByText('You are viewing this workflow in read-only mode.')).toBeInTheDocument()
+    expect(screen.getByText('Blocked step types: Script, REST API.')).toBeInTheDocument()
+    expect(screen.queryByText(/policy|scope/i)).not.toBeInTheDocument()
+  })
+
+  it('offers a retry action when permission checks fail', async () => {
+    const user = userEvent.setup()
+    const onRetryPermissionCheck = vi.fn()
+    render(
+      <BuilderReadOnlyBanner
+        canEdit={false}
+        isLoading={false}
+        isBuiltin={false}
+        permissionCheckError
+        onRetryPermissionCheck={onRetryPermissionCheck}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Retry permission check' }))
+
+    expect(onRetryPermissionCheck).toHaveBeenCalledOnce()
   })
 
   it('has no accessibility violations when showing builtin banner', async () => {

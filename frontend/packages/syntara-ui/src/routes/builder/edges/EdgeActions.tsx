@@ -3,7 +3,7 @@ import { RhUiAddSquareIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { EdgeLabelRenderer } from '@xyflow/react'
 import React from 'react'
 
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 type EdgeActionsProps = {
   /** X coordinate for positioning the actions */
@@ -26,9 +26,9 @@ type EdgeActionsProps = {
  */
 export function EdgeActions(props: EdgeActionsProps) {
   const { labelX, labelY, onButtonMouseEnter, onButtonMouseLeave, onAddNode, onDelete } = props
-  const isVersionView = useIsVersionView()
+  const isReadOnly = useIsStepFormReadOnly()
 
-  if (isVersionView) return null
+  if (isReadOnly) return null
 
   return (
     <EdgeLabelRenderer>

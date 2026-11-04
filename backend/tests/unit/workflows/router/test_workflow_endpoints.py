@@ -68,6 +68,7 @@ class TestWorkflowEndpoints:
             allowed_projects=None,
         )
         mock_service.populate_published_version_numbers.assert_awaited_once_with(mock_result.resources)
+        mock_service.populate_step_types.assert_awaited_once_with(mock_result.resources)
         assert result is mock_result
 
     @pytest.mark.asyncio

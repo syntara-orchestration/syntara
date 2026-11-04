@@ -183,6 +183,7 @@ export function BuilderEditorToolbar({
       workflowName,
       workflowDescription,
       onPendingImport,
+      canEdit: builderPermissions.canEdit,
     })
 
   const hasNoSteps = useWorkflowStore((s) => (s.currentWorkflow?.workflow?.activities?.length ?? 0) === 0)

@@ -26,7 +26,7 @@ import {
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
 import { DroppableField } from '../panels/fields/DroppableField'
 import type { ActionFormData as RegistryActionFormData } from '../stepFormTypes'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { actionFormSchema, type ActionFormData, type ActionFormValues } from './actionFormSchema'
 import { HttpCredentialSection, HttpUrlField } from './httpCredentialSection'
@@ -207,7 +207,7 @@ function ActionParametersContent({
   projectId,
 }: ActionParametersContentProps) {
   const { register, getValues, setValue } = useFormContext<ActionFormValues>()
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
 
   return (
     <Stack hasGutter style={{ paddingInline: 'var(--pf-t--global--spacer--xs)' }}>

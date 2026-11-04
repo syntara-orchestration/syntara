@@ -18,6 +18,7 @@ export type UseBuilderFlowInteractionHandlersOptions = {
   sourceHandle: string | null | undefined
   targetHandle: string | null | undefined
   onRunStep: (nodeId: string) => void
+  canEdit?: boolean
 }
 
 /**
@@ -32,6 +33,7 @@ export function useBuilderFlowInteractionHandlers({
   sourceHandle,
   targetHandle,
   onRunStep,
+  canEdit = true,
 }: UseBuilderFlowInteractionHandlersOptions) {
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node<NodeType['data']>) => {
@@ -54,6 +56,7 @@ export function useBuilderFlowInteractionHandlers({
       sourceHandle: handle,
       desiredPosition,
     }: AddNodeFromEdgeOptions) => {
+      if (!canEdit) return
       let edgeTargetHandle: string | undefined = undefined
       if (edgeId) {
         const edge = reactFlowInstance.getEdge(edgeId)
@@ -64,11 +67,12 @@ export function useBuilderFlowInteractionHandlers({
         payload: { sourceId, targetId, edgeId, handle, targetHandle: edgeTargetHandle, desiredPosition },
       })
     },
-    [dispatch, reactFlowInstance]
+    [canEdit, dispatch, reactFlowInstance]
   )
 
   const handleConnectFromPanel = useCallback(
     (sourceId: string, targetId: string) => {
+      if (!canEdit) return
       const params = {
         sourceId,
         targetId,
@@ -93,14 +97,15 @@ export function useBuilderFlowInteractionHandlers({
         },
       })
     },
-    [edgeIdToReplace, targetNodeId, sourceHandle, targetHandle, reactFlowInstance, handleAddNodeFromEdge]
+    [canEdit, edgeIdToReplace, targetNodeId, sourceHandle, targetHandle, reactFlowInstance, handleAddNodeFromEdge]
   )
 
   const handleNodesDeleted = useCallback(
     (deletedNodeIds: string[]) => {
+      if (!canEdit) return
       dispatch({ type: 'CLEAR_SELECTED_IF_DELETED', payload: deletedNodeIds })
     },
-    [dispatch]
+    [canEdit, dispatch]
   )
 
   const handleViewStepDetails = useCallback(
@@ -119,13 +124,15 @@ export function useBuilderFlowInteractionHandlers({
 
   const handleReplaceStep = useCallback(
     (nodeId: string) => {
+      if (!canEdit) return
       dispatch({ type: 'OPEN_ADD_NODE_PANEL', payload: { sourceNodeId: null, replacementNodeId: nodeId } })
     },
-    [dispatch]
+    [canEdit, dispatch]
   )
 
   const handleDuplicateStep = useCallback(
     (nodeId: string) => {
+      if (!canEdit) return
       const node = reactFlowInstance.getNode(nodeId)
       dispatch({ type: 'CLOSE_NODE_EDITOR' })
       if (node) {
@@ -139,19 +146,23 @@ export function useBuilderFlowInteractionHandlers({
       }
       duplicateActivity(nodeId)
     },
-    [dispatch, reactFlowInstance, duplicateActivity]
+    [canEdit, dispatch, reactFlowInstance, duplicateActivity]
   )
 
-  const handleToggleStepDisabled = useCallback((nodeId: string) => {
-    const store = useWorkflowStore.getState()
-    const activities = store.currentWorkflow?.workflow.activities ?? []
-    const activity = activities.find((a) => a.id === nodeId)
-    if (!activity) return
-    const currentDisabled = activity.settings?.disabled ?? false
-    store.updateActivity(nodeId, {
-      settings: { ...activity.settings, disabled: !currentDisabled },
-    })
-  }, [])
+  const handleToggleStepDisabled = useCallback(
+    (nodeId: string) => {
+      if (!canEdit) return
+      const store = useWorkflowStore.getState()
+      const activities = store.currentWorkflow?.workflow.activities ?? []
+      const activity = activities.find((a) => a.id === nodeId)
+      if (!activity) return
+      const currentDisabled = activity.settings?.disabled ?? false
+      store.updateActivity(nodeId, {
+        settings: { ...activity.settings, disabled: !currentDisabled },
+      })
+    },
+    [canEdit]
+  )
 
   const stepActionsValue = useMemo<StepActionsContextValue>(
     () => ({

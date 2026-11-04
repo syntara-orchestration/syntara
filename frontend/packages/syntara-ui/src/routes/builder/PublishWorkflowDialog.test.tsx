@@ -86,6 +86,39 @@ describe('PublishWorkflowDialog', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
   })
 
+  it('disables publish metadata when the selected version has a blocked type', () => {
+    render(
+      <PublishWorkflowDialog
+        {...defaultProps}
+        canPublish={false}
+        editTooltip="Blocked step types: Script."
+        blockedStepTypes={['Script']}
+      />
+    )
+
+    expect(screen.getByLabelText('Version name')).toBeDisabled()
+    expect(screen.getByLabelText('Description')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Publish workflow' })).toBeDisabled()
+    expect(screen.getByText('Blocked step types: Script.')).toBeInTheDocument()
+  })
+
+  it('offers a retry when publish permission checks fail', async () => {
+    const user = userEvent.setup()
+    const onRetryPermissionCheck = vi.fn()
+    render(
+      <PublishWorkflowDialog
+        {...defaultProps}
+        canPublish={false}
+        permissionCheckError
+        onRetryPermissionCheck={onRetryPermissionCheck}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Retry permission check' }))
+
+    expect(onRetryPermissionCheck).toHaveBeenCalledOnce()
+  })
+
   it('does not render when closed', () => {
     render(<PublishWorkflowDialog {...defaultProps} isOpen={false} />)
     expect(screen.queryByText('Publish workflow?')).not.toBeInTheDocument()

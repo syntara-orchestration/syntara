@@ -91,13 +91,16 @@ export const BuilderSidePanels = memo(function BuilderSidePanels({
         <FlexItem style={{ flexShrink: 0, alignSelf: 'stretch' }}>
           <WorkflowSidepanel
             workflow={workflow}
+            canEdit={canEdit}
             workflowName={workflowName}
             workflowDescription={workflowDescription}
             onNameChange={(name) => {
+              if (!canEdit) return
               dispatch({ type: 'SET_WORKFLOW_NAME', payload: name })
               markDirty()
             }}
             onDescriptionChange={(desc) => {
+              if (!canEdit) return
               dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: desc })
               markDirty()
             }}

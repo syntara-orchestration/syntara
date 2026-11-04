@@ -21,6 +21,7 @@ import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { ApprovalSidePanel } from '../executions/ApprovalSidePanel'
 import { transformExecutionStatusFilter } from '../executions/executionFilters'
+import { getStepTypePermissionMessage, useStepTypePermissions } from '../workflows/useStepTypePermissions'
 
 import styles from './BuilderContent.module.css'
 import { BuilderFlow } from './BuilderFlow'
@@ -62,6 +63,7 @@ import { createAddStepHandler } from './utils/panelActions'
 import { buildWorkflowDefinition, transformStepParameters } from './utils/workflowDefinitionBuilder'
 import { ValidationBanner } from './ValidationBanner'
 import { VersionInfoCard } from './VersionInfoCard'
+import { StepFormReadOnlyContext } from './VersionViewContext'
 import { VersionViewProvider } from './VersionViewProvider'
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
@@ -158,7 +160,6 @@ export function BuilderContent(props: BuilderContentProps) {
     stepEditorMode
   )
 
-  useUndoRedoKeyboard({ disabled: isStepEditorOpen || viewingVersion !== null })
   useEffect(() => () => useWorkflowStore.temporal.getState().clear(), [])
   const { executionsQuery, mostRecentExecutionQuery, workflowsListQuery } = useBuilderContentQueries({
     workflowId,
@@ -213,6 +214,60 @@ export function BuilderContent(props: BuilderContentProps) {
   )
   const workflowMetadata = useWorkflowMetadata(workflow)
   const currentVersion = workflow?.current_version ?? workflow?.version?.version
+  const builderProjectId = workflow?.project_id ?? selectedProject?.id ?? stableProjectId
+  const workflowPermissionChecks = useBuilderPermissions(isNew, currentWorkflow?.is_builtin === true, builderProjectId)
+  const retryWorkflowPermissionContext = useCallback(
+    async () =>
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[0] === 'get' &&
+          typeof query.queryKey[1] === 'string' &&
+          query.queryKey[1].startsWith('/workflows'),
+      }),
+    [queryClient]
+  )
+  const stepTypePermissions = useStepTypePermissions(workflow?.step_types, builderProjectId, {
+    enabled: !isNew && Boolean(workflowId) && currentWorkflow?.is_builtin !== true,
+    retryContext: retryWorkflowPermissionContext,
+  })
+  let stepTypeTooltip = getStepTypePermissionMessage(stepTypePermissions)
+  if (stepTypePermissions.isError) {
+    stepTypeTooltip = 'Unable to check step-type permissions. Retry the check before authoring.'
+  } else if (stepTypePermissions.blockedStepTypes.length > 0) {
+    stepTypeTooltip = `Editing is unavailable because this workflow contains blocked step types: ${stepTypePermissions.blockedStepTypes
+      .map((stepType) => stepType.label)
+      .join(', ')}.`
+  }
+  const builderTooltips = useMemo(() => {
+    if (stepTypePermissions.canAuthor) return workflowPermissionChecks.tooltips
+    return {
+      edit: stepTypeTooltip,
+      save: stepTypeTooltip,
+      publish: stepTypeTooltip,
+      unpublish: stepTypeTooltip,
+      run: workflowPermissionChecks.tooltips.run,
+      delete: stepTypeTooltip,
+      create: stepTypeTooltip,
+    }
+  }, [workflowPermissionChecks.tooltips, stepTypePermissions.canAuthor, stepTypeTooltip])
+  const builderPermissions = useMemo(
+    () => ({
+      ...workflowPermissionChecks,
+      canEdit: workflowPermissionChecks.canEdit && stepTypePermissions.canAuthor,
+      canCreate: workflowPermissionChecks.canCreate && stepTypePermissions.canAuthor,
+      canDelete: workflowPermissionChecks.canDelete && stepTypePermissions.canAuthor,
+      isLoading: workflowPermissionChecks.isLoading || stepTypePermissions.isChecking,
+      stepTypePermissionError: stepTypePermissions.isError,
+      stepTypePermissionLoading: stepTypePermissions.isChecking,
+      blockedStepTypes: stepTypePermissions.blockedStepTypes.map((stepType) => stepType.label),
+      retryStepTypePermissions: stepTypePermissions.retry,
+      tooltips: builderTooltips,
+    }),
+    [workflowPermissionChecks, stepTypePermissions, builderTooltips]
+  )
+  useUndoRedoKeyboard({
+    disabled: isStepEditorOpen || viewingVersion !== null || !builderPermissions.canEdit,
+  })
 
   const { loadedVersion, handleConflict, onVersionUpdated, setActions, conflictDialogProps } = useBuilderConflict({
     workflowId,
@@ -228,8 +283,11 @@ export function BuilderContent(props: BuilderContentProps) {
     markClean,
   })
 
-  const { unpublish: onUnpublish } = useUnpublishWorkflow(workflowId)
-  const handleSaveWorkflow = useBuilderSaveWorkflow({
+  const { unpublish: unpublishWorkflow } = useUnpublishWorkflow(workflowId)
+  const onUnpublish = useCallback(() => {
+    if (builderPermissions.canEdit) unpublishWorkflow()
+  }, [builderPermissions.canEdit, unpublishWorkflow])
+  const saveWorkflow = useBuilderSaveWorkflow({
     currentWorkflow,
     workflowName,
     workflowDescription,
@@ -260,6 +318,11 @@ export function BuilderContent(props: BuilderContentProps) {
     createWorkflow: createWorkflow,
     updateWorkflow,
   })
+  const handleSaveWorkflow = useCallback(
+    (options?: Parameters<typeof saveWorkflow>[0]) =>
+      builderPermissions.canEdit ? saveWorkflow(options) : Promise.resolve(false),
+    [builderPermissions.canEdit, saveWorkflow]
+  )
   const guardedSaveWorkflow = useGuardedSaveWorkflow({
     handleSaveWorkflow,
     isStepEditorOpen,
@@ -268,7 +331,7 @@ export function BuilderContent(props: BuilderContentProps) {
     dispatch,
   })
 
-  const { publish: onPublish, isPublishing } = usePublishWorkflow({
+  const { publish: publishWorkflow, isPublishing } = usePublishWorkflow({
     workflowId,
     currentVersion,
     workflowName,
@@ -277,6 +340,12 @@ export function BuilderContent(props: BuilderContentProps) {
     onConflict: handleConflict('publish'),
     onVersionUpdated,
   })
+  const onPublish = useCallback(
+    (...args: Parameters<typeof publishWorkflow>) => {
+      if (builderPermissions.canEdit) publishWorkflow(...args)
+    },
+    [builderPermissions.canEdit, publishWorkflow]
+  )
 
   const mostRecentExecution = mostRecentExecutionQuery.data
   const {
@@ -330,6 +399,9 @@ export function BuilderContent(props: BuilderContentProps) {
     loadedVersionName: workflow?.version?.name ?? null,
     loadedVersionCreatedAt: workflow?.version?.created_at ?? null,
     onRunConflict: handleConflict('run'),
+    isReadOnly: !builderPermissions.canEdit,
+    savedWorkflowDefinition: workflow?.version?.workflow_definition,
+    canDelete: builderPermissions.canDelete,
   })
   useEffect(() => {
     registerSaveHandler(handleSaveWorkflow)
@@ -369,7 +441,7 @@ export function BuilderContent(props: BuilderContentProps) {
 
   const executeDuplicateWorkflow = useCallback(
     (definition: Record<string, unknown>) => {
-      if (isDuplicating || !workflow?.name || !workflow.project_id) return
+      if (!builderPermissions.canCreate || isDuplicating || !workflow?.name || !workflow.project_id) return
       const timestamp = Date.now().toString(36)
       const suffix = ` - duplicate-${timestamp}`
       const maxBaseLength = 255 - suffix.length
@@ -438,7 +510,17 @@ export function BuilderContent(props: BuilderContentProps) {
         }
       )
     },
-    [isDuplicating, workflow, duplicateWorkflow, queryClient, showAlert, showError, setLocation, workflowDescription]
+    [
+      builderPermissions.canCreate,
+      isDuplicating,
+      workflow,
+      duplicateWorkflow,
+      queryClient,
+      showAlert,
+      showError,
+      setLocation,
+      workflowDescription,
+    ]
   )
 
   const handleDuplicateVersion = useCallback(
@@ -513,6 +595,8 @@ export function BuilderContent(props: BuilderContentProps) {
     executedVersionNumbers: executionsByVersion,
     onDuplicateVersion: (v: WorkflowVersion) => detachPromise(handleDuplicateVersion(v)),
     onVersionUpdated,
+    canEdit: builderPermissions.canEdit,
+    canCreate: builderPermissions.canCreate,
   })
 
   const {
@@ -531,9 +615,13 @@ export function BuilderContent(props: BuilderContentProps) {
     sourceHandle,
     targetHandle,
     onRunStep: handleRunStep,
+    canEdit: builderPermissions.canEdit,
   })
   const handleNavigateToStep = useStepPanelNavigation(reactFlowInstance, dispatch)
-  const handleAddStepFromPanel = useMemo(() => createAddStepHandler(dispatch), [dispatch])
+  const handleAddStepFromPanel = useMemo(
+    () => createAddStepHandler(dispatch, builderPermissions.canEdit),
+    [dispatch, builderPermissions.canEdit]
+  )
   useBuilderWindowEffects(nodesInitialized, reactFlowInstance)
   const {
     pendingApproval,
@@ -551,10 +639,6 @@ export function BuilderContent(props: BuilderContentProps) {
     handleNodeClick,
     isLiveRunActive,
   })
-  // UUID only — StepDetailsPanel / CredentialSelector / integrations filter by project_id.
-  // can_i also accepts UUID (backend resolves to project name).
-  const builderProjectId = workflow?.project_id ?? selectedProject?.id ?? stableProjectId
-  const builderPermissions = useBuilderPermissions(isNew, currentWorkflow?.is_builtin === true, builderProjectId)
   const triggers = currentWorkflow?.triggers ?? []
   const nodeExpandedAllContextValue = useMemo(
     () => ({ expandAllEvent, collapseAllEvent }),
@@ -583,208 +667,223 @@ export function BuilderContent(props: BuilderContentProps) {
   return (
     <StepActionsContext.Provider value={stepActionsValue}>
       <SynStepExpandedAllContext.Provider value={nodeExpandedAllContextValue}>
-        <VersionViewProvider value={versionPanel.isViewingVersion}>
-          <SynPage>
-            <SynReactFlowViewportGuard>
-              <StackItem>
-                <BuilderWorkflowPageHeader
-                  workflowName={workflowName}
-                  workflowDescription={workflowDescription}
-                  isNew={isNew}
-                  workflow={workflow?.id ? { id: workflow.id } : undefined}
-                  isPending={isCreating || isUpdating}
-                  isDirty={isDirty}
-                  lastSavedAt={workflow?.updated_at}
-                  isKebabOpen={isKebabOpen}
-                  publishedVersionId={workflow?.published_version_id ?? null}
-                  currentVersionId={workflow?.version?.id}
-                  isPublishing={isPublishing}
-                  ProjectSelector={ProjectSelector}
-                  dispatch={dispatch}
-                  markDirty={markDirty}
-                  handleToggleHistory={handleToggleHistory}
-                  handleToggleVersionHistory={versionPanel.handleToggleVersionHistory}
-                  handleToggleDetails={handleToggleDetails}
-                  handleSaveWorkflow={guardedSaveWorkflow}
-                  onPublish={onPublish}
-                  onUnpublish={onUnpublish}
-                  onDuplicate={handleDuplicateWorkflow}
-                  onPendingImport={setPendingImport}
-                  isLiveRunActive={isLiveRunActive}
-                  executionId={mostRecentExecutionId}
-                  executionStatus={mostRecentExecution?.status}
-                  projectId={builderProjectId}
-                  onBackToEditor={isLiveRunActive ? handleCloseMostRecentRunPanel : undefined}
-                  hasApprovalPending={!!pendingApproval}
-                  isApprovalLoading={isApprovalLoading}
-                  isApprovalPanelOpen={approvalViewOpen}
-                  onReviewApproval={openApprovalView}
-                  triggers={triggers}
-                  isAddStepPanelOpen={isAddStepPanelOpen}
-                  hasNoWorkflowSteps={hasNoWorkflowSteps}
-                  isBuiltin={currentWorkflow?.is_builtin === true}
-                  builderPermissions={builderPermissions}
-                  isViewingVersion={versionPanel.isViewingVersion}
-                  versionHistoryOpen={versionHistoryOpen}
-                  viewedVersionDate={versionPanel.viewedVersionDate}
-                  viewedVersionStatus={versionPanel.viewedVersionStatus}
-                  onExitVersionView={versionPanel.handleExitVersionView}
-                  onRestoreVersion={versionPanel.openRestoreDialogForCurrentVersion}
-                  isStepEditorOpen={isStepEditorOpen}
-                />
-              </StackItem>
-              <BuilderReadOnlyBanner
-                canEdit={builderPermissions.canEdit}
-                isLoading={builderPermissions.isLoading}
-                isBuiltin={currentWorkflow?.is_builtin === true}
-              />
-              <ValidationBanner
-                errors={state.validationErrors}
-                dismissed={state.validationBannerDismissed}
-                source={state.validationSource ?? 'verify'}
-                dispatch={dispatch}
-                onNavigateToStep={handleNavigateToStep}
-              />
-              <StackItem isFilled className={styles.filledMinHeight}>
-                <Flex
-                  alignItems={{ default: 'alignItemsStretch' }}
-                  flexWrap={{ default: 'nowrap' }}
-                  gap={{ default: 'gapSm' }}
-                  className={styles.canvasFlex}
-                >
-                  <FlexItem
-                    className={styles.canvasFlexItem}
-                    style={{ pointerEvents: isStepEditorOpen && !versionPanel.isViewingVersion ? 'none' : 'auto' }}
-                  >
-                    <SynPanelStack>
-                      <SynPanelStackItem isFilled>
-                        <SynPanel hasNoPadding isFullHeight className={styles.canvasPanel}>
-                          <VersionInfoCard
-                            title={versionPanel.viewedVersionName}
-                            date={versionPanel.viewedVersionDate}
-                            description={versionPanel.viewedVersionDescription}
-                            publishedAt={versionPanel.viewedVersionPublishedAt}
-                            unpublishedAt={versionPanel.viewedVersionUnpublishedAt}
-                          />
-                          <BuilderFlow
-                            workflowId={workflowId}
-                            readOnly={versionPanel.isViewingVersion}
-                            canEdit={builderPermissions.canEdit}
-                            panelOpen={isAddStepPanelOpen || !!selectedNode}
-                            activeEdgeButtonNodeId={isAddStepPanelOpen ? sourceNodeId : null}
-                            activeEdgeButtonHandle={isAddStepPanelOpen ? sourceHandle : null}
-                            activeEdgeId={isAddStepPanelOpen ? edgeIdToReplace : null}
-                            executionStatus={canvasExecutionStatus}
-                            copiedRunActivityIds={copiedRunActivityIds}
-                            disableDeleteKey={isStepEditorOpen}
-                            disableSpacePanning={isStepEditorOpen || confirmDialogOpen}
-                            onNodeClick={wrappedHandleNodeClick}
-                            onAddNodeFromEdge={handleAddNodeFromEdge}
-                            onNodesDeleted={handleNodesDeleted}
-                            newNodeDesiredPosition={state.newNodeDesiredPosition}
-                            onClearDesiredPosition={handleClearDesiredPosition}
-                            validationErrors={state.validationErrors}
-                          />
-                        </SynPanel>
-                      </SynPanelStackItem>
-                      {showMostRecentRunPanelInEditor && mostRecentExecutionId && (
-                        <ExecutionDetailsPanelWrapper
-                          executionId={mostRecentExecutionId}
-                          workflowDefinition={workflow?.version?.workflow_definition}
-                          selectedNodeId={mostRecentSelectedNodeId}
-                          selectedNodeName={mostRecentSelectedNodeName}
-                          onNodeSelect={handleMostRecentNodeSelect}
-                          panelHeight={mostRecentPanelHeight}
-                          onResize={handleMostRecentResize}
-                          isTerminalStatus={isTerminalStatus}
-                          onClosePanel={handleCloseMostRecentRunPanel}
-                        />
-                      )}
-                    </SynPanelStack>
-                  </FlexItem>
-                  <BuilderSidePanels
-                    isAddStepPanelOpen={isAddStepPanelOpen}
-                    isStepEditorOpen={isStepEditorOpen}
-                    canEdit={builderPermissions.canEdit}
-                    sourceNodeId={sourceNodeId}
-                    replacementNodeId={replacementNodeId}
-                    hasNoWorkflowSteps={hasNoWorkflowSteps}
-                    dispatch={dispatch}
-                    historyCardOpen={historyCardOpen}
-                    isNew={isNew}
-                    executions={executionsQuery.data?.resources ?? []}
-                    onExecutionNavigate={handleExecutionNavigate}
-                    executionFilters={executionFilters}
-                    onFilterChange={handleExecutionFilterChange}
-                    executionPaginationFooterProps={executionPaginationFooterProps}
-                    detailsOpen={detailsOpen}
-                    workflow={workflow}
+        <StepFormReadOnlyContext.Provider value={!builderPermissions.canEdit}>
+          <VersionViewProvider value={versionPanel.isViewingVersion}>
+            <SynPage>
+              <SynReactFlowViewportGuard>
+                <StackItem>
+                  <BuilderWorkflowPageHeader
                     workflowName={workflowName}
                     workflowDescription={workflowDescription}
+                    isNew={isNew}
+                    workflow={workflow?.id ? { id: workflow.id } : undefined}
+                    isPending={isCreating || isUpdating}
+                    isDirty={isDirty}
+                    lastSavedAt={workflow?.updated_at}
+                    isKebabOpen={isKebabOpen}
+                    publishedVersionId={workflow?.published_version_id ?? null}
+                    currentVersionId={workflow?.version?.id}
+                    isPublishing={isPublishing}
+                    ProjectSelector={ProjectSelector}
+                    dispatch={dispatch}
                     markDirty={markDirty}
-                  />
-
-                  {!isStepEditorOpen && approvalViewOpen && pendingApproval && (
-                    <FlexItem className={styles.approvalPanelSlot}>
-                      <ApprovalSidePanel
-                        approval={pendingApproval}
-                        message={approvalMessage}
-                        onClose={handleApprovalClose}
-                        onDecisionSubmitted={handleApprovalDismiss}
-                        onNavigate={setLocation}
-                      />
-                    </FlexItem>
-                  )}
-
-                  <VersionHistorySidePanel
-                    sidePanel={versionPanel.versionSidePanel}
+                    handleToggleHistory={handleToggleHistory}
+                    handleToggleVersionHistory={versionPanel.handleToggleVersionHistory}
+                    handleToggleDetails={handleToggleDetails}
+                    handleSaveWorkflow={guardedSaveWorkflow}
+                    onPublish={onPublish}
+                    onUnpublish={onUnpublish}
+                    onDuplicate={handleDuplicateWorkflow}
+                    onPendingImport={setPendingImport}
+                    isLiveRunActive={isLiveRunActive}
+                    executionId={mostRecentExecutionId}
+                    executionStatus={mostRecentExecution?.status}
+                    projectId={builderProjectId}
+                    onBackToEditor={isLiveRunActive ? handleCloseMostRecentRunPanel : undefined}
+                    hasApprovalPending={!!pendingApproval}
+                    isApprovalLoading={isApprovalLoading}
+                    isApprovalPanelOpen={approvalViewOpen}
+                    onReviewApproval={openApprovalView}
+                    triggers={triggers}
+                    isAddStepPanelOpen={isAddStepPanelOpen}
+                    hasNoWorkflowSteps={hasNoWorkflowSteps}
+                    isBuiltin={currentWorkflow?.is_builtin === true}
+                    builderPermissions={builderPermissions}
+                    isViewingVersion={versionPanel.isViewingVersion}
+                    versionHistoryOpen={versionHistoryOpen}
+                    viewedVersionDate={versionPanel.viewedVersionDate}
+                    viewedVersionStatus={versionPanel.viewedVersionStatus}
+                    onExitVersionView={versionPanel.handleExitVersionView}
+                    onRestoreVersion={versionPanel.openRestoreDialogForCurrentVersion}
+                    isRestoreDisabled={!versionPanel.canRestoreSelectedVersion}
+                    restoreTooltip={versionPanel.restoreTooltip}
                     isStepEditorOpen={isStepEditorOpen}
-                    editPermission={{
-                      canEdit: builderPermissions.canEdit,
-                      tooltip: builderPermissions.tooltips.edit,
-                    }}
                   />
-
-                  <StepEditorAutoSubmitContext.Provider value={autoSubmitRef}>
-                    <StepEditorOverlay
-                      isOpen={isStepEditorOpen}
-                      mode={stepEditorMode}
-                      selectedNode={selectedNode}
-                      stepTypeId={stepEditorStepTypeId}
-                      stepSubtypeId={stepEditorStepSubtypeId}
+                </StackItem>
+                <BuilderReadOnlyBanner
+                  canEdit={builderPermissions.canEdit}
+                  isLoading={builderPermissions.isLoading || versionPanel.selectedVersionPermissionLoading}
+                  isBuiltin={currentWorkflow?.is_builtin === true}
+                  blockedStepTypes={stepTypePermissions.blockedStepTypes.map((stepType) => stepType.label)}
+                  permissionCheckError={stepTypePermissions.isError || versionPanel.selectedVersionPermissionError}
+                  onRetryPermissionCheck={() =>
+                    detachPromise(
+                      Promise.all([stepTypePermissions.retry(), versionPanel.retrySelectedVersionPermissions()])
+                    )
+                  }
+                />
+                <ValidationBanner
+                  errors={state.validationErrors}
+                  dismissed={state.validationBannerDismissed}
+                  source={state.validationSource ?? 'verify'}
+                  dispatch={dispatch}
+                  onNavigateToStep={handleNavigateToStep}
+                />
+                <StackItem isFilled className={styles.filledMinHeight}>
+                  <Flex
+                    alignItems={{ default: 'alignItemsStretch' }}
+                    flexWrap={{ default: 'nowrap' }}
+                    gap={{ default: 'gapSm' }}
+                    className={styles.canvasFlex}
+                  >
+                    <FlexItem
+                      className={styles.canvasFlexItem}
+                      style={{ pointerEvents: isStepEditorOpen && !versionPanel.isViewingVersion ? 'none' : 'auto' }}
+                    >
+                      <SynPanelStack>
+                        <SynPanelStackItem isFilled>
+                          <SynPanel hasNoPadding isFullHeight className={styles.canvasPanel}>
+                            <VersionInfoCard
+                              title={versionPanel.viewedVersionName}
+                              date={versionPanel.viewedVersionDate}
+                              description={versionPanel.viewedVersionDescription}
+                              publishedAt={versionPanel.viewedVersionPublishedAt}
+                              unpublishedAt={versionPanel.viewedVersionUnpublishedAt}
+                            />
+                            <BuilderFlow
+                              workflowId={workflowId}
+                              readOnly={versionPanel.isViewingVersion || !stepTypePermissions.canAuthor}
+                              canEdit={workflowPermissionChecks.canEdit}
+                              panelOpen={isAddStepPanelOpen || !!selectedNode}
+                              activeEdgeButtonNodeId={isAddStepPanelOpen ? sourceNodeId : null}
+                              activeEdgeButtonHandle={isAddStepPanelOpen ? sourceHandle : null}
+                              activeEdgeId={isAddStepPanelOpen ? edgeIdToReplace : null}
+                              executionStatus={canvasExecutionStatus}
+                              copiedRunActivityIds={copiedRunActivityIds}
+                              disableDeleteKey={isStepEditorOpen}
+                              disableSpacePanning={isStepEditorOpen || confirmDialogOpen}
+                              onNodeClick={wrappedHandleNodeClick}
+                              onAddNodeFromEdge={handleAddNodeFromEdge}
+                              onNodesDeleted={handleNodesDeleted}
+                              newNodeDesiredPosition={state.newNodeDesiredPosition}
+                              onClearDesiredPosition={handleClearDesiredPosition}
+                              validationErrors={state.validationErrors}
+                            />
+                          </SynPanel>
+                        </SynPanelStackItem>
+                        {showMostRecentRunPanelInEditor && mostRecentExecutionId && (
+                          <ExecutionDetailsPanelWrapper
+                            executionId={mostRecentExecutionId}
+                            workflowDefinition={workflow?.version?.workflow_definition}
+                            selectedNodeId={mostRecentSelectedNodeId}
+                            selectedNodeName={mostRecentSelectedNodeName}
+                            onNodeSelect={handleMostRecentNodeSelect}
+                            panelHeight={mostRecentPanelHeight}
+                            onResize={handleMostRecentResize}
+                            isTerminalStatus={isTerminalStatus}
+                            onClosePanel={handleCloseMostRecentRunPanel}
+                          />
+                        )}
+                      </SynPanelStack>
+                    </FlexItem>
+                    <BuilderSidePanels
+                      isAddStepPanelOpen={isAddStepPanelOpen}
+                      isStepEditorOpen={isStepEditorOpen}
+                      canEdit={builderPermissions.canEdit}
                       sourceNodeId={sourceNodeId}
                       replacementNodeId={replacementNodeId}
-                      executionId={mostRecentExecutionId}
-                      workflowId={workflowId}
-                      onConnect={handleConnectFromPanel}
-                      onClose={handleCloseStepEditor}
-                      onNavigateToStep={handleNavigateToStep}
-                      onAddStep={handleAddStepFromPanel}
-                      projectId={builderProjectId}
-                      workflowMetadata={workflowMetadata}
-                      onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
+                      hasNoWorkflowSteps={hasNoWorkflowSteps}
+                      dispatch={dispatch}
+                      historyCardOpen={historyCardOpen}
+                      isNew={isNew}
+                      executions={executionsQuery.data?.resources ?? []}
+                      onExecutionNavigate={handleExecutionNavigate}
+                      executionFilters={executionFilters}
+                      onFilterChange={handleExecutionFilterChange}
+                      executionPaginationFooterProps={executionPaginationFooterProps}
+                      detailsOpen={detailsOpen}
+                      workflow={workflow}
+                      workflowName={workflowName}
+                      workflowDescription={workflowDescription}
+                      markDirty={markDirty}
                     />
-                  </StepEditorAutoSubmitContext.Provider>
-                </Flex>
-              </StackItem>
-            </SynReactFlowViewportGuard>
 
-            <BuilderDialogs {...dialogProps} conflictDialogProps={conflictDialogProps} />
-            <UnsavedStepEditorDialog
-              isOpen={unsavedStepEditorDialogOpen}
-              onClose={() => dispatch({ type: 'SET_UNSAVED_STEP_EDITOR_DIALOG', payload: false })}
-            />
-            <SaveBeforeViewDialog
-              isOpen={pendingDuplicateNavigation !== null}
-              onSave={handleSaveBeforeDuplicateNavigation}
-              onViewWithoutSaving={handleNavigateWithoutSaving}
-              onCancel={handleCancelDuplicateNavigation}
-              title="Save changes before opening the duplicated workflow?"
-              bodyText="Opening the duplicated workflow will exit the editor view and will permanently delete all recent unsaved progress on your current workflow. Please save your work before leaving."
-              buttonLabel="Open without saving"
-            />
-          </SynPage>
-        </VersionViewProvider>
+                    {!isStepEditorOpen && approvalViewOpen && pendingApproval && (
+                      <FlexItem className={styles.approvalPanelSlot}>
+                        <ApprovalSidePanel
+                          approval={pendingApproval}
+                          message={approvalMessage}
+                          onClose={handleApprovalClose}
+                          onDecisionSubmitted={handleApprovalDismiss}
+                          onNavigate={setLocation}
+                        />
+                      </FlexItem>
+                    )}
+
+                    <VersionHistorySidePanel
+                      sidePanel={versionPanel.versionSidePanel}
+                      isStepEditorOpen={isStepEditorOpen}
+                      projectId={builderProjectId}
+                      editPermission={{
+                        canEdit: builderPermissions.canEdit,
+                        tooltip: builderPermissions.tooltips.edit,
+                        canCreate: builderPermissions.canCreate,
+                        createTooltip: builderPermissions.tooltips.create,
+                      }}
+                    />
+
+                    <StepEditorAutoSubmitContext.Provider value={autoSubmitRef}>
+                      <StepEditorOverlay
+                        isOpen={isStepEditorOpen}
+                        mode={stepEditorMode}
+                        selectedNode={selectedNode}
+                        stepTypeId={stepEditorStepTypeId}
+                        stepSubtypeId={stepEditorStepSubtypeId}
+                        sourceNodeId={sourceNodeId}
+                        replacementNodeId={replacementNodeId}
+                        executionId={mostRecentExecutionId}
+                        workflowId={workflowId}
+                        onConnect={handleConnectFromPanel}
+                        onClose={handleCloseStepEditor}
+                        onNavigateToStep={handleNavigateToStep}
+                        onAddStep={handleAddStepFromPanel}
+                        projectId={builderProjectId}
+                        workflowMetadata={workflowMetadata}
+                        onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
+                        readOnly={!builderPermissions.canEdit}
+                      />
+                    </StepEditorAutoSubmitContext.Provider>
+                  </Flex>
+                </StackItem>
+              </SynReactFlowViewportGuard>
+
+              <BuilderDialogs {...dialogProps} conflictDialogProps={conflictDialogProps} />
+              <UnsavedStepEditorDialog
+                isOpen={unsavedStepEditorDialogOpen}
+                onClose={() => dispatch({ type: 'SET_UNSAVED_STEP_EDITOR_DIALOG', payload: false })}
+              />
+              <SaveBeforeViewDialog
+                isOpen={pendingDuplicateNavigation !== null}
+                onSave={handleSaveBeforeDuplicateNavigation}
+                onViewWithoutSaving={handleNavigateWithoutSaving}
+                onCancel={handleCancelDuplicateNavigation}
+                title="Save changes before opening the duplicated workflow?"
+                bodyText="Opening the duplicated workflow will exit the editor view and will permanently delete all recent unsaved progress on your current workflow. Please save your work before leaving."
+                buttonLabel="Open without saving"
+              />
+            </SynPage>
+          </VersionViewProvider>
+        </StepFormReadOnlyContext.Provider>
       </SynStepExpandedAllContext.Provider>
     </StepActionsContext.Provider>
   )

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 import structlog
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -62,6 +63,7 @@ from syntara.workflows.models.validation_finding import (
 )
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from syntara.workflows.node_kinds import step_types_in_definitions
 from syntara.workflows.node_permissions import check_node_kind_write_permission
 from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_TYPES, WebhookTriggerService
@@ -912,7 +914,47 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         """
         read = WorkflowRead.model_validate(workflow, from_attributes=True)
         await self.resolve_user_references([read])
+        await self.populate_step_types([read])
         return read
+
+    async def populate_step_types(self, workflows: list[WorkflowRead]) -> None:
+        """Batch-populate the current and published step-type summary."""
+        if not workflows:
+            return
+        current_conditions = [
+            and_(
+                col(WorkflowVersion.workflow_id) == workflow.id,
+                col(WorkflowVersion.version) == workflow.current_version,
+            )
+            for workflow in workflows
+        ]
+        published_ids = [workflow.published_version_id for workflow in workflows if workflow.published_version_id]
+        clauses = [*current_conditions]
+        if published_ids:
+            clauses.append(col(WorkflowVersion.id).in_(published_ids))
+        result = await self.session.exec(
+            select(
+                WorkflowVersion.workflow_id,
+                WorkflowVersion.version,
+                WorkflowVersion.id,
+                WorkflowVersion.workflow_definition,
+            ).where(or_(*clauses))
+        )
+        rows = result.all()
+        current_versions = {(row[0], row[1]): row[3] for row in rows}
+        published_versions = {row[2]: (row[0], row[3]) for row in rows}
+        for workflow in workflows:
+            current = current_versions.get((workflow.id, workflow.current_version))
+            published = published_versions.get(workflow.published_version_id) if workflow.published_version_id else None
+            if current is None or (
+                workflow.published_version_id and (published is None or published[0] != workflow.id)
+            ):
+                workflow.step_types = None
+                continue
+            definitions = [current]
+            if published:
+                definitions.append(published[1])
+            workflow.step_types = step_types_in_definitions(definitions)
 
     async def populate_published_version_numbers(self, workflows: list[WorkflowRead]) -> None:
         """Batch-populate published_version_number on WorkflowRead objects."""

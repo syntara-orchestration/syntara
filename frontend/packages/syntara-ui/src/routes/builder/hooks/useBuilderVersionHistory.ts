@@ -7,6 +7,7 @@ import { useDialogState } from '../../../hooks/useDialogState'
 import type { AlertMessage } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
+import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { BuilderAction } from '../builderReducer'
 import { formatHistoryDateTime } from '../historyDateUtils'
@@ -103,6 +104,7 @@ export function useBuilderVersionHistory({
   const viewedVersionName = viewedVersionQuery.data?.name ?? null
   const viewedVersionPublishedAt = viewedVersionQuery.data?.last_published_at ?? null
   const viewedVersionUnpublishedAt = viewedVersionQuery.data?.last_unpublished_at ?? null
+  const viewedVersionDefinition = viewedVersionQuery.data?.workflow_definition
 
   useEffect(() => {
     if (!isViewingVersion || !viewedVersionQuery.data?.workflow_definition) return
@@ -154,8 +156,8 @@ export function useBuilderVersionHistory({
           )
           showSuccess({ title: 'Version restored', description: `Restored from version ${versionToRestore}` })
         },
-        onError: () => {
-          showError({ title: 'Failed to restore version' })
+        onError: (error: unknown) => {
+          showError({ title: 'Failed to restore version', description: getErrorMessage(error) })
         },
       }
     )
@@ -191,6 +193,9 @@ export function useBuilderVersionHistory({
     viewedVersionName,
     viewedVersionPublishedAt,
     viewedVersionUnpublishedAt,
+    viewedVersionDefinition,
+    viewedVersionIsLoading: viewedVersionQuery.isLoading,
+    refetchViewedVersion: viewedVersionQuery.refetch,
     handleExitVersionView,
     handleConfirmRestore,
     restoreDialog,

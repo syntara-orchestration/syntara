@@ -311,6 +311,7 @@ async def list_project_workflows(
         allowed_projects=allowed,
     )
     await service.populate_published_version_numbers(result.resources)
+    await service.populate_step_types(result.resources)
     return result
 
 

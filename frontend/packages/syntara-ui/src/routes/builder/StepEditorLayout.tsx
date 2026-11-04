@@ -49,6 +49,7 @@ type StepEditorLayoutProps = {
   workflowMetadata?: WorkflowMetadata
   tabBarAction?: ReactNode
   readOnly?: boolean
+  isViewingVersion?: boolean
   mode?: 'add' | 'edit'
 }
 
@@ -73,6 +74,7 @@ export function StepEditorLayout({
   workflowMetadata,
   tabBarAction,
   readOnly,
+  isViewingVersion = false,
   mode = 'edit',
 }: StepEditorLayoutProps) {
   const { inputData, outputData } = useStepExecutionData(nodeId ?? '', executionId, workflowId)
@@ -170,7 +172,7 @@ export function StepEditorLayout({
             </FlexItem>
           </Flex>
         </StackItem>
-        {readOnly && (
+        {isViewingVersion && (
           <StackItem style={{ padding: '0 var(--pf-t--global--spacer--sm)' }}>
             <Alert
               variant="info"

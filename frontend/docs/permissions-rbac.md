@@ -196,6 +196,13 @@ When `canEdit` is false, the builder:
 
 This is the correct pattern for editor-style pages where many controls are affected by a single permission. Use inline `DisabledWithTooltip` for pages with a small number of independent actions.
 
+The builder also checks `step_type:write` for every type in the latest saved and published definitions,
+using `resource_project` and `resource_labels.kind`. A denied type or a failed check locks all authoring
+actions and shows the blocked display names or a retryable permission-check error. The canvas and step
+forms remain available for inspection, Run continues to use execution permission, and read-only Run
+does not save local edits first. Workflow-list row checks are deferred until a row menu opens and share
+TanStack Query cache keys by project and kind.
+
 ## Cache Behavior
 
 - `staleTime: Infinity` on all `useCanI` queries — permissions are fetched once per session.
@@ -203,6 +210,7 @@ This is the correct pattern for editor-style pages where many controls are affec
 - After role or assignment mutations: call `invalidateAuthzCaches(queryClient)` from
   `packages/syntara-ui/src/hooks/invalidateAuthzCaches.ts` (invalidates `['authz', 'can_i']`
   and `['all-permissions']`).
+- Workflow step-type checks use the same cache keys with `resource_labels.kind`, stale immediately, and refresh on window focus. They also share results across rows in the same project.
 
 **Trade-off**: `staleTime: Infinity` means permissions revoked server-side won't take effect in a user's browser until cache invalidation or logout. This is intentional — permission checks are high-frequency and low-change, so we trade freshness for reduced API load. Server-side enforcement remains the ultimate authority; the UI cache is a UX optimization, not a security boundary.
 
