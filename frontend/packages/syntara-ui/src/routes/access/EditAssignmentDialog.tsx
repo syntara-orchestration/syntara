@@ -1,13 +1,9 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import {
   Button,
   Content,
   ContentVariants,
   Form,
   FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   Modal,
   ModalBody,
   ModalFooter,
@@ -15,11 +11,11 @@ import {
 } from '@patternfly/react-core'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { Controller, useForm } from 'react-hook-form'
-import { z } from 'zod'
 
+import { SynForm } from '../../components/forms/SynForm'
+import { SynFormField } from '../../components/forms/SynFormField'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
-import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
+import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
 import { buildAssignmentBody } from '../access-management/RoleAssignmentTypes'
@@ -27,6 +23,8 @@ import { buildAssignmentBody } from '../access-management/RoleAssignmentTypes'
 import { accessClient } from './accessClient'
 import { accessControlHelp } from './accessControlFieldHelp'
 import { assignNewThenDeleteOldWithRollback } from './editAssignmentMutations'
+import { editAssignmentSchema } from './editAssignmentSchema'
+import type { EditAssignmentFormData } from './editAssignmentSchema'
 import { TypeaheadSelect } from './TypeaheadSelect'
 import type { PermissionRow } from './types'
 import { useAllRoles } from './useAllRoles'
@@ -37,12 +35,6 @@ type EditAssignmentDialogProps = {
   onClose: () => void
   onSuccess: () => void
 }
-
-const editAssignmentSchema = z.object({
-  roleName: z.string().min(1, 'Role is required'),
-})
-
-type EditAssignmentFormData = z.infer<typeof editAssignmentSchema>
 
 export function EditAssignmentDialog({ row, displayName, onClose, onSuccess }: Readonly<EditAssignmentDialogProps>) {
   const queryClient = useQueryClient()
@@ -61,14 +53,14 @@ export function EditAssignmentDialog({ row, displayName, onClose, onSuccess }: R
     [allRoles, isProjectScoped]
   )
 
-  const { handleSubmit, control, reset, setError } = useForm<EditAssignmentFormData>({
-    resolver: zodResolver(editAssignmentSchema, undefined, { mode: 'sync' }),
+  const form = useSynForm({
+    schema: editAssignmentSchema,
     defaultValues: {
       roleName: '',
     },
+    onClose,
   })
-
-  const handleError = useFormMutationErrorHandler<EditAssignmentFormData>(setError)
+  const { handleSubmit, handleError, handleClose, reset, setError } = form
 
   useEffect(() => {
     reset({ roleName: isProjectScoped ? row.assignmentName : '' })
@@ -89,7 +81,7 @@ export function EditAssignmentDialog({ row, displayName, onClose, onSuccess }: R
   const onSubmit = async (data: EditAssignmentFormData) => {
     const newRole = data.roleName
     if (!newRole || newRole === row.assignmentName) {
-      onClose()
+      handleClose()
       return
     }
 
@@ -130,8 +122,8 @@ export function EditAssignmentDialog({ row, displayName, onClose, onSuccess }: R
       showSuccess({ title: 'Assignment updated', description: `Updated role for ${displayName}` })
       invalidateAuthzCaches(queryClient)
       detachPromise(queryClient.invalidateQueries({ queryKey: ['role-assignments'] }))
+      handleClose()
       onSuccess()
-      onClose()
     } catch (error) {
       handleError({ title: 'Failed to update assignment' })(error)
     } finally {
@@ -140,7 +132,7 @@ export function EditAssignmentDialog({ row, displayName, onClose, onSuccess }: R
   }
 
   return (
-    <Modal isOpen onClose={onClose} variant="small">
+    <Modal isOpen onClose={handleClose} variant="small">
       <ModalHeader title="Edit principal assignment" />
       <ModalBody>
         <Form id="edit-assignment-form" onSubmit={handleSubmit(onSubmit)}>
@@ -152,39 +144,40 @@ export function EditAssignmentDialog({ row, displayName, onClose, onSuccess }: R
             <Content component={ContentVariants.p}>{row.scopeType === 'project' ? row.scopeName : 'System'}</Content>
           </FormGroup>
 
-          <FormGroup label="Role" isRequired fieldId="role-select" labelHelp={accessControlHelp.role}>
-            <Controller
+          <SynForm form={form}>
+            <SynFormField<EditAssignmentFormData, 'roleName'>
               name="roleName"
-              control={control}
-              render={({ field, fieldState }) => (
-                <>
-                  <TypeaheadSelect
-                    id="role-select"
-                    ariaLabel="Role"
-                    options={roleOptions}
-                    selected={field.value}
-                    onChange={field.onChange}
-                    placeholder="Select a role..."
-                    hasError={!!fieldState.error}
-                  />
-                  {fieldState.error && (
-                    <FormHelperText>
-                      <HelperText>
-                        <HelperTextItem variant="error">{fieldState.error.message}</HelperTextItem>
-                      </HelperText>
-                    </FormHelperText>
-                  )}
-                </>
+              label="Role"
+              fieldId="role-select"
+              isRequired
+              labelHelp={accessControlHelp.role}
+            >
+              {({ field, fieldState }) => (
+                <TypeaheadSelect
+                  id="role-select"
+                  ariaLabel="Role"
+                  options={roleOptions}
+                  selected={field.value}
+                  onChange={field.onChange}
+                  placeholder="Select a role..."
+                  hasError={!!fieldState.error}
+                />
               )}
-            />
-          </FormGroup>
+            </SynFormField>
+          </SynForm>
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button variant="primary" form="edit-assignment-form" type="submit" isLoading={isPending}>
+        <Button
+          variant="primary"
+          form="edit-assignment-form"
+          type="submit"
+          isDisabled={isPending}
+          isLoading={isPending}
+        >
           Save assignment
         </Button>
-        <Button variant="link" onClick={onClose}>
+        <Button variant="link" onClick={handleClose} isDisabled={isPending}>
           Cancel
         </Button>
       </ModalFooter>

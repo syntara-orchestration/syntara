@@ -10,6 +10,15 @@ import { AlertProvider } from '../../../../providers/alerts'
 import { useSelectableProjects } from '../../../access/useAllProjects'
 
 import { CredentialFormModal } from './CredentialFormModal'
+import {
+  asCredentialMutationResult,
+  type CredentialTypeFixture,
+  type CredentialTypesQueryMock,
+  installCredentialTypesQueryMock,
+  mockCredentialMutation,
+  mockCredentialTypesQuery,
+  mockCredentialTypesQueryLoading,
+} from './credentialFormTestMocks'
 
 vi.mock('../../../../client', () => ({
   credentialsClient: {
@@ -32,7 +41,7 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </QueryClientProvider>
 )
 
-const mockTypes = [
+const mockTypes: CredentialTypeFixture[] = [
   {
     id: 'type-1',
     name: 'HTTP Bearer Token',
@@ -87,6 +96,8 @@ const mockProjects = [
   { id: 'proj-3', name: 'Project Gamma' },
 ]
 
+let typesQueryState: CredentialTypesQueryMock
+
 const mockCredential = {
   id: 'cred-1',
   name: 'My Token',
@@ -108,14 +119,11 @@ describe('CredentialFormModal', () => {
     vi.clearAllMocks()
     mockMutate = vi.fn()
 
-    vi.mocked(credentialsClient.useQuery).mockReturnValue({
-      data: { resources: mockTypes },
-      isLoading: false,
-      error: null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: mockMutate, isPending: false } as any)
+    typesQueryState = mockCredentialTypesQuery(mockTypes)
+    installCredentialTypesQueryMock(() => typesQueryState)
+    vi.mocked(credentialsClient.useMutation).mockReturnValue(
+      asCredentialMutationResult(mockCredentialMutation(mockMutate))
+    )
     const projectsMock = { projects: mockProjects, isLoading: false, error: null, refetch: vi.fn() }
 
     vi.mocked(useSelectableProjects).mockReturnValue(projectsMock)
@@ -150,7 +158,7 @@ describe('CredentialFormModal', () => {
 
   it('renders name and description fields', () => {
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
-    expect(screen.getByLabelText('Credential name')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Credential name' })).toBeInTheDocument()
     expect(screen.getByLabelText('Credential description')).toBeInTheDocument()
   })
 
@@ -260,6 +268,17 @@ describe('CredentialFormModal', () => {
     expect(screen.getByText('Name is required')).toBeInTheDocument()
   })
 
+  it('validates required dynamic token field after name is filled', async () => {
+    const user = userEvent.setup()
+    render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
+
+    await user.type(screen.getByLabelText('Credential name'), 'validation-test')
+    await user.click(screen.getByRole('button', { name: 'Create credential' }))
+
+    expect(screen.getByText('Token is required')).toBeInTheDocument()
+    expect(mockMutate).not.toHaveBeenCalled()
+  })
+
   it('auto-selects first credential type in create mode', () => {
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
 
@@ -268,12 +287,7 @@ describe('CredentialFormModal', () => {
   })
 
   it('shows loading placeholder when types are loading', () => {
-    vi.mocked(credentialsClient.useQuery).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      error: null,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    typesQueryState = mockCredentialTypesQueryLoading(mockTypes)
 
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
 
@@ -281,23 +295,53 @@ describe('CredentialFormModal', () => {
   })
 
   it('shows error when types fail to load', () => {
-    vi.mocked(credentialsClient.useQuery).mockReturnValue({
+    typesQueryState = mockCredentialTypesQuery(mockTypes, {
       data: undefined,
       isLoading: false,
       error: new Error('Network error'),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any)
+    })
 
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
 
     expect(screen.getByText('Failed to load credential types')).toBeInTheDocument()
   })
 
+  it('does not reset the name when the parent passes a new credential object with the same id', async () => {
+    const user = userEvent.setup({ delay: null })
+    const initialCredential = { ...mockCredential }
+    const { rerender } = render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={initialCredential} />, {
+      wrapper,
+    })
+
+    await user.clear(screen.getByDisplayValue('My Token'))
+    await user.type(screen.getByLabelText('Credential name'), 'Edited name')
+
+    const refreshedCredential = { ...mockCredential, name: 'Server refreshed name' }
+    rerender(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={refreshedCredential} />)
+
+    expect(screen.getByDisplayValue('Edited name')).toBeInTheDocument()
+  })
+
+  it('submits create from the footer button click and Enter on the focused button', async () => {
+    const user = userEvent.setup({ delay: null })
+    render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
+
+    const submitButton = screen.getByRole('button', { name: 'Create credential' })
+    expect(submitButton).toHaveAttribute('type', 'button')
+
+    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'my-secret-token')
+    submitButton.focus()
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => expect(mockMutate).toHaveBeenCalled())
+  })
+
   it('calls create mutation with correct data', async () => {
     const user = userEvent.setup()
     render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
 
-    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'New Token')
     // type-1 (HTTP Bearer Token) is auto-selected, no need to re-select
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'my-secret-token')
     await user.click(screen.getByRole('button', { name: 'Create credential' }))
@@ -321,7 +365,7 @@ describe('CredentialFormModal', () => {
     render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={mockCredential} />, { wrapper })
 
     await user.clear(screen.getByDisplayValue('My Token'))
-    await user.type(screen.getByLabelText('Credential name'), 'Updated Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'Updated Token')
     await user.click(screen.getByRole('button', { name: 'Save credential' }))
 
     await waitFor(() => expect(mockMutate).toHaveBeenCalled())
@@ -340,7 +384,7 @@ describe('CredentialFormModal', () => {
       wrapper,
     })
 
-    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'New Token')
     // type-1 (HTTP Bearer Token) is auto-selected
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'secret')
     await user.click(screen.getByRole('button', { name: 'Create credential' }))
@@ -373,7 +417,7 @@ describe('CredentialFormModal', () => {
     expect(screen.getByText('Name is required')).toBeInTheDocument()
 
     // Type in name to clear error
-    await user.type(screen.getByLabelText('Credential name'), 'Test')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'Test')
     expect(screen.queryByText('Name is required')).not.toBeInTheDocument()
   })
 
@@ -412,6 +456,29 @@ describe('CredentialFormModal', () => {
     expect(screen.getByRole('button', { name: 'Credential project' })).toHaveTextContent('Project Alpha')
   })
 
+  it('limits credential types and default selection when compatibleTypeNames is provided', async () => {
+    const user = userEvent.setup()
+    render(
+      <CredentialFormModal
+        isOpen
+        onClose={vi.fn()}
+        defaultProjectId="proj-1"
+        compatibleTypeNames={['HTTP Bearer Token', 'HTTP Basic Auth']}
+      />,
+      { wrapper }
+    )
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Token')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByLabelText('Credential type'))
+    const listbox = screen.getByRole('listbox', { name: 'Credential type options' })
+    expect(within(listbox).getByRole('option', { name: 'HTTP Bearer Token' })).toBeInTheDocument()
+    expect(within(listbox).getByRole('option', { name: 'HTTP Basic Auth' })).toBeInTheDocument()
+    expect(within(listbox).queryByRole('option', { name: 'Ansible Automation Platform' })).not.toBeInTheDocument()
+  })
+
   it('shows placeholder when no defaultProjectId is provided', () => {
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
 
@@ -423,7 +490,7 @@ describe('CredentialFormModal', () => {
     const user = userEvent.setup()
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
 
-    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'New Token')
     // type-1 (HTTP Bearer Token) is auto-selected
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'my-secret-token')
     await user.click(screen.getByRole('button', { name: 'Create credential' }))
@@ -435,7 +502,7 @@ describe('CredentialFormModal', () => {
     const user = userEvent.setup()
     render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
 
-    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'New Token')
     // type-1 (HTTP Bearer Token) is auto-selected
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'my-secret-token')
     await user.click(screen.getByRole('button', { name: 'Create credential' }))
@@ -452,7 +519,7 @@ describe('CredentialFormModal', () => {
 
     await user.click(screen.getByRole('button', { name: 'Credential project' }))
     await user.click(screen.getByRole('option', { name: 'Project Beta' }))
-    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'New Token')
     // type-1 (HTTP Bearer Token) is auto-selected
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'my-secret-token')
     await user.click(screen.getByRole('button', { name: 'Create credential' }))
@@ -508,7 +575,7 @@ describe('CredentialFormModal', () => {
       wrapper,
     })
 
-    await user.type(screen.getByLabelText('Credential name'), 'New Token')
+    await user.type(screen.getByPlaceholderText('Enter credential name'), 'New Token')
     // type-1 (HTTP Bearer Token) is auto-selected
     await user.type(screen.getByLabelText('Token', { selector: 'input' }), 'secret')
     await user.click(screen.getByRole('button', { name: 'Create credential' }))
@@ -616,7 +683,7 @@ describe('CredentialFormModal', () => {
 
       await selectAAPType(user)
       await selectAuthMethod(user, 'Basic Auth')
-      await user.type(screen.getByLabelText('Credential name'), 'Test AAP')
+      await user.type(screen.getByPlaceholderText('Enter credential name'), 'Test AAP')
       await user.type(screen.getByLabelText('Username', { selector: 'input' }), 'admin')
       await user.click(screen.getByRole('button', { name: 'Create credential' }))
 

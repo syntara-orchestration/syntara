@@ -1,35 +1,42 @@
-import { FormGroup, FormHelperText, HelperText, HelperTextItem, Switch } from '@patternfly/react-core'
-import { RhUiErrorIcon } from '@patternfly/react-icons'
-import { Controller, type Control, type FieldValues, type Path } from 'react-hook-form'
+import { FormHelperText, HelperText, HelperTextItem, Switch } from '@patternfly/react-core'
+import type { FieldPath, FieldValues } from 'react-hook-form'
 
+import { SynFormField } from '../../../../components/forms/SynFormField'
 import { integrationHelp } from '../integrationFieldHelp'
 
 import { ProjectMultiSelect } from './ProjectMultiSelect'
 
 type ScopeFieldsProps<T extends FieldValues> = Readonly<{
-  control: Control<T>
   scope: string
-  scopeName: Path<T>
-  projectIdsName: Path<T>
+  scopeName: FieldPath<T>
+  projectIdsName: FieldPath<T>
   idPrefix: string
   onScopeChange?: (newScope: string) => void
 }>
 
 export function ScopeFields<T extends FieldValues>({
-  control,
   scope,
   scopeName,
   projectIdsName,
   idPrefix,
   onScopeChange,
 }: ScopeFieldsProps<T>) {
+  const scopeHint =
+    scope === 'global'
+      ? 'Global integrations are available to all projects. Turn off to scope this integration to specific projects.'
+      : 'This integration will only be available to selected projects.'
+
   return (
     <>
-      <FormGroup label="Scope" fieldId={`${idPrefix}-scope`} labelHelp={integrationHelp.scope}>
-        <Controller
-          name={scopeName}
-          control={control}
-          render={({ field }) => (
+      <SynFormField<T, FieldPath<T>>
+        name={scopeName}
+        label="Scope"
+        fieldId={`${idPrefix}-scope`}
+        labelHelp={integrationHelp.scope}
+        hideFooter
+      >
+        {({ field }) => (
+          <>
             <Switch
               id={`${idPrefix}-scope`}
               label="Global"
@@ -42,44 +49,31 @@ export function ScopeFields<T extends FieldValues>({
                 onScopeChange?.(newScope)
               }}
             />
-          )}
-        />
-        <FormHelperText>
-          <HelperText>
-            <HelperTextItem>
-              {scope === 'global'
-                ? 'Global integrations are available to all projects. Turn off to scope this integration to specific projects.'
-                : 'This integration will only be available to selected projects.'}
-            </HelperTextItem>
-          </HelperText>
-        </FormHelperText>
-      </FormGroup>
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem>{scopeHint}</HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          </>
+        )}
+      </SynFormField>
 
       {scope === 'project' && (
-        <FormGroup label="Projects" fieldId={`${idPrefix}-projects`} isRequired labelHelp={integrationHelp.projects}>
-          <Controller
-            name={projectIdsName}
-            control={control}
-            render={({ field, fieldState }) => (
-              <>
-                <ProjectMultiSelect
-                  selectedIds={(field.value as string[]) ?? []}
-                  onChange={(ids) => field.onChange(ids)}
-                  validated={fieldState.error ? 'error' : 'default'}
-                />
-                {fieldState.error && (
-                  <FormHelperText>
-                    <HelperText>
-                      <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-                        {fieldState.error.message}
-                      </HelperTextItem>
-                    </HelperText>
-                  </FormHelperText>
-                )}
-              </>
-            )}
-          />
-        </FormGroup>
+        <SynFormField<T, FieldPath<T>>
+          name={projectIdsName}
+          label="Projects"
+          fieldId={`${idPrefix}-projects`}
+          isRequired
+          labelHelp={integrationHelp.projects}
+        >
+          {({ field, fieldState }) => (
+            <ProjectMultiSelect
+              selectedIds={(field.value as string[]) ?? []}
+              onChange={(ids) => field.onChange(ids)}
+              validated={fieldState.error ? 'error' : 'default'}
+            />
+          )}
+        </SynFormField>
       )}
     </>
   )

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -9,8 +9,23 @@ import { COLOR_SCHEME_STORAGE_KEY } from '../providers/theme/colorScheme'
 import { ColorSchemeProvider } from '../providers/theme/ColorSchemeProvider'
 
 import { AppDockedNav } from './AppDockedNav'
-import styles from './AppDockedNav.module.css'
 import type { DockState } from './useDockState'
+
+function createMockDockState(overrides: Partial<DockState> = {}): DockState {
+  return {
+    isDockExpanded: false,
+    isDockOverlay: false,
+    isMobile: false,
+    dockedToggleRef: { current: null },
+    mobileToggleRef: { current: null },
+    onToggleDock: mockOnToggleDock,
+    onMobileToggle: vi.fn(),
+    isNavGroupExpanded: () => false,
+    onExpandNavGroup: vi.fn(),
+    onNavSelect: vi.fn(),
+    ...overrides,
+  }
+}
 
 const mockOnToggleDock = vi.fn()
 const mockUseDockState = vi.fn<() => DockState>()
@@ -105,15 +120,7 @@ describe('AppDockedNav', () => {
     vi.mocked(authClient.useQuery).mockReturnValue({
       data: { id: 'user-1', username: 'testuser' },
     })
-    mockUseDockState.mockReturnValue({
-      isDockExpanded: false,
-      isDockTextExpanded: false,
-      isMobile: false,
-      dockedToggleRef: { current: null },
-      mobileToggleRef: { current: null },
-      onToggleDock: mockOnToggleDock,
-      onMobileToggle: vi.fn(),
-    })
+    mockUseDockState.mockReturnValue(createMockDockState())
     localStorage.clear()
     document.documentElement.classList.add('pf-v6-theme-dark', 'pf-v6-theme-glass')
   })
@@ -128,116 +135,68 @@ describe('AppDockedNav', () => {
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument()
   })
 
-  it('renders user menu toggle', () => {
+  it.each([
+    { buttonName: 'User menu', description: 'user menu toggle' },
+    { buttonName: 'Documentation (opens in a new tab)', description: 'documentation button' },
+    {
+      buttonName: 'Theme, color scheme System, contrast System',
+      description: 'theme menu when no preference is stored',
+    },
+    { buttonName: 'Global navigation', description: 'menu toggle button' },
+  ])('renders $description', ({ buttonName }) => {
     renderDockedNav()
-    expect(screen.getByRole('button', { name: 'User menu' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: buttonName })).toBeInTheDocument()
   })
 
-  it('scopes docked chrome styles to the masthead and collapsed nav', () => {
+  it('uses PatternFly docked nav classes', () => {
     renderDockedNav()
 
-    expect(screen.getByRole('banner')).toHaveClass(styles.dockedMasthead)
-    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass(styles.iconDockNav)
-    expect(screen.getByRole('button', { name: 'User menu' })).toHaveClass(styles.dockedAction)
+    expect(screen.getByRole('banner')).toHaveClass('pf-v6-c-masthead', 'pf-m-docked')
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass('pf-m-docked')
   })
 
-  it('renders documentation button', () => {
-    renderDockedNav()
-    expect(screen.getByRole('button', { name: 'Documentation (opens in a new tab)' })).toBeInTheDocument()
-  })
-
-  it('renders color scheme toggle when in dark mode', () => {
-    renderDockedNav()
-    expect(screen.getByRole('button', { name: 'Switch to light mode' })).toBeInTheDocument()
-  })
-
-  it('persists light mode and updates document when toggling from dark', async () => {
+  it('persists light mode from the theme menu without changing contrast', async () => {
     const user = userEvent.setup()
     renderDockedNav()
-    await user.click(screen.getByRole('button', { name: 'Switch to light mode' }))
+    await user.click(screen.getByRole('button', { name: 'Theme, color scheme System, contrast System' }))
+    await user.click(screen.getByRole('button', { name: 'Light' }))
     expect(document.documentElement.classList.contains('pf-v6-theme-dark')).toBe(false)
+    expect(document.documentElement.classList.contains('pf-v6-theme-glass')).toBe(true)
+    expect(document.documentElement.classList.contains('pf-v6-theme-high-contrast')).toBe(false)
     expect(localStorage.getItem(COLOR_SCHEME_STORAGE_KEY)).toBe('light')
-    expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Theme, color scheme Light, contrast System' })).toBeInTheDocument()
   })
 
-  it('renders menu toggle button', () => {
-    renderDockedNav()
-    expect(screen.getByRole('button', { name: 'Global navigation' })).toBeInTheDocument()
-  })
-
-  it('shows My Profile and Logout in user menu flyout when hovered', async () => {
+  it('shows My Profile and Logout in user menu when clicked', async () => {
     const user = userEvent.setup()
     renderDockedNav()
 
-    await user.hover(screen.getByRole('button', { name: 'User menu' }))
+    await user.click(screen.getByRole('button', { name: 'User menu' }))
 
     const menu = screen.getByRole('menu')
-    const menuItems = within(menu).getAllByRole('menuitem')
-    expect(menuItems).toHaveLength(2)
-    expect(menuItems[0]).toHaveTextContent('My Profile')
-    expect(menuItems[1]).toHaveTextContent('Logout')
-    expect(menuItems[0]).toHaveClass(styles.flyoutMenuItem)
-    expect(screen.queryByText('Settings')).not.toBeInTheDocument()
-  })
-
-  it('closes user menu flyout when pointer leaves the trigger and flyout', async () => {
-    const user = userEvent.setup()
-    renderDockedNav()
-
-    const userMenuButton = screen.getByRole('button', { name: 'User menu' })
-    await user.hover(userMenuButton)
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-
-    await user.unhover(userMenuButton)
-
-    await waitFor(() => {
-      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    })
-  })
-
-  it('keeps user menu flyout open while pointer is over a menu item', async () => {
-    const user = userEvent.setup()
-    renderDockedNav()
-
-    const userMenuButton = screen.getByRole('button', { name: 'User menu' })
-    await user.hover(userMenuButton)
-    await user.hover(screen.getByRole('menuitem', { name: 'My Profile' }))
-
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-  })
-
-  it('closes user menu when Escape is pressed', async () => {
-    const user = userEvent.setup()
-    renderDockedNav()
-
-    await user.hover(screen.getByRole('button', { name: 'User menu' }))
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-
-    await user.keyboard('{Escape}')
-
-    await waitFor(() => {
-      expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    })
+    expect(within(menu).getByText('My Profile')).toBeInTheDocument()
+    expect(within(menu).getByText('Logout')).toBeInTheDocument()
   })
 
   it('opens user menu when Enter is pressed while focused', async () => {
     const user = userEvent.setup()
+    mockUseDockState.mockReturnValue(createMockDockState({ isDockExpanded: true }))
     renderDockedNav()
 
-    await user.tab()
     const userMenuButton = screen.getByRole('button', { name: 'User menu' })
     userMenuButton.focus()
     await user.keyboard('{Enter}')
 
-    expect(screen.getByText('My Profile')).toBeInTheDocument()
-    expect(screen.getByText('Logout')).toBeInTheDocument()
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByText('My Profile')).toBeInTheDocument()
+    expect(within(menu).getByText('Logout')).toBeInTheDocument()
   })
 
   it('navigates to /my-profile when My Profile is clicked', async () => {
     const user = userEvent.setup()
     renderDockedNav()
 
-    await user.hover(screen.getByRole('button', { name: 'User menu' }))
+    await user.click(screen.getByRole('button', { name: 'User menu' }))
     await user.click(screen.getByText('My Profile'))
 
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/my-profile' })
@@ -291,107 +250,82 @@ describe('AppDockedNav', () => {
     expect(logoLinks[0]).toHaveAttribute('href', '/')
   })
 
-  it('navigates to Integrations when Configuration is clicked', async () => {
+  it('calls onExpandNavGroup when an expandable group is clicked', async () => {
+    const onExpandNavGroup = vi.fn()
+    mockUseDockState.mockReturnValue(createMockDockState({ onExpandNavGroup }))
     const user = userEvent.setup()
     renderDockedNav()
 
-    const configItem = screen.getByLabelText('Configuration')
-    await user.click(configItem)
-
-    expect(mockRequestNavigation).toHaveBeenCalledWith('/configuration/integrations')
+    await user.click(screen.getByRole('button', { name: 'Configuration' }))
+    expect(onExpandNavGroup).toHaveBeenCalled()
   })
 
-  it('shows dropdown with Integrations and Credentials when Configuration is clicked', async () => {
+  it('shows Configuration child links when the group is expanded', () => {
+    mockUseDockState.mockReturnValue(
+      createMockDockState({
+        isDockExpanded: true,
+        isNavGroupExpanded: () => true,
+      })
+    )
+    renderDockedNav()
+
+    expect(screen.getByRole('link', { name: 'Integrations' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Credentials' })).toBeInTheDocument()
+  })
+
+  it.each([
+    { linkName: 'Integrations', expectedPath: '/configuration/integrations' },
+    { linkName: 'Access Management', expectedPath: '/system-administration/access-management' },
+    { linkName: 'Identity Providers', expectedPath: '/system-administration/authentication' },
+  ])('navigates to $linkName when child link is clicked', async ({ linkName, expectedPath }) => {
+    mockUseDockState.mockReturnValue(
+      createMockDockState({
+        isDockExpanded: true,
+        isNavGroupExpanded: () => true,
+      })
+    )
     const user = userEvent.setup()
     renderDockedNav()
 
-    const navButton = screen.getByRole('button', { name: 'Configuration' })
-    await user.click(navButton)
-
-    const menu = screen.getByRole('menu')
-    const menuItems = within(menu).getAllByRole('menuitem')
-
-    // Configuration has 2 child items: Integrations, Credentials (Settings moved to System Administration)
-    expect(menuItems.length).toBe(2)
-    expect(menu).toBeInTheDocument()
-    expect(menuItems[0]).toHaveClass(styles.flyoutMenuItem)
+    await user.click(screen.getByRole('link', { name: linkName }))
+    expect(mockRequestNavigation).toHaveBeenCalledWith(expectedPath)
   })
 
-  it('applies navFlyoutItem class to collapsed-mode flyout nav items', () => {
+  it('shows System Administration child links when the group is expanded', () => {
+    mockUseDockState.mockReturnValue(
+      createMockDockState({
+        isDockExpanded: true,
+        isNavGroupExpanded: () => true,
+      })
+    )
     renderDockedNav()
 
-    expect(screen.getByRole('button', { name: 'Configuration' })).toHaveClass(styles.navFlyoutItem)
-    expect(screen.getByRole('button', { name: 'System Administration' })).toHaveClass(styles.navFlyoutItem)
-  })
-
-  it('shows dropdown with Access Management, Identity Providers, and Settings when System Administration is clicked', async () => {
-    const user = userEvent.setup()
-    renderDockedNav()
-
-    const navButton = screen.getByRole('button', { name: 'System Administration' })
-    await user.click(navButton)
-
-    const menu = screen.getByRole('menu')
-    const menuItems = within(menu).getAllByRole('menuitem')
-
-    // System Administration has 3 child items: Access Management, Identity Providers, Settings
-    expect(menuItems.length).toBe(3)
-    expect(menu).toBeInTheDocument()
-  })
-
-  it('navigates to Access Management from System Administration dropdown', async () => {
-    const user = userEvent.setup()
-    renderDockedNav()
-
-    const navButton = screen.getByRole('button', { name: 'System Administration' })
-    await user.click(navButton)
-
-    const menu = screen.getByRole('menu')
-    const menuItems = within(menu).getAllByRole('menuitem')
-    await user.click(menuItems[0])
-    expect(mockRequestNavigation).toHaveBeenCalledWith('/system-administration/access-management')
-  })
-
-  it('navigates to Identity Providers from System Administration dropdown', async () => {
-    const user = userEvent.setup()
-    renderDockedNav()
-
-    const navButton = screen.getByRole('button', { name: 'System Administration' })
-    await user.click(navButton)
-
-    await user.click(screen.getByText('Identity Providers'))
-    expect(mockRequestNavigation).toHaveBeenCalledWith('/system-administration/authentication')
+    expect(screen.getByRole('link', { name: 'Access Management' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Identity Providers' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument()
   })
 
   describe('Expanded text mode', () => {
     beforeEach(() => {
-      mockUseDockState.mockReturnValue({
-        isDockExpanded: false,
-        isDockTextExpanded: true,
-        isMobile: false,
-        dockedToggleRef: { current: null },
-        mobileToggleRef: { current: null },
-        onToggleDock: mockOnToggleDock,
-        onMobileToggle: vi.fn(),
-      })
+      mockUseDockState.mockReturnValue(
+        createMockDockState({
+          isDockExpanded: true,
+          isNavGroupExpanded: () => true,
+        })
+      )
     })
 
-    it('renders expandable nav groups instead of flyout menus', () => {
+    it('renders expandable nav groups with child links visible', () => {
       renderDockedNav()
       expect(screen.getByRole('button', { name: 'Configuration' })).toBeInTheDocument()
-      expect(screen.getByText('Integrations')).toBeInTheDocument()
-      expect(screen.getByText('Credentials')).toBeInTheDocument()
-    })
-
-    it('does not hide nav expand toggles when dock text is expanded', () => {
-      renderDockedNav()
-      expect(screen.getByRole('navigation', { name: 'Main navigation' })).not.toHaveClass(styles.iconDockNav)
+      expect(screen.getByRole('link', { name: 'Integrations' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Credentials' })).toBeInTheDocument()
     })
 
     it('shows the brand logo when expanded', () => {
       renderDockedNav()
-      const logo = within(screen.getByRole('banner')).getByRole('img', { name: 'Syntara' })
-      expect(logo).toBeInTheDocument()
+      const logos = within(screen.getByRole('banner')).getAllByRole('img', { name: 'Syntara' })
+      expect(logos.length).toBeGreaterThanOrEqual(1)
     })
 
     it('navigates to child item when clicked in expanded mode', async () => {
@@ -416,7 +350,7 @@ describe('AppDockedNav', () => {
 
     it('shows label text for color scheme and documentation buttons', () => {
       renderDockedNav()
-      expect(screen.getByText('Light mode')).toBeInTheDocument()
+      expect(screen.getByText('Theme')).toBeInTheDocument()
       expect(screen.getByText('Documentation')).toBeInTheDocument()
     })
 
@@ -428,52 +362,43 @@ describe('AppDockedNav', () => {
 
   describe('Mobile mode', () => {
     beforeEach(() => {
-      mockUseDockState.mockReturnValue({
-        isDockExpanded: true,
-        isDockTextExpanded: false,
-        isMobile: true,
-        dockedToggleRef: { current: null },
-        mobileToggleRef: { current: null },
-        onToggleDock: mockOnToggleDock,
-        onMobileToggle: vi.fn(),
-      })
+      mockUseDockState.mockReturnValue(
+        createMockDockState({
+          isDockExpanded: true,
+          isMobile: true,
+          isNavGroupExpanded: () => true,
+        })
+      )
     })
 
     it('shows label text for docked actions when mobile overlay is expanded', () => {
       renderDockedNav()
-      expect(screen.getByText('Light mode')).toBeInTheDocument()
+      expect(screen.getByText('Theme')).toBeInTheDocument()
       expect(screen.getByText('Documentation')).toBeInTheDocument()
     })
 
-    it('does not apply icon-only nav styles when mobile overlay is expanded', () => {
+    it('does not use icon-only nav presentation when mobile overlay is expanded', () => {
       renderDockedNav()
-      expect(screen.getByRole('navigation', { name: 'Main navigation' })).not.toHaveClass(styles.iconDockNav)
+      expect(screen.getByRole('button', { name: 'Configuration' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'System Administration' })).toBeInTheDocument()
     })
 
     it('renders expandable nav groups when dock is expanded on mobile', () => {
       renderDockedNav()
-      expect(screen.getByText('Integrations')).toBeInTheDocument()
-      expect(screen.getByText('Credentials')).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Integrations' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Credentials' })).toBeInTheDocument()
     })
 
     it('shows the brand logo when expanded on mobile', () => {
       renderDockedNav()
-      const logo = within(screen.getByRole('banner')).getByRole('img', { name: 'Syntara' })
-      expect(logo).toBeInTheDocument()
+      const logos = within(screen.getByRole('banner')).getAllByRole('img', { name: 'Syntara' })
+      expect(logos.length).toBeGreaterThanOrEqual(1)
     })
   })
 
   describe('Mobile collapsed mode', () => {
     beforeEach(() => {
-      mockUseDockState.mockReturnValue({
-        isDockExpanded: false,
-        isDockTextExpanded: false,
-        isMobile: true,
-        dockedToggleRef: { current: null },
-        mobileToggleRef: { current: null },
-        onToggleDock: mockOnToggleDock,
-        onMobileToggle: vi.fn(),
-      })
+      mockUseDockState.mockReturnValue(createMockDockState({ isMobile: true }))
     })
 
     it('renders without errors when mobile and dock is collapsed', () => {
@@ -482,13 +407,11 @@ describe('AppDockedNav', () => {
     })
   })
 
-  it('renders light mode icon when in light mode', async () => {
-    const user = userEvent.setup()
+  it('keeps the theme menu label when the resolved scheme is light and no preference is stored', () => {
     document.documentElement.classList.remove('pf-v6-theme-dark', 'pf-v6-theme-glass')
     renderDockedNav()
-    expect(screen.getByText('Dark mode')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /switch to dark mode/i }))
-    expect(screen.getByText('Light mode')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Theme, color scheme System, contrast System' })).toBeInTheDocument()
+    expect(screen.getByText('Theme')).toBeInTheDocument()
   })
 
   it('opens documentation in a new tab when Documentation button is clicked', async () => {
@@ -510,15 +433,12 @@ describe('AppDockedNav', () => {
   describe('Expanded with active configuration child', () => {
     beforeEach(() => {
       mockLocation = '/configuration/integrations'
-      mockUseDockState.mockReturnValue({
-        isDockExpanded: false,
-        isDockTextExpanded: true,
-        isMobile: false,
-        dockedToggleRef: { current: null },
-        mobileToggleRef: { current: null },
-        onToggleDock: mockOnToggleDock,
-        onMobileToggle: vi.fn(),
-      })
+      mockUseDockState.mockReturnValue(
+        createMockDockState({
+          isDockExpanded: true,
+          isNavGroupExpanded: () => true,
+        })
+      )
     })
 
     it('highlights the active Configuration group', () => {
@@ -537,15 +457,12 @@ describe('AppDockedNav', () => {
   describe('Expanded with active system-administration child', () => {
     beforeEach(() => {
       mockLocation = '/system-administration/access-management'
-      mockUseDockState.mockReturnValue({
-        isDockExpanded: false,
-        isDockTextExpanded: true,
-        isMobile: false,
-        dockedToggleRef: { current: null },
-        mobileToggleRef: { current: null },
-        onToggleDock: mockOnToggleDock,
-        onMobileToggle: vi.fn(),
-      })
+      mockUseDockState.mockReturnValue(
+        createMockDockState({
+          isDockExpanded: true,
+          isNavGroupExpanded: () => true,
+        })
+      )
     })
 
     it('renders System Administration children in expanded mode', () => {
@@ -579,7 +496,7 @@ describe('AppDockedNav', () => {
     const user = userEvent.setup()
     renderDockedNav()
 
-    await user.hover(screen.getByRole('button', { name: 'User menu' }))
+    await user.click(screen.getByRole('button', { name: 'User menu' }))
     await user.click(screen.getByText('Logout'))
 
     // Should call logout directly — no modal

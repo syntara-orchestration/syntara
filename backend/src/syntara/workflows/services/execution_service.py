@@ -41,7 +41,10 @@ from syntara.workflows.exceptions import (
     WorkflowNotPublishedError,
 )
 from syntara.workflows.json_schema_validation import apply_schema_defaults
-from syntara.workflows.models.activity_execution import ActivityExecution, ActivityExecutionListResponse
+from syntara.workflows.models.activity_execution import (
+    ActivityExecution,
+    ActivityExecutionListResponse,
+)
 from syntara.workflows.models.execution import (
     TERMINAL_EXECUTION_STATUSES,
     ActivityData,
@@ -974,12 +977,12 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         if query_params_items:
             execution_filter.extend(query_params_items)
 
-        # Pass identity converter — the service's default mixin converts to ExecutionRead,
-        # but ActivityExecution is used directly as the response model.
+        # The internal control_data field is excluded from the public model schema
+        # and serialization.
         return await self.list_resources(
             model=ActivityExecution,
             response_type=ActivityExecutionListResponse,
-            response_type_converter=lambda a: a,
+            response_type_converter=lambda activity: activity,
             limit=limit,
             cursor=cursor,
             sort=sort or "-created_at",

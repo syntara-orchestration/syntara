@@ -123,6 +123,7 @@ jobs:
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           base: devel
+          sign-commits: true
           branch: ${{ env.BASELINE_REFRESH_BRANCH }}
           delete-branch: true
           add-paths: frontend/packages/syntara-ui/e2e/visual-regression/page-screenshots.spec.ts-snapshots/**
@@ -132,7 +133,6 @@ jobs:
           title: >-
             Visual regression: weekly baseline refresh
             (${{ steps.detect.outputs.added }} new, ${{ steps.detect.outputs.modified }} changed)
-          team-reviewers: uxd-team
           body: |
             Weekly scheduled run against `devel` regenerated every screenshot in `page-registry.ts`. **${{ steps.detect.outputs.added }}** are new, **${{ steps.detect.outputs.modified }}** changed since last Monday's run.
 

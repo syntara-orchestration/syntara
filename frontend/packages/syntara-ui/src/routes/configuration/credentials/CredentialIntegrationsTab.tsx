@@ -61,11 +61,11 @@ function IntegrationsTable({
             }}
             aria-label="Row expansion"
           />
-          <Th>Integration name</Th>
-          <Th>Type</Th>
-          <Th>Created by</Th>
-          <Th>Status</Th>
-          <Th>Scope</Th>
+          <Th width={20}>Integration name</Th>
+          <Th width={15}>Type</Th>
+          <Th width={20}>Created by</Th>
+          <Th width={15}>Status</Th>
+          <Th width={15}>Scope</Th>
         </Tr>
       </Thead>
       {integrations.map((integration, rowIndex) => {

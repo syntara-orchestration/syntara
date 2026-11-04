@@ -70,8 +70,8 @@ test.describe('My Profile — user menu navigation', () => {
     await viewerApp.goto(toAppUrl('/workflows'))
     await expect(viewerApp.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
-    await viewerApp.getByRole('button', { name: 'User menu' }).hover()
-    await viewerApp.getByText('My Profile').click()
+    await viewerApp.getByRole('button', { name: 'User menu' }).click()
+    await viewerApp.getByRole('menuitem', { name: 'My Profile' }).click()
 
     await expect(viewerApp).toHaveURL(toAppUrl(MY_PROFILE_URL))
     await expect(viewerApp.getByRole('heading', { level: 1, name: 'My Profile' })).toBeVisible()
@@ -81,8 +81,8 @@ test.describe('My Profile — user menu navigation', () => {
     await app.goto(toAppUrl('/workflows'))
     await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
-    await app.getByRole('button', { name: 'User menu' }).hover()
-    await app.getByText('My Profile').click()
+    await app.getByRole('button', { name: 'User menu' }).click()
+    await app.getByRole('menuitem', { name: 'My Profile' }).click()
 
     await expect(app).toHaveURL(toAppUrl(MY_PROFILE_URL))
     await expect(app.getByRole('heading', { level: 1, name: 'My Profile' })).toBeVisible()

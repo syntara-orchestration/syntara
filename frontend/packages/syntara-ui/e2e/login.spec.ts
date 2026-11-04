@@ -16,6 +16,7 @@ import AxeBuilder from '@axe-core/playwright'
 import { test, expect } from './fixtures'
 import { WCAG_TAGS } from './fixtures/accessibility'
 import { BUILT_IN_ADMIN_USER_INFO } from './fixtures/mock-users'
+import { mainNavGroup } from './helpers/docked-nav'
 import { goToLoginPage } from './helpers/login'
 
 test.describe('Login form error handling', () => {
@@ -221,9 +222,9 @@ test.describe('Built-in admin login flow', () => {
     await expect(mainNav).toBeVisible({ timeout: 30_000 })
     await settingsPermissionChecks
 
-    // Compass dock nav can overflow vertically; last items may need scroll into view.
-    const systemAdminNav = mainNav.getByRole('button', { name: 'System Administration' })
+    // Nav can re-render when can_i checks finish — wait for attach before scrolling.
+    const systemAdminNav = mainNavGroup(page, 'System Administration')
+    await expect(systemAdminNav).toBeVisible({ timeout: 15_000 })
     await systemAdminNav.scrollIntoViewIfNeeded()
-    await expect(systemAdminNav).toBeVisible()
   })
 })

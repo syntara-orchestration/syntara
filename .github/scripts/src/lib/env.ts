@@ -17,7 +17,7 @@ export function getEnvironment(): Environment {
   const result = EnvironmentSchema.safeParse(rawEnv)
 
   if (!result.success) {
-    const errors = result.error.errors.map((err) => `${err.path.join('.')}: ${err.message}`).join(', ')
+    const errors = result.error.issues.map((err) => `${err.path.join('.')}: ${err.message}`).join(', ')
     throw new Error(`Environment validation failed: ${errors}`)
   }
 

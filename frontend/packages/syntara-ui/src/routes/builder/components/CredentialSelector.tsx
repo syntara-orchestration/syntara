@@ -368,6 +368,7 @@ export function CredentialSelector({
           preSelectedTypeId={resolvedPreSelectedTypeId}
           onCreated={handleCreated}
           defaultProjectId={projectId}
+          compatibleTypeNames={compatibleTypeNames}
         />
       )}
     </FormGroup>

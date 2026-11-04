@@ -11,7 +11,7 @@
 - [Publish Flow](#publish-flow)
 - [Unpublish Flow](#unpublish-flow)
 - [Restore Flow](#restore-flow)
-- [Export / Import](#export--import)
+- [Export / Import](#export-import)
 - [Execution Binding](#execution-binding)
 - [Trigger Sync](#trigger-sync)
 - [Telemetry](#telemetry)

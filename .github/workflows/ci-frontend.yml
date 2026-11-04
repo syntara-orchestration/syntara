@@ -1,11 +1,11 @@
 ---
 # Frontend CI workflow with conditional E2E execution and cost-saving gates.
-# Manual E2E trigger documentation lives in frontend/CONTRIBUTING.md.
+# Manual E2E trigger documentation lives in docs/frontend-contributing.md.
 name: CI Frontend
 
 on:
   pull_request:
-    branches: [devel, early-access]
+    branches: [devel, early-access, 'feature/*', 'feature/**/*', 'feat/*', 'feat/**/*']
   merge_group:
     branches: [devel, early-access]
   push:
@@ -99,7 +99,7 @@ jobs:
           else
             echo "contracts=false" >> "$GITHUB_OUTPUT"
           fi
-          if grep -qE '^(\\.github/scripts/|\\.github/workflows/ci-frontend\\.yml$)' <<< "$FILES"; then
+          if grep -qE '^(\.github/scripts/|\.github/workflows/ci-frontend\.yml$)' <<< "$FILES"; then
             echo "scripts=true" >> "$GITHUB_OUTPUT"
           else
             echo "scripts=false" >> "$GITHUB_OUTPUT"
@@ -797,7 +797,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/konflux-gate
         with:
-          check-name: 'Integration Service / conforma-on-pull-request-{branch} / ansible-automation-orchestrator-ui-{branch}'
+          check-name: 'Red Hat Konflux / conforma-on-pull-request-{branch} / ansible-automation-orchestrator-ui-{branch}'
           pipeline-check-name: 'Konflux kflux-prd-rh03 / ansible-automation-orchestrator-ui-{branch}-on-pull-request'
           timeout-minutes: '85'
 

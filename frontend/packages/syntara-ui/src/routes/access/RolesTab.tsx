@@ -134,18 +134,20 @@ function RolesTable({
             }}
             aria-label="Row expansion"
           />
-          <Th sort={getSortParams(1)}>Name</Th>
-          <Th>Description</Th>
-          <Th sort={getSortParams(3)} modifier="nowrap">
+          <Th width={15} sort={getSortParams(1)}>
+            Name
+          </Th>
+          <Th width={25}>Description</Th>
+          <Th width={15} sort={getSortParams(3)} modifier="nowrap">
             Scope
           </Th>
-          <Th sort={getSortParams(4)} modifier="nowrap">
+          <Th width={15} sort={getSortParams(4)} modifier="nowrap">
             Project
           </Th>
-          <Th sort={getSortParams(5)} modifier="nowrap">
+          <Th width={10} sort={getSortParams(5)} modifier="nowrap">
             Type
           </Th>
-          <Th screenReaderText="Actions" />
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       {roles.map((role, rowIndex) => {

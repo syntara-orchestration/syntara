@@ -95,13 +95,21 @@ function PoliciesTableBody({
     <>
       <Thead>
         <Tr>
-          <Th sort={getSortParams(0)}>Name</Th>
-          <Th>Description</Th>
-          <Th sort={getSortParams(2)}>Scope</Th>
-          <Th>Statements</Th>
-          <Th sort={getSortParams(4)}>Project</Th>
-          <Th sort={getSortParams(5)}>Type</Th>
-          <Th screenReaderText="Actions" />
+          <Th width={25} sort={getSortParams(0)}>
+            Name
+          </Th>
+          <Th width={20}>Description</Th>
+          <Th width={15} sort={getSortParams(2)}>
+            Scope
+          </Th>
+          <Th width={15}>Statements</Th>
+          <Th width={15} sort={getSortParams(4)}>
+            Project
+          </Th>
+          <Th width={15} sort={getSortParams(5)}>
+            Type
+          </Th>
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       <Tbody>

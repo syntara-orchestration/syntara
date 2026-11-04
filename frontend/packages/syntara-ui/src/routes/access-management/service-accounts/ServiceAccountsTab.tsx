@@ -300,12 +300,18 @@ export function ServiceAccountsTab() {
             <SynListPanelTable caption="Service accounts" footer={getFooterProps(query.data)}>
               <Thead>
                 <Tr>
-                  <Th sort={getSortParams(0)}>Name</Th>
-                  <Th>Owning project</Th>
-                  <Th sort={getSortParams(1)}>Created</Th>
-                  <Th sort={getSortParams(2)}>Last authenticated</Th>
-                  <Th>State</Th>
-                  <Th screenReaderText="Actions" />
+                  <Th width={20} sort={getSortParams(0)}>
+                    Name
+                  </Th>
+                  <Th width={20}>Owning project</Th>
+                  <Th width={20} sort={getSortParams(1)}>
+                    Created
+                  </Th>
+                  <Th width={20} sort={getSortParams(2)}>
+                    Last authenticated
+                  </Th>
+                  <Th width={10}>State</Th>
+                  <Th width={10} screenReaderText="Actions" />
                 </Tr>
               </Thead>
               <ServiceAccountTableBody

@@ -113,4 +113,30 @@ describe('useSynForm', () => {
 
     expect(result.current.getValues()).toMatchObject(hydratedValues)
   })
+
+  it('resetOptions keepDirtyValues preserves edited fields when external values update', () => {
+    const { result, rerender } = renderHook(
+      ({ values }: { values: FormData }) =>
+        useSynForm({
+          schema,
+          defaultValues,
+          values,
+          resetOptions: { keepDirtyValues: true },
+        }),
+      {
+        initialProps: {
+          values: { name: 'server', description: 'old' },
+        },
+      }
+    )
+
+    act(() => {
+      result.current.setValue('name', 'user-edit', { shouldDirty: true })
+    })
+
+    rerender({ values: { name: 'server', description: 'new from api' } })
+
+    expect(result.current.getValues('name')).toBe('user-edit')
+    expect(result.current.getValues('description')).toBe('new from api')
+  })
 })
