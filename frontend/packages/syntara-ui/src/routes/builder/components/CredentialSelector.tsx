@@ -12,16 +12,18 @@ import {
   SelectOption,
   Spinner,
 } from '@patternfly/react-core'
-import { RhUiAddIcon, RhUiErrorIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import React, { type ReactElement, useCallback, useMemo, useState } from 'react'
 
 import { credentialsClient } from '../../../client'
+import { FormFieldError } from '../../../components/FormFieldError'
 import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { Credential, CredentialType } from '../../configuration/credentials/credentialConstants'
 import { CredentialFormModal } from '../../configuration/credentials/form/CredentialFormModal'
 
 import { resolveFormGroupLabelHelp } from './resolveFormGroupLabelHelp'
+import { TypeaheadMenuToggle } from './TypeaheadMenuToggle'
 import { useAllCredentials } from './useAllCredentials'
 
 export type CredentialSelectorProps = {
@@ -53,25 +55,21 @@ export type CredentialSelectorProps = {
   isRequired?: boolean
   /** Validation error message — when set, shows danger styling and error text */
   errorMessage?: string
+  isSearchable?: boolean
 }
 
 const NO_CREDENTIAL_VALUE = '__none__'
 const CREATE_NEW_VALUE = '__create_new__'
 
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null
-  return (
-    <FormHelperText>
-      <HelperText>
-        <HelperTextItem icon={<RhUiErrorIcon />} variant="error">
-          {message}
-        </HelperTextItem>
-      </HelperText>
-    </FormHelperText>
-  )
+function credentialMessageIds(fieldId: string, errorMessage: string | undefined, isReadOnlyCredential: boolean) {
+  const errorId = `${fieldId}-error`
+  const warningId = `${fieldId}-readonly-warning`
+  const describedBy =
+    [errorMessage ? errorId : '', isReadOnlyCredential ? warningId : ''].filter(Boolean).join(' ') || undefined
+  return { errorId, warningId, describedBy }
 }
 
-function credentialDescription(credential: { enabled: boolean; description?: string | null }) {
+function credentialDescription(credential: { enabled?: boolean; description?: string | null }) {
   if (credential.enabled) return credential.description ?? undefined
   return `${credential.description ?? ''} (disabled)`.trim()
 }
@@ -91,8 +89,7 @@ function buildTypeGroups(credentials: Credential[], credentialTypes: CredentialT
       const ct = typeMap.get(typeId)
       groupMap.set(typeId, { typeId, typeName: ct?.name ?? 'Unknown', credentials: [] })
     }
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: key was just set via groupMap.set(typeId, ...) above
-    groupMap.get(typeId)!.credentials.push(cred)
+    groupMap.get(typeId)?.credentials.push(cred)
   }
   return Array.from(groupMap.values())
 }
@@ -103,11 +100,26 @@ type TypeGroup = {
   credentials: Credential[]
 }
 
+function CredentialOption({ credential, value }: Readonly<{ credential: Credential; value?: string }>) {
+  return (
+    <SelectOption
+      key={credential.id}
+      value={credential.id}
+      isSelected={credential.id === value}
+      isDisabled={!credential.enabled}
+      description={credentialDescription(credential)}
+    >
+      {credential.name}
+    </SelectOption>
+  )
+}
+
 type MenuToggleProps = {
   toggleRef: React.Ref<MenuToggleElement>
   isOpen: boolean
   isDisabled: boolean
   isPending: boolean
+  describedBy?: string
   isReadOnlyCredential: boolean
   hasDanger: boolean
   label: string
@@ -120,7 +132,7 @@ function CredentialMenuToggle({
   isOpen,
   isDisabled,
   isPending,
-  isReadOnlyCredential,
+  describedBy,
   hasDanger,
   label,
   toggleLabel,
@@ -132,7 +144,8 @@ function CredentialMenuToggle({
       onClick={() => setIsOpen((prev) => !prev)}
       isExpanded={isOpen}
       isDisabled={isDisabled || isPending}
-      aria-describedby={isReadOnlyCredential ? 'credential-readonly-warning' : undefined}
+      aria-describedby={describedBy}
+      aria-invalid={hasDanger || undefined}
       isFullWidth
       status={hasDanger ? 'danger' : undefined}
       aria-label={label}
@@ -160,12 +173,71 @@ function NoCredentialOption({ isRequired, value }: { isRequired: boolean; value?
   )
 }
 
-function ReadOnlyCredentialWarning({ show }: { show: boolean }) {
+function CredentialOptions({
+  label,
+  isRequired,
+  value,
+  allowCreate,
+  typeGroups,
+  hasGroups,
+  isPending,
+  isError,
+  filterText,
+  credentialCount,
+}: Readonly<{
+  label: string
+  isRequired: boolean
+  value?: string
+  allowCreate: boolean
+  typeGroups: TypeGroup[]
+  hasGroups: boolean
+  isPending: boolean
+  isError: boolean
+  filterText: string
+  credentialCount: number
+}>) {
+  return (
+    <SelectList aria-label={`${label} options`}>
+      <NoCredentialOption isRequired={isRequired} value={value} />
+      {allowCreate && (
+        <>
+          <SelectOption value={CREATE_NEW_VALUE} icon={<RhUiAddIcon />}>
+            Create new credential
+          </SelectOption>
+          <Divider />
+        </>
+      )}
+      {hasGroups
+        ? typeGroups.map((group) => (
+            <SelectGroup key={group.typeId} label={group.typeName.toUpperCase()}>
+              {group.credentials.map((credential) => (
+                <CredentialOption key={credential.id} credential={credential} value={value} />
+              ))}
+            </SelectGroup>
+          ))
+        : typeGroups
+            .flatMap((group) => group.credentials)
+            .map((credential) => <CredentialOption key={credential.id} credential={credential} value={value} />)}
+      {filterText && !typeGroups.length && !isPending && (
+        <SelectOption isDisabled value="__no_matches__">
+          No matching credentials
+        </SelectOption>
+      )}
+      {credentialCount === 0 && !isPending && !allowCreate && (
+        <SelectOption isDisabled value="__empty__">
+          {isError ? 'Failed to load credentials' : 'No credentials available'}
+        </SelectOption>
+      )}
+    </SelectList>
+  )
+}
+
+function ReadOnlyCredentialWarning({ show, id }: { show: boolean; id: string }) {
   if (!show) return null
   return (
     <FormHelperText>
       <HelperText>
-        <HelperTextItem id="credential-readonly-warning" variant="warning">
+        <HelperTextItem id={id} variant="warning">
           You do not have permission to use this credential. Contact a project administrator for access.
         </HelperTextItem>
       </HelperText>
@@ -212,25 +284,28 @@ export function CredentialSelector({
   projectId,
   isRequired = false,
   errorMessage,
+  isSearchable = false,
 }: Readonly<CredentialSelectorProps>) {
   const [isOpen, setIsOpen] = useState(false)
+  const [filterText, setFilterText] = useState('')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
   const {
     credentials: allCredentials,
-    isLoading: isPending,
+    isLoading: isCredentialsPending,
     error: credentialsError,
     refetch,
   } = useAllCredentials({ projectId })
-  const isError = !!credentialsError
-
-  const { data: typesData } = credentialsClient.useQuery('get', '/credential_types')
+  const typesQuery = credentialsClient.useQuery('get', '/credential_types')
+  const typesData = typesQuery.data
+  const isError = Boolean(credentialsError) || Boolean(compatibleTypeNames && typesQuery.isError)
+  const isPending = isCredentialsPending || Boolean(compatibleTypeNames && typesQuery.isPending)
 
   const credentialTypes: CredentialType[] = useMemo(() => typesData?.resources ?? [], [typesData?.resources])
 
   // Derive compatible type IDs from type names
   const compatibleTypeIds = useMemo(() => {
-    if (!compatibleTypeNames || credentialTypes.length === 0) return null
+    if (!compatibleTypeNames) return null
     return credentialTypes.filter((t) => compatibleTypeNames.includes(t.name)).map((t) => t.id)
   }, [compatibleTypeNames, credentialTypes])
 
@@ -248,8 +323,12 @@ export function CredentialSelector({
   }, [allCredentials, compatibleTypeIds])
 
   const typeGroups: TypeGroup[] = useMemo(
-    () => buildTypeGroups(credentials, credentialTypes),
-    [credentials, credentialTypes]
+    () =>
+      buildTypeGroups(
+        credentials.filter((item) => item.name.toLowerCase().includes(filterText.toLowerCase())),
+        credentialTypes
+      ),
+    [credentials, credentialTypes, filterText]
   )
 
   const {
@@ -268,6 +347,7 @@ export function CredentialSelector({
   const handleSelect = useCallback(
     (_event: React.MouseEvent | undefined, selectedValue: string | number | undefined) => {
       setIsOpen(false)
+      setFilterText('')
       if (selectedValue === CREATE_NEW_VALUE) {
         setIsCreateModalOpen(true)
       } else {
@@ -287,36 +367,62 @@ export function CredentialSelector({
 
   const resolvedLabelHelp = resolveFormGroupLabelHelp(label, labelHelp, helpText)
 
+  const { errorId, warningId, describedBy } = credentialMessageIds(fieldId, errorMessage, isReadOnlyCredential)
   const hasGroups = credentialTypes.length > 0
   const hasDanger = [isError, errorMessage].some(Boolean)
 
-  const renderCredentialOption = (credential: (typeof credentials)[number]) => (
-    <SelectOption
-      key={credential.id}
-      value={credential.id}
-      isSelected={credential.id === value}
-      isDisabled={!credential.enabled}
-      description={credentialDescription(credential as { enabled: boolean; description?: string | null })}
-    >
-      {credential.name}
-    </SelectOption>
-  )
-
   const renderToggle = useCallback(
-    (toggleRef: React.Ref<MenuToggleElement>) => (
-      <CredentialMenuToggle
-        toggleRef={toggleRef}
-        isOpen={isOpen}
-        isDisabled={isDisabled}
-        isPending={isPending || isSingleCredPending}
-        isReadOnlyCredential={isReadOnlyCredential}
-        hasDanger={hasDanger}
-        label={label}
-        toggleLabel={toggleLabel}
-        setIsOpen={setIsOpen}
-      />
-    ),
-    [isOpen, isDisabled, isPending, isSingleCredPending, isReadOnlyCredential, hasDanger, label, toggleLabel]
+    (toggleRef: React.Ref<MenuToggleElement>) =>
+      isSearchable ? (
+        <TypeaheadMenuToggle
+          toggleRef={toggleRef}
+          displayText={value ? toggleLabel : ''}
+          ariaLabel={label}
+          fieldId={fieldId}
+          isOpen={isOpen}
+          isDisabled={isDisabled}
+          isPending={isPending || isSingleCredPending}
+          hasSelection={Boolean(value)}
+          filterText={filterText}
+          placeholder={placeholder}
+          loadingPlaceholder="Loading credentials..."
+          onFilterChange={setFilterText}
+          onClear={() => onChange(undefined)}
+          onToggle={() => setIsOpen(!isOpen)}
+          isInvalid={hasDanger}
+          describedBy={describedBy}
+        />
+      ) : (
+        <CredentialMenuToggle
+          toggleRef={toggleRef}
+          isOpen={isOpen}
+          isDisabled={isDisabled}
+          isPending={isPending || isSingleCredPending}
+          isReadOnlyCredential={isReadOnlyCredential}
+          describedBy={describedBy}
+          hasDanger={hasDanger}
+          label={label}
+          toggleLabel={toggleLabel}
+          setIsOpen={setIsOpen}
+        />
+      ),
+    [
+      isOpen,
+      isDisabled,
+      isPending,
+      isSingleCredPending,
+      isReadOnlyCredential,
+      hasDanger,
+      label,
+      toggleLabel,
+      isSearchable,
+      fieldId,
+      value,
+      filterText,
+      placeholder,
+      onChange,
+      describedBy,
+    ]
   )
 
   return (
@@ -326,38 +432,38 @@ export function CredentialSelector({
         isOpen={isOpen}
         selected={value ?? NO_CREDENTIAL_VALUE}
         onSelect={handleSelect}
-        onOpenChange={setIsOpen}
+        onOpenChange={(open) => {
+          setIsOpen(open)
+          if (!open) setFilterText('')
+        }}
+        shouldFocusToggleOnSelect
         toggle={renderToggle}
       >
-        <SelectList aria-label={`${label} options`}>
-          <NoCredentialOption isRequired={isRequired} value={value} />
-          {allowCreate && (
-            <>
-              <SelectOption value={CREATE_NEW_VALUE} icon={<RhUiAddIcon />}>
-                Create new credential
-              </SelectOption>
-              <Divider />
-            </>
-          )}
-          {hasGroups
-            ? typeGroups.map((group) => (
-                <SelectGroup key={group.typeId} label={group.typeName.toUpperCase()}>
-                  {group.credentials.map(renderCredentialOption)}
-                </SelectGroup>
-              ))
-            : credentials.map(renderCredentialOption)}
-          {credentials.length === 0 && !isPending && !allowCreate && (
-            <SelectOption isDisabled value="__empty__">
-              {isError ? 'Failed to load credentials' : 'No credentials available'}
-            </SelectOption>
-          )}
-        </SelectList>
+        <CredentialOptions
+          label={label}
+          isRequired={isRequired}
+          value={value}
+          allowCreate={allowCreate}
+          typeGroups={typeGroups}
+          hasGroups={hasGroups}
+          isPending={isPending}
+          isError={isError}
+          filterText={filterText}
+          credentialCount={credentials.length}
+        />
       </SynSelect>
 
-      <FieldError message={errorMessage} />
-      <ReadOnlyCredentialWarning show={isReadOnlyCredential} />
+      <FormFieldError id={errorId} message={errorMessage} />
+      <ReadOnlyCredentialWarning id={warningId} show={isReadOnlyCredential} />
       {isError && (
-        <Button variant="link" size="sm" onClick={() => detachPromise(refetch())}>
+        <Button
+          variant="link"
+          size="sm"
+          onClick={() => {
+            detachPromise(refetch())
+            if (typesQuery.isError) detachPromise(typesQuery.refetch())
+          }}
+        >
           Retry loading credentials
         </Button>
       )}

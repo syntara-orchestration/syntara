@@ -177,19 +177,22 @@ function findActivityInCurrentWorkflow(activityId: string): Activity | undefined
 
 /** Renders the appropriate details component for a given node in edit mode. */
 function renderEditModeContent(params: {
+  workflowId?: string | null
   node: Node<NodeType['data']>
   currentWorkflow: ReturnType<typeof selectCurrentWorkflow>
   onClose: () => void
   onHeaderContentChange: (content: ReactNode | null) => void
   projectId?: string
 }): ReactNode {
-  const { node, currentWorkflow, onClose, onHeaderContentChange, projectId } = params
+  const { node, currentWorkflow, onClose, onHeaderContentChange, projectId, workflowId } = params
   if (node.type === FlowNodeType.TRIGGER) {
     const triggerIdx = parseTriggerIndex(node.id) ?? 0
     const trigger = currentWorkflow?.triggers?.[triggerIdx]
     if (trigger) {
       return (
         <TriggerNodeDetails
+          workflowId={workflowId}
+          projectId={projectId}
           trigger={trigger}
           triggerIndex={triggerIdx}
           onClose={onClose}
@@ -460,6 +463,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
 
       return (
         <FormComponent
+          workflowId={workflowId}
           {...subtypeFormProps}
           initialData={initialData}
           submitButtonText={submitButtonText}
@@ -475,6 +479,7 @@ export function NodeDetailsPanel(props: NodeDetailsPanelProps) {
     return (
       <Flex key={node.id} direction={{ default: 'column' }} style={{ height: '100%', minHeight: 0 }}>
         {renderEditModeContent({
+          workflowId,
           node,
           currentWorkflow,
           onClose,

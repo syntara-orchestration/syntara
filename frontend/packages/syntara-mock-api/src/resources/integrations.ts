@@ -11,6 +11,24 @@ const MOCK_USER_1_REF = { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'use
 
 export const integrations: IntegrationRead[] = [
   {
+    id: '11111111-1111-4111-8111-111111111111',
+    name: 'Orders Kafka',
+    integration_type: IntegrationTypeEnum.KAFKA,
+    enabled: true,
+    validation_status: IntegrationStatusEnum.AVAILABLE,
+    scope: 'global',
+    configuration: null,
+    kafka_configuration: {
+      integration_type: IntegrationTypeEnum.KAFKA,
+      bootstrap_servers: ['kafka.example.com:9093'],
+      sasl_mechanism: 'SCRAM-SHA-256',
+    },
+    management_credential_id: null,
+    created_at: mockDate.now,
+    updated_at: mockDate.now,
+    labels: {},
+  },
+  {
     id: '1',
     name: 'GitHub Copilot',
     description: 'GitHub Copilot MCP integration',

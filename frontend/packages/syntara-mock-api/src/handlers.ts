@@ -1245,6 +1245,62 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
+  http.post('/api/v1/workflows/:workflowId/event_subscriptions/test', async ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (username === 'viewer' || username === 'auditor') {
+      return HttpResponse.json(
+        { title: 'Permission denied', detail: 'Workflow update permission is required.' },
+        { status: 403 }
+      )
+    }
+    const workflow = workflows.find((item) => item.id === params.workflowId)
+    if (!workflow) return HttpResponse.json({ title: 'Workflow not found' }, { status: 404 })
+    const body: unknown = await request.json()
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      !('integration_id' in body) ||
+      !('credential_id' in body) ||
+      !('topic' in body)
+    ) {
+      return HttpResponse.json({ title: 'Invalid subscription parameters' }, { status: 422 })
+    }
+    const integration = integrations.find(
+      (item) => item.id === body.integration_id && item.integration_type === IntegrationTypeEnum.KAFKA && item.enabled
+    )
+    const credential = credentials.find(
+      (item) =>
+        item.id === body.credential_id &&
+        item.enabled &&
+        item.credential_type_id === 'ctype-kafka' &&
+        item.project_id === workflow.project_id
+    )
+    if (
+      !integration ||
+      !credential ||
+      typeof body.topic !== 'string' ||
+      !/^[a-zA-Z0-9._-]{1,249}$/.test(body.topic) ||
+      ['.', '..'].includes(body.topic)
+    ) {
+      return HttpResponse.json(
+        {
+          title: 'Invalid Kafka binding',
+          detail: 'Select an available Integration, compatible credential and exact topic.',
+        },
+        { status: 422 }
+      )
+    }
+    const result: WorkflowAPI.components['schemas']['EventSubscriptionTestResponse'] = {
+      success: true,
+      checked_at: mockDate.now,
+      connection: 'verified',
+      topic_metadata: 'verified',
+      topic_read: 'unverified',
+      group_access: 'unverified',
+    }
+    return HttpResponse.json(result)
+  }),
+
   http.post('/api/v1/workflows/:workflowId/test', async ({ request, params }) => {
     const workflowId = params.workflowId as string
     const workflow = workflows.find((w) => w.id === workflowId)

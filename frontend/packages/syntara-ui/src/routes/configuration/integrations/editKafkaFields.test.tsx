@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useForm, type UseFormReturn } from 'react-hook-form'
 import { describe, expect, it } from 'vitest'
@@ -70,6 +70,8 @@ describe('EditKafkaFields', () => {
 
     const brokers = screen.getByRole('textbox', { name: 'Bootstrap servers' })
     expect(screen.getByText('At least one bootstrap server is required')).toBeInTheDocument()
+    expect(brokers).toHaveAttribute('aria-invalid', 'true')
+    expect(brokers).toHaveAccessibleDescription(/At least one bootstrap server is required/)
 
     await user.type(brokers, 'broker.example.com:9093')
     expect(brokers).toHaveValue('broker.example.com:9093')
@@ -85,6 +87,7 @@ describe('EditKafkaFields', () => {
     await user.click(screen.getByText('SCRAM-SHA-256'))
     await user.click(screen.getByRole('option', { name: 'PLAIN' }))
 
+    await waitFor(() => expect(screen.queryByRole('option', { name: 'PLAIN' })).not.toBeInTheDocument())
     expect(screen.getByRole('button', { name: 'PLAIN' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'PLAIN' })).toHaveAttribute('aria-expanded', 'false')
   })

@@ -9,6 +9,17 @@ vi.mock('../../../../utils/triggerNodeIds', () => ({
 }))
 
 describe('getTriggerInputSchemaFields', () => {
+  it('exposes the Kafka envelope instead of flattening payload properties into the trigger namespace', () => {
+    const fields = getTriggerInputSchemaFields('subscribe', [
+      {
+        id: 'subscribe',
+        type: 'event_subscribe_trigger',
+        parameters: { input_schema: { properties: { order_id: { type: 'string' } } } },
+      },
+    ])
+    expect(fields?.map((field) => field.name)).toEqual(['envelope_version', 'payload', 'original', 'metadata'])
+  })
+
   it('returns null when triggersList is undefined', () => {
     expect(getTriggerInputSchemaFields('trigger-1', undefined)).toBeNull()
   })

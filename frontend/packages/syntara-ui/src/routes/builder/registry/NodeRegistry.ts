@@ -12,6 +12,7 @@ export type BaseNodeFormProps<TData = unknown> = {
   submitButtonText?: string
   onHeaderContentChange?: (content: ReactNode | null) => void
   projectId?: string
+  workflowId?: string | null
 }
 
 export type NodeSubtypeDefinition<TFormData = unknown> = {

@@ -33,7 +33,8 @@
     "gen:local:role-assignments": "openapi-typescript ../../../backend/src/syntara/schemas/authz/role_assignment.openapi.yaml --output ./src/role-assignments-api.ts --default-non-nullable false",
     "gen:local:service-accounts": "openapi-typescript ../../../backend/src/syntara/schemas/service_accounts/openapi.yaml --output ./src/service-accounts-api.ts --default-non-nullable false",
     "sync-examples": "cp -r ../../../backend/tests/integration/workflows/examples ../syntara-mock-api/src",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "gen:kafka-prerequisites": "node scripts/generate-kafka-prerequisite-contracts.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

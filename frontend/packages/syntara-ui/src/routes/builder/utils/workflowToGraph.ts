@@ -114,6 +114,12 @@ export function getTriggerDisplayData(trigger: Trigger): { name: string; details
     case TriggerTypeEnum.WEBHOOK_TRIGGER:
       details = getWebhookStyleDetails(trigger.parameters, 'Webhook')
       break
+    case TriggerTypeEnum.EVENT_SUBSCRIBE:
+      details =
+        typeof trigger.parameters?.topic === 'string' && trigger.parameters.topic
+          ? `Topic: ${trigger.parameters.topic}`
+          : null
+      break
     case TriggerTypeEnum.EDA_TRIGGER:
       details = getWebhookStyleDetails(trigger.parameters, 'EDA')
       break

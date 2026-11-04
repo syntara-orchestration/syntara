@@ -35,6 +35,23 @@ function typeInjectors(extra_vars: Record<string, string>) {
 
 export const credentialTypes: CredentialTypeRead[] = [
   {
+    id: 'ctype-kafka',
+    name: 'Kafka',
+    description: 'Kafka SASL authentication',
+    managed: true,
+    inputs: typeInputs(
+      [
+        { id: 'username', label: 'Username', type: 'string' },
+        { id: 'password', label: 'Password', type: 'string', secret: true },
+      ],
+      ['username', 'password']
+    ),
+    injectors: typeInjectors({ username: '{{username}}', password: '{{password}}' }),
+    created_at: '2026-06-15T10:00:00.000Z',
+    updated_at: '2026-06-15T10:00:00.000Z',
+    labels: {},
+  },
+  {
     id: 'ctype-bearer',
     name: 'HTTP Bearer Token',
     description: 'Bearer token authentication for HTTP APIs',
@@ -220,6 +237,17 @@ export const credentialWorkflows: Record<string, CredentialWorkflowRef[]> = {
 
 /** TODO: Revert to CredentialRead[] once project_id is added to the OpenAPI spec */
 export const credentials: (CredentialRead & { project_id?: string })[] = [
+  {
+    id: '22222222-2222-4222-8222-222222222222',
+    name: 'Orders Kafka runtime',
+    credential_type_id: 'ctype-kafka',
+    inputs: { username: 'orders-consumer', password: '$encrypted$' },
+    enabled: true,
+    project_id: 'p-001',
+    created_at: '2026-06-15T10:00:00.000Z',
+    updated_at: '2026-06-15T10:00:00.000Z',
+    labels: {},
+  },
   {
     id: 'cred-001',
     name: 'Production API Auth',
