@@ -111,6 +111,15 @@ class SubWorkflowSetupActivity:
             msg = f"Invalid workflow_id format: {child_workflow_id_str}"
             raise ApplicationError(msg, type="ConfigError", non_retryable=True) from None
 
+        # The effective actor must be a valid UUID. A schedule/webhook/event start
+        # may not carry one; raise a non-retryable config error rather than letting
+        # UUID() raise ValueError and be retried 3x as a transient activity failure.
+        try:
+            created_by_uuid = UUID(created_by_user_id)
+        except (ValueError, TypeError):
+            msg = "Sub-workflow invocation is missing a valid created_by_user_id"
+            raise ApplicationError(msg, type="ConfigError", non_retryable=True) from None
+
         # parent_node_id is the canvas node identity, kept for lineage metadata;
         # invocation_node_id is the iteration-aware identity used only here so that
         # distinct for_each iterations derive distinct child executions.
@@ -127,6 +136,7 @@ class SubWorkflowSetupActivity:
             parent_execution_id=parent_execution_id,
             parent_node_id=parent_node_id,
             created_by_user_id=created_by_user_id,
+            created_by_uuid=created_by_uuid,
             current_depth=current_depth,
         )
 
@@ -141,6 +151,7 @@ class SubWorkflowSetupActivity:
         parent_execution_id: str,
         parent_node_id: str,
         created_by_user_id: str,
+        created_by_uuid: UUID,
         current_depth: int,
     ) -> dict[str, Any]:
         from sqlmodel import select  # noqa: PLC0415
@@ -242,8 +253,8 @@ class SubWorkflowSetupActivity:
                 trigger_node_id=trigger_node_id,
                 trigger_type=ActivityName.SUBWORKFLOW_TRIGGER.value,
                 interface=None,
-                created_by=UUID(created_by_user_id),
-                updated_by=UUID(created_by_user_id),
+                created_by=created_by_uuid,
+                updated_by=created_by_uuid,
                 execution_metadata={
                     "trigger_type": ActivityName.SUBWORKFLOW_TRIGGER,
                     "parent_execution_id": parent_execution_id,
