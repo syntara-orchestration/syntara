@@ -249,6 +249,11 @@ class MCPProvider(ToolProviderAdapter):
         Returns raw BaseTools for use in Agent Orchestrator without
         converting to Tool domain models.
 
+        Retries on timeout for the same reason as ``validate_connection()``:
+        the streamable-http transport in FastMCP has a known race condition
+        where the SSE stream handler can fail intermittently, which manifests
+        as a timeout on the client side.
+
         Returns:
             list[BaseTool]: Raw LangChain tools from provider
 
@@ -258,36 +263,57 @@ class MCPProvider(ToolProviderAdapter):
             ConnectionError: If unable to communicate with provider
 
         """
+        max_attempts = 3
         timeout = 30  # Default timeout for tool retrieval
 
-        try:
-            logger.info("Retrieving base tools from MCP provider", integration_name=self.integration_name)
+        logger.info("Retrieving base tools from MCP provider", integration_name=self.integration_name)
 
-            client = await self._get_client()
+        last_timeout_error: TimeoutError | None = None
 
-            # Get tools from MCP server
-            langchain_tools: list[BaseTool] = await asyncio.wait_for(client.get_tools(), timeout=timeout)
+        for attempt in range(1, max_attempts + 1):
+            if attempt > 1:
+                # Reset client so each retry starts with a fresh MCP session
+                self._client = None
 
-            logger.info(
-                "Successfully retrieved base tools from MCP provider",
-                tool_count=len(langchain_tools),
-                integration_name=self.integration_name,
-            )
-            return langchain_tools
+            try:
+                client = await self._get_client()
 
-        except TimeoutError as e:
-            msg = f"Tool retrieval timed out after {timeout}s"
-            logger.warning(
-                "MCP provider tool retrieval timed out",
-                integration_name=self.integration_name,
-                message=msg,
-                timeout_seconds=timeout,
-            )
-            raise TimeoutError(msg) from e
-        except Exception as e:
-            msg = f"Tool retrieval failed: {e}"
-            logger.exception("MCP provider tool retrieval failed", integration_name=self.integration_name, message=msg)
-            raise ConnectionError(msg) from e
+                # Get tools from MCP server
+                langchain_tools: list[BaseTool] = await asyncio.wait_for(client.get_tools(), timeout=timeout)
+            except TimeoutError as e:
+                last_timeout_error = e
+                if attempt < max_attempts:
+                    logger.warning(
+                        "MCP provider tool retrieval timed out, retrying",
+                        integration_name=self.integration_name,
+                        attempt=attempt,
+                        max_attempts=max_attempts,
+                        timeout_seconds=timeout,
+                    )
+                    continue
+                break
+            except Exception as e:
+                msg = f"Tool retrieval failed: {e}"
+                logger.exception(
+                    "MCP provider tool retrieval failed", integration_name=self.integration_name, message=msg
+                )
+                raise ConnectionError(msg) from e
+            else:
+                logger.info(
+                    "Successfully retrieved base tools from MCP provider",
+                    tool_count=len(langchain_tools),
+                    integration_name=self.integration_name,
+                )
+                return langchain_tools
+
+        msg = f"Tool retrieval timed out after {timeout}s"
+        logger.warning(
+            "MCP provider tool retrieval timed out",
+            integration_name=self.integration_name,
+            message=msg,
+            timeout_seconds=timeout,
+        )
+        raise TimeoutError(msg) from last_timeout_error
 
     async def refresh_tools(self) -> list[Tool]:
         """Refresh and discover tools from the MCP server.
