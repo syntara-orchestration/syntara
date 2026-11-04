@@ -1,5 +1,5 @@
 import { Button, EmptyState, EmptyStateBody, EmptyStateActions, EmptyStateFooter } from '@patternfly/react-core'
-import { PlusCircleIcon, RhUiAddIcon } from '@patternfly/react-icons'
+import { RhUiAddCircleIcon, RhUiAddIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 
 import { SynEmptyStateImageIcon } from './SynEmptyStateImageIcon'
@@ -33,7 +33,9 @@ export function SynEmptyStateNoData(props: SynEmptyStateNoDataProps) {
   const defaultButtonText = 'Add data'
 
   // Use custom image component if provided, otherwise use default icon
-  const icon = imageSrc ? () => <SynEmptyStateImageIcon src={imageSrc} alt={imageAlt ?? 'No data'} /> : PlusCircleIcon
+  const icon = imageSrc
+    ? () => <SynEmptyStateImageIcon src={imageSrc} alt={imageAlt ?? 'No data'} />
+    : RhUiAddCircleIcon
 
   return (
     <EmptyState headingLevel="h2" titleText={title ?? defaultTitle} icon={icon} isFullHeight>

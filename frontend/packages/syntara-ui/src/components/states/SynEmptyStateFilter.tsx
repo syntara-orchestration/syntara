@@ -1,5 +1,5 @@
 import { Button, EmptyState, EmptyStateBody, EmptyStateActions, EmptyStateFooter } from '@patternfly/react-core'
-import { SearchIcon } from '@patternfly/react-icons'
+import { RhUiSearchIcon } from '@patternfly/react-icons'
 
 import { SynEmptyStateImageIcon } from './SynEmptyStateImageIcon'
 
@@ -30,7 +30,9 @@ export function SynEmptyStateFilter(props: SynEmptyStateFilterProps) {
   const defaultButtonText = 'Clear all filters'
 
   // Use custom image component if provided, otherwise use default icon
-  const icon = imageSrc ? () => <SynEmptyStateImageIcon src={imageSrc} alt={imageAlt ?? 'No results'} /> : SearchIcon
+  const icon = imageSrc
+    ? () => <SynEmptyStateImageIcon src={imageSrc} alt={imageAlt ?? 'No results'} />
+    : RhUiSearchIcon
 
   return (
     <EmptyState headingLevel="h2" titleText={title ?? defaultTitle} icon={icon} isFullHeight>

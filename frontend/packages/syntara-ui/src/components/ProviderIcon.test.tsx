@@ -10,9 +10,9 @@ describe('ProviderIcon', () => {
     expect(screen.getByRole('img', { hidden: true })).toBeInTheDocument()
   })
 
-  it('renders globe icon fallback when no idpType is provided', () => {
+  it('renders network icon fallback when no idpType is provided', () => {
     render(<ProviderIcon name="Okta SSO" />)
-    expect(screen.getByTestId('globe-icon')).toBeInTheDocument()
+    expect(screen.getByTestId('network-icon')).toBeInTheDocument()
   })
 
   it('renders no icon for custom idpType', () => {
@@ -20,9 +20,9 @@ describe('ProviderIcon', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('renders globe icon for unknown provider', () => {
+  it('renders network icon for unknown provider', () => {
     render(<ProviderIcon name="custom-idp" />)
-    expect(screen.getByTestId('globe-icon')).toBeInTheDocument()
+    expect(screen.getByTestId('network-icon')).toBeInTheDocument()
   })
 
   it('has no accessibility violations with icon', async () => {
