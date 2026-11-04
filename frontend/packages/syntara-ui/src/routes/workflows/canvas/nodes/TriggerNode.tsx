@@ -46,15 +46,15 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
   const iconColor = getStepTypeColor(FlowNodeType.TRIGGER)
   const iconNode = renderStepIcon(metadata.icon, iconId, 'header', iconColor)
   const semanticZoomIcon = renderStepIcon(metadata.icon, iconId, 'semanticZoom', iconColor)
-  // 75px is a layout constraint for the left pill shape. No semantic token applies.
+  // 45px left pill radius per canvas step QoL prototype. No semantic token applies.
   // High contrast draws the panel edge on ::before from --pf-v6-c-panel--BorderRadius.
   // Corner longhands alone leave that edge on the default radius.
   const triggerStyle = {
-    borderTopLeftRadius: '75px',
-    borderBottomLeftRadius: '75px',
+    borderTopLeftRadius: '45px',
+    borderBottomLeftRadius: '45px',
     paddingLeft: 'var(--pf-t--global--spacer--lg)',
     '--pf-v6-c-panel--BorderRadius':
-      '75px var(--pf-t--global--border--radius--medium) var(--pf-t--global--border--radius--medium) 75px',
+      '45px var(--pf-t--global--border--radius--medium) var(--pf-t--global--border--radius--medium) 45px',
   } as CSSProperties
 
   const triggerIndex = parseTriggerIndex(props.id) ?? 0

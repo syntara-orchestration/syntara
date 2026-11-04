@@ -76,10 +76,10 @@ describe('TriggerStepComponent', () => {
     render(<TriggerStepComponent {...createNodeProps()} />)
 
     expect(screen.getByTestId('trigger-step')).toHaveStyle({
-      borderTopLeftRadius: '75px',
-      borderBottomLeftRadius: '75px',
+      borderTopLeftRadius: '45px',
+      borderBottomLeftRadius: '45px',
       '--pf-v6-c-panel--BorderRadius':
-        '75px var(--pf-t--global--border--radius--medium) var(--pf-t--global--border--radius--medium) 75px',
+        '45px var(--pf-t--global--border--radius--medium) var(--pf-t--global--border--radius--medium) 45px',
     })
   })
 
