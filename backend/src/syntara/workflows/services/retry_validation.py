@@ -1,4 +1,4 @@
-"""Pre-retry validation for retry-from-failure (AAP-92820).
+"""Pre-retry validation for retry-from-failure.
 
   Shared by ``GET /executions/{id}/retry-from-failure-preview`` (pure verdict,
   no state mutation, reports the default or requested selection) and
@@ -20,7 +20,7 @@ Validation is a chain of checks:
    workflow version captured when the original run started
    (``source.workflow_version_id``). There is no comparison against the
    currently saved definition and no diffing — later edits never affect a
-   retry (SDP ANSTRAT-1779 R9/R10). Rejected only if that version no longer
+   retry (R9/R10). Rejected only if that version no longer
    exists, or a selected id is not a node in it.
 5. **Sanitized-output guard** — persisted ``output_data`` is credential-scrubbed
    on write while the live run consumed raw values. Redacted *field paths*
@@ -40,7 +40,7 @@ Validation is a chain of checks:
    output, not chosen by the caller. A failed node that the caller excluded from
    this retry is rejected too, since the override would be silently discarded.
    Overrides are validated here but never applied: the engine applies them at
-   dispatch (AAP-92821). An override replaces the value the node would
+   dispatch. An override replaces the value the node would
    otherwise receive, after upstream outputs are injected.
 
     For an **explicit** selection, a sanitized dependency always rejects. For
@@ -61,10 +61,10 @@ Validation is a chain of checks:
     eligible point.
 
 
-Design decisions (SDP ANSTRAT-1779, aligned 2026-09-24):
+Design decisions (aligned 2026-09-24):
 
 - Loop-iteration activities (``<node>#iter-<n>``) normalize to their base node
-  id for eligibility; iteration-level classification is AAP-92821's job.
+  id for eligibility; iteration-level classification is the engine's job.
 - An empty failure-point selection means "all currently failed nodes"
   (SDP R11/AC-15) — not an error. A non-empty selection means exactly those
   nodes. Rejected only if there are no failed nodes at all to default to.
@@ -554,7 +554,7 @@ async def validate_retry_from_failure(
 
     ``input_parameter_overrides`` is validated, never applied: this layer only
     decides whether the retry may proceed with them (SDP AC-14/R10c). The engine
-    applies them at dispatch (AAP-92821).
+    applies them at dispatch.
 
     Raises:
         ExecutionNotFoundError: If the source execution is gone.
@@ -599,7 +599,7 @@ async def validate_retry_from_failure(
         )
     ).all()
     # Per-iteration outputs keyed by base node id: any tainted iteration taints
-    # the node (iteration-level classification is AAP-92821's job; validation
+    # the node (iteration-level classification is the engine's job; validation
     # stays fail-closed at base-id granularity rather than last-write-wins).
     completed_outputs: dict[str, list[Any]] = {}
     for activity in completed:
