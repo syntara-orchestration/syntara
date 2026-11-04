@@ -189,7 +189,7 @@ export default tseslint.config(
     ignores: ['**/hooks/routing/*.{ts,tsx}', '**/hooks/routing/*.test.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
-        'warn',
+        'error',
         {
           ...SHARED_RESTRICTED_IMPORT_OPTIONS,
         },
@@ -363,7 +363,7 @@ export default tseslint.config(
       'reactYouMightNotNeedAnEffect/no-chain-state-updates': 'warn',
       'reactYouMightNotNeedAnEffect/no-event-handler': 'warn',
       'reactYouMightNotNeedAnEffect/no-adjust-state-on-prop-change': 'warn',
-      'reactYouMightNotNeedAnEffect/no-reset-all-state-on-prop-change': 'warn',
+      'reactYouMightNotNeedAnEffect/no-reset-all-state-on-prop-change': 'error',
       'reactYouMightNotNeedAnEffect/no-pass-live-state-to-parent': 'warn',
       'reactYouMightNotNeedAnEffect/no-pass-data-to-parent': 'warn',
       'reactYouMightNotNeedAnEffect/no-initialize-state': 'warn',
@@ -497,7 +497,7 @@ export default tseslint.config(
       'testing-library/no-debugging-utils': 'error',
       // Prefer userEvent over fireEvent for realistic user interaction simulation
       'testing-library/prefer-user-event': 'error',
-      'testing-library/no-container': 'warn',
+      'testing-library/no-container': 'error',
       'testing-library/no-node-access': 'error',
     },
   },
