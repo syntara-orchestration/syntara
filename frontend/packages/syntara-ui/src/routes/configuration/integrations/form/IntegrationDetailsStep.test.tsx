@@ -1,5 +1,5 @@
 import { IntegrationTypeEnum, LLMProviderHintEnum } from '@syntara/contracts'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useCallback } from 'react'
 import { useForm } from 'react-hook-form'
@@ -481,6 +481,7 @@ describe('IntegrationDetailsStep', () => {
       await user.click(screen.getByText('SCRAM-SHA-256'))
       await user.click(screen.getByRole('option', { name: 'SCRAM-SHA-512' }))
 
+      await waitFor(() => expect(screen.queryByRole('option', { name: 'SCRAM-SHA-512' })).not.toBeInTheDocument())
       expect(screen.getByRole('button', { name: 'SCRAM-SHA-512' })).toBeInTheDocument()
     })
   })

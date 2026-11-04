@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
@@ -17,6 +17,7 @@ from sqlalchemy import event, func, update
 from sqlalchemy.exc import OperationalError
 from sqlmodel import col, select
 
+from syntara.core.constants import EventDeliveryDefaults
 from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
@@ -367,7 +368,7 @@ async def test_evidence_mismatch_is_parked_and_releases_claim(scheduling_context
         assert row.frozen_binding == context.prepared.claim.binding
         assert row.scheduling_failure_count == 1
         assert row.last_error_code == SchedulingFailureCode.EVIDENCE_MISMATCH.value
-        assert row.next_attempt_at.replace(tzinfo=UTC) == datetime.max.replace(tzinfo=UTC)
+        assert row.next_attempt_at == EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT
         assert row.claim_token is row.owner_worker_id is row.lease_until is None
         assert execution.input_data == {"mismatching": True}
         assert execution.execution_metadata["event_delivery"]["scheduling_state"] == "prepared"
@@ -424,8 +425,8 @@ async def test_permanent_temporal_failure_waits_for_correction(scheduling_contex
         assert row.attempt_count == (0 if phase == "namespace" else 1)
         assert row.scheduling_failure_count == 1
         assert row.last_error_code == code.value
-        blocked_until = datetime.max.replace(tzinfo=UTC)
-        assert row.next_attempt_at.replace(tzinfo=UTC) == blocked_until
+        blocked_until = EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT
+        assert row.next_attempt_at == blocked_until
         assert row.claim_token is None
         assert execution.execution_metadata["event_delivery"]["last_error_code"] == code.value
         assert execution.execution_metadata["event_delivery"]["next_attempt_at"] == blocked_until.isoformat()

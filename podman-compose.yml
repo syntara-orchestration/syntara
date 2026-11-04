@@ -445,6 +445,8 @@ services:
       - APP_EVENT_DELIVERY_CACHE_TIMEOUT_SECONDS=${APP_EVENT_DELIVERY_CACHE_TIMEOUT_SECONDS:-1}
       - APP_EVENT_DELIVERY_CACHE_SKEW_SECONDS=${APP_EVENT_DELIVERY_CACHE_SKEW_SECONDS:-1}
     volumes:
+      # Match the other local workers; restart the process after Python source edits.
+      - ./backend/src:/opt/app-root/src/src:z
       - ./backend/.secrets/jwt-primary.pem:/run/secrets/jwt-primary.pem:ro,z
       - ./backend/.secrets/jwt-backup.pem:/run/secrets/jwt-backup.pem:ro,z
       - ./backend/.secrets/encryption-key:/run/secrets/encryption-key:ro,z

@@ -14,8 +14,8 @@ type NodeFormTabsLayoutProps = {
 }
 
 export function NodeFormTabsLayout({ parametersContent, settingsContent, hideSettingsTab }: NodeFormTabsLayoutProps) {
+  const contentId = useId()
   const [activeTabKey, setActiveTabKey] = useState<number>(0)
-  const panelId = useId()
   const tabBarAction = useNodeFormTabBar()
 
   return (
@@ -24,9 +24,9 @@ export function NodeFormTabsLayout({ parametersContent, settingsContent, hideSet
         <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
           <FlexItem>
             <Tabs activeKey={activeTabKey} onSelect={(_event, key) => setActiveTabKey(Number(key))}>
-              <Tab eventKey={0} title="Parameters" tabContentId={`${panelId}-parameters`} />
+              <Tab eventKey={0} title="Parameters" tabContentId={`${contentId}-parameters`} />
               {!hideSettingsTab && settingsContent !== undefined && (
-                <Tab eventKey={1} title="Settings" tabContentId={`${panelId}-settings`} />
+                <Tab eventKey={1} title="Settings" tabContentId={`${contentId}-settings`} />
               )}
             </Tabs>
           </FlexItem>
@@ -36,12 +36,12 @@ export function NodeFormTabsLayout({ parametersContent, settingsContent, hideSet
       <SynPageBody>
         <Stack hasGutter>
           <StackItem>
-            <TabContent id={`${panelId}-parameters`} aria-label="Parameters" hidden={activeTabKey !== 0}>
-              {activeTabKey === 0 ? parametersContent : []}
+            <TabContent id={`${contentId}-parameters`} eventKey={0} activeKey={activeTabKey} aria-label="Parameters">
+              {activeTabKey === 0 && parametersContent}
             </TabContent>
             {!hideSettingsTab && settingsContent !== undefined && (
-              <TabContent id={`${panelId}-settings`} aria-label="Settings" hidden={activeTabKey !== 1}>
-                {activeTabKey === 1 ? settingsContent : []}
+              <TabContent id={`${contentId}-settings`} eventKey={1} activeKey={activeTabKey} aria-label="Settings">
+                {activeTabKey === 1 && settingsContent}
               </TabContent>
             )}
           </StackItem>

@@ -1,4 +1,4 @@
-import type { Activity } from '@syntara/contracts'
+import { TriggerTypeEnum, type Activity } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import type { EdgeConnection } from '../../../types/edge'
@@ -23,6 +23,82 @@ function makeTriggerWithInputs(fields: string[]): Activity {
 }
 
 describe('validateVariableReferences', () => {
+  describe('Kafka envelope and payload schema', () => {
+    const kafka = makeActivity({
+      id: 'kafka',
+      type: TriggerTypeEnum.EVENT_SUBSCRIBE,
+      parameters: {
+        input_schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            order_id: { type: 'string' },
+            customer: { type: 'object', additionalProperties: false, properties: { name: { type: 'string' } } },
+          },
+        },
+      },
+    })
+    it.each(['payload.order_id', 'payload.customer.name', 'metadata.topic', 'original', 'envelope_version'])(
+      'accepts trigger.%s',
+      (path) => {
+        const step = makeActivity({ id: 'step', type: 'script', parameters: { code: `echo \${trigger.${path}}` } })
+        expect(validateVariableReferences([step], [], { triggers: [kafka] })).toEqual([])
+      }
+    )
+    it.each(['order_id', 'payload.missing', 'payload.customer.missing'])('rejects trigger.%s', (path) => {
+      const step = makeActivity({ id: 'step', type: 'script', parameters: { code: `echo \${trigger.${path}}` } })
+      expect(validateVariableReferences([step], [], { triggers: [kafka] })).toHaveLength(1)
+    })
+    it('allows an unconstrained payload when schema is omitted', () => {
+      const step = makeActivity({ id: 'step', type: 'script', parameters: { code: '${trigger.payload.anything}' } })
+      expect(validateVariableReferences([step], [], { triggers: [{ ...kafka, parameters: {} }] })).toEqual([])
+    })
+    it.each([
+      { schema: { properties: {} }, path: 'other', allowed: true },
+      { schema: { properties: {}, additionalProperties: true }, path: 'other', allowed: true },
+      { schema: { properties: {}, additionalProperties: false }, path: 'other', allowed: false },
+      { schema: { additionalProperties: false }, path: 'other', allowed: false },
+      { schema: { additionalProperties: true }, path: 'other.nested', allowed: true },
+      { schema: { additionalProperties: {} }, path: 'other.nested', allowed: true },
+      {
+        schema: {
+          properties: {},
+          additionalProperties: { properties: { name: { type: 'string' } }, additionalProperties: false },
+        },
+        path: 'other.name',
+        allowed: true,
+      },
+      {
+        schema: {
+          properties: {},
+          additionalProperties: { properties: { name: { type: 'string' } }, additionalProperties: false },
+        },
+        path: 'other.missing',
+        allowed: false,
+      },
+      {
+        schema: { properties: { customer: { properties: { name: { type: 'string' } } } } },
+        path: 'customer.other',
+        allowed: true,
+      },
+      { schema: { properties: { forbidden: false } }, path: 'forbidden', allowed: false },
+    ])('validates payload.$path against additional properties ($allowed)', ({ schema, path, allowed }) => {
+      const step = makeActivity({
+        id: 'step',
+        type: 'script',
+        parameters: { code: `echo \${trigger.payload.${path}}` },
+      })
+      const trigger = { ...kafka, parameters: { input_schema: { type: 'object', ...schema } } }
+      expect(validateVariableReferences([step], [], { triggers: [trigger] })).toHaveLength(allowed ? 0 : 1)
+    })
+    it('keeps manual fields available in mixed-trigger workflows', () => {
+      const step = makeActivity({ id: 'step', type: 'script', parameters: { code: '${trigger.order_id}' } })
+      expect(
+        validateVariableReferences([step], [], { triggers: [kafka, makeTriggerWithInputs(['order_id'])] })
+      ).toEqual([])
+    })
+  })
+
   describe('unknown names (same rule as missing nodes)', () => {
     it.each(['input', 'inputs', 'variables'])(
       'errors on ${%s.*} when no node has that id, even if the field exists on the trigger schema',

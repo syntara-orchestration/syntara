@@ -31,6 +31,9 @@ const triggerFormSchemaBase = z.object({
     .optional(),
   inputSchema: z.string().optional(),
   webhookPath: z.string().optional(),
+  integrationId: z.string().optional(),
+  runtimeCredentialId: z.string().optional(),
+  topic: z.string().optional(),
   authorizedServiceAccountIds: z.array(z.string().uuid()).optional(),
 })
 
@@ -111,12 +114,41 @@ function validateCronFormat(cron: string | undefined, ctx: z.RefinementCtx) {
   }
 }
 
+function validateKafkaSubscribe(data: z.infer<typeof triggerFormSchemaBase>, ctx: z.RefinementCtx) {
+  if (data.integrationId && !z.string().uuid().safeParse(data.integrationId).success) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Select a Kafka Integration', path: ['integrationId'] })
+  }
+  if (data.runtimeCredentialId && !z.string().uuid().safeParse(data.runtimeCredentialId).success) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Select a valid runtime credential',
+      path: ['runtimeCredentialId'],
+    })
+  }
+  if (
+    data.topic &&
+    (data.topic.length > 249 || !/^[a-zA-Z0-9._-]+$/.test(data.topic) || ['.', '..'].includes(data.topic))
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Enter one exact Kafka topic (1–249 letters, numbers, dots, underscores, or hyphens)',
+      path: ['topic'],
+    })
+  }
+}
+
 export const AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE = 'At least one authorized service account is required'
 
 export const triggerFormSchema = triggerFormSchemaBase.superRefine((data, ctx) => {
-  if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER || WEBHOOK_TRIGGER_TYPES.has(data.triggerType)) {
+  if (
+    data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER ||
+    data.triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE ||
+    WEBHOOK_TRIGGER_TYPES.has(data.triggerType)
+  ) {
     validateInputSchemaJson(data.inputSchema, ctx)
   }
+
+  if (data.triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE) validateKafkaSubscribe(data, ctx)
 
   if (data.triggerType === TriggerTypeEnum.SCHEDULED && data.scheduleType === ScheduleTypeEnum.INTERVAL) {
     if (!data.interval?.trim()) {

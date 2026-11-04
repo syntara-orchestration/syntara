@@ -125,6 +125,20 @@ describe('TypeaheadMenuToggle', () => {
       await user.click(screen.getByRole('button', { name: 'Clear filter' }))
       expect(onFilterChange).toHaveBeenCalledWith('')
     })
+
+    it('clears the filter without toggling the menu and returns focus to the input', async () => {
+      const onFilterChange = vi.fn()
+      const onToggle = vi.fn()
+      const user = userEvent.setup()
+      renderToggle({ isOpen: true, filterText: 'search', onFilterChange, onToggle })
+
+      await user.click(screen.getByRole('button', { name: 'Clear filter' }))
+
+      expect(onFilterChange).toHaveBeenCalledWith('')
+      expect(onToggle).not.toHaveBeenCalled()
+      expect(screen.getByRole('textbox', { name: 'Select item' })).toHaveFocus()
+      expect(screen.getByRole('button', { name: 'Select item' })).toHaveAttribute('aria-expanded', 'true')
+    })
   })
 
   describe('clear selection button', () => {

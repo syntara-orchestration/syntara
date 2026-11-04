@@ -18,7 +18,10 @@ from referencing.jsonschema import DRAFT202012
 
 from syntara.core.constants import JsonbLimits
 from syntara.core.exceptions import SafeValueError
-from syntara.eventstreams.adapters.subscribe_parameters import validate_event_subscribe_parameters
+from syntara.eventstreams.adapters.subscribe_parameters import (
+    validate_event_subscribe_draft_parameters,
+    validate_event_subscribe_parameters,
+)
 from syntara.schemas import SCHEMA_DIR
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.models.validation_finding import (
@@ -502,6 +505,8 @@ def collect_scheduled_trigger_config_findings(
 
 def collect_event_subscribe_config_findings(
     workflow_definition: dict[str, Any],
+    *,
+    allow_incomplete: bool = False,
 ) -> list[ValidationFinding]:
     """Validate literal Subscribe bindings and the optional payload schema."""
     findings: list[ValidationFinding] = []
@@ -509,7 +514,10 @@ def collect_event_subscribe_config_findings(
         if not isinstance(trigger, dict) or trigger.get("type") != NodeType.EVENT_SUBSCRIBE_TRIGGER:
             continue
         try:
-            config = validate_event_subscribe_parameters(trigger.get("parameters", {}))
+            validate_parameters = (
+                validate_event_subscribe_draft_parameters if allow_incomplete else validate_event_subscribe_parameters
+            )
+            config = validate_parameters(trigger.get("parameters", {}))
             if config.input_schema is not None:
                 validate_json_schema_definition(config.input_schema)
         except (TypeError, ValueError):

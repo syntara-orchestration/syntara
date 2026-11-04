@@ -1,6 +1,7 @@
 """Select Subscribe definition schemas without importing broker clients."""
 
 from syntara.eventstreams.adapters.kafka_parameters import KafkaSubscribeParameters
+from syntara.eventstreams.core.draft_parameters import EventSubscribeDraftParameters, KafkaSubscribeDraftParameters
 from syntara.eventstreams.core.subscribe_parameters import EventSubscribeParameters
 
 # Keyed off the Integration type (resolved server-side), not a client-supplied
@@ -9,6 +10,27 @@ from syntara.eventstreams.core.subscribe_parameters import EventSubscribeParamet
 _PARAMETER_SCHEMAS: dict[str, type[EventSubscribeParameters]] = {
     "kafka": KafkaSubscribeParameters,
 }
+
+
+_DRAFT_PARAMETER_SCHEMAS: dict[str, type[EventSubscribeDraftParameters]] = {
+    "kafka": KafkaSubscribeDraftParameters,
+}
+
+
+def validate_event_subscribe_draft_parameters(
+    parameters: object, *, integration_type: str | None = None
+) -> EventSubscribeDraftParameters:
+    """Validate supplied draft fields without making the draft executable."""
+    if not isinstance(parameters, dict):
+        msg = "Event Subscribe parameters must be an object"
+        raise TypeError(msg)
+    if integration_type is None:
+        return EventSubscribeDraftParameters.model_validate(parameters)
+    schema = _DRAFT_PARAMETER_SCHEMAS.get(integration_type)
+    if schema is None:
+        msg = "Event Subscribe transport does not match the selected Integration type"
+        raise ValueError(msg)
+    return schema.model_validate(parameters)
 
 
 def validate_event_subscribe_parameters(
