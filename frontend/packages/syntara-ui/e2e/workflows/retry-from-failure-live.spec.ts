@@ -138,6 +138,11 @@ async function openRetryPanel(app: Page): Promise<void> {
   await expect(app.getByRole('complementary', { name: 'Retry run from failure review' })).toBeVisible()
 }
 
+async function selectFailedStepInDetails(app: Page, stepName: string): Promise<void> {
+  await app.getByRole('tab', { name: 'Details' }).click()
+  await app.getByRole('row', { name: new RegExp(stepName) }).click()
+}
+
 async function clickCanvasStepHeading(
   app: Page,
   node: ReturnType<Page['getByTestId']>,
@@ -389,8 +394,7 @@ test.describe('Retry from failure — real backend', () => {
     test.setTimeout(TERMINAL_POLL_TIMEOUT_MS + 60_000)
     const run = requireRun(failedRun, 'Failed run')
     await openExecutionDetail(app, run.executionId)
-    await app.getByRole('tab', { name: 'Details' }).click()
-    await app.getByRole('row', { name: /Second Step/ }).click()
+    await selectFailedStepInDetails(app, 'Second Step')
     await openRetryPanel(app)
 
     await expect(app.getByText(/"code": "exit 1"/, { exact: false })).toBeVisible()
@@ -447,10 +451,13 @@ test.describe('Retry from failure — real backend', () => {
     try {
       await loginViaUI(page, persona.username, persona.password)
       await openExecutionDetail(page, run.executionId)
+      await selectFailedStepInDetails(page, 'Second Step')
       await openRetryPanel(page)
 
       const panel = page.getByRole('complementary', { name: 'Retry run from failure review' })
-      await expect(panel.getByText('Workflow edit permission is required to override retry inputs.')).toBeVisible()
+      await expect(page.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+      // The warning is in Run details (RetryInputOverrideDetails), not the retry side panel.
+      await expect(page.getByText('Workflow edit permission is required to override retry inputs.')).toBeVisible()
       await expect(page.getByRole('button', { name: 'Edit parameters for retry' })).toHaveCount(0)
 
       const retryResponsePromise = page.waitForResponse(
