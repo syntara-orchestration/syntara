@@ -4,6 +4,7 @@ import {
   ExecutorTypeEnum,
   TriggerTypeEnum,
   type ApprovalActivity,
+  type FormPromptActivity,
   type ConditionActivity,
   type ConvergeActivity,
   type LoopActivity,
@@ -64,6 +65,7 @@ vi.mock('../../stores/useExecutionStore', () => ({
 import { ApprovalStepComponent, type ApprovalNode } from './ApprovalNode'
 import { ConditionStepComponent, type ConditionNode } from './ConditionNode'
 import { ConvergeStepComponent, type ConvergeNode } from './ConvergeNode'
+import { FormPromptNodeComponent, type FormPromptNode } from './FormPromptNode'
 import { GenericStepComponent, type GenericNode } from './GenericNode'
 import { LoopStepComponent, type LoopNode } from './LoopNode'
 import { SwitchStepComponent, type SwitchNode } from './SwitchNode'
@@ -211,6 +213,27 @@ describe('canvas nodes at semantic zoom', () => {
     expect(screen.getByRole('button', { name: 'Sign off, Approval' })).toBeInTheDocument()
   })
 
+  it('renders form step node at semantic zoom', () => {
+    const data: FormPromptActivity = {
+      type: 'form_prompt',
+      id: 'form-prompt-1',
+      name: 'Collect feedback',
+      parameters: {
+        form_definition: {
+          fields: [{ type: 'text', value_name: 'q1', label: 'Question' }],
+        },
+      },
+    }
+
+    render(
+      <ReactFlowProvider>
+        <FormPromptNodeComponent {...castNodeProps<FormPromptNode>(canvasNodeProps(data, 'form_prompt', data.id))} />
+      </ReactFlowProvider>
+    )
+
+    expect(screen.getByRole('button', { name: 'Collect feedback, Form' })).toBeInTheDocument()
+  })
+
   it('renders wait node at semantic zoom', () => {
     const data = {
       type: 'wait',
@@ -244,6 +267,24 @@ describe('canvas nodes at semantic zoom', () => {
     )
 
     expect(screen.getByRole('button', { name: 'Incoming hook, Webhook trigger' })).toBeInTheDocument()
+  })
+
+  it('renders form trigger node at semantic zoom', () => {
+    const data = {
+      name: 'Start from form',
+      details: null,
+      triggerType: TriggerTypeEnum.FORM_TRIGGER,
+    }
+
+    render(
+      <ReactFlowProvider>
+        <TriggerStepComponent
+          {...castNodeProps<TriggerNode>(canvasNodeProps(data, FlowNodeType.TRIGGER, 'trigger-0'))}
+        />
+      </ReactFlowProvider>
+    )
+
+    expect(screen.getByRole('button', { name: 'Start from form, Form trigger' })).toBeInTheDocument()
   })
 
   it('renders reversed task node at semantic zoom', () => {

@@ -7,36 +7,33 @@ import { useShallow } from 'zustand/react/shallow'
 import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { FlowNodeType } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
 import { latestActivityStateForCanvasNode } from '../../execution/utils/activityState'
 import { useExecutionStore } from '../../stores/useExecutionStore'
-import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
+import { getStepTypeColor } from '../stepTypeColors'
 
 import { BranchHandle, BranchHandles } from './common/BranchHandle'
 import { renderText } from './common/detailRenderers'
 import { StandardStepHeader } from './common/StandardStepHeader'
-import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
-import { nodeMetadata } from './nodeMetadata'
-import { renderNodeIcon } from './renderNodeIcon'
+import { StepMenuCategory, useStepMenuActions } from './hooks/useStepMenuActions'
+import { renderStepIcon } from './renderStepIcon'
+import { stepMetadata } from './stepMetadata'
 
 export type FormPromptNode = { type: 'form_prompt' } & Node<Activity>
 
 export function FormPromptNodeComponent(props: NodeProps<FormPromptNode>) {
-  const metadata = nodeMetadata.form_prompt
-  const menuActions = useNodeMenuActions({
+  const metadata = stepMetadata.form_prompt
+  const menuActions = useStepMenuActions({
     nodeId: props.data.id,
-    nodeType: MenuNodeType.ACTIVITY,
+    stepCategory: StepMenuCategory.ACTIVITY,
     disabled: props.data.settings?.disabled ?? false,
   })
 
-  const iconNode = renderNodeIcon(
-    metadata.icon,
-    'form_prompt',
-    'canvas',
-    getNodeTypeColor(ActivityTypeEnum.FORM_PROMPT)
-  )
+  const iconColor = getStepTypeColor(ActivityTypeEnum.FORM_PROMPT)
+  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.FORM_PROMPT, 'canvas', iconColor)
+  const semanticZoomIcon = renderStepIcon(metadata.icon, RegistryStepId.FORM_PROMPT, 'semanticZoom', iconColor)
   const taskExecutor = metadata.label
 
   const executionStateFromData = (props.data as Record<string, unknown>).__executionState as
@@ -82,7 +79,7 @@ export function FormPromptNodeComponent(props: NodeProps<FormPromptNode>) {
       collapsible={false}
       executionState={executionState}
       showExecutionBadge={showExecutionBadge}
-      topBarColor={getNodeTypeColor(FlowNodeType.FORM_PROMPT)}
+      topBarColor={getStepTypeColor(ActivityTypeEnum.FORM_PROMPT)}
       semanticZoomSummary={{
         title: semanticZoomActivityTitle(props.data.name, `Untitled ${taskExecutor}`),
         typeLabel: taskExecutor,
@@ -91,6 +88,8 @@ export function FormPromptNodeComponent(props: NodeProps<FormPromptNode>) {
         { id: EdgeHandleEnum.SUBMITTED, ariaLabel: 'Submitted branch output' },
         { id: EdgeHandleEnum.FALLBACK, ariaLabel: 'Fallback branch output' },
       ]}
+      semanticZoomIcon={semanticZoomIcon}
+      semanticZoomMenuActions={menuActions}
     >
       <>
         <StandardStepHeader
