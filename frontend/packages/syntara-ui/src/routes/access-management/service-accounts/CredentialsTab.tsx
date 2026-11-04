@@ -280,41 +280,44 @@ function CredentialsTable({
         </Tr>
       </Thead>
       <Tbody>
-        {credentials.map((cred) => (
-          <Tr key={cred.id}>
-            <Td dataLabel="Client ID">
-              <ClipboardCopy isReadOnly variant="inline-compact" hoverTip="Copy" clickTip="Copied">
-                {cred.identifier}
-              </ClipboardCopy>
-            </Td>
-            <Td dataLabel="Created">
-              <DateCell dateString={cred.created_at} />
-            </Td>
-            <Td dataLabel="Last used">
-              <DateCell dateString={cred.last_used_at} />
-            </Td>
-            <Td dataLabel="Expires">{cred.expires_at ? formatExpirationDate(cred.expires_at) : 'Never'}</Td>
-            <Td dataLabel="State" modifier="nowrap">
-              <Switch
-                id={`cred-state-${cred.id}`}
-                label={cred.status === 'active' ? 'Enabled' : 'Disabled'}
-                isChecked={cred.status === 'active'}
-                onChange={permissions.canUpdate ? () => onToggleStatus(cred) : undefined}
-                aria-label={`Toggle credential ${cred.identifier} state`}
-                aria-disabled={!permissions.canUpdate || undefined}
-              />
-            </Td>
-            <Td dataLabel="Rotation status" modifier="nowrap">
-              <RotationGraceIndicator oldSecretValidUntil={cred.old_secret_valid_until} />
-            </Td>
-            <Td isActionCell>
-              <SynKebabMenu
-                actions={getCredentialActions(cred, permissions, onRotate, onDelete)}
-                aria-label={`Actions for ${cred.identifier}`}
-              />
-            </Td>
-          </Tr>
-        ))}
+        {credentials.map((cred) => {
+          const canToggle = cred.status === 'active' ? permissions.canDisable : permissions.canEnable
+          return (
+            <Tr key={cred.id}>
+              <Td dataLabel="Client ID">
+                <ClipboardCopy isReadOnly variant="inline-compact" hoverTip="Copy" clickTip="Copied">
+                  {cred.identifier}
+                </ClipboardCopy>
+              </Td>
+              <Td dataLabel="Created">
+                <DateCell dateString={cred.created_at} />
+              </Td>
+              <Td dataLabel="Last used">
+                <DateCell dateString={cred.last_used_at} />
+              </Td>
+              <Td dataLabel="Expires">{cred.expires_at ? formatExpirationDate(cred.expires_at) : 'Never'}</Td>
+              <Td dataLabel="State" modifier="nowrap">
+                <Switch
+                  id={`cred-state-${cred.id}`}
+                  label={cred.status === 'active' ? 'Enabled' : 'Disabled'}
+                  isChecked={cred.status === 'active'}
+                  onChange={canToggle ? () => onToggleStatus(cred) : undefined}
+                  aria-label={`Toggle credential ${cred.identifier} state`}
+                  aria-disabled={!canToggle || undefined}
+                />
+              </Td>
+              <Td dataLabel="Rotation" modifier="nowrap">
+                <RotationGraceIndicator oldSecretValidUntil={cred.old_secret_valid_until} />
+              </Td>
+              <Td isActionCell>
+                <SynKebabMenu
+                  actions={getCredentialActions(cred, permissions, onRotate, onDelete)}
+                  aria-label={`Actions for ${cred.identifier}`}
+                />
+              </Td>
+            </Tr>
+          )
+        })}
       </Tbody>
     </>
   )
@@ -332,9 +335,8 @@ function getCreateDisabledTooltip(
 export function CredentialsTab({
   serviceAccountId,
   serviceAccountName = 'This service account',
-  resourceProject,
-}: Readonly<{ serviceAccountId: string; serviceAccountName?: string; resourceProject?: string }>) {
-  const permissions = useServiceAccountPermissions({ resourceProject })
+}: Readonly<{ serviceAccountId: string; serviceAccountName?: string }>) {
+  const permissions = useServiceAccountPermissions({ resourceId: serviceAccountId })
   const deleteDialog = useDialogState<ServiceAccountCredentialRead>()
   const disableDialog = useDialogState<ServiceAccountCredentialRead>()
   const rotateDialog = useDialogState<ServiceAccountCredentialRead>()

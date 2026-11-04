@@ -91,6 +91,7 @@ function buildTriggerFormDefaults(initialData?: Partial<TriggerFormData>): Trigg
 type TriggerStepFormProps = Readonly<{
   onSubmit: (data: TriggerFormData) => void
   initialData?: Partial<TriggerFormData>
+  projectId?: string
   onHeaderContentChange?: (content: ReactNode | null) => void
 }>
 
@@ -268,9 +269,11 @@ function ScheduleIntervalFields({
 
 function TriggerFormFields({
   onHeaderContentChange,
+  projectId,
   validationErrors,
 }: Readonly<{
   onHeaderContentChange?: (content: ReactNode | null) => void
+  projectId?: string
   validationErrors?: {
     interval?: { message?: string }
     cron?: { message?: string }
@@ -408,7 +411,7 @@ function TriggerFormFields({
       {triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER && (
         <fieldset disabled={isVersionView} className={stepFormStyles.disabledFieldset}>
           <Stack hasGutter>
-            <WebhookFields />
+            <WebhookFields projectId={projectId} />
           </Stack>
         </fieldset>
       )}
@@ -416,7 +419,7 @@ function TriggerFormFields({
       {triggerType === TriggerTypeEnum.EDA_TRIGGER && (
         <fieldset disabled={isVersionView} className={stepFormStyles.disabledFieldset}>
           <Stack hasGutter>
-            <EdaFields />
+            <EdaFields projectId={projectId} />
           </Stack>
         </fieldset>
       )}
@@ -464,7 +467,11 @@ export function TriggerStepForm(props: TriggerStepFormProps) {
   return (
     <StepFormContainer formId="trigger-step-form" onSubmit={form.handleSubmit(handleSubmit)}>
       <SynForm form={form}>
-        <TriggerFormFields onHeaderContentChange={props.onHeaderContentChange} validationErrors={errors} />
+        <TriggerFormFields
+          onHeaderContentChange={props.onHeaderContentChange}
+          projectId={props.projectId}
+          validationErrors={errors}
+        />
       </SynForm>
     </StepFormContainer>
   )

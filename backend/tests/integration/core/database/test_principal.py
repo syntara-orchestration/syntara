@@ -40,15 +40,12 @@ def _make_user(user_id: UUID | None = None, **overrides: object) -> User:
     return User(**defaults)
 
 
-def _make_service_account(
-    sa_id: UUID | None = None, *, project_id: UUID, created_by: UUID, **overrides: object
-) -> ServiceAccount:
+def _make_service_account(sa_id: UUID | None = None, *, created_by: UUID, **overrides: object) -> ServiceAccount:
     defaults: dict[str, object] = {
         "id": sa_id or uuid4(),
         "name": f"sa-{uuid4().hex[:8]}",
         "client_id": f"nx_sa_{uuid4().hex[:16]}",
         "hashed_secret": "$argon2id$v=19$m=65536,t=3,p=4$test",
-        "project_id": project_id,
         "created_by": created_by,
     }
     defaults.update(overrides)
@@ -66,7 +63,7 @@ async def owner_user(test_db_session: AsyncSession) -> User:
 
 @pytest.fixture
 async def project(test_db_session: AsyncSession) -> Project:
-    """Create a project for service account isolation."""
+    """Create a project for audit-target operations."""
     p = Project(name=f"test-project-{uuid4().hex[:8]}", description="Test project")
     test_db_session.add(p)
     await test_db_session.flush()
@@ -105,10 +102,8 @@ class TestPrincipalAutoCreation:
         assert principal.id == user.id
 
     @pytest.mark.asyncio
-    async def test_creates_principal_and_service_account(
-        self, test_db_session: AsyncSession, owner_user: User, project: Project
-    ) -> None:
-        sa = _make_service_account(project_id=project.id, created_by=owner_user.id)
+    async def test_creates_principal_and_service_account(self, test_db_session: AsyncSession, owner_user: User) -> None:
+        sa = _make_service_account(created_by=owner_user.id)
         test_db_session.add(sa)
         await test_db_session.flush()
 
@@ -122,9 +117,9 @@ class TestPrincipalAutoCreation:
 
     @pytest.mark.asyncio
     async def test_principal_id_matches_service_account_id(
-        self, test_db_session: AsyncSession, owner_user: User, project: Project
+        self, test_db_session: AsyncSession, owner_user: User
     ) -> None:
-        sa = _make_service_account(project_id=project.id, created_by=owner_user.id)
+        sa = _make_service_account(created_by=owner_user.id)
         test_db_session.add(sa)
         await test_db_session.flush()
 
@@ -144,13 +139,11 @@ class TestPrincipalAutoCreation:
         assert len(principals) == 1
 
     @pytest.mark.asyncio
-    async def test_multiple_entities_in_one_flush(
-        self, test_db_session: AsyncSession, owner_user: User, project: Project
-    ) -> None:
+    async def test_multiple_entities_in_one_flush(self, test_db_session: AsyncSession, owner_user: User) -> None:
         """Multiple new users/SAs in a single flush each get their own Principal."""
         user1 = _make_user()
         user2 = _make_user()
-        sa = _make_service_account(project_id=project.id, created_by=owner_user.id)
+        sa = _make_service_account(created_by=owner_user.id)
 
         test_db_session.add(user1)
         test_db_session.add(user2)
@@ -201,7 +194,7 @@ class TestServiceAccountAuditAttribution:
         await test_db_session.exec(text("SELECT * FROM audit_triggers_enable()"))  # type: ignore[call-overload]
         await test_db_session.flush()
 
-        sa = _make_service_account(project_id=project.id, created_by=owner_user.id)
+        sa = _make_service_account(created_by=owner_user.id)
         test_db_session.add(sa)
         await test_db_session.flush()
 

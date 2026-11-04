@@ -10,7 +10,8 @@ Covers:
 """
 
 from collections.abc import Awaitable, Callable
-from uuid import uuid4
+from unittest.mock import patch
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -19,10 +20,14 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.api.main import app
 from syntara.auth.dependencies import get_current_user
+from syntara.authz.audit.role_assignment import RoleAssignmentEvent
 from syntara.authz.models.assignments import RoleAssignment
 from syntara.authz.models.project import Project
+from syntara.authz.models.role import Role
 from syntara.core.models import User
 from syntara.core.models.group import Group
+from syntara.service_accounts.models.service_account import ServiceAccount
+from tests.integration.api.conftest import make_user_role
 
 USERS_URL = "/api/v1/users"
 GROUPS_URL = "/api/v1/groups"
@@ -342,6 +347,188 @@ async def test_delete_group_role_assignment_idor_protection(
 # ============================================================================
 
 ROLE_ASSIGNMENTS_URL = "/api/v1/role_assignments"
+
+
+@pytest.fixture
+async def role_service_account(test_db_session: AsyncSession, admin_user: User) -> ServiceAccount:
+    """Independent service account with no grants."""
+    sa = ServiceAccount(
+        name="deploy-bot",
+        created_by=admin_user.id,
+    )
+    test_db_session.add(sa)
+    await test_db_session.commit()
+    return sa
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint", ["global", "user"])
+@pytest.mark.parametrize("role_name", ["admin", "auditor", "custom-system"])
+async def test_service_account_global_role_allowed(
+    admin_client: AsyncClient,
+    test_db_session: AsyncSession,
+    role_service_account: ServiceAccount,
+    endpoint: str,
+    role_name: str,
+) -> None:
+    """Both principal entry points allow explicit global service account grants."""
+    sa = role_service_account
+    if role_name == "custom-system":
+        test_db_session.add(Role(name=role_name, scope="system", policy_names=[]))
+        await test_db_session.commit()
+    url = ROLE_ASSIGNMENTS_URL if endpoint == "global" else f"{USERS_URL}/{sa.id}/role_assignments"
+
+    with patch("syntara.audit.dispatcher.AuditEventDispatcher.dispatch") as dispatch:
+        response = await admin_client.post(url, json={"principal_id": str(sa.id), "role_name": role_name})
+
+    assert response.status_code == 201
+    assert response.json()["project_id"] is None
+    assert response.json()["role_name"] == role_name
+    assert any(isinstance(call.args[0], RoleAssignmentEvent) for call in dispatch.call_args_list)
+
+
+@pytest.mark.asyncio
+async def test_service_account_global_role_assignment_is_visible_and_revocable(
+    admin_client: AsyncClient,
+    role_service_account: ServiceAccount,
+) -> None:
+    """System assignments for service accounts use the normal list and revoke API."""
+    created = await admin_client.post(
+        ROLE_ASSIGNMENTS_URL,
+        json={"principal_id": str(role_service_account.id), "role_name": "auditor"},
+    )
+    assert created.status_code == 201, created.text
+    assignment = created.json()
+    assert assignment["project_id"] is None
+
+    listed = await admin_client.get(ROLE_ASSIGNMENTS_URL, params={"principal_id": str(role_service_account.id)})
+    assert listed.status_code == 200, listed.text
+    assert any(row["id"] == assignment["id"] and row["role_name"] == "auditor" for row in listed.json()["resources"])
+
+    revoked = await admin_client.delete(f"{ROLE_ASSIGNMENTS_URL}/{assignment['id']}")
+    assert revoked.status_code == 204
+
+    remaining = await admin_client.get(ROLE_ASSIGNMENTS_URL, params={"principal_id": str(role_service_account.id)})
+    assert all(row["id"] != assignment["id"] for row in remaining.json()["resources"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint", ["global", "project", "user"])
+async def test_service_account_project_role_allowed(
+    admin_client: AsyncClient,
+    test_db_session: AsyncSession,
+    role_service_account: ServiceAccount,
+    test_project_id: str,
+    endpoint: str,
+) -> None:
+    """Independent accounts accept grants from any authorized project."""
+    sa = role_service_account
+    url = ROLE_ASSIGNMENTS_URL
+    body_project_id = test_project_id
+    if endpoint == "project":
+        url = f"/api/v1/projects/{test_project_id}/role_assignments"
+        body_project_id = test_project_id
+    elif endpoint == "user":
+        url = f"{USERS_URL}/{sa.id}/role_assignments"
+
+    with patch("syntara.audit.dispatcher.AuditEventDispatcher.dispatch") as dispatch:
+        response = await admin_client.post(
+            url,
+            json={"principal_id": str(sa.id), "role_name": "project-user", "project_id": body_project_id},
+        )
+
+    assert response.status_code == 201
+    assert response.json()["project_id"] == test_project_id
+    assert any(isinstance(call.args[0], RoleAssignmentEvent) for call in dispatch.call_args_list)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role_name", ["admin", "auditor", "custom-system"])
+async def test_service_account_system_role_at_project_scope_rejected(
+    admin_client: AsyncClient,
+    test_db_session: AsyncSession,
+    role_service_account: ServiceAccount,
+    role_name: str,
+    test_project_id: str,
+) -> None:
+    """Normal role scope validation still applies."""
+    sa = role_service_account
+    if role_name == "custom-system":
+        test_db_session.add(Role(name=role_name, scope="system", policy_names=[]))
+        await test_db_session.commit()
+
+    with patch("syntara.audit.dispatcher.AuditEventDispatcher.dispatch") as dispatch:
+        response = await admin_client.post(
+            f"/api/v1/projects/{test_project_id}/role_assignments",
+            json={"principal_id": str(sa.id), "role_name": role_name},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == f"Role '{role_name}' is a system role and cannot be assigned to a project"
+    assert not any(isinstance(call.args[0], RoleAssignmentEvent) for call in dispatch.call_args_list)
+    assignments = await test_db_session.exec(select(RoleAssignment).where(RoleAssignment.principal_id == sa.id))
+    assert assignments.all() == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint", ["global", "project", "user"])
+@pytest.mark.parametrize("role_name", ["project-user", "custom-project"])
+async def test_service_account_custom_project_role_allowed(
+    admin_client: AsyncClient,
+    test_db_session: AsyncSession,
+    role_service_account: ServiceAccount,
+    endpoint: str,
+    role_name: str,
+    test_project_id: str,
+) -> None:
+    """Built-in and custom project roles can be assigned to independent accounts."""
+    sa = role_service_account
+    if role_name == "custom-project":
+        test_db_session.add(Role(name=role_name, scope="project", project_id=UUID(test_project_id), policy_names=[]))
+        await test_db_session.commit()
+    url = ROLE_ASSIGNMENTS_URL
+    if endpoint == "project":
+        url = f"/api/v1/projects/{test_project_id}/role_assignments"
+    elif endpoint == "user":
+        url = f"{USERS_URL}/{sa.id}/role_assignments"
+
+    response = await admin_client.post(
+        url, json={"principal_id": str(sa.id), "role_name": role_name, "project_id": test_project_id}
+    )
+
+    assert response.status_code == 201
+    assert response.json()["principal_id"] == str(sa.id)
+    assert response.json()["project_id"] == test_project_id
+    assert response.json()["role_name"] == role_name
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint", ["global", "project", "user"])
+async def test_service_account_role_assignment_unauthorized(
+    base_client: AsyncClient,
+    test_db_session: AsyncSession,
+    role_service_account: ServiceAccount,
+    user_factory: Callable[..., Awaitable[User]],
+    auth_as: Callable[[User], None],
+    endpoint: str,
+    test_project_id: str,
+) -> None:
+    """Caller authorization still rejects grants before principal scope validation."""
+    user = await user_factory(username="unprivileged", email="unprivileged@example.com")
+    await make_user_role(test_db_session, user)
+    auth_as(user)
+    sa = role_service_account
+    url = ROLE_ASSIGNMENTS_URL
+    if endpoint == "project":
+        url = f"/api/v1/projects/{test_project_id}/role_assignments"
+    elif endpoint == "user":
+        url = f"{USERS_URL}/{sa.id}/role_assignments"
+
+    response = await base_client.post(
+        url, json={"principal_id": str(sa.id), "role_name": "admin", "project_id": test_project_id}
+    )
+
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio

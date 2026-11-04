@@ -6,7 +6,7 @@
  */
 import type { Page } from '../fixtures'
 
-import { apiRequest, ensureProject, getAuthToken } from './api-core'
+import { apiRequest, getAuthToken } from './api-core'
 
 // ---------------------------------------------------------------------------
 // Groups
@@ -310,11 +310,8 @@ export async function deleteRoleAssignmentViaApi(app: Page, assignmentId: string
 
 /** Create a service account via the API. Returns the created resource. */
 export async function createServiceAccountViaApi(app: Page, name: string): Promise<{ id: string; name: string }> {
-  const project = await ensureProject(app)
-  if (!project) throw new Error('createServiceAccountViaApi: could not ensure project')
-
   const resp = await apiRequest(app, 'post', '/service_accounts', {
-    data: { name, description: 'E2E test service account', project_id: project.id },
+    data: { name, description: 'E2E test service account' },
   })
   if (!resp.ok()) {
     const body = await resp.text().catch(() => '(unreadable)')

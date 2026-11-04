@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 if TYPE_CHECKING:
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from syntara.authz.exceptions import ProjectNotFoundError
 from syntara.service_accounts.exceptions import ServiceAccountNameConflictError, ServiceAccountNotFoundError
 from syntara.service_accounts.models.service_account import ServiceAccount, ServiceAccountStatus
 from syntara.service_accounts.schemas import ServiceAccountListResponse, ServiceAccountRead
@@ -53,7 +54,6 @@ class TestCreateServiceAccount:
     async def test_create_returns_service_account(self, service: ServiceAccountService) -> None:
         sa = await service.create_service_account(
             name="CI Pipeline",
-            project_id=uuid4(),
             description="For CI/CD",
         )
         assert sa.name == "CI Pipeline"
@@ -64,13 +64,12 @@ class TestCreateServiceAccount:
     async def test_create_sets_created_by(self, service: ServiceAccountService, mock_user: MagicMock) -> None:
         sa = await service.create_service_account(
             name="test",
-            project_id=uuid4(),
         )
         assert sa.created_by == mock_user.id
 
     @pytest.mark.asyncio
     async def test_create_commits_to_database(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
-        await service.create_service_account(name="test", project_id=uuid4())
+        await service.create_service_account(name="test")
         mock_session.add.assert_called_once()
         mock_session.flush.assert_called_once()
         mock_session.commit.assert_called_once()
@@ -82,12 +81,34 @@ class TestCreateServiceAccount:
         error = IntegrityError("", {}, Exception("service_accounts_name"))
         mock_session.flush.side_effect = error
         with pytest.raises(ServiceAccountNameConflictError, match="already exists"):
-            await service.create_service_account(name="duplicate", project_id=uuid4())
+            await service.create_service_account(name="duplicate")
 
     @pytest.mark.asyncio
     async def test_create_description_defaults_none(self, service: ServiceAccountService) -> None:
-        sa = await service.create_service_account(name="test", project_id=uuid4())
+        sa = await service.create_service_account(name="test")
         assert sa.description is None
+
+    @pytest.mark.asyncio
+    async def test_create_with_project_context(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
+        project_id = uuid4()
+        with patch(
+            "syntara.service_accounts.services.service_account_service.assert_project_alive",
+            new_callable=AsyncMock,
+        ) as validate_project:
+            account = await service.create_service_account(name="test", project_id=project_id)
+
+        validate_project.assert_awaited_once_with(mock_session, project_id)
+        assert account.project_id == project_id
+
+    @pytest.mark.asyncio
+    async def test_create_rejects_unknown_project(self, service: ServiceAccountService) -> None:
+        with patch(
+            "syntara.service_accounts.services.service_account_service.assert_project_alive",
+            new_callable=AsyncMock,
+            side_effect=ProjectNotFoundError("Project not found"),
+        ):
+            with pytest.raises(ProjectNotFoundError):
+                await service.create_service_account(name="test", project_id=uuid4())
 
 
 class TestGetServiceAccount:
@@ -281,7 +302,6 @@ class TestToReadConversion:
     async def test_to_read_returns_read_schema(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
         sa = ServiceAccount(
             name="test",
-            project_id=uuid4(),
             created_by=uuid4(),
         )
         # Mock the project name resolution
@@ -293,175 +313,27 @@ class TestToReadConversion:
         assert isinstance(read, ServiceAccountRead)
         assert read.name == "test"
 
-    @pytest.mark.asyncio
-    async def test_to_read_includes_project_name(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
-        project_id = uuid4()
-        sa = ServiceAccount(name="test", project_id=project_id, created_by=uuid4())
-
-        mock_result = MagicMock()
-        mock_result.first.return_value = "My Project"
-        mock_session.exec.return_value = mock_result
-
-        read = await service.to_read(sa)
-        assert read.project_name == "My Project"
-
-    @pytest.mark.asyncio
-    async def test_to_read_handles_missing_project(
-        self, service: ServiceAccountService, mock_session: AsyncMock
-    ) -> None:
-        project_id = uuid4()
-        sa = ServiceAccount(name="test", project_id=project_id, created_by=uuid4())
-
-        mock_result = MagicMock()
-        mock_result.first.return_value = None
-        mock_session.exec.return_value = mock_result
-
-        read = await service.to_read(sa)
-        assert read.project_name is None
-
-
-class TestResolveProjectInfosBatch:
-    """Tests for batch project info resolution (_resolve_project_infos)."""
-
-    @pytest.mark.asyncio
-    async def test_returns_empty_dict_for_empty_input(
-        self, service: ServiceAccountService, mock_session: AsyncMock
-    ) -> None:
-        result = await service._resolve_project_infos(set())
-        assert result == {}
-        mock_session.exec.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_resolves_multiple_projects(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
-        proj_a = uuid4()
-        proj_b = uuid4()
-        mock_result = MagicMock()
-        mock_result.all.return_value = [
-            (proj_a, "Project A"),
-            (proj_b, "Project B"),
-        ]
-        mock_session.exec.return_value = mock_result
-
-        result = await service._resolve_project_infos({proj_a, proj_b})
-        assert result[proj_a] == "Project A"
-        assert result[proj_b] == "Project B"
-
-    @pytest.mark.asyncio
-    async def test_missing_projects_omitted(self, service: ServiceAccountService, mock_session: AsyncMock) -> None:
-        existing = uuid4()
-        missing = uuid4()
-        mock_result = MagicMock()
-        mock_result.all.return_value = [
-            (existing, "Exists"),
-        ]
-        mock_session.exec.return_value = mock_result
-
-        result = await service._resolve_project_infos({existing, missing})
-        assert existing in result
-        assert missing not in result
-
 
 class TestListServiceAccounts:
-    """Tests for listing service accounts with project info resolution."""
+    """Tests for listing readable service accounts."""
 
     @pytest.mark.asyncio
-    async def test_list_resolves_project_info(
+    async def test_list_passes_visibility_restriction(
         self,
         service: ServiceAccountService,
-        mock_session: AsyncMock,
         override_runtime_settings: Callable[..., AbstractContextManager[object]],
     ) -> None:
-        proj_id = uuid4()
-        sa_read = ServiceAccountRead(
-            id=uuid4(),
-            name="sa-1",
-            status=ServiceAccountStatus.ACTIVE,
-            project_id=proj_id,
-            created_by=uuid4(),
-            created_at="2026-01-01T00:00:00Z",
-            updated_at="2026-01-01T00:00:00Z",
-        )
-        mock_response = ServiceAccountListResponse(resources=[sa_read], next=None)
-
+        account_ids = [uuid4()]
+        response = ServiceAccountListResponse(resources=[], next=None)
         with (
-            override_runtime_settings({"service_accounts.credential_max_lifetime_days": 180}),
+            override_runtime_settings({"service_accounts.credential_max_lifetime_days": 90}),
             pytest.MonkeyPatch.context() as mp,
         ):
-            mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
-
-            mock_result = MagicMock()
-            mock_result.all.return_value = [(proj_id, "My Project")]
-            mock_session.exec.return_value = mock_result
-
-            response = await service.list_service_accounts()
-
-        assert response.resources[0].project_name == "My Project"
-
-    @pytest.mark.asyncio
-    async def test_list_handles_hard_deleted_project(
-        self,
-        service: ServiceAccountService,
-        mock_session: AsyncMock,
-        override_runtime_settings: Callable[..., AbstractContextManager[object]],
-    ) -> None:
-        proj_id = uuid4()
-        sa_read = ServiceAccountRead(
-            id=uuid4(),
-            name="sa-1",
-            status=ServiceAccountStatus.ACTIVE,
-            project_id=proj_id,
-            created_by=uuid4(),
-            created_at="2026-01-01T00:00:00Z",
-            updated_at="2026-01-01T00:00:00Z",
-        )
-        mock_response = ServiceAccountListResponse(resources=[sa_read], next=None)
-
-        with (
-            override_runtime_settings({"service_accounts.credential_max_lifetime_days": 180}),
-            pytest.MonkeyPatch.context() as mp,
-        ):
-            mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
-
-            mock_result = MagicMock()
-            mock_result.all.return_value = []
-            mock_session.exec.return_value = mock_result
-
-            response = await service.list_service_accounts()
-
-        assert response.resources[0].project_name is None
-
-    @pytest.mark.asyncio
-    async def test_list_handles_missing_project(
-        self,
-        service: ServiceAccountService,
-        mock_session: AsyncMock,
-        override_runtime_settings: Callable[..., AbstractContextManager[object]],
-    ) -> None:
-        proj_id = uuid4()
-        sa_read = ServiceAccountRead(
-            id=uuid4(),
-            name="sa-1",
-            status=ServiceAccountStatus.ACTIVE,
-            project_id=proj_id,
-            created_by=uuid4(),
-            created_at="2026-01-01T00:00:00Z",
-            updated_at="2026-01-01T00:00:00Z",
-        )
-        mock_response = ServiceAccountListResponse(resources=[sa_read], next=None)
-
-        with (
-            override_runtime_settings({"service_accounts.credential_max_lifetime_days": 180}),
-            pytest.MonkeyPatch.context() as mp,
-        ):
-            mp.setattr(service, "list_resources", AsyncMock(return_value=mock_response))
-
-            mock_result = MagicMock()
-            mock_result.all.return_value = []
-            mock_session.exec.return_value = mock_result
-
-            response = await service.list_service_accounts()
-
-        assert response.resources[0].project_name is None
+            list_resources = AsyncMock(return_value=response)
+            mp.setattr(service, "list_resources", list_resources)
+            result = await service.list_service_accounts(id_restriction=account_ids)
+        assert list_resources.call_args.kwargs["id_restriction"] == account_ids
+        assert result.max_lifetime_days == 90
 
     @pytest.mark.asyncio
     async def test_list_empty_resources(

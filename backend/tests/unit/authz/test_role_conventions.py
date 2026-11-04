@@ -104,6 +104,19 @@ class TestLookupHelpers:  # noqa: D101
 
 
 class TestRolePolicyMapping:  # noqa: D101
+    def test_service_account_policies_are_system_only(self) -> None:
+        policies = {p.name: set(p.roles) for p in BUILTIN_POLICIES if p.resource == "service_account"}
+
+        assert policies == {
+            "service_account:create:any": {"admin", "authenticated"},
+            "service_account:read:any": {"admin", "auditor", "authenticated"},
+            "service_account:update:any": {"admin"},
+            "service_account:delete:any": {"admin"},
+            "service_account:rotate_secret:any": {"admin"},
+            "service_account:disable:any": {"admin"},
+            "service_account:enable:any": {"admin"},
+        }
+
     def test_admin_has_all_admin_policies(self) -> None:
         names = builtin_role_policy_names("admin")
         assert len(names) > 0

@@ -80,6 +80,25 @@ describe('useFilteredNavigationItems', () => {
     expect(findItem(result.current, 'Access Management')).toBeDefined()
   })
 
+  it('shows the service-account page to system readers without opening other access tabs', () => {
+    setPermissions({
+      'setting:read': false,
+      'user:read': false,
+      'group:read': false,
+      'identity-provider:read': false,
+      'project:read': false,
+      'role-assignment:read': false,
+      'role-assignment:assign': false,
+      'service_account:read': true,
+    })
+    const { result } = renderHook(() => useFilteredNavigationItems())
+
+    expect(findItem(result.current, 'Access Management')).toBeDefined()
+    expect(findItem(result.current, 'Service Accounts')).toBeDefined()
+    expect(findItem(result.current, 'Users')).toBeUndefined()
+    expect(findItem(result.current, 'Groups')).toBeUndefined()
+  })
+
   it('excludes Settings when setting:read is denied', () => {
     setPermissions({ 'setting:read': false })
     const { result } = renderHook(() => useFilteredNavigationItems())
@@ -139,6 +158,7 @@ describe('useFilteredNavigationItems', () => {
         'user:read': false,
         'group:read': false,
         'project:read': false,
+        'service_account:read': false,
         'role-assignment:read': true,
         'role-assignment:assign': false,
       })
@@ -152,6 +172,7 @@ describe('useFilteredNavigationItems', () => {
         'user:read': false,
         'group:read': false,
         'project:read': true,
+        'service_account:read': false,
         'role-assignment:read': false,
         'role-assignment:assign': false,
       })
@@ -165,6 +186,7 @@ describe('useFilteredNavigationItems', () => {
         'user:read': false,
         'group:read': false,
         'project:read': false,
+        'service_account:read': false,
         'role-assignment:read': false,
         'role-assignment:assign': false,
       })
@@ -208,6 +230,7 @@ describe('useFilteredNavigationItems', () => {
         'user:read': false,
         'group:read': false,
         'project:read': false,
+        'service_account:read': false,
         'role-assignment:read': false,
         'role-assignment:assign': false,
       })
@@ -277,6 +300,7 @@ describe('useFilteredNavigationItems', () => {
       setPermissions({
         'user:read': false,
         'group:read': false,
+        'service_account:read': false,
         'role-assignment:read': true,
         'role-assignment:assign': false,
       })
@@ -289,6 +313,7 @@ describe('useFilteredNavigationItems', () => {
       setPermissions({
         'user:read': false,
         'group:read': false,
+        'service_account:read': false,
         'role-assignment:read': false,
         'role-assignment:assign': false,
         'project:read': true,

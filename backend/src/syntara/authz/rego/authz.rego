@@ -42,6 +42,11 @@ _action_matches(policy) if {
 _scope_matches(policy) if { policy.scope == "any" }
 _scope_matches(policy) if {
     policy.scope == "self"
+    input.resource.type == "service_account"
+    input.resource.metadata.created_by == input.user.id
+}
+_scope_matches(policy) if {
+    policy.scope == "self"
     input.resource.type == "user"
     input.resource.id == input.user.id
 }

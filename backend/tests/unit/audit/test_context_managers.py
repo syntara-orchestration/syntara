@@ -239,7 +239,6 @@ class TestBuildActorContextDuckTyping:
             name="my-bot",
             client_id="cid-test",
             hashed_secret="not-real",  # noqa: S106
-            project_id=uuid4(),
             created_by=uuid4(),
         )
         ctx = build_actor_context(sa)
@@ -256,7 +255,6 @@ class TestBuildActorContextDuckTyping:
             name="fallback-name",
             client_id="cid-test2",
             hashed_secret="not-real",  # noqa: S106
-            project_id=uuid4(),
             created_by=uuid4(),
         )
         sa.__dict__["username"] = ""

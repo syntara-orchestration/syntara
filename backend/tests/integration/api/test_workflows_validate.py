@@ -564,7 +564,7 @@ async def test_validate_webhook_empty_service_accounts_rejected(jwt_client: Asyn
         "workflow_definition": {
             "schema_version": "2.0.0",
             "name": "webhook-empty-sa",
-            "description": "Imported webhook with no in-project service accounts",
+            "description": "Imported webhook with no authorized service accounts",
             "triggers": [
                 {
                     "id": "snow_trigger",

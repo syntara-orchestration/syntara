@@ -569,13 +569,13 @@ export const mockUserRoleAssignments: MockUserRoleAssignment[] = [
   },
 ]
 
-// ── Service Account Role Assignments (SA → role in project) ─────────────
+// ── Service Account Role Assignments (system or project scope) ────────────
 
 export interface MockServiceAccountRoleAssignment {
   id: string
   service_account_id: string
   service_account_name: string
-  project_id: string
+  project_id: string | null
   role_id: string
   role_name: string
   created_at: string
@@ -601,9 +601,8 @@ export interface MockServiceAccount {
   id: string
   name: string
   description: string | null
+  project_id: string | null
   status: ServiceAccountStatus
-  project_id: string
-  project_name: string | null
   last_authenticated_at: string | null
   created_by: { id: string; name: string; type: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' }
   updated_by: {
@@ -621,9 +620,8 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     id: 'sa-001',
     name: 'ci-pipeline',
     description: 'CI/CD pipeline service account for automated deployments',
+    project_id: null,
     status: 'active',
-    project_id: 'p-001',
-    project_name: 'default',
     last_authenticated_at: mockDate.hoursAgo2,
     created_by: { id: 'u-001', name: 'alice', type: 'user' as const },
     updated_by: null,
@@ -635,9 +633,8 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     id: 'sa-002',
     name: 'monitoring-agent',
     description: 'Monitoring and observability agent',
+    project_id: null,
     status: 'active',
-    project_id: 'p-001',
-    project_name: 'default',
     last_authenticated_at: mockDate.minutesAgo30,
     created_by: { id: 'u-001', name: 'alice', type: 'user' as const },
     updated_by: null,
@@ -649,9 +646,8 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     id: 'sa-003',
     name: 'backup-agent',
     description: 'Automated backup service',
+    project_id: null,
     status: 'disabled',
-    project_id: 'p-002',
-    project_name: 'alice-sandbox',
     last_authenticated_at: mockDate.daysAgo5,
     created_by: { id: 'u-002', name: 'bob', type: 'user' as const },
     updated_by: { id: 'u-001', name: 'alice', type: 'user' as const },
@@ -663,9 +659,8 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     id: 'sa-004',
     name: 'api-gateway',
     description: null,
+    project_id: null,
     status: 'active',
-    project_id: 'p-002',
-    project_name: 'alice-sandbox',
     last_authenticated_at: null,
     created_by: { id: 'u-001', name: 'alice', type: 'user' as const },
     updated_by: null,
@@ -677,9 +672,8 @@ export const mockServiceAccounts: MockServiceAccount[] = [
     id: 'sa-005',
     name: 'legacy-sync',
     description: 'Legacy inventory sync agent',
+    project_id: null,
     status: 'disabled',
-    project_id: 'p-002',
-    project_name: 'alice-sandbox',
     last_authenticated_at: mockDate.daysAgo5,
     created_by: { id: 'u-002', name: 'bob', type: 'user' as const },
     updated_by: null,

@@ -14,7 +14,7 @@ import { WebhookUrlPreview } from './WebhookUrlPreview'
 
 const EDA_WEBHOOK_BASE_URL = `${WEBHOOK_BASE_URL}/eda`
 
-export function EdaFields() {
+export function EdaFields({ projectId }: Readonly<{ projectId?: string }>) {
   const fullEdaUrl = useWebhookUrl(EDA_WEBHOOK_BASE_URL)
 
   return (
@@ -69,6 +69,7 @@ export function EdaFields() {
               id="eda-authorized-service-accounts"
               selectedIds={(field.value ?? []) as string[]}
               onChange={field.onChange}
+              projectId={projectId}
             />
           )}
         </SynFormField>

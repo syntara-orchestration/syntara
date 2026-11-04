@@ -275,6 +275,58 @@ function paginate<T>(items: T[], cursor: string | null, limit: number, includeTo
   }
 }
 
+/** Policy the implicit 'authenticated' role grants in what_can_i responses. */
+const authenticatedServiceAccountPolicy = {
+  policy_name: 'authenticated',
+  effect: 'allow',
+  actions: ['service_account:create', 'service_account:read'],
+  scope: 'system',
+  project: '',
+}
+
+/** Create a service-account role assignment (system-wide when projectId is null). */
+function createServiceAccountAssignment(
+  account: (typeof mockServiceAccounts)[number],
+  roleName: string,
+  projectId: string | null
+) {
+  const role = mockRoles.find((item) => item.name === roleName)
+  const assignment = {
+    id: uuidv4(),
+    service_account_id: account.id,
+    service_account_name: account.name,
+    project_id: projectId,
+    role_id: role?.id ?? roleName,
+    role_name: roleName,
+    created_at: new Date().toISOString(),
+  }
+  mockServiceAccountRoleAssignments.push(assignment)
+  return {
+    id: assignment.id,
+    principal_id: account.id,
+    group_id: null,
+    principal_name: account.name,
+    principal_type: 'service_account',
+    role_name: roleName,
+    role_description: role?.description ?? null,
+    role_policies: role?.policies ?? [],
+    project_id: projectId,
+    project_name: projectId ? (mockProjects.find((project) => project.id === projectId)?.name ?? null) : null,
+    is_builtin: role?.is_builtin ?? false,
+    created_at: assignment.created_at,
+  }
+}
+
+/** Remove a service-account role assignment; returns false when no match exists. */
+function removeServiceAccountAssignment(assignmentId: string, projectId: string | null) {
+  const idx = mockServiceAccountRoleAssignments.findIndex(
+    (assignment) => assignment.id === assignmentId && assignment.project_id === projectId
+  )
+  if (idx === -1) return false
+  mockServiceAccountRoleAssignments.splice(idx, 1)
+  return true
+}
+
 /** Redact secret fields in a credential's inputs to match real API behavior */
 function redactCredential(credential: (typeof credentials)[number]) {
   const credType = credentialTypes.find((t) => t.id === credential.credential_type_id)
@@ -4070,6 +4122,13 @@ export const handlers = [
     }
 
     const principalId = body.principal_id!
+    const serviceAccount = mockServiceAccounts.find((account) => account.id === principalId)
+    if (serviceAccount) {
+      return HttpResponse.json(createServiceAccountAssignment(serviceAccount, body.role_name, projectId), {
+        status: 201,
+      })
+    }
+
     const assignment = {
       id: uuidv4(),
       user_id: principalId,
@@ -4111,6 +4170,9 @@ export const handlers = [
       return new HttpResponse(null, { status: 204 })
     }
 
+    if (removeServiceAccountAssignment(assignmentId, projectId)) {
+      return new HttpResponse(null, { status: 204 })
+    }
     return HttpResponse.json(
       { type: 'not-found', title: 'Not Found', detail: 'Assignment not found', code: 'NOT_FOUND', retryable: false },
       { status: 404 }
@@ -4727,6 +4789,23 @@ export const handlers = [
     return HttpResponse.json(paginate(all, cursor, limit, includeTotal))
   }),
 
+  http.post('/api/v1/role_assignments', async ({ request }) => {
+    const body = (await request.json()) as { principal_id?: string; role_name: string }
+    const account = mockServiceAccounts.find((sa) => sa.id === body.principal_id)
+    if (!account) return HttpResponse.json({ detail: 'Service account not found' }, { status: 404 })
+    const role = mockRoles.find((item) => item.name === body.role_name)
+    if (!role) return HttpResponse.json({ detail: 'Role not found' }, { status: 404 })
+
+    return HttpResponse.json(createServiceAccountAssignment(account, body.role_name, null), { status: 201 })
+  }),
+
+  http.delete('/api/v1/role_assignments/:assignment_id', ({ params }) => {
+    if (!removeServiceAccountAssignment(params.assignment_id as string, null)) {
+      return HttpResponse.json({ detail: 'Assignment not found' }, { status: 404 })
+    }
+    return new HttpResponse(null, { status: 204 })
+  }),
+
   // ── Access Management: All Role Assignments (unified view) ─────────────
 
   http.get('/api/v1/all_role_assignments', ({ request }) => {
@@ -5016,6 +5095,7 @@ export const handlers = [
         project: ['create', 'delete', 'read', 'update'],
         role: ['create', 'delete', 'read', 'update'],
         role_assignment: ['assign', 'read', 'revoke'],
+        service_account: ['create', 'delete', 'disable', 'enable', 'read', 'rotate_secret', 'update'],
         setting: ['read', 'write'],
         user: ['create', 'delete', 'read', 'update'],
         user_identity: ['create', 'delete', 'read'],
@@ -5037,6 +5117,19 @@ export const handlers = [
 
   // ── Service Accounts ───────────────────────────────────────────────
 
+  http.get('/api/v1/service_accounts/directory', ({ request }) => {
+    const url = new URL(request.url)
+    const limit = Math.min(Number(url.searchParams.get('limit') ?? '20'), 100)
+    const name = url.searchParams.get('name[contains]')?.toLowerCase()
+    const status = url.searchParams.get('status')
+    const cursor = url.searchParams.get('cursor')
+    const results = mockServiceAccounts
+      .filter((sa) => (!name || sa.name.toLowerCase().includes(name)) && (!status || sa.status === status))
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+      .map((sa) => ({ id: sa.id, name: sa.name, status: sa.status }))
+    return HttpResponse.json(paginate(results, cursor, limit, url.searchParams.get('include_total') === 'true'))
+  }),
+
   http.get('/api/v1/service_accounts', ({ request }) => {
     const url = new URL(request.url)
     const limit = Math.min(Number(url.searchParams.get('limit') ?? '20'), 50)
@@ -5047,11 +5140,6 @@ export const handlers = [
     const includeTotal = url.searchParams.get('include_total') === 'true'
 
     let results = [...mockServiceAccounts]
-
-    const username = getUsernameFromRequest(request)
-    if (username === 'project-admin') {
-      results = results.filter((sa) => sa.project_id === 'p-001')
-    }
 
     if (nameFilter) results = results.filter((sa) => sa.name.toLowerCase().includes(nameFilter))
     if (statusFilter) results = results.filter((sa) => sa.status === statusFilter)
@@ -5076,30 +5164,39 @@ export const handlers = [
 
     return HttpResponse.json({
       resources: page,
-      next_cursor: nextCursor,
+      next: nextCursor,
+      prev: null,
       max_lifetime_days: 180,
       ...(includeTotal ? { total: results.length } : {}),
     })
   }),
 
   http.post('/api/v1/service_accounts', async ({ request }) => {
-    const body = (await request.json()) as { name?: string; description?: string | null; project_id?: string } | null
-    if (!body?.name || !body?.project_id) {
-      return HttpResponse.json({ detail: 'name and project_id are required' }, { status: 422 })
+    const body = (await request.json()) as {
+      name?: string
+      description?: string | null
+      project_id?: string | null
+    } | null
+    if (!body?.name) {
+      return HttpResponse.json({ detail: 'name is required' }, { status: 422 })
+    }
+    if (body.project_id && !mockProjects.some((project) => project.id === body.project_id)) {
+      return HttpResponse.json({ detail: `Project '${body.project_id}' not found` }, { status: 404 })
     }
     const id = `sa-new-${uuidv4().slice(0, 8)}`
-    const project = mockProjects.find((p) => p.id === body.project_id)
-    const project_name = project?.name ?? null
 
     const sa = {
       id,
       name: body.name,
       description: body.description ?? null,
+      project_id: body.project_id ?? null,
       status: 'active' as const,
-      project_id: body.project_id,
-      project_name,
       last_authenticated_at: null,
-      created_by: { id: 'u-001', name: 'alice', type: 'user' as const },
+      created_by: {
+        id: users.find((u) => u.username === getUsernameFromRequest(request))?.id ?? 'u-001',
+        name: getUsernameFromRequest(request),
+        type: 'user' as const,
+      },
       updated_by: null,
       created_at: mockDate.now,
       updated_at: mockDate.now,
@@ -5283,6 +5380,7 @@ export const handlers = [
       resource_type?: string
       check_any_project?: boolean
       resource_project?: string
+      resource_id?: string
     } | null
     const action = (body?.action ?? '').toLowerCase()
     const resourceType = (body?.resource_type ?? '').toLowerCase()
@@ -5324,7 +5422,6 @@ export const handlers = [
       'role-assignment': new Set(['read', 'assign', 'revoke']),
       role: new Set(['read', 'create', 'update', 'delete']),
       policy: new Set(['read', 'create', 'update', 'delete']),
-      service_account: new Set(['read', 'create', 'update', 'delete', 'rotate_secret', 'disable', 'enable']),
       workflow: new Set(['read', 'create', 'update', 'delete']),
       execution: new Set(['read', 'run']),
       credential: new Set(['read', 'create', 'update', 'delete', 'use']),
@@ -5368,11 +5465,9 @@ export const handlers = [
         allowed = false
       }
     } else if (username === 'auditor') {
-      if (WRITE_ACTIONS.has(action)) {
+      if (WRITE_ACTIONS.has(action) || (resourceType === 'authz' && action === 'query')) {
         allowed = false
       } else if (resourceType === 'user_identity') {
-        allowed = false
-      } else if (resourceType === 'authz' && action === 'query') {
         allowed = false
       }
     } else if (username === 'padmin' || username === 'project-admin') {
@@ -5388,6 +5483,9 @@ export const handlers = [
       } else {
         allowed = projectUserGrants[resourceType]?.has(action) ?? false
       }
+    }
+    if (resourceType === 'service_account') {
+      allowed = action === 'create' || action === 'read' || ['admin', 'demo'].includes(username)
     }
     // admin / demo / default: all actions allowed
 
@@ -5474,16 +5572,27 @@ export const handlers = [
     if (username === 'viewer') {
       return respond([
         { policy_name: 'viewer-policy', effect: 'allow', actions: ['read'], scope: 'system', project: '' },
+        authenticatedServiceAccountPolicy,
       ])
     }
 
     if (username === 'user') {
-      return respond([{ policy_name: 'user-policy', effect: 'allow', actions: ['read'], scope: 'system', project: '' }])
+      return respond([
+        { policy_name: 'user-policy', effect: 'allow', actions: ['read'], scope: 'system', project: '' },
+        authenticatedServiceAccountPolicy,
+      ])
     }
 
     if (username === 'auditor') {
       return respond([
-        { policy_name: 'auditor-policy', effect: 'allow', actions: ['read'], scope: 'system', project: '' },
+        {
+          policy_name: 'auditor-policy',
+          effect: 'allow',
+          actions: ['read', 'service_account:read'],
+          scope: 'system',
+          project: '',
+        },
+        authenticatedServiceAccountPolicy,
       ])
     }
 
@@ -5502,14 +5611,11 @@ export const handlers = [
             'role:create',
             'role:update',
             'role:delete',
-            'service_account:read',
-            'service_account:create',
-            'service_account:update',
-            'service_account:delete',
           ],
           scope: 'project',
           project: 'default',
         },
+        authenticatedServiceAccountPolicy,
       ])
     }
 
@@ -5522,6 +5628,7 @@ export const handlers = [
           scope: 'project',
           project: 'default',
         },
+        authenticatedServiceAccountPolicy,
       ])
     }
 

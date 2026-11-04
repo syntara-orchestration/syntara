@@ -144,7 +144,7 @@ describe('CredentialsTab', () => {
   })
 
   it('renders a table with credential data', () => {
-    render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+    render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
       wrapper,
     })
 
@@ -153,7 +153,7 @@ describe('CredentialsTab', () => {
   })
 
   it('renders column headers', () => {
-    render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+    render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
       wrapper,
     })
 
@@ -167,7 +167,7 @@ describe('CredentialsTab', () => {
   it('shows empty state when there are no credentials', () => {
     vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [] }))
 
-    render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+    render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
       wrapper,
     })
 
@@ -175,7 +175,7 @@ describe('CredentialsTab', () => {
   })
 
   it('renders the Create credential button', () => {
-    render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+    render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
       wrapper,
     })
 
@@ -183,7 +183,7 @@ describe('CredentialsTab', () => {
   })
 
   it('renders status switches for each credential', () => {
-    render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+    render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
       wrapper,
     })
 
@@ -192,7 +192,7 @@ describe('CredentialsTab', () => {
   })
 
   it('shows Never for credentials without expiry date', () => {
-    render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+    render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
       wrapper,
     })
 
@@ -205,7 +205,7 @@ describe('CredentialsTab', () => {
   describe('Delete credential flow', () => {
     it('shows confirmation dialog when delete is triggered', async () => {
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -229,7 +229,7 @@ describe('CredentialsTab', () => {
       )
 
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -253,7 +253,7 @@ describe('CredentialsTab', () => {
   describe('Rotate credential flow', () => {
     it('shows confirmation dialog with grace period select when rotate is triggered', async () => {
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -279,7 +279,7 @@ describe('CredentialsTab', () => {
       )
 
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -317,7 +317,7 @@ describe('CredentialsTab', () => {
       )
 
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" resourceProject="proj-1" />, { wrapper })
+      render(<CredentialsTab serviceAccountId="sa-1" />, { wrapper })
 
       const kebab = screen.getByRole('button', { name: 'Actions for client-id-abc' })
       await user.click(kebab)
@@ -353,7 +353,7 @@ describe('CredentialsTab', () => {
       vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: credsWithGracePeriod }))
 
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" resourceProject="proj-1" />, { wrapper })
+      render(<CredentialsTab serviceAccountId="sa-1" />, { wrapper })
 
       const kebab = screen.getByRole('button', { name: 'Actions for client-id-abc' })
       await user.click(kebab)
@@ -370,7 +370,7 @@ describe('CredentialsTab', () => {
   describe('Disable credential flow', () => {
     it('shows confirmation dialog when toggling an active credential', async () => {
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -391,7 +391,7 @@ describe('CredentialsTab', () => {
       )
 
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -412,7 +412,7 @@ describe('CredentialsTab', () => {
       })
 
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -446,7 +446,7 @@ describe('CredentialsTab', () => {
       })
 
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -477,7 +477,7 @@ describe('CredentialsTab', () => {
         buildQueryResult({ resources: maxCreds, max_credentials: 10, total_credentials: 10 })
       )
 
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -497,7 +497,7 @@ describe('CredentialsTab', () => {
       )
 
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -512,7 +512,7 @@ describe('CredentialsTab', () => {
 
   describe('Filtering', () => {
     it('shows dash for credentials with no last used date', () => {
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -524,7 +524,7 @@ describe('CredentialsTab', () => {
 
     it('passes status filter to the API query', async () => {
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -544,7 +544,7 @@ describe('CredentialsTab', () => {
 
     it('clears filters when clear all is clicked', async () => {
       const user = userEvent.setup()
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -585,7 +585,7 @@ describe('CredentialsTab', () => {
         })
       )
 
-      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />, {
+      render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
         wrapper,
       })
 
@@ -595,12 +595,9 @@ describe('CredentialsTab', () => {
 
   describe('Accessibility', () => {
     it('has no accessibility violations with credentials table', async () => {
-      const { container } = render(
-        <CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />,
-        {
-          wrapper,
-        }
-      )
+      const { container } = render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
+        wrapper,
+      })
 
       const results = await axe(container)
       expect(results).toHaveNoViolations()
@@ -617,12 +614,9 @@ describe('CredentialsTab', () => {
         buildQueryResult({ resources: maxCreds, max_credentials: 10, total_credentials: 10 })
       )
 
-      const { container } = render(
-        <CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />,
-        {
-          wrapper,
-        }
-      )
+      const { container } = render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
+        wrapper,
+      })
 
       const results = await axe(container)
       expect(results).toHaveNoViolations()
@@ -631,12 +625,9 @@ describe('CredentialsTab', () => {
     it('has no accessibility violations in empty state', async () => {
       vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [] }))
 
-      const { container } = render(
-        <CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" resourceProject="proj-1" />,
-        {
-          wrapper,
-        }
-      )
+      const { container } = render(<CredentialsTab serviceAccountId="sa-1" serviceAccountName="deploy-bot" />, {
+        wrapper,
+      })
 
       const results = await axe(container)
       expect(results).toHaveNoViolations()
