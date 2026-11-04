@@ -320,6 +320,13 @@ export interface components {
         [key: string]: unknown
       } | null
       /**
+       * Runtime Metadata
+       * @description Intermediate, UI-relevant execution metadata available before the final output
+       */
+      runtime_metadata?: {
+        [key: string]: unknown
+      } | null
+      /**
        * Error Details
        * @description Error information if failed
        */
@@ -351,6 +358,10 @@ export interface components {
       iteration?: number | null
       /** Output Data */
       output_data?: {
+        [key: string]: unknown
+      } | null
+      /** Runtime Metadata */
+      runtime_metadata?: {
         [key: string]: unknown
       } | null
       /** Started At */

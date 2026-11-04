@@ -472,6 +472,12 @@ components:
               type: object
             - type: 'null'
           title: Output Data
+        runtime_metadata:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+          title: Runtime Metadata
         started_at:
           anyOf:
             - type: string
@@ -726,6 +732,13 @@ components:
                 - type: 'null'
               description: Activity results (if completed)
               title: Output Data
+            runtime_metadata:
+              anyOf:
+                - additionalProperties: true
+                  type: object
+                - type: 'null'
+              description: Intermediate, UI-relevant execution metadata available before the final output
+              title: Runtime Metadata
             error_details:
               anyOf:
                 - type: string

@@ -12,6 +12,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.activity_data_output_data_type_0 import ActivityDataOutputDataType0
+    from ..models.activity_data_runtime_metadata_type_0 import ActivityDataRuntimeMetadataType0
 
 
 T = TypeVar("T", bound="ActivityData")
@@ -27,6 +28,7 @@ class ActivityData:
         error_details (None | str | Unset):
         iteration (int | None | Unset):
         output_data (ActivityDataOutputDataType0 | None | Unset):
+        runtime_metadata (ActivityDataRuntimeMetadataType0 | None | Unset):
         started_at (datetime.datetime | None | Unset):
         completed_at (datetime.datetime | None | Unset):
     """
@@ -36,12 +38,14 @@ class ActivityData:
     error_details: None | str | Unset = UNSET
     iteration: int | None | Unset = UNSET
     output_data: ActivityDataOutputDataType0 | None | Unset = UNSET
+    runtime_metadata: ActivityDataRuntimeMetadataType0 | None | Unset = UNSET
     started_at: datetime.datetime | None | Unset = UNSET
     completed_at: datetime.datetime | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.activity_data_output_data_type_0 import ActivityDataOutputDataType0
+        from ..models.activity_data_runtime_metadata_type_0 import ActivityDataRuntimeMetadataType0
 
         activity_id = self.activity_id
 
@@ -66,6 +70,14 @@ class ActivityData:
             output_data = self.output_data.to_dict()
         else:
             output_data = self.output_data
+
+        runtime_metadata: dict[str, Any] | None | Unset
+        if isinstance(self.runtime_metadata, Unset):
+            runtime_metadata = UNSET
+        elif isinstance(self.runtime_metadata, ActivityDataRuntimeMetadataType0):
+            runtime_metadata = self.runtime_metadata.to_dict()
+        else:
+            runtime_metadata = self.runtime_metadata
 
         started_at: None | str | Unset
         if isinstance(self.started_at, Unset):
@@ -97,6 +109,8 @@ class ActivityData:
             field_dict["iteration"] = iteration
         if output_data is not UNSET:
             field_dict["output_data"] = output_data
+        if runtime_metadata is not UNSET:
+            field_dict["runtime_metadata"] = runtime_metadata
         if started_at is not UNSET:
             field_dict["started_at"] = started_at
         if completed_at is not UNSET:
@@ -107,6 +121,7 @@ class ActivityData:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.activity_data_output_data_type_0 import ActivityDataOutputDataType0
+        from ..models.activity_data_runtime_metadata_type_0 import ActivityDataRuntimeMetadataType0
 
         d = dict(src_dict)
         activity_id = d.pop("activity_id")
@@ -148,6 +163,23 @@ class ActivityData:
 
         output_data = _parse_output_data(d.pop("output_data", UNSET))
 
+        def _parse_runtime_metadata(data: object) -> ActivityDataRuntimeMetadataType0 | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                runtime_metadata_type_0 = ActivityDataRuntimeMetadataType0.from_dict(data)
+
+                return runtime_metadata_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(ActivityDataRuntimeMetadataType0 | None | Unset, data)
+
+        runtime_metadata = _parse_runtime_metadata(d.pop("runtime_metadata", UNSET))
+
         def _parse_started_at(data: object) -> datetime.datetime | None | Unset:
             if data is None:
                 return data
@@ -188,6 +220,7 @@ class ActivityData:
             error_details=error_details,
             iteration=iteration,
             output_data=output_data,
+            runtime_metadata=runtime_metadata,
             started_at=started_at,
             completed_at=completed_at,
         )

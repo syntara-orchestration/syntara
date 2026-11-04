@@ -169,6 +169,7 @@ class ActivityExecutionSyncMixin:
             "error_details": existing.error_details,
             "retry_count": existing.retry_count,
             "output_data": existing.output_data,
+            "runtime_metadata": existing.runtime_metadata,
             "iteration": existing.iteration,
         }
 
@@ -177,6 +178,10 @@ class ActivityExecutionSyncMixin:
         existing.completed_at = activity_data["completed_at"]
         existing.input_data = input_data or {}
         existing.output_data = output_data
+        # Preserve runtime_metadata when a partial update omits the key; an explicit
+        # null (key present, value None) clears it. No populator sets it yet (C1).
+        if "runtime_metadata" in activity_data:
+            existing.runtime_metadata = activity_data["runtime_metadata"]
         existing.error_details = activity_data["error_details"]
         existing.retry_count = activity_data["retry_count"]
         if activity_data.get("iteration") is not None and not is_loop_control:
