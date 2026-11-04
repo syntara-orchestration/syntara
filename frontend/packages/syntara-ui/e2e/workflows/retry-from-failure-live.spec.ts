@@ -432,9 +432,7 @@ test.describe('Retry from failure — real backend', () => {
 
     await app.reload()
     // The header badge shows the first 8 characters of the source run id.
-    await expect(app.getByTestId('retried-from-badge')).toContainText(
-      `Retried from: ${run.executionId.slice(0, 8)}`
-    )
+    await expect(app.getByTestId('retried-from-badge')).toContainText(`Retried from: ${run.executionId.slice(0, 8)}`)
     await expect.poll(() => app.getByTestId('replayed-output-badge').count(), { timeout: 30_000 }).toBeGreaterThan(0)
   })
 
