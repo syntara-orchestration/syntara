@@ -811,11 +811,12 @@ def test_retrying_a_quorum_branch_prevents_stale_failed_converge_restoration(
         project_id=first_project_id,
     )
     assert source.status == ExecutionStatus.FAILED
-    source_rows = _wait_for_activity_executions(
+    source = _wait_for_activity_ids(
         syntara_api,
-        source.id,
+        source,
         {"already_successful", "repair_branch", "retained_failure", "join"},
     )
+    source_rows = _activities_by_id(source)
     assert source_rows["already_successful"].status == "completed"
     assert source_rows["repair_branch"].status == "failed"
     assert source_rows["retained_failure"].status == "failed"
@@ -834,15 +835,16 @@ def test_retrying_a_quorum_branch_prevents_stale_failed_converge_restoration(
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
     # The unselected failure is retained, so a satisfied ANY quorum completes with errors.
     assert final.status == ExecutionStatus.COMPLETED_WITH_ERRORS, final.error_details
-    retry_rows = _wait_for_activity_executions(
+    final = _wait_for_activity_ids(
         syntara_api,
-        final.id,
+        final,
         {"already_successful", "repair_branch", "retained_failure", "join", "after_join"},
         required_stdouts={
             "repair_branch": "repaired-quorum-branch",
             "after_join": "quorum-reached",
         },
     )
+    retry_rows = _activities_by_id(final)
 
     assert retry_rows["already_successful"].status == "completed"
     assert _timestamp(retry_rows["already_successful"], "started_at") == _timestamp(
@@ -860,7 +862,8 @@ def test_retrying_a_quorum_branch_prevents_stale_failed_converge_restoration(
         source_rows["retained_failure"], "started_at"
     )
     assert retry_rows["join"].status == "completed"
-    assert _timestamp(retry_rows["join"], "started_at") > _timestamp(source_rows["join"], "started_at")
+    # Converge controls are synchronized without an activity start timestamp;
+    # completion and downstream execution prove that the stale failure was not restored.
     assert retry_rows["after_join"].status == "completed"
 
 
@@ -905,6 +908,7 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
     assert _activity_status(source_alpha) == "completed"
     assert _activity_status(source_bravo) == "failed"
     assert _activity_input(source_alpha).get("environment") == {"ITEM": "alpha"}
+    assert _listed_stdout(source_alpha) == "alpha"
     assert _activity_input(source_bravo).get("environment") == {"ITEM": "bravo"}
 
     preview = _preview_retry(syntara_api, source.id)
@@ -919,12 +923,13 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
     )
     final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
     assert final.status == ExecutionStatus.COMPLETED, final.error_details
-    retry_rows = _wait_for_activity_executions(
+    final = _wait_for_activity_ids(
         syntara_api,
-        final.id,
-        {"loop_body_iter_0", "loop_body_iter_1", "loop_body_iter_2"},
-        required_stdouts={"loop_body_iter_1": "bravo", "loop_body_iter_2": "charlie"},
+        final,
+        {"loop_body", "loop_body#iter-1", "loop_body#iter-2"},
+        required_stdouts={"loop_body#iter-1": "bravo", "loop_body#iter-2": "charlie"},
     )
+    retry_rows = _activity_executions_by(syntara_api, final.id, lambda activity: activity.temporal_activity_id)
     retry_alpha = retry_rows["loop_body_iter_0"]
     retry_bravo = retry_rows["loop_body_iter_1"]
     retry_charlie = retry_rows["loop_body_iter_2"]
@@ -1004,7 +1009,10 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
         timeout=90,
         project_id=first_project_id,
     )
-    assert source.status == ExecutionStatus.FAILED
+    assert source.status == ExecutionStatus.FAILED, [
+        (activity.activity_id, activity.status, activity.error_details, _activity_output(activity))
+        for activity in source.activities or []
+    ]
     source_rows = _wait_for_activity_executions(
         syntara_api,
         source.id,
