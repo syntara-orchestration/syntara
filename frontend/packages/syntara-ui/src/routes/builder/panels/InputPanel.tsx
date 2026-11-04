@@ -76,10 +76,8 @@ function computeEffectiveUpstream(params: {
 }
 
 /**
- * Merge three data sources into a single input map. Precedence (highest wins):
- * 1. Real execution data (base layer, kept when present)
- * 2. Pinned output mocks from upstream nodes (fill gaps not covered by execution data)
- * 3. Input mocks for the current node (fill remaining gaps, highest precedence)
+ * Merge predecessor data by source. An upstream output mock overrides execution
+ * data for that predecessor, and this node's input mock fills any remaining gaps.
  */
 function computeMergedExecutionData(
   executionData: Record<string, Record<string, unknown>> | null | undefined,
@@ -90,7 +88,7 @@ function computeMergedExecutionData(
   const merged = { ...executionData }
   for (const upstream of effectiveUpstream) {
     const upstreamOutputMock = upstreamOutputMocks[upstream.id]
-    if (upstreamOutputMock && !merged[upstream.id]) {
+    if (upstreamOutputMock) {
       merged[upstream.id] = upstreamOutputMock
     }
   }
@@ -323,7 +321,7 @@ export function InputPanel({
   if (editingPredecessorId) {
     const editingNode = effectiveUpstream.find((n) => n.id === editingPredecessorId)
     const existingMock = nodeInputMocks?.[editingPredecessorId]
-    const executionOrUpstreamData = mergedExecutionData?.[editingPredecessorId]
+    const executionOrUpstreamData = executionData?.[editingPredecessorId] ?? upstreamOutputMocks[editingPredecessorId]
     const dataToStringify = existingMock ?? executionOrUpstreamData
     const initialJson = dataToStringify
       ? JSON.stringify(dataToStringify, null, 2)

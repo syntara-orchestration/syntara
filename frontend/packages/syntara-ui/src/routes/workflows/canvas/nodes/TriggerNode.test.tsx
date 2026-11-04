@@ -72,6 +72,17 @@ describe('TriggerStepComponent', () => {
     expect(screen.getByLabelText('Step actions menu')).toBeInTheDocument()
   })
 
+  it('keeps the high contrast panel edge on the trigger pill radius', () => {
+    render(<TriggerStepComponent {...createNodeProps()} />)
+
+    expect(screen.getByTestId('trigger-step')).toHaveStyle({
+      borderTopLeftRadius: '75px',
+      borderBottomLeftRadius: '75px',
+      '--pf-v6-c-panel--BorderRadius':
+        '75px var(--pf-t--global--border--radius--medium) var(--pf-t--global--border--radius--medium) 75px',
+    })
+  })
+
   it('hides the step actions menu in execution view', () => {
     render(
       <ExecutionViewContext.Provider value={true}>

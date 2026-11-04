@@ -32,9 +32,9 @@ import {
   buildAAPWorkflowTemplateConfig,
   buildExpressionModeActivity,
   buildWorkflowExpressionModeActivity,
-  hasExpressionValue,
   isJobTemplateInputVariablesMode,
   isWorkflowTemplateInputVariablesMode,
+  resolveJobTemplateUseInputVariables,
   resolveWorkflowUseInputVariables,
   validateJobTemplateId,
   validateWorkflowTemplateId,
@@ -228,29 +228,6 @@ function getStringField(config: Record<string, unknown>, ...keys: string[]): str
   return undefined
 }
 
-function resolveUseInputVariables(params: {
-  c: StoredAAPConfig
-  organizationName: string
-  jobTemplateName: string
-  inventoryName: string
-  extraVars: string
-}): boolean {
-  const { c, organizationName, jobTemplateName, inventoryName, extraVars } = params
-  return (
-    c.use_input_variables === true ||
-    c.useInputVariables === true ||
-    hasExpressionValue(
-      organizationName,
-      jobTemplateName,
-      inventoryName,
-      c.limit ?? '',
-      c.tags ?? '',
-      c.skip_tags ?? c.skipTags ?? '',
-      extraVars
-    )
-  )
-}
-
 function buildAAPInitialData(taskName: string, config: Record<string, unknown>): Partial<AAPJobTemplateFormData> {
   if (!hasJobTemplateConfig(config)) {
     return { name: taskName }
@@ -285,13 +262,7 @@ function buildAAPInitialData(taskName: string, config: Record<string, unknown>):
     instance_group: getField(c.instance_group_name, c.instanceGroupName, ''),
     instance_group_id: c.instance_group_id ?? c.instanceGroupId,
     labels: c.labels ?? [],
-    use_input_variables: resolveUseInputVariables({
-      c,
-      organizationName,
-      jobTemplateName,
-      inventoryName,
-      extraVars,
-    }),
+    use_input_variables: resolveJobTemplateUseInputVariables(c),
   }
 }
 
