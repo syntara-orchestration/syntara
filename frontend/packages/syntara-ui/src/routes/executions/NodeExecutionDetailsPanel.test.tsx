@@ -42,14 +42,6 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   }
 })
 
-const mockUseSubWorkflowChildData = vi.fn()
-vi.mock('../builder/panels/hooks/useSubWorkflowChildData', () => ({
-  useSubWorkflowChildData: (...args: unknown[]) =>
-    mockUseSubWorkflowChildData(...args) as ReturnType<
-      typeof import('../builder/panels/hooks/useSubWorkflowChildData').useSubWorkflowChildData
-    >,
-}))
-
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 })
@@ -74,7 +66,6 @@ describe('NodeExecutionDetailsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUseQuery.mockReturnValue({ data: mockActivityData, isLoading: false, error: null, refetch: vi.fn() })
-    mockUseSubWorkflowChildData.mockReturnValue({ childData: [], isLoading: false, isError: false, isTruncated: false })
   })
 
   it('renders the node name in the header', () => {
@@ -751,123 +742,67 @@ describe('NodeExecutionDetailsPanel', () => {
     }
 
     beforeEach(() => {
-      mockUseSubWorkflowChildData.mockReturnValue({
-        childData: [
-          {
-            child: { id: 'child-1', workflow_name: 'Child WF', workflow_version: 2, status: 'completed' },
-            activities: [
-              {
-                activity_name: 'build_greeting',
-                node_type: 'script',
-                status: 'completed',
-                output_data: { stdout: 'child out' },
-                error_details: null,
-                started_at: null,
-                completed_at: null,
+      // The sub-workflow node's own persisted output carries the child-execution reference.
+      mockUseQuery.mockReturnValue({
+        data: {
+          resources: [
+            {
+              activity_name: 'run_child',
+              node_type: 'sub_workflow',
+              status: 'completed',
+              output_data: {
+                workflow_id: 'wf-1',
+                workflow_name: 'Child WF',
+                child_execution_id: 'child-1',
+                child_workflow_version: 1,
               },
-            ],
-            isTruncated: false,
-          },
-        ],
+              input_data: { input_parameters: { username: 'rohit' } },
+            },
+          ],
+        },
         isLoading: false,
-        isError: false,
-        isTruncated: false,
-      })
-      mockUseQuery.mockImplementation((...args: unknown[]) => {
-        const path = args[1]
-        const opts = args[2] as { params?: { query?: Record<string, unknown> } } | undefined
-        const query = opts?.params?.query ?? {}
-        if (path === '/executions/{execution_id}/children') {
-          return {
-            data: {
-              resources: [{ id: 'child-1', workflow_name: 'Child WF', workflow_version: 2, status: 'completed' }],
-            },
-            isLoading: false,
-            error: null,
-            refetch: vi.fn(),
-          }
-        }
-        if (query.activity_name) {
-          // The sub-workflow node's own persisted output (carries the child reference).
-          return {
-            data: {
-              resources: [
-                {
-                  activity_name: 'run_child',
-                  node_type: 'sub_workflow',
-                  status: 'completed',
-                  output_data: {
-                    workflow_id: 'wf-1',
-                    workflow_name: 'Child WF',
-                    child_execution_id: 'child-1',
-                    child_workflow_version: 1,
-                  },
-                  input_data: { input_parameters: { username: 'rohit' } },
-                },
-              ],
-            },
-            isLoading: false,
-            error: null,
-            refetch: vi.fn(),
-          }
-        }
-        // Child execution's own activities (Child activities tab).
-        return {
-          data: {
-            resources: [
-              {
-                id: 'a1',
-                activity_name: 'build_greeting',
-                node_type: 'script',
-                status: 'completed',
-                output_data: { stdout: 'child out' },
-              },
-            ],
-          },
-          isLoading: false,
-          error: null,
-          refetch: vi.fn(),
-        }
+        error: null,
+        refetch: vi.fn(),
       })
     })
 
-    it('defaults to Input/Output with the output-view toggle and a contextual header link', () => {
+    it('shows Input/Output content with a contextual child-run link and no Child activities tab', () => {
       render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
 
-      expect(screen.getByRole('tab', { name: 'Input/Output' })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: 'Child activities' })).toBeInTheDocument()
+      // Input/Output panes render directly; a sub-workflow node has no tab bar.
       expect(screen.getByText('Parameters')).toBeInTheDocument()
-      // Child-activities panel (tab content) is not rendered on the default tab.
-      expect(screen.queryByRole('button', { name: /View child execution/i })).not.toBeInTheDocument()
+      expect(screen.getByText('Output')).toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: 'Child activities' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('tab')).not.toBeInTheDocument()
       // Contextual link to the child run, in the selected-activity header.
       expect(screen.getByRole('link', { name: /View sub-workflow run: Child WF/i })).toBeInTheDocument()
-      expect(screen.getByText('Output view:')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'About output views' })).toBeInTheDocument()
     })
 
-    it('composes the child activities into the Output panel (With child data view)', async () => {
+    it('does not render any inline child-activity inspection UI', () => {
       render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
 
-      await userEvent.click(screen.getByRole('button', { name: 'With child data' }))
-
-      expect(screen.getAllByText(/child_activities/).length).toBeGreaterThan(0)
-      expect(screen.getAllByText(/child out/).length).toBeGreaterThan(0)
+      // No output-view toggle, no composed child-activity view, no child-step inspection.
+      expect(screen.queryByText('Output view:')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'With child data' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Saved output' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'About output views' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /View child execution/i })).not.toBeInTheDocument()
     })
 
-    it('shows the saved (persisted) output by default', () => {
+    it('shows the persisted (saved) output without injecting child-step data', () => {
       render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
 
       expect(screen.getAllByText(/child_execution_id/).length).toBeGreaterThan(0)
       expect(screen.queryAllByText(/child_activities/)).toHaveLength(0)
     })
 
-    it('shows the child-activities panel when the Child activities tab is selected', async () => {
+    it('links to the child execution by its id', () => {
       render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
 
-      await userEvent.click(screen.getByRole('tab', { name: 'Child activities' }))
-
-      expect(screen.getByRole('button', { name: /View child execution/i })).toBeInTheDocument()
-      expect(screen.queryByText('Parameters')).not.toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /View sub-workflow run: Child WF/i })).toHaveAttribute(
+        'href',
+        '/executions/child-1'
+      )
     })
 
     it('does not render a Child activities tab or header link for non sub-workflow nodes', () => {

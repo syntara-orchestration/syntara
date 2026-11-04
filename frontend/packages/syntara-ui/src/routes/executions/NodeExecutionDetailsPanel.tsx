@@ -32,9 +32,6 @@ import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { highlightTextLines } from '../../utils/highlightText'
 import { ActivityStatusLabel } from '../builder/ExecutionStatus'
-import { composeSubWorkflowOutput } from '../builder/panels/composeSubWorkflowOutput'
-import { useSubWorkflowChildData } from '../builder/panels/hooks/useSubWorkflowChildData'
-import { SubWorkflowChildActivities } from '../builder/panels/SubWorkflowChildActivities'
 import { InputSchemaView } from '../builder/panels/views/InputSchemaView'
 import { InputTableView } from '../builder/panels/views/InputTableView'
 import { ViewToggle, type PanelView } from '../builder/panels/ViewToggle'
@@ -47,7 +44,7 @@ import { extractAgentTrace } from './agentTraceTypes'
 import { AgentTraceView } from './AgentTraceView'
 import { useNodeExecutionDetails } from './hooks/useNodeExecutionDetails'
 import styles from './NodeExecutionDetailsPanel.module.css'
-import { NodeDetailTabBar, SubWorkflowOutputView } from './NodeExecutionDetailsViews'
+import { NodeDetailTabBar } from './NodeExecutionDetailsViews'
 import { nodeTabPanelAttrs } from './nodeTabPanel'
 import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
 
@@ -328,7 +325,7 @@ type NodeContentAreaProps = Readonly<{
   refetch: () => Promise<unknown>
   nodeIsFailed: boolean
   isAgenticNode: boolean
-  activeTab: 'io' | 'agent-steps' | 'child-activities'
+  activeTab: 'io' | 'agent-steps'
 }>
 
 function NodeContentArea({
@@ -379,50 +376,6 @@ function NodeContentArea({
   )
 }
 
-function NodeDetailBody({
-  isSubWorkflowNode,
-  executionId,
-  nodeId,
-  inputData,
-  outputData,
-  isLoading,
-  error,
-  refetch,
-  nodeIsFailed,
-  isAgenticNode,
-  activeTab,
-}: Readonly<NodeContentAreaProps & { isSubWorkflowNode: boolean; executionId?: string }>) {
-  if (isSubWorkflowNode && executionId && activeTab === 'child-activities') {
-    return (
-      <div style={{ height: '100%', overflow: 'auto' }}>
-        <SubWorkflowChildActivities parentExecutionId={executionId} nodeId={nodeId} />
-      </div>
-    )
-  }
-  return (
-    <NodeContentArea
-      nodeId={nodeId}
-      inputData={inputData}
-      outputData={outputData}
-      isLoading={isLoading}
-      error={error}
-      refetch={refetch}
-      nodeIsFailed={nodeIsFailed}
-      isAgenticNode={isAgenticNode}
-      activeTab={activeTab}
-    />
-  )
-}
-
-function resolveOutputPaneData(
-  isSubWorkflowNode: boolean,
-  outputMode: 'composed' | 'persisted',
-  enrichedOutput: Record<string, unknown> | null,
-  outputData: Record<string, unknown> | null
-): Record<string, unknown> | null {
-  return isSubWorkflowNode && outputMode === 'composed' ? enrichedOutput : outputData
-}
-
 export function NodeExecutionDetailsPanel({
   nodeId,
   nodeName,
@@ -430,14 +383,14 @@ export function NodeExecutionDetailsPanel({
   nodeState,
   nodeType,
 }: Readonly<NodeExecutionDetailsPanelProps>) {
-  const [activeTab, setActiveTab] = useState<'io' | 'agent-steps' | 'child-activities'>('io')
+  const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
   const isAgenticNode = nodeType === ActivityTypeEnum.AGENTIC
   const isSubWorkflowNode = nodeType === ActivityTypeEnum.SUB_WORKFLOW
-  // Tab/panel wiring: the Input/Output, Agent steps and Child activities tabs render
-  // their content in a shared region below. Give that region role="tabpanel" and point
-  // its aria-labelledby at the active tab's button so assistive tech gets the tab-to-panel
-  // relationship (PatternFly composes a tab button's id as `pf-tab-{eventKey}-{id}`).
-  const hasNodeTabs = isAgenticNode || isSubWorkflowNode
+  // Tab/panel wiring: the Input/Output and Agent steps tabs render their content in a
+  // shared region below. Give that region role="tabpanel" and point its aria-labelledby
+  // at the active tab's button so assistive tech gets the tab-to-panel relationship
+  // (PatternFly composes a tab button's id as `pf-tab-{eventKey}-{id}`).
+  const hasNodeTabs = isAgenticNode
   const tabsBaseId = useId()
   const { inputData, outputData, isLoading, error, refetch } = useNodeExecutionDetails(
     nodeId,
@@ -455,25 +408,8 @@ export function NodeExecutionDetailsPanel({
   const { elapsedMs } = useElapsedTime(nodeStarted, nodeCompleted, nodeIsRunning)
   const nodeElapsedLabel = elapsedMs === undefined ? undefined : formatElapsedTime(elapsedMs)
 
-  // Display-time enrichment for sub-workflow nodes: fetch the child execution(s)
-  // and their persisted activities (read-only; shared cache with the Child
-  // activities tab). Disabled for non-sub-workflow nodes via the undefined parent id.
-  const [outputMode, setOutputMode] = useState<'composed' | 'persisted'>('persisted')
-  const subWorkflowData = useSubWorkflowChildData(isSubWorkflowNode ? executionId : undefined, nodeId)
-  const enrichedOutput = useMemo(
-    () =>
-      isSubWorkflowNode
-        ? composeSubWorkflowOutput({
-            outputData,
-            inputParameters: inputData?.input_parameters,
-            nodeStatus: nodeState?.status,
-            childData: subWorkflowData.childData,
-          })
-        : null,
-    [isSubWorkflowNode, outputData, inputData, nodeState?.status, subWorkflowData.childData]
-  )
+  // Link to the child execution for a sub-workflow node, read from its persisted output.
   const subWorkflowChild = isSubWorkflowNode ? extractSubWorkflowChild(outputData) : null
-  const outputPaneData = resolveOutputPaneData(isSubWorkflowNode, outputMode, enrichedOutput, outputData)
 
   return (
     <Stack className={styles.contentContainer}>
@@ -497,23 +433,13 @@ export function NodeExecutionDetailsPanel({
 
       <AAPJobLink outputData={outputData} nodeType={nodeType} />
 
-      {/* Tab bar for agentic nodes (Input/Output | Agent steps) and sub-workflow
-          nodes (Input/Output | Child activities). Input/Output stays the default. */}
+      {/* Tab bar for agentic nodes (Input/Output | Agent steps). Input/Output stays the default. */}
       {hasNodeTabs && (
         <NodeDetailTabBar
           activeTab={activeTab}
           onTabChange={setActiveTab}
           isAgenticNode={isAgenticNode}
-          isSubWorkflowNode={isSubWorkflowNode}
           idBase={tabsBaseId}
-        />
-      )}
-
-      {isSubWorkflowNode && activeTab === 'io' && (
-        <SubWorkflowOutputView
-          outputMode={outputMode}
-          onOutputModeChange={setOutputMode}
-          subWorkflowData={subWorkflowData}
         />
       )}
 
@@ -522,12 +448,10 @@ export function NodeExecutionDetailsPanel({
         style={{ minHeight: 0, overflow: 'hidden' }}
         {...nodeTabPanelAttrs(hasNodeTabs, tabsBaseId, activeTab)}
       >
-        <NodeDetailBody
-          isSubWorkflowNode={isSubWorkflowNode}
-          executionId={executionId}
+        <NodeContentArea
           nodeId={nodeId}
           inputData={inputData}
-          outputData={outputPaneData}
+          outputData={outputData}
           isLoading={isLoading}
           error={error}
           refetch={refetch}
