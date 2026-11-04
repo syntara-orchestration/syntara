@@ -669,11 +669,11 @@ describe('flat ESLint config rule inheritance', () => {
   it('applies import restrictions only in the intended source profiles', async () => {
     const iconSourceMessages = await lintMessages(
       'src/routes/access-management/AssignRoleModal.tsx',
-      "import { SearchIcon } from '@patternfly/react-icons'; export { SearchIcon }"
+      "import { WrenchIcon } from '@patternfly/react-icons'; export { WrenchIcon }"
     )
     const iconTestMessages = await lintMessages(
       'src/routes/access-management/groupFieldHelp.test.tsx',
-      "import { SearchIcon } from '@patternfly/react-icons'; export { SearchIcon }"
+      "import { WrenchIcon } from '@patternfly/react-icons'; export { WrenchIcon }"
     )
     const bridgeImportMessages = await lintMessages(
       'src/routes/access-management/AssignRoleModal.tsx',
@@ -697,7 +697,7 @@ describe('flat ESLint config rule inheritance', () => {
     )
 
     expect(
-      iconSourceMessages.some((message) => message.ruleId === 'no-restricted-imports' && message.severity === 1)
+      iconSourceMessages.some((message) => message.ruleId === 'no-restricted-imports' && message.severity === 2)
     ).toBe(true)
     expect(iconTestMessages.some((message) => message.ruleId === 'no-restricted-imports')).toBe(false)
     expect(bridgeImportMessages.some((message) => message.ruleId === '@typescript-eslint/no-restricted-imports')).toBe(
@@ -713,6 +713,24 @@ describe('flat ESLint config rule inheritance', () => {
       false
     )
     expect(synLinkMessages.some((message) => message.ruleId === '@typescript-eslint/no-restricted-imports')).toBe(false)
+  })
+
+  it('allows approved icon names and rejects all other PatternFly icons', async () => {
+    const approvedIconMessages = await lintMessages(
+      'src/routes/access-management/AssignRoleModal.tsx',
+      "import { RhUiAddIcon, RhUiSearchIcon, AnsibleTowerIcon, GlobeIcon, PlusCircleIcon, SearchIcon } from '@patternfly/react-icons'; export { RhUiAddIcon, RhUiSearchIcon, AnsibleTowerIcon, GlobeIcon, PlusCircleIcon, SearchIcon }"
+    )
+    const restrictedIconMessages = await lintMessages(
+      'src/routes/access-management/AssignRoleModal.tsx',
+      "import { WrenchIcon, SearchIconAlt } from '@patternfly/react-icons'; export { WrenchIcon, SearchIconAlt }"
+    )
+    const restrictedIconViolations = restrictedIconMessages.filter(
+      (message) => message.ruleId === 'no-restricted-imports'
+    )
+
+    expect(approvedIconMessages.some((message) => message.ruleId === 'no-restricted-imports')).toBe(false)
+    expect(restrictedIconViolations).toHaveLength(2)
+    expect(restrictedIconViolations.every((message) => message.severity === 2)).toBe(true)
   })
 
   it('keeps Storybook export/import exceptions in the story profile', async () => {
