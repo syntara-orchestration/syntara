@@ -447,6 +447,12 @@ services:
     environment:
       - EP_API_HOST=0.0.0.0
       - EP_API_PORT=8443
+      # Namespace the EP provisions the default execution target in and the
+      # worker dispatches Jobs to: must match the namespace the e2e kind setup
+      # applies the syntara-dispatcher RBAC in (deploy_kind_execution_target's
+      # --namespace, default execution-plane). Unset, EP defaults to "default",
+      # where the dispatcher SA holds no permissions (403 on every dispatch).
+      - EP_DEFAULT_WORKLOAD_NAMESPACE=${EP_DEFAULT_WORKLOAD_NAMESPACE:-execution-plane}
       - EP_API_TLS_CERT_PATH=/run/secrets/ep-api/tls.crt
       - EP_API_TLS_KEY_PATH=/run/secrets/ep-api/tls.key
       - EP_API_TLS_CLIENT_CA_PATH=/run/secrets/ep-api/ca.pem
@@ -482,6 +488,7 @@ services:
     environment:
       - EP_DATABASE_URL=postgresql+asyncpg://execution_plane_runtime:${EP_DB_RUNTIME_PASSWORD:-ep-runtime}@database:5432/execution_plane
       - EP_CREDENTIAL_ENCRYPTION_KEY_PATH=/run/secrets/ep-credential-encryption-key
+      - EP_DEFAULT_WORKLOAD_NAMESPACE=${EP_DEFAULT_WORKLOAD_NAMESPACE:-execution-plane}
       - EP_COMPLETION_CALLBACK_URL=https://syntara:8000/api/execution_plane/v1/commands
       - EP_CALLBACK_CA_CERT_PATH=/run/secrets/s2s-ca.pem
       - EP_CALLBACK_CERT_PATH=/run/secrets/ep-callback.crt
