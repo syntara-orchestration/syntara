@@ -24,9 +24,6 @@ services:
   execution-plane-db-init:
     profiles:
       - execution-plane
-    build:
-      context: ../syntara-execution-plane
-      dockerfile: ./Containerfile
     image: ${POSTGRES_IMAGE:-quay.io/sclorg/postgresql-15-c9s}
     entrypoint: ["/bin/sh", "-ec"]
     command:
