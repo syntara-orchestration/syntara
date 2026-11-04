@@ -347,7 +347,7 @@ class TestRetryRejectionMetrics:
 
     @pytest.mark.asyncio
     async def test_plain_retry_records_rejection_for_nonexistent_execution(self) -> None:
-        """Plain retry records rejection metric when execution not found."""
+        """Standard retry records rejection metric when execution not found."""
         exec_result = Mock()
         exec_result.one_or_none.return_value = None
         mock_session = Mock(spec=AsyncSession)
@@ -367,7 +367,7 @@ class TestRetryRejectionMetrics:
         ):
             await service.retry_execution(non_existent_id)
 
-        mock_record.assert_called_once_with("plain", "rejected")
+        mock_record.assert_called_once_with("standard", "rejected")
 
     @pytest.mark.asyncio
     async def test_retry_from_failure_records_rejection_for_nonexistent_execution(self) -> None:
