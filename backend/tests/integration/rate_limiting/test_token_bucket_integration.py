@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
 import pytest_asyncio
 
+import syntara.rate_limiting.token_bucket as token_bucket_module
 from syntara.rate_limiting.redis_client import RateLimitRedisClient
 from syntara.rate_limiting.token_bucket import TokenBucket
 
@@ -99,18 +101,23 @@ class TestTokenRefill:
         assert result.remaining >= 3
 
     @pytest.mark.asyncio
-    async def test_full_refill_after_window(self, rate_limit_client: RateLimitRedisClient) -> None:
+    async def test_full_refill_after_window(
+        self, rate_limit_client: RateLimitRedisClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """After a full window elapses, the bucket is back to max capacity."""
         user = _unique_user()
         tb = TokenBucket(redis_client=rate_limit_client)
+        clock = SimpleNamespace(now=1_000.0)
+        monkeypatch.setattr(token_bucket_module, "time", SimpleNamespace(time=lambda: clock.now))
 
         for _ in range(5):
-            await tb.consume(user_id=user, max_tokens=5, window_seconds=1)
+            result = await tb.consume(user_id=user, max_tokens=5, window_seconds=1)
+            assert result.allowed is True
 
         denied = await tb.consume(user_id=user, max_tokens=5, window_seconds=1)
         assert denied.allowed is False
 
-        await asyncio.sleep(1.1)
+        clock.now += 1.1
 
         result = await tb.consume(user_id=user, max_tokens=5, window_seconds=1)
         assert result.allowed is True

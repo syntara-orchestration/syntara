@@ -5,7 +5,7 @@ from uuid import UUID
 
 import structlog
 from fastapi import Depends, Query, Request, Response, status
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.service import RPCError
 
@@ -24,8 +24,11 @@ from syntara.workflows.models.execution import (
     ExecutionCreate,
     ExecutionListResponse,
     ExecutionRead,
+    RetryFailureRequest,
+    RetryFromFailureValidationResponse,
 )
 from syntara.workflows.models.query_params import ActivityListParams, ExecutionIncludeParams
+from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.services import ExecutionService
 from syntara.workflows.workflow_engine.services.temporal_execution_service import (
     TemporalExecutionService,
@@ -299,6 +302,103 @@ async def retry_execution(
     """Retry a completed workflow execution."""
     logger.info("Retrying execution", execution_id=execution_id)
     return await service.retry_execution(execution_id)
+
+
+@router.get(
+    "/{execution_id}/retry_from_failure_preview",
+    operation_id="retry_from_failure_preview",
+    summary="Preview retry from failure",
+    description="Report whether an execution can be retried from its failure points, and what would re-run. "
+    "An optional retry_point_ids query parameter previews a selected subset; when omitted, the preview uses "
+    "all currently failed nodes. Returns the eligible retry points, the re-run step count for each, the "
+    "deduplicated total, and completed results retained outside the retry paths. Purely informational: the "
+    "retry endpoint independently re-validates the selection and any input parameter overrides. "
+    "Never mutates any state.",
+    response_model=RetryFromFailureValidationResponse,
+    response_description="Retry preview",
+    dependencies=[Depends(_exec_perm_run)],
+)
+async def retry_from_failure_preview(
+    execution_id: UUID,
+    service: Annotated[ExecutionService, Depends(get_execution_service)],
+    retry_point_ids: Annotated[
+        list[str] | None,
+        Query(
+            description=(
+                "Optional failure points to preview. Repeat the parameter to preview a subset; "
+                "omitting it previews all currently failed points."
+            )
+        ),
+    ] = None,
+) -> RetryFromFailureValidationResponse:
+    """Preview what a retry from failure would do, without mutating state."""
+    logger.info("Previewing retry from failure", execution_id=execution_id, retry_point_ids=retry_point_ids)
+    return await service.preview_retry_from_failure(execution_id, retry_point_ids)
+
+
+@router.post(
+    "/{execution_id}/retry_from_failure",
+    operation_id="retry_from_failure",
+    summary="Retry from failure",
+    description="Retry a failed execution from the given failure points, optionally overriding "
+    "input parameters of the starting nodes for this run only. "
+    "Independently repeats all validation checks, then creates a new execution "
+    "linked to the source and triggers a Temporal run carrying retry context.",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ExecutionRead,
+    response_description="New execution created from retry",
+    dependencies=[Depends(_exec_perm_run)],
+)
+async def retry_from_failure(
+    execution_id: UUID,
+    body: RetryFailureRequest,
+    request: Request,
+    service: Annotated[ExecutionService, Depends(get_execution_service)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ExecutionRead:
+    """Retry a failed execution from failure points."""
+    # AC-14: changing resolved inputs is a workflow edit, scoped to the
+    # workflow associated with the original execution. A retry without values
+    # to override still requires only execution:run.
+    if any(body.input_parameter_overrides.values()):
+        workflow_context_result = await db.exec(
+            select(Execution.workflow_id, Workflow.labels, Project.name)
+            .join(Workflow, col(Workflow.id) == col(Execution.workflow_id))
+            .outerjoin(Project, col(Project.id) == col(Workflow.project_id))
+            .where(Execution.id == execution_id)
+        )
+        workflow_context = workflow_context_result.first()
+        if workflow_context is not None:
+            workflow_id, workflow_labels, resource_project = workflow_context
+            authz_result = await authorize(
+                db,
+                get_authz_evaluator(request),
+                AuthzRequest(
+                    user_id=current_user.id,
+                    action="update",
+                    resource_type="workflow",
+                    resource_id=str(workflow_id),
+                    resource_project=resource_project or "",
+                    resource_labels=dict(workflow_labels or {}),
+                    user_labels=current_user.labels,
+                    user_metadata=current_user.authz_metadata,
+                ),
+            )
+            if not authz_result.allowed:
+                logger.info(
+                    "Authorization denied",
+                    user_id=str(current_user.id),
+                    resource_type="workflow",
+                    action="update",
+                    resource_id=str(workflow_id),
+                    denied_by=authz_result.denied_by,
+                )
+                msg = "Not authorized to perform update on workflow"
+                raise AuthorizationDeniedError(msg)
+
+    logger.info("Retrying execution from failure", execution_id=execution_id)
+    return await service.retry_from_failure(execution_id, body.retry_point_ids, body.input_parameter_overrides)
 
 
 @router.get(

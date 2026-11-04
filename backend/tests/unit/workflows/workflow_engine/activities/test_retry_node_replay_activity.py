@@ -1,0 +1,686 @@
+"""Stored-output resolution for retry-from-failure .
+
+These outputs are injected into a run in place of the nodes it skipped, so a
+wrong one is a silently wrong result rather than a failure.
+"""
+
+from datetime import UTC, datetime
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from syntara.workflows.models.activity_execution import ActivityStatus
+from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import (
+    _result_digest,
+    fetch_retry_converge_metadata_activity,
+    replay_retry_node_activity,
+    retry_control_ports,
+)
+from syntara.workflows.workflow_engine.constants import RESTORABLE_SOURCE_STATUSES
+
+
+class _Row:
+    """Minimal stand-in for an ActivityExecution row."""
+
+    def __init__(
+        self,
+        activity_name: str,
+        status: ActivityStatus,
+        output: dict[str, Any] | None,
+        input_data: dict[str, Any] | None = None,
+        started_at: datetime | None = None,
+        completed_at: datetime | None = None,
+        error_details: str | None = None,
+        control_data: dict[str, Any] | None = None,
+        temporal_activity_id: str | None = None,
+    ) -> None:
+        self.activity_name = activity_name
+        self.temporal_activity_id = temporal_activity_id or activity_name
+        self.status = status
+        self.output_data = output
+        self.input_data = input_data
+        self.started_at = started_at
+        self.completed_at = completed_at
+        self.error_details = error_details
+        self.control_data = control_data
+
+
+def _mock_session(rows: list[Any]) -> AsyncMock:
+    session = AsyncMock()
+    result = MagicMock()
+    result.first.return_value = rows[0] if rows else None
+    session.exec.return_value = result
+    return session
+
+
+async def _run(
+    rows: list[Any],
+    node_id: str | None,
+    *,
+    temporal_activity_id: str | None = None,
+) -> dict[str, Any] | None:
+    # The mock session does not execute SQL, so apply its predicates here: row
+    # identity is the canonical Temporal ID, never the display activity name.
+    wanted = temporal_activity_id or (node_id.strip() if node_id else "")
+    matching_rows = [
+        row for row in rows if row.status in RESTORABLE_SOURCE_STATUSES and row.temporal_activity_id == wanted
+    ]
+    session = _mock_session(matching_rows)
+
+    async def mock_get_db():  # noqa: ANN202
+        yield session
+
+    with patch(
+        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        mock_get_db,
+    ):
+        return await replay_retry_node_activity("src-1", node_id, wanted) if node_id is not None else None
+
+
+@pytest.mark.asyncio
+async def test_returns_completed_output_for_a_node() -> None:
+    """A completed node's stored output is what gets injected in its place."""
+    rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
+
+    assert await _run(rows, "step_1") == {
+        "status": "completed",
+        "error_details": None,
+        "control_data": None,
+        "input_data": {},
+        "output_data": {"result": "ok"},
+        "started_at": None,
+        "completed_at": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_only_requested_nodes_are_returned() -> None:
+    """Unrelated rows in the execution must not be pulled in.
+
+    The name match happens in the query, so the worker only ever holds the
+    requested node's row and payload.
+    """
+    rows = [
+        _Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"}),
+        _Row("step_2", ActivityStatus.COMPLETED, {"result": "other"}),
+    ]
+
+    assert await _run(rows, "step_1") == {
+        "status": "completed",
+        "error_details": None,
+        "control_data": None,
+        "input_data": {},
+        "output_data": {"result": "ok"},
+        "started_at": None,
+        "completed_at": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_nested_loop_restore_selects_the_exact_temporal_path() -> None:
+    rows = [
+        _Row(
+            "step#iter-1",
+            ActivityStatus.COMPLETED,
+            {"value": "outer-0"},
+            temporal_activity_id="step_iter_0_iter_1",
+        ),
+        _Row(
+            "step#iter-2",
+            ActivityStatus.COMPLETED,
+            {"value": "outer-2"},
+            temporal_activity_id="step_iter_2_iter_1",
+        ),
+    ]
+
+    answer = await _run(
+        rows,
+        "step#iter-2",
+        temporal_activity_id="step_iter_2_iter_1",
+    )
+
+    assert answer is not None
+    assert answer["output_data"] == {"value": "outer-2"}
+
+
+@pytest.mark.asyncio
+async def test_nested_loop_restore_does_not_guess_from_the_global_iteration_name() -> None:
+    rows = [
+        _Row(
+            "step#iter-2",
+            ActivityStatus.COMPLETED,
+            {"value": "wrong-outer-iteration"},
+            temporal_activity_id="step_iter_2_iter_0",
+        )
+    ]
+
+    answer = await _run(
+        rows,
+        "step#iter-2",
+        temporal_activity_id="step_iter_1_iter_2",
+    )
+
+    assert answer is None
+
+
+@pytest.mark.asyncio
+async def test_a_node_with_no_restorable_record_is_absent_not_empty() -> None:
+    """Absent distinguishes "nothing recorded" from "ran and produced nothing".
+
+    A node with no restorable record cannot be replayed, because there would be
+    nothing to inject. Returning an empty dict for it would let the caller skip it
+    and leave downstream expressions unresolved.
+
+    A FAILED node *is* restorable, so it is used here only as a name that has no row
+    at all — the row list is what decides, not the status.
+    """
+    assert await _run([_Row("step_1", ActivityStatus.FAILED, None)], "never_ran") is None
+
+
+@pytest.mark.asyncio
+async def test_completed_node_with_no_output_returns_empty_dict() -> None:
+    """A node that completed but produced nothing is an empty output, not absent."""
+    rows = [_Row("step_1", ActivityStatus.COMPLETED, None)]
+
+    assert await _run(rows, "step_1") == {
+        "status": "completed",
+        "error_details": None,
+        "control_data": None,
+        "input_data": {},
+        "output_data": {},
+        "started_at": None,
+        "completed_at": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_iteration_suffixed_request_is_not_resolved_to_a_base_node() -> None:
+    """A display-style iteration name does not identify a canonical source row."""
+    rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
+
+    assert await _run(rows, "step_1#iter-2") is None
+
+
+@pytest.mark.asyncio
+async def test_an_iteration_row_is_matched_only_by_its_temporal_activity_id() -> None:
+    """Loop occurrence replay uses its full canonical path, not its UI label."""
+    rows = [
+        _Row("step_1", ActivityStatus.COMPLETED, {"result": "iter-0"}),
+        _Row(
+            "A#iter-1",
+            ActivityStatus.COMPLETED,
+            {"result": "iter-1"},
+            temporal_activity_id="step_1_iter_1",
+        ),
+    ]
+
+    by_iteration = await _run(rows, "step_1#iter-1", temporal_activity_id="step_1_iter_1")
+    by_base = await _run(rows, "step_1")
+
+    assert by_iteration is not None
+    assert by_iteration["output_data"] == {"result": "iter-1"}
+    assert by_base is not None
+    assert by_base["output_data"] == {"result": "iter-0"}
+
+
+@pytest.mark.asyncio
+async def test_the_lookup_filters_by_temporal_id_in_the_query() -> None:
+    """The canonical ID predicate belongs in the query, not in Python.
+
+    This activity runs once per restored node. Reading the run's completed rows
+    and filtering in Python made each call cost the whole execution, and pulled
+    every node's payload into the worker to answer one question about one node.
+    Asserting on the statement is what pins that: a mock that returns rows
+    cannot tell a name filter from a full scan.
+    """
+    captured: list[Any] = []
+    session = _mock_session([])
+
+    async def capture(stmt: Any) -> MagicMock:  # noqa: ANN401 — the statement type is SQLAlchemy-internal
+        captured.append(stmt)
+        result = MagicMock()
+        result.first.return_value = None
+        return result
+
+    session.exec.side_effect = capture
+
+    async def mock_get_db():  # noqa: ANN202
+        yield session
+
+    with patch(
+        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        mock_get_db,
+    ):
+        assert await replay_retry_node_activity("src-1", "ui label", "step_target") is None
+
+    assert len(captured) == 1
+    statement = captured[0]
+    sql = str(statement)
+    assert "activity_execution.temporal_activity_id = " in sql
+    assert "activity_execution.activity_name =" not in sql
+    assert "LIMIT" in sql.upper()
+    assert statement.compile().params["temporal_activity_id_1"] == "step_target"
+
+
+@pytest.mark.asyncio
+async def test_empty_request_short_circuits() -> None:
+    """Nothing requested means no query and no result."""
+    assert await _run([], None) is None
+
+
+@pytest.mark.asyncio
+async def test_blank_ids_are_ignored() -> None:
+    """Whitespace-only ids are not node ids."""
+    assert await _run([], "   ") is None
+
+
+@pytest.mark.asyncio
+async def test_ids_are_whitespace_trimmed() -> None:
+    """A padded id still resolves to its node."""
+    rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
+
+    assert await _run(rows, "  step_1  ") == {
+        "status": "completed",
+        "error_details": None,
+        "control_data": None,
+        "input_data": {},
+        "output_data": {"result": "ok"},
+        "started_at": None,
+        "completed_at": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_oversized_result_is_refused_rather_than_truncated() -> None:
+    """An oversized payload raises instead of being silently cut.
+
+    The engine would otherwise inject a truncated value that the source run never
+    produced, which is worse than refusing the retry: a truncated output is
+    indistinguishable from a real one downstream.
+    """
+    from syntara.core.exceptions import SafeValueError
+
+    rows = [_Row("step_1", ActivityStatus.COMPLETED, {"blob": "x" * 2_000_000})]
+
+    with pytest.raises(SafeValueError, match="over the"):
+        await _run(rows, "step_1")
+
+
+@pytest.mark.asyncio
+async def test_size_within_the_limit_is_returned() -> None:
+    """A payload under the limit passes through untouched."""
+    rows = [_Row("step_1", ActivityStatus.COMPLETED, {"blob": "x" * 1000})]
+
+    result = await _run(rows, "step_1")
+
+    assert result is not None
+    assert result["output_data"]["blob"] == "x" * 1000
+
+
+@pytest.mark.asyncio
+async def test_returns_stored_input_alongside_output() -> None:
+    """Both halves of the stored record come back.
+
+    A restored node has to be indistinguishable from one that executed, and the
+    sync service resolves input through ``get_activity_input``, which reads
+    ``node_inputs``. Returning output alone leaves drill-down with a blank input.
+    """
+    rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"}, input_data={"query": "select 1"})]
+
+    result = await _run(rows, "step_1")
+
+    assert result == {
+        "status": "completed",
+        "error_details": None,
+        "control_data": None,
+        "input_data": {"query": "select 1"},
+        "output_data": {"result": "ok"},
+        "started_at": None,
+        "completed_at": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_returns_source_timestamps_as_iso_strings() -> None:
+    """The source row's timestamps come back as ISO strings.
+
+    The replayed node is recorded through the normal sync path with this run's
+    event times; the sync service applies these source timestamps over them so the
+    row reports when the work actually ran rather than the restore time.
+    """
+    started = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
+    completed = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)
+    rows = [
+        _Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"}, started_at=started, completed_at=completed),
+    ]
+
+    result = await _run(rows, "step_1")
+
+    assert result is not None
+    assert result["started_at"] == started.isoformat()
+    assert result["completed_at"] == completed.isoformat()
+
+
+@pytest.mark.asyncio
+async def test_node_with_no_stored_input_returns_empty_not_missing() -> None:
+    """A node with no recorded input yields ``{}``, so the key is always present.
+
+    The caller writes ``node_inputs[node.id]`` unconditionally; a missing key
+    would have to be special-cased for no benefit.
+    """
+    rows = [_Row("step_1", ActivityStatus.COMPLETED, {"result": "ok"})]
+
+    result = await _run(rows, "step_1")
+
+    assert result is not None
+    assert result["input_data"] == {}
+
+
+@pytest.mark.asyncio
+async def test_a_skipped_node_is_restorable() -> None:
+    """A source SKIPPED node must come back, not be treated as absent.
+
+    Absent means "no restorable record", and the caller then *executes* the node.
+    Filtering to COMPLETED only would turn every source skip into a re-execution,
+    which is both wrong work and a divergence from what the run view reported.
+    """
+    rows = [_Row("skipped_one", ActivityStatus.SKIPPED, {"reason": "not on this branch"})]
+
+    result = await _run(rows, "skipped_one")
+
+    assert result is not None
+    assert result["status"] == "skipped"
+    assert result["output_data"] == {"reason": "not on this branch"}
+
+
+@pytest.mark.asyncio
+async def test_a_failed_node_is_restorable_with_its_error() -> None:
+    """A source failure keeps its recorded reason.
+
+    The caller restores the node as FAILED; without the error details it would
+    report a failure with no explanation, or — if the status were also dropped —
+    report the failure as a clean skip.
+    """
+    rows = [_Row("failed_one", ActivityStatus.FAILED, {"partial": True}, error_details="exit code 1")]
+
+    result = await _run(rows, "failed_one")
+
+    assert result is not None
+    assert result["status"] == "failed"
+    assert result["error_details"] == "exit code 1"
+    assert result["output_data"] == {"partial": True}
+
+
+@pytest.mark.asyncio
+async def test_an_unfinished_node_is_not_restorable() -> None:
+    """PENDING, RUNNING and WAITING have nothing to restore.
+
+    The source run reached a terminal state, so an in-flight row is work that never
+    finished. Returning it would have the caller inject nothing and skip a node that
+    should run.
+    """
+    for status in (ActivityStatus.PENDING, ActivityStatus.RUNNING, ActivityStatus.WAITING):
+        rows = [_Row("unfinished", status, None)]
+
+        assert await _run(rows, "unfinished") is None, status
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_node_is_not_restorable() -> None:
+    """A cancelled row is an interrupted node, not a node with recorded state.
+
+    Cancellation only rewrites unfinished rows — a node that had completed keeps its
+    real status and output — so a CANCELLED row carries a synthetic
+    "Workflow was cancelled" error and no output. Restoring it would report an
+    interrupted node as a failure, which sets the run's unhandled-failure flag for a
+    node that merely stopped. Absence makes the caller run it for real, which is what
+    a retry of a cancelled run should do.
+    """
+    rows = [_Row("cancelled_one", ActivityStatus.CANCELLED, None, error_details="Workflow was cancelled")]
+
+    assert await _run(rows, "cancelled_one") is None
+
+
+@pytest.mark.asyncio
+async def test_a_completed_node_in_a_cancelled_run_is_still_restorable() -> None:
+    """Cancelling a run does not invalidate the work that had already finished.
+
+    This is what makes retrying a cancelled run work: the completed nodes keep their
+    real status and output, so they restore, and only the interrupted ones have no
+    restorable record and run for real.
+    """
+    rows = [
+        _Row("finished", ActivityStatus.COMPLETED, {"result": "ok"}),
+        _Row("interrupted", ActivityStatus.CANCELLED, None, error_details="Workflow was cancelled"),
+    ]
+
+    result = await _run(rows, "finished")
+
+    assert result is not None
+    assert result["status"] == "completed"
+    assert result["output_data"] == {"result": "ok"}
+    assert await _run([rows[1]], "interrupted") is None
+
+
+# --- persisted routing data reaches the caller -------------------------------
+#
+# The retry mixin reads ``control_data`` from the activity's return. If the
+# activity stops carrying it the field is silently ``{}`` and every retry falls
+# back to inference, with no error anywhere — so the shape is pinned here.
+
+
+@pytest.mark.asyncio
+async def test_replay_carries_the_persisted_control_data() -> None:
+    """The source row's routing decision must survive the replay transport."""
+    row = _Row(
+        activity_name="cond_1",
+        status=ActivityStatus.COMPLETED,
+        output={"evaluated_result": True},
+        control_data={"next_port": "true"},
+    )
+
+    stored = await _run([row], "cond_1")
+
+    assert stored is not None
+    assert stored["control_data"] == {"next_port": "true"}, (
+        "the mixin reads control_data from this record; without it the persisted branch is never consulted"
+    )
+
+
+@pytest.mark.asyncio
+async def test_replay_reports_null_control_data_for_older_runs() -> None:
+    """A row predating the column returns None, so the caller falls back."""
+    row = _Row(activity_name="cond_1", status=ActivityStatus.COMPLETED, output={})
+
+    stored = await _run([row], "cond_1")
+
+    assert stored is not None
+    assert stored["control_data"] is None
+
+
+def _port_session(rows: list[Any]) -> AsyncMock:
+    """Session whose ``.all()`` returns canonical ID/control data pairs."""
+    session = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = rows
+    session.exec.return_value = result
+    return session
+
+
+async def _run_ports(pairs: list[Any]) -> dict[str, str]:
+    session = _port_session(pairs)
+
+    async def mock_get_db():  # noqa: ANN202
+        yield session
+
+    with patch(
+        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        mock_get_db,
+    ):
+        return await retry_control_ports("src-1")
+
+
+@pytest.mark.asyncio
+async def test_control_ports_maps_node_ids_to_ports() -> None:
+    """Every control node that recorded a port is keyed by its Temporal ID."""
+    ports = await _run_ports([("cond_1", {"next_port": "true"}), ("sw_1", {"next_port": "b"})])
+
+    assert ports == {"cond_1": "true", "sw_1": "b"}
+
+
+@pytest.mark.asyncio
+async def test_control_ports_keep_only_the_exact_iteration_path() -> None:
+    """A nested control decision is not aliased to its UI name or base node."""
+    ports = await _run_ports([("cond_1_iter_2_iter_3", {"next_port": "true"})])
+
+    assert ports == {"cond_1_iter_2_iter_3": "true"}
+
+
+@pytest.mark.asyncio
+async def test_control_ports_skips_rows_with_no_port() -> None:
+    """Control data without a next_port is left to the caller's inference."""
+    ports = await _run_ports([("cond_1", {"other": 1}), ("sw_1", {"next_port": "a"})])
+
+    assert ports == {"sw_1": "a"}, "a row with no next_port must not become a routing entry"
+
+
+@pytest.mark.asyncio
+async def test_control_ports_ignores_non_dict_control_data() -> None:
+    """A malformed value is skipped rather than crashing the whole read."""
+    ports = await _run_ports([("cond_1", "not-a-dict"), ("sw_1", {"next_port": "a"})])
+
+    assert ports == {"sw_1": "a"}
+
+
+# ---------------------------------------------------------------------------
+# fetch_retry_converge_metadata: source gate + per-branch state for retry replay
+# ---------------------------------------------------------------------------
+
+
+def _metadata_session(rows: list[tuple[Any, ...]]) -> AsyncMock:
+    """A session whose query returns the given (temporal_id, status, in, out, control) rows."""
+    session = AsyncMock()
+    result = MagicMock()
+    result.all.return_value = rows
+    session.exec.return_value = result
+    return session
+
+
+async def _run_metadata(
+    rows: list[tuple[Any, ...]],
+    converge_temporal_id: str,
+    predecessor_temporal_ids: dict[str, str],
+    *,
+    source_execution_id: str = "src-1",
+) -> dict[str, Any] | None:
+    session = _metadata_session(rows)
+
+    async def mock_get_db():  # noqa: ANN202
+        yield session
+
+    with patch(
+        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        mock_get_db,
+    ):
+        return await fetch_retry_converge_metadata_activity(
+            source_execution_id, converge_temporal_id, predecessor_temporal_ids
+        )
+
+
+def test_result_digest_is_none_for_none() -> None:
+    """A missing branch output has no digest rather than a digest of ``null``."""
+    assert _result_digest(None) is None
+
+
+def test_result_digest_is_stable_and_order_independent() -> None:
+    """The digest is key-order independent and distinguishes different payloads."""
+    assert _result_digest({"a": 1, "b": 2}) == _result_digest({"b": 2, "a": 1})
+    assert _result_digest({"a": 1}) != _result_digest({"a": 2})
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_returns_gate_and_branch_state() -> None:
+    """The source converge gate and each direct predecessor's state are returned."""
+    gate = {"strategy": "any", "n_required": 1, "total_branches": 2}
+    rows = [
+        (
+            "join",
+            ActivityStatus.COMPLETED,
+            {"strategy": "any", "n_required": 1},
+            {"branch_count": 2},
+            {"retry_gate_metadata": gate},
+        ),
+        ("b1", ActivityStatus.COMPLETED, {}, {"v": 1}, {}),
+        ("b2", ActivityStatus.FAILED, {}, None, {}),
+    ]
+
+    result = await _run_metadata(rows, "join", {"b1": "b1", "b2": "b2"})
+
+    assert result is not None
+    assert result["converge"] == {
+        "status": "completed",
+        "input_data": {"strategy": "any", "n_required": 1},
+        "output_branch_count": 2,
+        "gate_metadata": gate,
+    }
+    assert result["predecessors"]["b1"] == {"status": "completed", "result_digest": _result_digest({"v": 1})}
+    # A branch with no stored output still reports its status, with a null digest.
+    assert result["predecessors"]["b2"] == {"status": "failed", "result_digest": None}
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_absent_converge_row_returns_none() -> None:
+    """With no source row for the converge itself there is nothing to compare."""
+    rows: list[tuple[Any, ...]] = [("b1", ActivityStatus.COMPLETED, {}, {"v": 1}, {})]
+
+    assert await _run_metadata(rows, "join", {"b1": "b1"}) is None
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_missing_predecessor_is_reported_as_unknown() -> None:
+    """A predecessor absent from the source run is explicit, not dropped."""
+    rows: list[tuple[Any, ...]] = [("join", ActivityStatus.COMPLETED, {}, {}, {})]
+
+    result = await _run_metadata(rows, "join", {"b1": "b1"})
+
+    assert result is not None
+    assert result["predecessors"]["b1"] == {"status": None, "result_digest": None}
+    # No recorded gate metadata collapses to an empty mapping, not a crash.
+    assert result["converge"]["gate_metadata"] == {}
+    assert result["converge"]["output_branch_count"] is None
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_tolerates_non_dict_payloads() -> None:
+    """Null input/output/control columns from older rows degrade to empty mappings."""
+    rows = [("join", ActivityStatus.COMPLETED, None, None, None)]
+
+    result = await _run_metadata(rows, "join", {})
+
+    assert result is not None
+    assert result["converge"]["input_data"] == {"strategy": None, "n_required": None}
+    assert result["converge"]["output_branch_count"] is None
+    assert result["converge"]["gate_metadata"] == {}
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_accepts_plain_string_statuses() -> None:
+    """A status stored as a plain string (not an enum) is returned verbatim."""
+    rows: list[tuple[Any, ...]] = [
+        ("join", "completed", {}, {}, {}),
+        ("b1", "skipped", {}, {}, {}),
+    ]
+
+    result = await _run_metadata(rows, "join", {"b1": "b1"})
+
+    assert result is not None
+    assert result["converge"]["status"] == "completed"
+    assert result["predecessors"]["b1"]["status"] == "skipped"
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_short_circuits_on_blank_ids() -> None:
+    """A blank execution or converge id returns None without touching the database."""
+    assert await _run_metadata([], "join", {}, source_execution_id="") is None
+    assert await _run_metadata([("join", ActivityStatus.COMPLETED, {}, {}, {})], "", {}) is None
