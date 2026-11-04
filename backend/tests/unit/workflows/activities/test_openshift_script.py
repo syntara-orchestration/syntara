@@ -40,7 +40,7 @@ async def test_activity_dispatch_preserves_outputs(return_code):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("scenario", ["success", "failed", "timeout", "api_error", "cancel"])
+@pytest.mark.parametrize("scenario", ["success", "failed", "timeout", "api_error", "cancel", "invalid_result"])
 async def test_remote_lifecycle(scenario):
     import asyncio
 
@@ -55,6 +55,8 @@ async def test_remote_lifecycle(scenario):
         if request.method == "DELETE":
             return httpx.Response(200, json={})
         if request.url.path.endswith("/log"):
+            if scenario == "invalid_result":
+                return httpx.Response(200, json=["unexpected result"])
             return httpx.Response(
                 200,
                 json={"timed_out": True}

@@ -133,3 +133,8 @@ def mock_api_server() -> Generator[respx.MockRouter, None, None]:
         respx_mock.route().mock(return_value=Response(200, json={"success": True}))
 
         yield respx_mock
+
+
+@pytest.fixture(autouse=True)
+def _script_execution_boundary(local_script_execution: None) -> None:
+    """Run workflow scripts through the controlled test execution boundary."""

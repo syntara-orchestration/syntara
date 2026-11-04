@@ -9,7 +9,7 @@ exercises the full SDK code path (serialization, batching, queuing)
 without mocking, while ensuring the consumer threads never block on
 TCP timeouts so ``shutdown()`` returns promptly.
 
-Each iteration executes real ``execute_bash_script`` activities (subprocess
+Each iteration executes ``execute_script_activity`` with a local test boundary (subprocess
 creation, Pydantic config validation, template resolution, env setup) so
 the baseline faithfully represents the actual cost of workflow activity
 execution.
@@ -40,6 +40,8 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeType,
     WorkflowTerminalStatus,
 )
+
+pytestmark = pytest.mark.usefixtures("local_script_execution")
 
 logger = structlog.stdlib.get_logger(__name__)
 

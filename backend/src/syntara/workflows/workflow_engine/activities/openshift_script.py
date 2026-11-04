@@ -164,6 +164,9 @@ async def execute_openshift_script(  # noqa: C901, PLR0912, PLR0915
                                 non_retryable=True,
                             )
                 result = json.loads(chunks)
+                if not isinstance(result, dict):
+                    msg = "Invalid OpenShift script result"
+                    raise ApplicationError(msg, type="OpenShiftScriptError", non_retryable=True)
                 if result.get("timed_out"):
                     raise TimeoutError
                 if not isinstance(result.get("return_code"), int) or not all(
@@ -171,7 +174,7 @@ async def execute_openshift_script(  # noqa: C901, PLR0912, PLR0915
                 ):
                     msg = "Invalid OpenShift script result"
                     raise ApplicationError(msg, type="OpenShiftScriptError", non_retryable=True)
-                return result
+                return dict(result)
         except httpx.HTTPError:
             msg = "OpenShift API request failed"
             raise ApplicationError(msg, type="OpenShiftScriptError", non_retryable=True) from None
