@@ -235,6 +235,51 @@ describe('useExecutionStore', () => {
       expect(state.activityStates.get('task2')?.status).toBe('running')
     })
 
+    it('maps runtime_metadata to runtimeMetadata state', () => {
+      useExecutionStore.getState().setActivityExecutions([
+        {
+          id: 'sub-exec',
+          created_at: '2025-12-10T15:00:05Z',
+          updated_at: '2025-12-10T15:00:05Z',
+          execution_id: 'exec-123',
+          temporal_activity_id: 'temporal-sub',
+          activity_name: 'run_child',
+          node_type: 'sub_workflow',
+          status: 'running' as const,
+          error_details: null,
+          runtime_metadata: { child_execution_id: 'c-1', child_workflow_version: 3 },
+          started_at: '2025-12-10T15:00:05Z',
+          completed_at: null,
+        },
+      ])
+
+      expect(useExecutionStore.getState().activityStates.get('run_child')?.runtimeMetadata).toEqual({
+        child_execution_id: 'c-1',
+        child_workflow_version: 3,
+      })
+    })
+
+    it('tolerates a null runtime_metadata (historical rows)', () => {
+      useExecutionStore.getState().setActivityExecutions([
+        {
+          id: 'legacy-exec',
+          created_at: '2025-12-10T15:00:05Z',
+          updated_at: '2025-12-10T15:00:05Z',
+          execution_id: 'exec-123',
+          temporal_activity_id: 'temporal-legacy',
+          activity_name: 'legacy',
+          node_type: 'internal_activity',
+          status: 'completed' as const,
+          error_details: null,
+          runtime_metadata: null,
+          started_at: '2025-12-10T15:00:05Z',
+          completed_at: '2025-12-10T15:00:10Z',
+        },
+      ])
+
+      expect(useExecutionStore.getState().activityStates.get('legacy')?.runtimeMetadata ?? null).toBeNull()
+    })
+
     it('preserves original ActivityStatus from backend', () => {
       useExecutionStore.getState().setActivityExecutions([
         {

@@ -2465,6 +2465,10 @@ export interface components {
       output_data?: {
         [key: string]: unknown
       } | null
+      /** Runtime Metadata */
+      runtime_metadata?: {
+        [key: string]: unknown
+      } | null
       /** Started At */
       started_at?: string | null
       /** Completed At */
