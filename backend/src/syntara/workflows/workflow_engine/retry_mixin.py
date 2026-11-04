@@ -245,32 +245,41 @@ class WorkflowRetryMixin:
         self._retry_replay_candidates = set(self._retry_restorable_nodes(graph))
 
     def _classify_unselected_branches(self, graph: WorkflowGraph) -> None:
-        """Skip unselected failures without suppressing shared selected descendants.
-
-        Completed nodes form a boundary: a satisfied converge and its descendants
-        retain their results under R6c, even if a different predecessor failed.
+        """Skip exclusive work that never ran; reuse recorded unselected-branch output.
 
         A failure the caller did not select is restored as a failure by
-        ``_restore_node_state``, from its own recorded error. What this suppresses
-        is everything *downstream* of such a failure — those nodes have nothing to
-        run against, and the source run never produced results for them either. The
-        failing node itself is deliberately not added here: marking it skipped would
-        report a failure as a clean skip and drop the reason it failed.
+        ``_restore_node_state``. Completed, failed, and skipped source records on
+        that branch are reused rather than reported as a clean skip, so a later
+        converge still sees the recorded result. Exclusive descendants with no
+        source record never ran, and those are the nodes skipped here.
+
+        Shared descendants of a selected retry point stay in the rerun set so
+        the retry can re-evaluate them against the preserved plus new results.
+        The failing node itself is deliberately not added: marking it skipped
+        would report a failure as a clean skip and drop the reason it failed.
         """
         selected = {strip_iteration_suffix(point) for point in self.retry_context.get("eligible_point_ids", [])}
         rerun: set[str] = set()
         for point in selected:
             rerun.update(self._walk_downstream(point, graph))
         for node_id, status in self._retry_source_statuses.items():
-            if status != "failed" or node_id in rerun:
+            if status != ActivityStatus.FAILED.value or node_id in rerun:
                 continue
             pending = list(graph.get_successors(node_id))
             seen: set[str] = set()
             while pending:
                 current = pending.pop()
-                if current in seen or current in rerun or self._retry_source_statuses.get(current) == "completed":
+                if current in seen or current in rerun:
                     continue
                 seen.add(current)
+                source_status = self._retry_source_statuses.get(current)
+                if source_status in _RESTORABLE_SOURCE_STATUS_VALUES:
+                    # Reuse the recorded outcome. Walk past restored failures so
+                    # exclusive never-ran descendants can still be skipped;
+                    # a completed node is a boundary and keeps its descendants.
+                    if source_status != ActivityStatus.COMPLETED.value:
+                        pending.extend(graph.get_successors(current))
+                    continue
                 self.skipped_nodes.add(current)
                 pending.extend(graph.get_successors(current))
 
@@ -615,6 +624,26 @@ class WorkflowRetryMixin:
         # Outside loops the canonical Temporal ID is the canvas node ID. This
         # projection is also built from temporal_activity_id, never activity_name.
         return self._retry_source_statuses.get(node_id)
+
+    def _is_retry_traversable_source_node(self, node_id: str, graph: WorkflowGraph) -> bool:
+        """Whether retry traversal may reach a node with a recorded source outcome.
+
+        This is deliberately broader than ``_should_restore_node``: a loop or a
+        control node whose route cannot be inferred may need to run through its
+        normal retry-aware path. They still need to belong to the retry-restorable
+        region and have a terminal source record before an unselected branch may
+        keep them reachable.
+        """
+        if not self.retry_context:
+            return False
+
+        node_id_without_iteration = strip_iteration_suffix(node_id)
+        if node_id_without_iteration not in self._retry_restorable_nodes(
+            graph
+        ) and not self._is_before_selected_failure_iteration(node_id):
+            return False
+
+        return self._source_status_for_node(node_id, graph) in _RESTORABLE_SOURCE_STATUS_VALUES
 
     def _is_before_selected_failure_iteration(self, node_id: str) -> bool:
         """Whether this row belongs to an earlier enclosing-loop iteration.
