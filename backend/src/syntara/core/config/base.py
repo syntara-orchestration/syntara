@@ -1501,12 +1501,7 @@ class WorkflowEngineSettings(BaseSettings):
 
     script_openshift_integration_id: UUID | None = Field(
         default=None,
-        description="Default OpenShift integration for script execution; required when scripts are enabled",
-    )
-    script_openshift_image: str = Field(
-        default="quay.io/pjohari/syntara-node-script@sha256:a18617479a99fb46bd62f4f8c712eef764f73410adf2718bc2c00e0f28cf1280",
-        min_length=1,
-        description="Script runner image containing syntara_node_script.executor",
+        description="Default OpenShift integration for script execution; auto-discovers if blank",
     )
 
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]

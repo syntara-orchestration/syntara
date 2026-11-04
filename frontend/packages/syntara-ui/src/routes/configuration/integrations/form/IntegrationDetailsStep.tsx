@@ -412,6 +412,16 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
           />
         )}
 
+        {isOpenShift && (
+          <SynTextField<IntegrationFormData, 'configuration.script_image'>
+            name="configuration.script_image"
+            label="Script Image"
+            fieldId="script-image"
+            placeholder="registry.example.com/syntara-node-script@sha256:..."
+            hint="Container image implementing the ContainerService gRPC contract for script execution"
+          />
+        )}
+
         <SecurityFields />
 
         <ScopeFields<IntegrationFormData>

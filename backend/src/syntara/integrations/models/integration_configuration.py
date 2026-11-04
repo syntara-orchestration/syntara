@@ -152,6 +152,10 @@ class OpenShiftConfiguration(IntegrationSecurityMixin):
         pattern=r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
         description="Namespace reserved for future execution workloads",
     )
+    script_image: str | None = Field(
+        default=None,
+        description="Script container image implementing the ContainerService gRPC contract",
+    )
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 

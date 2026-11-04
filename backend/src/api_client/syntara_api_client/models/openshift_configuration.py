@@ -23,6 +23,7 @@ class OpenShiftConfiguration:
         insecure_skip_tls_verify (bool | Unset): Disable TLS certificate verification for connections to this
             integration. Default: False.
         ca_certificate (None | str | Unset): PEM-encoded CA certificate to trust for this integration's TLS connections.
+        script_image (None | str | Unset): Script container image implementing the ContainerService gRPC contract.
     """
 
     base_url: str
@@ -31,6 +32,7 @@ class OpenShiftConfiguration:
     allow_http: bool | Unset = False
     insecure_skip_tls_verify: bool | Unset = False
     ca_certificate: None | str | Unset = UNSET
+    script_image: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         base_url = self.base_url
@@ -49,6 +51,12 @@ class OpenShiftConfiguration:
         else:
             ca_certificate = self.ca_certificate
 
+        script_image: None | str | Unset
+        if isinstance(self.script_image, Unset):
+            script_image = UNSET
+        else:
+            script_image = self.script_image
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -65,6 +73,8 @@ class OpenShiftConfiguration:
             field_dict["insecure_skip_tls_verify"] = insecure_skip_tls_verify
         if ca_certificate is not UNSET:
             field_dict["ca_certificate"] = ca_certificate
+        if script_image is not UNSET:
+            field_dict["script_image"] = script_image
 
         return field_dict
 
@@ -92,6 +102,15 @@ class OpenShiftConfiguration:
 
         ca_certificate = _parse_ca_certificate(d.pop("ca_certificate", UNSET))
 
+        def _parse_script_image(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        script_image = _parse_script_image(d.pop("script_image", UNSET))
+
         openshift_configuration = cls(
             base_url=base_url,
             namespace=namespace,
@@ -99,6 +118,7 @@ class OpenShiftConfiguration:
             allow_http=allow_http,
             insecure_skip_tls_verify=insecure_skip_tls_verify,
             ca_certificate=ca_certificate,
+            script_image=script_image,
         )
 
         return openshift_configuration

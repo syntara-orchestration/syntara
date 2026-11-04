@@ -112,6 +112,7 @@ export const openshiftConfigurationSchema = z
     insecure_skip_tls_verify: z.boolean().refine((val) => !val, { message: 'OpenShift requires TLS verification' }),
     allow_http: z.boolean().refine((val) => !val, { message: 'OpenShift requires HTTPS' }),
     ca_certificate: z.string().optional().nullable(),
+    script_image: z.string().optional().nullable(),
   })
   .superRefine((data, ctx) => {
     try {
@@ -203,6 +204,7 @@ export function getDefaultConfiguration(integrationType: string): IntegrationFor
         insecure_skip_tls_verify: false,
         allow_http: false,
         ca_certificate: null,
+        script_image: null,
       }
     default:
       return { integration_type: 'mcp_server' as const, base_url: '', ...SECURITY_DEFAULTS }

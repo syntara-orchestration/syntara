@@ -771,6 +771,11 @@ export interface components {
        * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
        */
       ca_certificate?: string | null
+      /**
+       * Script Image
+       * @description Script container image implementing the ContainerService gRPC contract
+       */
+      script_image?: string | null
     }
     /**
      * DiscoveredLLMModel

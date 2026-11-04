@@ -2,10 +2,12 @@
 
 import asyncio
 import hashlib
-import json
+import ipaddress
 from typing import Any
 
 import httpx
+from sqlmodel import select
+from syntara_plugin.runtime import ContainerInvocation
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
@@ -20,37 +22,28 @@ from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.models.integration_configuration import OpenShiftConfiguration
 
 from .common import HEARTBEAT_STOP_MONITOR
+from .script_grpc import SCRIPT_STEP_ID, invoke_script
 
-# Override the image's long-lived gRPC entrypoint for a single isolated execution.
-# Only the image's executor runs user code; no subprocess is started on the worker.
-_RUNNER = """
-import asyncio, json, os
-from syntara_node_script.executor import run_script_async, ScriptExecutionError
-p = json.loads(os.environ.pop("SYNTARA_SCRIPT_INPUT"))
-async def main():
-    try:
-        result = await asyncio.wait_for(run_script_async(
-            p["language"], p["code"], p["environment"],
-            max_output_bytes=p["max_output_bytes"]), p["timeout"])
-    except ScriptExecutionError as e:
-        result = dict(return_code=e.exit_code, stdout=e.stdout, stderr=e.stderr, stdout_json=None)
-    except TimeoutError:
-        result = dict(timed_out=True)
-    print(json.dumps(result))
-asyncio.run(main())
-"""
+MAX_SCRIPT_TIMEOUT_SECONDS = 600
+MAX_SCRIPT_OUTPUT_BYTES = 1024 * 1024
 
 
 async def _connection() -> tuple[OpenShiftConfiguration, str]:
     """Resolve the worker's integration and credential locally, outside Temporal history."""
     integration_id = get_settings().script_openshift_integration_id
-    if integration_id is None:
-        msg = "Configure APP_SCRIPT_OPENSHIFT_INTEGRATION_ID"
-        raise ApplicationError(msg, type="ConfigError", non_retryable=True)
     async with AsyncSessionLocal() as session:
-        integration = await session.get(Integration, integration_id)
+        if integration_id is not None:
+            integration = await session.get(Integration, integration_id)
+        else:
+            result = await session.exec(
+                select(Integration)
+                .where(Integration.integration_type == IntegrationType.OPENSHIFT)
+                .where(Integration.enabled == True)  # noqa: E712
+                .limit(1)
+            )
+            integration = result.first()
         if integration is None or not integration.enabled or integration.integration_type != IntegrationType.OPENSHIFT:
-            msg = "Script OpenShift integration is missing, disabled, or has the wrong type"
+            msg = "No enabled OpenShift integration found; configure APP_SCRIPT_OPENSHIFT_INTEGRATION_ID or add one"
             raise ApplicationError(
                 msg,
                 type="ConfigError",
@@ -78,7 +71,7 @@ async def _connection() -> tuple[OpenShiftConfiguration, str]:
         return config, token
 
 
-def _pod(name: str, payload: dict[str, Any], image: str) -> dict[str, Any]:
+def _pod(name: str, timeout_seconds: int, image: str) -> dict[str, Any]:
     """Build a single-use pod compatible with OpenShift restricted admission."""
     return {
         "apiVersion": "v1",
@@ -88,14 +81,13 @@ def _pod(name: str, payload: dict[str, Any], image: str) -> dict[str, Any]:
             "restartPolicy": "Never",
             "nodeSelector": {"kubernetes.io/arch": "amd64"},
             "automountServiceAccountToken": False,
-            "activeDeadlineSeconds": payload["timeout"] + 15,
+            "activeDeadlineSeconds": timeout_seconds + 75,
             "securityContext": {"runAsNonRoot": True, "seccompProfile": {"type": "RuntimeDefault"}},
             "containers": [
                 {
                     "name": "script",
                     "image": image,
-                    "command": ["python", "-c", _RUNNER],
-                    "env": [{"name": "SYNTARA_SCRIPT_INPUT", "value": json.dumps(payload)}],
+                    "ports": [{"name": "grpc", "containerPort": 50051}],
                     "securityContext": {"allowPrivilegeEscalation": False, "capabilities": {"drop": ["ALL"]}},
                     "resources": {
                         "requests": {"cpu": "100m", "memory": "128Mi"},
@@ -107,7 +99,7 @@ def _pod(name: str, payload: dict[str, Any], image: str) -> dict[str, Any]:
     }
 
 
-async def execute_openshift_script(  # noqa: C901, PLR0912, PLR0915
+async def execute_openshift_script(  # noqa: C901, PLR0915
     language: str,
     code: str,
     environment: dict[str, str],
@@ -120,13 +112,24 @@ async def execute_openshift_script(  # noqa: C901, PLR0912, PLR0915
     identity = f"{info.workflow_id}/{info.workflow_run_id}/{info.activity_id}/{info.attempt}"
     name = "syntara-script-" + hashlib.sha256(identity.encode()).hexdigest()[:40]
     path = f"/api/v1/namespaces/{config.namespace}/pods"
-    payload = {
-        "language": language,
-        "code": code,
-        "environment": environment,
-        "timeout": timeout_seconds,
-        "max_output_bytes": max_output_bytes,
-    }
+    image = config.script_image
+    if not image:
+        msg = "Configure script_image on the OpenShift integration"
+        raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+    if not 1 <= timeout_seconds <= MAX_SCRIPT_TIMEOUT_SECONDS or not 1 <= max_output_bytes <= MAX_SCRIPT_OUTPUT_BYTES:
+        msg = "Script container supports timeouts up to 600 seconds and output limits up to 1024 KB"
+        raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+    if not info.workflow_run_id:
+        msg = "Script execution requires a workflow run identity"
+        raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+    invocation = ContainerInvocation(
+        invocation_id=name,
+        workflow_run_id=info.workflow_run_id,
+        step_revision_id=SCRIPT_STEP_ID,
+        inputs={"language": language, "code": code, "environment": environment, "max_output_bytes": max_output_bytes},
+        credential_file_paths={},
+        timeout_seconds=timeout_seconds,
+    )
     async with httpx.AsyncClient(
         base_url=config.base_url,
         headers={"Authorization": f"Bearer {token}"},
@@ -135,8 +138,8 @@ async def execute_openshift_script(  # noqa: C901, PLR0912, PLR0915
         follow_redirects=False,
     ) as client:
         try:
-            async with asyncio.timeout(timeout_seconds + 30):
-                response = await client.post(path, json=_pod(name, payload, get_settings().script_openshift_image))
+            async with asyncio.timeout(timeout_seconds + 75):
+                response = await client.post(path, json=_pod(name, timeout_seconds, image))
                 if response.status_code != httpx.codes.CONFLICT:
                     response.raise_for_status()
                 while True:
@@ -145,36 +148,14 @@ async def execute_openshift_script(  # noqa: C901, PLR0912, PLR0915
                     response.raise_for_status()
                     status = response.json().get("status", {})
                     if status.get("phase") in {"Succeeded", "Failed"}:
-                        break
+                        msg = "Script container terminated before gRPC execution"
+                        raise ApplicationError(msg, type="OpenShiftScriptError", non_retryable=True)
+                    if status.get("phase") == "Running" and status.get("podIP"):
+                        # Pod IP comes from the authenticated cluster API, not workflow input.
+                        address = ipaddress.ip_address(status["podIP"])
+                        host = f"[{address}]" if isinstance(address, ipaddress.IPv6Address) else str(address)
+                        return await invoke_script(f"{host}:50051", invocation)
                     await asyncio.sleep(1)
-                if status.get("phase") != "Succeeded":
-                    msg = "OpenShift script container failed"
-                    raise ApplicationError(msg, type="OpenShiftScriptError", non_retryable=True)
-                # Bound data consumed from the API, including malformed container logs.
-                chunks = bytearray()
-                async with client.stream("GET", f"{path}/{name}/log", params={"container": "script"}) as logs:
-                    logs.raise_for_status()
-                    async for chunk in logs.aiter_bytes():
-                        chunks.extend(chunk)
-                        if len(chunks) > 18 * max_output_bytes + 100_000:
-                            msg = "OpenShift script result exceeded output limit"
-                            raise ApplicationError(
-                                msg,
-                                type="OpenShiftScriptError",
-                                non_retryable=True,
-                            )
-                result = json.loads(chunks)
-                if not isinstance(result, dict):
-                    msg = "Invalid OpenShift script result"
-                    raise ApplicationError(msg, type="OpenShiftScriptError", non_retryable=True)
-                if result.get("timed_out"):
-                    raise TimeoutError
-                if not isinstance(result.get("return_code"), int) or not all(
-                    isinstance(result.get(key), str) for key in ("stdout", "stderr")
-                ):
-                    msg = "Invalid OpenShift script result"
-                    raise ApplicationError(msg, type="OpenShiftScriptError", non_retryable=True)
-                return dict(result)
         except httpx.HTTPError:
             msg = "OpenShift API request failed"
             raise ApplicationError(msg, type="OpenShiftScriptError", non_retryable=True) from None
@@ -184,9 +165,9 @@ async def execute_openshift_script(  # noqa: C901, PLR0912, PLR0915
             try:
                 response = await asyncio.shield(cleanup)
                 if response.status_code not in {200, 202, 404}:
-                    activity.logger.warning("OpenShift rejected script pod cleanup", pod=name)
+                    activity.logger.warning("OpenShift rejected script pod cleanup: %s", name)
             except asyncio.CancelledError:
                 await cleanup
                 raise
             except httpx.HTTPError:
-                activity.logger.warning("Unable to delete script pod; activeDeadlineSeconds bounds execution", pod=name)
+                activity.logger.warning("Unable to delete script pod; activeDeadlineSeconds bounds execution: %s", name)
