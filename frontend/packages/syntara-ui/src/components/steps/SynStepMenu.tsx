@@ -60,7 +60,7 @@ export function SynStepMenu(props: Readonly<SynStepMenuProps>) {
             }}
             isExpanded={isMenuOpen}
             aria-label="Step actions menu"
-            className={`nodrag nopan ${styles.menuToggle}`}
+            className="nodrag nopan"
           >
             <RhUiEllipsisVerticalFillIcon />
           </MenuToggle>

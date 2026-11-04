@@ -8,10 +8,3 @@
   width: auto;
   max-width: max-content;
 }
-
-/* patternfly-override: icon-only kebab in canvas step header action row */
-.menuToggle {
-  padding: 0;
-  min-width: auto;
-  width: auto;
-}
