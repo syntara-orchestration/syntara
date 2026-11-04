@@ -45,11 +45,11 @@ def build_workflow_metadata(
     ``_init_state()`` to populate ``_project_id``, the expression
     resolver's ``workflow_context`` namespace, and audit fields.
 
-    When retrying from failure (AAP-92820), a ``retry`` block carries the
+    When retrying from failure, a ``retry`` block carries the
     source execution id (``retry_from_execution_id``), the retry points that
     will actually run (``eligible_point_ids``), and any validated input
     parameter overrides keyed by starting node id (``input_parameter_overrides``,
-    SDP AC-14/R10c). The engine (AAP-92821) uses them for node classification,
+    SDP AC-14/R10c). The engine uses them for node classification,
     output injection, and parameter application. The block is absent for
     normal runs and for plain ``/retry`` reruns, which share only
     ``retried_from_execution_id`` lineage.
