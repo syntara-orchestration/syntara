@@ -1,4 +1,4 @@
-"""Unit tests for retry pre-validation (AAP-92820)."""
+"""Unit tests for retry pre-validation."""
 
 from typing import Any
 from unittest.mock import Mock
