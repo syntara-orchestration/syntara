@@ -10,7 +10,6 @@ vi.mock('../../../providers/theme/useColorScheme', () => ({
   useColorScheme: vi.fn(() => ({
     colorScheme: 'dark',
     setColorScheme: vi.fn(),
-    toggleColorScheme: vi.fn(),
   })),
 }))
 
