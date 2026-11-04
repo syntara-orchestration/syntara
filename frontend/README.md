@@ -72,7 +72,7 @@ Get familiar with the hot reload workflow:
 5. **Watch it reload** automatically in your browser - no refresh needed!
 6. **Revert the change** - you're ready to start real development
 
-**What's next?** See [docs/architecture.md](docs/architecture.md) → "Your First Day" section for a guided tour.
+**What's next?** See [docs/architecture.md](docs/architecture.md) → "Your First Day" section for a guided tour
 
 ### Common Commands
 
