@@ -397,11 +397,32 @@ role assignment must make it effective.
 `matched_policy` show original policy names, never internal statement IDs.
 `what_can_i` lists effective deny statements under their original policy names;
 `who_can` excludes users blocked for the requested kind/project and retains
-its existing query authorization gate. These policy checks do not enforce
-workflow saves or expose a palette endpoint.
-Default authoring grants are seeded as editable custom records by the
-separate default-policy story; no built-in grant is added here. Save
-enforcement must ship with that seeding so existing authors retain access.
+its existing query authorization gate.
+
+Workflow creation (including import and duplication), saves, metadata edits,
+version metadata edits, restores, and deletion require `step_type:write` on
+every type in the latest saved draft and the submitted or selected definition.
+Removing a blocked type or submitting an unchanged definition still requires
+that permission. Triggers and control-flow types follow the same rule. Project
+deletion checks the latest drafts of its workflows before any cleanup.
+
+Publishing an existing version and unpublishing do not check step-type write
+permissions. Changes saved during a publish request, including version metadata
+changes, do follow the authoring rules. A published version containing a blocked
+type does not make an otherwise permitted draft uneditable.
+
+Denied writes return HTTP 403 `NODE_KIND_WRITE_DENIED` with `blocked_step_types`
+containing `kind`, `label`, `reason`, and `project`. The detail names the attempted
+operation. An explicit deny uses `reason: "explicit_deny"`; a missing grant uses
+`reason: "no_matching_allow"`. Policy names and scopes appear only in denial
+audit events, together with the caller, kind, operation and evaluated project.
+Missing or failing policy evaluation blocks writes. Service accounts and
+certificate-authenticated callers follow these service-layer checks too.
+Startup installation of built-in workflows writes models directly and is exempt.
+
+The default grant remains the built-in `step_type:write:any` policy in the
+`step-author` role assigned to the authenticated group. That built-in assignment
+is protected and ensured at startup; it is not an editable seed-once custom grant.
 
 ## Query Endpoints
 

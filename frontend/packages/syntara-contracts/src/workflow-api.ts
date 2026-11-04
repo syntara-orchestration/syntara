@@ -281,6 +281,87 @@ export type webhooks = Record<string, never>
 export interface components {
   schemas: {
     /**
+     * BlockedStepType
+     * @description A step type the caller cannot author.
+     */
+    BlockedStepType: {
+      /** Kind */
+      kind: string
+      /** Label */
+      label: string
+      /**
+       * Reason
+       * @enum {string}
+       */
+      reason: 'explicit_deny' | 'no_matching_allow'
+      /** Project */
+      project: string | null
+    }
+    /**
+     * NodeKindWriteDeniedProblemDetail
+     * @description RFC 9457 permission denial with blocked step types.
+     * @example {
+     *       "code": "RATE_LIMIT_EXCEEDED",
+     *       "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+     *       "retryable": true,
+     *       "title": "LLM Rate Limit Exceeded",
+     *       "type": "https://api.example.com/errors/llm-error"
+     *     }
+     * @example {
+     *       "code": "STREAM_TIMEOUT",
+     *       "detail": "LLM streaming timed out after 30 seconds",
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+     *       "retryable": true,
+     *       "title": "Streaming Timeout",
+     *       "type": "https://api.example.com/errors/timeout-error"
+     *     }
+     */
+    NodeKindWriteDeniedProblemDetail: {
+      /**
+       * Type
+       * @description URI reference identifying the problem type
+       * @example https://api.example.com/errors/llm-error
+       */
+      type: string
+      /**
+       * Title
+       * @description Short, human-readable summary of the problem
+       * @example LLM Service Unavailable
+       */
+      title: string
+      /**
+       * Detail
+       * @description Human-readable explanation specific to this occurrence
+       * @example OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.
+       */
+      detail: string
+      /**
+       * Code
+       * @default NODE_KIND_WRITE_DENIED
+       * @constant
+       */
+      code?: 'NODE_KIND_WRITE_DENIED'
+      /**
+       * Retryable
+       * @default false
+       */
+      retryable?: boolean
+      /**
+       * Instance
+       * @description Optional URI reference identifying the specific occurrence
+       * @example /invocations/550e8400-e29b-41d4-a716-446655440000
+       */
+      instance?: string | null
+      /**
+       * Status
+       * @default 403
+       */
+      status?: number
+      /** Blocked Step Types */
+      blocked_step_types: components['schemas']['BlockedStepType'][]
+    }
+    /**
      * WorkflowRead
      * @description Schema for workflow response (GET /workflows/{id}).
      *
@@ -2555,7 +2636,16 @@ export interface operations {
       }
       400: components['responses']['BadRequestError']
       401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json':
+            components['schemas']['NodeKindWriteDeniedProblemDetail'] | components['schemas']['ErrorData']
+        }
+      }
       404: components['responses']['NotFoundError']
       409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
@@ -2653,7 +2743,16 @@ export interface operations {
       }
       400: components['responses']['BadRequestError']
       401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json':
+            components['schemas']['NodeKindWriteDeniedProblemDetail'] | components['schemas']['ErrorData']
+        }
+      }
       404: components['responses']['NotFoundError']
       409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
@@ -2687,7 +2786,16 @@ export interface operations {
       }
       400: components['responses']['BadRequestError']
       401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json':
+            components['schemas']['NodeKindWriteDeniedProblemDetail'] | components['schemas']['ErrorData']
+        }
+      }
       404: components['responses']['NotFoundError']
       409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
@@ -2823,7 +2931,16 @@ export interface operations {
       }
       400: components['responses']['BadRequestError']
       401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json':
+            components['schemas']['NodeKindWriteDeniedProblemDetail'] | components['schemas']['ErrorData']
+        }
+      }
       /** @description Workflow not found */
       404: {
         headers: {
@@ -2865,7 +2982,16 @@ export interface operations {
       }
       400: components['responses']['BadRequestError']
       401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json':
+            components['schemas']['NodeKindWriteDeniedProblemDetail'] | components['schemas']['ErrorData']
+        }
+      }
       404: components['responses']['NotFoundError']
       409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
@@ -2895,7 +3021,16 @@ export interface operations {
       }
       400: components['responses']['BadRequestError']
       401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json':
+            components['schemas']['NodeKindWriteDeniedProblemDetail'] | components['schemas']['ErrorData']
+        }
+      }
       404: components['responses']['NotFoundError']
       409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']
@@ -2927,7 +3062,16 @@ export interface operations {
       }
       400: components['responses']['BadRequestError']
       401: components['responses']['UnauthorizedError']
-      403: components['responses']['ForbiddenError']
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json':
+            components['schemas']['NodeKindWriteDeniedProblemDetail'] | components['schemas']['ErrorData']
+        }
+      }
       404: components['responses']['NotFoundError']
       409: components['responses']['ConflictError']
       422: components['responses']['ValidationError']

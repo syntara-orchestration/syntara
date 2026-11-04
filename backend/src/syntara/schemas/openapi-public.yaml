@@ -13254,13 +13254,10 @@ paths:
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
+                anyOf:
+                  - $ref: '#/components/schemas/NodeKindWriteDeniedProblemDetail'
+                  - $ref: '#/components/schemas/ErrorData'
+                title: Response 403 Delete Project
         '404':
           description: Not Found
           content:
@@ -24773,13 +24770,10 @@ paths:
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
+                anyOf:
+                  - $ref: '#/components/schemas/NodeKindWriteDeniedProblemDetail'
+                  - $ref: '#/components/schemas/ErrorData'
+                title: Response 403 Create Workflow
         '404':
           description: Not Found
           content:
@@ -25155,13 +25149,10 @@ paths:
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
+                anyOf:
+                  - $ref: '#/components/schemas/NodeKindWriteDeniedProblemDetail'
+                  - $ref: '#/components/schemas/ErrorData'
+                title: Response 403 Update Workflow
         '404':
           description: Not Found
           content:
@@ -25275,13 +25266,10 @@ paths:
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
+                anyOf:
+                  - $ref: '#/components/schemas/NodeKindWriteDeniedProblemDetail'
+                  - $ref: '#/components/schemas/ErrorData'
+                title: Response 403 Delete Workflow
         '404':
           description: Not Found
           content:
@@ -25829,13 +25817,10 @@ paths:
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
+                anyOf:
+                  - $ref: '#/components/schemas/NodeKindWriteDeniedProblemDetail'
+                  - $ref: '#/components/schemas/ErrorData'
+                title: Response 403 Update Workflow Version Metadata
         '404':
           description: Workflow not found
         '409':
@@ -25956,13 +25941,10 @@ paths:
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
+                anyOf:
+                  - $ref: '#/components/schemas/NodeKindWriteDeniedProblemDetail'
+                  - $ref: '#/components/schemas/ErrorData'
+                title: Response 403 Publish Workflow Version
         '404':
           description: Not Found
           content:
@@ -26081,13 +26063,10 @@ paths:
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
+                anyOf:
+                  - $ref: '#/components/schemas/NodeKindWriteDeniedProblemDetail'
+                  - $ref: '#/components/schemas/ErrorData'
+                title: Response 403 Unpublish Workflow
         '404':
           description: Not Found
           content:
@@ -26213,13 +26192,10 @@ paths:
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/forbidden
-                title: Forbidden
-                detail: You do not have permission to access this resource
-                code: FORBIDDEN
-                retryable: false
+                anyOf:
+                  - $ref: '#/components/schemas/NodeKindWriteDeniedProblemDetail'
+                  - $ref: '#/components/schemas/ErrorData'
+                title: Response 403 Restore Workflow Version
         '404':
           description: Not Found
           content:
@@ -31699,6 +31675,107 @@ components:
         - updated_count
         - skipped_count
         - updated_at
+    BlockedStepType:
+      properties:
+        kind:
+          type: string
+          title: Kind
+        label:
+          type: string
+          title: Label
+        reason:
+          type: string
+          enum:
+            - explicit_deny
+            - no_matching_allow
+          title: Reason
+        project:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Project
+      type: object
+      required:
+        - kind
+        - label
+        - reason
+        - project
+      title: BlockedStepType
+      description: A step type the caller cannot author.
+    NodeKindWriteDeniedProblemDetail:
+      properties:
+        type:
+          type: string
+          maxLength: 500
+          minLength: 1
+          title: Type
+          description: URI reference identifying the problem type
+          examples:
+            - https://api.example.com/errors/llm-error
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Title
+          description: Short, human-readable summary of the problem
+          examples:
+            - LLM Service Unavailable
+        detail:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Detail
+          description: Human-readable explanation specific to this occurrence
+          examples:
+            - 'OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.'
+        code:
+          type: string
+          const: NODE_KIND_WRITE_DENIED
+          title: Code
+          default: NODE_KIND_WRITE_DENIED
+        retryable:
+          type: boolean
+          title: Retryable
+          default: false
+        instance:
+          anyOf:
+            - type: string
+              maxLength: 2048
+            - type: 'null'
+          title: Instance
+          description: Optional URI reference identifying the specific occurrence
+          examples:
+            - /invocations/550e8400-e29b-41d4-a716-446655440000
+        status:
+          type: integer
+          title: Status
+          default: 403
+        blocked_step_types:
+          items:
+            $ref: '#/components/schemas/BlockedStepType'
+          type: array
+          title: Blocked Step Types
+      type: object
+      required:
+        - type
+        - title
+        - detail
+        - blocked_step_types
+      title: NodeKindWriteDeniedProblemDetail
+      description: RFC 9457 permission denial with blocked step types.
+      examples:
+        - code: RATE_LIMIT_EXCEEDED
+          detail: OpenRouter API rate limit exceeded. Please try again in a few moments.
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          retryable: true
+          title: LLM Rate Limit Exceeded
+          type: https://api.example.com/errors/llm-error
+        - code: STREAM_TIMEOUT
+          detail: LLM streaming timed out after 30 seconds
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          retryable: true
+          title: Streaming Timeout
+          type: https://api.example.com/errors/timeout-error
     ProjectCreate:
       type: object
       title: ProjectCreate

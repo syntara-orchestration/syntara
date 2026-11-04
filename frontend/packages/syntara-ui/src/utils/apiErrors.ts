@@ -1,3 +1,5 @@
+import { getNodeKindWriteDeniedMessage } from './nodeKindDenials'
+
 /**
  * API Error Parsing Utilities
  *
@@ -27,6 +29,7 @@ export type ApiErrorCode =
   | 'WORKFLOW_NOT_FOUND'
   | 'WORKFLOW_VERSION_NOT_FOUND'
   | 'WORKFLOW_DEFINITION_INVALID'
+  | 'NODE_KIND_WRITE_DENIED'
   // Provider/Tool errors
   | 'PROVIDER_NAME_CONFLICT'
   | 'PROVIDER_NOT_FOUND'
@@ -260,6 +263,8 @@ export function isForbiddenError(error: unknown): boolean {
  * showAlert({ title: 'Error', message })
  */
 export function getErrorMessage(error: unknown): string {
+  const stepTypeMessage = getNodeKindWriteDeniedMessage(error)
+  if (stepTypeMessage) return finalizeUserFacingMessage(stepTypeMessage)
   const fallback = 'An unexpected error occurred'
 
   if (!error) {
@@ -519,6 +524,7 @@ const ERROR_TITLES: Record<string, string> = {
   WORKFLOW_NOT_FOUND: 'Workflow Not Found',
   WORKFLOW_VERSION_NOT_FOUND: 'Workflow Version Not Found',
   WORKFLOW_DEFINITION_INVALID: 'Workflow Definition Invalid',
+  NODE_KIND_WRITE_DENIED: 'Step types not allowed',
   // Provider/Tool errors
   PROVIDER_NAME_CONFLICT: 'Provider Name Conflict',
   PROVIDER_NOT_FOUND: 'Provider Not Found',

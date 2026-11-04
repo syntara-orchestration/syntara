@@ -6,6 +6,7 @@ authoring/palette ``NodeType`` values. System-only types such as
 Registration does not enforce permissions on workflow writes.
 """
 
+from collections.abc import Mapping
 from typing import Any
 
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
@@ -46,6 +47,19 @@ def node_labels(node: dict[str, Any]) -> dict[str, str]:
     """Return the step type label without exposing step parameters."""
     kind = node.get("type")
     return {NODE_KIND_LABEL: kind} if isinstance(kind, str) and kind else {}
+
+
+def step_types_in_definitions(definitions: list[Mapping[str, Any]]) -> list[str]:
+    """Return sorted distinct step type identifiers from workflow definitions."""
+    return sorted(
+        {
+            labels[NODE_KIND_LABEL]
+            for definition in definitions
+            for collection in ("nodes", "triggers")
+            for node in (definition.get(collection) or [])
+            if isinstance(node, dict) and (labels := node_labels(node))
+        }
+    )
 
 
 def _validate_kind_labels(labels: object, condition: str) -> str | None:

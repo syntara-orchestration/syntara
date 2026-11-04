@@ -124,9 +124,11 @@ class TestPublishEventsCreation(_PublishEventsTestBase):
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_publish_creates_published_event(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_publish_creates_published_event(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Publishing a version creates a single PUBLISHED event."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, published_version = await self._create_and_publish(
             service, test_db_session, name="publish-event-test"
         )
@@ -142,10 +144,10 @@ class TestPublishEventsCreation(_PublishEventsTestBase):
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_publish_creates_implicit_unpublish_event(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Publishing v2 while v1 is published creates an implicit UNPUBLISHED event for v1."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, v1_published = await self._create_and_publish(
             service, test_db_session, name="implicit-unpublish-test"
         )
@@ -179,9 +181,11 @@ class TestPublishEventsCreation(_PublishEventsTestBase):
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_unpublish_creates_unpublish_event(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_unpublish_creates_unpublish_event(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Explicitly unpublishing creates an UNPUBLISHED event."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, published_version = await self._create_and_publish(
             service, test_db_session, name="unpublish-event-test"
         )
@@ -203,9 +207,11 @@ class TestPublishEventsCreation(_PublishEventsTestBase):
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_republish_creates_new_published_event(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_republish_creates_new_published_event(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Publish, unpublish, then republish creates two PUBLISHED events."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, published_version = await self._create_and_publish(
             service, test_db_session, name="republish-event-test"
         )
@@ -240,9 +246,11 @@ class TestPublishEventsQuery(_PublishEventsTestBase):
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_list_versions_returns_correct_status(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_list_versions_returns_correct_status(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """After publishing v1, listing shows v1 as published and v2 as draft."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, _ = await self._create_and_publish(service, test_db_session, name="status-listing-test")
 
         # Create v2 as a draft (different definition so it actually creates a new version)
@@ -266,10 +274,10 @@ class TestPublishEventsQuery(_PublishEventsTestBase):
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_list_versions_previously_published_status(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """After publishing v1 then v2, v1 becomes previously_published."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, _ = await self._create_and_publish(service, test_db_session, name="prev-published-test")
 
         # Create and publish v2
@@ -297,9 +305,11 @@ class TestPublishEventsQuery(_PublishEventsTestBase):
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_populate_published_version_numbers(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_populate_published_version_numbers(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """populate_published_version_numbers sets version number on WorkflowRead objects."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create and publish two workflows
         _workflow_a, _ = await self._create_and_publish(service, test_db_session, name="pvn-test-a")
@@ -333,10 +343,10 @@ class TestPublishTimestamps(_PublishEventsTestBase):
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_publish_timestamps_returned_in_version_list(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """After publishing v1, last_published_at is set in version list response."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, _ = await self._create_and_publish(service, test_db_session, name="timestamps-test")
 
         response = await service.list_workflow_versions_cursor(
@@ -354,14 +364,14 @@ class TestPublishTimestamps(_PublishEventsTestBase):
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_unpublish_timestamp_suppressed_on_republish(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """After publish -> unpublish -> republish, last_unpublished_at is None.
 
         The serialization logic suppresses last_unpublished_at when the most recent
         publish timestamp is later than the most recent unpublish timestamp.
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, _ = await self._create_and_publish(service, test_db_session, name="suppress-unpublish-ts-test")
 
         # Unpublish
