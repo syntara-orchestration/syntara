@@ -21,9 +21,10 @@ class RetryFailureRequest:
 
     Attributes:
         retry_point_ids (list[str] | Unset): Retry points to resume from (node IDs from the source execution). A subset
-            may be passed when multiple parallel branches failed; unselected branches are skipped. Empty selects the
-            default: all currently failed nodes. This is what the caller asks for; the points that will actually run come
-            back as eligible_point_ids on the response, which can differ.
+            may be passed when multiple parallel branches failed; unselected branches reuse their recorded output (completed
+            results are retained, unselected failures stay failed). Empty selects the default: all currently failed nodes.
+            This is what the caller asks for; the points that will actually run come back as eligible_point_ids on the
+            response, which can differ.
         input_parameter_overrides (RetryFailureRequestInputParameterOverrides | Unset): Input parameter overrides for
             the retry's starting nodes, keyed by node id then parameter name (SDP AC-14/R10c). Each override replaces the
             value the node would otherwise receive, after upstream outputs are injected, so the supplied value is what
