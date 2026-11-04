@@ -533,13 +533,23 @@ describe('flat ESLint config rule inheritance', () => {
     ).toBe(true)
   })
 
-  it('allows required JSON extensions while warning on TypeScript extensions', async () => {
+  it('errors on TypeScript extensions while allowing required JSON extensions', async () => {
+    const sourceFile = 'src/routes/access-management/AssignRoleModal.tsx'
     const jsonMessages = await lintMessages(
-      'src/routes/access-management/AssignRoleModal.tsx',
+      sourceFile,
       "import docs from '../../utils/docs/docsUrls.json'; export { docs }"
     )
+    const typescriptMessages = await lintMessages(
+      sourceFile,
+      "import { DateCell } from '../../components/table/DateCell.tsx'; export { DateCell }"
+    )
+    const config = await eslint.calculateConfigForFile(sourceFile)
 
     expect(jsonMessages.some((message) => message.ruleId === 'import-x/extensions')).toBe(false)
+    expect(
+      typescriptMessages.some((message) => message.ruleId === 'import-x/extensions' && message.severity === 2)
+    ).toBe(true)
+    expect(config?.rules['import-x/extensions']?.[0]).toBe(2)
   })
 
   it('loads every Syntara custom rule in the route source profile', async () => {

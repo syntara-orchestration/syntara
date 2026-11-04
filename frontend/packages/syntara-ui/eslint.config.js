@@ -323,7 +323,7 @@ export default tseslint.config(
       'import-x/no-cycle': ['error', { maxDepth: 2 }],
       'import-x/no-self-import': 'error',
       // TypeScript resolves source extensions automatically; JSON imports need `.json`.
-      'import-x/extensions': ['warn', 'never', { json: 'always' }],
+      'import-x/extensions': ['error', 'never', { json: 'always' }],
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       // -- syntara custom rules (PR checklist + UX design system enforcement) --
       // no-switch-is-reversed, require-alert-object-param, and require-query-state-object
