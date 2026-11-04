@@ -1,5 +1,6 @@
 """Translate Temporal activity events into pending database updates."""
 
+import json
 from typing import Any
 
 import structlog
@@ -22,9 +23,14 @@ logger = structlog.stdlib.get_logger(__name__)
 class ActivitySyncEventProcessorMixin:
     """Handlers for Temporal activity task history events."""
 
+    _SUBWORKFLOW_SETUP_PREFIX = "__internal__setup_sub_workflow_"
+
     def _process_activity_scheduled(self, event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
         """Process ACTIVITY_TASK_SCHEDULED event."""
         attrs = event.activity_task_scheduled_event_attributes
+        if attrs.activity_id.startswith(self._SUBWORKFLOW_SETUP_PREFIX):
+            self._process_subworkflow_setup_scheduled(event, attrs.activity_id, metadata)
+            return
         if attrs.activity_id.startswith("__internal__"):
             return
         iteration_number = innermost_iteration_index(attrs.activity_id)
@@ -62,6 +68,44 @@ class ActivitySyncEventProcessorMixin:
             "iteration": iteration_number,
             "scheduled_at": ensure_timezone_aware(event.event_time),
             "configured_timeout_seconds": configured_timeout_seconds,
+        }
+        metadata.pending_sync_event_ids.add(event.event_id)
+
+    def _process_subworkflow_setup_scheduled(
+        self, event: HistoryEvent, activity_id: str, metadata: ExecutionMonitorMetadata
+    ) -> None:
+        """Register the sub-workflow setup activity against its canvas node.
+
+        The sub-workflow node runs through an ``__internal__setup_sub_workflow_*``
+        activity whose id encodes the canvas node and (for ``for_each``) the
+        iteration: ``__internal__setup_sub_workflow_{node.id}`` or
+        ``..._{node.id}_iter_{n}``. The node's aggregate ActivityExecution row is
+        already created upfront, so this only registers a pending update keyed to
+        the canvas node: the activity's STARTED event drives RUNNING and its
+        COMPLETED event populates runtime_metadata (non-iterated nodes only).
+        Terminal status stays owned by the finalizer (see
+        ``_process_subworkflow_setup_completed``).
+        """
+        invocation_node_id = activity_id[len(self._SUBWORKFLOW_SETUP_PREFIX) :]
+        iteration_number = innermost_iteration_index(invocation_node_id)
+        canvas_node_id = (
+            strip_loop_iteration_suffixes(invocation_node_id) if iteration_number is not None else invocation_node_id
+        )
+        metadata.pending_activity_updates[event.event_id] = {
+            "activity_id": canvas_node_id,
+            "activity_name": canvas_node_id,
+            "_is_loop_iteration": False,
+            "_is_loop_control": False,
+            "_subworkflow_setup": True,
+            "_subworkflow_iteration": iteration_number,
+            "status": ActivityStatus.PENDING,
+            "started_at": None,
+            "completed_at": None,
+            "error_details": None,
+            "retry_count": 0,
+            "iteration": None,
+            "scheduled_at": ensure_timezone_aware(event.event_time),
+            "configured_timeout_seconds": None,
         }
         metadata.pending_sync_event_ids.add(event.event_id)
 
@@ -154,10 +198,70 @@ class ActivitySyncEventProcessorMixin:
         scheduled_id = attrs.scheduled_event_id
         if scheduled_id in metadata.pending_activity_updates:
             update = metadata.pending_activity_updates[scheduled_id]
+            if update.get("_subworkflow_setup"):
+                self._process_subworkflow_setup_completed(attrs, update, scheduled_id, metadata)
+                return
             update["status"] = ActivityStatus.COMPLETED
             update["completed_at"] = ensure_timezone_aware(event.event_time)
             metadata.pending_sync_event_ids.add(scheduled_id)
             metadata.terminal_activity_ids.add(update["activity_id"])
+
+    def _process_subworkflow_setup_completed(
+        self,
+        attrs: Any,  # noqa: ANN401 - ActivityTaskCompletedEventAttributes
+        update: dict[str, Any],
+        scheduled_id: int,
+        metadata: ExecutionMonitorMetadata,
+    ) -> None:
+        """Handle completion of the sub-workflow setup activity.
+
+        Setup completion is NOT node completion: the child workflow has only just
+        been dispatched. The node is kept RUNNING and deliberately not added to
+        ``terminal_activity_ids`` — the finalizer owns the node's terminal status
+        until a reliable logical-node completion signal exists (C3).
+
+        For a non-iterated node the child's identifying metadata from the setup
+        result is surfaced as ``runtime_metadata``. For a ``for_each`` node
+        (N setups -> one aggregate row) ``runtime_metadata`` is intentionally left
+        unset in C2: writing each iteration would silently overwrite the previous
+        one, and the aggregate representation is a deferred decision (C3).
+        """
+        update["status"] = ActivityStatus.RUNNING
+        update["completed_at"] = None
+        if update.get("_subworkflow_iteration") is None:
+            child_metadata = self._extract_child_runtime_metadata(attrs)
+            if child_metadata is not None:
+                update["runtime_metadata"] = child_metadata
+        metadata.pending_sync_event_ids.add(scheduled_id)
+
+    @staticmethod
+    def _extract_child_runtime_metadata(attrs: Any) -> dict[str, Any] | None:  # noqa: ANN401
+        """Pull the child's identifying metadata from the setup activity result.
+
+        The setup activity returns a JSON dict carrying the child execution and
+        workflow identifiers. Only those UI-relevant identifiers are surfaced as
+        ``runtime_metadata``; the full result (which also carries the child
+        workflow definition) is never stored. Returns ``None`` when the payload is
+        absent, unparseable, or carries none of the expected identifiers.
+        """
+        if not attrs.result or not attrs.result.payloads:
+            return None
+        try:
+            result_data = json.loads(attrs.result.payloads[0].data)
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to parse sub-workflow setup result for runtime_metadata", exc_info=True)
+            return None
+        if not isinstance(result_data, dict):
+            return None
+        child_metadata = {
+            "child_execution_id": result_data.get("execution_id"),
+            "child_workflow_id": result_data.get("child_workflow_id"),
+            "child_workflow_name": result_data.get("child_workflow_name"),
+            "child_workflow_version": result_data.get("child_workflow_version"),
+        }
+        if all(value is None for value in child_metadata.values()):
+            return None
+        return child_metadata
 
     def _process_activity_failed(self, event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
         """Process ACTIVITY_TASK_FAILED event."""
@@ -165,6 +269,10 @@ class ActivitySyncEventProcessorMixin:
         scheduled_id = attrs.scheduled_event_id
         if scheduled_id in metadata.pending_activity_updates:
             update = metadata.pending_activity_updates[scheduled_id]
+            if update.get("_subworkflow_setup"):
+                # Terminal status for the sub-workflow node is owned by the
+                # finalizer in C2; a setup failure must not terminalize the node.
+                return
             is_cancelled = bool(
                 attrs.failure
                 and attrs.failure.application_failure_info
@@ -183,6 +291,10 @@ class ActivitySyncEventProcessorMixin:
         scheduled_id = attrs.scheduled_event_id
         if scheduled_id in metadata.pending_activity_updates:
             update = metadata.pending_activity_updates[scheduled_id]
+            if update.get("_subworkflow_setup"):
+                # Terminal status for the sub-workflow node is owned by the
+                # finalizer in C2; a setup timeout must not terminalize the node.
+                return
             update["status"] = ActivityStatus.FAILED
             timed_out_at = ensure_timezone_aware(event.event_time)
             update["completed_at"] = timed_out_at
@@ -208,6 +320,10 @@ class ActivitySyncEventProcessorMixin:
         scheduled_id = attrs.scheduled_event_id
         if scheduled_id in metadata.pending_activity_updates:
             update = metadata.pending_activity_updates[scheduled_id]
+            if update.get("_subworkflow_setup"):
+                # Terminal status for the sub-workflow node is owned by the
+                # finalizer in C2; a setup cancel must not terminalize the node.
+                return
             update["status"] = ActivityStatus.CANCELLED
             update["completed_at"] = ensure_timezone_aware(event.event_time)
             update["error_details"] = "Activity was canceled"
