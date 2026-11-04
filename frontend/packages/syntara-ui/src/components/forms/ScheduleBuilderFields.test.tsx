@@ -98,8 +98,16 @@ describe('ScheduleBuilderFields', () => {
 
   it('calls onTimezoneChange when timezone is selected', async () => {
     const onTimezoneChange = vi.fn()
+    const onChange = vi.fn()
     const user = userEvent.setup()
-    render(<ScheduleBuilderFields timezone="UTC" onTimezoneChange={onTimezoneChange} />)
+    render(
+      <ScheduleBuilderFields
+        value="R/2024-01-15T10:00:00+00:00/P3D"
+        timezone="UTC"
+        onChange={onChange}
+        onTimezoneChange={onTimezoneChange}
+      />
+    )
 
     await user.click(screen.getByRole('button', { name: 'UTC' }))
     await user.type(screen.getByPlaceholderText('Filter timezones'), 'America/New_York')
@@ -107,6 +115,7 @@ describe('ScheduleBuilderFields', () => {
     await user.click(option)
 
     expect(onTimezoneChange).toHaveBeenCalledWith('America/New_York')
+    expect(onChange).toHaveBeenCalledWith('R/2024-01-15T10:00:00-05:00/P3D')
   })
 
   it('renders multi-unit interval count', () => {
@@ -264,14 +273,11 @@ describe('ScheduleBuilderFields', () => {
     expect(screen.getByText('If this field is left empty, the schedule will not have an end date.')).toBeInTheDocument()
   })
 
-  it('calls onChange with a non-empty interval when no start date is set', async () => {
+  it('does not emit schedule data before a user action when the value is empty', () => {
     const onChange = vi.fn()
     render(<ScheduleBuilderFields onChange={onChange} />)
 
-    await waitFor(() => {
-      expect(onChange).toHaveBeenCalled()
-      expect(onChange.mock.calls.at(-1)?.[0]).toMatch(/^R1\/\d{4}-\d{2}-\d{2}/)
-    })
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('has no accessibility violations when end date is invalid', async () => {

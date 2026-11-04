@@ -1,6 +1,7 @@
 import { Alert, Button, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
 import { RhUiExternalLinkIcon } from '@patternfly/react-icons'
 import type { Node } from '@xyflow/react'
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { SynPanel } from '../../components/layout/SynPanel'
@@ -8,6 +9,7 @@ import type { NodeType } from '../workflows/canvas/nodes/NodeType'
 
 import { useStepExecutionData } from './panels/hooks/useStepExecutionData'
 import { StepEditorPanelBody } from './panels/StepEditorPanelBody'
+import { StepFormHeaderPortalContext } from './step-forms/shared/StepFormHeaderPortalContext'
 import { StepFormTabBarProvider } from './step-forms/shared/StepFormTabBarContext'
 import type { WorkflowMetadata } from './types/workflowMetadata'
 
@@ -76,6 +78,7 @@ export function StepEditorLayout({
   mode = 'edit',
 }: StepEditorLayoutProps) {
   const { inputData, outputData } = useStepExecutionData(nodeId ?? '', executionId, workflowId)
+  const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null)
   let closeAriaLabel = 'Cancel without saving'
   if (readOnly) closeAriaLabel = 'Close step editor'
   else if (mode === 'add') closeAriaLabel = 'Cancel step creation'
@@ -111,7 +114,11 @@ export function StepEditorLayout({
                     {headerIcon}
                   </FlexItem>
                 )}
-                {headerContent && <FlexItem>{headerContent}</FlexItem>}
+                <FlexItem style={{ display: 'contents' }}>
+                  <div ref={setHeaderPortalTarget} style={{ display: 'contents' }}>
+                    {headerContent}
+                  </div>
+                </FlexItem>
               </Flex>
             </FlexItem>
             <FlexItem>
@@ -187,21 +194,23 @@ export function StepEditorLayout({
             padding: 'var(--pf-t--global--spacer--sm) 0',
           }}
         >
-          <StepEditorPanelBody
-            showInputPanel={showInputPanel}
-            showNavigation={showNavigation}
-            nodeId={nodeId}
-            node={node}
-            sourceNodeId={sourceNodeId}
-            inputData={inputData}
-            outputData={outputData}
-            parametersContent={
-              <StepFormTabBarProvider tabBarAction={tabBarAction}>{parametersContent}</StepFormTabBarProvider>
-            }
-            onNavigateToStep={onNavigateToStep}
-            onAddStep={onAddStep}
-            workflowMetadata={workflowMetadata}
-          />
+          <StepFormHeaderPortalContext.Provider value={headerPortalTarget}>
+            <StepEditorPanelBody
+              showInputPanel={showInputPanel}
+              showNavigation={showNavigation}
+              nodeId={nodeId}
+              node={node}
+              sourceNodeId={sourceNodeId}
+              inputData={inputData}
+              outputData={outputData}
+              parametersContent={
+                <StepFormTabBarProvider tabBarAction={tabBarAction}>{parametersContent}</StepFormTabBarProvider>
+              }
+              onNavigateToStep={onNavigateToStep}
+              onAddStep={onAddStep}
+              workflowMetadata={workflowMetadata}
+            />
+          </StepFormHeaderPortalContext.Provider>
         </StackItem>
       </Stack>
     </SynPanel>

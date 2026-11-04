@@ -54,14 +54,17 @@ vi.mock('../../client', () => ({
 }))
 
 vi.mock('../stores/useProjectStore', () => ({
-  useProjectStore: () => ({
-    selectedProjectId: mockSelectedProjectId,
-    selectedProjectName: mockSelectedProjectName,
-    setSelectedProjectId: mockSetSelectedProjectId,
-    setSelectedProjectName: mockSetSelectedProjectName,
-    favoriteProjectIds: mockFavoriteProjectIds,
-    toggleFavoriteProjectId: mockToggleFavoriteProjectId,
-  }),
+  useProjectStore: (selector?: (state: Record<string, unknown>) => unknown) => {
+    const state = {
+      selectedProjectId: mockSelectedProjectId,
+      selectedProjectName: mockSelectedProjectName,
+      setSelectedProjectId: mockSetSelectedProjectId,
+      setSelectedProjectName: mockSetSelectedProjectName,
+      favoriteProjectIds: mockFavoriteProjectIds,
+      toggleFavoriteProjectId: mockToggleFavoriteProjectId,
+    }
+    return selector ? selector(state) : state
+  },
 }))
 
 vi.mock('../../client', () => ({

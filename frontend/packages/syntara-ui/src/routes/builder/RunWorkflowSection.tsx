@@ -45,6 +45,7 @@ export type RunWorkflowSectionProps = Readonly<{
   isSaved: boolean
   validationErrorCount: number
   dispatch: Dispatch<BuilderAction>
+  onRequestWorkflowRun?: (triggerIndex?: number) => void
   builderPermissions: BuilderPermissions
   isStepEditorOpen?: boolean
 }>
@@ -58,6 +59,7 @@ export function RunWorkflowSection({
   isSaved,
   validationErrorCount,
   dispatch,
+  onRequestWorkflowRun,
   builderPermissions,
   isStepEditorOpen,
 }: RunWorkflowSectionProps) {
@@ -109,8 +111,12 @@ export function RunWorkflowSection({
               <DropdownItem
                 key={trigger.id}
                 onClick={() => {
-                  dispatch({ type: 'SET_SELECTED_TRIGGER', payload: index })
-                  dispatch({ type: 'SET_CONFIRM_DIALOG', payload: true })
+                  if (onRequestWorkflowRun) {
+                    onRequestWorkflowRun(index)
+                  } else {
+                    dispatch({ type: 'SET_SELECTED_TRIGGER', payload: index })
+                    dispatch({ type: 'SET_CONFIRM_DIALOG', payload: true })
+                  }
                   setIsRunDropdownOpen(false)
                 }}
               >
@@ -128,7 +134,17 @@ export function RunWorkflowSection({
       <Button
         variant="plain"
         isAriaDisabled={isRunDisabled}
-        onClick={!isRunDisabled ? () => dispatch({ type: 'SET_CONFIRM_DIALOG', payload: true }) : undefined}
+        onClick={
+          !isRunDisabled
+            ? () => {
+                if (onRequestWorkflowRun) {
+                  onRequestWorkflowRun()
+                } else {
+                  dispatch({ type: 'SET_CONFIRM_DIALOG', payload: true })
+                }
+              }
+            : undefined
+        }
         icon={
           <Icon isInline>
             <RhUiPlayIcon />

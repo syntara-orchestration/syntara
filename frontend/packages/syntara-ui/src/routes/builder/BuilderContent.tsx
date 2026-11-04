@@ -45,6 +45,7 @@ import { useBuilderLiveRunPanel } from './hooks/useBuilderLiveRunPanel'
 import { useBuilderSaveWorkflow } from './hooks/useBuilderSaveWorkflow'
 import { useBuilderToolbarHandlers } from './hooks/useBuilderToolbarHandlers'
 import { useBuilderValidation } from './hooks/useBuilderValidation'
+import { loadDefinitionIntoStore } from './hooks/useBuilderVersionHistory'
 import { useBuilderVersionPanel } from './hooks/useBuilderVersionPanel'
 import { useBuilderWindowEffects } from './hooks/useBuilderWindowEffects'
 import { useBuilderWorkflowLifecycle } from './hooks/useBuilderWorkflowLifecycle'
@@ -61,7 +62,11 @@ import { StepActionsContext } from './StepActionsContext'
 import type { BuilderContentProps } from './types/builderContent'
 import { useBuilderPermissions } from './useBuilderPermissions'
 import { createAddStepHandler } from './utils/panelActions'
+import { requestWorkflowRun } from './utils/requestWorkflowRun'
+import { getRunConfirmDismissed } from './utils/runConfirmPreference'
+import { activitiesReferenceTrigger, hasNonEmptyInputSchema } from './utils/triggerReferenceCheck'
 import { buildWorkflowDefinition, transformStepParameters } from './utils/workflowDefinitionBuilder'
+import { DEFAULT_WORKFLOW_NAME, getNextDefaultWorkflowName } from './utils/workflowNaming'
 import { ValidationBanner } from './ValidationBanner'
 import { VersionInfoCard } from './VersionInfoCard'
 import { VersionViewProvider } from './VersionViewProvider'
@@ -125,6 +130,9 @@ export function BuilderContent(props: BuilderContentProps) {
     defaultSort: { field: 'created_at', direction: 'desc' as const },
   })
   const [state, dispatch] = useReducer(builderReducer, getInitialBuilderState())
+  const defaultNameScopeRef = useRef({ workflowId, isNew })
+  const hasAppliedDefaultNameRef = useRef(false)
+  const appliedViewingVersionRef = useRef<number | null>(null)
   const autoSubmitRef = useStepEditorAutoSubmitRef()
   const {
     confirmDialogOpen,
@@ -175,7 +183,6 @@ export function BuilderContent(props: BuilderContentProps) {
     workflowId,
     isNew,
     workflow,
-    workflowName,
     initialViewVersion,
     workflowsListResources: workflowsListQuery.data?.resources,
     workflowsListDataUndefined: workflowsListQuery.data === undefined,
@@ -186,7 +193,25 @@ export function BuilderContent(props: BuilderContentProps) {
     setStoredEdges,
     loadWorkflowWithEdges,
   })
-  useExecutionCopyToEditor({ executionCopy, dispatch, markDirty, showSuccess })
+  useEffect(() => {
+    if (defaultNameScopeRef.current.workflowId !== workflowId || defaultNameScopeRef.current.isNew !== isNew) {
+      defaultNameScopeRef.current = { workflowId, isNew }
+      hasAppliedDefaultNameRef.current = false
+    }
+
+    const workflowsListResources = workflowsListQuery.data?.resources
+    if (!isNew || workflowsListResources === undefined) return
+    if (workflowName !== DEFAULT_WORKFLOW_NAME || hasAppliedDefaultNameRef.current) return
+
+    const nextName = getNextDefaultWorkflowName(workflowsListResources)
+    if (nextName === DEFAULT_WORKFLOW_NAME) return
+    hasAppliedDefaultNameRef.current = true
+    dispatch({ type: 'SET_WORKFLOW_NAME', payload: nextName })
+  }, [isNew, workflowId, workflowsListQuery.data?.resources, workflowName, dispatch])
+  const applyExecutionCopy = useExecutionCopyToEditor({ executionCopy, dispatch, markDirty, showSuccess })
+  useEffect(() => {
+    applyExecutionCopy()
+  }, [applyExecutionCopy])
 
   const initialViewVersionRef = useRef(initialViewVersion)
   useEffect(() => {
@@ -334,6 +359,30 @@ export function BuilderContent(props: BuilderContentProps) {
     loadedVersionCreatedAt: workflow?.version?.created_at ?? null,
     onRunConflict: handleConflict('run'),
   })
+  const handleRequestWorkflowRun = useCallback(
+    (triggerIndex?: number) => {
+      const workflowTriggers = currentWorkflow?.triggers ?? []
+      const trigger = workflowTriggers[triggerIndex ?? selectedTriggerIndex] ?? workflowTriggers[0]
+      const triggerParameters = trigger?.parameters as Record<string, unknown> | undefined
+      const triggerInputSchema = triggerParameters?.input_schema as Record<string, unknown> | undefined
+      const requiresInput =
+        hasNonEmptyInputSchema(triggerInputSchema) ||
+        activitiesReferenceTrigger(
+          currentWorkflow?.workflow.activities ?? [],
+          workflowTriggers.map((workflowTrigger) => workflowTrigger.id).filter(Boolean)
+        )
+
+      requestWorkflowRun({
+        triggerIndex,
+        triggerNodeId: trigger?.id,
+        requiresInput,
+        skipConfirmation: getRunConfirmDismissed(),
+        dispatch,
+        handleRunWorkflow,
+      })
+    },
+    [currentWorkflow, dispatch, handleRunWorkflow, selectedTriggerIndex]
+  )
   useEffect(() => {
     registerSaveHandler(handleSaveWorkflow)
     setActions({ handleSaveWorkflow, onPublish, handleRunWorkflow })
@@ -517,6 +566,18 @@ export function BuilderContent(props: BuilderContentProps) {
     onDuplicateVersion: (v: WorkflowVersion) => detachPromise(handleDuplicateVersion(v)),
     onVersionUpdated,
   })
+  useEffect(() => {
+    if (viewingVersion === null) {
+      appliedViewingVersionRef.current = null
+      return
+    }
+    if (!versionPanel.viewedVersionDefinition || appliedViewingVersionRef.current === viewingVersion) return
+
+    appliedViewingVersionRef.current = viewingVersion
+    loadDefinitionIntoStore(versionPanel.viewedVersionDefinition, loadWorkflowWithEdges)
+    markClean()
+    expandAllEvent.dispatchEvent(new Event('expandAll'))
+  }, [viewingVersion, versionPanel.viewedVersionDefinition, loadWorkflowWithEdges, markClean, expandAllEvent])
 
   const {
     handleNodeClick,
@@ -604,6 +665,7 @@ export function BuilderContent(props: BuilderContentProps) {
                   isPublishing={isPublishing}
                   ProjectSelector={ProjectSelector}
                   dispatch={dispatch}
+                  onRequestWorkflowRun={handleRequestWorkflowRun}
                   markDirty={markDirty}
                   handleToggleHistory={handleToggleHistory}
                   handleToggleVersionHistory={versionPanel.handleToggleVersionHistory}

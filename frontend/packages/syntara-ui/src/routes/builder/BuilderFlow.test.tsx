@@ -7,6 +7,8 @@ import { BuilderFlow } from './BuilderFlow'
 
 let workflowStoreState: Record<string, unknown> = {}
 let temporalState = { pause: vi.fn(), clear: vi.fn(), resume: vi.fn() }
+const mockSetStoredEdges = vi.fn()
+const mockReorderActivitiesFromEdges = vi.fn()
 
 function resetStoreState() {
   workflowStoreState = {
@@ -17,6 +19,8 @@ function resetStoreState() {
     nodePositions: {},
     triggers: [] as Array<Record<string, unknown>>,
     activities: [] as Array<Record<string, unknown>>,
+    _temporalBatchPending: false,
+    reorderActivitiesFromEdges: mockReorderActivitiesFromEdges,
   }
   temporalState = { pause: vi.fn(), clear: vi.fn(), resume: vi.fn() }
 }
@@ -50,7 +54,19 @@ vi.mock('@xyflow/react', () => ({
   Background: () => null,
   BackgroundVariant: { Dots: 'dots' },
   ConnectionLineType: { SmoothStep: 'smoothstep' },
-  applyEdgeChanges: (_changes: unknown, edges: Array<Record<string, unknown>>) => edges,
+  applyEdgeChanges: (changes: Array<Record<string, unknown>>, edges: Array<Record<string, unknown>>) => {
+    let nextEdges = [...edges]
+    changes.forEach((change) => {
+      if (change.type === 'add') {
+        nextEdges = [...nextEdges, change.item as Record<string, unknown>]
+      } else if (change.type === 'remove') {
+        nextEdges = nextEdges.filter((edge) => edge.id !== change.id)
+      } else if (change.type === 'select') {
+        nextEdges = nextEdges.map((edge) => (edge.id === change.id ? { ...edge, selected: change.selected } : edge))
+      }
+    })
+    return nextEdges
+  },
   applyNodeChanges: (_changes: unknown, nodes: Array<Record<string, unknown>>) => nodes,
   useReactFlow: () => ({
     fitView: vi.fn(),
@@ -90,25 +106,23 @@ vi.mock('./utils/detectLoopBackNodes', () => ({
 }))
 
 vi.mock('./hooks/useWorkflowInitialization', () => ({
-  useWorkflowInitialization: ({ onAfterInitialLayout }: { onAfterInitialLayout?: () => void }) => {
+  useWorkflowInitialization: ({
+    nodes,
+    onAfterInitialLayout,
+  }: {
+    nodes: unknown[]
+    onAfterInitialLayout?: () => void
+  }) => {
     onAfterInitialLayout?.()
-    return { isInitialized: true, hasRunInitialLayoutRef: { current: true }, workflowVersionRef: { current: 1 } }
+    return {
+      isInitialized: nodes.length > 0,
+      hasRunInitialLayoutRef: { current: true },
+      workflowVersionRef: { current: 1 },
+    }
   },
 }))
 
-vi.mock('./hooks/useNodeUpdates', () => ({
-  useNodeUpdates: () => ({ newlyAddedNodeIdsRef: { current: new Set() } }),
-}))
-
 vi.mock('./hooks/useNodePositioning', () => ({ useNodePositioning: () => {} }))
-vi.mock('./hooks/useEdgeSynchronization', () => ({ useEdgeSynchronization: () => ({}) }))
-vi.mock('./hooks/useLoopBackNodeTypes', () => ({
-  useLoopBackNodeTypes: () => {},
-  applyLoopBackNodeTypes: (nodes: unknown[]) => nodes,
-}))
-vi.mock('./hooks/useEdgeActiveState', () => ({ useEdgeActiveState: () => {} }))
-vi.mock('./hooks/useButtonEdgeMaintenance', () => ({ useButtonEdgeMaintenance: () => {} }))
-vi.mock('./hooks/usePendingEdgeManagement', () => ({ usePendingEdgeManagement: () => {} }))
 vi.mock('./hooks/useConnectionHandlers', () => ({
   useConnectionHandlers: () => ({ onConnect: vi.fn(), onConnectStart: vi.fn(), onConnectEnd: vi.fn() }),
 }))
@@ -122,12 +136,13 @@ vi.mock('../../stores/useWorkflowStore', () => {
   const useWorkflowStore = (selector: (state: Record<string, unknown>) => unknown) => selector(workflowStoreState)
   useWorkflowStore.getState = () => workflowStoreState
   useWorkflowStore.temporal = { getState: () => temporalState }
+  useWorkflowStore.setState = (updates: Record<string, unknown>) => Object.assign(workflowStoreState, updates)
 
   return {
     useWorkflowStore,
     useWorkflowStoreActions: () => ({
       setWorkflow: vi.fn(),
-      setEdges: vi.fn(),
+      setEdges: mockSetStoredEdges,
       loadWorkflowWithEdges: vi.fn(),
       updateNodePositions: mockUpdateNodePositions,
     }),
@@ -158,7 +173,7 @@ const sampleWorkflow = {
   id: 'wf-1',
   name: 'Test Workflow',
   inputs: {},
-  triggers: [{ type: 'manual_trigger', name: 'Manual Trigger' }],
+  triggers: [{ id: 'trigger-real-1', type: 'manual_trigger', name: 'Manual Trigger' }],
   workflow: {
     activities: [
       { id: 'task-1', type: 'script', name: 'Script 1', parameters: { type: 'script', language: 'python', code: '' } },
@@ -174,7 +189,7 @@ const loopWorkflow = {
   id: 'wf-1',
   name: 'Loop Workflow',
   inputs: {},
-  triggers: [{ type: 'manual_trigger', name: 'Manual Trigger' }],
+  triggers: [{ id: 'trigger-real-1', type: 'manual_trigger', name: 'Manual Trigger' }],
   workflow: {
     activities: [
       {
@@ -236,16 +251,135 @@ describe('BuilderFlow (builder mode)', () => {
     expect(screen.getByTestId('canvas-controls')).toBeInTheDocument()
   })
 
+  it('applies new workflow nodes and their edges through BuilderFlow state ownership', () => {
+    seedWorkflow()
+    const { rerender } = render(<BuilderFlow {...defaultProps} />)
+
+    const nextActivity = {
+      id: 'task-2',
+      type: 'script',
+      name: 'Script 2',
+      parameters: { type: 'script', language: 'python', code: '' },
+    }
+    const nextWorkflow = {
+      ...sampleWorkflow,
+      workflow: { activities: [...sampleWorkflow.workflow.activities, nextActivity] },
+    }
+    const nextEdges = [...sampleEdges, { id: 'e2', source: 'task-1', target: 'task-2' }]
+
+    Object.assign(workflowStoreState, { currentWorkflow: nextWorkflow, edges: nextEdges })
+    rerender(<BuilderFlow {...defaultProps} />)
+
+    expect(latestReactFlowProps?.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'task-2' })]))
+    expect(latestReactFlowProps?.edges).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'e2' })]))
+  })
+
+  it('defers changed edges during active execution and synchronizes them when it ends', () => {
+    seedWorkflow()
+    const { rerender } = render(<BuilderFlow {...defaultProps} />)
+    expect(mockSetStoredEdges).not.toHaveBeenCalled()
+    const onEdgesChange = latestReactFlowProps?.onEdgesChange as (changes: Array<Record<string, unknown>>) => void
+
+    rerender(<BuilderFlow {...defaultProps} executionStatus="running" />)
+    act(() =>
+      onEdgesChange([
+        {
+          type: 'add',
+          item: { id: 'e2', source: 'task-1', target: 'task-2', sourceHandle: 'source', targetHandle: 'target' },
+        },
+      ])
+    )
+
+    expect(mockSetStoredEdges).not.toHaveBeenCalled()
+
+    rerender(<BuilderFlow {...defaultProps} executionStatus="completed" />)
+
+    expect(mockSetStoredEdges).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: 'e2', source: 'task-1', target: 'task-2' })])
+    )
+  })
+
+  it('does not synchronize edges when only React Flow selection metadata changes', () => {
+    seedWorkflow()
+    render(<BuilderFlow {...defaultProps} />)
+    const onEdgesChange = latestReactFlowProps?.onEdgesChange as (changes: Array<Record<string, unknown>>) => void
+
+    act(() => onEdgesChange([{ type: 'select', id: 'e1', selected: true }]))
+
+    expect(mockSetStoredEdges).not.toHaveBeenCalled()
+  })
+
+  it('does not synchronize edges before the workflow graph is initialized', () => {
+    render(<BuilderFlow {...defaultProps} />)
+    const onEdgesChange = latestReactFlowProps?.onEdgesChange as (changes: Array<Record<string, unknown>>) => void
+
+    act(() =>
+      onEdgesChange([
+        {
+          type: 'add',
+          item: { id: 'e1', source: 'task-1', target: 'task-2' },
+        },
+      ])
+    )
+
+    expect(mockSetStoredEdges).not.toHaveBeenCalled()
+  })
+
+  it('resets the edge first-sync guard when workflowVersion changes', () => {
+    seedWorkflow()
+    const { rerender } = render(<BuilderFlow {...defaultProps} />)
+
+    const nextEdges = [{ id: 'e2', source: 'task-1', target: 'task-2' }]
+    Object.assign(workflowStoreState, { workflowVersion: 2, edges: nextEdges })
+    rerender(<BuilderFlow {...defaultProps} />)
+
+    expect(mockSetStoredEdges).not.toHaveBeenCalled()
+  })
+
+  it('reorders activities and resumes a pending temporal batch after edge sync', () => {
+    seedWorkflow({ _temporalBatchPending: true })
+    render(<BuilderFlow {...defaultProps} />)
+    const onEdgesChange = latestReactFlowProps?.onEdgesChange as (changes: Array<Record<string, unknown>>) => void
+
+    act(() =>
+      onEdgesChange([
+        {
+          type: 'add',
+          item: { id: 'e2', source: 'task-1', target: 'task-2', sourceHandle: 'source', targetHandle: 'target' },
+        },
+      ])
+    )
+
+    expect(mockSetStoredEdges).toHaveBeenCalledTimes(1)
+    expect(mockReorderActivitiesFromEdges).toHaveBeenCalledTimes(1)
+    expect(workflowStoreState._temporalBatchPending).toBe(false)
+    expect(temporalState.resume).toHaveBeenCalled()
+  })
+
   // --- Re-initialization ---
 
   it('re-initializes when workflowVersion changes', () => {
     seedWorkflow({ nodePositions: { 'trigger-0': { x: 10, y: 20 }, 'task-1': { x: 100, y: 200 } } })
     const { rerender } = render(<BuilderFlow {...defaultProps} />)
 
-    Object.assign(workflowStoreState, { workflowVersion: 2 })
+    const nextWorkflow = {
+      ...sampleWorkflow,
+      workflow: {
+        activities: [
+          {
+            id: 'task-2',
+            type: 'script',
+            name: 'Script 2',
+            parameters: { type: 'script', language: 'python', code: '' },
+          },
+        ],
+      },
+    }
+    Object.assign(workflowStoreState, { workflowVersion: 2, currentWorkflow: nextWorkflow, edges: [] })
     rerender(<BuilderFlow {...defaultProps} />)
 
-    expect(latestReactFlowProps).toBeDefined()
+    expect(latestReactFlowProps?.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'task-2' })]))
+    expect(latestReactFlowProps?.nodes).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: 'task-1' })]))
   })
 
   it('resets state when workflowId changes', () => {
@@ -282,13 +416,51 @@ describe('BuilderFlow (builder mode)', () => {
   })
 
   it('applies position undo in-place when _positionUndoVersion changes', () => {
+    seedWorkflow({
+      triggers: sampleWorkflow.triggers,
+      nodePositions: {
+        'trigger-real-1': { x: 10, y: 20 },
+        'task-1': { x: 50, y: 60 },
+      },
+    })
+    const { rerender } = render(<BuilderFlow {...defaultProps} />)
+
+    Object.assign(workflowStoreState, {
+      nodePositions: {
+        'trigger-real-1': { x: 80, y: 90 },
+        'task-1': { x: 200, y: 300 },
+      },
+    })
+    rerender(<BuilderFlow {...defaultProps} />)
+
+    expect(latestReactFlowProps?.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'trigger-0', position: { x: 10, y: 20 } }),
+        expect.objectContaining({ id: 'task-1', position: { x: 50, y: 60 } }),
+      ])
+    )
+
+    Object.assign(workflowStoreState, { _positionUndoVersion: 1 })
+    rerender(<BuilderFlow {...defaultProps} />)
+
+    expect(latestReactFlowProps?.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'trigger-0', position: { x: 80, y: 90 } }),
+        expect.objectContaining({ id: 'task-1', position: { x: 200, y: 300 } }),
+      ])
+    )
+  })
+
+  it('keeps current positions when undo has no stored positions', () => {
     seedWorkflow({ nodePositions: { 'task-1': { x: 50, y: 60 } } })
     const { rerender } = render(<BuilderFlow {...defaultProps} />)
 
-    Object.assign(workflowStoreState, { _positionUndoVersion: 1, nodePositions: { 'task-1': { x: 200, y: 300 } } })
+    Object.assign(workflowStoreState, { _positionUndoVersion: 1, nodePositions: {} })
     rerender(<BuilderFlow {...defaultProps} />)
 
-    expect(latestReactFlowProps).toBeDefined()
+    expect(latestReactFlowProps?.nodes).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'task-1', position: { x: 50, y: 60 } })])
+    )
   })
 
   // --- Node drag ---

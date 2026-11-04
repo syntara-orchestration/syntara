@@ -11,7 +11,8 @@ import {
   TextArea,
 } from '@patternfly/react-core'
 import { ExecutorTypeEnum } from '@syntara/contracts'
-import React, { type ReactNode, use, useEffect, useMemo, useRef, useState } from 'react'
+import React, { use, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { SynForm } from '../../../components/forms/SynForm'
@@ -34,6 +35,7 @@ import { KeyValueFields } from './KeyValueFields'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { stepHelp } from './shared/stepFieldHelp'
 import { StepFormContainer } from './shared/StepFormContainer'
+import { StepFormHeaderPortalContext } from './shared/StepFormHeaderPortalContext'
 import { StepFormTabsLayout } from './shared/StepFormTabsLayout'
 import { StepSettingsForm } from './shared/StepSettingsForm'
 
@@ -48,7 +50,6 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 type ActionStepFormProps = {
   onSubmit: (data: RegistryActionFormData) => void
   initialData?: Partial<RegistryActionFormData>
-  onHeaderContentChange?: (content: ReactNode | null) => void
   projectId?: string
 }
 
@@ -330,12 +331,10 @@ function ActionParametersContent({
  * Form fields component that manually registers fields with react-hook-form
  */
 function ActionFormFields({
-  onHeaderContentChange,
   validationErrors,
   scriptEditorRef,
   projectId,
 }: Readonly<{
-  onHeaderContentChange?: (content: ReactNode | null) => void
   validationErrors?: { code?: { message?: string }; url?: { message?: string } }
   scriptEditorRef?: React.RefObject<ExpandableCodeEditorHandle | null>
   projectId?: string
@@ -349,6 +348,7 @@ function ActionFormFields({
   const language = useWatch({ control, name: 'language' })
   const editorLanguage: 'bash' | 'python' | 'plaintext' =
     language === 'bash' || language === 'python' ? language : 'plaintext'
+  const headerPortalTarget = use(StepFormHeaderPortalContext)
 
   useEffect(() => {
     if (errors.code && scriptEditorRef?.current) scriptEditorRef.current.focus()
@@ -377,17 +377,6 @@ function ActionFormFields({
     [control, executor]
   )
 
-  useEffect(() => {
-    onHeaderContentChange?.(headerContent)
-  }, [headerContent, onHeaderContentChange])
-
-  useEffect(
-    () => () => {
-      onHeaderContentChange?.(null)
-    },
-    [onHeaderContentChange]
-  )
-
   const parametersContent = (
     <ActionParametersContent
       errors={errors}
@@ -402,7 +391,12 @@ function ActionFormFields({
   const timeoutStepType = isHttpRequest ? 'http_request' : 'script'
   const settingsContent = <StepSettingsForm timeoutStepType={timeoutStepType} supportsRetryPolicy={isHttpRequest} />
 
-  return <StepFormTabsLayout parametersContent={parametersContent} settingsContent={settingsContent} />
+  return (
+    <>
+      {headerPortalTarget ? createPortal(headerContent, headerPortalTarget) : null}
+      <StepFormTabsLayout parametersContent={parametersContent} settingsContent={settingsContent} />
+    </>
+  )
 }
 
 export function ActionStepForm(props: Readonly<ActionStepFormProps>) {
@@ -455,12 +449,7 @@ export function ActionStepForm(props: Readonly<ActionStepFormProps>) {
   return (
     <StepFormContainer formId="action-step-form" onSubmit={form.handleSubmit(handleSubmit)}>
       <SynForm form={form}>
-        <ActionFormFields
-          onHeaderContentChange={props.onHeaderContentChange}
-          validationErrors={errors}
-          scriptEditorRef={scriptEditorRef}
-          projectId={props.projectId}
-        />
+        <ActionFormFields validationErrors={errors} scriptEditorRef={scriptEditorRef} projectId={props.projectId} />
       </SynForm>
     </StepFormContainer>
   )

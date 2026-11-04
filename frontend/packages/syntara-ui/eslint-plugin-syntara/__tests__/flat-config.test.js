@@ -33,6 +33,19 @@ const eslintProbe = new ESLint({
     },
   ],
 })
+const reactEffectRuleProbeEslint = new ESLint({
+  cwd: process.cwd(),
+  overrideConfig: [
+    {
+      files: ['**/*.{ts,tsx}'],
+      languageOptions: { parserOptions: { project: false } },
+      rules: {
+        ...projectBackedRuleOverrides,
+        'reactYouMightNotNeedAnEffect/no-pass-data-to-parent': 'error',
+      },
+    },
+  ],
+})
 const mockApiEslint = new ESLint({
   cwd: resolve(process.cwd(), '../syntara-mock-api'),
   overrideConfig: [
@@ -309,6 +322,8 @@ const reactEffectWarningProbes = [
   ],
 ]
 
+const escalatedReactEffectRules = new Set(['reactYouMightNotNeedAnEffect/no-pass-data-to-parent'])
+
 const testProfileRuleProbes = [
   ['focused test', "describe.only('focused', () => {})", 'no-only-tests/no-only-tests'],
   [
@@ -458,14 +473,27 @@ describe('flat ESLint config rule inheritance', () => {
   })
 
   it.each(reactEffectWarningProbes)(
-    'surfaces the configured React effect warning: %s',
+    'surfaces the configured React effect rule severity: %s',
     async (_name, _code, expectedRuleId) => {
       const config = await eslint.calculateConfigForFile('src/routes/access-management/AssignRoleModal.tsx')
 
-      expect(config?.rules[expectedRuleId]?.[0]).toBe(1)
+      expect(config?.rules[expectedRuleId]?.[0]).toBe(escalatedReactEffectRules.has(expectedRuleId) ? 2 : 1)
     },
     30_000
   )
+
+  it('reports data passed to a parent from an effect as an error', async () => {
+    const [result] = await reactEffectRuleProbeEslint.lintText(
+      "import { useEffect } from 'react'; import { useQuery } from '@tanstack/react-query'; export function Probe({ onDataFetched }: { onDataFetched: (data: number) => void }) { const { data } = useQuery({ queryKey: ['probe'], queryFn: async () => 1 }); useEffect(() => { onDataFetched(data) }, [data, onDataFetched]); return null }",
+      { filePath: 'src/routes/access-management/AssignRoleModal.tsx' }
+    )
+
+    expect(
+      result.messages.some(
+        (message) => message.ruleId === 'reactYouMightNotNeedAnEffect/no-pass-data-to-parent' && message.severity === 2
+      )
+    ).toBe(true)
+  })
 
   it.each(testProfileRuleProbes)(
     'enforces the test-only rule: %s',

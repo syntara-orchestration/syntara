@@ -767,6 +767,33 @@ describe('AIAgentStepForm', () => {
         expect(screen.getByDisplayValue('1 of 3 tools selected')).toBeInTheDocument()
       })
 
+      it('submits only tool selections that are still available', async () => {
+        setupToolMocks()
+
+        renderWithHeader(
+          <AIAgentStepForm
+            onSubmit={mockOnSubmit}
+            initialData={{
+              name: 'Agent',
+              llm_model_id: 'model-1',
+              tool_selection_strategy: 'SELECTED',
+              tool_selections: ['tool-1', 'stale-tool-id'],
+            }}
+          />
+        )
+
+        fireEvent.submit(screen.getByTestId('ai-agent-step-form'))
+
+        await waitFor(() => {
+          expect(mockOnSubmit).toHaveBeenCalledWith(
+            expect.objectContaining({
+              tool_selection_strategy: 'SELECTED',
+              tool_selections: ['tool-1'],
+            })
+          )
+        })
+      })
+
       it('resets to NONE when all selected tools are stale', () => {
         setupToolMocks()
 
