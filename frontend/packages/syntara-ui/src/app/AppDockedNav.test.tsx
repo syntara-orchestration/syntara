@@ -138,7 +138,10 @@ describe('AppDockedNav', () => {
   it.each([
     { buttonName: 'User menu', description: 'user menu toggle' },
     { buttonName: 'Documentation (opens in a new tab)', description: 'documentation button' },
-    { buttonName: 'Switch to light mode', description: 'color scheme toggle when in dark mode' },
+    {
+      buttonName: 'Theme, color scheme System, contrast System',
+      description: 'theme menu when no preference is stored',
+    },
     { buttonName: 'Global navigation', description: 'menu toggle button' },
   ])('renders $description', ({ buttonName }) => {
     renderDockedNav()
@@ -152,13 +155,16 @@ describe('AppDockedNav', () => {
     expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass('pf-m-docked')
   })
 
-  it('persists light mode and updates document when toggling from dark', async () => {
+  it('persists light mode from the theme menu without changing contrast', async () => {
     const user = userEvent.setup()
     renderDockedNav()
-    await user.click(screen.getByRole('button', { name: 'Switch to light mode' }))
+    await user.click(screen.getByRole('button', { name: 'Theme, color scheme System, contrast System' }))
+    await user.click(screen.getByRole('button', { name: 'Light' }))
     expect(document.documentElement.classList.contains('pf-v6-theme-dark')).toBe(false)
+    expect(document.documentElement.classList.contains('pf-v6-theme-glass')).toBe(true)
+    expect(document.documentElement.classList.contains('pf-v6-theme-high-contrast')).toBe(false)
     expect(localStorage.getItem(COLOR_SCHEME_STORAGE_KEY)).toBe('light')
-    expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Theme, color scheme Light, contrast System' })).toBeInTheDocument()
   })
 
   it('shows My Profile and Logout in user menu when clicked', async () => {
@@ -344,7 +350,7 @@ describe('AppDockedNav', () => {
 
     it('shows label text for color scheme and documentation buttons', () => {
       renderDockedNav()
-      expect(screen.getByText('Light mode')).toBeInTheDocument()
+      expect(screen.getByText('Theme')).toBeInTheDocument()
       expect(screen.getByText('Documentation')).toBeInTheDocument()
     })
 
@@ -367,7 +373,7 @@ describe('AppDockedNav', () => {
 
     it('shows label text for docked actions when mobile overlay is expanded', () => {
       renderDockedNav()
-      expect(screen.getByText('Light mode')).toBeInTheDocument()
+      expect(screen.getByText('Theme')).toBeInTheDocument()
       expect(screen.getByText('Documentation')).toBeInTheDocument()
     })
 
@@ -401,13 +407,11 @@ describe('AppDockedNav', () => {
     })
   })
 
-  it('renders light mode icon when in light mode', async () => {
-    const user = userEvent.setup()
+  it('keeps the theme menu label when the resolved scheme is light and no preference is stored', () => {
     document.documentElement.classList.remove('pf-v6-theme-dark', 'pf-v6-theme-glass')
     renderDockedNav()
-    expect(screen.getByText('Dark mode')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /switch to dark mode/i }))
-    expect(screen.getByText('Light mode')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Theme, color scheme System, contrast System' })).toBeInTheDocument()
+    expect(screen.getByText('Theme')).toBeInTheDocument()
   })
 
   it('opens documentation in a new tab when Documentation button is clicked', async () => {
