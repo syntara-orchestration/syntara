@@ -136,6 +136,7 @@ export function SynTextField<
 
         return (
           <TextInput
+            ref={field.ref}
             id={resolvedFieldId}
             type={type}
             aria-label={ariaLabel}

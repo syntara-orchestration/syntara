@@ -230,7 +230,7 @@ export function CredentialSelector({
 
   // Derive compatible type IDs from type names
   const compatibleTypeIds = useMemo(() => {
-    if (!compatibleTypeNames || credentialTypes.length === 0) return null
+    if (!compatibleTypeNames) return null
     return credentialTypes.filter((t) => compatibleTypeNames.includes(t.name)).map((t) => t.id)
   }, [compatibleTypeNames, credentialTypes])
 
@@ -328,6 +328,7 @@ export function CredentialSelector({
         onSelect={handleSelect}
         onOpenChange={setIsOpen}
         toggle={renderToggle}
+        shouldFocusToggleOnSelect
       >
         <SelectList aria-label={`${label} options`}>
           <NoCredentialOption isRequired={isRequired} value={value} />

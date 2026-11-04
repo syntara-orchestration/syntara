@@ -337,6 +337,16 @@ describe('CredentialSelector', () => {
     expect(screen.getByText('Dev Bearer Token')).toBeInTheDocument()
   })
 
+  it('does not offer incompatible credentials while credential types are unavailable', async () => {
+    const user = userEvent.setup()
+    mockUseQuery({ credentialTypes: { data: undefined, isPending: true } })
+    renderSelector({ compatibleTypeNames: ['Kafka'] })
+    await user.click(screen.getByRole('button', { name: 'Credential' }))
+    expect(screen.queryByRole('option', { name: 'Production API Key' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Staging Token' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Dev Bearer Token' })).not.toBeInTheDocument()
+  })
+
   it('shows selected credential name on toggle after selection', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()

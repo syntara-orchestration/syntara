@@ -12,13 +12,12 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationStatusEnum, IntegrationTypeEnum } from '@syntara/contracts'
 import React, { type ReactElement, useCallback, useMemo, useState } from 'react'
 
-import { integrationsClient } from '../../../client'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
-import { projectIdParam } from '../../../utils/queryParams'
 
 import { resolveFormGroupLabelHelp } from './resolveFormGroupLabelHelp'
+import { useAllIntegrations } from './useAllIntegrations'
 
 type IntegrationRead =
   | IntegrationsAPI.components['schemas']['IntegrationRead']
@@ -123,29 +122,17 @@ export function IntegrationSelector({
 
   const isKafka = integrationType === IntegrationTypeEnum.KAFKA
   const emptyLabel = isKafka ? 'No Kafka integrations available' : 'No MCP server integrations available'
-  const { data, isPending, isError, refetch } = integrationsClient.useQuery(
-    'get',
-    isKafka ? '/kafka_integrations' : '/integrations',
-    {
-      params: {
-        query: {
-          ...(isKafka ? {} : { integration_type: IntegrationTypeEnum.MCP_SERVER }),
-          enabled: true,
-          ...projectIdParam(projectId),
-        },
-      },
-    }
-  )
+  const { data, isPending, isError, refetch } = useAllIntegrations(integrationType, projectId)
 
-  const integrations: IntegrationRead[] = useMemo(() => data?.resources ?? [], [data?.resources])
+  const integrations: IntegrationRead[] = useMemo(() => data ?? [], [data])
 
   const selectedIntegration = useMemo(() => integrations.find((i) => i.id === value), [integrations, value])
 
   const toggleLabel = useMemo(() => {
     if (isPending) return 'Loading integrations...'
     if (isError) return 'Error loading integrations'
-    return selectedIntegration?.name ?? placeholder
-  }, [isPending, isError, selectedIntegration?.name, placeholder])
+    return selectedIntegration?.name ?? (value ? 'Selected integration is unavailable' : placeholder)
+  }, [isPending, isError, selectedIntegration?.name, placeholder, value])
 
   const handleSelect = useCallback(
     (_event: React.MouseEvent | undefined, selectedValue: string | number | undefined) => {
