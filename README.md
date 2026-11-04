@@ -67,8 +67,8 @@ This reads specs from `backend/src/syntara/schemas/` and generates types in `fro
 The root `podman-compose.yml` provides the full stack: PostgreSQL, Redis, Temporal, the Syntara API, and the UI. The UI service builds from `frontend/` instead of pulling a pre-built image.
 
 ```bash
-# Start all services
-podman-compose up --build
+# Start all services (the UIs sit behind the "ui" profile)
+podman-compose --profile ui up --build
 
 # Start specific services
 podman-compose up database redis temporal syntara

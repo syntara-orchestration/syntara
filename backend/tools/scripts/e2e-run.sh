@@ -11,7 +11,7 @@
 #                         (default: uv run podman-compose -p syntara -f podman-compose.yml)
 set -euo pipefail
 
-COMPOSE_CMD="${COMPOSE_CMD:-uv run podman-compose -p syntara -f podman-compose.yml}"
+COMPOSE_CMD="${COMPOSE_CMD:-uv run podman-compose -p syntara -f podman-compose.yml --build}"
 MAKE="${MAKE:-make}"
 PYTEST_ARGS=("$@")
 
@@ -30,9 +30,12 @@ NODE_IMAGE="${NODE_IMAGE:-quay.io/ahetheri/syntara-node-script:migration-test}"
 EP_JWT_ISSUER="${EP_AO_JWT_ISSUER:-$(grep -E '^APP_SERVER_PUBLIC_URL=' .env 2>/dev/null | tail -1 | cut -d= -f2- | cut -d'#' -f1 | tr -d '"' | xargs)}"
 EP_JWT_ISSUER="${EP_JWT_ISSUER:-https://0.0.0.0:8000}"
 
-EP_SERVICES=()
+# The Execution Plane services live behind the "execution-plane" compose
+# profile: enabling the profile starts exactly the service set the EP e2e
+# needs (db-init, migrate, api, worker) without enumerating them here.
+EP_PROFILES=()
 if [[ "${E2E_EP}" == "1" ]]; then
-    EP_SERVICES=(execution-plane-db-init execution-plane-migrate execution-plane-api execution-plane-worker)
+    EP_PROFILES=(--profile execution-plane)
     # podman-compose does not honor "${EP_API_PORT:-8001}" defaults in port
     # mappings (it falls back to the container port); export the variable so the
     # documented 8001 publish port is actually used.
@@ -51,7 +54,7 @@ cleanup() {
         podman logs "$container" > "${log_dir}/${container}.log" 2>&1 || true
     done
 
-    ${COMPOSE_CMD} --profile telemetry-e2e down > /dev/null 2>&1 || true
+    ${COMPOSE_CMD} --profile telemetry-e2e --profile mcp-scenarios ${EP_PROFILES[*]+"${EP_PROFILES[@]}"} down > /dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -75,7 +78,13 @@ APP_SEGMENT_MAX_RETRIES=2 \
 APP_SEGMENT_TIMEOUT=5 \
 APP_COLLECTION_INTERVAL_SECONDS=10 \
 APP_INTEGRATION_URL_ALLOWED_HOSTS='["mcp-server"]' \
-${COMPOSE_CMD} --profile telemetry-e2e --profile mcp-scenarios up -d --force-recreate temporal temporal-worker temporal-background-worker mock-segment mcp-server mcp-server-scenarios syntara ${EP_SERVICES[*]+"${EP_SERVICES[@]}"} \
+# Bare up with profiles: every non-profiled service plus the active profiles
+# (mock-segment, mcp-server-scenarios, and the Execution Plane set in EP mode).
+# The UIs sit behind the "ui" profile so they stay down; no --force-recreate
+# so the database container started above is not restarted (podman-compose
+# still recreates containers whose configuration changed, and cleanup tears
+# the stack down after each run anyway).
+${COMPOSE_CMD} --profile telemetry-e2e --profile mcp-scenarios ${EP_PROFILES[*]+"${EP_PROFILES[@]}"} up -d \
     >> /tmp/syntara-e2e-infra.log 2>&1
 
 echo "⏳ Waiting for mock Segment server..."
