@@ -416,21 +416,27 @@ class ActivityExecutionSyncMixin:
         existing_activities: dict[str, ActivityExecution],
         metadata: ExecutionMonitorMetadata,
     ) -> tuple[ActivityExecution, dict[str, Any], bool] | None:
-        """Sync a sub-workflow node's RUNNING / runtime_metadata from its setup activity.
+        """Sync a sub-workflow node's lifecycle + I/O from its setup activity.
 
-        Keyed to the canvas node's aggregate row (created upfront). Deliberately:
+        Keyed to the canvas node's aggregate row (created upfront). This is the sole
+        writer of the node's ``input_data``/``output_data`` (reconstructed from the
+        setup result in ``_subworkflow_io``); there is no direct activity-side
+        writer. Behaviour:
 
-        - does NOT query Temporal or write ``input_data``/``output_data`` — those
-          are owned by ``_persist_parent_node_io``; ``preserve_io`` keeps this path
-          from clobbering them;
-        - does NOT regress a terminal row (the finalizer may have already closed
-          the node), so setup events can never resurrect a completed/failed/
-          cancelled node;
-        - never sets a terminal status itself (the event processor keeps the node
-          RUNNING on setup start/completion).
+        - STARTED (no payload yet): status RUNNING + started_at only; I/O preserved
+          (``preserve_io=True``).
+        - COMPLETED (payload present): writes the reconstructed I/O summaries and,
+          for a non-iterated node, ``runtime_metadata``, through the shared writer.
+          ``for_each`` overwrites the single aggregate row per iteration, so the
+          last iteration's setup result wins (preserving prior behaviour).
+        - Terminal row: an I/O-only, set-if-empty backfill (see
+          ``_backfill_terminal_subworkflow_io``) — never touches status/timestamps/
+          error_details/runtime_metadata and never overwrites non-empty I/O, so a
+          node terminalized mid-setup still shows its invocation I/O with no
+          terminal-state regression.
 
-        Reuses the shared writer so the websocket publisher emits the ``status`` /
-        ``runtime_metadata`` deltas exactly like any other activity update.
+        Reuses the shared writer/publisher so deltas are emitted like any other
+        activity update.
         """
         activity_id = activity_data["activity_id"]
         existing = existing_activities.get(activity_id)
@@ -441,15 +447,65 @@ class ActivityExecutionSyncMixin:
                 execution_id=metadata.execution_id,
             )
             return None
+
+        io_summary = activity_data.get("_subworkflow_io")
+
         if existing.status in TERMINAL_ACTIVITY_STATUSES:
+            return self._backfill_terminal_subworkflow_io(existing, io_summary)
+
+        if io_summary is not None:
+            old_values = self._update_activity_record(
+                existing,
+                activity_data,
+                io_summary["input"],
+                io_summary["output"],
+                preserve_io=False,
+            )
+        else:
+            old_values = self._update_activity_record(
+                existing,
+                activity_data,
+                existing.input_data,
+                existing.output_data,
+                preserve_io=True,
+            )
+        return existing, old_values, False
+
+    @staticmethod
+    def _backfill_terminal_subworkflow_io(
+        existing: ActivityExecution,
+        io_summary: dict[str, dict[str, Any]] | None,
+    ) -> tuple[ActivityExecution, dict[str, Any], bool] | None:
+        """I/O-only, set-if-empty backfill for a sub-workflow row already terminal.
+
+        Never modifies status/started_at/completed_at/error_details/runtime_metadata
+        and never overwrites non-empty input/output, so a node terminalized
+        mid-setup (e.g. parent cancel / converge detach) still shows its invocation
+        I/O without any terminal-state regression. Idempotent: a second application
+        is a no-op. Committed by the existing synchronizer transaction — not a new
+        writer.
+        """
+        if io_summary is None:
             return None
-        old_values = self._update_activity_record(
-            existing,
-            activity_data,
-            existing.input_data,
-            existing.output_data,
-            preserve_io=True,
-        )
+        old_output = existing.output_data
+        wrote = False
+        if existing.input_data in (None, {}) and io_summary["input"]:
+            existing.input_data = io_summary["input"]
+            wrote = True
+        if existing.output_data is None and io_summary["output"]:
+            existing.output_data = io_summary["output"]
+            wrote = True
+        if not wrote:
+            return None
+        old_values = {
+            "status": existing.status,
+            "started_at": existing.started_at,
+            "completed_at": existing.completed_at,
+            "error_details": existing.error_details,
+            "output_data": old_output,
+            "runtime_metadata": existing.runtime_metadata,
+            "iteration": existing.iteration,
+        }
         return existing, old_values, False
 
     @staticmethod

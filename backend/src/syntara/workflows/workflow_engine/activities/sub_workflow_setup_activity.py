@@ -173,7 +173,6 @@ class SubWorkflowSetupActivity:
                     current_depth=current_depth,
                 )
         if resume_result is not None:
-            await self._persist_parent_node_io(parent_execution_id, parent_node_id, resume_result)
             return resume_result
 
         # New invocation: resolve the currently-published version, validate it, and
@@ -263,7 +262,7 @@ class SubWorkflowSetupActivity:
             parent_node_id=parent_node_id,
         )
 
-        setup_result = {
+        return {
             "execution_id": child_execution_id_str,
             "temporal_workflow_id": temporal_workflow_id,
             "workflow_definition": workflow_def,
@@ -275,89 +274,6 @@ class SubWorkflowSetupActivity:
             "child_workflow_name": child_wf_name,
             "child_workflow_version": child_version_number,
         }
-        await self._persist_parent_node_io(parent_execution_id, parent_node_id, setup_result)
-        return setup_result
-
-    async def _persist_parent_node_io(
-        self,
-        parent_execution_id: str,
-        parent_node_id: str,
-        result: dict[str, Any],
-    ) -> None:
-        """Record the sub-workflow node's own input/output on its ActivityExecution row.
-
-        The node runs via this setup activity plus a Temporal child workflow, so no
-        ACTIVITY_TASK_COMPLETED event ever carries its input/output; without this the
-        Parameters/Output panes in the execution view stay empty. This writes only the
-        node's own invocation metadata — which child was invoked, with what input, and
-        the resulting child execution id — and deliberately does NOT embed the child's
-        activities (the UI fetches those separately via the children endpoint).
-
-        Update-only: ``_create_all_activities_upfront`` creates every node row
-        (PENDING, empty I/O) before any node runs, and nothing else writes this row's
-        I/O (the finalizer only sets status), so the row reliably exists here and the
-        write is not clobbered. If the row is somehow absent, this is a no-op rather
-        than racing the upfront creation. For a ``for_each`` sub-workflow the single
-        aggregate row reflects the most recent iteration's metadata; per-iteration
-        child outputs remain available through the children endpoint.
-        """
-        from sqlmodel import select  # noqa: PLC0415
-
-        from syntara.workflows.models.activity_execution import ActivityExecution  # noqa: PLC0415
-
-        try:
-            parent_exec_uuid = UUID(parent_execution_id)
-        except ValueError:
-            return
-
-        input_data = {
-            "execution_mode": "reference",
-            "workflow_id": result.get("child_workflow_id"),
-            "workflow_name": result.get("child_workflow_name"),
-            "trigger_node_id": result.get("trigger_node_id"),
-            "input_parameters": result.get("input_data") or {},
-        }
-        output_data = {
-            "workflow_id": result.get("child_workflow_id"),
-            "workflow_name": result.get("child_workflow_name"),
-            "child_workflow_version": result.get("child_workflow_version"),
-            "child_execution_id": result.get("execution_id"),
-        }
-
-        async with self._session_factory() as session:
-            row = (
-                await session.exec(
-                    select(ActivityExecution).where(
-                        ActivityExecution.execution_id == parent_exec_uuid,
-                        ActivityExecution.activity_name == parent_node_id,
-                    )
-                )
-            ).first()
-            if row is None:
-                logger.warning(
-                    "Sub-workflow node activity row not found; skipping I/O persistence",
-                    parent_execution_id=parent_execution_id,
-                    parent_node_id=parent_node_id,
-                )
-                return
-            # Mark the node's start the moment its setup runs (child dispatch).
-            # The sub-workflow node emits no ACTIVITY_TASK_COMPLETED event, so
-            # nothing else sets started_at; the finalizer only sets completed_at.
-            # Set-if-None keeps this idempotent across setup-activity retries and
-            # the resume path. completed_at is deliberately NOT set here so the
-            # node's duration spans the full invocation, not just this setup window.
-            if row.started_at is None:
-                row.started_at = datetime.now(UTC)
-            row.input_data = input_data
-            row.output_data = output_data
-            session.add(row)
-            await session.commit()
-            logger.info(
-                "Persisted sub-workflow node I/O",
-                parent_execution_id=parent_execution_id,
-                parent_node_id=parent_node_id,
-                child_execution_id=output_data["child_execution_id"],
-            )
 
     async def _resume_pinned_child_execution(
         self,

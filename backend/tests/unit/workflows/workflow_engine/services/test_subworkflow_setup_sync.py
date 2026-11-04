@@ -33,7 +33,9 @@ def _setup_result(**over: object) -> dict:
         "child_workflow_id": "wf-123",
         "child_workflow_name": "demo-child",
         "child_workflow_version": 2,
-        # Fields the setup activity also returns but must NOT be surfaced:
+        "trigger_node_id": "child_trigger",
+        "input_data": {"greeting": "hi"},
+        # Fields the setup activity also returns but must NOT be surfaced in runtime_metadata:
         "workflow_definition": {"nodes": ["lots", "of", "stuff"]},
         "task_queue": "tq",
     }
@@ -254,7 +256,7 @@ class TestSetupTerminalEventsDoNotTerminalize:
 
 
 class TestExtractChildRuntimeMetadata:
-    """_extract_child_runtime_metadata parsing / guards."""
+    """_decode_setup_result / _child_runtime_metadata parsing and guards."""
 
     def _attrs(self, result: object | None, *, raw: bytes | None = None) -> Mock:
         attrs = Mock()
@@ -271,7 +273,7 @@ class TestExtractChildRuntimeMetadata:
         return attrs
 
     def test_extracts_four_identifiers(self) -> None:
-        out = ActivitySyncService._extract_child_runtime_metadata(self._attrs(_setup_result()))
+        out = ActivitySyncService._child_runtime_metadata(_setup_result())
         assert out == {
             "child_execution_id": "child-exec-1",
             "child_workflow_id": "wf-123",
@@ -279,14 +281,17 @@ class TestExtractChildRuntimeMetadata:
             "child_workflow_version": 2,
         }
 
+    def test_decode_returns_dict(self) -> None:
+        assert ActivitySyncService._decode_setup_result(self._attrs(_setup_result())) == _setup_result()
+
     def test_none_when_no_result(self) -> None:
-        assert ActivitySyncService._extract_child_runtime_metadata(self._attrs(None)) is None
+        assert ActivitySyncService._decode_setup_result(self._attrs(None)) is None
 
     def test_none_when_unparseable(self) -> None:
-        assert ActivitySyncService._extract_child_runtime_metadata(self._attrs(None, raw=b"not-json")) is None
+        assert ActivitySyncService._decode_setup_result(self._attrs(None, raw=b"not-json")) is None
 
     def test_none_when_no_expected_keys(self) -> None:
-        assert ActivitySyncService._extract_child_runtime_metadata(self._attrs({"unrelated": 1})) is None
+        assert ActivitySyncService._child_runtime_metadata({"unrelated": 1}) is None
 
 
 class TestWriterPreserveIo:
@@ -567,3 +572,240 @@ class TestFinalizerPreservesRuntimeMetadata:
         assert act.status == ActivityStatus.FAILED
         assert act.error_details == "child failed"
         assert act.runtime_metadata == self._RM
+
+
+# ---------------------------------------------------------------------------
+# C3 · B1 — ActivitySyncService owns input_data/output_data (from the setup
+# result payload), same shapes _persist_parent_node_io wrote; terminal backfill.
+# ---------------------------------------------------------------------------
+
+from syntara.workflows.workflow_engine.services.activity_sync_event_processor import (  # noqa: E402
+    ActivitySyncEventProcessorMixin,
+)
+
+_EP = ActivitySyncEventProcessorMixin
+
+
+class TestSetupIoReconstruction:
+    """_build_subworkflow_io / _decode_setup_result / _child_runtime_metadata."""
+
+    def test_build_io_exact_shapes(self) -> None:
+        io = _EP._build_subworkflow_io(_setup_result())
+        assert io["input"] == {
+            "execution_mode": "reference",
+            "workflow_id": "wf-123",
+            "workflow_name": "demo-child",
+            "trigger_node_id": "child_trigger",
+            "input_parameters": {"greeting": "hi"},
+        }
+        assert io["output"] == {
+            "workflow_id": "wf-123",
+            "workflow_name": "demo-child",
+            "child_workflow_version": 2,
+            "child_execution_id": "child-exec-1",
+        }
+
+    def test_build_io_input_parameters_defaults_to_empty_dict(self) -> None:
+        io = _EP._build_subworkflow_io(_setup_result(input_data=None))
+        assert io["input"]["input_parameters"] == {}
+
+    def test_build_io_missing_keys_become_none(self) -> None:
+        io = _EP._build_subworkflow_io({})
+        assert io["input"]["workflow_id"] is None
+        assert io["output"]["child_execution_id"] is None
+        assert io["input"]["input_parameters"] == {}
+
+    def test_build_io_excludes_workflow_definition(self) -> None:
+        io = _EP._build_subworkflow_io(_setup_result())
+        assert "workflow_definition" not in io["input"]
+        assert "workflow_definition" not in io["output"]
+
+    def test_run_link_fields_present(self) -> None:
+        # extractSubWorkflowChild reads output_data.child_execution_id + .workflow_name
+        out = _EP._build_subworkflow_io(_setup_result())["output"]
+        assert out["child_execution_id"] == "child-exec-1"
+        assert out["workflow_name"] == "demo-child"
+
+    def test_decode_none_when_no_payload(self) -> None:
+        attrs = Mock()
+        attrs.result = None
+        assert _EP._decode_setup_result(attrs) is None
+
+    def test_child_runtime_metadata_none_when_empty(self) -> None:
+        assert _EP._child_runtime_metadata({"unrelated": 1}) is None
+
+
+class TestSetupCompletedBuildsIo:
+    """The completed handler stashes _subworkflow_io for all nodes; metadata single-only."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.metadata = create_test_metadata()
+
+    def _run(self, activity_id: str, sched: int) -> dict:
+        self.service._process_activity_scheduled(_scheduled(sched, activity_id), self.metadata)
+        self.service._process_activity_started(_started(sched + 1, sched), self.metadata)
+        self.service._process_activity_completed(_completed(sched + 2, sched, _setup_result()), self.metadata)
+        return self.metadata.pending_activity_updates[sched]
+
+    def test_single_node_has_io_and_metadata(self) -> None:
+        update = self._run(f"{_PREFIX}node-A", 10)
+        assert update["_subworkflow_io"]["output"]["child_execution_id"] == "child-exec-1"
+        assert update["_subworkflow_io"]["input"]["execution_mode"] == "reference"
+        assert update["runtime_metadata"]["child_execution_id"] == "child-exec-1"
+        assert update["status"] == ActivityStatus.RUNNING
+
+    def test_for_each_has_io_but_no_metadata(self) -> None:
+        update = self._run(f"{_PREFIX}node-B_iter_0", 20)
+        assert "_subworkflow_io" in update
+        assert "runtime_metadata" not in update
+
+
+class TestSyncWritesIo:
+    """_sync_subworkflow_setup persists the reconstructed I/O on a non-terminal row."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.metadata = create_test_metadata()
+
+    def _data(self, *, io: bool, iteration: object = None, **over: object) -> dict:
+        data = {
+            "activity_id": "node-A",
+            "activity_name": "node-A",
+            "_subworkflow_setup": True,
+            "_subworkflow_iteration": iteration,
+            "status": ActivityStatus.RUNNING,
+            "started_at": datetime.now(UTC),
+            "completed_at": None,
+            "error_details": None,
+            "retry_count": 0,
+            "iteration": None,
+        }
+        if io:
+            data["_subworkflow_io"] = _EP._build_subworkflow_io(_setup_result())
+        data.update(over)
+        return data
+
+    def test_completed_writes_exact_io_shapes(self) -> None:
+        row = _row("node-A", status=ActivityStatus.PENDING, input_data={}, output_data=None)
+        self.service._sync_subworkflow_setup(
+            self._data(io=True, runtime_metadata={"child_execution_id": "child-exec-1"}),
+            {"node-A": row},
+            self.metadata,
+        )
+        assert row.input_data == {
+            "execution_mode": "reference",
+            "workflow_id": "wf-123",
+            "workflow_name": "demo-child",
+            "trigger_node_id": "child_trigger",
+            "input_parameters": {"greeting": "hi"},
+        }
+        assert row.output_data == {
+            "workflow_id": "wf-123",
+            "workflow_name": "demo-child",
+            "child_workflow_version": 2,
+            "child_execution_id": "child-exec-1",
+        }
+        assert row.status == ActivityStatus.RUNNING
+        assert row.runtime_metadata == {"child_execution_id": "child-exec-1"}
+
+    def test_started_only_preserves_io(self) -> None:
+        row = _row("node-A", status=ActivityStatus.PENDING, input_data={"keep": 1}, output_data={"keep": 2})
+        self.service._sync_subworkflow_setup(self._data(io=False), {"node-A": row}, self.metadata)
+        assert row.input_data == {"keep": 1}
+        assert row.output_data == {"keep": 2}
+        assert row.status == ActivityStatus.RUNNING
+
+    def test_for_each_last_iteration_wins(self) -> None:
+        row = _row("node-A", status=ActivityStatus.RUNNING, input_data={}, output_data=None)
+        io0 = _EP._build_subworkflow_io(_setup_result(execution_id="child-0"))
+        io1 = _EP._build_subworkflow_io(_setup_result(execution_id="child-1"))
+        d0 = self._data(io=False, iteration=0, _subworkflow_io=io0)
+        d1 = self._data(io=False, iteration=1, _subworkflow_io=io1)
+        self.service._sync_subworkflow_setup(d0, {"node-A": row}, self.metadata)
+        self.service._sync_subworkflow_setup(d1, {"node-A": row}, self.metadata)
+        assert row.output_data["child_execution_id"] == "child-1"
+        assert row.runtime_metadata is None
+
+
+class TestTerminalBackfill:
+    """Terminal-row I/O-only, set-if-empty backfill."""
+
+    def _io(self) -> dict:
+        return _EP._build_subworkflow_io(_setup_result())
+
+    def test_backfills_empty_io_without_touching_status(self) -> None:
+        row = _row(
+            "node-A", status=ActivityStatus.CANCELLED, input_data={}, output_data=None, runtime_metadata={"keep": 1}
+        )
+        result = ActivityExecutionSyncMixin._backfill_terminal_subworkflow_io(row, self._io())
+        assert result is not None
+        activity, old_values, is_new = result
+        assert is_new is False
+        assert activity.status == ActivityStatus.CANCELLED  # untouched
+        assert activity.runtime_metadata == {"keep": 1}  # untouched
+        assert activity.input_data["execution_mode"] == "reference"
+        assert activity.output_data["child_execution_id"] == "child-exec-1"
+        # old_values carries current status/runtime_metadata so no spurious delta
+        assert old_values["status"] == ActivityStatus.CANCELLED
+
+    def test_does_not_overwrite_nonempty_io(self) -> None:
+        row = _row("node-A", status=ActivityStatus.FAILED, input_data={"existing": 1}, output_data={"existing": 2})
+        assert ActivityExecutionSyncMixin._backfill_terminal_subworkflow_io(row, self._io()) is None
+        assert row.input_data == {"existing": 1}
+        assert row.output_data == {"existing": 2}
+
+    def test_idempotent_second_backfill_is_noop(self) -> None:
+        row = _row("node-A", status=ActivityStatus.CANCELLED, input_data={}, output_data=None)
+        assert ActivityExecutionSyncMixin._backfill_terminal_subworkflow_io(row, self._io()) is not None
+        assert ActivityExecutionSyncMixin._backfill_terminal_subworkflow_io(row, self._io()) is None
+
+    def test_no_summary_returns_none(self) -> None:
+        row = _row("node-A", status=ActivityStatus.CANCELLED, input_data={}, output_data=None)
+        assert ActivityExecutionSyncMixin._backfill_terminal_subworkflow_io(row, None) is None
+
+
+class TestSyncRoutesTerminalToBackfill:
+    """_sync_subworkflow_setup dispatches terminal rows to the backfill carve-out."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.metadata = create_test_metadata()
+
+    def test_terminal_row_backfilled_not_regressed(self) -> None:
+        row = _row("node-A", status=ActivityStatus.CANCELLED, input_data={}, output_data=None)
+        data = {
+            "activity_id": "node-A",
+            "_subworkflow_setup": True,
+            "_subworkflow_iteration": None,
+            "status": ActivityStatus.RUNNING,
+            "started_at": datetime.now(UTC),
+            "completed_at": None,
+            "error_details": None,
+            "retry_count": 0,
+            "iteration": None,
+            "_subworkflow_io": _EP._build_subworkflow_io(_setup_result()),
+        }
+        result = self.service._sync_subworkflow_setup(data, {"node-A": row}, self.metadata)
+        assert result is not None
+        assert row.status == ActivityStatus.CANCELLED
+        assert row.output_data["child_execution_id"] == "child-exec-1"
+
+
+class TestIoWebsocketDelta:
+    """Writing I/O emits an output_data patch and no spurious deltas."""
+
+    def test_output_data_patch_emitted(self) -> None:
+        row = _row("node-A", status=ActivityStatus.RUNNING, output_data={"child_execution_id": "child-exec-1"})
+        old = {
+            "status": ActivityStatus.RUNNING,
+            "started_at": None,
+            "completed_at": None,
+            "error_details": None,
+            "output_data": None,
+            "runtime_metadata": None,
+            "iteration": None,
+        }
+        ops = ActivitySyncPublisherMixin._build_field_patch_ops(row, old, 1)
+        assert any(op["path"] == "/activities/1/output_data" for op in ops)
+        assert all(op["path"] != "/activities/1/status" for op in ops)  # unchanged
