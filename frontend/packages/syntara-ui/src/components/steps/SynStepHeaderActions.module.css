@@ -6,3 +6,7 @@
 .actionsRow :global(.pf-v6-l-flex__item) {
   margin: 0;
 }
+
+.actionsRow :global(.pf-v6-l-flex__item + .pf-v6-l-flex__item) {
+  margin-left: calc(-1 * var(--pf-t--global--spacer--2xs));
+}

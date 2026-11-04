@@ -43,6 +43,7 @@ export function SynStepSemanticZoomBody(props: {
     | 'borderTopRightRadius'
     | 'borderBottomRightRadius'
   >
+  previewCardStyle?: Pick<CSSProperties, 'paddingLeft' | 'paddingRight'>
 }): ReactNode {
   const nodeId = useNodeId()
   const updateNodeInternals = useUpdateNodeInternals()
@@ -128,7 +129,14 @@ export function SynStepSemanticZoomBody(props: {
             data-testid="semantic-zoom-preview"
             onPointerEnter={openPreview}
           >
-            <div className={styles.previewCard} style={{ borderTopColor: props.accentColor, ...tileRadiusStyle }}>
+            <div
+              className={styles.previewCard}
+              style={{
+                borderTopColor: props.accentColor,
+                ...tileRadiusStyle,
+                ...props.previewCardStyle,
+              }}
+            >
               <StandardStepHeader
                 icon={previewHeaderIcon}
                 title={props.title}

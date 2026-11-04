@@ -12,4 +12,9 @@
 
 .detailsRegion :global(.pf-v6-c-code-block__content) {
   max-height: 4.5rem;
+  padding: var(--pf-t--global--spacer--sm) var(--pf-t--global--spacer--md);
+}
+
+.detailsRegion :global(.pf-v6-c-code-block__code) {
+  padding: 0;
 }

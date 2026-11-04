@@ -1,3 +1,5 @@
 .editButton {
   flex-shrink: 0;
+  --pf-v6-c-button--PaddingInlineStart: var(--pf-t--global--spacer--sm);
+  --pf-v6-c-button--PaddingInlineEnd: var(--pf-t--global--spacer--sm);
 }

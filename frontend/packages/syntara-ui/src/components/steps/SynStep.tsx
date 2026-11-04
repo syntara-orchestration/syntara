@@ -130,6 +130,14 @@ export function SynStep(props: {
     return barRadiusStyle
   }, [barRadiusStyle])
 
+  const semanticZoomPreviewCardStyle = useMemo((): React.CSSProperties | undefined => {
+    const paddingLeft = props.style?.paddingLeft
+    if (paddingLeft === undefined) {
+      return undefined
+    }
+    return { paddingLeft }
+  }, [props.style?.paddingLeft])
+
   useEffect(() => {
     if (!isCollapsible) return
 
@@ -248,6 +256,7 @@ export function SynStep(props: {
             selected={isSelected}
             hasDashedBorder={props.hasDashedBorder ?? false}
             tileStyle={semanticZoomTileStyle}
+            previewCardStyle={semanticZoomPreviewCardStyle}
           />
         ) : (
           props.children
