@@ -56,8 +56,6 @@ class ExecutionRead:
             mode (ExecutionMode | Unset): Execution mode for workflow runs.
             execution_metadata (ExecutionReadExecutionMetadataType0 | None | Unset):
             retried_from_execution_id (None | Unset | UUID):
-            retry_kind (None | str | Unset): Type of retry execution: 'plain' (retry_execution), 'from_failure'
-                (retry_from_failure), 'unknown' (legacy), or null (not a retry)
             trigger_type (None | str | Unset): Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger,
                 eda_trigger)
             interface (None | str | Unset): Originating interface (ui or api)
@@ -91,7 +89,6 @@ class ExecutionRead:
     mode: ExecutionMode | Unset = UNSET
     execution_metadata: ExecutionReadExecutionMetadataType0 | None | Unset = UNSET
     retried_from_execution_id: None | Unset | UUID = UNSET
-    retry_kind: None | str | Unset = UNSET
     trigger_type: None | str | Unset = UNSET
     interface: None | str | Unset = UNSET
     labels: ExecutionReadLabels | Unset = UNSET
@@ -201,12 +198,6 @@ class ExecutionRead:
         else:
             retried_from_execution_id = self.retried_from_execution_id
 
-        retry_kind: None | str | Unset
-        if isinstance(self.retry_kind, Unset):
-            retry_kind = UNSET
-        else:
-            retry_kind = self.retry_kind
-
         trigger_type: None | str | Unset
         if isinstance(self.trigger_type, Unset):
             trigger_type = UNSET
@@ -289,8 +280,6 @@ class ExecutionRead:
             field_dict["execution_metadata"] = execution_metadata
         if retried_from_execution_id is not UNSET:
             field_dict["retried_from_execution_id"] = retried_from_execution_id
-        if retry_kind is not UNSET:
-            field_dict["retry_kind"] = retry_kind
         if trigger_type is not UNSET:
             field_dict["trigger_type"] = trigger_type
         if interface is not UNSET:
@@ -487,15 +476,6 @@ class ExecutionRead:
 
         retried_from_execution_id = _parse_retried_from_execution_id(d.pop("retried_from_execution_id", UNSET))
 
-        def _parse_retry_kind(data: object) -> None | str | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(None | str | Unset, data)
-
-        retry_kind = _parse_retry_kind(d.pop("retry_kind", UNSET))
-
         def _parse_trigger_type(data: object) -> None | str | Unset:
             if data is None:
                 return data
@@ -593,7 +573,6 @@ class ExecutionRead:
             mode=mode,
             execution_metadata=execution_metadata,
             retried_from_execution_id=retried_from_execution_id,
-            retry_kind=retry_kind,
             trigger_type=trigger_type,
             interface=interface,
             labels=labels,
