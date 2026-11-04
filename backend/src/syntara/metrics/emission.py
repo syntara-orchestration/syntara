@@ -178,8 +178,8 @@ def _emit_workflow(
             "status": retry_status,
         }
         recorder.record(MetricType.WORKFLOW_RETRY_COMPLETIONS, value=1, labels=retry_labels)
-        duration_s = (execution.completed_at - execution.created_at).total_seconds()
-        recorder.record(MetricType.WORKFLOW_RETRY_DURATION, duration_s, unit="s", labels=retry_labels)
+        duration_ms = (execution.completed_at - execution.created_at).total_seconds() * 1000
+        recorder.record(MetricType.WORKFLOW_RETRY_DURATION, duration_ms, unit="ms", labels=retry_labels)
 
     with _workflow_completion_lock:
         _workflow_completion_counts[1] += 1

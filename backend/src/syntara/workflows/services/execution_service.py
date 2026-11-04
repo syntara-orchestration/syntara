@@ -1262,6 +1262,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         original = result.one_or_none()
 
         if original is None:
+            self._record_retry_request(RetryKind.PLAIN.value, "rejected")
             raise ExecutionNotFoundError(execution_id)
 
         # Step 2: Validate retryability
@@ -1422,9 +1423,14 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         # Re-validates the actual selection rather than trusting any earlier preview:
         # the preview reports the default (all failed nodes) and cannot speak for a
         # subset or for the supplied overrides.
-        validation = await validate_retry_from_failure(
-            self.session, execution_id, retry_point_ids, input_parameter_overrides
-        )
+        try:
+            validation = await validate_retry_from_failure(
+                self.session, execution_id, retry_point_ids, input_parameter_overrides
+            )
+        except ExecutionNotFoundError:
+            self._record_retry_request(RetryKind.FROM_FAILURE.value, "rejected")
+            raise
+
         if not validation.eligible:
             self._record_retry_request(RetryKind.FROM_FAILURE.value, "rejected")
             raise ExecutionNotRetryableFromFailureError(execution_id, validation.reason or "retry validation failed")

@@ -340,3 +340,57 @@ class TestFailedStepTypes:
         step_types = await ExecutionService._get_failed_step_types(session, uuid4())
 
         assert step_types == ["http_request", "script"]
+
+
+class TestRetryRejectionMetrics:
+    """Test retry rejection metrics are recorded for all failure paths."""
+
+    @pytest.mark.asyncio
+    async def test_plain_retry_records_rejection_for_nonexistent_execution(self) -> None:
+        """Plain retry records rejection metric when execution not found."""
+        exec_result = Mock()
+        exec_result.one_or_none.return_value = None
+        mock_session = Mock(spec=AsyncSession)
+        mock_session.exec = AsyncMock(return_value=exec_result)
+        mock_user = Mock(spec=User)
+
+        service = ExecutionService(
+            session=mock_session,
+            user=mock_user,
+            temporal_service=None,
+        )
+
+        non_existent_id = uuid4()
+        with (
+            patch.object(service, "_record_retry_request") as mock_record,
+            pytest.raises(ExecutionNotFoundError),
+        ):
+            await service.retry_execution(non_existent_id)
+
+        mock_record.assert_called_once_with("plain", "rejected")
+
+    @pytest.mark.asyncio
+    async def test_retry_from_failure_records_rejection_for_nonexistent_execution(self) -> None:
+        """Retry-from-failure records rejection metric when execution not found."""
+        mock_session = Mock(spec=AsyncSession)
+        mock_user = Mock(spec=User)
+
+        service = ExecutionService(
+            session=mock_session,
+            user=mock_user,
+            temporal_service=None,
+        )
+
+        non_existent_id = uuid4()
+        with (
+            patch(
+                "syntara.workflows.services.execution_service.validate_retry_from_failure",
+                new_callable=AsyncMock,
+                side_effect=ExecutionNotFoundError(non_existent_id),
+            ),
+            patch.object(service, "_record_retry_request") as mock_record,
+            pytest.raises(ExecutionNotFoundError),
+        ):
+            await service.retry_from_failure(non_existent_id, ["node-1"])
+
+        mock_record.assert_called_once_with("from_failure", "rejected")
