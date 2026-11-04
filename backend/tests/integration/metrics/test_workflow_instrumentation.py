@@ -485,18 +485,16 @@ class TestRetryMetrics:
         executions_factory: ExecutionsFactory,
         test_db_session: AsyncSession,
     ) -> None:
-        """WorkflowTimedOut retry execution maps to Prometheus status=failed."""
-        from syntara.workflows.models.execution import RetryKind
-
+        """Standard retry execution maps to Prometheus retry_kind=standard, status=failed."""
         # Create original execution
         original_execs = await executions_factory.create_executions(count=1, status=ExecutionStatus.FAILED)
         original_exec = original_execs[0]
 
-        # Create retry execution that timed out
+        # Create standard retry execution (no eligible_point_ids)
         retry_execs = await executions_factory.create_executions(count=1, status=ExecutionStatus.FAILED)
         retry_exec = retry_execs[0]
         retry_exec.retried_from_execution_id = original_exec.id
-        retry_exec.retry_kind = RetryKind.PLAIN.value
+        retry_exec.execution_metadata = None  # No eligible_point_ids → standard retry
         retry_exec.completed_at = datetime.now(UTC)
         test_db_session.add(retry_exec)
         await test_db_session.commit()
@@ -510,32 +508,32 @@ class TestRetryMetrics:
         # Verify retry completion metric with status=failed
         retry_completions = list(recorder.query(metric_types={MetricType.WORKFLOW_RETRY_COMPLETIONS}))
         assert len(retry_completions) == 1
-        assert retry_completions[0].labels["retry_kind"] == "plain"
+        assert retry_completions[0].labels["retry_kind"] == "standard"
         assert retry_completions[0].labels["status"] == "failed"
 
         # Verify retry duration metric with status=failed
         retry_durations = list(recorder.query(metric_types={MetricType.WORKFLOW_RETRY_DURATION}))
         assert len(retry_durations) == 1
-        assert retry_durations[0].labels["retry_kind"] == "plain"
+        assert retry_durations[0].labels["retry_kind"] == "standard"
         assert retry_durations[0].labels["status"] == "failed"
 
     @pytest.mark.asyncio
-    async def test_legacy_retry_maps_to_unknown_kind(
+    async def test_retry_from_failure_classification(
         self,
         recorder: MetricsRecorder,
         executions_factory: ExecutionsFactory,
         test_db_session: AsyncSession,
     ) -> None:
-        """Legacy retry (NULL retry_kind but has parent) maps to retry_kind=unknown."""
+        """Retry with eligible_point_ids in execution_metadata maps to retry_kind=from_failure."""
         # Create original execution
-        original_execs = await executions_factory.create_executions(count=1, status=ExecutionStatus.COMPLETED)
+        original_execs = await executions_factory.create_executions(count=1, status=ExecutionStatus.FAILED)
         original_exec = original_execs[0]
 
-        # Create legacy retry execution (NULL retry_kind but has parent)
+        # Create retry-from-failure execution (has eligible_point_ids in metadata)
         retry_execs = await executions_factory.create_executions(count=1, status=ExecutionStatus.COMPLETED)
         retry_exec = retry_execs[0]
         retry_exec.retried_from_execution_id = original_exec.id
-        retry_exec.retry_kind = None  # Legacy: no explicit kind
+        retry_exec.execution_metadata = {"eligible_point_ids": ["node-1", "node-2"]}
         retry_exec.completed_at = datetime.now(UTC)
         test_db_session.add(retry_exec)
         await test_db_session.commit()
@@ -546,14 +544,14 @@ class TestRetryMetrics:
         with patch(PATCH_TARGET, return_value=recorder):
             await service._emit_completion_metrics(retry_exec)
 
-        # Verify retry completion metric with retry_kind=unknown
+        # Verify retry completion metric with retry_kind=from_failure
         retry_completions = list(recorder.query(metric_types={MetricType.WORKFLOW_RETRY_COMPLETIONS}))
         assert len(retry_completions) == 1
-        assert retry_completions[0].labels["retry_kind"] == "unknown"
+        assert retry_completions[0].labels["retry_kind"] == "from_failure"
         assert retry_completions[0].labels["status"] == "completed"
 
-        # Verify retry duration metric with retry_kind=unknown
+        # Verify retry duration metric with retry_kind=from_failure
         retry_durations = list(recorder.query(metric_types={MetricType.WORKFLOW_RETRY_DURATION}))
         assert len(retry_durations) == 1
-        assert retry_durations[0].labels["retry_kind"] == "unknown"
+        assert retry_durations[0].labels["retry_kind"] == "from_failure"
         assert retry_durations[0].labels["status"] == "completed"

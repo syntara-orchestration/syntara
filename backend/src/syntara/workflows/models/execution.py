@@ -69,18 +69,16 @@ TERMINAL_EXECUTION_STATUSES = frozenset(
 class RetryKind(StrEnum):
     """Classification of retry execution type.
 
-    Used for durable retry telemetry and metrics. Persisted in retry_kind column.
+    Used for retry telemetry and metrics. Inferred from execution metadata, not persisted.
 
     Attributes:
-        PLAIN: Complete workflow retry via retry_execution() (same inputs, trigger node).
+        STANDARD: Complete workflow retry via retry_execution() (same inputs, trigger node).
         FROM_FAILURE: Replay-based retry via retry_from_failure() (from failed state, optional overrides).
-        UNKNOWN: Legacy retry with indeterminate classification (backfill/migration value).
 
     """
 
-    PLAIN = "plain"
+    STANDARD = "standard"
     FROM_FAILURE = "from_failure"
-    UNKNOWN = "unknown"
 
 
 class Execution(UserOwnedResource, table=True):
@@ -244,17 +242,6 @@ class Execution(UserOwnedResource, table=True):
         description="ID of the execution this was retried from (null if not a retry)",
     )
 
-    retry_kind: str | None = Field(
-        default=None,
-        nullable=True,
-        max_length=16,
-        sa_type=String(16),  # type: ignore[call-overload]
-        description=(
-            "Type of retry execution: 'plain' (retry_execution), 'from_failure' (retry_from_failure), "
-            "'unknown' (legacy), or null (not a retry)"
-        ),
-    )
-
     # Telemetry: trigger type and interface
     trigger_type: str | None = Field(
         default=None,
@@ -332,6 +319,28 @@ class Execution(UserOwnedResource, table=True):
             postgresql_using="gin",
         ),
     )
+
+    @property
+    def inferred_retry_kind(self) -> str | None:
+        """Infer retry kind from execution metadata.
+
+        Classification rules:
+        - If retried_from_execution_id is None → not a retry (returns None)
+        - If retried_from_execution_id is set AND execution_metadata has 'eligible_point_ids' → 'from_failure'
+        - If retried_from_execution_id is set AND execution_metadata lacks 'eligible_point_ids' → 'standard'
+
+        Returns:
+            Retry kind value ('standard', 'from_failure') or None if not a retry
+
+        """
+        if self.retried_from_execution_id is None:
+            return None
+
+        # Check if execution_metadata contains eligible_point_ids
+        if self.execution_metadata and "eligible_point_ids" in self.execution_metadata:
+            return RetryKind.FROM_FAILURE.value
+
+        return RetryKind.STANDARD.value
 
     def __repr__(self) -> str:
         """Return string representation of Execution.
@@ -574,13 +583,6 @@ class ExecutionRead(UserReferenceFieldsMixin, SQLModel):
     mode: ExecutionMode = ExecutionMode.STANDARD
     execution_metadata: dict[str, Any] | None = None
     retried_from_execution_id: UUID | None = None
-    retry_kind: str | None = Field(
-        default=None,
-        description=(
-            "Type of retry execution: 'plain' (retry_execution), 'from_failure' (retry_from_failure), "
-            "'unknown' (legacy), or null (not a retry)"
-        ),
-    )
     trigger_type: str | None = Field(
         default=None,
         description="Trigger node type (manual_trigger, scheduled_trigger, webhook_trigger, eda_trigger)",

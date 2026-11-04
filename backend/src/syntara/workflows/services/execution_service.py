@@ -379,7 +379,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         recorder: "MetricsRecorder",
         component: ComponentLabel,
         retried_from_execution_id: UUID | None = None,
-        retry_kind: str | None = None,
         eligible_point_ids: list[str] | None = None,
         input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
     ) -> ExecutionRead:
@@ -466,6 +465,12 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         # Create execution record in database ONLY after Temporal accepts workflow
         _, trigger_node = resolve_trigger_node(workflow_version.workflow_definition, trigger_node_id)
+
+        # Build execution_metadata for retry-from-failure executions
+        execution_metadata = None
+        if eligible_point_ids is not None:
+            execution_metadata = {"eligible_point_ids": eligible_point_ids}
+
         execution = Execution(
             id=execution_id,
             workflow_id=workflow.id,
@@ -476,7 +481,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             input_data=input_data,
             trigger_node_id=trigger_node_id,
             retried_from_execution_id=retried_from_execution_id,
-            retry_kind=retry_kind,
+            execution_metadata=execution_metadata,
             trigger_type=trigger_node.get("type"),
             interface=interface_context_var.get(),
             created_by=self.user.id,
@@ -1188,7 +1193,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         """Record retry request metric (fire-and-forget).
 
         Args:
-            retry_kind: Type of retry (plain, from_failure, unknown)
+            retry_kind: Type of retry (standard, from_failure)
             outcome: Request outcome (accepted, rejected)
 
         """
@@ -1262,18 +1267,18 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         original = result.one_or_none()
 
         if original is None:
-            self._record_retry_request(RetryKind.PLAIN.value, "rejected")
+            self._record_retry_request(RetryKind.STANDARD.value, "rejected")
             raise ExecutionNotFoundError(execution_id)
 
         # Step 2: Validate retryability
         if original.status not in TERMINAL_EXECUTION_STATUSES:
-            self._record_retry_request(RetryKind.PLAIN.value, "rejected")
+            self._record_retry_request(RetryKind.STANDARD.value, "rejected")
             raise ExecutionNotRetryableError(
                 execution_id, f"execution is in {original.status.value} state (must be terminal)"
             )
 
         if original.mode == ExecutionMode.TEST:
-            self._record_retry_request(RetryKind.PLAIN.value, "rejected")
+            self._record_retry_request(RetryKind.STANDARD.value, "rejected")
             raise ExecutionNotRetryableError(execution_id, "test executions cannot be retried")
 
         # Step 3: Fetch the workflow version used by the original execution
@@ -1282,7 +1287,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         )
         workflow_version = version_result.one_or_none()
         if workflow_version is None:
-            self._record_retry_request(RetryKind.PLAIN.value, "rejected")
+            self._record_retry_request(RetryKind.STANDARD.value, "rejected")
             raise ExecutionNotRetryableError(execution_id, "original workflow version no longer exists")
 
         logger.info(
@@ -1297,7 +1302,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         if original.trigger_node_id is None:
             from syntara.core.exceptions import SafeValueError  # noqa: PLC0415
 
-            self._record_retry_request(RetryKind.PLAIN.value, "rejected")
+            self._record_retry_request(RetryKind.STANDARD.value, "rejected")
             msg = "Cannot retry execution: original execution has no trigger_node_id recorded"
             raise SafeValueError(msg)
         trigger_node_id, _ = resolve_trigger_node(workflow_def, original.trigger_node_id)
@@ -1314,14 +1319,13 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                 recorder=recorder,
                 component=component,
                 retried_from_execution_id=original.id,
-                retry_kind=RetryKind.PLAIN.value,
             )
         except Exception:
             # Record rejected on any failure (Temporal, concurrency, persistence)
-            self._record_retry_request(RetryKind.PLAIN.value, "rejected")
+            self._record_retry_request(RetryKind.STANDARD.value, "rejected")
             raise
 
-        self._record_retry_request(RetryKind.PLAIN.value, "accepted")
+        self._record_retry_request(RetryKind.STANDARD.value, "accepted")
         try:
             from syntara.audit.emitter import request_id_context_var  # noqa: PLC0415
             from syntara.workflows.audit.retry_requested import WorkflowRetryRequestedEvent  # noqa: PLC0415
@@ -1330,7 +1334,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                 WorkflowRetryRequestedEvent(
                     execution_id=new_execution.id,
                     source_execution_id=execution_id,
-                    retry_kind=RetryKind.PLAIN.value,
+                    retry_kind=RetryKind.STANDARD.value,
                     request_id=request_id_context_var.get(),
                 )
             )
@@ -1499,7 +1503,6 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                 recorder=recorder,
                 component=component,
                 retried_from_execution_id=source.id,
-                retry_kind=RetryKind.FROM_FAILURE.value,
                 eligible_point_ids=validation.eligible_point_ids,
                 input_parameter_overrides=validated_overrides,
             )

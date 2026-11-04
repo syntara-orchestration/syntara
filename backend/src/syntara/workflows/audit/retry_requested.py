@@ -14,7 +14,7 @@ class WorkflowRetryRequestedEvent:
     Attributes:
         execution_id: The new retry execution identifier (UUID).
         source_execution_id: The parent execution being retried (UUID).
-        retry_kind: Type of retry (plain, from_failure, unknown).
+        retry_kind: Type of retry (standard, from_failure).
         node_count: Total nodes in the workflow (from_failure only, optional).
         failed_step_types: Normalized, sorted, deduplicated list of failed node types
             (from_failure only). Bounded to maximum 50 entries. Uses existing
