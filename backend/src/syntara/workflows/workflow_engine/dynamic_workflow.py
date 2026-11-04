@@ -68,6 +68,7 @@ from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
 # sub-workflow executions replay with their original activity scheduling even
 # when they already marked the loop-iteration patch via a loop or approval.
 _SUBWORKFLOW_ITERATION_IDS_PATCH = "subworkflow-iteration-unique-ids"
+_SUBWORKFLOW_COMPLETED_WITH_ERRORS_PATCH = "subworkflow-completed-with-errors-success"
 
 # Trigger types allowed for dynamic dispatch via Temporal activities.
 # Each entry must have a corresponding @activity.defn with a matching name.
@@ -1773,39 +1774,66 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 parent_close_policy=ParentClosePolicy.REQUEST_CANCEL,
             )
         except ChildWorkflowError as exc:
-            failure_status = self._classify_child_workflow_failure(exc)
-            output = self._build_sub_workflow_output(setup_result, failure_status)
-            msg = f"Sub-workflow {failure_status}"
+            child_status, reason = self._classify_child_workflow_failure(exc)
+            output = self._build_sub_workflow_output(setup_result, child_status)
+            output["ErrorMessage"] = f"Sub-workflow {reason}"
+            msg = f"Sub-workflow {reason}"
             raise ApplicationError(msg, {"output": output}, type="SubWorkflowFailedError", non_retryable=True) from exc
 
         valid_child_statuses = {"completed", "completed_with_errors", "failed", "cancelled"}
         raw_status = child_result.get("status") if isinstance(child_result, dict) else None
         child_status: str | None = raw_status if raw_status in valid_child_statuses else None
-        is_success = child_status == "completed"
+        # A ``completed_with_errors`` child has finished (its own continue_on_failure
+        # nodes absorbed their failures), so the parent step succeeds. Gated behind a
+        # Temporal patch so in-flight executions keep the pre-patch raise on replay.
+        if workflow.patched(_SUBWORKFLOW_COMPLETED_WITH_ERRORS_PATCH):
+            is_success = child_status in {"completed", "completed_with_errors"}
+        else:
+            is_success = child_status == "completed"
         status_detail = child_status or "returned unexpected status"
         output = self._build_sub_workflow_output(setup_result, child_status)
         if is_success:
             output["StatusCode"] = 0
-            output["StatusMessage"] = "Sub-workflow completed successfully"
+            output["StatusMessage"] = (
+                "Sub-workflow completed with errors"
+                if child_status == "completed_with_errors"
+                else "Sub-workflow completed successfully"
+            )
             output["ErrorMessage"] = None
 
         if not is_success:
             msg = f"Sub-workflow {status_detail}"
+            if child_status == "failed" and isinstance(child_result, dict):
+                # Surface one failing child step + message. ``failed_activities`` is a
+                # dict keyed by node id; its order is not guaranteed to be chronological,
+                # so this reports "a" failing step, not "the first" one.
+                failed = child_result.get("failed_activities") or {}
+                if failed:
+                    step_id = next(iter(failed))
+                    detail = f"child step '{step_id}' failed: {failed[step_id]}"
+                    output["ErrorMessage"] = f"{output['ErrorMessage']} — {detail}"[:10000]
+                    msg = f"{msg} — {detail}"
             raise ApplicationError(msg, {"output": output}, type="SubWorkflowFailedError", non_retryable=True)
 
         return {"output": output}
 
     @staticmethod
-    def _classify_child_workflow_failure(exc: ChildWorkflowError) -> str:
-        """Map a ChildWorkflowError cause to a child_status string."""
+    def _classify_child_workflow_failure(exc: ChildWorkflowError) -> tuple[str, str]:
+        """Map a ChildWorkflowError cause to ``(child_status, reason)``.
+
+        ``child_status`` stays within the published ``child_status`` enum
+        (``completed``/``completed_with_errors``/``failed``/``cancelled``); a
+        timeout or termination is a parent-step ``failed`` while ``reason``
+        preserves the specific Temporal cause for the ``ErrorMessage``.
+        """
         cause = exc.cause
         if isinstance(cause, TemporalCancelledError):
-            return "cancelled"
+            return "cancelled", "cancelled"
         if isinstance(cause, TemporalTimeoutError):
-            return "timed_out"
+            return "failed", "timed out"
         if isinstance(cause, TerminatedError):
-            return "terminated"
-        return "failed"
+            return "failed", "terminated"
+        return "failed", "failed"
 
     @staticmethod
     def _build_sub_workflow_output(setup_result: dict[str, Any], child_status: str | None) -> dict[str, Any]:

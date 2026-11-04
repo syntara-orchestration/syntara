@@ -210,6 +210,21 @@ class TestSetupActivityValidation:
             )
         assert exc_info.value.non_retryable
 
+    async def test_missing_created_by_raises_config_error(self) -> None:
+        """A3: a missing/invalid actor id is a non-retryable ConfigError, not a retryable ValueError."""
+        for bad in ("", "not-a-uuid", None):
+            activity = _make_setup_activity()
+            with pytest.raises(ApplicationError, match="created_by_user_id") as exc_info:
+                await activity.run(
+                    parameters={"workflow_id": str(uuid4()), "trigger_node_id": "t1"},
+                    parent_execution_id="parent-001",
+                    parent_node_id="sub_wf_node",
+                    created_by_user_id=bad,  # type: ignore[arg-type]
+                    current_depth=0,
+                )
+            assert exc_info.value.non_retryable
+            assert exc_info.value.type == "ConfigError"
+
 
 class TestSetupActivityTriggerValidation:
     """Trigger type and existence checks."""
@@ -581,6 +596,46 @@ class TestSubWorkflowDispatch:
         assert output["StatusCode"] == 1
         assert output["ErrorMessage"] == "Sub-workflow failed"
 
+    async def test_failed_child_error_message_includes_failing_step(self) -> None:
+        """A4: a failing child surfaces one failing step + message in ErrorMessage (string only)."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(
+                return_value={"status": "failed", "failed_activities": {"step_a": "boom"}}
+            )
+            node = ActivityNode(node_id="sub_wf_1", node_type=NodeType.SUB_WORKFLOW, parameters={})
+            with pytest.raises(ApplicationError) as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.type == "SubWorkflowFailedError"
+        assert exc_info.value.non_retryable
+        error_message = exc_info.value.details[0]["output"]["ErrorMessage"]
+        assert "step_a" in error_message
+        assert "boom" in error_message
+        assert len(error_message) <= 10000
+
+    def test_classifier_child_status_within_published_enum(self) -> None:
+        """A2-P1: the classifier only yields child_status values the published schema allows."""
+        from temporalio.exceptions import TimeoutType
+
+        allowed = {"completed", "completed_with_errors", "failed", "cancelled"}
+        causes = [
+            TemporalCancelledError(),
+            TemporalTimeoutError("t", type=TimeoutType.START_TO_CLOSE, last_heartbeat_details=[]),
+            TerminatedError("x"),
+            RuntimeError("other"),
+        ]
+        for cause in causes:
+            child_status, reason = OrchestratorWorkflow._classify_child_workflow_failure(
+                _make_child_workflow_error(cause)
+            )
+            assert child_status in allowed
+            assert isinstance(reason, str)
+            assert reason
+
     async def test_child_cancelled_raises_application_error(self) -> None:
         """Child cancellation must also propagate as ApplicationError."""
         wf = _make_workflow_with_depth(0)
@@ -604,21 +659,36 @@ class TestSubWorkflowDispatch:
         assert output["Result"]["child_status"] == "cancelled"
         assert output["StatusCode"] == 1
 
-    async def test_child_completed_with_errors_raises(self) -> None:
-        """completed_with_errors is non-success and must raise."""
+    async def test_child_completed_with_errors_succeeds_when_patched(self) -> None:
+        """A1: with the patch active, completed_with_errors is a successful parent step."""
         wf = _make_workflow_with_depth(0)
         setup_result = _make_setup_result()
 
         with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
             mock_wf.execute_activity = AsyncMock(return_value=setup_result)
             mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "completed_with_errors"})
+            mock_wf.patched = MagicMock(return_value=True)
 
-            node = ActivityNode(
-                node_id="sub_wf_1",
-                node_type=NodeType.SUB_WORKFLOW,
-                parameters={},
-            )
+            node = ActivityNode(node_id="sub_wf_1", node_type=NodeType.SUB_WORKFLOW, parameters={})
+            result = await wf._execute_sub_workflow_node(node, {})
 
+        output = result["output"]
+        assert output["StatusCode"] == 0
+        assert output["Result"]["child_status"] == "completed_with_errors"
+        assert output["StatusMessage"] == "Sub-workflow completed with errors"
+        assert output["ErrorMessage"] is None
+
+    async def test_child_completed_with_errors_raises_when_unpatched(self) -> None:
+        """A1: in-flight (pre-patch) executions keep the old raise on replay."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "completed_with_errors"})
+            mock_wf.patched = MagicMock(return_value=False)
+
+            node = ActivityNode(node_id="sub_wf_1", node_type=NodeType.SUB_WORKFLOW, parameters={})
             with pytest.raises(ApplicationError, match="Sub-workflow completed_with_errors"):
                 await wf._execute_sub_workflow_node(node, {})
 
@@ -674,8 +744,11 @@ class TestChildWorkflowErrorHandling:
         assert output["Result"]["child_workflow_id"] == setup_result["child_workflow_id"]
         assert output["Result"]["child_workflow_name"] == setup_result["child_workflow_name"]
         assert output["Result"]["child_workflow_version"] == setup_result["child_workflow_version"]
-        assert output["Result"]["child_status"] == "terminated"
+        # A2-P1: child_status stays within the published enum; the "terminated"
+        # reason is preserved in ErrorMessage instead.
+        assert output["Result"]["child_status"] == "failed"
         assert output["StatusCode"] == 1
+        assert output["ErrorMessage"] == "Sub-workflow terminated"
 
     async def test_cancelled_child_preserves_m1_output(self) -> None:
         """Temporal-level cancellation preserves M1 output and uses SubWorkflowFailedError."""
@@ -723,15 +796,17 @@ class TestChildWorkflowErrorHandling:
                 parameters={},
             )
 
-            with pytest.raises(ApplicationError, match="Sub-workflow timed_out") as exc_info:
+            with pytest.raises(ApplicationError, match="Sub-workflow timed out") as exc_info:
                 await wf._execute_sub_workflow_node(node, {})
 
         assert exc_info.value.non_retryable
         assert exc_info.value.type == "SubWorkflowFailedError"
         output = exc_info.value.details[0]["output"]
         assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
-        assert output["Result"]["child_status"] == "timed_out"
+        # A2-P1: timeout maps to child_status "failed"; reason preserved in ErrorMessage.
+        assert output["Result"]["child_status"] == "failed"
         assert output["StatusCode"] == 1
+        assert output["ErrorMessage"] == "Sub-workflow timed out"
 
     async def test_cancelled_child_does_not_cancel_parent(self) -> None:
         """Cancelled child must use SubWorkflowFailedError, not InvocationCancelledError."""
@@ -864,7 +939,7 @@ class TestSetupActivityDisabledWorkflow:
                 },
                 parent_execution_id="parent-exec-1",
                 parent_node_id="sub_wf_node",
-                created_by_user_id="user-1",
+                created_by_user_id=str(uuid4()),
                 current_depth=0,
             )
 
