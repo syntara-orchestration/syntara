@@ -283,7 +283,7 @@ def _wait_for_activity_ids(
     )
 
 
-def _listed_stdout(activity: ActivityExecution) -> str:
+def _listed_stdout(activity: ActivityData | ActivityExecution) -> str:
     return str(_activity_output(activity).get("stdout", "")).strip()
 
 
