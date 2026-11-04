@@ -1,4 +1,4 @@
-"""Integration tests for retry_from_failure endpoints (AAP-92820)."""
+"""Integration tests for retry_from_failure endpoints."""
 
 import copy
 import uuid
