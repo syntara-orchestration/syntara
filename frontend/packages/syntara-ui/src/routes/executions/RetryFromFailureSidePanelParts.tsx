@@ -105,7 +105,7 @@ export function RetryPlan({
 
   return (
     <Stack hasGutter>
-      {selectablePoints.length > 1 && (
+      {(selectablePoints.length > 1 || (selectablePoints.length === 1 && defaultPoints.length > 1)) && (
         <StackItem>
           <RetryScopeSelector
             scopeMode={scopeMode}
