@@ -1,4 +1,4 @@
-import { RhUiAutomationIcon, RhUiNetworkIcon } from '@patternfly/react-icons'
+import { AnsibleTowerIcon, GlobeIcon } from '@patternfly/react-icons'
 
 import { IdpTypeKey } from '../routes/access-management/authentication/identity-providers/idpTypePresets'
 
@@ -30,8 +30,8 @@ export function ProviderIcon({ name, idpType, style }: Readonly<ProviderIconProp
 
   switch (key) {
     case 'ansible':
-      return <RhUiAutomationIcon style={iconStyle} />
+      return <AnsibleTowerIcon style={iconStyle} />
     case null:
-      return <RhUiNetworkIcon data-testid="network-icon" aria-hidden="true" style={iconStyle} />
+      return <GlobeIcon data-testid="globe-icon" aria-hidden="true" style={iconStyle} />
   }
 }

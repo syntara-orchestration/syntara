@@ -159,7 +159,7 @@ export default tseslint.config(
       'no-restricted-properties': ['error', CRYPTO_RANDOM_UUID_RESTRICTION],
     },
   },
-  // Require RhUi icons in production TypeScript files.
+  // Require RhUi icons in production TypeScript files when equivalents exist.
   // Bridge hook deprecation uses @typescript-eslint/no-restricted-imports (a separate
   // rule name) to avoid flat-config shadowing — two blocks setting the same rule on the same files
   // would cause the last one to win and silently drop the other.
@@ -173,8 +173,10 @@ export default tseslint.config(
           patterns: [
             {
               group: ['@patternfly/react-icons'],
-              importNamePattern: '^(?!RhUi)',
-              message: 'Use RhUi* icons from @patternfly/react-icons (e.g. RhUiAddIcon, RhUiTrashIcon, RhUiEditIcon).',
+              // The provider identity icons have no RhUi equivalents.
+              importNamePattern: '^(?!(?:RhUi|AnsibleTowerIcon|GlobeIcon))',
+              message:
+                'Use RhUi* icons from @patternfly/react-icons when an equivalent exists (e.g. RhUiAddIcon, RhUiTrashIcon, RhUiEditIcon).',
             },
           ],
         },
