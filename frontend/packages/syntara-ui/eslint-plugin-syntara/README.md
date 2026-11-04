@@ -10,7 +10,7 @@ Disallows raw HTTP usage in UI source code: references to the global `fetch` and
 
 `axios` is blocked at the import boundary via `no-restricted-imports` (error level) in `eslint.config.js`.
 
-Non-`RhUi` icon imports from `@patternfly/react-icons` are rejected by `no-restricted-imports` at error level in production TypeScript files, except `AnsibleTowerIcon` and `GlobeIcon`, which have no `RhUi` equivalents.
+Non-`RhUi` icon imports from `@patternfly/react-icons` are rejected by `no-restricted-imports` at error level in production TypeScript files, except `AnsibleTowerIcon` and `GlobeIcon` for provider identity and `PlusCircleIcon` and `SearchIcon` for empty states.
 
 For `fetch`, the rule flags any reference to the global identifier (direct calls, aliasing, passing as a callback). Property access such as `window.fetch` is allowed.
 

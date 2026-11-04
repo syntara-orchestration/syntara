@@ -173,10 +173,9 @@ export default tseslint.config(
           patterns: [
             {
               group: ['@patternfly/react-icons'],
-              // The provider identity icons have no RhUi equivalents.
-              importNamePattern: '^(?!(?:RhUi|AnsibleTowerIcon|GlobeIcon))',
-              message:
-                'Use RhUi* icons from @patternfly/react-icons when an equivalent exists (e.g. RhUiAddIcon, RhUiTrashIcon, RhUiEditIcon).',
+              // Provider identity and empty-state icon choices follow product UX guidance.
+              importNamePattern: '^(?!(?:RhUi|AnsibleTowerIcon|GlobeIcon|PlusCircleIcon|SearchIcon))',
+              message: 'Use RhUi* icons from @patternfly/react-icons, except approved provider and empty-state icons.',
             },
           ],
         },

@@ -1,5 +1,5 @@
 import { Content, ContentVariants, EmptyState, EmptyStateBody, StackItem, Title } from '@patternfly/react-core'
-import { RhUiAddCircleIcon, RhUiKeyIcon } from '@patternfly/react-icons'
+import { PlusCircleIcon, RhUiKeyIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 
 import { AppRoute } from '../../../app/AppRoute'
@@ -105,7 +105,7 @@ export function SelectUserStep({
       )}
       {!showSelectionUi && (
         <StackItem isFilled style={flexCenteredBothAxes}>
-          <EmptyState headingLevel="h4" titleText="No users yet" icon={RhUiAddCircleIcon} variant="sm">
+          <EmptyState headingLevel="h4" titleText="No users yet" icon={PlusCircleIcon} variant="sm">
             <EmptyStateBody>
               There must be at least one other user before you can transfer a federated identity.
             </EmptyStateBody>

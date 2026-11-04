@@ -90,19 +90,19 @@ Nice to have (but we'll explain the basics):
 
 ## Technology Stack
 
-| Layer               | Technology                   | Notes                                                                                     |
-| ------------------- | ---------------------------- | ----------------------------------------------------------------------------------------- |
-| **UI Components**   | PatternFly 6                 | Enterprise UI component framework                                                         |
-| **Styling**         | PatternFly 6                 | Enterprise UI component framework                                                         |
-| **Forms**           | react-hook-form              | Performant form handling                                                                  |
-| **Icons**           | PatternFly `RhUi` icons      | Use `RhUi` icons when equivalents exist; keep the provider identity icons without matches |
-| **Workflow Canvas** | React Flow (`@xyflow/react`) | Step-based workflow editor (React Flow graph)                                             |
-| **State (Server)**  | TanStack Query               | Caching, fetching, synchronizing API data                                                 |
-| **State (Client)**  | Zustand                      | Lightweight store for workflow editing                                                    |
-| **WebSocket**       | Pure Zustand store           | Real-time communication with backend                                                      |
-| **Routing**         | TanStack Router              | Route tree, route matching, and URL state                                                 |
-| **Build**           | Vite                         | Fast dev server and bundler                                                               |
-| **Testing**         | Vitest + Testing Library     | Unit and component testing                                                                |
+| Layer               | Technology                   | Notes                                                                        |
+| ------------------- | ---------------------------- | ---------------------------------------------------------------------------- |
+| **UI Components**   | PatternFly 6                 | Enterprise UI component framework                                            |
+| **Styling**         | PatternFly 6                 | Enterprise UI component framework                                            |
+| **Forms**           | react-hook-form              | Performant form handling                                                     |
+| **Icons**           | PatternFly `RhUi` icons      | `RhUi` by default; provider and empty-state icons have documented exceptions |
+| **Workflow Canvas** | React Flow (`@xyflow/react`) | Step-based workflow editor (React Flow graph)                                |
+| **State (Server)**  | TanStack Query               | Caching, fetching, synchronizing API data                                    |
+| **State (Client)**  | Zustand                      | Lightweight store for workflow editing                                       |
+| **WebSocket**       | Pure Zustand store           | Real-time communication with backend                                         |
+| **Routing**         | TanStack Router              | Route tree, route matching, and URL state                                    |
+| **Build**           | Vite                         | Fast dev server and bundler                                                  |
+| **Testing**         | Vitest + Testing Library     | Unit and component testing                                                   |
 
 ---
 
