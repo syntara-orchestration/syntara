@@ -392,9 +392,10 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         scheduled for a restored skip: the source run never ran them, and scheduling
         them would execute work the retry was meant to skip.
 
-        A restored failure propagates the way a live one does, so an unselected
-        failure still suppresses its downstream nodes instead of letting them run
-        against output that no longer exists.
+        A restored failure propagates the way a live one does, so exclusive
+        descendants that never ran stay suppressed. Descendants that recorded
+        output are still replayed, or a later converge would treat them as
+        skipped and evaluate the gate against the wrong inputs.
         """
         if restored_status == ActivityStatus.SKIPPED.value:
             workflow.logger.info(
@@ -419,6 +420,47 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         if cof:
             self._route_failed_node(node_id, node)
             await self._handle_continued_failure(node_id, node, graph, pending_tasks)
+            return
+        await self._schedule_restorable_unselected_successors(node_id, graph, pending_tasks)
+
+    async def _schedule_restorable_unselected_successors(
+        self,
+        node_id: str,
+        graph: WorkflowGraph,
+        pending_tasks: dict[str, asyncio.Task[Any]],
+    ) -> None:
+        """Keep recorded descendants of an unselected failure reachable.
+
+        A restored unselected failure must not execute downstream work against
+        output that no longer exists. Descendants with recorded source outcomes
+        must stay reachable: ordinary nodes can replay, while loops and controls
+        may need to run through their retry-aware execution path. Otherwise a
+        later converge can treat the branch as skipped and evaluate the gate
+        against the wrong set of inputs. Converges are left to the gate, which
+        re-evaluates from the preserved plus new results.
+        """
+        if not self.retry_context:
+            return
+        for successor_id in graph.get_successors(node_id):
+            if (
+                successor_id in self.skipped_nodes
+                or successor_id in self.failed_nodes
+                or successor_id in pending_tasks
+                or self.resolver.has_namespace(successor_id)
+            ):
+                continue
+            successor = graph.get_node(successor_id)
+            if successor.type == NodeType.CONVERGE:
+                continue
+            # Reachability is based on retry-region membership and a recorded
+            # terminal source outcome, not on whether the node can be replayed
+            # directly. Loops and controls with unknown routing must still reach
+            # _execute_node(), which can run their retry-aware path normally.
+            if not self._is_retry_traversable_source_node(successor_id, graph):
+                continue
+            workflow.logger.info(f"Scheduling restored unselected-branch successor {successor_id} from {node_id}")
+            pending_tasks[successor_id] = asyncio.create_task(self._execute_node(node=successor, graph=graph))
+            self._handle_converge_timeout(successor_id, graph, pending_tasks)
 
     @staticmethod
     def _find_node_for_task(
@@ -1115,6 +1157,12 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                 # let _check_converge_successors handle them.
                 succ_node = graph.get_node(succ_id)
                 if succ_node.type == NodeType.CONVERGE:
+                    continue
+
+                # Keep source-recorded nodes in the retry-restorable region
+                # reachable. Some (loops and controls with unknown routing) must
+                # run through _execute_node() instead of being directly replayed.
+                if self._is_retry_traversable_source_node(succ_id, graph):
                     continue
 
                 if boundary is not None and succ_id not in boundary:

@@ -1366,8 +1366,7 @@ class TestRestoredTerminalOutcomeInTheCompletionPath:
         import asyncio
         from unittest.mock import AsyncMock, patch
 
-        wf = _injectable_workflow()
-        wf.retry_context = _retry("step_3")
+        wf = _injectable_workflow(source_statuses={"step_1": "failed", "step_3": "failed"})
         wf.retry_context = _retry("step_3")
         node = ActivityNode(node_id="step_1", node_type="script", parameters={})
         mock_wf.execute_activity = AsyncMock(
@@ -1449,6 +1448,207 @@ class TestRestoredTerminalOutcomeInTheCompletionPath:
 
 
 @pytest.mark.asyncio
+async def test_restored_unselected_failure_replays_exclusive_recorded_successor(
+    mock_wf: MagicMock,
+) -> None:
+    """Exclusive descendants with a source record are replayed, not skipped.
+
+    Skipping ``east_post`` after restoring ``east`` as failed made a later All
+    converge treat that branch as never-run and evaluate the gate without it.
+    """
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    from syntara.workflows.workflow_engine.graph import WorkflowGraph
+    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("east", {"id": "east", "type": "script", "parameters": {}})
+    backend.add_node("east_post", {"id": "east_post", "type": "script", "parameters": {}})
+    backend.add_node("west", {"id": "west", "type": "script", "parameters": {}})
+    backend.add_node("join", {"id": "join", "type": "converge", "parameters": {"strategy": "all"}})
+    backend.add_edge("east", "east_post", None)
+    backend.add_edge("east_post", "join", None)
+    backend.add_edge("west", "join", None)
+    graph = WorkflowGraph(backend)
+
+    wf = _injectable_workflow(
+        source_statuses={"east": "failed", "east_post": "failed", "west": "failed", "join": "failed"}
+    )
+    wf.retry_context = _retry("west")
+    wf._execute_node = AsyncMock(return_value={"output": {}})  # type: ignore[method-assign]
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "failed",
+            "input_data": {},
+            "output_data": {"partial": True},
+            "error_details": "east failed",
+            "started_at": None,
+            "completed_at": None,
+        }
+    )
+    node = ActivityNode(node_id="east", node_type="script", parameters={})
+    result = await wf._maybe_restore_retry_output(node, graph)
+    assert result is not None
+
+    async def supplied() -> dict[str, Any]:
+        return wf._process_supplied_result(node, result)
+
+    task = asyncio.create_task(supplied())
+    pending = {node.id: task}
+    await wf._process_completed_task(task, pending, graph)
+
+    assert "east" in wf.failed_nodes
+    assert "east_post" not in wf.skipped_nodes
+    assert "east_post" in pending
+    pending["east_post"].cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await pending["east_post"]
+
+
+@pytest.mark.parametrize("successor_type", [NodeType.LOOP, NodeType.CONDITION])
+@pytest.mark.asyncio
+async def test_restored_unselected_failure_keeps_retryable_successor_reachable(
+    mock_wf: MagicMock,
+    successor_type: NodeType,
+) -> None:
+    """Recorded loops and controls must reach _execute_node even if not replayable.
+
+    A loop enters its retry-aware iteration path. A condition with no inferable
+    source route executes against the rebuilt namespace. Neither should be
+    eagerly skipped just because _should_restore_node correctly rejects direct
+    replay for that node type/state.
+    """
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("east", {"id": "east", "type": "script", "parameters": {}})
+    backend.add_node("candidate", {"id": "candidate", "type": successor_type.value, "parameters": {}})
+    backend.add_node("west", {"id": "west", "type": "script", "parameters": {}})
+    backend.add_node("join", {"id": "join", "type": "converge", "parameters": {"strategy": "all"}})
+    if successor_type == NodeType.LOOP:
+        backend.add_node("body", {"id": "body", "type": "script", "parameters": {}})
+        backend.add_edge("candidate", "body", {"from_port": "iterate"})
+        backend.add_edge("candidate", "join", {"from_port": "complete"})
+        backend.add_edge("body", "candidate", {"from_port": "continue"})
+        backend.add_edge("body", "join", {"from_port": "complete"})
+        statuses = {
+            "east": ActivityStatus.FAILED.value,
+            "candidate": ActivityStatus.COMPLETED.value,
+            "body": ActivityStatus.COMPLETED.value,
+            "west": ActivityStatus.FAILED.value,
+            "join": ActivityStatus.FAILED.value,
+        }
+    else:
+        backend.add_node("true_branch", {"id": "true_branch", "type": "script", "parameters": {}})
+        backend.add_node("false_branch", {"id": "false_branch", "type": "script", "parameters": {}})
+        backend.add_edge("candidate", "true_branch", {"from_port": "true"})
+        backend.add_edge("candidate", "false_branch", {"from_port": "false"})
+        backend.add_edge("true_branch", "join", None)
+        backend.add_edge("false_branch", "join", None)
+        statuses = {
+            "east": ActivityStatus.FAILED.value,
+            "candidate": ActivityStatus.COMPLETED.value,
+            "true_branch": ActivityStatus.COMPLETED.value,
+            "false_branch": ActivityStatus.COMPLETED.value,
+            "west": ActivityStatus.FAILED.value,
+            "join": ActivityStatus.FAILED.value,
+        }
+    backend.add_edge("east", "candidate", None)
+    backend.add_edge("west", "join", None)
+    graph = WorkflowGraph(backend)
+
+    wf = _injectable_workflow(source_statuses=statuses)
+    wf.retry_context = _retry("west")
+    wf.failed_nodes["east"] = "unselected source failure"
+    wf._execute_node = AsyncMock(return_value={"output": {}})  # type: ignore[method-assign]
+
+    # This is the direct-replay predicate, which must remain false for these
+    # cases; reachability has its own source-record eligibility check.
+    assert not wf._should_restore_node("candidate", graph)
+    assert wf._is_retry_traversable_source_node("candidate", graph)
+
+    # Failure handling performs this skip propagation before it schedules the
+    # unselected branch's recorded successors.
+    wf._mark_downstream_as_skipped("east", graph)
+    assert "candidate" not in wf.skipped_nodes
+
+    pending: dict[str, asyncio.Task[Any]] = {}
+    await wf._schedule_restorable_unselected_successors("east", graph, pending)
+
+    assert "candidate" in pending
+    await asyncio.sleep(0)
+    wf._execute_node.assert_awaited_once()
+    await_args = wf._execute_node.await_args
+    assert await_args is not None
+    assert await_args.kwargs["node"].id == "candidate"
+    assert await_args.kwargs["graph"] is graph
+
+
+@pytest.mark.asyncio
+async def test_unselected_failure_does_not_schedule_selected_downstream_node(
+    mock_wf: MagicMock,
+) -> None:
+    """A shared successor downstream of a selected point must execute by that path."""
+    from unittest.mock import AsyncMock
+
+    backend = InMemoryGraphBackend()
+    for node_id in ("east", "west", "shared"):
+        backend.add_node(node_id, {"id": node_id, "type": "script", "parameters": {}})
+    backend.add_edge("east", "shared", None)
+    backend.add_edge("west", "shared", None)
+    graph = WorkflowGraph(backend)
+
+    wf = _injectable_workflow(
+        source_statuses={
+            "east": ActivityStatus.FAILED.value,
+            "west": ActivityStatus.FAILED.value,
+            "shared": ActivityStatus.COMPLETED.value,
+        }
+    )
+    wf.retry_context = _retry("west")
+    wf._execute_node = AsyncMock(return_value={"output": {}})  # type: ignore[method-assign]
+    pending: dict[str, Any] = {}
+
+    assert not wf._is_retry_traversable_source_node("shared", graph)
+    await wf._schedule_restorable_unselected_successors("east", graph, pending)
+
+    assert "shared" not in pending
+    wf._execute_node.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_unselected_failure_leaves_missing_source_successor_skipped(
+    mock_wf: MagicMock,
+) -> None:
+    """A node without a source outcome remains skipped instead of being enqueued."""
+    from unittest.mock import AsyncMock
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("east", {"id": "east", "type": "script", "parameters": {}})
+    backend.add_node("never_ran", {"id": "never_ran", "type": "script", "parameters": {}})
+    backend.add_node("west", {"id": "west", "type": "script", "parameters": {}})
+    backend.add_edge("east", "never_ran", None)
+    graph = WorkflowGraph(backend)
+
+    wf = _injectable_workflow(
+        source_statuses={"east": ActivityStatus.FAILED.value, "west": ActivityStatus.FAILED.value}
+    )
+    wf.retry_context = _retry("west")
+    wf.failed_nodes["east"] = "unselected source failure"
+    wf._execute_node = AsyncMock(return_value={"output": {}})  # type: ignore[method-assign]
+
+    wf._mark_downstream_as_skipped("east", graph)
+    pending: dict[str, Any] = {}
+    await wf._schedule_restorable_unselected_successors("east", graph, pending)
+
+    assert "never_ran" in wf.skipped_nodes
+    assert "never_ran" not in pending
+    wf._execute_node.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_a_restored_failure_with_no_output_falls_back_to_the_declared_model(
     mock_wf: MagicMock,
 ) -> None:
@@ -1461,7 +1661,7 @@ async def test_a_restored_failure_with_no_output_falls_back_to_the_declared_mode
     import asyncio
     from unittest.mock import AsyncMock, patch
 
-    wf = _injectable_workflow()
+    wf = _injectable_workflow(source_statuses={"step_1": "failed", "step_3": "failed"})
     wf.retry_context = _retry("step_3")
     node = ActivityNode(node_id="step_1", node_type="script", parameters={})
     mock_wf.execute_activity = AsyncMock(
