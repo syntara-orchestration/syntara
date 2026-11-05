@@ -20,7 +20,8 @@ Schedules for built-in scheduled workflows. Two caveats on that re-run:
 use the current release (an older build re-publishes old definitions as new
 versions), and it includes its
 ``authz`` dependency, which re-asserts the seeded baseline — e.g. a
-revoked role assignment is recreated. When Temporal is unreachable the
+revoked role assignment is recreated, except the one-time custom step-authoring
+default, whose edits and removal persist. When Temporal is unreachable the
 schedule sync logs a warning and the command still exits 0 by default;
 pass ``--strict`` to abort on the first built-in seeding error and exit
 non-zero, including validation, database, and schedule sync errors.

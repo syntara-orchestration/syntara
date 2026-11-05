@@ -99,7 +99,6 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("user", "read", scope="self", roles=("admin", "authenticated")),
     PolicyInfo("user", "update", scope="self", roles=("admin", "authenticated")),
     # -- system-scoped (any) --
-    PolicyInfo(NODE_RESOURCE_TYPE, NODE_ACTION_WRITE, roles=("step-author",)),
     # credentials
     PolicyInfo("credential", "read", roles=("admin", "auditor")),
     PolicyInfo("credential", "create", roles=("admin",)),
@@ -274,7 +273,6 @@ BUILTIN_ROLES: list[RoleInfo] = [
         "authenticated",
         "Default permissions granted to all authenticated users",
     ),
-    RoleInfo("step-author", "Author all workflow step types"),
 ]
 
 
