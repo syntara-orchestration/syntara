@@ -182,6 +182,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             self._created_by_user_id = wf_ctx.get("execution", {}).get("created_by_user_id", "")
 
         self.node_inputs: dict[str, dict[str, Any]] = {}
+        # Keep historical I/O for nodes that execute repeatedly in a loop. The
+        # current namespace is intentionally overwritten on every iteration for
+        # expression evaluation, but activity synchronization needs the value
+        # belonging to the specific iteration it is persisting.
+        self.activity_input_history: dict[str, list[dict[str, Any]]] = {}
+        self.activity_output_history: dict[str, list[dict[str, Any]]] = {}
         self.node_control_data: dict[str, dict[str, Any]] = {}
         self.skipped_nodes: set[str] = set()
         self.failed_nodes: dict[str, str] = {}
@@ -241,6 +247,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self._skip_unselected_triggers(trigger_node_id, graph)
 
         self.node_inputs[trigger_node.id] = trigger_inputs
+        self.activity_input_history[trigger_node.id] = [copy.deepcopy(trigger_inputs)]
 
         # Validate trigger type against allowlist to prevent arbitrary activity dispatch
         if trigger_node.type not in ALLOWED_TRIGGER_TYPES:
@@ -260,6 +267,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         trigger_output = trigger_result.get("output", trigger_result)
         self.resolver.set_namespace("trigger", trigger_output)
         self.resolver.set_namespace(trigger_node.id, trigger_output)
+        self.activity_output_history[trigger_node.id] = [copy.deepcopy(trigger_output)]
 
         await self._schedule_successors(
             completed_node_id=trigger_node.id,
@@ -326,6 +334,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             return
 
         self.resolver.set_namespace(completed_node_id, {**output, "status": "completed"})
+        self.activity_output_history.setdefault(completed_node_id, []).append(
+            copy.deepcopy({**output, "status": "completed"})
+        )
         workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
         await self._schedule_successors(completed_node_id=completed_node_id, graph=graph, pending_tasks=pending_tasks)
         self._cancel_skipped_pending_tasks(pending_tasks)
@@ -1494,6 +1505,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         timeout_seconds = resolve_timeout(node, self._runtime_settings)
         self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
+        self.activity_input_history.setdefault(node.id, []).append(copy.deepcopy(resolved_parameters))
 
         result = await self._dispatch_node(node, resolved_parameters, graph, timeout_seconds)
         return self._process_node_result(node, result)
@@ -1725,38 +1737,57 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             scrubbed = scrub_credential_values(scrubbed, secret_values)
         return cast("dict[str, Any]", scrubbed)
 
+    def _activity_history_value(
+        self,
+        history: dict[str, list[dict[str, Any]]],
+        activity_id: str,
+        iteration: int | None,
+    ) -> dict[str, Any] | None:
+        """Return an iteration-specific value, falling back to current state."""
+        if iteration is not None:
+            values = history.get(activity_id, [])
+            if 0 <= iteration < len(values):
+                return values[iteration]
+        return None
+
     @workflow.query
-    def get_activity_input(self, activity_id: str) -> dict[str, Any] | None:
+    def get_activity_input(self, activity_id: str, iteration: int | None = None) -> dict[str, Any] | None:
         """Query to get input data for a specific activity.
 
         This is consumed by ActivitySyncService to sync activity data to the database.
 
         Args:
             activity_id: Node ID to get input for
+            iteration: Optional zero-based loop iteration to retrieve
 
         Returns:
             Activity input data or None if not found
 
         """
-        data = self.node_inputs.get(activity_id)
+        data = self._activity_history_value(getattr(self, "activity_input_history", {}), activity_id, iteration)
+        if data is None and iteration is None:
+            data = self.node_inputs.get(activity_id)
         if data is None:
             return None
         return self._scrub_data(data)
 
     @workflow.query
-    def get_activity_output(self, activity_id: str) -> dict[str, Any] | None:
+    def get_activity_output(self, activity_id: str, iteration: int | None = None) -> dict[str, Any] | None:
         """Query to get output data for a specific activity.
 
         This is consumed by ActivitySyncService to sync activity data to the database.
 
         Args:
             activity_id: Node ID to get output for
+            iteration: Optional zero-based loop iteration to retrieve
 
         Returns:
             Activity output data or None if not found
 
         """
-        data = self.resolver.get_namespace(activity_id) if self.resolver.has_namespace(activity_id) else None
+        data = self._activity_history_value(getattr(self, "activity_output_history", {}), activity_id, iteration)
+        if data is None and iteration is None:
+            data = self.resolver.get_namespace(activity_id) if self.resolver.has_namespace(activity_id) else None
         if data is None:
             return None
         return self._scrub_data(data)
@@ -1780,7 +1811,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         return self.node_control_data[activity_id]
 
     @workflow.update
-    async def get_activity_output_when_ready(self, activity_id: str) -> dict[str, Any]:
+    async def get_activity_output_when_ready(self, activity_id: str, iteration: int | None = None) -> dict[str, Any]:
         """Wait until activity output is stored in the resolver, then return it.
 
         Unlike the ``get_activity_output`` query, this update handler blocks
@@ -1794,10 +1825,18 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         ``except TemporalError`` and falls back to a sleep + query retry.
         """
         await workflow.wait_condition(
-            lambda: self.resolver.has_namespace(activity_id),
+            lambda: (
+                self._activity_history_value(getattr(self, "activity_output_history", {}), activity_id, iteration)
+                is not None
+                if iteration is not None
+                else self.resolver.has_namespace(activity_id)
+            ),
             timeout=timedelta(seconds=30),
         )
-        return self._scrub_data(self.resolver.get_namespace(activity_id))
+        data = self._activity_history_value(getattr(self, "activity_output_history", {}), activity_id, iteration)
+        if data is None:
+            data = self.resolver.get_namespace(activity_id)
+        return self._scrub_data(data)
 
     @workflow.query
     def get_skipped_nodes(self) -> list[str]:

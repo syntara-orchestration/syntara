@@ -51,6 +51,8 @@ def _make_workflow(
     wf.failed_nodes = failed_nodes if failed_nodes is not None else {}
     wf.resolver = resolver if resolver is not None else NamespaceResolver()
     wf.node_inputs = {}
+    wf.activity_input_history = {}
+    wf.activity_output_history = {}
     wf.node_control_data = {}
     wf.loop_state = {}
     wf.loop_body_map = {}
@@ -153,6 +155,15 @@ class TestGetActivityInputQuery:
         wf.node_inputs["trigger"] = {"body": {"key": "value"}}
         assert wf.get_activity_input("trigger") == {"body": {"key": "value"}}
 
+    def test_returns_input_for_requested_loop_iteration(self) -> None:
+        wf = _make_workflow()
+        wf.node_inputs["node_a"] = {"value": 3}
+        wf.activity_input_history["node_a"] = [{"value": 1}, {"value": 2}, {"value": 3}]
+
+        assert wf.get_activity_input("node_a", 0) == {"value": 1}
+        assert wf.get_activity_input("node_a", 1) == {"value": 2}
+        assert wf.get_activity_input("node_a", 2) == {"value": 3}
+
 
 # ---------------------------------------------------------------------------
 # Tests: get_activity_output query
@@ -179,6 +190,19 @@ class TestGetActivityOutputQuery:
         wf = _make_workflow()
         wf.resolver.set_namespace("trigger", {"url": "http://example.com"})
         assert wf.get_activity_output("trigger") == {"url": "http://example.com"}
+
+    def test_returns_output_for_requested_loop_iteration(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("node_a", {"stdout": "3\\n"})
+        wf.activity_output_history["node_a"] = [
+            {"stdout": "1\\n"},
+            {"stdout": "2\\n"},
+            {"stdout": "3\\n"},
+        ]
+
+        assert wf.get_activity_output("node_a", 0) == {"stdout": "1\\n"}
+        assert wf.get_activity_output("node_a", 1) == {"stdout": "2\\n"}
+        assert wf.get_activity_output("node_a", 2) == {"stdout": "3\\n"}
 
 
 # ---------------------------------------------------------------------------

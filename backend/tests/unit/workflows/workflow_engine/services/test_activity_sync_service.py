@@ -5,7 +5,7 @@ import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, call, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -5423,6 +5423,22 @@ class TestQueryActivityIoOutputMerge:
         )
 
         assert output_data == {"invocation_id": "abc-123"}
+
+    @pytest.mark.asyncio
+    async def test_queries_loop_iteration_with_named_args(self) -> None:
+        """Loop I/O queries pass both activity ID and iteration via ``args``."""
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [{"value": 2}, {"stdout": "2\\n"}]
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED, "iteration": 1}
+
+        input_data, output_data = await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
+
+        assert input_data == {"value": 2}
+        assert output_data == {"stdout": "2\\n"}
+        assert mock_handle.query.await_args_list == [
+            call("get_activity_input", args=["my-activity", 1]),
+            call("get_activity_output", args=["my-activity", 1]),
+        ]
 
     @pytest.mark.asyncio
     async def test_completed_query_returns_output_skips_update(self) -> None:
