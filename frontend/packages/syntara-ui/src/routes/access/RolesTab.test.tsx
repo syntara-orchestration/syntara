@@ -193,7 +193,7 @@ describe('RolesTab', () => {
   })
 
   describe('Rendering', () => {
-    it('shows the step-author role with the built-in step allow and no edit or delete actions', async () => {
+    it('shows the custom step-author role with edit and delete actions', async () => {
       const user = userEvent.setup()
       vi.mocked(accessClient.useQuery).mockReturnValue({
         data: {
@@ -201,6 +201,7 @@ describe('RolesTab', () => {
             {
               ...mockRoles[0],
               name: 'step-author',
+              is_builtin: false,
               description: 'Author all workflow step types',
               policies: ['step_type:write:any'],
               scope: 'system',
@@ -220,9 +221,12 @@ describe('RolesTab', () => {
       render(<RolesTab />, { wrapper: createWrapper() })
 
       const row = screen.getByRole('row', { name: /step-author/ })
-      expect(within(row).getByText('Built-in')).toBeInTheDocument()
-      expect(within(row).queryByText('Custom')).not.toBeInTheDocument()
-      expect(within(row).queryByRole('button', { name: 'Kebab toggle' })).not.toBeInTheDocument()
+      expect(within(row).getByText('Custom')).toBeInTheDocument()
+      expect(within(row).queryByText('Built-in')).not.toBeInTheDocument()
+      await user.click(within(row).getByRole('button', { name: 'Kebab toggle' }))
+      expect(await screen.findByRole('menuitem', { name: 'Edit role' })).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: 'Delete role' })).toBeInTheDocument()
+      await user.keyboard('{Escape}')
       await user.click(within(row).getByRole('button', { name: /Details/ }))
       expect(screen.getByText('step_type:write:any')).toBeVisible()
     })

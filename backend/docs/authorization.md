@@ -73,9 +73,10 @@ Groups organize users. The `authenticated` group implicitly includes all authent
 
 Projects provide resource isolation. Resources belong to projects, and users can have different roles in different projects.
 
-## Built-in Roles
+## Built-in and Default Roles
 
-Defined in `BUILTIN_ROLES` in `src/syntara/authz/role_conventions.py`:
+Built-in roles are defined in `BUILTIN_ROLES` in `src/syntara/authz/role_conventions.py`.
+The custom `step-author` default is seeded once into the database.
 
 | Role | Builtin | Scope | Description | Key Permissions |
 |------|---------|-------|-------------|-----------------|
@@ -86,7 +87,7 @@ Defined in `BUILTIN_ROLES` in `src/syntara/authz/role_conventions.py`:
 | `project-user` | yes | project | Standard access within a project | Read project, CRUD workflows, run executions |
 | `project-auditor` | yes | project | Read-only within a project | Read project, workflows, executions, roles, policies |
 | `authenticated` | yes | system | Default permissions for all authenticated users | Read/update self, read own role assignments, manage own identity links |
-| `step-author` | yes | system | Author all workflow step types | `step_type:write:any` |
+| `step-author` | no (seeded once) | system | Author all workflow step types | `step_type:write:any` |
 
 ## Database Schema
 
@@ -102,6 +103,7 @@ The authorization system uses these tables:
 | `user_groups` | *(association table)* | `src/syntara/core/models/group.py` | User-to-group membership (SQLAlchemy Table) |
 | `role_assignments` | `RoleAssignment` | `src/syntara/authz/models/assignments.py` | Principal-to-role with `principal_type` (user/group), `principal_id`, optional `project_id`; references roles by `role_name` (string) |
 | `projects` | `Project` | `src/syntara/authz/models/project.py` | Resource isolation boundaries |
+| `seed_markers` | `SeedMarker` | `src/syntara/core/models/seed_marker.py` | Internal completion history for one-time defaults, independent of editable authorization records |
 
 Built-in roles and policies are **not** stored in these tables. They live in `role_conventions.py` and are resolved at runtime by the policy resolver, then merged into API list/get responses by the service layer.
 
@@ -158,13 +160,13 @@ On first boot, the seed module (`src/syntara/authz/seed.py`) creates:
 - `admin` user (member of `admins` and `users` groups)
 - `system` user (member of `admins` and `users` groups)
 - `authenticated` role → `authenticated` group via `RoleAssignment` (principal_type=group, project_id=NULL, global, **builtin**)
-- `step-author` role → `authenticated` group via `RoleAssignment` (principal_type=group, project_id=NULL, global, **builtin**)
+- `step-author` custom role and `step_type:write:any` custom policy → `authenticated` group via a revocable global `RoleAssignment` (all three **is_builtin=False**, seeded once)
 - `user` role → `users` group via `RoleAssignment` (principal_type=group, project_id=NULL, global, **builtin**)
 - `admin` role → `admins` group via `RoleAssignment` (principal_type=group, project_id=NULL, global, **builtin**)
 - `auditor` role → `auditors` group via `RoleAssignment` (principal_type=group, project_id=NULL, global, **builtin**)
 - `project-user` role → `users` group via `RoleAssignment` (principal_type=group, project_id=default project, project-scoped, revocable)
 
-The `authenticated`, `step-author`, `user`, `admin`, and `auditor` role assignments are marked `is_builtin=True` and cannot be revoked via the API. The `project-user` assignment on the `users` group is revocable, allowing admins to customise default project permissions.
+The `authenticated`, `user`, `admin`, and `auditor` role assignments are marked `is_builtin=True` and cannot be revoked via the API. The `step-author` assignment on `authenticated` and the `project-user` assignment on `users` are revocable, allowing admins to customise default permissions. Only `step-author` removal persists across reseeding.
 
 New local users are automatically added to the `users` group by default. The API accepts an optional `group_names` field on user creation: omit it to use the default, pass an empty list to skip group assignment, or pass specific group names to override.
 
@@ -172,19 +174,35 @@ There are two seeding paths:
 - `seed_authz_data()` — full seed used by tests after table truncation.
 - `seed_groups_project_admin()` — lightweight seed that creates groups, project, admin user, and role assignments. Used at app startup after migrations have already run.
 
-Both functions only create groups, the default project, the admin user, and role assignments. Built-in policies and roles are not seeded into the database — they are resolved from `role_conventions.py` at runtime.
+Both functions create groups, the default project, the admin user, and role assignments, and run the same one-time seed for the custom step-authoring default. Built-in policies and roles remain resolved from `role_conventions.py` at runtime.
 
 ### Default step-type authoring permissions
 
-The built-in `step-author` role includes `step_type:write:any`, which allows
+The custom `step-author` role includes the custom policy `step_type:write:any`, which allows
 `step_type:write` at `any` scope without conditions. The built-in `authenticated`
 group has a global assignment to both `authenticated` and `step-author`, so every
 authenticated user can author all step types, including newly introduced types.
 
-The policy and role appear as **Built-in** in Access Management and cannot be
-edited or deleted. Roles and policies resolve from the code registry; both seed
-paths create the group assignment idempotently. Workflow and project permissions
+The policy and role appear as **Custom** in Access Management. Administrators can
+edit or delete them through the existing APIs, edit the role in the UI, detach
+the policy, or revoke the group assignment. Workflow and project permissions
 still apply independently.
+
+Both seed paths atomically create the policy, role, assignment, and the internal
+`seed_markers` entry `authz.default_step_allow.v1`. Later runs skip this default
+entirely, preserving edits, renames, deletions, and detached policies across
+restarts and upgrades. The marker is internal bootstrap history, not a runtime
+setting; ordinary upgrades must retain its key and row. Databases seeded by the
+former built-in implementation retain the assignment ID while it becomes
+revocable. Matching custom records are reused; conflicting names abort the seed
+without overwriting data or recording completion.
+
+To adopt deny-by-default for step authoring, remove this default allow or its
+attachment, then grant only selected kinds using custom policies. Without
+another matching allow, step authorization denies every kind. The canonical
+action name is `step_type:write` (called `workflow_node:write` in the original
+story). Downgrading past the marker-table migration discards its history; do not
+do so after customizing defaults without preserving the marker.
 
 For selective restrictions, compose built-in deny policies into custom roles:
 

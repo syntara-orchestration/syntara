@@ -19,7 +19,7 @@ from syntara.authz.schemas import PolicyStatementSchema
 from syntara.authz.services.policy_service import PolicyService
 from syntara.core.models import User
 from syntara.workflows.node_kinds import NODE_KINDS
-from tests.unit.authz.conftest import build_opa_input, policies_for_role
+from tests.unit.authz.conftest import allow_policy, build_opa_input
 
 DENY_POLICIES = [p for p in BUILTIN_POLICIES if p.resource == "step_type" and p.effect == "deny"]
 
@@ -72,7 +72,7 @@ def test_catalog_denies_only_the_matching_kind_and_project(
                 resource_type="step_type",
                 resource_labels={"kind": kind},
                 resource_project=project,
-                effective_policies=[*policies_for_role("step-author"), deny],
+                effective_policies=[allow_policy("custom-step-allow", ["step_type:write"]), deny],
             )
         )
         assert result["deny"] is denied
@@ -80,9 +80,7 @@ def test_catalog_denies_only_the_matching_kind_and_project(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "name", ["step_type:write:any", "step_type:write:any:deny:script", "step_type:write:project:deny:script"]
-)
+@pytest.mark.parametrize("name", ["step_type:write:any:deny:script", "step_type:write:project:deny:script"])
 async def test_builtin_step_policy_can_be_read_but_not_modified(name: str) -> None:
     """Step policies use the existing UUID lookup, filtering, and builtin protection."""
     service = PolicyService(AsyncMock(spec=AsyncSession), User(username="admin"))
@@ -97,20 +95,6 @@ async def test_builtin_step_policy_can_be_read_but_not_modified(name: str) -> No
         await service.delete_policy(policy_id)
 
 
-@pytest.mark.parametrize("kind", [*sorted(NODE_KINDS), "future_step_kind"])
-def test_step_author_baseline_allows_every_kind(
-    kind: str, opa_evaluate: Callable[[dict[str, Any]], dict[str, Any]]
-) -> None:
-    """The unconditional baseline covers current and future kinds across projects."""
-    for project in ("payments", "other"):
-        result = opa_evaluate(
-            build_opa_input(
-                action="write",
-                resource_type="step_type",
-                resource_labels={"kind": kind},
-                resource_project=project,
-                effective_policies=policies_for_role("step-author"),
-            )
-        )
-        assert result["allow"]
-        assert not result["deny"]
+def test_no_builtin_policy_grants_step_authoring() -> None:
+    """Removing the editable baseline must make deny-by-default reachable."""
+    assert not any(p.resource == "step_type" and p.effect == "allow" for p in BUILTIN_POLICIES)

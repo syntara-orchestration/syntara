@@ -124,9 +124,9 @@ class TestRolePolicyMapping:  # noqa: D101
         assert "role-assignment:read:self" in names
         assert "step_type:write:any" not in names
 
-    def test_step_author_role_has_step_type_write(self) -> None:
-        names = builtin_role_policy_names("step-author")
-        assert names == ["step_type:write:any"]
+    def test_step_author_role_is_not_builtin(self) -> None:
+        assert get_builtin_role("step-author") is None
+        assert get_builtin_policy("step_type:write:any") is None
 
     def test_admin_has_credential_use(self) -> None:
         names = builtin_role_policy_names("admin")
