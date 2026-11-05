@@ -106,11 +106,7 @@ const openshiftSchema = z.object({
   configuration: z
     .object({
       integration_type: z.literal(IntegrationTypeEnum.OPENSHIFT),
-      base_url: z.string().min(1, 'Cluster URL is required').url('Cluster URL must be a valid URL'),
-      namespace: z
-        .string()
-        .min(1, 'Namespace is required')
-        .regex(/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/, 'Invalid namespace format'),
+      base_url: z.string().min(1, 'API endpoint is required').url('API endpoint must be a valid URL'),
       insecure_skip_tls_verify: z.boolean().refine((val) => !val, { message: 'OpenShift requires TLS verification' }),
       allow_http: z.boolean().refine((val) => !val, { message: 'OpenShift requires HTTPS' }),
       ca_certificate: z.string().optional().nullable(),
@@ -163,7 +159,7 @@ export function getStep1Fields(integrationType: string, scope?: string): string[
     case IntegrationTypeEnum.LLM_PROVIDER:
       return [...shared, 'configuration.provider_hint', 'configuration.base_url']
     case IntegrationTypeEnum.OPENSHIFT:
-      return [...shared, 'configuration.base_url', 'configuration.namespace']
+      return [...shared, 'configuration.base_url']
     default:
       return shared
   }
@@ -188,7 +184,6 @@ export function getDefaultConfiguration(integrationType: string): IntegrationFor
       return {
         integration_type: 'openshift' as const,
         base_url: '',
-        namespace: 'default',
         insecure_skip_tls_verify: false,
         allow_http: false,
         ca_certificate: null,
@@ -202,7 +197,7 @@ export const INTEGRATION_TYPE_OPTIONS = [
   { value: IntegrationTypeEnum.MCP_SERVER, label: 'MCP Server' },
   { value: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM, label: 'Ansible Automation Platform' },
   { value: IntegrationTypeEnum.LLM_PROVIDER, label: 'LLM Provider' },
-  { value: IntegrationTypeEnum.OPENSHIFT, label: 'OpenShift' },
+  { value: IntegrationTypeEnum.OPENSHIFT, label: 'Execution plane infrastructure' },
 ] as const
 
 export const PROVIDER_HINT_OPTIONS = [

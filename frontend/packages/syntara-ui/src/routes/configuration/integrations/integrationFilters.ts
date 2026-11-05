@@ -8,19 +8,21 @@ export const CREDENTIAL_TYPES_BY_INTEGRATION: Record<string, string[]> = {
   [IntegrationTypeEnum.MCP_SERVER]: ['HTTP Bearer Token'],
   [IntegrationTypeEnum.LLM_PROVIDER]: ['LLM Provider'],
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]: ['Ansible Automation Platform'],
+  [IntegrationTypeEnum.OPENSHIFT]: ['HTTP Bearer Token'],
 }
 
 /** Integration types that require a management credential for discovery and validation. */
 export const CREDENTIAL_REQUIRED_TYPES: ReadonlySet<string> = new Set([
   IntegrationTypeEnum.LLM_PROVIDER,
   IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
+  IntegrationTypeEnum.OPENSHIFT,
 ])
 
 export const INTEGRATION_TYPE_LABELS: Record<string, string> = {
   [IntegrationTypeEnum.MCP_SERVER]: 'MCP Server',
   [IntegrationTypeEnum.LLM_PROVIDER]: 'LLM Provider',
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]: 'Ansible Automation Platform',
-  [IntegrationTypeEnum.OPENSHIFT]: 'OpenShift',
+  [IntegrationTypeEnum.OPENSHIFT]: 'Execution plane infrastructure',
 }
 
 export const PROVIDER_HINT_LABELS: Record<string, string> = {

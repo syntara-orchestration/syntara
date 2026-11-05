@@ -4,6 +4,8 @@ import {
   ContentVariants,
   ExpandableSection,
   Form,
+  FormGroup,
+  FormHelperText,
   HelperText,
   HelperTextItem,
   MenuToggle,
@@ -14,17 +16,19 @@ import {
   Title,
 } from '@patternfly/react-core'
 import { IntegrationTypeEnum } from '@syntara/contracts'
-import { type ReactNode, type Ref, useCallback, useState } from 'react'
+import { type ReactElement, type ReactNode, type Ref, useCallback, useEffect, useState } from 'react'
 import { useWatch, type UseFormSetValue } from 'react-hook-form'
 
 import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynTextField } from '../../../../components/forms/SynTextField'
 import { SynSelect } from '../../../../components/SynSelect'
 import { integrationHelp } from '../integrationFieldHelp'
+import { EXECUTION_PLANE_SCOPE_HELP, EXECUTION_PLANE_SINGLETON_HELP } from '../integrationFieldHelpText'
 import { PROVIDERS_HIDING_BASE_URL, PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
 
 import { INTEGRATION_TYPE_OPTIONS, PROVIDER_HINT_OPTIONS, type IntegrationFormData } from './integrationFormSchema'
 import { ScopeFields } from './ScopeFields'
+import { useOpenShiftIntegrationExists } from './useOpenShiftIntegrationExists'
 import styles from './WizardSteps.module.css'
 
 function ProviderHintMenuToggle({
@@ -107,12 +111,17 @@ function IntegrationTypeSelect({
   onOpenChange,
   onSelect,
   renderToggle,
+  isOpenShiftDisabled,
+  openShiftDisabledDescription,
 }: Readonly<{
   value: string
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   onSelect: (value: string) => void
   renderToggle: (toggleRef: Ref<MenuToggleElement>) => ReactNode
+  isOpenShiftDisabled: boolean
+  /** Shown only when the option is disabled because an EP integration already exists. */
+  openShiftDisabledDescription?: string
 }>) {
   return (
     <SynSelect
@@ -127,11 +136,19 @@ function IntegrationTypeSelect({
       shouldFocusToggleOnSelect
     >
       <SelectList>
-        {INTEGRATION_TYPE_OPTIONS.map((opt) => (
-          <SelectOption key={opt.value} value={opt.value}>
-            {opt.label}
-          </SelectOption>
-        ))}
+        {INTEGRATION_TYPE_OPTIONS.map((opt) => {
+          const isDisabled = opt.value === IntegrationTypeEnum.OPENSHIFT && isOpenShiftDisabled
+          return (
+            <SelectOption
+              key={opt.value}
+              value={opt.value}
+              isDisabled={isDisabled}
+              description={isDisabled ? openShiftDisabledDescription : undefined}
+            >
+              {opt.label}
+            </SelectOption>
+          )
+        })}
       </SelectList>
     </SynSelect>
   )
@@ -232,10 +249,13 @@ function getTypeConfig(
 ): {
   nameLabel: string
   namePlaceholder: string
+  nameLabelHelp: ReactElement
   showProviderHint: boolean
   hideBaseUrl: boolean
   requireBaseUrl: boolean
+  baseUrlLabel: string
   baseUrlPlaceholder: string
+  baseUrlLabelHelp: ReactElement
 } {
   const isLLM = integrationType === IntegrationTypeEnum.LLM_PROVIDER
   const isAAP = integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
@@ -245,31 +265,40 @@ function getTypeConfig(
     return {
       nameLabel: 'Name',
       namePlaceholder: 'Enter provider name',
+      nameLabelHelp: integrationHelp.name,
       showProviderHint: true,
       hideBaseUrl: typeof providerHint === 'string' && PROVIDERS_HIDING_BASE_URL.has(providerHint),
       requireBaseUrl: typeof providerHint === 'string' && PROVIDERS_REQUIRING_BASE_URL.has(providerHint),
+      baseUrlLabel: 'API URL',
       baseUrlPlaceholder: 'https://api.example.com/v1',
+      baseUrlLabelHelp: integrationHelp.apiUrl,
     }
   }
 
   if (isOpenShift) {
     return {
-      nameLabel: 'Cluster name',
-      namePlaceholder: 'Enter cluster name',
+      nameLabel: 'Connection name',
+      namePlaceholder: 'ocp-us-east-prod',
+      nameLabelHelp: integrationHelp.executionPlaneConnectionName,
       showProviderHint: false,
       hideBaseUrl: false,
       requireBaseUrl: true,
-      baseUrlPlaceholder: 'https://api.example.com:6443',
+      baseUrlLabel: 'API endpoint',
+      baseUrlPlaceholder: 'https://api.your-cluster.example.com:6443',
+      baseUrlLabelHelp: integrationHelp.executionPlaneApiEndpoint,
     }
   }
 
   return {
     nameLabel: 'Server name / ID',
     namePlaceholder: 'Enter server name / ID',
+    nameLabelHelp: integrationHelp.serverName,
     showProviderHint: false,
     hideBaseUrl: false,
     requireBaseUrl: true,
+    baseUrlLabel: 'API URL',
     baseUrlPlaceholder: isAAP ? 'e.g. https://aap.example.com' : 'https://mcp-server.example.com/mcp',
+    baseUrlLabelHelp: isAAP ? integrationHelp.aapUrl : integrationHelp.apiUrl,
   }
 }
 
@@ -281,11 +310,18 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
   })
   const [isTypeOpen, setIsTypeOpen] = useState(false)
   const [isProviderOpen, setIsProviderOpen] = useState(false)
+  const { exists: openShiftExists, isUnavailable: isOpenShiftUnavailable } = useOpenShiftIntegrationExists()
 
-  const isLLM = integrationType === IntegrationTypeEnum.LLM_PROVIDER
-  const isAAP = integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
   const isOpenShift = integrationType === IntegrationTypeEnum.OPENSHIFT
   const typeConfig = getTypeConfig(integrationType, providerHint)
+
+  // If a singleton appears after the user already selected EP (e.g. race with another
+  // create), clear the selection so a disabled menu option is not left as the value.
+  useEffect(() => {
+    if (isOpenShift && openShiftExists) {
+      onTypeChange(IntegrationTypeEnum.MCP_SERVER)
+    }
+  }, [isOpenShift, openShiftExists, onTypeChange])
 
   const renderTypeToggle = useCallback(
     (toggleRef: Ref<MenuToggleElement>) => (
@@ -332,9 +368,12 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
               value={field.value}
               isOpen={isTypeOpen}
               onOpenChange={setIsTypeOpen}
+              isOpenShiftDisabled={isOpenShiftUnavailable}
+              openShiftDisabledDescription={openShiftExists ? EXECUTION_PLANE_SINGLETON_HELP : undefined}
               onSelect={(value) => {
                 const validType = INTEGRATION_TYPE_OPTIONS.find((opt) => opt.value === value)
                 if (!validType) return
+                if (validType.value === IntegrationTypeEnum.OPENSHIFT && isOpenShiftUnavailable) return
                 onTypeChange(validType.value)
                 setIsTypeOpen(false)
               }}
@@ -342,20 +381,27 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
             />
           )}
         </SynFormField>
+        {isOpenShift && (
+          <FormGroup label="Infrastructure type" fieldId="infrastructure-type">
+            <Content id="infrastructure-type">OpenShift</Content>
+          </FormGroup>
+        )}
         <SynTextField<IntegrationFormData, 'name'>
           name="name"
           label={typeConfig.nameLabel}
           fieldId="name"
           placeholder={typeConfig.namePlaceholder}
           isRequired
-          labelHelp={isLLM ? integrationHelp.name : integrationHelp.serverName}
+          labelHelp={typeConfig.nameLabelHelp}
         />
-        <SynTextField<IntegrationFormData, 'description'>
-          name="description"
-          label="Description"
-          fieldId="description"
-          placeholder="Enter description"
-        />
+        {!isOpenShift && (
+          <SynTextField<IntegrationFormData, 'description'>
+            name="description"
+            label="Description"
+            fieldId="description"
+            placeholder="Enter description"
+          />
+        )}
         {typeConfig.showProviderHint && (
           <SynFormField<IntegrationFormData, 'configuration.provider_hint'>
             name="configuration.provider_hint"
@@ -387,36 +433,36 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
         {!typeConfig.hideBaseUrl && (
           <SynTextField<IntegrationFormData, 'configuration.base_url'>
             name="configuration.base_url"
-            label={isOpenShift ? 'Cluster URL' : 'API URL'}
+            label={typeConfig.baseUrlLabel}
             fieldId="base-url"
             placeholder={typeConfig.baseUrlPlaceholder}
             isRequired={typeConfig.requireBaseUrl}
-            labelHelp={isAAP ? integrationHelp.aapUrl : integrationHelp.apiUrl}
-          />
-        )}
-
-        {isOpenShift && (
-          <SynTextField<IntegrationFormData, 'configuration.namespace'>
-            name="configuration.namespace"
-            label="Namespace"
-            fieldId="namespace"
-            placeholder="default"
-            isRequired
-            labelHelp={<Content>Namespace reserved for execution workloads</Content>}
+            labelHelp={typeConfig.baseUrlLabelHelp}
           />
         )}
 
         <SecurityFields />
 
-        <ScopeFields<IntegrationFormData>
-          scope={scope}
-          scopeName="scope"
-          projectIdsName="project_ids"
-          idPrefix="integration"
-          onScopeChange={(newScope) => {
-            if (newScope === 'global') setValue('project_ids', [])
-          }}
-        />
+        {isOpenShift ? (
+          <FormGroup label="Scope" fieldId="integration-scope">
+            <Content id="integration-scope">Global</Content>
+            <FormHelperText>
+              <HelperText>
+                <HelperTextItem>{EXECUTION_PLANE_SCOPE_HELP}</HelperTextItem>
+              </HelperText>
+            </FormHelperText>
+          </FormGroup>
+        ) : (
+          <ScopeFields<IntegrationFormData>
+            scope={scope}
+            scopeName="scope"
+            projectIdsName="project_ids"
+            idPrefix="integration"
+            onScopeChange={(newScope) => {
+              if (newScope === 'global') setValue('project_ids', [])
+            }}
+          />
+        )}
       </Form>
     </>
   )
