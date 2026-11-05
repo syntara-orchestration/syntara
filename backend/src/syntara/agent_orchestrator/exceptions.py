@@ -89,6 +89,14 @@ class EmptyLLMResponseError(AgentOrchestratorError, RetryableError):
         super().__init__("LLM returned empty response with no tool calls", invocation_id)
 
 
+class StructuredOutputValidationError(AgentOrchestratorError):
+    """Raised when structured output does not satisfy the response schema."""
+
+    def __init__(self, invocation_id: str | None = None) -> None:
+        """Initialize with optional invocation ID for context."""
+        super().__init__("Structured output did not match the response schema", invocation_id)
+
+
 class InvocationCancelledError(AgentOrchestratorError):
     """Raised when an invocation has been cancelled during execution."""
 
