@@ -213,6 +213,46 @@ class TestExecutionTargetsPagination:
 
         assert resp.status_code == 503
 
+    @pytest.mark.asyncio
+    async def test_invalid_sort_field_returns_422(
+        self,
+        auth_client: AsyncClient,
+    ) -> None:
+        """Validate sort field against EP sortable fields metadata."""
+        # last_ran_at is filterable but NOT sortable
+        resp = await auth_client.get(
+            "/api/execution_plane/v1/execution_targets",
+            params={"sort": "last_ran_at"},
+        )
+        assert resp.status_code == 422
+        assert "Invalid sort field: last_ran_at" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_invalid_filter_field_returns_422(
+        self,
+        auth_client: AsyncClient,
+    ) -> None:
+        """Validate filter fields against EP metadata before forwarding."""
+        resp = await auth_client.get(
+            "/api/execution_plane/v1/execution_targets",
+            params={"invalid_field": "value"},
+        )
+        assert resp.status_code == 422
+        assert "Invalid filter field: invalid_field" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_bracket_operator_validated(
+        self,
+        auth_client: AsyncClient,
+    ) -> None:
+        """Bracket operators like id[in] are validated against base field."""
+        resp = await auth_client.get(
+            "/api/execution_plane/v1/execution_targets",
+            params={"invalid_field[in]": "value"},
+        )
+        assert resp.status_code == 422
+        assert "Invalid filter field: invalid_field" in resp.json()["detail"]
+
 
 class TestWorkItemsPagination:
     """Work-item list endpoint forwards query controls and the EP page envelope."""
@@ -272,6 +312,46 @@ class TestWorkItemsPagination:
             resp = await auth_client.get("/api/execution_plane/v1/work_items")
 
         assert resp.status_code == 503
+
+    @pytest.mark.asyncio
+    async def test_invalid_sort_field_returns_422(
+        self,
+        auth_client: AsyncClient,
+    ) -> None:
+        """Validate sort field against work item sortable fields."""
+        # claimed_at is filterable but NOT sortable
+        resp = await auth_client.get(
+            "/api/execution_plane/v1/work_items",
+            params={"sort": "claimed_at"},
+        )
+        assert resp.status_code == 422
+        assert "Invalid sort field: claimed_at" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_labels_not_supported_returns_422(
+        self,
+        auth_client: AsyncClient,
+    ) -> None:
+        """Work items don't support label filtering."""
+        resp = await auth_client.get(
+            "/api/execution_plane/v1/work_items",
+            params={"labels[env]": "prod"},
+        )
+        assert resp.status_code == 422
+        assert "Label filtering not supported" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_invalid_filter_field_returns_422(
+        self,
+        auth_client: AsyncClient,
+    ) -> None:
+        """Validate filter fields against EP metadata before forwarding."""
+        resp = await auth_client.get(
+            "/api/execution_plane/v1/work_items",
+            params={"invalid_field": "value"},
+        )
+        assert resp.status_code == 422
+        assert "Invalid filter field: invalid_field" in resp.json()["detail"]
 
 
 LIST_ENDPOINTS = [
@@ -341,7 +421,6 @@ FORWARDED_QUERIES = [
     {"status[in]": "pending,failed", "created_at[gte]": "2025-06-01T12:00:00+00:00"},
     {"id[in]": ""},
     {"sort": "-status", "limit": "2", "include_total": "true", "cursor": "opaque+/=cursor"},
-    {"unknown[operator]": "preserve-for-ep-validation"},
 ]
 
 
@@ -396,12 +475,13 @@ async def test_get_list_omits_unspecified_sort_to_preserve_ep_default(
 
 @pytest.mark.parametrize(("path", "ep_path"), LIST_ENDPOINTS, ids=[p for p, _ in LIST_ENDPOINTS])
 async def test_get_list_preserves_ep_422_validation_error(auth_client: AsyncClient, path: str, ep_path: str) -> None:
+    """EP still validates cursor format and other non-field errors."""
     with respx.mock(base_url=_EP_BASE, assert_all_called=True) as ep:
-        route = ep.get(ep_path).mock(return_value=Response(422, json={"detail": "Invalid field: id__in"}))
-        response = await auth_client.get(path, params={"id__in": "bad-id"})
+        route = ep.get(ep_path).mock(return_value=Response(422, json={"detail": "Invalid cursor format"}))
+        response = await auth_client.get(path, params={"cursor": "invalid-base64"})
     assert response.status_code == 422, response.text
-    assert route.calls.last.request.url.params["id__in"] == "bad-id"
-    assert response.json()["detail"] == "Invalid field: id__in"
+    assert route.calls.last.request.url.params["cursor"] == "invalid-base64"
+    assert response.json()["detail"] == "Invalid cursor format"
 
 
 @pytest.mark.parametrize(("path", "ep_path"), LIST_ENDPOINTS, ids=[p for p, _ in LIST_ENDPOINTS])
