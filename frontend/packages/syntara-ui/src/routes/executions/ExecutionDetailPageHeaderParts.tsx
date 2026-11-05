@@ -17,20 +17,6 @@ import { RetryExecutionButton } from './RetryExecutionButton'
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
 
 export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ execution: Execution | undefined }>) {
-  const parentExecutionId =
-    typeof execution?.execution_metadata?.parent_execution_id === 'string'
-      ? execution.execution_metadata.parent_execution_id
-      : undefined
-  // Resolve the parent workflow name from its execution id so the return link can match
-  // the forward link; fall back to the concise label while it loads or is unavailable.
-  const parentQuery = executionsClient.useQuery(
-    'get',
-    '/executions/{execution_id}',
-    { params: { path: { execution_id: parentExecutionId ?? '' } } },
-    { enabled: Boolean(parentExecutionId) }
-  )
-  const parentName = parentQuery.data?.workflow_name ?? null
-
   if (!execution?.status && !execution?.created_at) {
     return null
   }
@@ -53,14 +39,37 @@ export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ executio
           </SynLabel>
         </FlexItem>
       ) : null}
-      {parentExecutionId ? (
-        <FlexItem data-testid="view-parent-run">
-          <SynLink to={`/executions/${parentExecutionId}`}>
-            View parent run{parentName ? `: ${parentName}` : ''}
-          </SynLink>
-        </FlexItem>
-      ) : null}
     </>
+  )
+}
+
+/**
+ * "View parent run" link for a sub-workflow execution. Rendered as secondary context
+ * directly beneath the title (via SynPageHeader `titleSubRow`) so the parent relationship
+ * reads as context for this run and stays grouped with its title. Resolves the parent
+ * workflow name from its execution id so the return link matches the forward link, and
+ * renders nothing for a top-level execution.
+ */
+export function ExecutionDetailParentRunLink({ execution }: Readonly<{ execution: Execution | undefined }>) {
+  const parentExecutionId =
+    typeof execution?.execution_metadata?.parent_execution_id === 'string'
+      ? execution.execution_metadata.parent_execution_id
+      : undefined
+  const parentQuery = executionsClient.useQuery(
+    'get',
+    '/executions/{execution_id}',
+    { params: { path: { execution_id: parentExecutionId ?? '' } } },
+    { enabled: Boolean(parentExecutionId) }
+  )
+  const parentName = parentQuery.data?.workflow_name ?? null
+
+  if (!parentExecutionId) {
+    return null
+  }
+  return (
+    <div data-testid="view-parent-run">
+      <SynLink to={`/executions/${parentExecutionId}`}>View parent run{parentName ? `: ${parentName}` : ''}</SynLink>
+    </div>
   )
 }
 

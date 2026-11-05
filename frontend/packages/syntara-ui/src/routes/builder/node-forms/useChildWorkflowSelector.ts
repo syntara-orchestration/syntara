@@ -39,14 +39,9 @@ type SchemaQueryResult = {
 function versionDescription(
   schema: Pick<InvocationSchema, 'published_version_name' | 'published_version_created_at'>
 ): string | undefined {
-  if (schema.published_version_name) return schema.published_version_name
-  if (schema.published_version_created_at) return formatDateTime(schema.published_version_created_at)
+  if (schema.published_version_name) return `Version: ${schema.published_version_name}`
+  if (schema.published_version_created_at) return `Version: ${formatDateTime(schema.published_version_created_at)}`
   return undefined
-}
-
-function workflowLabel(workflow: Workflow): string {
-  const version = workflow.published_version_number
-  return version == null ? workflow.name : `${workflow.name} (v${version})`
 }
 
 function buildWorkflowOptions(
@@ -60,7 +55,7 @@ function buildWorkflowOptions(
     return [
       {
         value: workflow.id,
-        label: `${workflow.name} (v${invocationSchema.published_version})`,
+        label: workflow.name,
         description: versionDescription(invocationSchema) ?? workflow.description ?? undefined,
         triggers: invocationSchema.triggers ?? [],
       },
@@ -263,7 +258,7 @@ export function useChildWorkflowSelector({
   const selectedOption = options.find((option) => option.value === selectedWorkflowId)
   const selectedSchemaQuery = selectedWorkflowId ? schemasByWorkflowId.get(selectedWorkflowId) : undefined
   const selectedWorkflow = selectedWorkflowFromList ?? selectedWorkflowQuery.data
-  const selectedWorkflowLabel = selectedWorkflow ? workflowLabel(selectedWorkflow) : undefined
+  const selectedWorkflowLabel = selectedWorkflow?.name
   const selectedSchema = selectedSchemaQuery?.data
   const resolvedSelectedOption = selectedWorkflowOption({
     existingOption: selectedOption,

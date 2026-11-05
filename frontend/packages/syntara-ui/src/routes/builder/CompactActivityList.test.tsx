@@ -113,6 +113,21 @@ describe('CompactActivityList', () => {
     expect(link).toHaveAttribute('href', '/executions/child-9')
   })
 
+  it('renders the run link from runtimeMetadata while the child is running', () => {
+    const swOrder: ActivityOrderItem[] = [{ id: 'run_child', name: 'Dispatch', type: 'sub_workflow' }]
+    const swStates = new Map([
+      state('run_child', {
+        status: 'running',
+        outputData: null,
+        runtimeMetadata: { child_execution_id: 'child-live', child_workflow_name: 'Live Child' },
+      }),
+    ])
+    render(<CompactActivityList activityStates={swStates} activityOrder={swOrder} />)
+
+    const link = screen.getByRole('link', { name: /View sub-workflow run: Live Child/i })
+    expect(link).toHaveAttribute('href', '/executions/child-live')
+  })
+
   it('does not render a sub-workflow link for non sub_workflow rows', () => {
     render(<CompactActivityList activityStates={states} activityOrder={order} />)
     expect(screen.queryByRole('link', { name: /View sub-workflow run/i })).not.toBeInTheDocument()

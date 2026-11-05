@@ -408,8 +408,10 @@ export function NodeExecutionDetailsPanel({
   const { elapsedMs } = useElapsedTime(nodeStarted, nodeCompleted, nodeIsRunning)
   const nodeElapsedLabel = elapsedMs === undefined ? undefined : formatElapsedTime(elapsedMs)
 
-  // Link to the child execution for a sub-workflow node, read from its persisted output.
-  const subWorkflowChild = isSubWorkflowNode ? extractSubWorkflowChild(outputData) : null
+  // Link to the child execution for a sub-workflow node. runtimeMetadata comes from the live
+  // execution store (updated over the WebSocket while the node is still RUNNING, with no status
+  // change), so the link appears during the child's run; outputData is the terminal-state fallback.
+  const subWorkflowChild = isSubWorkflowNode ? extractSubWorkflowChild(nodeState?.runtimeMetadata, outputData) : null
 
   return (
     <Stack className={styles.contentContainer}>

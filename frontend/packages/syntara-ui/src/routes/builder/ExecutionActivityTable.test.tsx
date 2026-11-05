@@ -268,6 +268,42 @@ describe('ExecutionActivityTable', () => {
       )
     })
 
+    it('links to the running child from runtimeMetadata before outputData is populated', () => {
+      renderTable({
+        states: new Map([
+          state('run_child', {
+            status: 'running',
+            outputData: null,
+            runtimeMetadata: { child_execution_id: 'child-live', child_workflow_name: 'Live Child' },
+          }),
+        ]),
+        order: [{ id: 'run_child', name: 'Run Child', type: 'sub_workflow' }],
+      })
+
+      expect(screen.getByRole('link', { name: /View sub-workflow run: Live Child/i })).toHaveAttribute(
+        'href',
+        '/executions/child-live'
+      )
+    })
+
+    it('prefers runtimeMetadata over outputData when both carry a child reference', () => {
+      renderTable({
+        states: new Map([
+          state('run_child', {
+            status: 'completed',
+            runtimeMetadata: { child_execution_id: 'child-live', child_workflow_name: 'Live Child' },
+            outputData: { child_execution_id: 'child-done', workflow_name: 'Done Child' },
+          }),
+        ]),
+        order: [{ id: 'run_child', name: 'Run Child', type: 'sub_workflow' }],
+      })
+
+      expect(screen.getByRole('link', { name: /View sub-workflow run: Live Child/i })).toHaveAttribute(
+        'href',
+        '/executions/child-live'
+      )
+    })
+
     it('shows no link for a sub_workflow row without a child execution id', () => {
       renderTable({
         states: new Map([state('run_child', { status: 'running', outputData: null })]),

@@ -37,7 +37,9 @@ export function CompactActivityList({
           const displayName = name ?? id
           const isSelected = baseId === selectedNodeId
           const subWorkflowChild =
-            type === ActivityTypeEnum.SUB_WORKFLOW ? extractSubWorkflowChild(state?.outputData) : null
+            type === ActivityTypeEnum.SUB_WORKFLOW
+              ? extractSubWorkflowChild(state?.runtimeMetadata, state?.outputData)
+              : null
 
           return (
             <Tr

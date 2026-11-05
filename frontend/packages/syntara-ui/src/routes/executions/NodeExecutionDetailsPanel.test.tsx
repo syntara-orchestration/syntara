@@ -805,6 +805,46 @@ describe('NodeExecutionDetailsPanel', () => {
       )
     })
 
+    it('links to the running child from live runtimeMetadata while the node stays RUNNING', () => {
+      // No output_data yet (child not terminal) and the node is RUNNING. The live child
+      // reference arrives via the execution store's runtimeMetadata (WebSocket field patch),
+      // not via a status-change refetch — so the link must come from nodeState.runtimeMetadata.
+      mockUseQuery.mockReturnValue({
+        data: {
+          resources: [
+            {
+              activity_name: 'run_child',
+              node_type: 'sub_workflow',
+              status: 'running',
+              output_data: null,
+              input_data: { input_parameters: { username: 'rohit' } },
+            },
+          ],
+        },
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(
+        <NodeExecutionDetailsPanel
+          {...subWorkflowProps}
+          nodeState={{
+            activityId: 'run_child',
+            status: 'running',
+            startedAt: '2024-01-01T10:00:00Z',
+            runtimeMetadata: { child_execution_id: 'child-live', child_workflow_name: 'Live Child' },
+          }}
+        />,
+        { wrapper }
+      )
+
+      expect(screen.getByRole('link', { name: /View sub-workflow run: Live Child/i })).toHaveAttribute(
+        'href',
+        '/executions/child-live'
+      )
+    })
+
     it('does not render a Child activities tab or header link for non sub-workflow nodes', () => {
       render(<NodeExecutionDetailsPanel {...defaultProps} nodeType="script" />, { wrapper })
 
