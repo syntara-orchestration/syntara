@@ -335,6 +335,46 @@ The evaluator response includes:
 - `denial_reason` — `"policy_deny"` if explicitly denied
 - `allowed_projects` — set of project names the user can access (for list filtering)
 
+### Step-type deny policies
+
+The policy API accepts `deny` only for the literal action `step_type:write`
+with scope `any` or `project`. Wildcard deny actions (`step_type:*`) and denies
+on other resources are rejected with HTTP 422. Keeping policy, role, and
+role-assignment recovery actions outside this allowlist prevents lockout.
+Existing allow statements retain their wildcard and scope behavior.
+
+```json
+{
+  "effect": "deny",
+  "actions": ["step_type:write"],
+  "scope": "any",
+  "conditions": {"resource_labels": {"kind": "script"}}
+}
+```
+
+The `kind` selector uses the grantable authoring types registered in
+`workflows/node_kinds.py`, including triggers and control-flow steps. Unknown
+kinds, system-only `internal_activity`, and unsupported step labels are
+rejected. Omitting the kind selector covers every grantable kind.
+
+A globally assigned `any` deny applies in every project. Project role
+assignments narrow a statement to that project, even if its original scope
+was `any`. Denies override matching allows for every principal, including
+admins. Creating a policy alone does not attach it to a principal: a role and
+role assignment must make it effective.
+
+`can_i` accepts `resource_type: "step_type"`, `action: "write"`,
+`resource_labels: {"kind": "script"}`, and a project name or UUID in
+`resource_project`. Its response fields are unchanged. `denied_by` and
+`matched_policy` show original policy names, never internal statement IDs.
+`what_can_i` lists effective deny statements under their original policy names;
+`who_can` excludes users blocked for the requested kind/project and retains
+its existing query authorization gate. These policy checks do not enforce
+workflow saves or expose a palette endpoint.
+Default authoring grants are seeded as editable custom records by the
+separate default-policy story; no built-in grant is added here. Save
+enforcement must ship with that seeding so existing authors retain access.
+
 ## Query Endpoints
 
 The `/authz` router provides introspection endpoints:
