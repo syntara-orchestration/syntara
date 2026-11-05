@@ -21,18 +21,18 @@ def find_ineligible_deny_actions(statements: list[dict[str, Any]]) -> list[str]:
 
 def validate_deny_statements(statements: list[dict[str, Any]]) -> str | None:
     """Share deny eligibility validation between API schemas and service callers."""
-    for statement in statements:
-        if statement.get("effect") != "deny":
-            continue
-        for action in statement.get("actions", []):
+    deny_statements = [statement for statement in statements if statement.get("effect") == "deny"]
+    for statement in deny_statements:
+        actions = statement.get("actions", [])
+        if not isinstance(actions, list):
+            return "Deny-effect actions must be a list"
+        for action in actions:
             if not isinstance(action, str):
                 return f"Deny-effect actions must be strings; got: {action!r}"
-    invalid = find_ineligible_deny_actions(statements)
+    invalid = find_ineligible_deny_actions(deny_statements)
     if invalid:
         return f"Deny-effect statements may only target '{_DENY_ACTION}'; got: {', '.join(invalid)}"
-    for statement in statements:
-        if statement.get("effect") != "deny":
-            continue
+    for statement in deny_statements:
         if not statement.get("actions"):
             return f"Deny-effect statements require the action '{_DENY_ACTION}'"
         if statement.get("scope") not in {"any", "project"}:

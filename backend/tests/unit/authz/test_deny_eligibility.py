@@ -55,6 +55,35 @@ def test_empty_deny_actions_are_rejected(statement: dict[str, Any]) -> None:
 def test_allow_statements_and_empty_input_are_unchanged() -> None:
     assert validate_deny_statements([]) is None
     assert validate_deny_statements([{"effect": "allow", "actions": ["policy:delete"], "scope": "self"}]) is None
+    assert validate_deny_statements([{"effect": "allow", "actions": None}]) is None
+
+
+@pytest.mark.parametrize(
+    "actions",
+    [
+        None,
+        123,
+        False,
+        1.5,
+        "step_type:write",
+        b"step_type:write",
+        {"step_type:write": True},
+        ("step_type:write",),
+        {"step_type:write"},
+    ],
+)
+def test_non_list_actions_are_rejected(actions: object) -> None:
+    statements = [{"effect": "deny", "actions": actions, "scope": "any"}]
+    assert validate_deny_statements(statements) == "Deny-effect actions must be a list"
+
+
+def test_later_deny_action_container_is_validated_before_iteration() -> None:
+    statements: list[dict[str, Any]] = [
+        {"effect": "allow", "actions": ["policy:delete"]},
+        {"effect": "deny", "actions": ["step_type:write"], "scope": "any"},
+        {"effect": "deny", "actions": None, "scope": "project"},
+    ]
+    assert validate_deny_statements(statements) == "Deny-effect actions must be a list"
 
 
 @pytest.mark.parametrize(
