@@ -17,6 +17,9 @@ class EventFailureCode(StrEnum):
     malformed_content_type = "malformed_content_type"
     duplicate_content_type = "duplicate_content_type"
     unsupported_content_type = "unsupported_content_type"
+    malformed_cloudevents = "malformed_cloudevents"
+    unsupported_cloudevents_version = "unsupported_cloudevents_version"
+    unsupported_cloudevents_mode = "unsupported_cloudevents_mode"
     registry_framing = "registry_framing"
     value_too_large = "value_too_large"
     envelope_too_large = "envelope_too_large"
@@ -35,6 +38,9 @@ _FAILURE_MESSAGES = {
     EventFailureCode.malformed_content_type: "The content-type header is malformed.",
     EventFailureCode.duplicate_content_type: "Multiple content-type headers are not supported.",
     EventFailureCode.unsupported_content_type: "The declared content type or charset is not supported.",
+    EventFailureCode.malformed_cloudevents: "The CloudEvents attributes are malformed or incomplete.",
+    EventFailureCode.unsupported_cloudevents_version: "The CloudEvents specification version is not supported.",
+    EventFailureCode.unsupported_cloudevents_mode: "Structured CloudEvents content mode is not supported.",
     EventFailureCode.registry_framing: "Schema-registry binary framing is not supported.",
     EventFailureCode.value_too_large: "The event value exceeds the configured candidate byte limit.",
     EventFailureCode.envelope_too_large: "The encoded envelope exceeds the configured candidate byte limit.",

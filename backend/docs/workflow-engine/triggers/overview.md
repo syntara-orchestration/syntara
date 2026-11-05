@@ -7,6 +7,7 @@ All four trigger types (manual, webhook, EDA, scheduled) converge on the same ex
 - [Manual Trigger](manual-trigger.md) — user-initiated via API
 - [Webhook Triggers](webhook-triggers.md) — HTTP webhooks and EDA events
 - [Scheduled Trigger](scheduled-trigger.md) — cron and interval schedules
+- [Event Subscribe](event-subscribe.md) — Kafka JSON and binary-mode CloudEvents decoding contract
 
 ## How a Trigger Becomes an Execution
 
