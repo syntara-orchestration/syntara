@@ -85,6 +85,21 @@ export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
   const menuRef = useRef<HTMLDivElement | null>(null)
   const toggleName = themeToggleName(colorSchemePreference, contrastPreference)
 
+  const handleToggleKeydown = (event: KeyboardEvent) => {
+    if (!isOpen || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) {
+      return
+    }
+
+    const options = menuRef.current?.querySelectorAll<HTMLButtonElement>('button[aria-pressed]:not(:disabled)')
+    const target = options?.item(event.key === 'ArrowDown' ? 0 : options.length - 1)
+    if (!target) {
+      return
+    }
+
+    event.preventDefault()
+    target.focus()
+  }
+
   useEffect(() => {
     if (!isOpen) {
       return
@@ -145,6 +160,7 @@ export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
         innerRef={menuRef}
         onOpenChange={setIsOpen}
         onOpenChangeKeys={['Escape']}
+        onToggleKeydown={handleToggleKeydown}
         shouldFocusToggleOnSelect
         toggle={toggle}
         className={styles.themeMenu}
