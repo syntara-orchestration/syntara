@@ -36051,9 +36051,11 @@ components:
           description: Currently executing activities
         workflow_definition:
           anyOf:
-            - $ref: '#/components/schemas/WorkflowDefinition'
+            - additionalProperties: true
+              type: object
             - type: 'null'
           description: Workflow definition from the executed version. Only included when requested via ?include=workflow_definition query parameter.
+          title: Workflow Definition
         activities:
           anyOf:
             - type: array

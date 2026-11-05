@@ -1351,8 +1351,13 @@ export interface components {
        * @description Currently executing activities
        */
       current_activities?: components['schemas']['CurrentActivity'][]
-      /** @description Workflow definition from the executed version. Only included when requested via ?include=workflow_definition query parameter. */
-      workflow_definition?: components['schemas']['WorkflowDefinition'] | null
+      /**
+       * Workflow Definition
+       * @description Workflow definition from the executed version. Only included when requested via ?include=workflow_definition query parameter.
+       */
+      workflow_definition?: {
+        [key: string]: unknown
+      } | null
       /**
        * Activities
        * @description List of activities with their current status. Only included when requested via ?include=activities query parameter.
