@@ -363,8 +363,7 @@ export function BuilderContent(props: BuilderContentProps) {
     (triggerIndex?: number) => {
       const workflowTriggers = currentWorkflow?.triggers ?? []
       const trigger = workflowTriggers[triggerIndex ?? selectedTriggerIndex] ?? workflowTriggers[0]
-      const triggerParameters = trigger?.parameters as Record<string, unknown> | undefined
-      const triggerInputSchema = triggerParameters?.input_schema as Record<string, unknown> | undefined
+      const triggerInputSchema = trigger?.parameters?.input_schema
       const requiresInput =
         hasNonEmptyInputSchema(triggerInputSchema) ||
         activitiesReferenceTrigger(

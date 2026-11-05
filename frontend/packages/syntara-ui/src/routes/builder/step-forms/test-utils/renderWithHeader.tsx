@@ -4,6 +4,7 @@ import { cloneElement, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 
 import { StepFormHeaderPortalContext } from '../shared/StepFormHeaderPortalContext'
+import styles from '../../StepEditorLayout.module.css'
 
 /**
  * Test utility to render a form component with header content handling.
@@ -32,7 +33,7 @@ export function renderWithHeader(ui: ReactElement) {
     const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null)
     return (
       <QueryClientProvider client={queryClient}>
-        <div ref={setHeaderPortalTarget} style={{ display: 'contents' }}>
+        <div ref={setHeaderPortalTarget} className={styles.headerContentPortalTarget}>
           {headerContent}
         </div>
         <StepFormHeaderPortalContext.Provider value={headerPortalTarget}>

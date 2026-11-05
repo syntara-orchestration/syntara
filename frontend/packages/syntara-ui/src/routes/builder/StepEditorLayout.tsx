@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 
 import { SynPanel } from '../../components/layout/SynPanel'
 import type { NodeType } from '../workflows/canvas/nodes/NodeType'
-
+import styles from './StepEditorLayout.module.css'
 import { useStepExecutionData } from './panels/hooks/useStepExecutionData'
 import { StepEditorPanelBody } from './panels/StepEditorPanelBody'
 import { StepFormHeaderPortalContext } from './step-forms/shared/StepFormHeaderPortalContext'
@@ -114,8 +114,8 @@ export function StepEditorLayout({
                     {headerIcon}
                   </FlexItem>
                 )}
-                <FlexItem style={{ display: 'contents' }}>
-                  <div ref={setHeaderPortalTarget} style={{ display: 'contents' }}>
+                <FlexItem className={styles.headerContentPortalTarget}>
+                  <div ref={setHeaderPortalTarget} className={styles.headerContentPortalTarget}>
                     {headerContent}
                   </div>
                 </FlexItem>
