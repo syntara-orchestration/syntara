@@ -1,6 +1,7 @@
 """AuthorizationDeniedEvent and handler for authz-domain audit."""
 
 from dataclasses import dataclass, field
+from typing import Any
 from urllib.parse import quote
 from uuid import UUID
 
@@ -28,6 +29,7 @@ class AuthorizationDeniedEvent:
     action: str
     denied_by: str | None = field(default=None)
     principal_type: PrincipalType | None = field(default=None)
+    context: dict[str, Any] = field(default_factory=dict)
 
 
 class AuthorizationDeniedHandler(AuditEventHandler[AuthorizationDeniedEvent]):
@@ -40,6 +42,7 @@ class AuthorizationDeniedHandler(AuditEventHandler[AuthorizationDeniedEvent]):
             resource_type=event.resource_type,
             action=event.action,
             denied_by=event.denied_by,
+            **event.context,
         )
 
         return AuditEvent(
