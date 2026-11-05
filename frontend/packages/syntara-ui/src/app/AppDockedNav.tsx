@@ -223,8 +223,8 @@ function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
           </DropdownItem>
         </DropdownList>
       </Dropdown>
-      {showTooltip && (
-        <Tooltip aria="none" aria-live="off" triggerRef={userMenuRef} content={username} position="right" />
+      {showTooltip && !isOpen && (
+        <Tooltip aria="none" aria-live="off" triggerRef={userMenuRef} content="Account" position="right" />
       )}
     </>
   )
