@@ -552,12 +552,5 @@ export function TaskStepDetails({
     }
   }
 
-  return (
-    <ActionStepForm
-      initialData={initialData}
-      onSubmit={handleSubmit}
-      onHeaderContentChange={onHeaderContentChange}
-      projectId={projectId}
-    />
-  )
+  return <ActionStepForm initialData={initialData} onSubmit={handleSubmit} projectId={projectId} />
 }

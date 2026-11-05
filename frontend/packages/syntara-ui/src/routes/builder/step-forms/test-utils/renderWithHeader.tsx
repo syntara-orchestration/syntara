@@ -3,6 +3,9 @@ import { render } from '@testing-library/react'
 import { cloneElement, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 
+import styles from '../../StepEditorLayout.module.css'
+import { StepFormHeaderPortalContext } from '../shared/StepFormHeaderPortalContext'
+
 /**
  * Test utility to render a form component with header content handling.
  * This allows testing forms that use onHeaderContentChange prop.
@@ -27,15 +30,20 @@ export function renderWithHeader(ui: ReactElement) {
 
   function Wrapper() {
     const [headerContent, setHeaderContent] = useState<ReactNode | null>(null)
+    const [headerPortalTarget, setHeaderPortalTarget] = useState<HTMLElement | null>(null)
     return (
       <QueryClientProvider client={queryClient}>
-        {headerContent}
-        {cloneElement(ui as ReactElement<{ onHeaderContentChange?: (content: ReactNode | null) => void }>, {
-          onHeaderContentChange: setHeaderContent,
-        })}
-        <button type="submit" form="action-step-form">
-          Submit
-        </button>
+        <div ref={setHeaderPortalTarget} className={styles.headerContentPortalTarget}>
+          {headerContent}
+        </div>
+        <StepFormHeaderPortalContext.Provider value={headerPortalTarget}>
+          {cloneElement(ui as ReactElement<{ onHeaderContentChange?: (content: ReactNode | null) => void }>, {
+            onHeaderContentChange: setHeaderContent,
+          })}
+          <button type="submit" form="action-step-form">
+            Submit
+          </button>
+        </StepFormHeaderPortalContext.Provider>
       </QueryClientProvider>
     )
   }

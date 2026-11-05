@@ -10,7 +10,7 @@ import {
   TextInputGroupUtilities,
 } from '@patternfly/react-core'
 import { RhUiCloseIcon } from '@patternfly/react-icons'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 
 import { SynSelect } from '../../../components/SynSelect'
 
@@ -24,20 +24,12 @@ export type IntegrationWithTools = {
 
 export type ToolSelection = { strategy: 'ALL' } | { strategy: 'NONE' } | { strategy: 'SELECTED'; toolIds: string[] }
 
-export type StaleToolInfo = {
-  validToolIds: string[]
-  removedCount: number
-}
-
 export type ToolsMultiSelectProps = {
   value: ToolSelection
   onChange: (selection: ToolSelection) => void
   integrations: IntegrationWithTools[]
   isLoading?: boolean
-  isError?: boolean
   hasNoIntegrations?: boolean
-  /** Called when tools finish loading and some selected tools are no longer available. */
-  onStaleDetected?: (info: StaleToolInfo) => void
 }
 
 const INTEGRATION_PREFIX = 'integration:'
@@ -179,26 +171,12 @@ export function ToolsMultiSelect({
   onChange,
   integrations,
   isLoading = false,
-  isError = false,
   hasNoIntegrations = false,
-  onStaleDetected,
 }: Readonly<ToolsMultiSelectProps>) {
   const [isOpen, setIsOpen] = useState(false)
   const [filterText, setFilterText] = useState('')
 
   const totalTools = useMemo(() => integrations.reduce((sum, i) => sum + i.discovered_tools.length, 0), [integrations])
-
-  const staleFiredRef = useRef(false)
-  useEffect(() => {
-    if (isLoading || isError || staleFiredRef.current) return
-    if (value.strategy !== 'SELECTED' || value.toolIds.length === 0) return
-    const availableIds = new Set(integrations.flatMap((i) => i.discovered_tools.map((t) => t.id)))
-    const validToolIds = value.toolIds.filter((id) => availableIds.has(id))
-    const removedCount = value.toolIds.length - validToolIds.length
-    if (removedCount === 0) return
-    staleFiredRef.current = true
-    onStaleDetected?.({ validToolIds, removedCount })
-  }, [integrations, isLoading, isError, value, onStaleDetected])
 
   const filteredIntegrations = useMemo(() => {
     const query = filterText.toLowerCase().trim()
