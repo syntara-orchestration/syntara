@@ -241,10 +241,7 @@ export function AppDockedNav() {
     useDockState()
 
   const filteredItems = useFilteredNavigationItems()
-  const visibleItems = useMemo(
-    () => filteredItems.filter((item) => !item.hidden && !item.path.startsWith('/support')),
-    [filteredItems]
-  )
+  const visibleItems = useMemo(() => filteredItems.filter((item) => !item.hidden), [filteredItems])
   const activeTopLevel = '/' + location.split('/')[1]
 
   const helpRef = useRef<HTMLButtonElement>(null)
