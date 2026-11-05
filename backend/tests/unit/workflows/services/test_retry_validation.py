@@ -388,6 +388,53 @@ async def test_validate_retry_accepts_explicit_sanitized_replacement() -> None:
 
 
 @pytest.mark.asyncio
+async def test_explicit_replacement_does_not_expand_another_selected_failure() -> None:
+    """A selected replacement must not widen an unrelated failed branch's retry scope."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    nodes = [
+        {"id": "step_a", "type": "script", "parameters": {"code": "echo a"}},
+        {
+            "id": "failed_a",
+            "type": "script",
+            "parameters": {"code": "exit 1", "input_ref": "${step_a.token}"},
+        },
+        {"id": "step_b", "type": "script", "parameters": {"code": "echo b"}},
+        {
+            "id": "failed_b",
+            "type": "script",
+            "parameters": {"code": "exit 1", "input_ref": "${step_b.token}"},
+        },
+    ]
+    snapshot = _make_version(1, nodes=nodes)
+    snapshot.workflow_definition["edges"] = [
+        {"from": "trigger_1", "to": "step_a"},
+        {"from": "step_a", "to": "failed_a"},
+        {"from": "trigger_1", "to": "step_b"},
+        {"from": "step_b", "to": "failed_b"},
+    ]
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("failed_a"), _make_activity("failed_b")], "all"),
+        (
+            [
+                _make_completed_activity("step_a", {"token": "[REDACTED]"}),
+                _make_completed_activity("step_b", {"token": "[REDACTED]"}),
+            ],
+            "all",
+        ),
+        (snapshot, "one"),
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a", "failed_b"])
+
+    assert verdict.eligible is False
+    assert verdict.eligible_point_ids == ["failed_b", "step_a"]
+    assert verdict.sanitized_node_ids == ["step_b"]
+    assert verdict.auto_included_node_ids == []
+    assert "step_b" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
 async def test_validate_retry_explicit_replacement_does_not_force_other_failures() -> None:
     """Two failed branches: the sanitized replacement is selectable independently."""
     execution = _make_execution(ExecutionStatus.FAILED)
