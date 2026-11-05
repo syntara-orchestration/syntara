@@ -159,7 +159,7 @@ test.describe('Workflows Page - Project Actions in Selected Project View', () =>
       projectId = project.id
 
       await app.goto(toAppUrl('/workflows'))
-      const projectSelector = app.getByRole('textbox', { name: 'Project' })
+      const projectSelector = app.getByTestId('page-header').getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await projectSelector.fill(projectName)
       await app.getByRole('option', { name: projectName }).waitFor({ state: 'visible', timeout: 10_000 })
@@ -187,7 +187,7 @@ test.describe('Workflows Page - Project Actions in Selected Project View', () =>
       projectId = project.id
 
       await app.goto(toAppUrl('/workflows'))
-      const projectSelector = app.getByRole('textbox', { name: 'Project' })
+      const projectSelector = app.getByTestId('page-header').getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
       await projectSelector.fill(originalName)
       await app.getByRole('option', { name: originalName }).waitFor({ state: 'visible', timeout: 10_000 })

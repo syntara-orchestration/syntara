@@ -10,7 +10,7 @@ contact_links:
     about: Please review and follow the community Code of Conduct.
 
   - name: Contributing guide
-    url: https://github.com/syntara-orchestration/syntara/blob/devel/CONTRIBUTING.md
+    url: https://syntara-orchestration.org/contributing/
     about: Read the contributing guide before submitting changes.
 
   - name: Discussions

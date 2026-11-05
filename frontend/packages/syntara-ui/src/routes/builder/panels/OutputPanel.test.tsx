@@ -29,7 +29,7 @@ function renderWithProviders(ui: ReactNode) {
  * 3. Mock data pinning and unpinning
  * 4. Mock data editor with valid/invalid JSON
  * 5. buildOutputSkeleton with various node types
- * 6. Data priority (real > mock > empty)
+ * 6. Data priority (mock > real > empty)
  * 7. Error handling and validation
  */
 
@@ -276,15 +276,15 @@ describe('OutputPanel', () => {
       expect(mockUnpinOutputMock).toHaveBeenCalledWith(testNodeId)
     })
 
-    it('prioritizes real output data over mock data', () => {
+    it('shows pinned mock data instead of last-run output data when mock is pinned', () => {
       const mockOutput = { mock: 'data' }
       mockGetOutputMock.mockReturnValue(mockOutput)
 
       renderWithProviders(<OutputPanel outputData={sampleOutput} nodeId={testNodeId} />)
 
-      // Should show real data, not mock
-      expect(screen.getByText(/"result": "success"/)).toBeInTheDocument()
-      expect(screen.queryByText(/"mock": "data"/)).not.toBeInTheDocument()
+      // Pinned mock data should be authoritative, not the last real execution output
+      expect(screen.getByText(/"mock": "data"/)).toBeInTheDocument()
+      expect(screen.queryByText(/"result": "success"/)).not.toBeInTheDocument()
     })
 
     it('pre-populates editor with existing mock data when setting mock again', async () => {

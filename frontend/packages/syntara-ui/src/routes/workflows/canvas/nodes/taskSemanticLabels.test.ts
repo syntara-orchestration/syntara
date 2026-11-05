@@ -54,7 +54,7 @@ describe('getTaskSemanticLabels', () => {
     expect(getTaskSemanticLabels(data).typeLabel).toBe('Task')
   })
 
-  it('uses AAP Job when detectTaskNodeType resolves agentic+ansible connector to actualExecutor aap', () => {
+  it('uses AAP Job when detectTaskExecutorType resolves agentic+ansible connector to actualExecutor aap', () => {
     const data = makeTask({
       name: 'Run job',
       type: ExecutorTypeEnum.AGENTIC,

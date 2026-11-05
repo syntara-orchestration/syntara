@@ -55,7 +55,7 @@ export type PageEntry = {
   perceptual?: boolean
   /**
    * When `perceptual` is true, mask `.react-flow` (default). Set to `false` when the
-   * screenshot subject is `NodeEditorOverlay` (step/trigger forms): that overlay is
+   * screenshot subject is `StepEditorOverlay` (step/trigger forms): that overlay is
    * `position:absolute; inset:0` over the same box as `.react-flow`, so a canvas mask
    * paints solid grey over the form and `--update-snapshots` commits empty baselines.
    */
@@ -71,7 +71,7 @@ export type PageEntry = {
  * `.react-flow` with a solid rectangle — node/edge layout and `fitView()` are
  * not pixel-deterministic. Use for any page that renders a ReactFlow canvas
  * (builder, execution visualizer, etc.). Set `maskCanvas: false` when the
- * subject is `NodeEditorOverlay` (see `PageEntry.maskCanvas`).
+ * subject is `StepEditorOverlay` (see `PageEntry.maskCanvas`).
  */
 export type CanvasPageEntry = PageEntry & {
   perceptual: true
@@ -1115,6 +1115,7 @@ export const excludedUnimplemented: string[] = [
 
 /** Routes excluded because they need dynamic setup or have no seeded mock data */
 export const excludedDynamic: string[] = [
+  AppRoute.FeatureFlagDemo, // Temporary direct-link demo route; no baseline required.
   AppRoute.WorkflowBuilder.New,
   AppRoute.SystemAdministration.Root,
   AppRoute.SystemAdministration.Authentication.EditIdentityProvider, // covered by oidcProviderWizardPages

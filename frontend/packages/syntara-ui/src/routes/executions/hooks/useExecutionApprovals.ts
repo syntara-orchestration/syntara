@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { FlowNodeType } from '../../../constants'
 import { useAlerts } from '../../../providers/alerts'
-import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
+import { getApprovalLoadErrorAlert } from '../../approvals/approvalLoadErrors'
 import { findApprovalIndexForCanvasNode } from '../../approvals/approvalNodeId'
 import { ACTIVITY_STATUS } from '../../builder/utils/executionState/executionHelpers'
 
@@ -48,7 +48,7 @@ type UseExecutionApprovalsResult = {
  * When the user clicks an approval node in "waiting" status on the canvas,
  * this hook fetches all pending approvals and sets the index to the clicked approval.
  *
- * Part of the approval hooks architecture. See `useExecutionNodeClick.ts` for the full layering explanation.
+ * Part of the approval hooks architecture. See `useExecutionStepClick.ts` for the full layering explanation.
  */
 export function useExecutionApprovals(executionId: string | undefined): UseExecutionApprovalsResult {
   const [approvals, setApprovals] = useState<Approval[]>([])
@@ -111,14 +111,11 @@ export function useExecutionApprovals(executionId: string | undefined): UseExecu
           })
           .catch((error: unknown) => {
             if (executionIdRef.current !== capturedExecutionId || latestNodeIdRef.current !== node.id) return
-            const message = getErrorMessage(error)
-            const key = `${node.id}::Failed to load approval::${message}`
+            const alert = getApprovalLoadErrorAlert(error)
+            const key = `${node.id}::${alert.title}::${alert.description}`
             if (lastFetchErrorKeyRef.current === key) return
             lastFetchErrorKeyRef.current = key
-            showError({
-              title: 'Failed to load approval',
-              description: message,
-            })
+            showError(alert)
           })
       )
     },

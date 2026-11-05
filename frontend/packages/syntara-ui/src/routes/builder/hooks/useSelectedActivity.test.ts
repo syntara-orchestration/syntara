@@ -133,7 +133,7 @@ describe('useSelectedActivity', () => {
     })
   })
 
-  describe('displayNodeName', () => {
+  describe('displayStepName', () => {
     it('prefers selectedNodeNameProp when provided', () => {
       const { result } = renderHook(() =>
         useSelectedActivity(
@@ -145,7 +145,7 @@ describe('useSelectedActivity', () => {
         )
       )
 
-      expect(result.current.displayNodeName).toBe('Prop Name')
+      expect(result.current.displayStepName).toBe('Prop Name')
     })
 
     it('falls back to matched activity name', () => {
@@ -158,10 +158,10 @@ describe('useSelectedActivity', () => {
         )
       )
 
-      expect(result.current.displayNodeName).toBe('Activity Name')
+      expect(result.current.displayStepName).toBe('Activity Name')
     })
 
-    it('falls back to nameMap via resolveNodeName', () => {
+    it('falls back to nameMap via resolveStepName', () => {
       const { result } = renderHook(() =>
         useSelectedActivity(
           makeDefaults({
@@ -171,13 +171,13 @@ describe('useSelectedActivity', () => {
         )
       )
 
-      expect(result.current.displayNodeName).toBe('Name Map Entry')
+      expect(result.current.displayStepName).toBe('Name Map Entry')
     })
 
     it('falls back to node ID when no other name source matches', () => {
       const { result } = renderHook(() => useSelectedActivity(makeDefaults({ selectedNodeId: 'task-unknown' })))
 
-      expect(result.current.displayNodeName).toBe('task-unknown')
+      expect(result.current.displayStepName).toBe('task-unknown')
     })
   })
 

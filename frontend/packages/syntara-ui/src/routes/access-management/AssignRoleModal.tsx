@@ -249,7 +249,7 @@ export function AssignRoleModal({
                     onChange={(value) => {
                       field.onChange(value)
                       setValue('projectId', '', { shouldValidate: true })
-                      setValue('roleIds', [], { shouldValidate: true })
+                      setValue('roleIds', [])
                     }}
                     options={roleAssignmentScopeOptions}
                   />
@@ -270,7 +270,7 @@ export function AssignRoleModal({
                     value={field.value ?? ''}
                     onChange={(value) => {
                       field.onChange(value)
-                      setValue('roleIds', [], { shouldValidate: true })
+                      setValue('roleIds', [])
                     }}
                     options={projectOptions}
                     placeholder="Select a project..."

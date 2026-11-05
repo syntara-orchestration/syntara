@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -107,6 +107,33 @@ describe('SynPageBreadcrumbsCollapsedMiddle', () => {
 
     const noLinkItem = screen.getByRole('menuitem', { name: 'No link' })
     expect(noLinkItem).not.toHaveAttribute('href')
+  })
+
+  it('truncates long labels inside the dropdown menu', async () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn()
+        disconnect = vi.fn()
+        unobserve = vi.fn()
+      }
+    )
+
+    const user = userEvent.setup()
+    const longLabel = `alice-sandbox-${'x'.repeat(80)}`
+    const items: readonly AppBreadcrumbItem[] = [
+      { label: 'Projects', href: '/projects' },
+      { label: longLabel, href: '/projects/1' },
+    ]
+
+    render(<SynPageBreadcrumbsCollapsedMiddle middleItems={items} />)
+
+    await user.click(screen.getByRole('button', { name: 'Earlier pages, 2 levels' }))
+
+    const longMenuItem = screen.getByRole('menuitem', { name: longLabel })
+    const label = within(longMenuItem).getByTestId('breadcrumb-collapsed-menu-label')
+    expect(label).toHaveTextContent(longLabel)
+    expect(label).toHaveAttribute('title', longLabel)
   })
 
   it('has no accessibility violations when the dropdown is open', async () => {

@@ -11,7 +11,7 @@ Invocation syntax depends on the agent: in Codex, use `$skill-name` or choose a 
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start--copy-this-prompt)
+1. [Quick Start](#quick-start-copy-this-prompt)
 2. [Mental Model](#1-mental-model)
 3. [Bring Your Screenshots (Optional)](#2-bring-your-screenshots-optional)
 4. [Implement a Feature](#3-implement-a-feature)
@@ -147,7 +147,7 @@ Use for: new pages, list views, dialogs, forms, hooks, or refactors.
 
 Tell the agent: "Plan this feature before writing any code." It finds a similar existing page, asks clarifying questions, and writes a plan for your approval before generating code.
 
-**Always follow existing codebase patterns and standards.** The coding standards skill ([`.agents/skills/frontend-coding-standards/SKILL.md`](../../.agents/skills/frontend-coding-standards/SKILL.md)) and UX design system skill ([`.agents/skills/frontend-patternfly-ux/SKILL.md`](../../.agents/skills/frontend-patternfly-ux/SKILL.md)) are the authoritative guidelines — match what already exists in the codebase rather than inventing new patterns.
+**Always follow existing codebase patterns and standards.** The coding standards skill ([`.agents/skills/frontend-coding-standards/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-coding-standards/SKILL.md)) and UX design system skill ([`.agents/skills/frontend-patternfly-ux/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-patternfly-ux/SKILL.md)) are the authoritative guidelines — match what already exists in the codebase rather than inventing new patterns.
 
 ### Prompt template
 
@@ -185,7 +185,7 @@ npm run test:ui # unit tests with coverage
 
 Run two checks after implementation:
 
-**1. Code quality** — ask the agent to use the `frontend-review-pr` skill. It scans changed files against the [quality checklist](../AGENTS.md) and returns Blocking/Suggestion/Nitpick issues. See [§9](#9-fixing-guideline-violations) for common violations.
+**1. Code quality** — ask the agent to use the `frontend-review-pr` skill. It scans changed files against the [quality checklist](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/AGENTS.md) and returns Blocking/Suggestion/Nitpick issues. See [§9](#9-fixing-guideline-violations) for common violations.
 
 **2. Visual / UX** — paste a screenshot and ask the agent to verify against the `frontend-patternfly-ux` skill.
 
@@ -221,7 +221,7 @@ Always check in a browser before opening a PR. Run `npm start` (UI at http://loc
 
 ## 5. Code Review (PR Review)
 
-Use after implementing a feature, or when reviewing a teammate's PR. The agent validates against the [quality checklist](../AGENTS.md), flags missing tests, and produces a draft PR description.
+Use after implementing a feature, or when reviewing a teammate's PR. The agent validates against the [quality checklist](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/AGENTS.md), flags missing tests, and produces a draft PR description.
 
 ```text
 Use the frontend-review-pr skill to review my current branch.
@@ -275,7 +275,7 @@ I am building [what]. Verify my implementation matches the design system.
 [PASTE SCREENSHOT]
 ```
 
-The full set of UX rules (table variants, form thresholds, modal sizes, alert casing, spacing tokens) lives in [`.agents/skills/frontend-patternfly-ux/SKILL.md`](../../.agents/skills/frontend-patternfly-ux/SKILL.md). The agent reads it automatically.
+The full set of UX rules (table variants, form thresholds, modal sizes, alert casing, spacing tokens) lives in [`.agents/skills/frontend-patternfly-ux/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-patternfly-ux/SKILL.md). The agent reads it automatically.
 
 ---
 
@@ -288,8 +288,8 @@ npm run e2e     # Playwright integration tests
 ```
 
 - Walk through all states in the browser ([§4](#4-review-your-changes-locally))
-- The quality checklist lives in [`AGENTS.md`](../AGENTS.md) — "Common PR Mistakes"
-- PR description guidelines are in the [PR template](../../.github/pull_request_template.md)
+- The quality checklist lives in [`AGENTS.md`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/AGENTS.md) — "Common PR Mistakes"
+- PR description guidelines are in the [PR template](https://github.com/syntara-orchestration/syntara/blob/devel/.github/pull_request_template.md)
 
 ---
 
@@ -323,7 +323,7 @@ Shortest path from "I need to build this page" to an open PR:
 2. **Identify the API endpoint** and response fields
 3. **Find the API client** in `src/client.tsx` (e.g. `credentialsClient`, `workflowClient`)
 4. **Ask the agent to plan** before writing code
-5. **Paste the [Quick Start prompt](#quick-start--copy-this-prompt)**, fill placeholders, drag in the screenshot
+5. **Paste the [Quick Start prompt](#quick-start-copy-this-prompt)**, fill placeholders, drag in the screenshot
 6. **Review the plan** — correct anything that looks wrong
 7. **Let the agent implement** — it writes code + tests
 8. **Review locally** — `npm start`, open http://localhost:5173, walk through every state ([§4](#4-review-your-changes-locally))
@@ -481,22 +481,22 @@ Agent: Here is my plan...
 
 ### File location
 
-The skill lives at [`.agents/skills/frontend-build-ui-feature/SKILL.md`](../../.agents/skills/frontend-build-ui-feature/SKILL.md). It uses `frontend-coding-standards`, `frontend-testing-guidelines`, `frontend-library-references`, `frontend-patternfly-ux`, and optionally `frontend-playwright-e2e`.
+The skill lives at [`.agents/skills/frontend-build-ui-feature/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-build-ui-feature/SKILL.md). It uses `frontend-coding-standards`, `frontend-testing-guidelines`, `frontend-library-references`, `frontend-patternfly-ux`, and optionally `frontend-playwright-e2e`.
 
 ---
 
 ## Further Reading
 
-| Topic                       | Document                                                                                                           |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Coding standards            | [`.agents/skills/frontend-coding-standards/SKILL.md`](../../.agents/skills/frontend-coding-standards/SKILL.md)     |
-| Testing standards           | [`.agents/skills/frontend-testing-guidelines/SKILL.md`](../../.agents/skills/frontend-testing-guidelines/SKILL.md) |
-| PR review process           | [`.agents/skills/frontend-pr-review/SKILL.md`](../../.agents/skills/frontend-pr-review/SKILL.md)                   |
-| Playwright E2E              | [`.agents/skills/frontend-playwright-e2e/SKILL.md`](../../.agents/skills/frontend-playwright-e2e/SKILL.md)         |
-| PatternFly UX design system | [`.agents/skills/frontend-patternfly-ux/SKILL.md`](../../.agents/skills/frontend-patternfly-ux/SKILL.md)           |
-| Frontend specialist         | [`.agents/skills/frontend-specialist/SKILL.md`](../../.agents/skills/frontend-specialist/SKILL.md)                 |
-| Library references          | [`.agents/skills/frontend-library-references/SKILL.md`](../../.agents/skills/frontend-library-references/SKILL.md) |
-| Architecture overview       | [`architecture.md`](./architecture.md)                                                                             |
-| Error handling              | [`error-handling.md`](./error-handling.md)                                                                         |
-| Contributing                | [`CONTRIBUTING.md`](../CONTRIBUTING.md)                                                                            |
-| PR template                 | [`.github/pull_request_template.md`](../../.github/pull_request_template.md)                                       |
+| Topic                       | Document                                                                                                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Coding standards            | [`.agents/skills/frontend-coding-standards/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-coding-standards/SKILL.md)     |
+| Testing standards           | [`.agents/skills/frontend-testing-guidelines/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-testing-guidelines/SKILL.md) |
+| PR review process           | [`.agents/skills/frontend-pr-review/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-pr-review/SKILL.md)                   |
+| Playwright E2E              | [`.agents/skills/frontend-playwright-e2e/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-playwright-e2e/SKILL.md)         |
+| PatternFly UX design system | [`.agents/skills/frontend-patternfly-ux/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-patternfly-ux/SKILL.md)           |
+| Frontend specialist         | [`.agents/skills/frontend-specialist/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-specialist/SKILL.md)                 |
+| Library references          | [`.agents/skills/frontend-library-references/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-library-references/SKILL.md) |
+| Architecture overview       | [`architecture.md`](./architecture.md)                                                                                                                                   |
+| Error handling              | [`error-handling.md`](./error-handling.md)                                                                                                                               |
+| Contributing                | [Frontend contributor guide](https://github.com/syntara-orchestration/syntara/blob/devel/docs/frontend-contributing.md)                                                  |
+| PR template                 | [`.github/pull_request_template.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.github/pull_request_template.md)                                       |
