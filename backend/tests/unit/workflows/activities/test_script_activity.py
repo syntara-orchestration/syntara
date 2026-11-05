@@ -1,6 +1,7 @@
 """Unit tests for script activity executor (V2 unified bash/python)."""
 
 import asyncio
+import json
 import sys
 from collections.abc import Generator
 from typing import ClassVar
@@ -1096,6 +1097,29 @@ class TestPayloadSizeEnforcement:
         enforced = _enforce_payload_limit(result, max_bytes=1000)
         assert "[Payload truncated:" in enforced["output"]["stderr"]
         assert len(enforced["output"]["stdout"]) < 500_000
+
+    def test_large_stdout_json_still_exceeds_limit_after_enforcement(self) -> None:
+        """AAP-93916: oversized stdout_json is excluded from truncation and never rechecked.
+
+        _enforce_payload_limit() is documented to truncate stdout/stderr "so the
+        serialized activity result fits within Temporal's payload limit", but it only
+        ever trims the ``stdout``/``stderr`` fields. When ``stdout_json`` itself is the
+        field pushing the payload over the limit, truncating stdout/stderr does nothing
+        to shrink it, and the function returns the result without rechecking the final
+        serialized size — so the returned payload can still exceed max_bytes.
+        """
+        result = {
+            "output": {
+                "stdout": "small",
+                "stderr": "",
+                "return_code": 0,
+                "stdout_json": {"data": "x" * 500_000},
+            }
+        }
+        enforced = _enforce_payload_limit(result, max_bytes=1000)
+
+        final_size = len(json.dumps(enforced).encode("utf-8"))
+        assert final_size <= 1000
 
 
 class TestCgroupMemoryLimit:

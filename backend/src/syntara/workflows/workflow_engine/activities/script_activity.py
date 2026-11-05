@@ -219,7 +219,7 @@ def _enforce_payload_limit(
     result_dict: dict[str, Any],
     max_bytes: int = constants.TEMPORAL_PAYLOAD_MAX_BYTES,
 ) -> dict[str, Any]:
-    """Truncate stdout/stderr so the serialized activity result fits within Temporal's payload limit.
+    """Truncate stdout/stderr/stdout_json so the serialized activity result fits within Temporal's payload limit.
 
     Temporal's server-side limit.blobSize.error (default 2MB) rejects oversized
     activity results. The SDK treats the rejection as retryable, causing futile
@@ -232,7 +232,10 @@ def _enforce_payload_limit(
     escaping can expand certain characters (e.g. newlines, quotes), so the
     truncated payload may be slightly larger than ``max_bytes`` after
     re-serialization. The 10% headroom in TEMPORAL_PAYLOAD_MAX_BYTES absorbs
-    this expansion.
+    this expansion. As a final safeguard, the serialized size is rechecked
+    after truncation: if it still exceeds ``max_bytes`` (e.g. because
+    ``stdout_json`` itself is oversized, or due to escaping overhead), the
+    offending fields are dropped/trimmed further until the result fits.
     """
     serialized = json.dumps(result_dict)
     payload_size = len(serialized.encode("utf-8"))
@@ -263,7 +266,23 @@ def _enforce_payload_limit(
         output["stderr"] = stderr_bytes[: max(0, len(stderr_bytes) - trim_needed)].decode("utf-8", errors="ignore")
 
     output["stderr"] = (output.get("stderr") or "") + notice
-    return {**result_dict, "output": output}
+    enforced = {**result_dict, "output": output}
+
+    final_size = len(json.dumps(enforced).encode("utf-8"))
+    if final_size > max_bytes and output.get("stdout_json") is not None:
+        output["stdout_json"] = None
+        enforced = {**result_dict, "output": output}
+        final_size = len(json.dumps(enforced).encode("utf-8"))
+
+    if final_size > max_bytes:
+        remaining_excess = final_size - max_bytes
+        stderr_bytes = (output.get("stderr") or "").encode("utf-8")
+        output["stderr"] = stderr_bytes[: max(0, len(stderr_bytes) - remaining_excess)].decode(
+            "utf-8", errors="ignore"
+        )
+        enforced = {**result_dict, "output": output}
+
+    return enforced
 
 
 def _sanitize_env_value(value: object) -> str:
