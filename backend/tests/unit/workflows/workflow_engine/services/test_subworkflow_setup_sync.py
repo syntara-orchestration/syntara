@@ -10,7 +10,7 @@ that keys the aggregate row and preserves the I/O owned by
 
 import json
 from datetime import UTC, datetime
-from typing import ClassVar
+from typing import Any, ClassVar
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -27,8 +27,8 @@ from .test_activity_sync_service import create_test_metadata
 _PREFIX = "__internal__setup_sub_workflow_"
 
 
-def _setup_result(**over: object) -> dict:
-    data = {
+def _setup_result(**over: object) -> dict[str, object]:
+    data: dict[str, object] = {
         "execution_id": "child-exec-1",
         "child_workflow_id": "wf-123",
         "child_workflow_name": "demo-child",
@@ -68,7 +68,7 @@ def _started(event_id: int, scheduled_event_id: int, attempt: int = 1) -> Mock:
     return event
 
 
-def _completed(event_id: int, scheduled_event_id: int, result: dict | None = None) -> Mock:
+def _completed(event_id: int, scheduled_event_id: int, result: dict[str, object] | None = None) -> Mock:
     event = Mock()
     event.event_type = EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED
     event.event_id = event_id
@@ -86,7 +86,7 @@ def _completed(event_id: int, scheduled_event_id: int, result: dict | None = Non
 
 
 def _row(node_id: str, **over: object) -> ActivityExecution:
-    kwargs: dict = {
+    kwargs: dict[str, object] = {
         "id": uuid4(),
         "execution_id": uuid4(),
         "activity_name": node_id,
@@ -159,7 +159,7 @@ class TestSetupCompleted:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
 
-    def _run(self, activity_id: str, result: dict | None, sched_id: int = 10) -> dict:
+    def _run(self, activity_id: str, result: dict[str, object] | None, sched_id: int = 10) -> dict[str, Any]:
         self.service._process_activity_scheduled(_scheduled(sched_id, activity_id), self.metadata)
         self.service._process_activity_started(_started(sched_id + 1, sched_id), self.metadata)
         self.service._process_activity_completed(_completed(sched_id + 2, sched_id, result), self.metadata)
@@ -305,8 +305,8 @@ class TestWriterPreserveIo:
             output_data={"child_execution_id": "child-exec-1"},
         )
 
-    def _update(self, **over: object) -> dict:
-        data = {
+    def _update(self, **over: object) -> dict[str, object]:
+        data: dict[str, object] = {
             "status": ActivityStatus.RUNNING,
             "started_at": datetime.now(UTC),
             "completed_at": None,
@@ -345,8 +345,8 @@ class TestSyncSubworkflowSetup:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
 
-    def _activity_data(self, **over: object) -> dict:
-        data = {
+    def _activity_data(self, **over: object) -> dict[str, object]:
+        data: dict[str, object] = {
             "activity_id": "node-A",
             "activity_name": "node-A",
             "_subworkflow_setup": True,
@@ -467,8 +467,8 @@ class TestSetupSyncNoOutputDelta:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
 
-    def _activity_data(self, **over: object) -> dict:
-        data = {
+    def _activity_data(self, **over: object) -> dict[str, object]:
+        data: dict[str, object] = {
             "activity_id": "node-A",
             "activity_name": "node-A",
             "_subworkflow_setup": True,
@@ -513,7 +513,7 @@ def _finalizer_activity(
     name: str,
     *,
     status: ActivityStatus,
-    runtime_metadata: dict | None,
+    runtime_metadata: dict[str, Any] | None,
 ) -> Mock:
     a = Mock()
     a.status = status
@@ -533,7 +533,7 @@ class TestFinalizerPreservesRuntimeMetadata:
     completed_at) only, never clobber the child metadata written on setup.
     """
 
-    _RM: ClassVar[dict] = {
+    _RM: ClassVar[dict[str, object]] = {
         "child_execution_id": "child-exec-1",
         "child_workflow_id": "wf-123",
         "child_workflow_name": "demo-child",
@@ -642,7 +642,7 @@ class TestSetupCompletedBuildsIo:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
 
-    def _run(self, activity_id: str, sched: int) -> dict:
+    def _run(self, activity_id: str, sched: int) -> dict[str, Any]:
         self.service._process_activity_scheduled(_scheduled(sched, activity_id), self.metadata)
         self.service._process_activity_started(_started(sched + 1, sched), self.metadata)
         self.service._process_activity_completed(_completed(sched + 2, sched, _setup_result()), self.metadata)
@@ -668,8 +668,8 @@ class TestSyncWritesIo:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
 
-    def _data(self, *, io: bool, iteration: object = None, **over: object) -> dict:
-        data = {
+    def _data(self, *, io: bool, iteration: object = None, **over: object) -> dict[str, object]:
+        data: dict[str, object] = {
             "activity_id": "node-A",
             "activity_name": "node-A",
             "_subworkflow_setup": True,
@@ -724,6 +724,7 @@ class TestSyncWritesIo:
         d1 = self._data(io=False, iteration=1, _subworkflow_io=io1)
         self.service._sync_subworkflow_setup(d0, {"node-A": row}, self.metadata)
         self.service._sync_subworkflow_setup(d1, {"node-A": row}, self.metadata)
+        assert row.output_data is not None
         assert row.output_data["child_execution_id"] == "child-1"
         assert row.runtime_metadata is None
 
@@ -731,7 +732,7 @@ class TestSyncWritesIo:
 class TestTerminalBackfill:
     """Terminal-row I/O-only, set-if-empty backfill."""
 
-    def _io(self) -> dict:
+    def _io(self) -> dict[str, Any]:
         return _EP._build_subworkflow_io(_setup_result())
 
     def test_backfills_empty_io_without_touching_status(self) -> None:
@@ -744,7 +745,9 @@ class TestTerminalBackfill:
         assert is_new is False
         assert activity.status == ActivityStatus.CANCELLED  # untouched
         assert activity.runtime_metadata == {"keep": 1}  # untouched
+        assert activity.input_data is not None
         assert activity.input_data["execution_mode"] == "reference"
+        assert activity.output_data is not None
         assert activity.output_data["child_execution_id"] == "child-exec-1"
         # old_values carries current status/runtime_metadata so no spurious delta
         assert old_values["status"] == ActivityStatus.CANCELLED
@@ -789,6 +792,7 @@ class TestSyncRoutesTerminalToBackfill:
         result = self.service._sync_subworkflow_setup(data, {"node-A": row}, self.metadata)
         assert result is not None
         assert row.status == ActivityStatus.CANCELLED
+        assert row.output_data is not None
         assert row.output_data["child_execution_id"] == "child-exec-1"
 
 
