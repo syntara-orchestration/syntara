@@ -574,6 +574,74 @@ def test_converge_failure_message_reports_an_unmet_quorum() -> None:
     assert "required 2 successful branches" in message
 
 
+def test_converge_failure_message_waits_on_retry_while_selected_branch_runs() -> None:
+    """A re-running ALL join must not fail-fast on a restored sibling failure."""
+    wf = _wf(_retry("b2"))
+    graph = _two_branch_converge_graph()
+    wf.failed_nodes = {"b1": "boom"}
+
+    assert wf._converge_failure_message("join", graph.get_node("join"), graph) is None
+    assert wf._converge_failure_message("join", graph.get_node("join"), graph, upstream_failure_id="b1") is None
+
+
+def test_converge_failure_message_fails_retry_join_once_all_branches_are_terminal() -> None:
+    """Once the selected branch finishes, the restored sibling failure fails ALL."""
+    wf = _wf(_retry("b2"))
+    graph = _two_branch_converge_graph()
+    wf.failed_nodes = {"b1": "boom"}
+    wf.resolver.set_namespace("b2", {"status": "completed"})
+
+    message = wf._converge_failure_message("join", graph.get_node("join"), graph)
+
+    assert message is not None
+    assert "b1" in message
+    assert "ALL strategy" in message
+
+
+def test_evaluate_converge_failure_does_not_cancel_selected_retry_branch() -> None:
+    """Restoring an unselected failure must not fail the join while the selected path runs."""
+    wf = _wf(_retry("b2"))
+    graph = _two_branch_converge_graph()
+    wf.failed_nodes = {"b1": "boom"}
+    fail = MagicMock()
+    wf._fail_converge_node = fail  # type: ignore[method-assign]
+
+    wf._evaluate_converge_failure("join", graph.get_node("join"), graph, pending_tasks={"b2": object()})
+
+    fail.assert_not_called()
+
+
+def test_check_converge_successors_does_not_fail_rerunning_join_while_selected_branch_runs() -> None:
+    """The BFS from a restored sibling must not fail a join whose other branch is retrying."""
+    wf = _wf(_retry("b2"))
+    graph = _two_branch_converge_graph()
+    wf.failed_nodes = {"b1": "boom"}
+    fail = MagicMock()
+    wf._fail_converge_node = fail  # type: ignore[method-assign]
+
+    wf._check_converge_successors("b1", graph, pending_tasks={"b2": object()})
+
+    fail.assert_not_called()
+
+
+def test_fail_converge_does_not_detach_selected_retry_path() -> None:
+    """A selected retry node stays attached so the safety net cannot mark it cancelled."""
+    wf = _wf(_retry("b2"))
+    graph = _two_branch_converge_graph()
+    wf._converge_branch_nodes = {"b2": {"join"}, "b1": {"join"}}
+    wf._detached_nodes = set()
+    wf._timeout_tasks = {}
+    wf._has_unhandled_failure = False
+    wf._timed_out_converge_nodes = set()
+    pending: dict[str, Any] = {"b2": object()}
+
+    with patch("syntara.workflows.workflow_engine.converge_mixin.workflow") as patched:
+        patched.logger = MagicMock()
+        wf._fail_converge_node("join", "gate failed", graph, pending)
+
+    assert "b2" not in wf._detached_nodes
+
+
 def test_evaluate_converge_failure_defers_a_retry_candidate() -> None:
     """A retry candidate's gate failure is deferred rather than failing immediately."""
     wf = _wf(_retry("join"))
