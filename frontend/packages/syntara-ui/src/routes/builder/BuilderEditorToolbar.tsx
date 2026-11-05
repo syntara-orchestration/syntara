@@ -133,6 +133,7 @@ type BuilderEditorToolbarProps = Readonly<{
   workflowName: string
   workflowDescription: string
   dispatch: Dispatch<BuilderAction>
+  onRequestWorkflowRun?: (triggerIndex?: number) => void
   markDirty: () => void
   handleToggleHistory: () => void
   handleToggleVersionHistory: () => void
@@ -162,6 +163,7 @@ export function BuilderEditorToolbar({
   workflowName,
   workflowDescription,
   dispatch,
+  onRequestWorkflowRun,
   markDirty,
   handleToggleHistory,
   handleToggleVersionHistory,
@@ -255,6 +257,7 @@ export function BuilderEditorToolbar({
         isSaved={!!workflow?.id}
         validationErrorCount={validationErrorCount}
         dispatch={dispatch}
+        onRequestWorkflowRun={onRequestWorkflowRun}
         builderPermissions={builderPermissions}
         isStepEditorOpen={isStepEditorOpen}
       />

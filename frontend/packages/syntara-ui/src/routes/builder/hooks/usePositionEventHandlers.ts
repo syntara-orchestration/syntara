@@ -1,13 +1,8 @@
 import { useReactFlow, type OnNodeDrag } from '@xyflow/react'
-import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react'
 
 import { FlowNodeType } from '../../../constants'
-import {
-  useWorkflowStore,
-  useWorkflowStoreActions,
-  selectCurrentWorkflow,
-  selectPositionUndoVersion,
-} from '../../../stores/useWorkflowStore'
+import { useWorkflowStore, useWorkflowStoreActions, selectCurrentWorkflow } from '../../../stores/useWorkflowStore'
 import { detachPromise } from '../../../utils/detachPromise'
 import { toPositionKey } from '../../../utils/triggerNodeIds'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
@@ -22,6 +17,17 @@ type LoopDragState = {
   offsets: Map<string, { dx: number; dy: number }>
 }
 
+export function restoreNodePositions(
+  nodes: NodeType[],
+  positions: Record<string, { x: number; y: number }>,
+  triggers: Array<{ id: string }>
+): NodeType[] {
+  return nodes.map((node) => {
+    const stored = positions[toPositionKey(node.id, triggers)]
+    return stored ? { ...node, position: stored } : node
+  })
+}
+
 export function usePositionEventHandlers(
   nodes: NodeType[],
   edges: EdgeType[],
@@ -29,24 +35,8 @@ export function usePositionEventHandlers(
   setEdges: Dispatch<SetStateAction<EdgeType[]>>
 ) {
   const currentWorkflow = useWorkflowStore(selectCurrentWorkflow)
-  const positionUndoVersion = useWorkflowStore(selectPositionUndoVersion)
   const { updateNodePositions } = useWorkflowStoreActions()
   const { fitView } = useReactFlow<NodeType, EdgeType>()
-
-  const positionUndoVersionRef = useRef(positionUndoVersion)
-  useEffect(() => {
-    if (positionUndoVersion === positionUndoVersionRef.current) return
-    positionUndoVersionRef.current = positionUndoVersion
-    const positions = useWorkflowStore.getState().nodePositions
-    if (Object.keys(positions).length === 0) return
-    const trigs = currentWorkflow?.triggers ?? []
-    setNodes((prev) =>
-      prev.map((n) => {
-        const stored = positions[toPositionKey(n.id, trigs)]
-        return stored ? { ...n, position: stored } : n
-      })
-    )
-  }, [positionUndoVersion, currentWorkflow?.triggers, setNodes])
 
   const loopDragRef = useRef<LoopDragState | null>(null)
 

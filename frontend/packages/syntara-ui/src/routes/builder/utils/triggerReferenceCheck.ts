@@ -1,7 +1,11 @@
-export function hasNonEmptyInputSchema(schema?: Record<string, unknown> | null): boolean {
-  if (schema == null) return false
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+export function hasNonEmptyInputSchema(schema?: unknown): boolean {
+  if (!isRecord(schema)) return false
   const properties = schema.properties
-  if (properties != null && typeof properties === 'object' && !Array.isArray(properties)) {
+  if (isRecord(properties)) {
     return Object.keys(properties).length > 0
   }
   const required = schema.required
