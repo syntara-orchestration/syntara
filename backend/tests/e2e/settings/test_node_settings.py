@@ -504,8 +504,18 @@ def test_retry_not_applied_to_script_nodes(syntara_api: SyntaraApiRegistry, firs
         elapsed = time.monotonic() - start
 
         assert result.status == ExecutionStatus.FAILED, f"Expected FAILED, got {result.status}"
-        # If retry applied, 5 retries x 2s interval = >10s. Script should fail well under that.
-        assert elapsed < 30, f"Script should fail fast (no retry despite global retry=5), took {elapsed:.1f}s"
+        # Wall clock conflates "no retries" with "fast dispatch": the script
+        # node's dispatch cold start (Job scheduling, pod, port-forward, gRPC)
+        # alone can exceed 30s on podman-compose e2e runs. The activity's
+        # retry_count is the timing-independent proof that the global retry
+        # policy is not applied to script nodes.
+        activities = _get_activities(result)
+        script = activities.get("script")
+        assert script is not None, "Script activity missing from the execution"
+        assert script.retry_count == 0, f"Global retry must not apply to script nodes: retry_count={script.retry_count}"
+        # If retry applied, 5 retries x 2s interval would dominate: a generous
+        # wall-clock bound still separates "failed once" from "failed 6 times".
+        assert elapsed < 120, f"Script should fail without retry delay, took {elapsed:.1f}s"
     finally:
         _restore_settings(syntara_api, {key_max: orig_max, key_interval: orig_interval})
 
