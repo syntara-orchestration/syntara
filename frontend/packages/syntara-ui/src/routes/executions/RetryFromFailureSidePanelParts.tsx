@@ -54,6 +54,8 @@ type RetryPlanProps = Readonly<{
   visiblePoints: RetryPlanPoint[]
   unavailablePoints: RetryPlanPoint[]
   requestedRetryPointIds: string[]
+  selectedPointCount: number
+  notRetriedFailureCount: number
   scopeMode: RetryScopeMode
   scopeId: string
   isRetryPending: boolean
@@ -69,6 +71,10 @@ type RetryPlanContentProps = Readonly<{
   isEmptySelection: boolean
   visiblePoints: RetryPlanPoint[]
   unavailablePoints: RetryPlanPoint[]
+  scopeMode: RetryScopeMode
+  selectedPointCount: number
+  affectedPointCount: number
+  notRetriedFailureCount: number
 }>
 
 /** Retry scope controls and the stateful retry plan view. */
@@ -84,6 +90,8 @@ export function RetryPlan({
   visiblePoints,
   unavailablePoints,
   requestedRetryPointIds,
+  selectedPointCount,
+  notRetriedFailureCount,
   scopeMode,
   scopeId,
   isRetryPending,
@@ -132,6 +140,7 @@ export function RetryPlan({
             scopeId={scopeId}
             selectablePoints={selectablePoints}
             selectedPointIds={requestedRetryPointIds}
+            affectedPointCount={selectablePoints.length}
             isRetryPending={isRetryPending}
             onSelectAll={onSelectAll}
             onChoosePoints={onChoosePoints}
@@ -147,6 +156,10 @@ export function RetryPlan({
           isEmptySelection={scopeMode === 'selected' && requestedRetryPointIds.length === 0}
           visiblePoints={visiblePoints}
           unavailablePoints={unavailablePoints}
+          scopeMode={scopeMode}
+          selectedPointCount={selectedPointCount}
+          affectedPointCount={selectablePoints.length}
+          notRetriedFailureCount={notRetriedFailureCount}
         />
       </StackItem>
     </Stack>
@@ -158,6 +171,7 @@ type RetryScopeSelectorProps = Readonly<{
   scopeId: string
   selectablePoints: RetryPlanPoint[]
   selectedPointIds: string[]
+  affectedPointCount: number
   isRetryPending: boolean
   onSelectAll: () => void
   onChoosePoints: () => void
@@ -169,6 +183,7 @@ function RetryScopeSelector({
   scopeId,
   selectablePoints,
   selectedPointIds,
+  affectedPointCount,
   isRetryPending,
   onSelectAll,
   onChoosePoints,
@@ -181,7 +196,7 @@ function RetryScopeSelector({
           <Radio
             id={`${scopeId}-all`}
             name={`${scopeId}-scope`}
-            label="All eligible failure points"
+            label="Retry all affected branches"
             isChecked={scopeMode === 'all'}
             isDisabled={isRetryPending}
             onChange={onSelectAll}
@@ -189,7 +204,7 @@ function RetryScopeSelector({
           <Radio
             id={`${scopeId}-selected`}
             name={`${scopeId}-scope`}
-            label="Choose failure points"
+            label="Choose branches"
             isChecked={scopeMode === 'selected'}
             isDisabled={isRetryPending}
             onChange={onChoosePoints}
@@ -198,23 +213,54 @@ function RetryScopeSelector({
       </StackItem>
       {scopeMode === 'selected' && (
         <StackItem>
-          <div role="group" aria-label="Failure points to retry">
-            <List isPlain>
-              {selectablePoints.map((point) => (
-                <ListItem key={point.id}>
-                  <Checkbox
-                    id={`${scopeId}-${point.id}`}
-                    name={`${scopeId}-retry-points`}
-                    label={point.name}
-                    description={point.typeLabel}
-                    isChecked={selectedPointIds.includes(point.id)}
-                    isDisabled={isRetryPending}
-                    onChange={(_event, isChecked) => onUpdatePoint(point.id, isChecked)}
-                  />
-                </ListItem>
-              ))}
-            </List>
-          </div>
+          <Stack hasGutter>
+            <StackItem>
+              <Title headingLevel="h4" size={TitleSizes.md}>
+                Select the branches where the retry should begin
+              </Title>
+            </StackItem>
+            <StackItem>
+              <div role="group" aria-label="Branches to retry">
+                <List isPlain>
+                  {selectablePoints.map((point) => (
+                    <ListItem key={point.id}>
+                      <Checkbox
+                        id={`${scopeId}-${point.id}`}
+                        name={`${scopeId}-retry-points`}
+                        label={point.name}
+                        description={point.typeLabel}
+                        body={
+                          point.sanitizedFailedNodeNames.length > 0 ? (
+                            <div className={styles.sanitizedReplacementDescription}>
+                              {point.sanitizedFailedNodeNames.map((failedNodeName) => (
+                                <div key={failedNodeName}>Failed node: {failedNodeName}</div>
+                              ))}
+                              <div>Output sanitized — retry starts upstream</div>
+                            </div>
+                          ) : undefined
+                        }
+                        isChecked={selectedPointIds.includes(point.id)}
+                        isDisabled={isRetryPending}
+                        onChange={(_event, isChecked) => onUpdatePoint(point.id, isChecked)}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </div>
+            </StackItem>
+            {selectedPointIds.length > 0 && selectedPointIds.length < affectedPointCount && (
+              <StackItem>
+                <Alert
+                  isInline
+                  variant="warning"
+                  title="Some branches may fail"
+                  data-testid="retry-partial-scope-warning"
+                >
+                  Skipped branches may leave downstream dependencies or the merge step without the inputs they need.
+                </Alert>
+              </StackItem>
+            )}
+          </Stack>
         </StackItem>
       )}
     </Stack>
@@ -228,6 +274,10 @@ function RetryPlanContent({
   isEmptySelection,
   visiblePoints,
   unavailablePoints,
+  scopeMode,
+  selectedPointCount,
+  affectedPointCount,
+  notRetriedFailureCount,
 }: RetryPlanContentProps) {
   if (isEmptySelection) {
     return (
@@ -277,18 +327,48 @@ function RetryPlanContent({
     )
   }
 
-  return <RetryPlanSummary preview={preview} visiblePoints={visiblePoints} unavailablePoints={unavailablePoints} />
+  return (
+    <RetryPlanSummary
+      preview={preview}
+      visiblePoints={visiblePoints}
+      unavailablePoints={unavailablePoints}
+      scopeMode={scopeMode}
+      selectedPointCount={selectedPointCount}
+      affectedPointCount={affectedPointCount}
+      notRetriedFailureCount={notRetriedFailureCount}
+    />
+  )
 }
 
 type RetryPlanSummaryProps = Readonly<{
   preview: RetryFromFailurePreview
   visiblePoints: RetryPlanPoint[]
   unavailablePoints: RetryPlanPoint[]
+  scopeMode: RetryScopeMode
+  selectedPointCount: number
+  affectedPointCount: number
+  notRetriedFailureCount: number
 }>
 
-function RetryPlanSummary({ preview, visiblePoints, unavailablePoints }: RetryPlanSummaryProps) {
+function RetryPlanSummary({
+  preview,
+  visiblePoints,
+  unavailablePoints,
+  scopeMode,
+  selectedPointCount,
+  affectedPointCount,
+  notRetriedFailureCount,
+}: RetryPlanSummaryProps) {
   return (
     <DescriptionList isHorizontal isCompact aria-label="Retry plan summary">
+      {scopeMode === 'selected' && selectedPointCount > 0 && (
+        <DescriptionListGroup>
+          <DescriptionListTerm>Scope</DescriptionListTerm>
+          <DescriptionListDescription>
+            {selectedPointCount} of {affectedPointCount} affected branches selected
+          </DescriptionListDescription>
+        </DescriptionListGroup>
+      )}
       <DescriptionListGroup>
         <DescriptionListTerm>Steps to retry</DescriptionListTerm>
         <DescriptionListDescription>
@@ -341,6 +421,12 @@ function RetryPlanSummary({ preview, visiblePoints, unavailablePoints }: RetryPl
         <DescriptionListTerm>Retained results</DescriptionListTerm>
         <DescriptionListDescription>{getRetainedResultLabel(preview.retained_result_count)}</DescriptionListDescription>
       </DescriptionListGroup>
+      {scopeMode === 'selected' && selectedPointCount > 0 && notRetriedFailureCount > 0 && (
+        <DescriptionListGroup>
+          <DescriptionListTerm>Not retried</DescriptionListTerm>
+          <DescriptionListDescription>{getNotRetriedFailureLabel(notRetriedFailureCount)}</DescriptionListDescription>
+        </DescriptionListGroup>
+      )}
     </DescriptionList>
   )
 }
@@ -357,6 +443,10 @@ function RetryPlanPointLabel({ point }: Readonly<{ point: RetryPlanPoint }>) {
 function getRetainedResultLabel(count: number | undefined): string {
   if (count === undefined) return '—'
   return `${count} completed ${count === 1 ? 'result' : 'results'} retained`
+}
+
+function getNotRetriedFailureLabel(count: number): string {
+  return `${count} failed ${count === 1 ? 'step remains' : 'steps remain'} failed`
 }
 
 function getRetryStepCountLabel(count: number | undefined): string {

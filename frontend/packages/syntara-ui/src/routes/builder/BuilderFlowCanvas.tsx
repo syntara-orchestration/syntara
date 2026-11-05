@@ -32,6 +32,7 @@ import canvasStyles from './BuilderFlowCanvas.module.css'
 import { builderEdgeTypes, builderNodeTypes } from './builderFlowConfig'
 import { BUTTON_EDGE_DEFAULT_STROKE } from './edges/buttonEdgeStrokeColor'
 import { EdgeMarkers } from './edges/edgeMarkers'
+import { getRetryPreviewCanvasStates, type RetryPreviewCanvasState } from './retryPreviewCanvasState'
 import { markerEnd, type EdgeType } from './utils/workflowToGraph'
 
 type BuilderFlowCanvasProps = {
@@ -132,16 +133,34 @@ export function BuilderFlowCanvas({
   disableSpacePanning,
   onLayout,
 }: Readonly<BuilderFlowCanvasProps>) {
-  const retryPreviewNodeIdSet = useMemo(() => new Set(retryPreviewNodeIds), [retryPreviewNodeIds])
+  const retryPreviewCanvasStates = useMemo(
+    () =>
+      getRetryPreviewCanvasStates(
+        nodes.map((node) => ({ id: node.id, type: node.type, status: getNodeExecutionStatus(node) })),
+        edges,
+        retryPreviewNodeIds
+      ),
+    [edges, nodes, retryPreviewNodeIds]
+  )
   const accessibleNodes = useMemo(
     () =>
       nodes.map((node) => {
-        if (!retryPreviewNodeIdSet.has(node.id)) return node
+        const retryState = retryPreviewCanvasStates.get(node.id)
+        if (!retryState) return node
 
         const nodeName = 'name' in node.data && typeof node.data.name === 'string' ? node.data.name : node.id
-        return { ...node, ariaLabel: `${node.ariaLabel ?? nodeName}, retry origin` }
+        const stateLabel = getRetryStateAccessibleLabel(retryState)
+        const className =
+          retryState === 'origin'
+            ? [node.className, canvasStyles.retryOriginNode].filter(Boolean).join(' ')
+            : node.className
+        return {
+          ...node,
+          className,
+          ariaLabel: `${node.ariaLabel ?? nodeName}, ${stateLabel}`,
+        }
       }),
-    [nodes, retryPreviewNodeIdSet]
+    [nodes, retryPreviewCanvasStates]
   )
 
   return (
@@ -203,10 +222,54 @@ export function BuilderFlowCanvas({
             </span>
           </NodeToolbar>
         ))}
+        {[...retryPreviewCanvasStates].map(([nodeId, state]) => {
+          if (state === 'origin') return null
+          return (
+            <NodeToolbar
+              key={`retry-state-${nodeId}`}
+              nodeId={nodeId}
+              isVisible
+              position={Position.Bottom}
+              align="center"
+              offset={8}
+              data-testid={`retry-state-${nodeId}`}
+            >
+              <span data-testid={`retry-state-label-${nodeId}`} aria-hidden="true">
+                <RetryStateLabel state={state} />
+              </span>
+            </NodeToolbar>
+          )
+        })}
         {!isReadOnly && <Background variant={BackgroundVariant.Dots} gap={20} size={1} />}
         <CanvasControls onLayout={onLayout} hideLayout={isReadOnly} />
         {!isReadOnly && <UndoRedoControls />}
       </ReactFlow>
     </div>
   )
+}
+
+function getNodeExecutionStatus(node: NodeType): string | undefined {
+  const data = node.data as Record<string, unknown>
+  const executionState = data.__executionState
+  if (!executionState || typeof executionState !== 'object' || !('status' in executionState)) return undefined
+  return typeof executionState.status === 'string' ? executionState.status : undefined
+}
+
+function getRetryStateAccessibleLabel(state: RetryPreviewCanvasState): string {
+  switch (state) {
+    case 'origin':
+      return 'retry origin'
+    case 'will-retry':
+      return 'will retry'
+    case 'retained':
+      return 'retains prior result'
+    case 'not-retried':
+      return 'not retried; remains failed'
+  }
+}
+
+function RetryStateLabel({ state }: Readonly<{ state: Exclude<RetryPreviewCanvasState, 'origin'> }>) {
+  if (state === 'will-retry') return <SynLabel color="blue">Will retry</SynLabel>
+  if (state === 'retained') return <SynLabel color="grey">Retains prior result</SynLabel>
+  return <SynLabel color="orange">Not retried — remains failed</SynLabel>
 }

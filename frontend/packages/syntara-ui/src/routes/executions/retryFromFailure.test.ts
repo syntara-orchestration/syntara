@@ -77,14 +77,50 @@ describe('getRetryPlanPoints', () => {
         ])
       )
     ).toEqual([
-      { id: 'node-a', name: 'First Step', typeLabel: 'Script', stepCount: 4 },
-      { id: 'node-b#iter-2', name: 'Loop Step (Iteration 3)', typeLabel: 'Loop', stepCount: 2 },
+      { id: 'node-a', name: 'First Step', typeLabel: 'Script', stepCount: 4, sanitizedFailedNodeNames: [] },
+      {
+        id: 'node-b#iter-2',
+        name: 'Loop Step (Iteration 3)',
+        typeLabel: 'Loop',
+        stepCount: 2,
+        sanitizedFailedNodeNames: [],
+      },
+    ])
+  })
+
+  it('identifies the failed step replaced by a sanitized retry start', () => {
+    expect(
+      getRetryPlanPoints(
+        preview({
+          eligible_point_ids: ['fetch-inventory'],
+          sanitized_replacements: { 'process-inventory': ['fetch-inventory'] },
+        }),
+        new Map([
+          ['fetch-inventory', 'Fetch inventory'],
+          ['process-inventory', 'Process inventory'],
+        ]),
+        new Map([['fetch-inventory', 'script']])
+      )
+    ).toEqual([
+      {
+        id: 'fetch-inventory',
+        name: 'Fetch inventory',
+        typeLabel: 'Script',
+        stepCount: undefined,
+        sanitizedFailedNodeNames: ['Process inventory'],
+      },
     ])
   })
 
   it('falls back to the source node ID if its display name is unavailable', () => {
     expect(getRetryPlanPoints(preview({ eligible_point_ids: ['unknown-node'] }), new Map())).toEqual([
-      { id: 'unknown-node', name: 'unknown-node', typeLabel: 'Step', stepCount: undefined },
+      {
+        id: 'unknown-node',
+        name: 'unknown-node',
+        typeLabel: 'Step',
+        stepCount: undefined,
+        sanitizedFailedNodeNames: [],
+      },
     ])
   })
 })
@@ -143,6 +179,7 @@ describe('getUnavailableRetryPlanPoints', () => {
         name: 'REST API',
         typeLabel: 'Step',
         stepCount: undefined,
+        sanitizedFailedNodeNames: ['script'],
       },
     ])
   })

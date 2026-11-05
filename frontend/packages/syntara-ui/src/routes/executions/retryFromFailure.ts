@@ -101,6 +101,7 @@ export type RetryPlanPoint = Readonly<{
   name: string
   typeLabel: string
   stepCount: number | undefined
+  sanitizedFailedNodeNames: string[]
 }>
 
 /** Resolve the preview's retry points to UI names without inferring downstream nodes. */
@@ -114,12 +115,21 @@ export function getRetryPlanPoints(
     const baseName = activityNameMap.get(baseId) ?? activityNameMap.get(id) ?? baseId
     const name = iteration === undefined ? baseName : `${baseName} (Iteration ${iteration + 1})`
     const type = activityTypeMap.get(baseId) ?? activityTypeMap.get(id)
+    const sanitizedFailedNodeNames = Object.entries(preview?.sanitized_replacements ?? {})
+      .filter(([, replacementIds]) =>
+        replacementIds.some((replacementId) => parseCompositeKey(replacementId).baseId === baseId)
+      )
+      .map(([failedId]) => {
+        const failedBaseId = parseCompositeKey(failedId).baseId
+        return activityNameMap.get(failedBaseId) ?? activityNameMap.get(failedId) ?? failedBaseId
+      })
 
     return {
       id,
       name,
       typeLabel: type ? (getActivityTypeLabel(type) ?? type) : 'Step',
       stepCount: preview?.step_count_by_eligible_point?.[id],
+      sanitizedFailedNodeNames: [...new Set(sanitizedFailedNodeNames)],
     }
   })
 }
