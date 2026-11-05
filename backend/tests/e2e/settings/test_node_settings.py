@@ -509,10 +509,17 @@ def test_retry_not_applied_to_script_nodes(syntara_api: SyntaraApiRegistry, firs
         # alone can exceed 30s on podman-compose e2e runs. The activity's
         # retry_count is the timing-independent proof that the global retry
         # policy is not applied to script nodes.
-        activities = _get_activities(result)
-        script = activities.get("script")
-        assert script is not None, "Script activity missing from the execution"
-        assert script.retry_count == 0, f"Global retry must not apply to script nodes: retry_count={script.retry_count}"
+        # include="activities" only returns the ActivityData summary; the
+        # full ActivityExecution (with retry_count) comes from the dedicated
+        # activities endpoint.
+        activities = (
+            syntara_api.executions.list_activities(execution_id=UUID(str(result.id))).assert_and_get().resources
+        )
+        script = [a for a in activities if a.temporal_activity_id == "script"]
+        assert script, f"Script activity missing from the execution: {[a.temporal_activity_id for a in activities]}"
+        assert all(a.retry_count == 0 for a in script), (
+            f"Global retry must not apply to script nodes: retry_counts={[a.retry_count for a in script]}"
+        )
         # If retry applied, 5 retries x 2s interval would dominate: a generous
         # wall-clock bound still separates "failed once" from "failed 6 times".
         assert elapsed < 120, f"Script should fail without retry delay, took {elapsed:.1f}s"
