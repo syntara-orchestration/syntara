@@ -131,6 +131,16 @@ describe('ExecutionTargetDetail', () => {
     expect(screen.getByText('workload=automation')).toBeInTheDocument()
     expect(screen.queryByText('region=us-west')).not.toBeInTheDocument()
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit execution target' })).toBeInTheDocument()
+  })
+
+  it('navigates to the edit page when Edit execution target is clicked', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionTargetDetail />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Edit execution target' }))
+
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/execution-plane/et-001/edit' })
   })
 
   it('shows Cluster as plain text when integration_id label is absent', async () => {
@@ -265,7 +275,7 @@ describe('ExecutionTargetDetail', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Prod OpenShift West' })).toBeInTheDocument()
   })
 
-  it('disables delete kebab action when canDelete is false', async () => {
+  it('disables edit button and delete kebab when update/delete are denied', async () => {
     vi.mocked(useCanI).mockImplementation((action) => ({
       allowed: action === 'create',
       isChecking: false,
@@ -274,7 +284,11 @@ describe('ExecutionTargetDetail', () => {
     const user = userEvent.setup()
     render(<ExecutionTargetDetail />, { wrapper })
 
-    await user.click(await screen.findByRole('button', { name: 'Actions for Prod OpenShift West' }))
+    expect(await screen.findByRole('button', { name: 'Edit execution target' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    await user.click(screen.getByRole('button', { name: 'Actions for Prod OpenShift West' }))
     expect(screen.getByRole('menuitem', { name: /Delete execution target/i })).toHaveAttribute('aria-disabled', 'true')
   })
 

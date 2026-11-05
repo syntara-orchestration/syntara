@@ -2,7 +2,7 @@ import type * as ExecutionPlaneAPI from '@syntara/contracts/src/execution-plane-
 
 import { mockDate } from './mockDates'
 
-type ExecutionTargetFacadeRead = ExecutionPlaneAPI.components['schemas']['ExecutionTargetFacadeRead']
+type ExecutionTargetRead = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
 
 /** Seeded default target — DELETE returns 409 until another target is promoted. */
 export const DEFAULT_EXECUTION_TARGET_ID = 'a1000000-0000-4000-8000-000000000001'
@@ -10,8 +10,14 @@ export const DEFAULT_EXECUTION_TARGET_ID = 'a1000000-0000-4000-8000-000000000001
 /** Seeded non-default target (Worker Pool 01) that DELETE rejects with 409 (in-use). */
 export const IN_USE_DELETE_CONFLICT_TARGET_ID = 'a1000000-0000-4000-8000-000000000101'
 
+/** Seeded target (Worker Pool 02) that PATCH rejects with 409 (stale/concurrent edit). */
+export const UPDATE_CONFLICT_TARGET_ID = 'a1000000-0000-4000-8000-000000000102'
+
 /** Label key the DELETE mock uses to force a lifecycle conflict (409). */
 export const MOCK_DELETE_CONFLICT_LABEL = 'mock_delete_conflict'
+
+/** Label key the PATCH mock uses to force a concurrent-edit conflict (409). */
+export const MOCK_UPDATE_CONFLICT_LABEL = 'mock_update_conflict'
 
 /**
  * Single installed OpenShift / Execution Plane cluster (matches the OpenShift
@@ -25,7 +31,7 @@ const STATUSES = ['active', 'bootstrapping', 'degraded', 'registering', 'failed'
 const REGIONS = ['us-west', 'us-east', 'eu-central', 'ap-south'] as const
 
 /** Extra targets so default page size (20) has a next page for pagination tests. */
-function buildExtraTargets(count: number): ExecutionTargetFacadeRead[] {
+function buildExtraTargets(count: number): ExecutionTargetRead[] {
   return Array.from({ length: count }, (_, index) => {
     const n = index + 1
     const padded = String(n).padStart(2, '0')
@@ -55,6 +61,7 @@ function buildExtraTargets(count: number): ExecutionTargetFacadeRead[] {
         pool: `pool-${padded}`,
         integration_id: INSTALLED_EXECUTION_PLANE_CLUSTER_ID,
         ...(id === IN_USE_DELETE_CONFLICT_TARGET_ID ? { [MOCK_DELETE_CONFLICT_LABEL]: 'in-use' } : {}),
+        ...(id === UPDATE_CONFLICT_TARGET_ID ? { [MOCK_UPDATE_CONFLICT_LABEL]: 'stale' } : {}),
       },
       created_at: mockDate.daysAgo1,
       last_ran_at: index % 4 === 0 ? mockDate.hoursAgo2 : null,
@@ -62,8 +69,8 @@ function buildExtraTargets(count: number): ExecutionTargetFacadeRead[] {
   })
 }
 
-/** Seeded Execution Plane facade targets for mock API / visual regression / pagination. */
-export const executionTargets: ExecutionTargetFacadeRead[] = [
+/** Seeded Execution Plane targets for mock API / visual regression / pagination. */
+export const executionTargets: ExecutionTargetRead[] = [
   {
     id: DEFAULT_EXECUTION_TARGET_ID,
     cluster_id: INSTALLED_EXECUTION_PLANE_CLUSTER_ID,

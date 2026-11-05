@@ -27,6 +27,11 @@ export const CreateExecutionTarget = lazy(() =>
     default: m.CreateExecutionTarget,
   }))
 )
+export const EditExecutionTarget = lazy(() =>
+  import('../routes/execution-plane/EditExecutionTarget').then((m) => ({
+    default: m.EditExecutionTarget,
+  }))
+)
 export const ExecutionTargetDetail = lazy(() => import('../routes/execution-plane/ExecutionTargetDetail'))
 export const AccessManagement = lazy(() =>
   import('../routes/access-management/AccessManagement').then((m) => ({ default: m.AccessManagement }))

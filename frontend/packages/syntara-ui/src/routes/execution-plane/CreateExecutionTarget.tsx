@@ -1,16 +1,14 @@
 import { ActionGroup, Button, Form, Stack } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
-import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 
 import { AppRoute } from '../../app/AppRoute'
 import { breadcrumbsConfigureExecutionTarget } from '../../app/breadcrumbBuilders'
-import { executionPlaneClient, integrationsClient } from '../../client'
+import { executionPlaneClient } from '../../client'
 import { SynForm } from '../../components/forms/SynForm'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
-import { SynLink } from '../../components/SynLink'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../hooks/useDirtyFormGuard'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
@@ -19,14 +17,15 @@ import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
 
-import styles from './CreateExecutionTarget.module.css'
 import { CreateExecutionTargetFields } from './CreateExecutionTargetFields'
+import styles from './ExecutionTargetForm.module.css'
 import {
   EXECUTION_TARGET_FORM_DEFAULT_VALUES,
   executionTargetFormSchema,
   toExecutionTargetCreateBody,
   type ExecutionTargetFormData,
 } from './executionTargetFormSchema'
+import { useExecutionTargetClusterName } from './useExecutionTargetClusterName'
 
 const PAGE_TITLE = 'Configure execution target'
 
@@ -34,19 +33,7 @@ export function CreateExecutionTarget() {
   const navigate = useNavigate()
   const docLink = useDocLink('executionPlane')
   const { showAlert } = useAlerts()
-
-  const clusterQuery = integrationsClient.useQuery('get', '/integrations', {
-    params: {
-      query: {
-        integration_type: IntegrationTypeEnum.OPENSHIFT,
-        limit: 1,
-        include_total: true,
-      },
-    },
-  })
-
-  const openshiftIntegrations = clusterQuery.data?.resources
-  const clusterName = clusterQuery.data?.total === 1 ? openshiftIntegrations?.[0]?.name?.trim() || undefined : undefined
+  const { clusterName, isClusterPending } = useExecutionTargetClusterName()
 
   const form = useSynForm({
     schema: executionTargetFormSchema,
@@ -110,18 +97,19 @@ export function CreateExecutionTarget() {
               >
                 Configure execution target
               </Button>
-              <SynLink
-                to={AppRoute.ExecutionPlane.Root}
+              <Button
+                variant="link"
                 onClick={
                   isSaving
-                    ? (event) => {
-                        event.preventDefault()
+                    ? undefined
+                    : () => {
+                        detachPromise(navigate({ to: AppRoute.ExecutionPlane.Root }))
                       }
-                    : undefined
                 }
+                isAriaDisabled={isSaving}
               >
                 Cancel
-              </SynLink>
+              </Button>
             </ActionGroup>
           }
           panelMainBodyProps={{ className: styles.panelBody }}
@@ -129,7 +117,7 @@ export function CreateExecutionTarget() {
           <Stack className={styles.formStack}>
             <Form id="execution-target-create-form" onSubmit={handleSubmit(onSubmit)}>
               <SynForm form={form}>
-                <CreateExecutionTargetFields clusterName={clusterName} isClusterPending={clusterQuery.isPending} />
+                <CreateExecutionTargetFields clusterName={clusterName} isClusterPending={isClusterPending} />
               </SynForm>
             </Form>
           </Stack>

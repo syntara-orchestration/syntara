@@ -228,10 +228,13 @@ describe('CreateExecutionTarget', () => {
     expect(navigatedToDetail).toBe(false)
   })
 
-  it('renders Cancel as a link to the execution plane list', async () => {
+  it('navigates to the execution plane list when Cancel is clicked', async () => {
+    const user = userEvent.setup()
     render(<CreateExecutionTarget />, { wrapper })
 
-    expect(await screen.findByRole('link', { name: 'Cancel' })).toHaveAttribute('href', AppRoute.ExecutionPlane.Root)
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }))
+
+    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.ExecutionPlane.Root })
   })
 
   it('has no accessibility violations', async () => {

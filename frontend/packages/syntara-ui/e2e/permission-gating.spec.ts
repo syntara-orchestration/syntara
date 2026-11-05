@@ -967,7 +967,7 @@ test.describe('Permission gating — Credential actions', () => {
 // ── Action gating — Execution targets ────────────────────────────────────
 //
 // Backend role conventions: execution_target:read = admin+auditor;
-// execution_target:create / execution_target:delete = admin only. Viewer/user
+// execution_target:create / update / delete = admin only. Viewer/user
 // cannot load the list at all — they are gated by the route/nav read check,
 // not a disabled create button.
 
@@ -1000,7 +1000,7 @@ test.describe('Permission gating — Execution target actions', () => {
     await expect(auditorApp.getByRole('tooltip').filter({ hasText: 'execution_target:create' })).toBeVisible()
   })
 
-  test('auditor: Delete execution target kebab is aria-disabled', async ({ app, auditorApp }) => {
+  test('auditor: Edit and Delete execution target kebabs are aria-disabled', async ({ app, auditorApp }) => {
     test.skip(
       !(await isExecutionPlaneListReachable(app)),
       'Execution Plane API is not available in this environment (compose CI does not start execution-plane-api)'
@@ -1021,7 +1021,11 @@ test.describe('Permission gating — Execution target actions', () => {
     await auditorApp.getByPlaceholder('Filter by name').fill(seededName)
     await auditorApp.getByRole('button', { name: 'Apply filter' }).click()
     await expect(row).toBeVisible({ timeout: 15_000 })
-    await openRowKebab(row, /Delete execution target/i)
+    await openRowKebab(row, /Edit execution target/i)
+    await expect(auditorApp.getByRole('menuitem', { name: /Edit execution target/i })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
     await expect(auditorApp.getByRole('menuitem', { name: /Delete execution target/i })).toHaveAttribute(
       'aria-disabled',
       'true'
@@ -1050,6 +1054,16 @@ test.describe('Permission gating — Execution target actions', () => {
 
   test('auditor: direct URL to Configure execution target shows access denied', async ({ auditorApp }) => {
     await auditorApp.goto(toAppUrl('/execution-plane/create'))
+    await expect(auditorApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+  })
+
+  test('viewer: direct URL to Edit execution target shows access denied', async ({ viewerApp }) => {
+    await viewerApp.goto(toAppUrl('/execution-plane/a1000000-0000-4000-8000-000000000002/edit'))
+    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+  })
+
+  test('auditor: direct URL to Edit execution target shows access denied', async ({ auditorApp }) => {
+    await auditorApp.goto(toAppUrl('/execution-plane/a1000000-0000-4000-8000-000000000002/edit'))
     await expect(auditorApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
   })
 })

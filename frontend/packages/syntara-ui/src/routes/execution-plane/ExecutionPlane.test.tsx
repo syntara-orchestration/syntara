@@ -135,6 +135,16 @@ describe('ExecutionPlane', () => {
     expect(screen.getByRole('button', { name: 'Actions for Staging OpenShift' })).toBeInTheDocument()
   })
 
+  it('navigates to the edit page from the row actions menu', async () => {
+    const user = userEvent.setup()
+    render(<ExecutionPlane />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Staging OpenShift' }))
+    await user.click(screen.getByRole('menuitem', { name: /Edit execution target/i }))
+
+    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/execution-plane/et-002/edit' })
+  })
+
   it('opens delete confirmation from the row actions menu', async () => {
     const user = userEvent.setup()
     render(<ExecutionPlane />, { wrapper })
@@ -148,7 +158,7 @@ describe('ExecutionPlane', () => {
     expect(within(dialog).getByRole('checkbox', { name: /permanently deleted/i })).toBeInTheDocument()
   })
 
-  it('disables delete kebab action when canDelete is false', async () => {
+  it('disables edit and delete kebab actions when update/delete are denied', async () => {
     vi.mocked(useCanI).mockImplementation((action) => ({
       allowed: action === 'create',
       isChecking: false,
@@ -158,8 +168,8 @@ describe('ExecutionPlane', () => {
     render(<ExecutionPlane />, { wrapper })
 
     await user.click(await screen.findByRole('button', { name: 'Actions for Staging OpenShift' }))
-    const deleteItem = screen.getByRole('menuitem', { name: /Delete execution target/i })
-    expect(deleteItem).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('menuitem', { name: /Edit execution target/i })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('menuitem', { name: /Delete execution target/i })).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('treats 202 Accepted as success, refetches, and leaves the pagination cursor unchanged', async () => {

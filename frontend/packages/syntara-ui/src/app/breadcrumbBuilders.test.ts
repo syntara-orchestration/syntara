@@ -25,6 +25,7 @@ import {
   breadcrumbsUserFormLoading,
   breadcrumbsIntegrationDetail,
   breadcrumbsConfigureExecutionTarget,
+  breadcrumbsEditExecutionTarget,
   breadcrumbsExecutionTargetDetail,
   breadcrumbsExecutionTargetDetailEarlyShell,
   breadcrumbsServiceAccountDetail,
@@ -107,6 +108,11 @@ describe('breadcrumbBuilders', () => {
     expect(breadcrumbsConfigureExecutionTarget()).toEqual([
       { label: 'Execution Plane', href: AppRoute.ExecutionPlane.Root },
       { label: 'Configure execution target' },
+    ])
+    expect(breadcrumbsEditExecutionTarget('Prod OpenShift West', '/execution-plane/et-1')).toEqual([
+      { label: 'Execution Plane', href: AppRoute.ExecutionPlane.Root },
+      { label: 'Prod OpenShift West', href: '/execution-plane/et-1' },
+      { label: 'Edit execution target' },
     ])
   })
 
