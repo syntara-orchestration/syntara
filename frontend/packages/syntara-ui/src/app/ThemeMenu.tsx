@@ -3,7 +3,7 @@ import {
   Divider,
   MenuSearch,
   MenuSearchInput,
-  Popover,
+  Popper,
   SelectGroup,
   ToggleGroup,
   ToggleGroupItem,
@@ -20,6 +20,22 @@ import styles from './ThemeMenu.module.css'
 
 const COLOR_SCHEME_TITLE_ID = 'theme-menu-color-scheme'
 const CONTRAST_MODE_TITLE_ID = 'theme-menu-contrast'
+const THEME_PANEL_ID = 'theme-settings-panel'
+
+const POPOVER_POSITION_MODIFIERS: Record<string, string> = {
+  top: 'pf-m-top',
+  bottom: 'pf-m-bottom',
+  left: 'pf-m-left',
+  right: 'pf-m-right',
+  'top-start': 'pf-m-top-left',
+  'top-end': 'pf-m-top-right',
+  'bottom-start': 'pf-m-bottom-left',
+  'bottom-end': 'pf-m-bottom-right',
+  'left-start': 'pf-m-left-top',
+  'left-end': 'pf-m-left-bottom',
+  'right-start': 'pf-m-right-top',
+  'right-end': 'pf-m-right-bottom',
+}
 
 const COLOR_SCHEME_OPTIONS = [
   { value: 'system', label: 'System' },
@@ -65,9 +81,10 @@ function contrastButtonId(value: ContrastPreference): string {
 }
 
 /**
- * Theme preferences open in a PatternFly popover dialog. The segmented toggle
- * groups mirror the PatternFly documentation theme selector. Theme variant
- * (Default vs Project Felt) stays on the brand config, not this panel.
+ * Theme preferences use an expandable, non-modal panel. Keeping the panel in
+ * the normal tab order lets keyboard users move through it and continue into
+ * the page without trapping focus. Theme variant (Default vs Project Felt)
+ * stays on the brand config, not this panel.
  */
 export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
   const { colorSchemePreference, setColorScheme, contrastPreference, setContrastMode } = useColorScheme()
@@ -84,84 +101,98 @@ export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
         variant="plain"
         icon={colorSchemeIcon(colorSchemePreference)}
         aria-label={toggleName}
-        aria-haspopup="dialog"
+        aria-controls={isOpen ? THEME_PANEL_ID : undefined}
         onClick={() => setIsOpen((open) => !open)}
       >
         Theme
       </Button>
-      <Popover
+      <Popper
         isVisible={isOpen}
         triggerRef={toggleRef}
-        shouldClose={() => setIsOpen(false)}
-        aria-label="Theme settings"
-        showClose={false}
-        withFocusTrap
-        position="right-end"
+        appendTo="inline"
+        placement="right-end"
         distance={8}
-        hasNoPadding
-        hasAutoWidth
-        className={styles.themeMenu}
-        bodyContent={
+        positionModifiers={POPOVER_POSITION_MODIFIERS}
+        onDocumentClick={(event, trigger, popper) => {
+          if (!(event?.target instanceof Node)) {
+            return
+          }
+          if (trigger?.contains(event.target) || popper?.contains(event.target)) {
+            return
+          }
+          setIsOpen(false)
+        }}
+        onDocumentKeyDown={(event) => {
+          if (event?.key === 'Escape') {
+            setIsOpen(false)
+            toggleRef.current?.focus()
+          }
+        }}
+        popper={
           <div
-            className={styles.themeContent}
-            role="presentation"
-            onMouseDown={(event) => {
-              // PatternFly's Popover disables its trap on bubbled mousedown; keep this
-              // presentational wrapper from disabling the modal dialog's focus trap.
-              event.stopPropagation()
-            }}
+            id={THEME_PANEL_ID}
+            role="group"
+            aria-label="Theme settings"
+            className={`pf-v6-c-popover pf-m-no-padding pf-m-width-auto ${styles.themeMenu}`}
           >
-            <SelectGroup
-              label={
-                <div className="pf-v6-c-menu__group-title" id={COLOR_SCHEME_TITLE_ID}>
-                  Color scheme
+            <div className="pf-v6-c-popover__arrow" />
+            <div className="pf-v6-c-popover__content">
+              <div className="pf-v6-c-popover__body">
+                <div className={styles.themeContent}>
+                  <SelectGroup
+                    label={
+                      <div className="pf-v6-c-menu__group-title" id={COLOR_SCHEME_TITLE_ID}>
+                        Color scheme
+                      </div>
+                    }
+                  >
+                    <MenuSearch>
+                      <MenuSearchInput>
+                        <ToggleGroup aria-labelledby={COLOR_SCHEME_TITLE_ID}>
+                          {COLOR_SCHEME_OPTIONS.map((option) => (
+                            <ToggleGroupItem
+                              key={option.value}
+                              text={option.label}
+                              buttonId={colorSchemeButtonId(option.value)}
+                              isSelected={colorSchemePreference === option.value}
+                              onChange={() => {
+                                setColorScheme(option.value)
+                              }}
+                            />
+                          ))}
+                        </ToggleGroup>
+                      </MenuSearchInput>
+                    </MenuSearch>
+                  </SelectGroup>
+                  <Divider />
+                  <SelectGroup
+                    label={
+                      <div className="pf-v6-c-menu__group-title" id={CONTRAST_MODE_TITLE_ID}>
+                        Contrast mode
+                      </div>
+                    }
+                  >
+                    <MenuSearch>
+                      <MenuSearchInput>
+                        <ToggleGroup aria-labelledby={CONTRAST_MODE_TITLE_ID}>
+                          {CONTRAST_OPTIONS.map((option) => (
+                            <ToggleGroupItem
+                              key={option.value}
+                              text={option.label}
+                              buttonId={contrastButtonId(option.value)}
+                              isSelected={contrastPreference === option.value}
+                              onChange={() => {
+                                setContrastMode(option.value)
+                              }}
+                            />
+                          ))}
+                        </ToggleGroup>
+                      </MenuSearchInput>
+                    </MenuSearch>
+                  </SelectGroup>
                 </div>
-              }
-            >
-              <MenuSearch>
-                <MenuSearchInput>
-                  <ToggleGroup aria-labelledby={COLOR_SCHEME_TITLE_ID}>
-                    {COLOR_SCHEME_OPTIONS.map((option) => (
-                      <ToggleGroupItem
-                        key={option.value}
-                        text={option.label}
-                        buttonId={colorSchemeButtonId(option.value)}
-                        isSelected={colorSchemePreference === option.value}
-                        onChange={() => {
-                          setColorScheme(option.value)
-                        }}
-                      />
-                    ))}
-                  </ToggleGroup>
-                </MenuSearchInput>
-              </MenuSearch>
-            </SelectGroup>
-            <Divider />
-            <SelectGroup
-              label={
-                <div className="pf-v6-c-menu__group-title" id={CONTRAST_MODE_TITLE_ID}>
-                  Contrast mode
-                </div>
-              }
-            >
-              <MenuSearch>
-                <MenuSearchInput>
-                  <ToggleGroup aria-labelledby={CONTRAST_MODE_TITLE_ID}>
-                    {CONTRAST_OPTIONS.map((option) => (
-                      <ToggleGroupItem
-                        key={option.value}
-                        text={option.label}
-                        buttonId={contrastButtonId(option.value)}
-                        isSelected={contrastPreference === option.value}
-                        onChange={() => {
-                          setContrastMode(option.value)
-                        }}
-                      />
-                    ))}
-                  </ToggleGroup>
-                </MenuSearchInput>
-              </MenuSearch>
-            </SelectGroup>
+              </div>
+            </div>
           </div>
         }
       />
