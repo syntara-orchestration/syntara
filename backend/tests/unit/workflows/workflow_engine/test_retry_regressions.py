@@ -5,6 +5,7 @@ actually produces. Earlier tests missed these because they encoded assumptions
 about the definition format rather than the format itself.
 """
 
+import asyncio
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -606,7 +607,8 @@ def test_evaluate_converge_failure_does_not_cancel_selected_retry_branch() -> No
     fail = MagicMock()
     wf._fail_converge_node = fail  # type: ignore[method-assign]
 
-    wf._evaluate_converge_failure("join", graph.get_node("join"), graph, pending_tasks={"b2": object()})
+    pending: dict[str, asyncio.Task[Any]] = {"b2": MagicMock(spec=asyncio.Task)}
+    wf._evaluate_converge_failure("join", graph.get_node("join"), graph, pending_tasks=pending)
 
     fail.assert_not_called()
 
@@ -619,7 +621,8 @@ def test_check_converge_successors_does_not_fail_rerunning_join_while_selected_b
     fail = MagicMock()
     wf._fail_converge_node = fail  # type: ignore[method-assign]
 
-    wf._check_converge_successors("b1", graph, pending_tasks={"b2": object()})
+    pending: dict[str, asyncio.Task[Any]] = {"b2": MagicMock(spec=asyncio.Task)}
+    wf._check_converge_successors("b1", graph, pending_tasks=pending)
 
     fail.assert_not_called()
 
@@ -633,7 +636,7 @@ def test_fail_converge_does_not_detach_selected_retry_path() -> None:
     wf._timeout_tasks = {}
     wf._has_unhandled_failure = False
     wf._timed_out_converge_nodes = set()
-    pending: dict[str, Any] = {"b2": object()}
+    pending: dict[str, asyncio.Task[Any]] = {"b2": MagicMock(spec=asyncio.Task)}
 
     with patch("syntara.workflows.workflow_engine.converge_mixin.workflow") as patched:
         patched.logger = MagicMock()

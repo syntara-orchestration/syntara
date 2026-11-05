@@ -62,7 +62,7 @@ export function unavailableOutputIds(preview: RetryFromFailurePreview | undefine
 }
 
 /** Failed nodes replaced by the current unavailable sanitized outputs. */
-export function replacedFailedNodeIds(
+function replacedFailedNodeIds(
   preview: RetryFromFailurePreview | undefined,
   unavailableIds: readonly string[]
 ): string[] {
@@ -72,7 +72,7 @@ export function replacedFailedNodeIds(
     .map(([failedId]) => failedId)
 }
 
-export function joinDisplayNames(names: readonly string[]): string {
+function joinDisplayNames(names: readonly string[]): string {
   if (names.length <= 1) return names[0] ?? ''
   if (names.length === 2) return `${names[0]} and ${names[1]}`
   return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`
