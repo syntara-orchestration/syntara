@@ -44,6 +44,11 @@ if [[ "${E2E_EP}" == "1" ]]; then
     # mappings (it falls back to the container port); export the variable so the
     # documented 8001 publish port is actually used.
     export EP_API_PORT
+    # Script-node pods exit in a couple of seconds, but the transport waits
+    # for the Job deletion (foreground propagation, bounded by the grace
+    # period) before finishing a dispatch. The default 30s grace would add
+    # that delay to every script node in the e2e run; 5s is plenty locally.
+    export EP_NODE_GRACE_SECONDS="${EP_NODE_GRACE_SECONDS:-5}"
 fi
 
 # Follow the logs of every pod in the EP kind cluster while the tests run.
