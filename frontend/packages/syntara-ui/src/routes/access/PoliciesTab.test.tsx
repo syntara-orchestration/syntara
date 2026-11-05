@@ -157,12 +157,13 @@ describe('PoliciesTab', () => {
     expect(screen.getByText('Custom')).toBeInTheDocument()
   })
 
-  it.each(['any', 'project'])('shows the built-in default allow and %s step deny', (scope) => {
+  it.each(['any', 'project'])('shows the custom default allow and built-in %s step deny', (scope) => {
     const description = 'Write any step_type'
     setupPoliciesQuery([
       {
         ...samplePolicies[0],
         name: 'step_type:write:any',
+        is_builtin: false,
         description,
         statements: [{ effect: 'allow', actions: ['step_type:write'], scope: 'any' }],
       },
@@ -181,8 +182,8 @@ describe('PoliciesTab', () => {
     render(<PoliciesTab />, { wrapper })
 
     const allowRow = screen.getByRole('row', { name: /step_type:write:any Write any step_type/ })
-    expect(within(allowRow).getByText('Built-in')).toBeInTheDocument()
-    expect(within(allowRow).queryByText('Custom')).not.toBeInTheDocument()
+    expect(within(allowRow).getByText('Custom')).toBeInTheDocument()
+    expect(within(allowRow).queryByText('Built-in')).not.toBeInTheDocument()
     expect(within(allowRow).getByText('Allow')).toBeInTheDocument()
     expect(within(allowRow).getByText(description)).toBeInTheDocument()
     const denyRow = screen.getByRole('row', { name: new RegExp(`step_type:write:${scope}:deny:script`) })

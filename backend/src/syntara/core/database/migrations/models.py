@@ -19,6 +19,7 @@ from syntara.core.models.group import Group
 from syntara.core.models.installation import Installation
 from syntara.core.models.principal import Principal
 from syntara.core.models.secret import EncryptedSecret, Secret
+from syntara.core.models.seed_marker import SeedMarker
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.files.models import FileMetadata
@@ -43,6 +44,7 @@ ALL_MODELS = [
     Principal,
     GlobalRevocationTimestamp,
     Installation,
+    SeedMarker,
     Invocation,
     User,
     Workflow,
