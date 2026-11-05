@@ -1,5 +1,5 @@
 import { Checkbox, Content, Stack, StackItem } from '@patternfly/react-core'
-import { useMemo, useEffect, useRef, useState, type Dispatch } from 'react'
+import { useMemo, useState, type Dispatch } from 'react'
 
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import type { DialogState } from '../../../hooks/useDialogState'
@@ -10,6 +10,7 @@ import { WorkflowDeleteDialog } from '../../workflows/WorkflowDeleteDialog'
 import type { BuilderAction } from '../builderReducer'
 import { useBuilderImportHandlers, type UseBuilderImportHandlersParams } from '../hooks/useBuilderImportHandlers'
 import type { PendingImportData } from '../useWorkflowImportExport'
+import { getRunConfirmDismissed, setRunConfirmDismissed } from '../utils/runConfirmPreference'
 import { activitiesReferenceTrigger, hasNonEmptyInputSchema } from '../utils/triggerReferenceCheck'
 import type { ConflictAction, ConflictInfo } from '../VersionConflictDialog'
 import { VersionConflictDialog } from '../VersionConflictDialog'
@@ -18,24 +19,6 @@ import { ImportConfirmationDialog } from './ImportConfirmationDialog'
 import type { RunStepDialogData, RunStepExecutionCreatedOptions } from './RunStepDialog'
 import { RunStepDialog } from './RunStepDialog'
 import { RunWorkflowModal } from './RunWorkflowModal'
-
-const RUN_CONFIRM_DISMISSED_KEY = 'syntara-run-workflow-confirm-dismissed'
-
-function getRunConfirmDismissed(): boolean {
-  try {
-    return localStorage.getItem(RUN_CONFIRM_DISMISSED_KEY) === 'true'
-  } catch {
-    return false
-  }
-}
-
-function setRunConfirmDismissed(): void {
-  try {
-    localStorage.setItem(RUN_CONFIRM_DISMISSED_KEY, 'true')
-  } catch {
-    // ignore – storage unavailable
-  }
-}
 
 type BuilderDialogsProps = Readonly<{
   workflowName: string
@@ -100,19 +83,6 @@ function useRunConfirmState({
   }
 
   const skipConfirm = confirmDialogOpen && getRunConfirmDismissed()
-
-  // Auto-run when confirmation is skipped and no input dialog is needed
-  const autoRanRef = useRef(false)
-  useEffect(() => {
-    if (skipConfirm && !showInputDialog && confirmDialogOpen && !autoRanRef.current) {
-      autoRanRef.current = true
-      handleRunWorkflow(undefined, triggerNodeId)
-      dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
-    }
-    if (!confirmDialogOpen) {
-      autoRanRef.current = false
-    }
-  }, [skipConfirm, showInputDialog, confirmDialogOpen, handleRunWorkflow, dispatch, triggerNodeId])
 
   return {
     showConfirmStep: confirmDialogOpen && !skipConfirm && !confirmedRun,

@@ -91,6 +91,15 @@ describe('ActionStepForm', () => {
     expect(screen.queryByRole('button', { name: 'HTTP Method' })).not.toBeInTheDocument()
   })
 
+  it('renders action name and executor badge in the step editor header', () => {
+    renderWithHeader(
+      <ActionStepForm onSubmit={mockOnSubmit} initialData={{ name: 'Header action', executor: 'script' }} />
+    )
+
+    expect(screen.getByDisplayValue('Header action')).toBeInTheDocument()
+    expect(screen.getByText('Developer Preview')).toBeInTheDocument()
+  })
+
   it('submits form even with empty script (permissive schema)', async () => {
     const user = userEvent.setup()
     renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} />)
