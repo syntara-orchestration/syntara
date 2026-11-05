@@ -95,13 +95,22 @@ export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
         shouldClose={() => setIsOpen(false)}
         aria-label="Theme settings"
         showClose={false}
+        withFocusTrap
         position="right-end"
         distance={8}
         hasNoPadding
         hasAutoWidth
         className={styles.themeMenu}
         bodyContent={
-          <div className={styles.themeContent}>
+          <div
+            className={styles.themeContent}
+            role="presentation"
+            onMouseDown={(event) => {
+              // PatternFly's Popover disables its trap on bubbled mousedown; keep this
+              // presentational wrapper from disabling the modal dialog's focus trap.
+              event.stopPropagation()
+            }}
+          >
             <SelectGroup
               label={
                 <div className="pf-v6-c-menu__group-title" id={COLOR_SCHEME_TITLE_ID}>

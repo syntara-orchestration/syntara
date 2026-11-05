@@ -112,9 +112,14 @@ describe('ThemeMenu', () => {
 
     await user.click(themeButton)
     const firstSystem = screen.getAllByRole('button', { name: 'System' })[0]
+    const light = screen.getByRole('button', { name: 'Light' })
     const glass = screen.getByRole('button', { name: 'Glass' })
     await waitFor(() => expect(firstSystem).toHaveFocus())
-    for (let step = 0; step < 6; step += 1) {
+    await user.click(light)
+    expect(light).toHaveAttribute('aria-pressed', 'true')
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Dark' })).toHaveFocus()
+    for (let step = 0; step < 4; step += 1) {
       await user.tab()
     }
     expect(glass).toHaveFocus()
