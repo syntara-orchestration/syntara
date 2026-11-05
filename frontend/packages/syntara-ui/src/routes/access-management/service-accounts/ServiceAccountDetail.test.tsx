@@ -11,7 +11,13 @@ import { AlertProvider } from '../../../providers/alerts'
 import { routerTestState } from '../../../test/setup'
 import { accessClient } from '../../access/accessClient'
 
-import { ServiceAccountDetail } from './ServiceAccountDetail'
+import {
+  ServiceAccountDetail,
+  ServiceAccountDetailAssignmentsTabRoute,
+  ServiceAccountDetailCredentialsTabRoute,
+  ServiceAccountDetailDetailsTabRoute,
+  ServiceAccountDetailUnknownTabRoute,
+} from './ServiceAccountDetail'
 import type { ServiceAccountRead } from './serviceAccountTypes'
 import { useServiceAccountPermissions } from './useServiceAccountPermissions'
 
@@ -30,6 +36,30 @@ vi.mock('../../access/accessClient', () => ({
 }))
 
 vi.mock('./useServiceAccountPermissions')
+
+function ServiceAccountDetailTestOutlet() {
+  const tab = routerTestState.pathname.split('/').at(-1)
+  if (tab === 'credentials') return <ServiceAccountDetailCredentialsTabRoute />
+  if (tab === 'assignments') return <ServiceAccountDetailAssignmentsTabRoute />
+  if (tab && !['details', 'sa-1'].includes(tab)) return <ServiceAccountDetailUnknownTabRoute />
+  return <ServiceAccountDetailDetailsTabRoute />
+}
+
+vi.mock('@tanstack/react-router', async () => {
+  const actual = await vi.importActual('@tanstack/react-router')
+  const { routerTestState, MockLink } = await import('../../../test/setup')
+  return {
+    ...actual,
+    Link: MockLink,
+    Outlet: ServiceAccountDetailTestOutlet,
+    useNavigate: () => routerTestState.navigate,
+    useParams: vi.fn(() => ({})),
+    useRouterState: (opts?: { select?: (state: { location: { pathname: string; searchStr: string } }) => unknown }) => {
+      const state = { location: { pathname: routerTestState.pathname, searchStr: routerTestState.searchStr } }
+      return opts?.select ? opts.select(state) : state
+    },
+  }
+})
 
 vi.mock('./CredentialsTab', () => ({
   CredentialsTab: () => <div data-testid="credentials-tab" />,

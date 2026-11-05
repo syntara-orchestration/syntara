@@ -99,7 +99,7 @@ export async function addManualTrigger(page: Page, name = 'Manual trigger') {
 /** Add a form trigger. Must be called on a fresh /workflow-builder/new page. */
 export async function addFormTrigger(page: Page, name = 'Form trigger') {
   await expect(page.getByRole('progressbar', { name: 'Loading' })).not.toBeVisible({ timeout: 15_000 })
-  await expect(page.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
   await page.getByRole('button', { name: 'Form trigger' }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
   await page.getByRole('button', { name: 'Create', exact: true }).click()

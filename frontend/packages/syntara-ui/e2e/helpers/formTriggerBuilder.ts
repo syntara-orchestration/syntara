@@ -13,11 +13,11 @@ import {
   parseFormDefinitionFieldFromApi,
   scrollFormFieldBuilderIntoView,
 } from './formFieldBuilder'
-import { addFormTrigger, addScriptNode } from './v2-nodes'
+import { addFormTrigger, addScriptStep } from './v2-steps'
 import { clickSaveAndWait } from './workflow-save'
 import {
-  openNodeForEditing,
-  saveAndCloseNodeForm,
+  openStepForEditing,
+  saveAndCloseStepForm,
   saveWorkflow,
   selectProjectIfRequired,
   waitForUIReady,
@@ -69,7 +69,7 @@ export async function openFormTriggerForEditing(page: Page, triggerName: string)
   await expect(async () => {
     await layoutCanvas(page)
     await waitForUIReady(page)
-    await openNodeForEditing(page, triggerName)
+    await openStepForEditing(page, triggerName)
     await expect(page.getByRole('heading', { name: 'Form fields', exact: true })).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: openTimeout, intervals: [500, 1_000, 2_000] })
 }
@@ -83,7 +83,7 @@ export async function createFormTriggerWorkflowWithBuilderOpen(
   await page.goto(toAppUrl('/workflow-builder/new'))
   await selectProjectIfRequired(page)
   await addFormTrigger(page, triggerName)
-  await addScriptNode(page, 'Next step', 'print("ok")')
+  await addScriptStep(page, 'Next step', 'print("ok")')
   await expect(page.getByRole('button', { name: 'Save workflow' })).toBeEnabled({ timeout: 15_000 })
   await saveWorkflow(page, workflowName, { timeout: FORM_TRIGGER_BUILDER_SAVE_TIMEOUT })
   const triggerNode = page.getByRole('group').filter({ has: page.getByText(triggerName, { exact: true }) })
@@ -94,7 +94,7 @@ export async function createFormTriggerWorkflowWithBuilderOpen(
 }
 
 export async function saveFormTriggerAndWorkflow(page: Page): Promise<void> {
-  await saveAndCloseNodeForm(page, true)
+  await saveAndCloseStepForm(page, true)
   await expect(page.getByRole('button', { name: 'Save workflow' })).toBeEnabled({ timeout: 15_000 })
   await clickSaveAndWait(page, { timeout: FORM_TRIGGER_BUILDER_SAVE_TIMEOUT })
 }
