@@ -420,17 +420,15 @@ def _version_reason(
     completed_outputs: dict[str, list[Any]],
     successors: dict[str, set[str]] | None = None,
     *,
-    allow_sanitized_expansion: bool,
+    sanitized_expansion_seeds: set[str] | None,
 ) -> tuple[str | None, list[str], list[str], list[str]]:
     """Rejection reason, blocking sanitized nodes, auto-included nodes, and the final selection.
 
-    Either way, the full transitive chain of sanitized dependencies is
-    resolved first. For an explicit selection of a failed node that still
-    needs sanitized output, that chain rejects outright (``sanitized`` names
-    every node in it, the selection is unchanged). For the default selection
-    (SDP AC-15) or an explicit selection of a sanitized replacement, the
-    selection is instead expanded to include the whole chain as additional
-    retry points, and what was auto-included is reported instead of rejecting.
+    The full transitive chain of sanitized dependencies is resolved first.
+    ``None`` means the default selection may expand from every selected point;
+    an explicit selection may expand only from its selected sanitized
+    replacements. Any sanitized dependency still needed by the combined
+    explicit selection after that expansion rejects the request.
     """
     if snapshot is None:
         return "original workflow version no longer exists", [], [], normalized
@@ -440,20 +438,27 @@ def _version_reason(
     if missing:
         return f"not nodes in the executed workflow version: {', '.join(missing)}", [], [], normalized
 
-    expanded, added = _expand_sanitized_chain(snapshot_def, set(normalized), completed_outputs, successors)
-    if not added:
-        return None, [], [], sorted(expanded)
-    if not allow_sanitized_expansion:
+    if sanitized_expansion_seeds is None:
+        expanded, added = _expand_sanitized_chain(snapshot_def, set(normalized), completed_outputs, successors)
+        return None, [], added, sorted(expanded)
+
+    replacement_expanded, added = _expand_sanitized_chain(
+        snapshot_def,
+        sanitized_expansion_seeds,
+        completed_outputs,
+        successors,
+    )
+    expanded = set(normalized) | (replacement_expanded - sanitized_expansion_seeds)
+    sanitized = _tainted_nodes(snapshot_def, sorted(expanded), completed_outputs, successors)
+    if sanitized:
         return (
-            (
-                "upstream nodes have sanitized outputs referenced on the retry path "
-                f"({', '.join(added)}); retrying would inject redacted data"
-            ),
-            added,
+            "upstream nodes have sanitized outputs referenced on the retry path "
+            f"({', '.join(sanitized)}); retrying would inject redacted data",
+            sanitized,
             [],
             normalized,
         )
-    return None, [], added, sorted(expanded)
+    return None, [], sorted(set(added) - set(normalized)), sorted(expanded)
 
 
 def _override_reason(
@@ -640,7 +645,7 @@ async def validate_retry_from_failure(
         snapshot,
         completed_outputs,
         successors,
-        allow_sanitized_expansion=is_default_selection or bool(set(normalized) & replacement_ids),
+        sanitized_expansion_seeds=(None if is_default_selection else set(normalized) & replacement_ids),
     )
     reason = (
         _state_reason(source)
