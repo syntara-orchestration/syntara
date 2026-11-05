@@ -145,6 +145,44 @@ class ActivityNodeSyncMixin:
                 execution_id=metadata.execution_id,
             )
 
+    async def _sync_cancelled_step_nodes(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+    ) -> None:
+        """Query cancelled sub-workflow step nodes and mark them CANCELLED in the database.
+
+        A cancelled child sub-workflow is a cancelled *step*: it stays in the workflow's
+        failed_nodes for flow-control but is excluded from get_failed_nodes, so without
+        this it would be left non-terminal and _finalize_non_terminal_activities would
+        label it SKIPPED. Writing CANCELLED first wins that race; the finalizer's
+        terminal-status guard then leaves the record untouched (mirrors _sync_detached_nodes).
+        """
+        cancelled_node_map: dict[str, str] = {}
+        try:
+            cancelled_node_map = await handle.query("get_cancelled_step_nodes")
+        except Exception:
+            logger.exception(
+                "Error querying cancelled step nodes",
+                execution_id=metadata.execution_id,
+            )
+
+        if not cancelled_node_map:
+            return
+
+        try:
+            await self._sync_nodes_to_terminal_status(
+                metadata,
+                node_ids=list(cancelled_node_map.keys()),
+                target_status=ActivityStatus.CANCELLED,
+                error_map=cancelled_node_map,
+            )
+        except Exception:
+            logger.exception(
+                "Error syncing cancelled step nodes to cancelled status",
+                execution_id=metadata.execution_id,
+            )
+
     async def _ensure_activity_records_exist(
         self,
         metadata: ExecutionMonitorMetadata,

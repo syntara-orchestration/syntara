@@ -214,6 +214,10 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self._secret_values: set[str] = set()
         self._has_unhandled_failure: bool = False
         self._cancelled_node: str | None = None
+        # Sub-workflow nodes whose child was cancelled: cancelled *steps* that stay in
+        # failed_nodes for flow-control but are surfaced as CANCELLED (not FAILED) and do
+        # not cancel the whole parent run (unlike _cancelled_node).
+        self._cancelled_step_nodes: set[str] = set()
         self._runtime_settings = {}  # populated by run() after settings fetch
         self.pre_resolved_outputs: dict[str, dict[str, Any]] = pre_resolved_outputs or {}
         self.stop_after_nodes: set[str] = set(stop_after_nodes) if stop_after_nodes else set()
@@ -389,6 +393,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         app_error = self._extract_application_error(error)
         error_message = self._resolve_failure_message(node_id, error, app_error, graph)
         is_cancellation = app_error is not None and app_error.type == "InvocationCancelledError"
+        is_cancelled_step = app_error is not None and app_error.type == "SubWorkflowCancelledError"
 
         namespace_entry = self._extract_failure_output(node_id, app_error, graph)
 
@@ -408,8 +413,16 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             workflow.logger.info(f"Node {node_id} cancelled: {error_message}")
         else:
             self.failed_nodes[node_id] = error_message
-            namespace_entry["status"] = "failed"
-            workflow.logger.error(f"Node {node_id} failed: {error_message}")
+            if is_cancelled_step:
+                # Cancelled sub-workflow step: stays in failed_nodes for flow-control
+                # (continue_on_failure, downstream skip, converge, run-status) but is
+                # surfaced CANCELLED, not FAILED, and does NOT set self._cancelled_node.
+                self._cancelled_step_nodes.add(node_id)
+                namespace_entry["status"] = "cancelled"
+                workflow.logger.info(f"Node {node_id} sub-workflow cancelled: {error_message}")
+            else:
+                namespace_entry["status"] = "failed"
+                workflow.logger.error(f"Node {node_id} failed: {error_message}")
         namespace_entry["error"] = error_message
 
         self.resolver.set_namespace(node_id, namespace_entry)
@@ -1778,7 +1791,11 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             output = self._build_sub_workflow_output(setup_result, child_status)
             output["ErrorMessage"] = f"Sub-workflow {reason}"
             msg = f"Sub-workflow {reason}"
-            raise ApplicationError(msg, {"output": output}, type="SubWorkflowFailedError", non_retryable=True) from exc
+            # A cancelled child is a cancelled *step* (shown cancelled, not retried,
+            # continue_on_failure still applies) that must not cancel the whole parent
+            # run; _handle_node_failure routes SubWorkflowCancelledError accordingly.
+            error_type = "SubWorkflowCancelledError" if child_status == "cancelled" else "SubWorkflowFailedError"
+            raise ApplicationError(msg, {"output": output}, type=error_type, non_retryable=True) from exc
 
         valid_child_statuses = {"completed", "completed_with_errors", "failed", "cancelled"}
         raw_status = child_result.get("status") if isinstance(child_result, dict) else None
@@ -1813,7 +1830,11 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                     detail = f"child step '{step_id}' failed: {failed[step_id]}"
                     output["ErrorMessage"] = f"{output['ErrorMessage']} — {detail}"[:10000]
                     msg = f"{msg} — {detail}"
-            raise ApplicationError(msg, {"output": output}, type="SubWorkflowFailedError", non_retryable=True)
+            # A child that returns status "cancelled" is a cancelled *step*, same as a
+            # Temporal-cancelled child (see the ChildWorkflowError path); surface it as
+            # cancelled, not failed, so it is not stored FAILED.
+            error_type = "SubWorkflowCancelledError" if child_status == "cancelled" else "SubWorkflowFailedError"
+            raise ApplicationError(msg, {"output": output}, type=error_type, non_retryable=True)
 
         return {"output": output}
 
@@ -2030,4 +2051,21 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             Dict mapping node ID to error message
 
         """
-        return dict(self.failed_nodes)
+        return {node_id: msg for node_id, msg in self.failed_nodes.items() if node_id not in self._cancelled_step_nodes}
+
+    @workflow.query
+    def get_cancelled_step_nodes(self) -> dict[str, str]:
+        """Query cancelled sub-workflow step node IDs and their messages.
+
+        Consumed by ActivitySyncService to sync these nodes to ActivityStatus.CANCELLED
+        (mirroring get_detached_nodes). A cancelled child sub-workflow is a cancelled
+        *step*: it stays in failed_nodes for flow-control but is reported here and
+        excluded from get_failed_nodes, so it is persisted CANCELLED rather than FAILED.
+
+        Returns:
+            Dict mapping cancelled step node ID to its message.
+
+        """
+        return {
+            node_id: self.failed_nodes.get(node_id, "Sub-workflow cancelled") for node_id in self._cancelled_step_nodes
+        }
