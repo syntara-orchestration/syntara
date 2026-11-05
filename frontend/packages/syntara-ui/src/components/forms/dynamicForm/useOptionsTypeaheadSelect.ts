@@ -68,10 +68,7 @@ export function useOptionsTypeaheadSelect({
   const placeholder = isLoading ? 'Loading options…' : (loadErrorMessage ?? emptyPlaceholderText)
   const toggleDisabled = Boolean(loadErrorMessage)
 
-  const filteredOptions = useMemo(
-    () => filterOptionsByLabel(options, filterValue),
-    [options, filterValue]
-  )
+  const filteredOptions = useMemo(() => filterOptionsByLabel(options, filterValue), [options, filterValue])
 
   const filteredAdditionalOptions = useMemo(() => {
     if (!additionalOptions?.length) {

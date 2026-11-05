@@ -67,11 +67,7 @@ export function FormFieldBuilderMultiSelectDefaultSelect({
         const selected = normalizeDefault(rhfField.value)
 
         return (
-          <FormGroup
-            label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
-            fieldId={fieldId}
-            labelHelp={labelHelp}
-          >
+          <FormGroup label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL} fieldId={fieldId} labelHelp={labelHelp}>
             <OptionsTypeaheadSelect
               fieldId={fieldId}
               ariaLabel={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}

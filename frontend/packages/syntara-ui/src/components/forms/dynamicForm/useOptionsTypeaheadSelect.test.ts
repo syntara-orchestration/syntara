@@ -49,9 +49,7 @@ describe('useOptionsTypeaheadSelect', () => {
         value: 'a',
         onChange,
         isMulti: false,
-        additionalOptions: [
-          { key: '__none__', label: 'None', isSelected: false, onSelect: onNone },
-        ],
+        additionalOptions: [{ key: '__none__', label: 'None', isSelected: false, onSelect: onNone }],
       })
     )
 

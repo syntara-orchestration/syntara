@@ -98,9 +98,7 @@ export function OptionsTypeaheadSelect({
   )
 
   const renderToggle = useCallback(
-    (toggleRef: React.Ref<MenuToggleElement>) => (
-      <OptionsTypeaheadMenuToggle toggleRef={toggleRef} {...toggleProps} />
-    ),
+    (toggleRef: React.Ref<MenuToggleElement>) => <OptionsTypeaheadMenuToggle toggleRef={toggleRef} {...toggleProps} />,
     [toggleProps]
   )
 
