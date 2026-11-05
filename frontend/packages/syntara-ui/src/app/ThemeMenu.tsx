@@ -1,13 +1,4 @@
-import {
-  Divider,
-  MenuSearch,
-  MenuSearchInput,
-  MenuToggle,
-  SelectGroup,
-  ToggleGroup,
-  ToggleGroupItem,
-  Tooltip,
-} from '@patternfly/react-core'
+import { Divider, MenuToggle, SelectGroup, SelectList, SelectOption, Tooltip } from '@patternfly/react-core'
 import type { MenuToggleElement } from '@patternfly/react-core'
 import { RhUiAutoLightDarkModeIcon, RhUiDarkModeIcon, RhUiLightModeIcon } from '@patternfly/react-icons'
 import { useEffect, useRef, useState } from 'react'
@@ -57,17 +48,9 @@ function colorSchemeIcon(preference: ColorSchemePreference) {
   return <RhUiAutoLightDarkModeIcon />
 }
 
-function colorSchemeButtonId(value: ColorSchemePreference): string {
-  return `theme-color-${value}`
-}
-
-function contrastButtonId(value: ContrastPreference): string {
-  return `theme-contrast-${value}`
-}
-
 /**
  * Masthead theme menu modeled on the PatternFly documentation theme selector:
- * separate toggle groups for color scheme and contrast mode. Theme variant
+ * separate options groups for color scheme and contrast mode. Theme variant
  * (Default vs Project Felt) stays on the brand config, not this menu.
  */
 function focusStaysInThemeMenu(
@@ -84,20 +67,19 @@ export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
   const toggleRef = useRef<HTMLButtonElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const toggleName = themeToggleName(colorSchemePreference, contrastPreference)
+  const selectedOptions = [`color-${colorSchemePreference}`, `contrast-${contrastPreference}`]
 
-  const handleToggleKeydown = (event: KeyboardEvent) => {
-    if (!isOpen || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) {
+  const handleSelect = (_event: React.MouseEvent | undefined, value: string | number | undefined) => {
+    const colorScheme = COLOR_SCHEME_OPTIONS.find((option) => `color-${option.value}` === value)?.value
+    if (colorScheme) {
+      setColorScheme(colorScheme)
       return
     }
 
-    const options = menuRef.current?.querySelectorAll<HTMLButtonElement>('button[aria-pressed]:not(:disabled)')
-    const target = options?.item(event.key === 'ArrowDown' ? 0 : options.length - 1)
-    if (!target) {
-      return
+    const contrastMode = CONTRAST_OPTIONS.find((option) => `contrast-${option.value}` === value)?.value
+    if (contrastMode) {
+      setContrastMode(contrastMode)
     }
-
-    event.preventDefault()
-    target.focus()
   }
 
   useEffect(() => {
@@ -157,11 +139,11 @@ export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
     <>
       <SynSelect
         isOpen={isOpen}
+        selected={selectedOptions}
+        onSelect={handleSelect}
         innerRef={menuRef}
         onOpenChange={setIsOpen}
         onOpenChangeKeys={['Escape']}
-        onToggleKeydown={handleToggleKeydown}
-        shouldFocusToggleOnSelect
         toggle={toggle}
         className={styles.themeMenu}
         isScrollable={false}
@@ -174,57 +156,35 @@ export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
           width: 'max-content',
         }}
       >
-        <SelectGroup
-          label={
-            <div className="pf-v6-c-menu__group-title" id={COLOR_SCHEME_TITLE_ID}>
-              Color scheme
-            </div>
-          }
-        >
-          <MenuSearch>
-            <MenuSearchInput>
-              <ToggleGroup aria-labelledby={COLOR_SCHEME_TITLE_ID}>
-                {COLOR_SCHEME_OPTIONS.map((option) => (
-                  <ToggleGroupItem
-                    key={option.value}
-                    text={option.label}
-                    buttonId={colorSchemeButtonId(option.value)}
-                    isSelected={colorSchemePreference === option.value}
-                    onChange={() => {
-                      setColorScheme(option.value)
-                    }}
-                  />
-                ))}
-              </ToggleGroup>
-            </MenuSearchInput>
-          </MenuSearch>
-        </SelectGroup>
-        <Divider />
-        <SelectGroup
-          label={
-            <div className="pf-v6-c-menu__group-title" id={CONTRAST_MODE_TITLE_ID}>
-              Contrast mode
-            </div>
-          }
-        >
-          <MenuSearch>
-            <MenuSearchInput>
-              <ToggleGroup aria-labelledby={CONTRAST_MODE_TITLE_ID}>
-                {CONTRAST_OPTIONS.map((option) => (
-                  <ToggleGroupItem
-                    key={option.value}
-                    text={option.label}
-                    buttonId={contrastButtonId(option.value)}
-                    isSelected={contrastPreference === option.value}
-                    onChange={() => {
-                      setContrastMode(option.value)
-                    }}
-                  />
-                ))}
-              </ToggleGroup>
-            </MenuSearchInput>
-          </MenuSearch>
-        </SelectGroup>
+        <SelectList aria-label="Theme settings" isAriaMultiselectable>
+          <SelectGroup
+            label={
+              <div className="pf-v6-c-menu__group-title" id={COLOR_SCHEME_TITLE_ID}>
+                Color scheme
+              </div>
+            }
+          >
+            {COLOR_SCHEME_OPTIONS.map((option) => (
+              <SelectOption key={option.value} value={`color-${option.value}`}>
+                {option.label}
+              </SelectOption>
+            ))}
+          </SelectGroup>
+          <Divider component="li" />
+          <SelectGroup
+            label={
+              <div className="pf-v6-c-menu__group-title" id={CONTRAST_MODE_TITLE_ID}>
+                Contrast mode
+              </div>
+            }
+          >
+            {CONTRAST_OPTIONS.map((option) => (
+              <SelectOption key={option.value} value={`contrast-${option.value}`}>
+                {option.label}
+              </SelectOption>
+            ))}
+          </SelectGroup>
+        </SelectList>
       </SynSelect>
       {props.showTooltip && (
         <Tooltip aria="none" aria-live="off" triggerRef={toggleRef} content={toggleName} position="right" />
