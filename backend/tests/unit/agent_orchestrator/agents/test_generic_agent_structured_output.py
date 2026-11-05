@@ -19,6 +19,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 
 from syntara.agent_orchestrator.agents.generic_agent import GenericAgent
+from syntara.agent_orchestrator.exceptions import AgentOrchestratorError
 from syntara.agent_orchestrator.models.agent_state import AgentState
 
 
@@ -211,6 +212,55 @@ class TestGenericAgentStructuredOutputNoTools:
                 "usage_details": {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
             },
         ]
+
+    @pytest.mark.asyncio
+    async def test_execute_structured_uses_tool_call_arguments_when_parsed_content_is_empty(
+        self, mock_llm: MagicMock, sample_state: AgentState, server_info_schema: dict[str, Any]
+    ) -> None:
+        """A tool-call response can carry the structured output for a toolless agent."""
+        sample_state["response_schema"] = server_info_schema
+
+        tool_call_output = {"hostname": "server-01", "ip": "192.168.1.10", "status": "active"}
+        raw_message = AIMessage(
+            content="{}",
+            tool_calls=[{"id": "structured-output", "name": "json_schema", "args": tool_call_output}],
+            usage_metadata={"input_tokens": 80, "output_tokens": 20, "total_tokens": 100},
+        )
+        mock_structured_llm = MagicMock()
+        mock_structured_llm.ainvoke = AsyncMock(return_value={"raw": raw_message, "parsed": {}, "parsing_error": None})
+        mock_llm.with_structured_output.return_value = mock_structured_llm
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[])
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+            mock_record.side_effect = _make_record_side_effect()
+            result_state = await agent.execute_as_node(sample_state)
+
+        assert result_state["result"] is not None
+        assert result_state["result"]["content"] == tool_call_output
+
+    @pytest.mark.asyncio
+    async def test_execute_structured_rejects_invalid_tool_call_arguments(
+        self, mock_llm: MagicMock, sample_state: AgentState, server_info_schema: dict[str, Any]
+    ) -> None:
+        """A schema-empty tool-call response must fail instead of completing."""
+        sample_state["response_schema"] = server_info_schema
+
+        raw_message = AIMessage(
+            content="{}",
+            tool_calls=[{"id": "structured-output", "name": "json_schema", "args": {}}],
+            usage_metadata={"input_tokens": 80, "output_tokens": 20, "total_tokens": 100},
+        )
+        mock_structured_llm = MagicMock()
+        mock_structured_llm.ainvoke = AsyncMock(return_value={"raw": raw_message, "parsed": {}, "parsing_error": None})
+        mock_llm.with_structured_output.return_value = mock_structured_llm
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[])
+        with (
+            patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record,
+            pytest.raises(AgentOrchestratorError, match="Structured output did not match the response schema"),
+        ):
+            mock_record.side_effect = _make_record_side_effect()
+            await agent.execute_as_node(sample_state)
 
 
 class TestStructuredOutputSystemPrompt:
