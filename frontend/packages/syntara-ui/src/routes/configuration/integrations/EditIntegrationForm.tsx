@@ -136,14 +136,23 @@ function EditIntegrationFormFields({
       )}
 
       {isOpenShift && (
-        <SynTextField<EditIntegrationFormValues, 'namespace'>
-          name="namespace"
-          label="Namespace"
-          fieldId="edit-namespace"
-          placeholder="e.g., syntara-workers"
-          isRequired
-          hint="Namespace for future execution workloads"
-        />
+        <>
+          <SynTextField<EditIntegrationFormValues, 'namespace'>
+            name="namespace"
+            label="Namespace"
+            fieldId="edit-namespace"
+            placeholder="e.g., syntara-workers"
+            isRequired
+            hint="Namespace for script execution pods"
+          />
+          <SynTextField<EditIntegrationFormValues, 'script_image'>
+            name="script_image"
+            label="Script Image"
+            fieldId="edit-script-image"
+            placeholder="registry.example.com/syntara-node-script@sha256:..."
+            hint="Container image implementing the ContainerService gRPC contract for script execution"
+          />
+        </>
       )}
       <EditSecurityFields />
 
@@ -279,6 +288,7 @@ export function EditIntegrationForm() {
       integration_type: integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER,
       base_url: 'base_url' in config ? String(config.base_url ?? '') : '',
       namespace: 'namespace' in config ? config.namespace : undefined,
+      script_image: 'script_image' in config ? (config.script_image ?? null) : null,
       allow_http: 'allow_http' in config ? Boolean(config.allow_http) : false,
       insecure_skip_tls_verify: 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
       ca_certificate: 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,

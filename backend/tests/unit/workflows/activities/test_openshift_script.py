@@ -40,7 +40,7 @@ async def test_activity_dispatch_preserves_outputs(return_code):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("scenario", ["success", "failed", "timeout", "api_error", "cancel"])
+@pytest.mark.parametrize("scenario", ["success", "failed", "timeout", "api_error", "cancel", "port_forward"])
 async def test_remote_lifecycle(scenario):
     import asyncio
 
@@ -66,7 +66,12 @@ async def test_remote_lifecycle(scenario):
         script_image="registry.example/script:test",
     )
     client = httpx.AsyncClient(base_url=config.base_url, transport=httpx.MockTransport(handler))
+    forward = MagicMock()
+    forward.__aenter__ = AsyncMock(return_value="127.0.0.1:43210")
+    forward.__aexit__ = AsyncMock(return_value=False)
     with (
+        patch.object(remote, "get_settings") as settings,
+        patch.object(remote, "script_port_forward", return_value=forward) as port_forward,
         patch.object(remote, "_connection", new=AsyncMock(return_value=(config, "secret-token"))),
         patch.object(remote.httpx, "AsyncClient", return_value=client),
         patch.object(remote.activity, "info", return_value=MagicMock()),
@@ -80,7 +85,8 @@ async def test_remote_lifecycle(scenario):
             ),
         ) as invoke,
     ):
-        if scenario == "success":
+        settings.return_value.script_openshift_port_forward = scenario == "port_forward"
+        if scenario in {"success", "port_forward"}:
             result = await remote.execute_openshift_script("bash", "echo hello", {}, 5, 1000)
             assert result["stdout"] == "hello"
         else:
@@ -97,9 +103,15 @@ async def test_remote_lifecycle(scenario):
     container = pod["spec"]["containers"][0]
     assert "command" not in container
     assert "env" not in container
-    if scenario == "success":
-        assert invoke.await_args.args[0] == "10.0.0.2:50051"
+    if scenario in {"success", "port_forward"}:
+        expected = "127.0.0.1:43210" if scenario == "port_forward" else "10.0.0.2:50051"
+        assert invoke.await_args.args[0] == expected
         assert invoke.await_args.args[1].inputs["code"] == "echo hello"
+    if scenario == "port_forward":
+        assert port_forward.call_args.args[:2] == (config.base_url, config.namespace)
+        forward.__aexit__.assert_awaited_once()
+    else:
+        port_forward.assert_not_called()
 
 
 @pytest.mark.asyncio

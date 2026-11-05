@@ -591,6 +591,7 @@ describe('integrationFormSchema', () => {
           integration_type: 'openshift',
           base_url: '',
           namespace: '',
+          script_image: null,
           insecure_skip_tls_verify: false,
           allow_http: false,
           ca_certificate: null,

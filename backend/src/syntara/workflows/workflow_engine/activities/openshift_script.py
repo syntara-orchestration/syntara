@@ -23,6 +23,7 @@ from syntara.integrations.models.integration_configuration import OpenShiftConfi
 
 from .common import HEARTBEAT_STOP_MONITOR
 from .script_grpc import SCRIPT_STEP_ID, invoke_script
+from .script_port_forward import script_port_forward
 
 MAX_SCRIPT_TIMEOUT_SECONDS = 600
 MAX_SCRIPT_OUTPUT_BYTES = 1024 * 1024
@@ -99,7 +100,17 @@ def _pod(name: str, timeout_seconds: int, image: str) -> dict[str, Any]:
     }
 
 
-async def execute_openshift_script(  # noqa: C901, PLR0915
+async def _invoke_pod(config: OpenShiftConfiguration, pod_ip: str, invocation: ContainerInvocation) -> dict[str, Any]:
+    if get_settings().script_openshift_port_forward:
+        async with script_port_forward(config.base_url, config.namespace, invocation.invocation_id) as target:
+            return await invoke_script(target, invocation)
+    # Pod IP comes from the authenticated cluster API, not workflow input.
+    address = ipaddress.ip_address(pod_ip)
+    host = f"[{address}]" if isinstance(address, ipaddress.IPv6Address) else str(address)
+    return await invoke_script(f"{host}:50051", invocation)
+
+
+async def execute_openshift_script(  # noqa: C901
     language: str,
     code: str,
     environment: dict[str, str],
@@ -151,10 +162,7 @@ async def execute_openshift_script(  # noqa: C901, PLR0915
                         msg = "Script container terminated before gRPC execution"
                         raise ApplicationError(msg, type="OpenShiftScriptError", non_retryable=True)
                     if status.get("phase") == "Running" and status.get("podIP"):
-                        # Pod IP comes from the authenticated cluster API, not workflow input.
-                        address = ipaddress.ip_address(status["podIP"])
-                        host = f"[{address}]" if isinstance(address, ipaddress.IPv6Address) else str(address)
-                        return await invoke_script(f"{host}:50051", invocation)
+                        return await _invoke_pod(config, status["podIP"], invocation)
                     await asyncio.sleep(1)
         except httpx.HTTPError:
             msg = "OpenShift API request failed"

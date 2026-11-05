@@ -45278,6 +45278,18 @@
             ],
             "title": "Ca Certificate",
             "description": "PEM-encoded CA certificate to trust for this integration's TLS connections."
+          },
+          "script_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Script Image",
+            "description": "Script container image implementing the ContainerService gRPC contract"
           }
         },
         "required": [

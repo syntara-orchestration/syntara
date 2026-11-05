@@ -58,6 +58,7 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
       integration_type: z.string(),
       base_url: z.string().optional(),
       namespace: z.string().optional(),
+      script_image: z.string().optional().nullable(),
       allow_http: z.boolean(),
       insecure_skip_tls_verify: z.boolean(),
       ca_certificate: z.string().optional().nullable(),
@@ -124,6 +125,7 @@ export function buildConfiguration(integrationType: string, values: EditIntegrat
       integration_type: IntegrationTypeEnum.OPENSHIFT,
       base_url: values.base_url ?? '',
       namespace: values.namespace ?? '',
+      script_image: values.script_image?.trim() || null,
       ...securityFields(values),
     }
   }
