@@ -117,7 +117,7 @@ describe('FormPromptResponseContent dynamic options', () => {
 
     renderContent(prompt)
 
-    await user.click(screen.getByRole('button', { name: 'Environment' }))
+    await user.click(screen.getByRole('textbox', { name: 'Environment' }))
     expect(await screen.findByRole('option', { name: 'Production' })).toBeInTheDocument()
   })
 
