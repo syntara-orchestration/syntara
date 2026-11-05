@@ -25,6 +25,23 @@ import styles from './RetryFromFailureSidePanel.module.css'
 
 export type RetryScopeMode = 'all' | 'selected'
 
+export function SanitizedOutputAlert({ warning }: Readonly<{ warning: string | undefined }>) {
+  if (!warning) return null
+  return (
+    <StackItem>
+      <Alert
+        isInline
+        variant="warning"
+        title="Retry plan updated"
+        component="h3"
+        data-testid="retry-sanitized-output-alert"
+      >
+        {warning}
+      </Alert>
+    </StackItem>
+  )
+}
+
 type RetryPlanProps = Readonly<{
   defaultPreview: RetryFromFailurePreview | undefined
   defaultIsLoading: boolean
@@ -35,6 +52,7 @@ type RetryPlanProps = Readonly<{
   defaultPoints: RetryPlanPoint[]
   selectablePoints: RetryPlanPoint[]
   visiblePoints: RetryPlanPoint[]
+  unavailablePoints: RetryPlanPoint[]
   requestedRetryPointIds: string[]
   scopeMode: RetryScopeMode
   scopeId: string
@@ -50,6 +68,7 @@ type RetryPlanContentProps = Readonly<{
   isError: boolean
   isEmptySelection: boolean
   visiblePoints: RetryPlanPoint[]
+  unavailablePoints: RetryPlanPoint[]
 }>
 
 /** Retry scope controls and the stateful retry plan view. */
@@ -63,6 +82,7 @@ export function RetryPlan({
   defaultPoints,
   selectablePoints,
   visiblePoints,
+  unavailablePoints,
   requestedRetryPointIds,
   scopeMode,
   scopeId,
@@ -105,7 +125,7 @@ export function RetryPlan({
 
   return (
     <Stack hasGutter>
-      {(selectablePoints.length > 1 || (selectablePoints.length === 1 && defaultPoints.length > 1)) && (
+      {selectablePoints.length > 1 && (
         <StackItem>
           <RetryScopeSelector
             scopeMode={scopeMode}
@@ -126,6 +146,7 @@ export function RetryPlan({
           isError={activeIsError}
           isEmptySelection={scopeMode === 'selected' && requestedRetryPointIds.length === 0}
           visiblePoints={visiblePoints}
+          unavailablePoints={unavailablePoints}
         />
       </StackItem>
     </Stack>
@@ -200,7 +221,14 @@ function RetryScopeSelector({
   )
 }
 
-function RetryPlanContent({ preview, isLoading, isError, isEmptySelection, visiblePoints }: RetryPlanContentProps) {
+function RetryPlanContent({
+  preview,
+  isLoading,
+  isError,
+  isEmptySelection,
+  visiblePoints,
+  unavailablePoints,
+}: RetryPlanContentProps) {
   if (isEmptySelection) {
     return (
       <Alert isInline variant="info" title="Choose at least one failure point">
@@ -249,15 +277,16 @@ function RetryPlanContent({ preview, isLoading, isError, isEmptySelection, visib
     )
   }
 
-  return <RetryPlanSummary preview={preview} visiblePoints={visiblePoints} />
+  return <RetryPlanSummary preview={preview} visiblePoints={visiblePoints} unavailablePoints={unavailablePoints} />
 }
 
 type RetryPlanSummaryProps = Readonly<{
   preview: RetryFromFailurePreview
   visiblePoints: RetryPlanPoint[]
+  unavailablePoints: RetryPlanPoint[]
 }>
 
-function RetryPlanSummary({ preview, visiblePoints }: RetryPlanSummaryProps) {
+function RetryPlanSummary({ preview, visiblePoints, unavailablePoints }: RetryPlanSummaryProps) {
   return (
     <DescriptionList isHorizontal isCompact aria-label="Retry plan summary">
       <DescriptionListGroup>
@@ -287,6 +316,27 @@ function RetryPlanSummary({ preview, visiblePoints }: RetryPlanSummaryProps) {
           </div>
         </DescriptionListDescription>
       </DescriptionListGroup>
+      {unavailablePoints.length > 0 && (
+        <DescriptionListGroup>
+          <DescriptionListTerm>Unavailable output</DescriptionListTerm>
+          <DescriptionListDescription>
+            <div data-testid="retry-unavailable-output">
+              {unavailablePoints.length === 1 ? (
+                <strong>{unavailablePoints[0].name}</strong>
+              ) : (
+                <List isPlain aria-label="Steps with sanitized output">
+                  {unavailablePoints.map((point) => (
+                    <ListItem key={point.id}>
+                      <strong>{point.name}</strong>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+              <Content component={ContentVariants.small}>Sanitized for safety and regenerated during retry</Content>
+            </div>
+          </DescriptionListDescription>
+        </DescriptionListGroup>
+      )}
       <DescriptionListGroup>
         <DescriptionListTerm>Retained results</DescriptionListTerm>
         <DescriptionListDescription>{getRetainedResultLabel(preview.retained_result_count)}</DescriptionListDescription>

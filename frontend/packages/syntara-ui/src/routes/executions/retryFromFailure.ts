@@ -37,15 +37,63 @@ export function eligibleRetryPointIds(preview: RetryFromFailurePreview | undefin
   return preview?.eligible_point_ids ?? []
 }
 
-/** Use a selected failed node as the retry point; iteration rows map to their base node ID. */
+/** Use a selected eligible node as the retry point; iteration rows map to their base node ID. */
 export function selectedRetryPointId(
   selectedNodeId: string | null | undefined,
   preview: RetryFromFailurePreview | undefined
 ): string | undefined {
   if (!selectedNodeId) return undefined
   const baseId = parseCompositeKey(selectedNodeId).baseId
-  const autoIncluded = preview?.auto_included_node_ids ?? []
-  return eligibleRetryPointIds(preview).includes(baseId) && !autoIncluded.includes(baseId) ? baseId : undefined
+  return eligibleRetryPointIds(preview).includes(baseId) ? baseId : undefined
+}
+
+/** Sanitized nodes that replace failed start points, independent of the current selection. */
+export function sanitizedReplacementIds(preview: RetryFromFailurePreview | undefined): string[] {
+  return [...new Set(Object.values(preview?.sanitized_replacements ?? {}).flat())]
+}
+
+/** Sanitized start points on the current retry path that cannot reuse stored output. */
+export function unavailableOutputIds(preview: RetryFromFailurePreview | undefined): string[] {
+  if (!preview?.eligible) return []
+  const replacements = new Set(sanitizedReplacementIds(preview))
+  const autoIncluded = preview.auto_included_node_ids ?? []
+  const eligible = preview.eligible_point_ids ?? []
+  return [...new Set([...autoIncluded, ...eligible.filter((id) => replacements.has(id))])]
+}
+
+/** Failed nodes replaced by the current unavailable sanitized outputs. */
+export function replacedFailedNodeIds(
+  preview: RetryFromFailurePreview | undefined,
+  unavailableIds: readonly string[]
+): string[] {
+  const unavailable = new Set(unavailableIds)
+  return Object.entries(preview?.sanitized_replacements ?? {})
+    .filter(([, ids]) => ids.some((id) => unavailable.has(id)))
+    .map(([failedId]) => failedId)
+}
+
+export function joinDisplayNames(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  if (names.length === 2) return `${names[0]} and ${names[1]}`
+  return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`
+}
+
+/** Visible warning when the retry must regenerate sanitized output. */
+export function getSanitizedOutputWarning(
+  preview: RetryFromFailurePreview | undefined,
+  activityNameMap: ReadonlyMap<string, string>
+): string | undefined {
+  const unavailableIds = unavailableOutputIds(preview)
+  if (unavailableIds.length === 0) return undefined
+
+  const sanitizedNames = unavailableIds.map((id) => activityNameMap.get(id) ?? id)
+  const replacedNames = replacedFailedNodeIds(preview, unavailableIds).map((id) => activityNameMap.get(id) ?? id)
+  const sanitizedList = joinDisplayNames(sanitizedNames)
+  const verb = sanitizedNames.length === 1 ? 'was' : 'were'
+  if (replacedNames.length === 0) {
+    return `Output from ${sanitizedList} ${verb} sanitized and cannot be reused. The retry will begin at ${sanitizedList} to regenerate the missing input.`
+  }
+  return `Output from ${sanitizedList} ${verb} sanitized and cannot be reused. The retry will begin at ${sanitizedList} to regenerate the missing input for ${joinDisplayNames(replacedNames)}.`
 }
 
 export type RetryPlanPoint = Readonly<{
@@ -74,6 +122,20 @@ export function getRetryPlanPoints(
       stepCount: preview?.step_count_by_eligible_point?.[id],
     }
   })
+}
+
+/** Retry plan rows for sanitized outputs on the current retry path. */
+export function getUnavailableRetryPlanPoints(
+  preview: RetryFromFailurePreview | undefined,
+  activityNameMap: ReadonlyMap<string, string>,
+  activityTypeMap: ReadonlyMap<string, string> = new Map()
+): RetryPlanPoint[] {
+  if (!preview) return []
+  return getRetryPlanPoints(
+    { ...preview, eligible_point_ids: unavailableOutputIds(preview) },
+    activityNameMap,
+    activityTypeMap
+  )
 }
 
 /** Whether the retry action should be enabled. */

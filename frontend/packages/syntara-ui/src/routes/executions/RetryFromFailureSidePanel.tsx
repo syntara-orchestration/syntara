@@ -13,10 +13,19 @@ import {
   canConfirmRetryFromFailure,
   eligibleRetryPointIds,
   getRetryPlanPoints,
+  getSanitizedOutputWarning,
+  getUnavailableRetryPlanPoints,
+  sanitizedReplacementIds,
   type RetryFromFailurePreview,
 } from './retryFromFailure'
 import styles from './RetryFromFailureSidePanel.module.css'
-import { HowRetryWorks, RetryFooter, RetryPlan, type RetryScopeMode } from './RetryFromFailureSidePanelParts'
+import {
+  HowRetryWorks,
+  RetryFooter,
+  RetryPlan,
+  SanitizedOutputAlert,
+  type RetryScopeMode,
+} from './RetryFromFailureSidePanelParts'
 
 type RetryFromFailureSidePanelProps = Readonly<{
   executionId: string
@@ -51,10 +60,8 @@ export function RetryFromFailureSidePanel({
 
   const defaultPreviewQuery = useRetryFromFailurePreview({ executionId, enabled: true })
   const defaultPoints = getRetryPlanPoints(defaultPreviewQuery.preview, activityNameMap, activityTypeMap)
-  const autoIncludedPointIds = new Set(defaultPreviewQuery.preview?.auto_included_node_ids ?? [])
-  const selectablePoints = defaultPoints.filter((point) => !autoIncludedPointIds.has(point.id))
   const selectedPointIdSet = new Set(checkedRetryPointIds)
-  const requestedRetryPointIds = selectablePoints
+  const requestedRetryPointIds = defaultPoints
     .filter((point) => selectedPointIdSet.has(point.id))
     .map((point) => point.id)
 
@@ -72,6 +79,7 @@ export function RetryFromFailureSidePanel({
   )
   const activeIsError = scopeMode === 'all' ? defaultPreviewQuery.isError : selectedPreviewQuery.isError
   const visiblePoints = getRetryPlanPoints(activePreview, activityNameMap, activityTypeMap)
+  const unavailablePoints = getUnavailableRetryPlanPoints(activePreview, activityNameMap, activityTypeMap)
   const retryPlanAnnouncement = getCurrentRetryPlanAnnouncement({
     shouldAnnounce: shouldAnnounceRetryPlan,
     scopeMode,
@@ -94,12 +102,10 @@ export function RetryFromFailureSidePanel({
     isLoading: activeIsLoading,
     activePreview,
   })
-  const retryInputOverridePointIds =
-    scopeMode === 'all'
-      ? eligibleRetryPointIds(defaultPreviewQuery.preview).filter(
-          (pointId) => !defaultPreviewQuery.preview?.auto_included_node_ids?.includes(pointId)
-        )
-      : requestedRetryPointIds
+  const sanitizedOverrideIds = new Set(sanitizedReplacementIds(defaultPreviewQuery.preview))
+  const retryInputOverridePointIds = (
+    scopeMode === 'all' ? eligibleRetryPointIds(defaultPreviewQuery.preview) : requestedRetryPointIds
+  ).filter((pointId) => !sanitizedOverrideIds.has(pointId))
   const retryInputOverridePointIdsKey = activePreview?.eligible ? retryInputOverridePointIds.join('\u0000') : ''
   const notifyRetryPreviewPointIdsChange = useEffectEvent((pointIds: string[]) => {
     onRetryPreviewPointIdsChange?.(pointIds)
@@ -185,6 +191,7 @@ export function RetryFromFailureSidePanel({
             </StackItem>
             <StackItem isFilled className={styles.bodyPadding}>
               <Stack hasGutter>
+                <SanitizedOutputAlert warning={getSanitizedOutputWarning(activePreview, activityNameMap)} />
                 <StackItem>
                   <HowRetryWorks />
                 </StackItem>
@@ -201,8 +208,9 @@ export function RetryFromFailureSidePanel({
                       activeIsLoading={activeIsLoading}
                       activeIsError={activeIsError}
                       defaultPoints={defaultPoints}
-                      selectablePoints={selectablePoints}
+                      selectablePoints={defaultPoints}
                       visiblePoints={visiblePoints}
+                      unavailablePoints={unavailablePoints}
                       requestedRetryPointIds={requestedRetryPointIds}
                       scopeMode={scopeMode}
                       scopeId={scopeId}

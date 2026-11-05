@@ -309,6 +309,7 @@ describe('RetryFromFailureSidePanel', () => {
         eligible: true,
         eligible_point_ids: ['step-1', 'step-2'],
         auto_included_node_ids: ['step-2'],
+        sanitized_replacements: { 'step-failed': ['step-2'] },
         step_count_by_eligible_point: { 'step-1': 4, 'step-2': 3 },
         total_step_count: 5,
       },
@@ -317,11 +318,55 @@ describe('RetryFromFailureSidePanel', () => {
     })
     renderPanel()
 
-    expect(screen.getByText('First Step')).toBeInTheDocument()
-    expect(screen.getByText('Second Step')).toBeInTheDocument()
+    expect(screen.getByTestId('retry-starts-at')).toHaveTextContent('First Step')
+    expect(screen.getByTestId('retry-starts-at')).toHaveTextContent('Second Step')
+    expect(screen.getByTestId('retry-unavailable-output')).toHaveTextContent('Second Step')
+    expect(screen.getByRole('radio', { name: 'All eligible failure points' })).toBeChecked()
+    expect(screen.queryByRole('checkbox', { name: 'First Step' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'Choose failure points' }))
+    expect(screen.getByRole('checkbox', { name: 'First Step' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Second Step' })).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'All eligible failure points' }))
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
 
     expect(mockHandleRetry).toHaveBeenCalledWith(undefined, {})
+  })
+
+  it('shows sanitized output in the retry plan and lets the replacement be selected', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useRetryFromFailurePreview).mockImplementation(({ retryPointIds }) => {
+      const selectedIds = retryPointIds ?? ['step-1', 'step-2']
+      return {
+        preview: {
+          eligible: true,
+          eligible_point_ids: selectedIds,
+          auto_included_node_ids: retryPointIds ? [] : ['step-2'],
+          sanitized_replacements: { 'step-failed': ['step-2'] },
+          step_count_by_eligible_point: { 'step-1': 4, 'step-2': 3 },
+          total_step_count: selectedIds.length === 1 ? 3 : 5,
+          retained_result_count: 1,
+        },
+        isLoading: false,
+        isError: false,
+      }
+    })
+    const { container } = renderPanel()
+
+    expect(screen.getByTestId('retry-sanitized-output-alert')).toHaveTextContent(
+      'Output from Second Step was sanitized and cannot be reused. The retry will begin at Second Step to regenerate the missing input for step-failed.'
+    )
+    expect(screen.getByTestId('retry-unavailable-output')).toHaveTextContent('Second Step')
+    expect(screen.getByTestId('retry-unavailable-output')).toHaveTextContent(
+      'Sanitized for safety and regenerated during retry'
+    )
+
+    await user.click(screen.getByRole('radio', { name: 'Choose failure points' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Second Step' }))
+
+    expect(screen.getByTestId('retry-starts-at')).toHaveTextContent('Second Step')
+    await user.click(screen.getByTestId('retry-from-failure-confirm'))
+    expect(mockHandleRetry).toHaveBeenCalledWith(['step-2'], {})
+    expect(await axe(container)).toHaveNoViolations()
   })
 
   it('disables retry and cancel while the retry request is pending', () => {

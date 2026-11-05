@@ -4,8 +4,11 @@ import {
   canConfirmRetryFromFailure,
   eligibleRetryPointIds,
   getRetryPlanPoints,
+  getSanitizedOutputWarning,
+  getUnavailableRetryPlanPoints,
   isRetryFromFailureEligible,
   selectedRetryPointId,
+  unavailableOutputIds,
   type RetryFromFailurePreview,
 } from './retryFromFailure'
 
@@ -95,13 +98,73 @@ describe('selectedRetryPointId', () => {
     expect(selectedRetryPointId('completed-node', preview({ eligible_point_ids: ['node-a'] }))).toBeUndefined()
   })
 
-  it('does not allow a sanitized auto-included node to become an explicit retry point', () => {
+  it('allows a sanitized replacement to become an explicit retry point', () => {
     expect(
       selectedRetryPointId(
         'sanitized-node',
         preview({ eligible_point_ids: ['failed-node', 'sanitized-node'], auto_included_node_ids: ['sanitized-node'] })
       )
-    ).toBeUndefined()
+    ).toBe('sanitized-node')
+  })
+})
+
+describe('unavailableOutputIds', () => {
+  it('includes auto-included sanitized nodes and eligible replacements', () => {
+    expect(
+      unavailableOutputIds(
+        preview({
+          eligible_point_ids: ['approval', 'rest-api'],
+          auto_included_node_ids: ['rest-api'],
+          sanitized_replacements: { script: ['rest-api'] },
+        })
+      )
+    ).toEqual(['rest-api'])
+  })
+
+  it('returns no unavailable output when the preview is ineligible', () => {
+    expect(unavailableOutputIds(preview({ eligible: false, auto_included_node_ids: ['rest-api'] }))).toEqual([])
+  })
+})
+
+describe('getUnavailableRetryPlanPoints', () => {
+  it('maps sanitized replacements to retry plan rows', () => {
+    expect(
+      getUnavailableRetryPlanPoints(
+        preview({
+          eligible_point_ids: ['approval', 'rest-api'],
+          auto_included_node_ids: ['rest-api'],
+          sanitized_replacements: { script: ['rest-api'] },
+        }),
+        new Map([['rest-api', 'REST API']])
+      )
+    ).toEqual([
+      {
+        id: 'rest-api',
+        name: 'REST API',
+        typeLabel: 'Step',
+        stepCount: undefined,
+      },
+    ])
+  })
+})
+
+describe('getSanitizedOutputWarning', () => {
+  it('describes the sanitized replacement and the failed node it regenerates input for', () => {
+    expect(
+      getSanitizedOutputWarning(
+        preview({
+          eligible_point_ids: ['transform-records'],
+          auto_included_node_ids: ['transform-records'],
+          sanitized_replacements: { 'connect-upstream': ['transform-records'] },
+        }),
+        new Map([
+          ['transform-records', 'Transform records'],
+          ['connect-upstream', 'Connect to upstream service'],
+        ])
+      )
+    ).toBe(
+      'Output from Transform records was sanitized and cannot be reused. The retry will begin at Transform records to regenerate the missing input for Connect to upstream service.'
+    )
   })
 })
 
