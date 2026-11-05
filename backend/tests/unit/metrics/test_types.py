@@ -89,6 +89,10 @@ class TestMetricType:
             # Authorization
             "AUTHZ_DURATION",
             "OPA_REQUEST_DURATION",
+            # Retry Telemetry
+            "WORKFLOW_RETRY_REQUESTS",
+            "WORKFLOW_RETRY_COMPLETIONS",
+            "WORKFLOW_RETRY_DURATION",
         }
         actual = {m.name for m in MetricType}
         assert actual == expected
@@ -135,6 +139,7 @@ class TestMetricType:
             "database",
             "system_wide",
             "authorization",
+            "retry",
         }
         assert set(METRIC_CATEGORIES.keys()) == expected_categories
 
