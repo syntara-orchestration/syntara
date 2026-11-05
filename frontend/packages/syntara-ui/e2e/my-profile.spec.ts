@@ -48,6 +48,20 @@ test.describe('My Profile — route accessibility', () => {
 // ── Page content and structure ────────────────────────────────────────────
 
 test.describe('My Profile — page content', () => {
+  test('Assignments keeps its labelled panel in the inline profile layout', async ({ app }) => {
+    await app.goto(toAppUrl(`${MY_PROFILE_URL}/roles`))
+    await expect(app.getByRole('heading', { level: 1, name: 'My Profile' })).toBeVisible()
+
+    const assignmentsTab = app.getByRole('tab', { name: /Assignments/i })
+    await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+    const assignmentsPanel = app.getByRole('tabpanel', { name: 'Assignments' })
+    await expect(assignmentsPanel).toBeVisible()
+
+    const panelId = await assignmentsPanel.getAttribute('id')
+    expect(panelId).toBeTruthy()
+    if (panelId) await expect(assignmentsTab).toHaveAttribute('aria-controls', panelId)
+  })
+
   test('does not show access denied for viewer', async ({ viewerApp }) => {
     await viewerApp.goto(toAppUrl(MY_PROFILE_URL))
     await expect(viewerApp.getByRole('heading', { level: 1, name: 'My Profile' })).toBeVisible()
