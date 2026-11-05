@@ -1,6 +1,6 @@
 import { Flex, FlexItem } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 
 import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
@@ -11,6 +11,7 @@ import type { FilterConfig } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
 import { ExecutionDetailsPanel, type WorkflowDefShape } from '../builder/ExecutionDetailsPanel'
 import { ExecutionViewContent } from '../builder/ExecutionViewContent'
+import type { RetryPreviewGraphEdge } from '../builder/retryPreviewCanvasState'
 import { WorkflowHistoryCard } from '../builder/WorkflowHistoryCard'
 import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
@@ -248,6 +249,11 @@ export function ExecutionDetailContent(props: ExecutionDetailContentProps) {
   const prevStatusRef = useRef(execution?.status)
   const [panelHeight, setPanelHeight] = useState(300)
   const [retryPreviewPointIds, setRetryPreviewPointIds] = useState<string[]>([])
+  const retryPreviewEdges = useMemo(
+    () => getRetryPreviewEdges(workflow?.version.workflow_definition),
+    [workflow?.version.workflow_definition]
+  )
+  const failedActivityIds = useMemo(() => getFailedActivityIds(activities), [activities])
   const {
     savedOverrides: retryInputParameterOverrides,
     hasUnsavedInputOverrides,
@@ -280,6 +286,8 @@ export function ExecutionDetailContent(props: ExecutionDetailContentProps) {
       executionId={executionId}
       activityNameMap={activityNameMap}
       activityTypeMap={activityTypeMap}
+      workflowEdges={retryPreviewEdges}
+      failedActivityIds={failedActivityIds}
       inputParameterOverrides={retryInputParameterOverrides}
       hasUnsavedInputOverrides={hasUnsavedInputOverrides}
       onRetryPreviewPointIdsChange={setRetryPreviewPointIds}
@@ -337,4 +345,29 @@ export function ExecutionDetailContent(props: ExecutionDetailContentProps) {
       onResize={handleResize}
     />
   )
+}
+
+function getRetryPreviewEdges(workflowDefinition: WorkflowDefShape | null | undefined): RetryPreviewGraphEdge[] {
+  return (workflowDefinition?.edges ?? []).flatMap((edge) => {
+    if ('from' in edge && typeof edge.from === 'string' && 'to' in edge && typeof edge.to === 'string') {
+      return [{ source: edge.from, target: edge.to }]
+    }
+    if ('source' in edge && typeof edge.source === 'string' && 'target' in edge && typeof edge.target === 'string') {
+      return [{ source: edge.source, target: edge.target }]
+    }
+    return []
+  })
+}
+
+function getFailedActivityIds(activities: (ActivityData | ActivityExecution)[]): string[] {
+  return [
+    ...new Set(
+      activities.flatMap((activity) => {
+        if (activity.status !== 'failed') return []
+        if ('activity_id' in activity && typeof activity.activity_id === 'string') return [activity.activity_id]
+        if ('activity_name' in activity && typeof activity.activity_name === 'string') return [activity.activity_name]
+        return []
+      })
+    ),
+  ]
 }

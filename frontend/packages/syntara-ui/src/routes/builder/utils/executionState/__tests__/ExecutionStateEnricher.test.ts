@@ -1263,7 +1263,7 @@ describe('ExecutionStateEnricher', () => {
       })
     })
 
-    it('flags a trigger as replayed when it started before the retry baseline', () => {
+    it('does not mark a rerun trigger as reused output when its source timestamp is preserved', () => {
       const triggerData = { name: 'Manual trigger', details: 'Manual', triggerType: 'manual' }
       const activityStates = new Map<string, ActivityState>([
         [
@@ -1285,7 +1285,9 @@ describe('ExecutionStateEnricher', () => {
         replayBaselineAt: '2024-01-02T00:00:00Z',
       })
 
-      expect(result.__executionState?.replayed).toBe(true)
+      expect(result.__executionState?.replayed).toBe(false)
+      expect(result.__executionState?.started_at).toBe('2024-01-01T00:00:00Z')
+      expect(result.__executionState?.completed_at).toBe('2024-01-01T00:00:01Z')
     })
 
     it('does not flag a trigger that started inside the retry window', () => {

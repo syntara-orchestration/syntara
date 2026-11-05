@@ -6,6 +6,7 @@ import { AppRoute } from '../../app/AppRoute'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SidePanelHeader } from '../../components/SidePanelHeader'
 import { detachPromise } from '../../utils/detachPromise'
+import { getNotRetriedFailureCount, type RetryPreviewGraphEdge } from '../builder/retryPreviewCanvasState'
 
 import { useRetryFromFailure } from './hooks/useRetryFromFailure'
 import { useRetryFromFailurePreview } from './hooks/useRetryFromFailurePreview'
@@ -27,10 +28,15 @@ import {
   type RetryScopeMode,
 } from './RetryFromFailureSidePanelParts'
 
+const EMPTY_RETRY_GRAPH_EDGES: readonly RetryPreviewGraphEdge[] = []
+const EMPTY_FAILED_ACTIVITY_IDS: readonly string[] = []
+
 type RetryFromFailureSidePanelProps = Readonly<{
   executionId: string
   activityNameMap: ReadonlyMap<string, string>
   activityTypeMap: ReadonlyMap<string, string>
+  workflowEdges?: readonly RetryPreviewGraphEdge[]
+  failedActivityIds?: readonly string[]
   inputParameterOverrides?: Readonly<Record<string, Record<string, unknown>>>
   hasUnsavedInputOverrides?: boolean
   onRetryPreviewPointIdsChange?: (pointIds: string[]) => void
@@ -45,6 +51,8 @@ export function RetryFromFailureSidePanel({
   executionId,
   activityNameMap,
   activityTypeMap,
+  workflowEdges = EMPTY_RETRY_GRAPH_EDGES,
+  failedActivityIds = EMPTY_FAILED_ACTIVITY_IDS,
   inputParameterOverrides = {},
   hasUnsavedInputOverrides = false,
   onRetryPreviewPointIdsChange,
@@ -80,6 +88,15 @@ export function RetryFromFailureSidePanel({
   const activeIsError = scopeMode === 'all' ? defaultPreviewQuery.isError : selectedPreviewQuery.isError
   const visiblePoints = getRetryPlanPoints(activePreview, activityNameMap, activityTypeMap)
   const unavailablePoints = getUnavailableRetryPlanPoints(activePreview, activityNameMap, activityTypeMap)
+  const retryPlanPointIds = activePreview?.eligible ? eligibleRetryPointIds(activePreview) : requestedRetryPointIds
+  const notRetriedFailureCount = getPanelNotRetriedFailureCount({
+    activePreview,
+    failedActivityIds,
+    requestedRetryPointIds,
+    retryPlanPointIds,
+    scopeMode,
+    workflowEdges,
+  })
   const retryPlanAnnouncement = getCurrentRetryPlanAnnouncement({
     shouldAnnounce: shouldAnnounceRetryPlan,
     scopeMode,
@@ -163,17 +180,14 @@ export function RetryFromFailureSidePanel({
     })
   }
 
-  const footer = (
-    <RetryFooter
-      onRetry={() =>
-        retry.handleRetry(scopeMode === 'all' ? undefined : requestedRetryPointIds, submitInputParameterOverrides)
-      }
-      onCancel={onClose}
-      isRetryDisabled={isRetryDisabled}
-      isRetryPending={retry.isPending}
-      stepCount={activePreview?.total_step_count}
-    />
-  )
+  const footer = getRetryFooter({
+    onRetry: () =>
+      retry.handleRetry(scopeMode === 'all' ? undefined : requestedRetryPointIds, submitInputParameterOverrides),
+    onCancel: onClose,
+    isRetryDisabled,
+    isRetryPending: retry.isPending,
+    stepCount: activePreview?.total_step_count,
+  })
 
   return (
     <aside
@@ -211,7 +225,9 @@ export function RetryFromFailureSidePanel({
                       selectablePoints={defaultPoints}
                       visiblePoints={visiblePoints}
                       unavailablePoints={unavailablePoints}
+                      notRetriedFailureCount={notRetriedFailureCount}
                       requestedRetryPointIds={requestedRetryPointIds}
+                      selectedPointCount={requestedRetryPointIds.length}
                       scopeMode={scopeMode}
                       scopeId={scopeId}
                       isRetryPending={retry.isPending || hasUnsavedInputOverrides}
@@ -239,6 +255,49 @@ export function RetryFromFailureSidePanel({
         </div>
       </SynPanel>
     </aside>
+  )
+}
+
+function getPanelNotRetriedFailureCount({
+  activePreview,
+  failedActivityIds,
+  requestedRetryPointIds,
+  retryPlanPointIds,
+  scopeMode,
+  workflowEdges,
+}: Readonly<{
+  activePreview: RetryPreviewState['preview']
+  failedActivityIds: readonly string[]
+  requestedRetryPointIds: readonly string[]
+  retryPlanPointIds: readonly string[]
+  scopeMode: RetryScopeMode
+  workflowEdges: readonly RetryPreviewGraphEdge[]
+}>): number {
+  if (scopeMode !== 'selected' || requestedRetryPointIds.length === 0 || !activePreview?.eligible) return 0
+  return getNotRetriedFailureCount(failedActivityIds, retryPlanPointIds, workflowEdges)
+}
+
+function getRetryFooter({
+  onRetry,
+  onCancel,
+  isRetryDisabled,
+  isRetryPending,
+  stepCount,
+}: Readonly<{
+  onRetry: () => void
+  onCancel: () => void
+  isRetryDisabled: boolean
+  isRetryPending: boolean
+  stepCount: number | undefined
+}>) {
+  return (
+    <RetryFooter
+      onRetry={onRetry}
+      onCancel={onCancel}
+      isRetryDisabled={isRetryDisabled}
+      isRetryPending={isRetryPending}
+      stepCount={stepCount}
+    />
   )
 }
 
