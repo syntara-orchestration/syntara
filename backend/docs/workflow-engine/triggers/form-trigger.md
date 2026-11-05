@@ -23,7 +23,7 @@ and the workflow does not pause while waiting for input.
   downstream nodes. The API schemas are generic: `ExecutionCreate.input_data` accepts an object,
   and `resultSchema.response_data` allows arbitrary properties. The form builder can generate a
   Draft-07 schema for preview and import/export, but the execution API does not use it as its
-  request or response contract. This work is still in progress. 
+  request or response contract. This work is still in progress.
 
 
 ## Form Definitions, Fields, and Parameters
