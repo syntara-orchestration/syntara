@@ -64,6 +64,7 @@ Manual trigger parameters are defined by the JSON Schema at `src/syntara/schemas
 ## Related Documentation
 
 - [Trigger System Overview](overview.md) — shared architecture, output flow, adding new trigger types
+- [Form Trigger](form-trigger.md) — the other user-initiated trigger, with a structured form
 - [Webhook Triggers](webhook-triggers.md) — HTTP webhooks and EDA events
 - [Scheduled Trigger](scheduled-trigger.md) — cron and interval schedules
 - [Workflow Definition Guide](../workflow-definition-guide.md) — complete guide to defining V2 workflows

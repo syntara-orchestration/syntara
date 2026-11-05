@@ -1,7 +1,8 @@
 /**
- * Helpers for SynFormFieldBuilder on the form_prompt node (workflow builder).
+ * Helpers for SynFormFieldBuilder on form_prompt (form step) and form_trigger nodes in the workflow builder.
  */
 import { expect, type Page } from '../fixtures'
+import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
 import { apiRequest } from '../utils/api'
 
 import { addFormPromptNodeWithSubmittedBranch } from './v2-steps'
@@ -15,7 +16,28 @@ import {
   waitForUIReady,
 } from './workflows'
 
+export type FormFieldBuilderHost = 'form_prompt' | 'form_trigger'
+
+function formFieldBuilderFieldsHeading(page: Page) {
+  return page.getByRole('heading', { name: 'Form fields', exact: true })
+}
+
 export const FORM_BUILDER_VALIDATION_ALERT = 'Fix validation errors before changes are saved to the parent form.'
+
+/** Strict-mode design-tab banner (SynFormFieldBuilder without draftMode). Hidden under draftMode on form step/trigger nodes. */
+export async function expectFormBuilderValidationAlert(
+  page: Page,
+  visible: boolean,
+  host: FormFieldBuilderHost = 'form_prompt'
+) {
+  await scrollFormFieldBuilderIntoView(page, host)
+  const alert = formFieldBuilderScope(page, host).getByText(FORM_BUILDER_VALIDATION_ALERT)
+  if (visible) {
+    await expect(alert).toBeVisible()
+  } else {
+    await expect(alert).not.toBeVisible()
+  }
+}
 
 export const FORM_FIELD_TYPE_MENU_LABELS = {
   text: 'Text',
@@ -31,48 +53,63 @@ export const FORM_FIELD_TYPE_MENU_LABELS = {
 
 export type FormFieldTypeMenuLabel = (typeof FORM_FIELD_TYPE_MENU_LABELS)[keyof typeof FORM_FIELD_TYPE_MENU_LABELS]
 
-function formFieldBuilderScope(page: Page) {
-  return page
-    .locator('#form-prompt-form-fields')
-    .locator('xpath=ancestor::*[.//button[contains(normalize-space(.), "Add field")]][1]')
+function formFieldBuilderScope(page: Page, host: FormFieldBuilderHost = 'form_prompt') {
+  const heading = formFieldBuilderFieldsHeading(page)
+  const builderRoot = heading.locator('xpath=ancestor::*[.//button[contains(normalize-space(.), "Add field")]][1]')
+  const hostMarker =
+    host === 'form_trigger'
+      ? page.getByText('Collect structured input before the workflow runs.')
+      : page.getByText('Pause the workflow and collect structured input', { exact: false })
+  return builderRoot.filter({ has: hostMarker })
 }
 
-async function ensureFieldExpanded(page: Page, fieldNumber: number) {
-  const expand = formFieldBuilderScope(page).getByRole('button', { name: `Expand field ${fieldNumber}` })
+async function ensureFieldExpanded(page: Page, fieldNumber: number, host: FormFieldBuilderHost = 'form_prompt') {
+  const expand = formFieldBuilderScope(page, host).getByRole('button', { name: `Expand field ${fieldNumber}` })
   if (await expand.isVisible().catch(() => false)) {
     await expand.click()
   }
 }
 
 /** Dismiss dnd-kit drag overlays/handles that can intercept clicks on field cards after reorder. */
-async function settleFormFieldBuilderInteraction(page: Page) {
-  await page.keyboard.press('Escape')
-  const scope = formFieldBuilderScope(page)
+async function dismissFormFieldBuilderDragChrome(page: Page, host: FormFieldBuilderHost = 'form_prompt') {
+  const scope = formFieldBuilderScope(page, host)
+  const dragging = scope.locator('[class*="dragging"]')
+  if ((await dragging.count()) > 0) {
+    await page.keyboard.press('Escape')
+  }
   // CSS modules hash local class names in CI preview builds — match the stable suffix.
-  await expect(scope.locator('[class*="dragging"]')).toHaveCount(0, { timeout: 5_000 })
+  await expect(dragging).toHaveCount(0, { timeout: 5_000 })
   await expect(page.locator('[class*="dragOverlay"]').filter({ visible: true })).toHaveCount(0, {
     timeout: 5_000,
   })
 }
 
-export async function scrollFormFieldBuilderIntoView(page: Page) {
-  await page.locator('#form-prompt-form-fields').scrollIntoViewIfNeeded()
+async function settleFormFieldBuilderInteraction(page: Page, host: FormFieldBuilderHost = 'form_prompt') {
+  await page.keyboard.press('Escape')
+  await dismissFormFieldBuilderDragChrome(page, host)
+}
+
+export async function scrollFormFieldBuilderIntoView(page: Page, host: FormFieldBuilderHost = 'form_prompt') {
+  await formFieldBuilderScope(page, host).getByRole('button', { name: 'Add field' }).scrollIntoViewIfNeeded()
 }
 
 /** Locator for one field card in the builder (1-based index, matches "Reorder field N"). */
-export function formFieldBuilderCard(page: Page, fieldNumber: number) {
-  const reorder = formFieldBuilderScope(page).getByRole('button', { name: `Reorder field ${fieldNumber}`, exact: true })
+export function formFieldBuilderCard(page: Page, fieldNumber: number, host: FormFieldBuilderHost = 'form_prompt') {
+  const reorder = formFieldBuilderScope(page, host).getByRole('button', {
+    name: `Reorder field ${fieldNumber}`,
+    exact: true,
+  })
   return reorder.locator(
     `xpath=ancestor::*[.//button[starts-with(@aria-label, "Collapse field ${fieldNumber}") or starts-with(@aria-label, "Expand field ${fieldNumber}")]][1]`
   )
 }
 
-function formFieldLabelInput(page: Page, fieldNumber: number) {
-  return formFieldBuilderCard(page, fieldNumber).getByRole('textbox', { name: /Field label|Checkbox label/ })
+function formFieldLabelInput(page: Page, fieldNumber: number, host: FormFieldBuilderHost = 'form_prompt') {
+  return formFieldBuilderCard(page, fieldNumber, host).getByRole('textbox', { name: /Field label|Checkbox label/ })
 }
 
-function formFieldValueNameInput(page: Page, fieldNumber: number) {
-  return formFieldBuilderCard(page, fieldNumber).getByRole('textbox', { name: 'Value name' })
+function formFieldValueNameInput(page: Page, fieldNumber: number, host: FormFieldBuilderHost = 'form_prompt') {
+  return formFieldBuilderCard(page, fieldNumber, host).getByRole('textbox', { name: 'Value name' })
 }
 
 /** Open the form_prompt node editor (avoids matching branch script nodes whose names contain the form title). */
@@ -91,52 +128,76 @@ export async function openFormPromptNodeForEditing(page: Page, nodeName: string)
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
 
-export async function clickAddFormField(page: Page) {
-  await scrollFormFieldBuilderIntoView(page)
-  const scope = formFieldBuilderScope(page)
-  await expect(scope.getByText(FORM_BUILDER_VALIDATION_ALERT)).not.toBeVisible({ timeout: 10_000 })
+export async function clickAddFormField(page: Page, host: FormFieldBuilderHost = 'form_prompt') {
+  await scrollFormFieldBuilderIntoView(page, host)
+  const scope = formFieldBuilderScope(page, host)
+  // Form trigger uses advisory/draft save — no blocking inline alert for invalid drafts.
+  if (host === 'form_prompt') {
+    await expect(scope.getByText(FORM_BUILDER_VALIDATION_ALERT)).not.toBeVisible({ timeout: 10_000 })
+  }
   const reorderButtons = scope.getByRole('button', { name: /^Reorder field \d+$/ })
   const countBefore = await reorderButtons.count()
   const addField = scope.getByRole('button', { name: 'Add field' })
+  const addFieldTimeout = process.env.CI || isSkipWebServerForPlaywrightTests() ? 30_000 : 15_000
   await expect(async () => {
     if ((await reorderButtons.count()) === countBefore) {
       await addField.scrollIntoViewIfNeeded()
       await addField.click()
     }
     await expect(reorderButtons).toHaveCount(countBefore + 1, { timeout: 2_000 })
-  }).toPass({ timeout: 15_000 })
+  }).toPass({ timeout: addFieldTimeout, intervals: [300, 500, 1_000, 2_000] })
 }
 
-export async function setFormFieldLabel(page: Page, fieldNumber: number, label: string) {
-  await scrollFormFieldBuilderIntoView(page)
-  const labelBox = formFieldLabelInput(page, fieldNumber)
+export async function setFormFieldLabel(
+  page: Page,
+  fieldNumber: number,
+  label: string,
+  host: FormFieldBuilderHost = 'form_prompt'
+) {
+  await scrollFormFieldBuilderIntoView(page, host)
+  const labelBox = formFieldLabelInput(page, fieldNumber, host)
   await labelBox.scrollIntoViewIfNeeded()
   await labelBox.fill(label)
 }
 
-export async function setFormFieldValueName(page: Page, fieldNumber: number, valueName: string) {
-  await scrollFormFieldBuilderIntoView(page)
-  await ensureFieldExpanded(page, fieldNumber)
-  const valueNameInput = formFieldValueNameInput(page, fieldNumber)
+export async function setFormFieldValueName(
+  page: Page,
+  fieldNumber: number,
+  valueName: string,
+  host: FormFieldBuilderHost = 'form_prompt'
+) {
+  await scrollFormFieldBuilderIntoView(page, host)
+  await ensureFieldExpanded(page, fieldNumber, host)
+  const valueNameInput = formFieldValueNameInput(page, fieldNumber, host)
   await valueNameInput.scrollIntoViewIfNeeded()
   await valueNameInput.fill(valueName)
   await valueNameInput.blur()
 }
 
-export async function setFormFieldPlaceholder(page: Page, fieldNumber: number, placeholder: string) {
-  await scrollFormFieldBuilderIntoView(page)
-  await ensureFieldExpanded(page, fieldNumber)
-  const card = formFieldBuilderCard(page, fieldNumber)
+export async function setFormFieldPlaceholder(
+  page: Page,
+  fieldNumber: number,
+  placeholder: string,
+  host: FormFieldBuilderHost = 'form_prompt'
+) {
+  await scrollFormFieldBuilderIntoView(page, host)
+  await ensureFieldExpanded(page, fieldNumber, host)
+  const card = formFieldBuilderCard(page, fieldNumber, host)
   const placeholderInput = card.getByRole('textbox', { name: 'Placeholder' })
   if (await placeholderInput.isVisible().catch(() => false)) {
     await placeholderInput.fill(placeholder)
   }
 }
 
-export async function setFormFieldRequired(page: Page, fieldNumber: number, checked: boolean) {
-  await scrollFormFieldBuilderIntoView(page)
-  await ensureFieldExpanded(page, fieldNumber)
-  const card = formFieldBuilderCard(page, fieldNumber)
+export async function setFormFieldRequired(
+  page: Page,
+  fieldNumber: number,
+  checked: boolean,
+  host: FormFieldBuilderHost = 'form_prompt'
+) {
+  await scrollFormFieldBuilderIntoView(page, host)
+  await ensureFieldExpanded(page, fieldNumber, host)
+  const card = formFieldBuilderCard(page, fieldNumber, host)
   const required = card.getByRole('checkbox', { name: 'Required' })
   if ((await required.isChecked()) === checked) {
     return
@@ -148,32 +209,52 @@ export async function setFormFieldRequired(page: Page, fieldNumber: number, chec
 
 const FIELD_TYPE_TOGGLE_NAME = /^(Text|Text area|Masked text|Email|Number|Checkbox|Date|Dropdown|Multi-select)$/
 
-export async function expectFormFieldTypeLabel(page: Page, fieldNumber: number, typeLabel: FormFieldTypeMenuLabel) {
-  await scrollFormFieldBuilderIntoView(page)
-  await ensureFieldExpanded(page, fieldNumber)
-  const card = formFieldBuilderCard(page, fieldNumber)
+export async function expectFormFieldTypeLabel(
+  page: Page,
+  fieldNumber: number,
+  typeLabel: FormFieldTypeMenuLabel,
+  host: FormFieldBuilderHost = 'form_prompt'
+) {
+  await scrollFormFieldBuilderIntoView(page, host)
+  await ensureFieldExpanded(page, fieldNumber, host)
+  const card = formFieldBuilderCard(page, fieldNumber, host)
   await expect(card.getByRole('button', { name: FIELD_TYPE_TOGGLE_NAME })).toHaveText(typeLabel)
 }
 
-export async function expectFormFieldPlaceholderValue(page: Page, fieldNumber: number, placeholder: string) {
-  await scrollFormFieldBuilderIntoView(page)
-  await ensureFieldExpanded(page, fieldNumber)
-  const card = formFieldBuilderCard(page, fieldNumber)
+export async function expectFormFieldPlaceholderValue(
+  page: Page,
+  fieldNumber: number,
+  placeholder: string,
+  host: FormFieldBuilderHost = 'form_prompt'
+) {
+  await scrollFormFieldBuilderIntoView(page, host)
+  await ensureFieldExpanded(page, fieldNumber, host)
+  const card = formFieldBuilderCard(page, fieldNumber, host)
   await expect(card.getByRole('textbox', { name: 'Placeholder' })).toHaveValue(placeholder)
 }
 
-export async function expectFormFieldRequiredChecked(page: Page, fieldNumber: number, checked: boolean) {
-  await scrollFormFieldBuilderIntoView(page)
-  await ensureFieldExpanded(page, fieldNumber)
-  const card = formFieldBuilderCard(page, fieldNumber)
+export async function expectFormFieldRequiredChecked(
+  page: Page,
+  fieldNumber: number,
+  checked: boolean,
+  host: FormFieldBuilderHost = 'form_prompt'
+) {
+  await scrollFormFieldBuilderIntoView(page, host)
+  await ensureFieldExpanded(page, fieldNumber, host)
+  const card = formFieldBuilderCard(page, fieldNumber, host)
   await expect(card.getByRole('checkbox', { name: 'Required' })).toBeChecked({ checked })
 }
 
-export async function selectFormFieldType(page: Page, fieldNumber: number, typeLabel: FormFieldTypeMenuLabel) {
-  await scrollFormFieldBuilderIntoView(page)
-  await settleFormFieldBuilderInteraction(page)
-  await ensureFieldExpanded(page, fieldNumber)
-  const card = formFieldBuilderCard(page, fieldNumber)
+export async function selectFormFieldType(
+  page: Page,
+  fieldNumber: number,
+  typeLabel: FormFieldTypeMenuLabel,
+  host: FormFieldBuilderHost = 'form_prompt'
+) {
+  await scrollFormFieldBuilderIntoView(page, host)
+  await settleFormFieldBuilderInteraction(page, host)
+  await ensureFieldExpanded(page, fieldNumber, host)
+  const card = formFieldBuilderCard(page, fieldNumber, host)
   const toggle = card.getByRole('button', { name: FIELD_TYPE_TOGGLE_NAME })
   const currentLabel = (await toggle.innerText()).trim()
   if (currentLabel === typeLabel) {
@@ -181,7 +262,7 @@ export async function selectFormFieldType(page: Page, fieldNumber: number, typeL
   }
 
   await expect(async () => {
-    await settleFormFieldBuilderInteraction(page)
+    await settleFormFieldBuilderInteraction(page, host)
     await toggle.scrollIntoViewIfNeeded()
     await toggle.focus()
     if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
@@ -198,9 +279,9 @@ export async function selectFormFieldType(page: Page, fieldNumber: number, typeL
   }).toPass({ timeout: 30_000, intervals: [300, 500, 1_000, 2_000] })
 }
 
-export async function removeFormField(page: Page, fieldNumber: number) {
-  await scrollFormFieldBuilderIntoView(page)
-  await formFieldBuilderCard(page, fieldNumber)
+export async function removeFormField(page: Page, fieldNumber: number, host: FormFieldBuilderHost = 'form_prompt') {
+  await scrollFormFieldBuilderIntoView(page, host)
+  await formFieldBuilderCard(page, fieldNumber, host)
     .getByRole('button', { name: `Remove field ${fieldNumber}` })
     .click()
   const dialog = page.getByRole('dialog', { name: 'Remove field?' })
@@ -209,59 +290,96 @@ export async function removeFormField(page: Page, fieldNumber: number) {
   await expect(dialog).not.toBeVisible()
 }
 
-async function moveFormFieldUpOneStep(page: Page, fieldNumber: number): Promise<void> {
-  const scope = formFieldBuilderScope(page)
-  const handle = scope.getByRole('button', { name: `Reorder field ${fieldNumber}`, exact: true })
-  await handle.scrollIntoViewIfNeeded()
-  await handle.focus()
-  await page.keyboard.press('Space')
-  await page.keyboard.press('ArrowUp')
-  await page.keyboard.press('Space')
+/** Drag one row up/down using adjacent reorder handles (dnd-kit sortable). */
+async function moveFormFieldOneStep(
+  page: Page,
+  fromFieldNumber: number,
+  toFieldNumber: number,
+  host: FormFieldBuilderHost = 'form_prompt'
+) {
+  if (fromFieldNumber === toFieldNumber) {
+    return
+  }
+  expect(Math.abs(fromFieldNumber - toFieldNumber)).toBe(1)
+
+  const scope = formFieldBuilderScope(page, host)
+  const fromHandle = scope.getByRole('button', { name: `Reorder field ${fromFieldNumber}`, exact: true })
+  const toHandle = scope.getByRole('button', { name: `Reorder field ${toFieldNumber}`, exact: true })
+  await fromHandle.scrollIntoViewIfNeeded()
+  await toHandle.scrollIntoViewIfNeeded()
+  await fromHandle.dragTo(toHandle, { force: true })
+  await dismissFormFieldBuilderDragChrome(page, host)
+}
+
+/** Move a field to another 1-based index using adjacent pointer drags (dnd-kit sortable). */
+async function moveFormFieldToFieldNumber(
+  page: Page,
+  fromFieldNumber: number,
+  toFieldNumber: number,
+  host: FormFieldBuilderHost = 'form_prompt'
+) {
+  if (fromFieldNumber === toFieldNumber) {
+    return
+  }
+  await dismissFormFieldBuilderDragChrome(page, host)
+
+  let current = fromFieldNumber
+  while (current > toFieldNumber) {
+    await moveFormFieldOneStep(page, current, current - 1, host)
+    current -= 1
+  }
+  while (current < toFieldNumber) {
+    await moveFormFieldOneStep(page, current, current + 1, host)
+    current += 1
+  }
 }
 
 export async function reorderFormField(
   page: Page,
   fromFieldNumber: number,
   toFieldNumber: number,
-  options?: { assertFirstLabel?: string }
+  options?: { assertFirstLabel?: string; host?: FormFieldBuilderHost }
 ) {
-  await scrollFormFieldBuilderIntoView(page)
+  const host = options?.host ?? 'form_prompt'
+  await scrollFormFieldBuilderIntoView(page, host)
+  await settleFormFieldBuilderInteraction(page, host)
   const reorderTimeout = process.env.CI ? 45_000 : 20_000
   await expect(async () => {
+    const labels = await fieldLabelValuesInOrder(page, host)
+
     if (options?.assertFirstLabel) {
-      for (let step = 0; step < 8; step++) {
-        const labels = await fieldLabelValuesInOrder(page)
-        if (labels[0] === options.assertFirstLabel) {
-          return
-        }
-        const fromIndex = labels.indexOf(options.assertFirstLabel) + 1
-        expect(fromIndex, `Field label "${options.assertFirstLabel}" not found in builder`).toBeGreaterThan(0)
-        if (fromIndex <= toFieldNumber) {
-          return
-        }
-        await moveFormFieldUpOneStep(page, fromIndex)
+      if (labels[0] === options.assertFirstLabel) {
+        return
       }
-      const labelsAfter = await fieldLabelValuesInOrder(page)
+      const fromIndex = labels.indexOf(options.assertFirstLabel) + 1
+      expect(fromIndex, `Field label "${options.assertFirstLabel}" not found in builder`).toBeGreaterThan(0)
+      expect(
+        fromIndex,
+        `Field "${options.assertFirstLabel}" should be below target index ${toFieldNumber} before reorder`
+      ).toBeGreaterThan(toFieldNumber)
+      await moveFormFieldToFieldNumber(page, fromIndex, toFieldNumber, host)
+      const labelsAfter = await fieldLabelValuesInOrder(page, host)
       expect(labelsAfter[0]).toBe(options.assertFirstLabel)
       return
     }
 
-    const steps = Math.max(0, fromFieldNumber - toFieldNumber)
-    for (let i = 0; i < steps; i++) {
-      const labels = await fieldLabelValuesInOrder(page)
-      const labelToMove = labels[fromFieldNumber - 1]
-      if (!labelToMove) break
-      const currentIndex = labels.indexOf(labelToMove) + 1
-      if (currentIndex <= toFieldNumber) break
-      await moveFormFieldUpOneStep(page, currentIndex)
+    const labelToMove = labels[fromFieldNumber - 1]
+    expect(labelToMove, `Field ${fromFieldNumber} has no label to reorder`).toBeTruthy()
+    const currentIndex = labels.indexOf(labelToMove) + 1
+    if (currentIndex <= toFieldNumber) {
+      return
     }
+    await moveFormFieldToFieldNumber(page, currentIndex, toFieldNumber, host)
   }).toPass({ timeout: reorderTimeout, intervals: [300, 500, 1_000, 2_000] })
-  await settleFormFieldBuilderInteraction(page)
+  await settleFormFieldBuilderInteraction(page, host)
 }
 
-export async function fieldLabelValuesInOrder(page: Page): Promise<string[]> {
-  await scrollFormFieldBuilderIntoView(page)
-  return formFieldBuilderScope(page)
+export async function fieldLabelValuesInOrder(
+  page: Page,
+  host: FormFieldBuilderHost = 'form_prompt'
+): Promise<string[]> {
+  await scrollFormFieldBuilderIntoView(page, host)
+  return formFieldBuilderScope(page, host)
     .getByRole('textbox', { name: /Field label|Checkbox label/ })
     .evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value))
 }
@@ -310,6 +428,9 @@ function parseFormPromptField(value: unknown): FormPromptDefinitionField | null 
   }
   return required === undefined ? { type, value_name, label } : { type, value_name, label, required }
 }
+
+/** Shared parser for form_definition.fields in E2E API assertions. */
+export const parseFormDefinitionFieldFromApi = parseFormPromptField
 
 function isUnknownArray(value: unknown): value is unknown[] {
   return Array.isArray(value)

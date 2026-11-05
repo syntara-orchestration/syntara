@@ -9,7 +9,7 @@ import { getDefaultStepBaseName } from '../../utils/stepNaming'
 import { StepRegistry } from '../StepRegistry'
 
 /**
- * Register the Form (interactive prompt) step type.
+ * Register the Form (form step) step type.
  */
 export default function registerFormPromptStep() {
   StepRegistry.register<FormPromptFormSubmitData>({
