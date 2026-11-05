@@ -20,31 +20,23 @@ export function useTextFilterState(
   filters: FilterConfig[],
   onFilterChange: (filter: FilterConfig | null, fieldKey?: string) => void
 ) {
-  const [selectedField, setSelectedField] = useState<FilterFieldDefinition | null>(() =>
-    getInitialSelectedField(filters, fieldDefinitions)
+  const [selectedFieldKey, setSelectedFieldKey] = useState<string | null>(
+    () => getInitialSelectedField(filters, fieldDefinitions)?.key ?? null
+  )
+  // Keep the key so a temporary definition refresh can restore the user's choice.
+  const selectedField = useMemo(
+    () => fieldDefinitions.find((field) => field.key === selectedFieldKey) ?? fieldDefinitions[0] ?? null,
+    [fieldDefinitions, selectedFieldKey]
   )
   const [isFieldSelectOpen, setIsFieldSelectOpen] = useState(false)
   const [isValueSelectOpen, setIsValueSelectOpen] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const lastFilterValueRef = useRef<string>('')
-  const hasUserSelectedFieldRef = useRef(false)
 
   const currentFilter = useMemo(
     () => (selectedField ? (filters.find((f) => f.key === selectedField.key) ?? null) : null),
     [filters, selectedField]
   )
-
-  React.useEffect(() => {
-    if (!selectedField) return
-    const matchingField = fieldDefinitions.find((f) => f.key === selectedField.key)
-    if (matchingField && matchingField !== selectedField) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- keep selectedField object identity in sync when fieldDefinitions reloads
-      setSelectedField(matchingField)
-    } else if (!matchingField) {
-      setSelectedField(fieldDefinitions[0] ?? null)
-      hasUserSelectedFieldRef.current = false
-    }
-  }, [fieldDefinitions, selectedField])
 
   React.useEffect(() => {
     const currentFilterValue = currentFilter ? String(currentFilter.value) : ''
@@ -58,11 +50,10 @@ export function useTextFilterState(
     (_event: React.MouseEvent | undefined, value: string | number | undefined) => {
       const field = fieldDefinitions.find((f) => f.key === value)
       if (field) {
-        setSelectedField(field)
+        setSelectedFieldKey(field.key)
         setInputValue('')
         lastFilterValueRef.current = ''
         setIsFieldSelectOpen(false)
-        hasUserSelectedFieldRef.current = true
       }
     },
     [fieldDefinitions]
