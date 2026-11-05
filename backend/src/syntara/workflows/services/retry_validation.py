@@ -11,8 +11,8 @@ Validation is a chain of checks:
 1. **State guard** — source execution must be ``FAILED`` or
    ``COMPLETED_WITH_ERRORS``.
 2. **Failure-point eligibility** — every selected id must match a ``failed``
-   ``ActivityExecution`` of the source execution *and* a node in the retained
-   workflow version that ran.
+   ``ActivityExecution`` of the source execution *or* a sanitized replacement
+   for one, *and* a node in the retained workflow version that ran.
 3. **Converge-mootness guard** — failure points feeding an already-completed
    converge node are rejected (the workflow moved past those branches); a
    failed converge keeps its branch failures as candidates.
@@ -43,20 +43,20 @@ Validation is a chain of checks:
    dispatch. An override replaces the value the node would
    otherwise receive, after upstream outputs are injected.
 
-    For an **explicit** selection, a sanitized dependency always rejects. For
-    the **default** selection (empty input — see below), a sanitized
-    dependency instead expands the retry points to include the sanitized
-    node, repeated until no dependency remains, and reports what was added
-    instead of rejecting (SDP AC-15/R9a). Either way, the response also
-    reports ``sanitized_replacements`` — for *every* currently-failed node
-    (not just the ones requested), which sanitized node(s) it would need to
-    be replaced by — so the UI can disallow selecting a failed node
-    explicitly before the user even submits a request (per Bill Wei,
-    2026-09-24: "so that the UI can disallow replaced nodes being selected").
+    For an **explicit** selection of a failed node that still needs sanitized
+    upstream output, that selection rejects. Selecting the sanitized
+    replacement instead retries that path: the replacement is a start point
+    and remaining sanitized dependencies are expanded, the same way the
+    **default** selection (empty input — see below) auto-includes them
+    (SDP AC-15/R9a). Either way, the response also reports
+    ``sanitized_replacements`` — for *every* currently-failed node (not just
+    the ones requested), which sanitized node(s) it would need to be replaced
+    by — so the UI can show the replacement as the selectable start point and
+    hide the superseded failed node.
 
     The reported retry set is the **eligible** set: the expanded selection
-    minus failed points superseded by auto-inclusion (a failed point strictly
-    downstream of an auto-included sanitized node still re-executes, but the
+    minus failed points superseded by a sanitized start point (a failed point
+    strictly downstream of that sanitized node still re-executes, but the
     retry initiates at the sanitized head). Step counts are keyed by
     eligible point.
 
@@ -200,16 +200,23 @@ def _state_reason(source: Execution) -> str | None:
     return None
 
 
-def _selection_reason(normalized: list[str], failed_ids: set[str]) -> str | None:
+def _selection_reason(
+    normalized: list[str],
+    failed_ids: set[str],
+    replacement_ids: set[str] | None = None,
+) -> str | None:
     """Rejection reason for an empty or ineligible selection, else None.
 
     ``normalized`` has already been resolved to the default (all currently
     failed nodes) if the caller's selection was empty, so an empty result
     here only happens when there are no failed nodes at all to default to.
+    Sanitized replacements for failed nodes are also allowed: they replace
+    the failed node as the selectable start point.
     """
     if not normalized:
         return "no failed nodes in this execution to retry from"
-    unknown = [point for point in normalized if point not in failed_ids]
+    allowed = failed_ids | (replacement_ids or set())
+    unknown = [point for point in normalized if point not in allowed]
     if unknown:
         return f"not failed nodes in this execution: {', '.join(unknown)}"
     return None
@@ -375,30 +382,36 @@ def _eligible_points(
     expanded: set[str],
     auto_included: set[str],
     successors: dict[str, set[str]] | None = None,
+    *,
+    failed_ids: set[str] | None = None,
 ) -> set[str]:
     """Retry initiation points: the expanded selection minus superseded failed points.
 
-    A failed point strictly downstream of an auto-included sanitized node still
+    A failed point strictly downstream of a sanitized start point still
     re-executes (as downstream of the sanitized head), but the retry no
-    longer *starts* there — the sanitized head supersedes it. Auto-included
-    sanitized nodes themselves always stay eligible: each must re-execute
+    longer *starts* there — the sanitized head supersedes it. Sanitized
+    start points themselves always stay eligible: each must re-execute
     fresh to regenerate raw outputs (its stored output can never be injected).
-    With no auto-inclusion, the eligible set is the requested selection
-    unchanged.
+    Heads are auto-included nodes plus any selected points that are not
+    currently failed (explicit sanitized replacements). With no such heads,
+    the eligible set is the requested selection unchanged.
     """
-    if not auto_included:
+    heads = set(auto_included)
+    if failed_ids is not None:
+        heads |= set(expanded) - failed_ids
+    if not heads:
         return set(expanded)
     if successors is None:
         successors = build_successors(snapshot_def)
-    seen = set(auto_included)
-    stack = list(auto_included)
+    seen = set(heads)
+    stack = list(heads)
     while stack:
         node_id = stack.pop()
         for nxt in successors.get(node_id, ()):
             if nxt not in seen:
                 seen.add(nxt)
                 stack.append(nxt)
-    return set(expanded) - (seen - set(auto_included))
+    return set(expanded) - (seen - heads)
 
 
 def _version_reason(
@@ -407,16 +420,17 @@ def _version_reason(
     completed_outputs: dict[str, list[Any]],
     successors: dict[str, set[str]] | None = None,
     *,
-    is_default_selection: bool,
+    allow_sanitized_expansion: bool,
 ) -> tuple[str | None, list[str], list[str], list[str]]:
     """Rejection reason, blocking sanitized nodes, auto-included nodes, and the final selection.
 
     Either way, the full transitive chain of sanitized dependencies is
-    resolved first. For an explicit selection, that chain rejects outright
-    (``sanitized`` names every node in it, the selection is unchanged). For
-    the default selection (SDP AC-15), the selection is instead expanded to
-    include the whole chain as additional retry points, and what was
-    auto-included is reported instead of rejecting.
+    resolved first. For an explicit selection of a failed node that still
+    needs sanitized output, that chain rejects outright (``sanitized`` names
+    every node in it, the selection is unchanged). For the default selection
+    (SDP AC-15) or an explicit selection of a sanitized replacement, the
+    selection is instead expanded to include the whole chain as additional
+    retry points, and what was auto-included is reported instead of rejecting.
     """
     if snapshot is None:
         return "original workflow version no longer exists", [], [], normalized
@@ -429,7 +443,7 @@ def _version_reason(
     expanded, added = _expand_sanitized_chain(snapshot_def, set(normalized), completed_outputs, successors)
     if not added:
         return None, [], [], sorted(expanded)
-    if not is_default_selection:
+    if not allow_sanitized_expansion:
         return (
             (
                 "upstream nodes have sanitized outputs referenced on the retry path "
@@ -616,24 +630,34 @@ async def validate_retry_from_failure(
     # walk below (converge-mootness, sanitized expansion, step counts, eligible
     # points, and the per-failed-node replacement scan).
     successors = build_successors(snapshot_def) if snapshot is not None else {}
+    replacements = (
+        _sanitized_replacements(snapshot_def, failed_ids, completed_outputs, successors) if snapshot is not None else {}
+    )
+    replacement_ids = {node_id for ids in replacements.values() for node_id in ids}
 
     version_reason, sanitized, auto_included, final_selection = _version_reason(
         normalized,
         snapshot,
         completed_outputs,
         successors,
-        is_default_selection=is_default_selection,
+        allow_sanitized_expansion=is_default_selection or bool(set(normalized) & replacement_ids),
     )
     reason = (
         _state_reason(source)
-        or _selection_reason(normalized, failed_ids)
+        or _selection_reason(normalized, failed_ids, replacement_ids)
         or _converge_reason(snapshot_def, normalized, completed_ids, successors)
         or version_reason
     )
 
     if reason is None:
         reported_selection = sorted(
-            _eligible_points(snapshot_def, set(final_selection), set(auto_included), successors)
+            _eligible_points(
+                snapshot_def,
+                set(final_selection),
+                set(auto_included),
+                successors,
+                failed_ids=failed_ids,
+            )
         )
         # Only meaningful once the earlier guards have passed: overrides target
         # failed nodes that re-execute, not starting points.
@@ -656,9 +680,6 @@ async def validate_retry_from_failure(
     else:
         step_counts, total_steps = {}, 0
         retained_result_count = 0
-    replacements = (
-        _sanitized_replacements(snapshot_def, failed_ids, completed_outputs, successors) if snapshot is not None else {}
-    )
 
     if reason is not None:
         return RetryValidation(
