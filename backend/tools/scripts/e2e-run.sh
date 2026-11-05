@@ -11,7 +11,7 @@
 #                         (default: uv run podman-compose -p syntara -f podman-compose.yml)
 set -euo pipefail
 
-COMPOSE_CMD="${COMPOSE_CMD:-uv run podman-compose -p syntara -f podman-compose.yml --build}"
+COMPOSE_CMD="${COMPOSE_CMD:-uv run podman-compose -p syntara -f podman-compose.yml}"
 MAKE="${MAKE:-make}"
 PYTEST_ARGS=("$@")
 
@@ -46,12 +46,72 @@ if [[ "${E2E_EP}" == "1" ]]; then
     export EP_API_PORT
 fi
 
+# Follow the logs of every pod in the EP kind cluster while the tests run.
+# Workload pods are deleted as soon as their Job completes, so dumping the
+# logs after the fact (in cleanup) would see nothing: the logs must be
+# captured live, pod by pod.
+start_kind_log_collector() {
+    if ! kubectl --context "kind-${EP_KIND_CLUSTER}" get ns >/dev/null 2>&1; then
+        echo "⚠️  No 'kind-${EP_KIND_CLUSTER}' kubeconfig context; skipping kind log collection"
+        return 0
+    fi
+    local log_dir="/tmp/syntara-e2e-logs/kind"
+    rm -rf "${log_dir}"
+    KIND_LOG_DIR="${log_dir}" KIND_CONTEXT="kind-${EP_KIND_CLUSTER}" bash -c '
+        declare -A followed=()
+        while true; do
+            # Only follow pods whose containers already exist: a failed
+            # "kubectl logs -f" (Pending/ContainerCreating pod) would mark
+            # them as followed forever. Completed pods are still followed:
+            # "logs -f" dumps what is left and exits.
+            while read -r ns name phase; do
+                case "${phase}" in
+                    Running|Succeeded|Failed|Completed) ;;
+                    *) continue ;;
+                esac
+                [[ -n "${followed[${ns}/${name}]:-}" ]] && continue
+                followed["${ns}/${name}"]=1
+                mkdir -p "${KIND_LOG_DIR}/${ns}"
+                kubectl --context "${KIND_CONTEXT}" -n "${ns}" logs -f --timestamps --prefix \
+                    --all-containers "${name}" >> "${KIND_LOG_DIR}/${ns}/${name}.log" 2>/dev/null &
+            done < <(kubectl --context "${KIND_CONTEXT}" get pods -A --no-headers 2>/dev/null \
+                | awk "{print \$1, \$2, \$4}")
+            # Poll fast: completed workload pods are garbage-collected within
+            # seconds of their Job finishing.
+            sleep 1
+        done
+    ' >/dev/null 2>&1 &
+    KIND_LOG_COLLECTOR_PID=$!
+    echo "📋 Recording kind cluster pod logs to ${log_dir}/ ..."
+}
+
+stop_kind_log_collector() {
+    [[ -n "${KIND_LOG_COLLECTOR_PID:-}" ]] || return 0
+    echo "📋 Capturing kind cluster state and events..."
+    local log_dir="/tmp/syntara-e2e-logs/kind"
+    kubectl --context "kind-${EP_KIND_CLUSTER}" get events -A --sort-by=.lastTimestamp \
+        > "${log_dir}/events.log" 2>/dev/null || true
+    kubectl --context "kind-${EP_KIND_CLUSTER}" get pods -A -o wide \
+        > "${log_dir}/pods.txt" 2>/dev/null || true
+    # Kill the kubectl followers before their parent: once the parent is
+    # dead they get re-parented to PID 1 and pkill -P would miss them.
+    pkill -P "${KIND_LOG_COLLECTOR_PID}" 2>/dev/null || true
+    kill "${KIND_LOG_COLLECTOR_PID}" 2>/dev/null || true
+    wait "${KIND_LOG_COLLECTOR_PID}" 2>/dev/null || true
+    unset KIND_LOG_COLLECTOR_PID
+}
+
 cleanup() {
     echo "🧹 Stopping background services..."
 
-    # Save container logs before tearing down (useful for debugging failures)
+    # Snapshot the kind cluster (events, pod table) before anything is torn
+    # down, and stop the live pod log collector.
+    stop_kind_log_collector
+
+    # Save container logs before tearing down (useful for debugging failures).
+    # Keep the kind/ subdirectory: it holds the logs recorded during the run.
     local log_dir="/tmp/syntara-e2e-logs"
-    rm -rf "$log_dir"
+    rm -f "${log_dir}"/*.log
     mkdir -p "$log_dir"
     echo "📋 Saving container logs to ${log_dir}/ ..."
     for container in $(podman ps -a --format '{{.Names}}' --filter "label=com.docker.compose.project" 2>/dev/null); do
@@ -226,6 +286,8 @@ if [[ "${E2E_EP}" == "1" ]]; then
             echo "⚠️  Pre-pull failed; the Job will pull ${NODE_IMAGE} itself at dispatch time"
         fi
     fi
+
+    start_kind_log_collector
 fi
 
 API="https://localhost:8000/api/v1"
