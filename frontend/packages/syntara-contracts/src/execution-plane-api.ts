@@ -976,6 +976,8 @@ export interface operations {
         include_total?: boolean
         /** @description Filter by id */
         id?: string | null
+        /** @description Filter by execution_target_id */
+        execution_target_id?: string | null
         /** @description Filter by status */
         status?: string | null
         /** @description Filter by created_at */

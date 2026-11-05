@@ -196,6 +196,12 @@ class Integration(NamedResource, UserOwnedResource, table=True):
 
     __table_args__ = (
         UniqueConstraint("name", name="uq_integrations_name"),
+        Index(
+            "uq_integrations_single_openshift",
+            "integration_type",
+            unique=True,
+            postgresql_where=text("integration_type = 'openshift'"),
+        ),
         Index("ix_integrations_created_at_id", "created_at", "id"),
         Index("ix_integrations_labels", "labels", postgresql_using="gin"),
     )

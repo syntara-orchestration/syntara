@@ -444,6 +444,16 @@ paths:
             description: Filter by id
             title: Id
           description: Filter by id
+        - name: execution_target_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by execution_target_id
+            title: Execution Target Id
+          description: Filter by execution_target_id
         - name: status
           in: query
           required: false

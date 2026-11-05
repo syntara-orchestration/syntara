@@ -17,6 +17,7 @@ from syntara.integrations.exceptions import (
     IntegrationCredentialTypeMismatchError,
     IntegrationNameConflictError,
     IntegrationNotFoundError,
+    IntegrationTypeConflictError,
 )
 from syntara.integrations.models.integration import (
     Integration,
@@ -154,6 +155,32 @@ class TestCreateIntegration:
         assert isinstance(reloaded.configuration, OpenShiftConfiguration)
         assert reloaded.management_credential_id == credential.id
         assert "execution_target_id" not in reloaded.configuration.model_dump()
+
+    @pytest.mark.asyncio
+    async def test_create_duplicate_openshift_integration_raises(
+        self,
+        test_db_session: AsyncSession,
+        integration_service: IntegrationService,
+        credential_factory,
+    ) -> None:
+        credential_type = await credential_factory.create_type("HTTP Bearer Token")
+        project = await credential_factory.create_project()
+        credential = await credential_factory.create(credential_type, project)
+        data = IntegrationCreate(
+            name="Development OpenShift",
+            integration_type=IntegrationType.OPENSHIFT,
+            configuration={
+                "integration_type": "openshift",
+                "base_url": "https://api.example.com:6443",
+            },
+            management_credential_id=credential.id,
+        )
+        await integration_service.create_integration(data)
+
+        duplicate = data.model_copy(update={"name": "Production OpenShift"})
+
+        with pytest.raises(IntegrationTypeConflictError, match="openshift"):
+            await integration_service.create_integration(duplicate)
 
     @pytest.mark.asyncio
     async def test_create_duplicate_name_raises(
