@@ -1,11 +1,10 @@
 import { expect, type Page } from '../fixtures'
-import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
+import { isRealBackendE2e } from '../playwrightWebServerEnv'
 import { apiRequest } from '../utils/api'
 
 import { clickWhenEnabled, pfWidget } from './patternfly'
 
-/** True when Playwright targets a live API (compose / podman E2E), not the in-process mock. */
-export const isRealBackendE2e = isSkipWebServerForPlaywrightTests()
+export { isRealBackendE2e }
 
 const FORM_STEP_SUBMIT_WAIT_MS = 45_000
 

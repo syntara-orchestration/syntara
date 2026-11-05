@@ -10,3 +10,6 @@ export function isSkipWebServerForPlaywrightTests(): boolean {
   const v = process.env.SYNTARA_E2E_SKIP_WEB_SERVER?.toLowerCase().trim() ?? ''
   return v === '1' || v === 'true' || v === 'yes'
 }
+
+/** True when Playwright targets a live API (compose / podman E2E), not the in-process mock. */
+export const isRealBackendE2e = isSkipWebServerForPlaywrightTests()

@@ -5,11 +5,11 @@
  */
 import { test, expect } from '../fixtures'
 import {
-  FORM_BUILDER_VALIDATION_ALERT,
   FORM_FIELD_TYPE_MENU_LABELS,
   type FormFieldTypeMenuLabel,
   clickAddFormField,
   createFormPromptWorkflowWithBuilderOpen,
+  expectFormBuilderValidationAlert,
   expectFormFieldPlaceholderValue,
   expectFormFieldRequiredChecked,
   expectFormFieldTypeLabel,
@@ -125,8 +125,9 @@ test.describe('Form prompt — form field builder', { tag: '@pr-check' }, () => 
       await selectFormFieldType(app, 2, FORM_FIELD_TYPE_MENU_LABELS.number)
 
       await removeFormField(app, 1)
-      await expect(app.getByRole('textbox', { name: 'Field label' })).toHaveCount(1)
-      await expect(app.getByRole('textbox', { name: 'Field label' })).toHaveValue('Second number')
+      await expect(async () => {
+        expect(await fieldLabelValuesInOrder(app)).toEqual(['Second number'])
+      }).toPass({ timeout: 15_000, intervals: [500, 1_000, 2_000] })
 
       await clickAddFormField(app)
       await clickAddFormField(app)
@@ -154,27 +155,33 @@ test.describe('Form prompt — form field builder', { tag: '@pr-check' }, () => 
     }
   })
 
-  test('UI-3: blocks invalid value names and duplicate value names from persisting', async ({ app }) => {
+  test('UI-3: draft builder allows invalid edits but persists only corrected unique value names', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-form-builder-ui3')
 
     try {
       await createFormPromptWorkflowWithBuilderOpen(app, workflowName, FORM_PROMPT_NODE_NAME)
 
+      // FormPromptNodeForm mounts SynFormFieldBuilder with draftMode on this base (advisory save); strict banner is unit-tested without draftMode.
       await setFormFieldValueName(app, 1, '1invalid')
-      await expect(app.getByText(FORM_BUILDER_VALIDATION_ALERT)).toBeVisible()
+      await expectFormBuilderValidationAlert(app, false)
+      await expect(formFieldBuilderCard(app, 1).getByRole('textbox', { name: 'Value name' })).toHaveValue('1invalid')
 
       await setFormFieldValueName(app, 1, 'valid_name')
-      await expect(app.getByText(FORM_BUILDER_VALIDATION_ALERT)).not.toBeVisible()
+      await expectFormBuilderValidationAlert(app, false)
+      await expect(formFieldBuilderCard(app, 1).getByRole('textbox', { name: 'Value name' })).toHaveValue('valid_name')
 
       await clickAddFormField(app)
       await setFormFieldLabel(app, 1, 'Field A')
       await setFormFieldLabel(app, 2, 'Field B')
       await setFormFieldValueName(app, 1, 'shared_name')
       await setFormFieldValueName(app, 2, 'shared_name')
-      await expect(app.getByText(FORM_BUILDER_VALIDATION_ALERT)).toBeVisible()
+      await expectFormBuilderValidationAlert(app, false)
+      await expect(formFieldBuilderCard(app, 1).getByRole('textbox', { name: 'Value name' })).toHaveValue('shared_name')
+      await expect(formFieldBuilderCard(app, 2).getByRole('textbox', { name: 'Value name' })).toHaveValue('shared_name')
 
       await setFormFieldValueName(app, 2, 'field_b')
-      await expect(app.getByText(FORM_BUILDER_VALIDATION_ALERT)).not.toBeVisible()
+      await expectFormBuilderValidationAlert(app, false)
+      await expect(formFieldBuilderCard(app, 2).getByRole('textbox', { name: 'Value name' })).toHaveValue('field_b')
 
       await saveFormPromptNodeAndWorkflow(app)
       const workflowId = workflowIdFromUrl(app)
