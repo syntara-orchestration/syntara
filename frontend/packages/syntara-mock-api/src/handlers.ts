@@ -25,6 +25,10 @@ import { activityExecutions } from './resources/activityExecutions'
 import { approvals } from './resources/approvals'
 import { applyMockApprovalDecisionEffects } from './resources/approvalDecisionEffects'
 import {
+  buildValidationResultFromFindings,
+  collectFormTriggerDefinitionFindings,
+} from './utils/formTriggerDefinitionValidation'
+import {
   alignPendingFormPromptClock,
   cancelPendingFormPromptsForExecution,
   formPromptToListRead,
@@ -1339,7 +1343,28 @@ export const handlers = [
       deleted_by: null,
     })
 
-    return HttpResponse.json(workflow)
+    const formTriggerFindings = collectFormTriggerDefinitionFindings(nextDefinition)
+    if (formTriggerFindings.length > 0) {
+      const validationResult = buildValidationResultFromFindings(formTriggerFindings)
+      mutableWorkflow.has_validation_issues = true
+      mutableWorkflow.validation_result = validationResult
+    } else {
+      mutableWorkflow.has_validation_issues = workflow.has_validation_issues === true
+      if (workflow.validation_result) {
+        mutableWorkflow.validation_result = workflow.validation_result
+      } else {
+        delete mutableWorkflow.validation_result
+      }
+    }
+
+    const responseHasValidationIssues = mutableWorkflow.has_validation_issues === true
+    const responseValidationResult = mutableWorkflow.validation_result
+
+    return HttpResponse.json({
+      ...workflow,
+      has_validation_issues: responseHasValidationIssues,
+      ...(responseValidationResult ? { validation_result: responseValidationResult } : {}),
+    })
   }),
   http.delete('/api/v1/workflows/:workflowId', (request) => {
     const workflowId = request.params.workflowId

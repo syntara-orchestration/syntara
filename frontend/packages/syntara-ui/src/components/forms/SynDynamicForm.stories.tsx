@@ -10,7 +10,7 @@ const meta: Meta<typeof SynDynamicForm> = {
   parameters: {
     docs: {
       description: {
-        component: 'Schema-driven form renderer for interactive prompts. File upload support is deferred.',
+        component: 'Schema-driven form renderer for form steps. File upload support is deferred.',
       },
     },
   },

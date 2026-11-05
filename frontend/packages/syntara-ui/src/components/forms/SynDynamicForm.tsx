@@ -24,7 +24,7 @@ function formResetKey(definition: SynDynamicFormProps['definition'], initialValu
 }
 
 /**
- * Renders an interactive prompt / workflow form from a backend {@link FormDefinition}.
+ * Renders a form step / workflow form from a backend {@link FormDefinition}.
  * File upload fields are not supported yet (deferred until schema and backend support land).
  */
 export function SynDynamicForm({
