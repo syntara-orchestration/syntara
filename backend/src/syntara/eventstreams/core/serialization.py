@@ -15,6 +15,7 @@ from referencing.exceptions import Unresolvable
 from sqlmodel import SQLModel
 
 from syntara.core.constants import EventStreamLimits
+from syntara.eventstreams.adapters.kafka_cloudevents import decode_kafka_cloudevents
 from syntara.eventstreams.core.envelope import (
     OriginalEvent,
     OriginalEventHeader,
@@ -73,12 +74,12 @@ def _reject_constant(_value: str) -> NoReturn:
     raise _ContentError(EventFailureCode.non_finite_number)
 
 
-def _validate_content_type(headers: tuple[RawEventHeader, ...]) -> None:
+def _validate_content_type(headers: tuple[RawEventHeader, ...]) -> str | None:
     values = [header.value for header in headers if header.name.lower() == "content-type"]
     if len(values) > 1:
         raise _ContentError(EventFailureCode.duplicate_content_type)
     if not values or values[0] is None:
-        return
+        return None
     try:
         text = values[0].decode("ascii").strip(" \t")
     except UnicodeDecodeError:
@@ -87,10 +88,17 @@ def _validate_content_type(headers: tuple[RawEventHeader, ...]) -> None:
     if match is None:
         raise _ContentError(EventFailureCode.malformed_content_type)
     media_type = f"{match['type']}/{match['subtype']}".lower()
+    if media_type.startswith("application/cloudevents"):
+        raise _ContentError(EventFailureCode.unsupported_cloudevents_mode)
     if media_type != "application/json" and not match["subtype"].lower().endswith("+json"):
         raise _ContentError(EventFailureCode.unsupported_content_type)
+    _validate_content_type_parameters(match["parameters"])
+    return text
+
+
+def _validate_content_type_parameters(parameters: str) -> None:
     seen_parameters: set[str] = set()
-    for parameter in _PARAMETERS.finditer(match["parameters"]):
+    for parameter in _PARAMETERS.finditer(parameters):
         name = parameter["name"].lower()
         if name in seen_parameters:
             raise _ContentError(EventFailureCode.malformed_content_type)
@@ -247,7 +255,10 @@ class JsonEventDecoder:
         minimum_encoded_bytes = base64_bytes + header_bytes + max(len(event.headers) - 1, 0)
         if minimum_encoded_bytes > self._max_envelope_bytes:
             return EventDecodeFailure(code=EventFailureCode.envelope_too_large)
-        _validate_content_type(event.headers)
+        datacontenttype = _validate_content_type(event.headers)
+        cloudevents = decode_kafka_cloudevents(event.headers, datacontenttype=datacontenttype)
+        if isinstance(cloudevents, EventDecodeFailure):
+            raise _ContentError(cloudevents.code)
         # Confluent framing: a zero magic byte followed by a four-byte schema ID.
         if len(value) >= _REGISTRY_FRAME_PREFIX_BYTES and value.startswith(b"\x00"):
             raise _ContentError(EventFailureCode.registry_framing)
@@ -264,6 +275,7 @@ class JsonEventDecoder:
         json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
         envelope = WorkflowEventEnvelope(
             payload=payload,
+            cloudevents=cloudevents,
             original=OriginalEvent(
                 value_base64=base64.b64encode(value).decode("ascii"),
                 key_base64=_base64(event.key),
