@@ -198,6 +198,34 @@ describe('AssignmentsTab', () => {
     vi.mocked(accessFetchClient.GET).mockResolvedValue({ data: { resources: [] } } as never)
   })
 
+  it('lets an admin revoke the global step-author assignment on authenticated', async () => {
+    const user = userEvent.setup()
+    setupAssignmentsQuery([
+      {
+        ...sampleAssignments[1],
+        id: 'default-step-author',
+        principal_name: 'authenticated',
+        role_name: 'step-author',
+        role_policies: ['step_type:write:any'],
+        project_id: null,
+        project_name: null,
+        is_builtin: false,
+      },
+    ])
+
+    render(<AssignmentsTab />, { wrapper })
+
+    const row = screen.getByRole('row', { name: /authenticated/ })
+    await user.click(within(row).getByRole('button', { name: 'Kebab toggle' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete assignment' }))
+    await user.click(await screen.findByRole('button', { name: 'Delete assignment' }))
+
+    expect(mockDeleteMutate).toHaveBeenCalledWith(
+      { params: { path: { assignment_id: 'default-step-author' } } },
+      expect.any(Object)
+    )
+  })
+
   describe('Empty State', () => {
     it('shows empty state when no rows and no active filters', () => {
       render(<AssignmentsTab />, { wrapper })

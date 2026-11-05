@@ -81,6 +81,7 @@ async def test_db_template(
     # in the template because tests seed their own per-test data and assume an empty
     # DB.  Truncate the same tables the old TRUNCATE-based cleanup truncated, leaving
     # only the four tables that were previously excluded from truncation.
+    # Seed markers are truncated too, so per-test authz seeds can create defaults.
     preserved = frozenset({"alembic_version", "installation", "runtime_settings", "setting_categories"})
     preparer = test_db_engine.dialect.identifier_preparer
     async with test_db_engine.begin() as conn:
