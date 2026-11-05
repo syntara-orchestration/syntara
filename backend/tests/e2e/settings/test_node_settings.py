@@ -787,8 +787,6 @@ def test_sequential_cof_second_failure_without_cof_is_failed(
     syntara_api: SyntaraApiRegistry, first_project_id: UUID
 ) -> None:
     """Node A fails (CoF=true) → Node B runs → Node B fails (CoF=false) → execution is 'failed'."""
-    # Sequential CoF chain: three script nodes each pay the dispatch cold
-    # start on local e2e runs, exceeding the default 60s poll budget there.
     result = _run_workflow(
         syntara_api,
         "e2e-cof-chain-mixed",
@@ -823,7 +821,6 @@ def test_sequential_cof_second_failure_without_cof_is_failed(
                 {"from": "second_fail", "to": "final"},
             ],
         },
-        timeout=180,
         project_id=first_project_id,
     )
 
