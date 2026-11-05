@@ -18,9 +18,12 @@ and the workflow does not pause while waiting for input.
   form-trigger table, service, or read endpoint.
 - **Domain ownership:** The forms domain provides the shared form field models and validator; the
   workflows domain owns the form-trigger node and execution path.
-- **Execution data:** The execution stores validated answers in `input_data`. The trigger
-  activity applies output mapping and returns the result under `response_data` for downstream
-  nodes to use.
+- **Execution data:** The form definition determines the validated values stored in `input_data`.
+  The trigger activity applies output mapping and returns the result under `response_data` for
+  downstream nodes. The API schemas are generic: `ExecutionCreate.input_data` accepts an object,
+  and `resultSchema.response_data` allows arbitrary properties. The form builder can generate a
+  Draft-07 schema for preview and import/export, but the execution API does not use it as its
+  request or response contract. This work is still in progress. 
 
 
 ## Form Definitions, Fields, and Parameters

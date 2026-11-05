@@ -11,10 +11,14 @@ extend the shared models.
 A `FormDefinition` is an ordered list of 1 to 100 fields. Each field has a unique `value_name`
 that downstream steps use to read its submitted value. Fields also have a label, a required
 flag, optional help and placeholder text, and a type-specific default. Each field must use a
-supported type and its defined settings; unknown types and extra settings are rejected.
+supported type and its defined settings; unknown types and extra settings are rejected. The
+100-field cap is a limit for usability, not a technical requirement.
 
 The supported field types are `text`, `textarea`, `masked_text`, `email`, `number`, `checkbox`,
 `date`, `dropdown`, and `multi_select`.
+
+`masked_text` hides a value in the UI but does not encrypt it. For sensitive values, use the
+[credential system](../credential.md) and reference credentials from supported workflow nodes.
 
 `FormPromptDefinition` and `FormTriggerDefinition` both inherit from `FormDefinition`. They share
 the common field models and specialize dropdown and multi-select fields to enforce their option
@@ -39,30 +43,42 @@ is also selected.
 After validation, the selected components are normalized into one string. If the field collects
 time and timezone without a date, the time string uses the timezone's standard UTC offset.
 
-#### Form Limits
-
-File uploads and encrypted-secret fields are not supported. `masked_text` hides a value in the
-UI, but the value is stored in plain text.
-For sensitive values, use the [credential system](../credential.md) and reference credentials
-from supported workflow nodes.
+**Planned follow-up:** Align the date field's input and normalized output with JSON Schema
+2020-12 and RFC 3339. The details above describe the current behavior.
 
 ## Form Parameters
 
-Form parameters are settings on the workflow node that configure the form itself; fields inside
-`form_definition` define the answers it collects.
+Each form prompt or form trigger has a `parameters` object. `form_definition` is one of its
+top-level parameters and contains the form fields users fill in. Other parameters configure the form itself, for example:
 
-Form prompts and form triggers share a base parameter model and related behavior. The classes
-`BaseFormParameters`, `FormPromptNodeParameters`, and `FormTriggerParameters` are defined in
+```json
+{
+  "parameters": {
+    "message": "Tell us what happened.",
+    "form_definition": {
+      "fields": [{"type": "text", "value_name": "details", "label": "Details"}]
+    },
+    "submit_label": "Submit",
+    "success_message": "Thanks for your response.",
+    "css_override": ".form { color: navy; }"
+  }
+}
+```
+
+Form prompts and form triggers share a base parameter model. The classes `BaseFormParameters`,
+`FormPromptNodeParameters`, and `FormTriggerParameters` are defined in
 `src/syntara/workflows/workflow_engine/models/workflow_definition.py`. Form prompts add responder,
-response-window, and fallback settings; see [Responders](form-prompt-overview.md#responders) and
+response-window, and fallback parameters, see
+[Responders](form-prompt-overview.md#responders) and
 [Timeout and Cleanup](form-prompt-overview.md#timeout-and-cleanup) for details.
 
 The shared `css_override` is author-supplied CSS shown to submitters. A security validator rejects
 patterns that could enable data exfiltration or code execution.
 
-Form prompt parameters can use template expressions where supported. Form triggers run before
-workflow nodes produce output, so they have no upstream values to reference and reject template
-expressions throughout their parameters.
+Form prompts allow template expressions in supported node parameters and in dynamic option
+expressions inside `form_definition`. The workflow resolves dynamic options when it reaches the
+prompt step. Form triggers are submitted before the workflow starts, so they have no upstream
+values to reference and reject template expressions throughout their parameters.
 
 ## Validation
 
