@@ -43,16 +43,19 @@ time and timezone without a date, the time string uses the timezone's standard U
 
 File uploads and encrypted-secret fields are not supported. `masked_text` hides a value in the
 UI, but the value is stored in plain text.
+For sensitive values, use the [credential system](../credential.md) and reference credentials
+from supported workflow nodes.
 
 ## Form Parameters
 
 Form parameters are settings on the workflow node that configure the form itself; fields inside
 `form_definition` define the answers it collects.
 
-Form prompts and form triggers use separate parameter models: `FormPromptNodeParameters` and
-`FormTriggerParameters`. Both inherit `message`, `form_definition`, `submit_label`,
-`success_message`, and `css_override` from `BaseFormParameters`. The prompt model additionally adds
-`responder_users`, `responder_groups`, `response_window`, and `fallback_decision`.
+Form prompts and form triggers share a base parameter model and related behavior. The classes
+`BaseFormParameters`, `FormPromptNodeParameters`, and `FormTriggerParameters` are defined in
+`src/syntara/workflows/workflow_engine/models/workflow_definition.py`. Form prompts add responder,
+response-window, and fallback settings; see [Responders](form-prompt-overview.md#responders) and
+[Timeout and Cleanup](form-prompt-overview.md#timeout-and-cleanup) for details.
 
 The shared `css_override` is author-supplied CSS shown to submitters. A security validator rejects
 patterns that could enable data exfiltration or code execution.
@@ -65,12 +68,11 @@ expressions throughout their parameters.
 
 ### When Saving a Workflow
 
-When a workflow is saved, each field's default is checked as if a user had submitted it. For
-example, a date default must use a valid date and the form's selected components, and a dropdown
-default must match one of its options.
-
-Validation findings use `form_prompt_configuration` for form prompts and
-`form_trigger_configuration` for form triggers. Drafts can be saved with findings, publishing is blocked until the findings are resolved.
+When a workflow is saved, the form parameter models call `validate_form_definition()` in
+`forms/validators/form_definition.py` to check defaults against their field rules. The workflow
+validator in `workflows/validators/workflow_definition.py` reports findings under
+`form_prompt_configuration` or `form_trigger_configuration`. Drafts can be saved with findings;
+the validation endpoint reports them as errors, and publishing is blocked until they are resolved.
 
 ### When Submitting a Form
 
@@ -94,11 +96,24 @@ rejects impossible calendar dates or invalid IANA timezone names.
 3. **Set the allowed option sources.** Form prompts can use static or dynamic options. Form
    triggers must use static options; their field models should override `options` with
    `StaticOptions`.
-4. **Update the JSON Schema** for each form prompt or form trigger that supports the field:
+4. **Update the schemas** for each form prompt or form trigger that supports the field:
+   - Shared field definitions: `src/syntara/schemas/forms/openapi.yaml` and
+     `src/syntara/schemas/workflows/v2/shared-schemas.yaml`
    - Form prompt: `src/syntara/schemas/workflows/v2/executors/form_prompt.schema.json`
    - Form trigger: `src/syntara/schemas/workflows/v2/triggers/form.schema.json`
-5. **Add tests** for the field definition, submitted values, defaults, and options where
-   applicable.
+5. **Update the API contract.** Adding a field type is additive: existing form definitions
+   remain valid, so it does not require a new API major version or URL. It does change the
+   OpenAPI schema, so bump the affected spec's `info.version` by a minor increment and run
+   `make gen-contracts` to regenerate TypeScript types. See
+   [OpenAPI Spec Management](../standards/openapi-spec-management.md).
+6. **Add frontend support.** Update the form builder schema and default-field setup in
+   `frontend/packages/syntara-ui/src/forms/formDefinitionSchema.ts` and
+   `frontend/packages/syntara-ui/src/components/forms/formFieldBuilder/createDefaultField.ts`.
+   Add rendering in `frontend/packages/syntara-ui/src/components/forms/dynamicForm/SynDynamicFormField.tsx`
+   and client-side validation in `frontend/packages/syntara-ui/src/forms/formSubmissionValidation.ts`
+   as needed. Add field-specific editor or input components when the type needs them.
+7. **Add tests** for backend validation and any frontend builder, rendering, and submission
+   behavior the field introduces.
 
 ### Adding a Parameter
 
@@ -109,6 +124,11 @@ both for a shared parameter. Both models reject unknown properties, so the schem
 
 - Form prompt: `src/syntara/schemas/workflows/v2/executors/form_prompt.schema.json`
 - Form trigger: `src/syntara/schemas/workflows/v2/triggers/form.schema.json`
+
+The workflow JSON Schemas are maintained separately from the Pydantic parameter models; they are
+not generated from those models. `tests/unit/workflows/test_form_prompt_schema.py` and
+`tests/integration/workflows/test_form_trigger_schema.py` cover representative schema cases, but
+there is no comprehensive model/schema parity check. Update and test both when adding a parameter.
 
 ## Related Documentation
 

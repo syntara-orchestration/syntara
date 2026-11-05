@@ -97,11 +97,6 @@ logged and swallowed so they do not prevent a submission.
 For steps to add a field type or form parameter, see
 [Extending Forms](../../forms/form-definitions.md#extending-forms).
 
-### Adding a Trigger Type
-
-The form trigger is an example of a trigger that needs its own config and validation, but no
-service or database table. See [Adding a New Trigger Type](overview.md#adding-a-new-trigger-type).
-
 ## Related Documentation
 
 - [Form Definitions](../../forms/form-definitions.md) — field types, validation and parameters shared
