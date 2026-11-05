@@ -349,7 +349,7 @@ background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal 
 .PHONY: ep-migrate
 ep-migrate: check-deps ## Apply execution_plane schema migrations (separate from main Syntara migrations)
 	@echo "🔄 Running execution_plane migrations..."
-	@$(COMPOSE_FINAL_CMD) up execution-plane-db-init
+	@$(COMPOSE_FINAL_CMD) --profile execution-plane up execution-plane-db-init
 	@cd $(EP_REPOSITORY) && \
 		DATABASE_URL="$${EP_DATABASE_MIGRATOR_URL:-$(EP_DATABASE_MIGRATOR_URL)}" \
 		EP_CREDENTIAL_ENCRYPTION_KEY_PATH="$(abspath .secrets/ep-credential-encryption-key)" \
@@ -524,7 +524,7 @@ run-all: _ensure-secrets _ensure-certs ## Register the local EP cluster and star
 	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
 	@echo "Press Ctrl+C to stop"
 	@echo ""
-	$(COMPOSE_FINAL_CMD) up --build --force-recreate
+	$(COMPOSE_FINAL_CMD) --profile ui up --build --force-recreate
 
 .PHONY: run-all-kind
 run-all-kind: _ensure-secrets _ensure-certs ## Start the full stack with the EP worker attached to the external kind network
@@ -544,7 +544,7 @@ run-all-kind: _ensure-secrets _ensure-certs ## Start the full stack with the EP 
 	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
 	@echo "Press Ctrl+C to stop"
 	@echo ""
-	$(COMPOSE_FINAL_CMD) -f ../podman-compose.kind-demo.override.yml up --build --force-recreate
+	$(COMPOSE_FINAL_CMD) --profile ui --profile execution-plane -f ../podman-compose.kind-demo.override.yml up --build --force-recreate
 
 .PHONY: services-run
 services-run: _ensure-secrets _ensure-certs ## Start infrastructure services (including the separate EP database) in background
@@ -554,7 +554,7 @@ services-run: _ensure-secrets _ensure-certs ## Start infrastructure services (in
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
 	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
 	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
-	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d database execution-plane-db-init redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
+	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios --profile ui --profile execution-plane up --build --force-recreate -d database execution-plane-db-init redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
 	@echo "✅ All services started in background"
 	@echo "   Use 'make services-logs' to view logs"
 	@echo "   Use 'make services-stop' to stop services"

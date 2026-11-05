@@ -23,35 +23,102 @@ EP_IMAGE="${EP_IMAGE:-localhost/execution-plane:latest}"
 EP_REPOSITORY="${EP_REPOSITORY:-../../syntara-execution-plane}"
 EP_API_PORT="${EP_API_PORT:-8001}"
 EP_KIND_CLUSTER="${EP_KIND_CLUSTER:-ep-kind}"
-NODE_IMAGE="${NODE_IMAGE:-quay.io/ahetheri/syntara-node-script:migration-test}"
+# Script-node image: built from the Execution Plane checkout's
+# tests/fixtures/sdk_script fixture, so the node runtime always speaks the
+# workload protocol of the EP source tree being tested. Set NODE_IMAGE to
+# override with a prebuilt image (e.g. the published migration-test tag).
+NODE_IMAGE="${NODE_IMAGE:-localhost/syntara-sdk-script:dev}"
 # Must match the EP API's EP_AO_JWT_ISSUER, which follows AO's jwt_issuer:
 # APP_SERVER_PUBLIC_URL when set (backend/.env wins over the compose default)
 # or the https://0.0.0.0:8000 fallback.
 EP_JWT_ISSUER="${EP_AO_JWT_ISSUER:-$(grep -E '^APP_SERVER_PUBLIC_URL=' .env 2>/dev/null | tail -1 | cut -d= -f2- | cut -d'#' -f1 | tr -d '"' | xargs)}"
 EP_JWT_ISSUER="${EP_JWT_ISSUER:-https://0.0.0.0:8000}"
 
-EP_SERVICES=()
+# The Execution Plane services live behind the "execution-plane" compose
+# profile: enabling the profile starts exactly the service set the EP e2e
+# needs (db-init, migrate, api, worker) without enumerating them here.
+EP_PROFILES=()
 if [[ "${E2E_EP}" == "1" ]]; then
-    EP_SERVICES=(execution-plane-db-init execution-plane-migrate execution-plane-api execution-plane-worker)
+    EP_PROFILES=(--profile execution-plane)
     # podman-compose does not honor "${EP_API_PORT:-8001}" defaults in port
     # mappings (it falls back to the container port); export the variable so the
     # documented 8001 publish port is actually used.
     export EP_API_PORT
 fi
 
+# Follow the logs of every pod in the EP kind cluster while the tests run.
+# Workload pods are deleted as soon as their Job completes, so dumping the
+# logs after the fact (in cleanup) would see nothing: the logs must be
+# captured live, pod by pod.
+start_kind_log_collector() {
+    if ! kubectl --context "kind-${EP_KIND_CLUSTER}" get ns >/dev/null 2>&1; then
+        echo "⚠️  No 'kind-${EP_KIND_CLUSTER}' kubeconfig context; skipping kind log collection"
+        return 0
+    fi
+    local log_dir="/tmp/syntara-e2e-logs/kind"
+    rm -rf "${log_dir}"
+    KIND_LOG_DIR="${log_dir}" KIND_CONTEXT="kind-${EP_KIND_CLUSTER}" bash -c '
+        declare -A followed=()
+        while true; do
+            # Only follow pods whose containers already exist: a failed
+            # "kubectl logs -f" (Pending/ContainerCreating pod) would mark
+            # them as followed forever. Completed pods are still followed:
+            # "logs -f" dumps what is left and exits.
+            while read -r ns name phase; do
+                case "${phase}" in
+                    Running|Succeeded|Failed|Completed) ;;
+                    *) continue ;;
+                esac
+                [[ -n "${followed[${ns}/${name}]:-}" ]] && continue
+                followed["${ns}/${name}"]=1
+                mkdir -p "${KIND_LOG_DIR}/${ns}"
+                kubectl --context "${KIND_CONTEXT}" -n "${ns}" logs -f --timestamps --prefix \
+                    --all-containers "${name}" >> "${KIND_LOG_DIR}/${ns}/${name}.log" 2>/dev/null &
+            done < <(kubectl --context "${KIND_CONTEXT}" get pods -A --no-headers 2>/dev/null \
+                | awk "{print \$1, \$2, \$4}")
+            # Poll fast: completed workload pods are garbage-collected within
+            # seconds of their Job finishing.
+            sleep 1
+        done
+    ' >/dev/null 2>&1 &
+    KIND_LOG_COLLECTOR_PID=$!
+    echo "📋 Recording kind cluster pod logs to ${log_dir}/ ..."
+}
+
+stop_kind_log_collector() {
+    [[ -n "${KIND_LOG_COLLECTOR_PID:-}" ]] || return 0
+    echo "📋 Capturing kind cluster state and events..."
+    local log_dir="/tmp/syntara-e2e-logs/kind"
+    kubectl --context "kind-${EP_KIND_CLUSTER}" get events -A --sort-by=.lastTimestamp \
+        > "${log_dir}/events.log" 2>/dev/null || true
+    kubectl --context "kind-${EP_KIND_CLUSTER}" get pods -A -o wide \
+        > "${log_dir}/pods.txt" 2>/dev/null || true
+    # Kill the kubectl followers before their parent: once the parent is
+    # dead they get re-parented to PID 1 and pkill -P would miss them.
+    pkill -P "${KIND_LOG_COLLECTOR_PID}" 2>/dev/null || true
+    kill "${KIND_LOG_COLLECTOR_PID}" 2>/dev/null || true
+    wait "${KIND_LOG_COLLECTOR_PID}" 2>/dev/null || true
+    unset KIND_LOG_COLLECTOR_PID
+}
+
 cleanup() {
     echo "🧹 Stopping background services..."
 
-    # Save container logs before tearing down (useful for debugging failures)
+    # Snapshot the kind cluster (events, pod table) before anything is torn
+    # down, and stop the live pod log collector.
+    stop_kind_log_collector
+
+    # Save container logs before tearing down (useful for debugging failures).
+    # Keep the kind/ subdirectory: it holds the logs recorded during the run.
     local log_dir="/tmp/syntara-e2e-logs"
-    rm -rf "$log_dir"
+    rm -f "${log_dir}"/*.log
     mkdir -p "$log_dir"
     echo "📋 Saving container logs to ${log_dir}/ ..."
     for container in $(podman ps -a --format '{{.Names}}' --filter "label=com.docker.compose.project" 2>/dev/null); do
         podman logs "$container" > "${log_dir}/${container}.log" 2>&1 || true
     done
 
-    ${COMPOSE_CMD} --profile telemetry-e2e down > /dev/null 2>&1 || true
+    ${COMPOSE_CMD} --profile telemetry-e2e --profile mcp-scenarios ${EP_PROFILES[*]+"${EP_PROFILES[@]}"} down > /dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -69,13 +136,20 @@ ${COMPOSE_CMD} --profile telemetry-e2e up -d --force-recreate database \
 
 echo "🚀 Starting remaining services..."
 APP_SCRIPT_NODES_ENABLED=true \
+APP_NODE_CONTAINER_IMAGES="{\"script\":\"${NODE_IMAGE}\"}" \
 APP_SEGMENT_WRITE_KEY=test-e2e-write-key \
 APP_SEGMENT_ENDPOINT="http://mock-segment:9999" \
 APP_SEGMENT_MAX_RETRIES=2 \
 APP_SEGMENT_TIMEOUT=5 \
 APP_COLLECTION_INTERVAL_SECONDS=10 \
 APP_INTEGRATION_URL_ALLOWED_HOSTS='["mcp-server"]' \
-${COMPOSE_CMD} --profile telemetry-e2e --profile mcp-scenarios up -d --force-recreate temporal temporal-worker temporal-background-worker mock-segment mcp-server mcp-server-scenarios syntara ${EP_SERVICES[*]+"${EP_SERVICES[@]}"} \
+# Bare up with profiles: every non-profiled service plus the active profiles
+# (mock-segment, mcp-server-scenarios, and the Execution Plane set in EP mode).
+# The UIs sit behind the "ui" profile so they stay down; no --force-recreate
+# so the database container started above is not restarted (podman-compose
+# still recreates containers whose configuration changed, and cleanup tears
+# the stack down after each run anyway).
+${COMPOSE_CMD} --profile telemetry-e2e --profile mcp-scenarios ${EP_PROFILES[*]+"${EP_PROFILES[@]}"} up -d \
     >> /tmp/syntara-e2e-infra.log 2>&1
 
 echo "⏳ Waiting for mock Segment server..."
@@ -179,7 +253,7 @@ if [[ "${E2E_EP}" == "1" ]]; then
         EP_API_CA_FILE="${BACKEND_DIR}/.secrets/certs/ca.pem" \
         EP_AO_JWT_PRIVATE_KEY_FILE="${BACKEND_DIR}/.secrets/jwt-primary.pem" \
         EP_AO_JWT_ISSUER="${EP_JWT_ISSUER}" \
-        uv run python tools/deploy_kind_execution_target.py \
+        uv run python -m tools.deploy_kind_execution_target \
             --cluster-name "${EP_KIND_CLUSTER}" \
             --api-url "https://localhost:${EP_API_PORT}" \
             --ao-api-url "https://localhost:8000" \
@@ -189,12 +263,31 @@ if [[ "${E2E_EP}" == "1" ]]; then
             --wait-for-api 60
     )
 
-    echo "📦 Pre-pulling ${NODE_IMAGE} on the ${EP_KIND_CLUSTER} node..."
-    if podman exec "${EP_KIND_CLUSTER}-control-plane" crictl pull "${NODE_IMAGE}"; then
-        echo "✅ Node image pre-pulled"
+    SDK_SCRIPT_FIXTURE="${EP_REPOSITORY}/tests/fixtures/sdk_script"
+    if [[ -f "${SDK_SCRIPT_FIXTURE}/Containerfile" ]]; then
+        echo "📦 Building the script-node image from ${SDK_SCRIPT_FIXTURE}..."
+        podman build -t "${NODE_IMAGE}" "${SDK_SCRIPT_FIXTURE}"
+        echo "📦 Loading ${NODE_IMAGE} into the ${EP_KIND_CLUSTER} node..."
+        podman save --output /tmp/syntara-node-image.tar "${NODE_IMAGE}"
+        kind load image-archive /tmp/syntara-node-image.tar --name "${EP_KIND_CLUSTER}"
+        rm -f /tmp/syntara-node-image.tar
+        echo "✅ Script-node image staged on the Kind node"
+    elif podman image exists "${NODE_IMAGE}"; then
+        echo "📦 Loading existing ${NODE_IMAGE} into the ${EP_KIND_CLUSTER} node..."
+        podman save --output /tmp/syntara-node-image.tar "${NODE_IMAGE}"
+        kind load image-archive /tmp/syntara-node-image.tar --name "${EP_KIND_CLUSTER}"
+        rm -f /tmp/syntara-node-image.tar
+        echo "✅ Script-node image staged on the Kind node"
     else
-        echo "⚠️  Pre-pull failed; the Job will pull ${NODE_IMAGE} itself at dispatch time"
+        echo "📦 Pre-pulling ${NODE_IMAGE} on the ${EP_KIND_CLUSTER} node..."
+        if podman exec "${EP_KIND_CLUSTER}-control-plane" crictl pull "${NODE_IMAGE}"; then
+            echo "✅ Node image pre-pulled"
+        else
+            echo "⚠️  Pre-pull failed; the Job will pull ${NODE_IMAGE} itself at dispatch time"
+        fi
     fi
+
+    start_kind_log_collector
 fi
 
 API="https://localhost:8000/api/v1"
