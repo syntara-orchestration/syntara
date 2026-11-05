@@ -44,3 +44,15 @@ export function getSelectToggleLabel(selectedLabels: string[], placeholder: stri
   }
   return selectedLabels[0] ?? placeholder
 }
+
+export function filterOptionsByLabel<T extends { label: string }>(
+  options: readonly T[],
+  filterValue: string
+): readonly T[] {
+  const trimmed = filterValue.trim()
+  if (!trimmed) {
+    return options
+  }
+  const term = trimmed.toLowerCase()
+  return options.filter((option) => option.label.toLowerCase().includes(term))
+}
