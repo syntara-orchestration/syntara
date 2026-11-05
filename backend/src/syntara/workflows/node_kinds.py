@@ -18,6 +18,28 @@ _NON_GRANTABLE_NODE_KINDS: frozenset[str] = frozenset({NodeType.INTERNAL_ACTIVIT
 NODE_KINDS: frozenset[str] = frozenset(
     node_type.value for node_type in NodeType if node_type.value not in _NON_GRANTABLE_NODE_KINDS
 )
+NODE_KIND_DISPLAY_LABELS: dict[str, str] = {
+    "manual_trigger": "Manual trigger",
+    "scheduled_trigger": "Schedule trigger",
+    "webhook_trigger": "Webhook trigger",
+    "eda_trigger": "Event-Driven Ansible trigger",
+    "condition": "Conditional",
+    "converge": "Converge",
+    "loop": "Loop",
+    "switch": "Switch",
+    "wait": "Wait",
+    "aap_job_template": "AAP Job Template",
+    "aap_workflow_job_template": "AAP Workflow Template",
+    "agentic": "Task Agent",
+    "approval": "Approval",
+    "http_request": "REST API",
+    "script": "Script",
+}
+
+
+def node_kind_display_label(kind: str) -> str:
+    """Human-readable label for a step type; falls back to title-cased kind."""
+    return NODE_KIND_DISPLAY_LABELS.get(kind, kind.replace("_", " ").title())
 
 
 def node_labels(node: dict[str, Any]) -> dict[str, str]:
