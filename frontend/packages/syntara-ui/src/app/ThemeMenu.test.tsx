@@ -74,30 +74,28 @@ describe('ThemeMenu', () => {
     const user = userEvent.setup()
     renderThemeMenu()
     await user.click(screen.getByRole('button', { name: THEME_BUTTON }))
-    // The menu portals to document.body, outside the masthead landmark, same as
+    // The dialog portals to document.body, outside the masthead landmark, like
     // other PatternFly poppers. The region rule flags that placement, not the controls.
     expect(await axe(document.body, { rules: { region: { enabled: false } } })).toHaveNoViolations()
   })
 
-  it('closes with Escape and activates a contrast option with Enter', async () => {
+  it('moves focus into the dialog, closes with Escape, and activates a contrast option with Enter', async () => {
     const user = userEvent.setup()
     renderThemeMenu()
     const themeButton = screen.getByRole('button', { name: THEME_BUTTON })
 
     await user.click(themeButton)
+    const firstSystem = screen.getAllByRole('button', { name: 'System' })[0]
     expect(screen.getByRole('group', { name: 'Contrast mode' })).toBeInTheDocument()
-    await user.keyboard('{Escape}')
-    await waitFor(() => {
-      expect(screen.queryByRole('group', { name: 'Contrast mode' })).not.toBeInTheDocument()
-    })
-
-    await user.click(themeButton)
+    await waitFor(() => expect(firstSystem).toHaveFocus())
+    expect(screen.getByRole('dialog', { name: 'Theme settings' })).toBeInTheDocument()
     await user.tab()
-    expect(screen.getAllByRole('button', { name: 'System' })[0]).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Light' })).toHaveFocus()
     await user.keyboard('{Escape}')
     await waitFor(() => {
-      expect(screen.queryByRole('group', { name: 'Contrast mode' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: 'Theme settings' })).not.toBeInTheDocument()
     })
+    expect(themeButton).toHaveFocus()
 
     await user.click(themeButton)
     const highContrast = screen.getByRole('button', { name: 'High contrast' })
@@ -117,23 +115,30 @@ describe('ThemeMenu', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
-  it('stays open while tabbing between groups and closes when tab leaves the menu', async () => {
+  it('keeps tab focus inside the dialog until Escape closes it', async () => {
     const user = userEvent.setup()
     renderThemeMenu()
     const themeButton = screen.getByRole('button', { name: THEME_BUTTON })
 
     await user.click(themeButton)
+    const firstSystem = screen.getAllByRole('button', { name: 'System' })[0]
     const glass = screen.getByRole('button', { name: 'Glass' })
-    for (let step = 0; step < 7; step += 1) {
+    await waitFor(() => expect(firstSystem).toHaveFocus())
+    for (let step = 0; step < 6; step += 1) {
       await user.tab()
     }
     expect(glass).toHaveFocus()
-    expect(screen.getByRole('group', { name: 'Color scheme' })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: 'Contrast mode' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Theme settings' })).toBeInTheDocument()
 
     await user.tab()
     await waitFor(() => {
-      expect(screen.queryByRole('group', { name: 'Contrast mode' })).not.toBeInTheDocument()
+      expect(firstSystem).toHaveFocus()
     })
+    expect(screen.getByRole('dialog', { name: 'Theme settings' })).toBeInTheDocument()
+    await user.keyboard('{Escape}')
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Theme settings' })).not.toBeInTheDocument()
+    })
+    expect(themeButton).toHaveFocus()
   })
 })
