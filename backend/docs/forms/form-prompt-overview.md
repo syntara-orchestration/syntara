@@ -5,10 +5,6 @@ workflow through `submitted`; if the prompt times out, the workflow follows its 
 outcome. Other branches can continue and finish while the prompt is pending. Unlike an
 approval, which collects a yes/no decision, a form prompt collects structured answers.
 
-> This overview describes the feature's architecture and behavior. See
-> [Form Definitions and Fields](#form-definitions-and-fields) for field types and
-> [API Surface](#api-surface) for API shapes.
-
 The sections follow the feature's own lifecycle: what an author defines, what the engine
 creates when the step runs, what comes back when someone answers, and what happens when
 nobody does.
@@ -54,26 +50,13 @@ Key properties:
 - Temporal tracks whether the step is waiting; Postgres stores the prompt and its response.
   Signal delivery and cleanup are best-effort; see [Current Limitations](#current-limitations).
 
-## Form Definitions and Fields
+## Form Definitions, Fields, and Parameters
 
-A `FormDefinition` is an ordered list of fields, each with a unique `value_name`. Downstream steps
-use those names to reference submitted field values. Definitions reject unknown properties and enforce limits
-on field, label, and option counts.
-
-Nine field types exist: `text`, `textarea`, `masked_text`, `email`, `number`, `checkbox`,
-`date`, `dropdown`, and `multi_select`. One note on the shape of that list:
-
-- **`date`** is one field type with toggles for date, time, and timezone. The enabled
-  components are submitted together as one object under a single `value_name`, so downstream
-  steps reference them through one field.
-
-### Options
-
-Workflow authors can give `dropdown` and `multi_select` fields a fixed list or a dynamic
-expression based on earlier workflow steps. The engine evaluates each dynamic expression
-when the step starts and saves the resulting options with the prompt. Responders see that
-snapshot, and submissions are checked against it, so the choices shown and accepted stay in
-sync.
+Form definitions list the fields a user will fill in. Authors choose each field's type from the
+supported set and configure its label, required status, and other settings. Form parameters
+configure the form itself. Most field, option, and validation rules are
+shared by form prompts and form triggers. See [Form Definitions](form-definitions.md) for the
+full guide, including where the two differ.
 
 ## The Form Prompt Step
 
@@ -100,13 +83,6 @@ mid-flight does not move a running prompt's deadline.
 Human-in-the-loop steps use dedicated parameters — `response_window` here and
 `decision_window` for approvals. `settings.timeout` does not set the form prompt deadline. See
 [Node Settings](../workflow-engine/node-settings.md) and [Runtime Settings](../runtime-settings.md).
-
-### Save-time validation
-
-Defaults are checked using the same rules as submitted answers. The workflow validator also
-checks constraints JSON Schema cannot express, such as valid calendar dates and defaults
-that match the selected date components or an option list. Drafts can save with validation
-issues; `/workflows/validate` returns `422`, and publishing returns `409`.
 
 ## Creating the Prompt
 
@@ -295,18 +271,10 @@ history timestamps. Neither metric compares clocks across hosts.
 Errors use RFC 9457 problem details. See [Audit](../audit.md) and
 [Observability](../standards/observability.md).
 
-## Adding a New Field Type
+### Adding a New Field Type or Parameter
 
-Files to touch:
-
-1. **`forms/models/form_fields.py`** — define the field model and add it to the
-   `FormField` discriminated union.
-2. **`forms/validators/submission.py`** — add its submission coercion and default behavior.
-   If it has options, update option resolution and membership validation in
-   `forms/validators/options.py` as well.
-3. **Tests** — cover the field definition and submitted values, including defaults and
-   options when applicable.
-
+For steps to add a field type or form parameter, see
+[Extending Forms](form-definitions.md#extending-forms).
 
 ## Current Limitations
 
@@ -327,8 +295,12 @@ Files to touch:
 
 ## Related Documentation
 
+- [Form Definitions](form-definitions.md) — field types and validation shared
+  by form prompts and form triggers
 - [Workflow Engine Architecture](../workflow-engine/workflow-engine-overview.md) — graph
   execution, async completion, and live-status sync shared by every step type
+- [Form Trigger](../workflow-engine/triggers/form-trigger.md) — the sibling collection point
+  that starts a workflow instead of pausing one
 - [Approval Overview](../approvals/approval-overview.md) — the sibling human-in-the-loop step
 - [Approval Execution Pattern](../approvals/approval-execution-pattern.md) — the
   async-completion/signal pattern in detail

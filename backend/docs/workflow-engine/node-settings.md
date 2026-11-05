@@ -95,7 +95,7 @@ Nodes not in this table (`converge`, `loop`, `wait`, `condition`, `switch`, `for
 dedicated config fields for timing. A form prompt's deadline comes from `parameters.response_window`,
 falling back to `workflow_engine.form_prompt_response_window_seconds`; `settings.timeout` does not
 set that deadline. See
-[Form Prompt Current Limitations](../form-prompts/form-prompt-overview.md#current-limitations).
+[Form Prompt Current Limitations](../forms/form-prompt-overview.md#current-limitations).
 
 ```yaml
 settings:

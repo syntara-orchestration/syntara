@@ -5,6 +5,7 @@ Triggers are the entry points that start workflow executions. Every workflow has
 Trigger types converge on the same execution path once they enter the workflow engine. This document explains that shared architecture. Per-trigger-type details are in the companion docs:
 
 - [Manual Trigger](manual-trigger.md) — user-initiated via API
+- [Form Trigger](form-trigger.md) — user-initiated with a structured form
 - [Webhook Triggers](webhook-triggers.md) — HTTP webhooks and EDA events
 - [Scheduled Trigger](scheduled-trigger.md) — cron and interval schedules
 
@@ -125,6 +126,7 @@ The shared infrastructure you get for free: output mapping, namespace registrati
 
 - [Workflow Engine Architecture](../workflow-engine-overview.md) — the shared graph/dispatch engine trigger nodes hand off into
 - [Manual Trigger](manual-trigger.md) — user-initiated via the executions API
+- [Form Trigger](form-trigger.md) — user-initiated with a validated form submission
 - [Webhook Triggers](webhook-triggers.md) — HTTP webhooks and EDA events
 - [Scheduled Trigger](scheduled-trigger.md) — cron and interval schedules
 - [Workflow Definition Guide](../workflow-definition-guide.md) — complete guide to defining V2 workflows
