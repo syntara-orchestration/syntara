@@ -72,6 +72,8 @@ dependencies = [
     "uuid-utils>=0.9.0",
     "pypdf>=6.19.0",
     "nh3>=0.2.21",
+    "syntara-plugin-contracts==0.1.0a1",
+    "grpcio>=1.78.0",
 ]
 
 [project.optional-dependencies]
@@ -115,6 +117,7 @@ dev = [
     "vulture>=2.16",  # dead code detection
     "pyan3>=2.6.0",  # import cycle detection
     "junitparser>=3.2.0",  # for merging JUnit XML reports in CI
+    "types-grpcio>=1.85.0.20261028",
 ]
 integration = []
 

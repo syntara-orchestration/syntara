@@ -1,3 +1,4 @@
+import { IntegrationTypeEnum } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -194,6 +195,35 @@ describe('EditIntegrationForm', () => {
     vi.clearAllMocks()
     setupMocks()
     setupMutationMocks()
+  })
+
+  it('loads and preserves the script image when editing an OpenShift integration', async () => {
+    const image = 'registry.example.com/script:test'
+    setupMocks({
+      integration: {
+        integration_type: IntegrationTypeEnum.OPENSHIFT,
+        management_credential_id: 'cred-123',
+        configuration: {
+          ...mockIntegration.configuration,
+          integration_type: IntegrationTypeEnum.OPENSHIFT,
+          namespace: 'scripts',
+          script_image: image,
+        },
+      },
+    })
+    const { patchMutate } = setupMutationMocks()
+    const user = userEvent.setup()
+    const { container } = render(<EditIntegrationForm />, { wrapper })
+    expect(screen.getByRole('textbox', { name: 'Script Image' })).toHaveValue(image)
+    await user.clear(screen.getByRole('textbox', { name: 'Script Image' }))
+    await user.type(screen.getByRole('textbox', { name: 'Script Image' }), `${image}-updated`)
+    expect(await axe(container)).toHaveNoViolations()
+    await user.click(screen.getByRole('button', { name: 'Save integration' }))
+    await waitFor(() => {
+      expect(patchMutate.mock.calls[0]).toMatchObject([
+        { body: { configuration: { script_image: `${image}-updated` } } },
+      ])
+    })
   })
 
   describe('Rendering', () => {

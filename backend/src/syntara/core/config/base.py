@@ -23,6 +23,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Self
 from urllib.parse import urlparse
+from uuid import UUID
 
 from pydantic import Field, HttpUrl, SecretStr, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -1492,15 +1493,20 @@ class WorkflowEngineSettings(BaseSettings):
         ge=1024,
     )
 
-    # SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python)
-    # directly in the Temporal worker process without additional sandboxing. Enabling this
-    # grants any user with workflow:create + execution:run permissions the ability
-    # to run arbitrary commands on the worker infrastructure, with access to all
-    # environment variables.
-    # Enabling Script Node is not recommended for production deployments.
+    # Script execution requires an explicitly configured OpenShift integration.
     script_nodes_enabled: bool = Field(
         default=False,
         description="Enable Script node execution in workflows (Developer Preview)",
+    )
+
+    script_openshift_integration_id: UUID | None = Field(
+        default=None,
+        description="Default OpenShift integration for script execution; auto-discovers if blank",
+    )
+
+    script_openshift_port_forward: bool = Field(
+        default=False,
+        description="Development only: tunnel script gRPC through local oc login instead of connecting to pod IPs",
     )
 
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]

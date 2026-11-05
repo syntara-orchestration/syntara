@@ -785,3 +785,53 @@ Code quality and coverage are tracked via SonarCloud. SonarCloud analysis runs a
 - 📖 **[Developer Getting Started Guide](docs/developer-getting-started.md)** - Architecture deep dive with examples
 - 📖 **[Development with Worktrees Guide](docs/development-with-worktrees.md)** - Parallel development setup
 - 📖 **[Architecture Decision Records](docs/decision-records.md)** - Design rationale and decisions
+
+### Script execution on OpenShift
+
+Script activities submit a single-use pod directly to the Kubernetes API. The
+script node still accepts `language`, `code`, and `environment`, and returns
+`return_code`, `stdout`, `stderr`, and `stdout_json` with existing output mappings
+and failure handling. No user script runs on the Temporal worker.
+
+Create an enabled OpenShift integration with a verified HTTPS API URL, namespace
+(for example `script-step-2523`), management bearer-token credential, and
+`configuration.script_image` pointing to the rebuilt SDK script image. Configure
+the Temporal worker with:
+
+```dotenv
+APP_SCRIPT_NODES_ENABLED=true
+APP_SCRIPT_OPENSHIFT_INTEGRATION_ID=<integration UUID>
+```
+
+The credential needs create/get/delete access to pods in that namespace. Workers
+normally run inside the cluster with access to pod TCP port 50051. For a local
+development worker without pod-network access, set
+`APP_SCRIPT_OPENSHIFT_PORT_FORWARD=true`. This starts an ephemeral loopback
+`oc port-forward` tunnel per script pod, using the worker host's active oc login
+and create permission on `pods/portforward`. Health, Execute and Cancel still use
+SDK gRPC through that tunnel; it is closed before pod cleanup. This mode requires
+the `oc` executable on the worker PATH and is disabled by default.
+No Service, external
+Route, or pod-log permission is needed. The current image serves plaintext gRPC;
+keep it on the trusted workload network and restrict access with network policies.
+
+Operators must configure an approved image implementing `syntara.container/v1alpha1`
+and advertising `syntara.script.script`; there is no built-in image default.
+The activity preserves the image entrypoint, negotiates Health with the published
+SDK and consumes the Execute stream. Inputs travel through gRPC, not environment
+variables. SDK operations run in threads while the activity heartbeats for Temporal
+cancellation. The SDK validates ABI, invocation identity and bounded outcomes.
+
+Script pods receive no cluster token and use restricted security settings, bounded
+resources and a hard deadline. Cancellation and timeout send Cancel before pod
+deletion. A Kubernetes deadline stops orphan pods after worker crashes.
+
+The image supports up to 600 seconds and 1024 KB captured per stream; the complete
+serialized result must fit the SDK's 1 MiB inline limit. Unsupported settings fail
+explicitly. Successful results preserve script-node fields. Failed terminal Results
+with output preserve exit code and logs. Completed subprocesses with nonzero exit
+codes return a business result; the activity marks them as script failures.
+Older images send REMOTE_REJECTED without
+output; these surface as ScriptContainerError. Preserving failure logs requires an
+image that returns them in Result. No absent fields are fabricated. There is no
+fallback to local execution.

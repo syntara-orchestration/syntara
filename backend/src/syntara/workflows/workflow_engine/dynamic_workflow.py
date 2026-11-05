@@ -1127,6 +1127,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     # Seconds added to start_to_close_timeout above the operational deadline so the
     # activity's internal timeout always fires before Temporal cancels the attempt.
     _TEMPORAL_MARGIN: ClassVar[int] = 10
+    _SCRIPT_STARTUP_CLEANUP_MARGIN: ClassVar[int] = 90
 
     # Executor node types whose activities enforce their own internal deadline,
     # so Temporal's start_to_close_timeout must include the margin.
@@ -1180,7 +1181,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         # fail them spuriously. Ref: AAP-88614.
         heartbeat_timeout = (
             timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
-            if node_type == NodeType.INTERNAL_ACTIVITY
+            if node_type in {NodeType.INTERNAL_ACTIVITY, NodeType.SCRIPT}
             else None
         )
         return cast(
@@ -1667,6 +1668,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 if node_type in self._EXECUTOR_TIMEOUT_MARGIN_TYPES
                 else timeout_seconds
             )
+            if node_type == NodeType.SCRIPT:
+                # Include pod startup, health negotiation and cancellation cleanup.
+                temporal_timeout = timeout_seconds + self._SCRIPT_STARTUP_CLEANUP_MARGIN
             return await self._execute_executor_node(
                 node,
                 node_type,

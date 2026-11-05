@@ -1,3 +1,4 @@
+import { IntegrationTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { buildEditSchema, buildConfiguration } from './editIntegrationFormSchema'
@@ -260,6 +261,23 @@ describe('buildConfiguration', () => {
     insecure_skip_tls_verify: false,
     ca_certificate: null,
   }
+
+  it.each(['registry.example/script@sha256:abc123', null, ''])('preserves an edited OpenShift image %s', (image) => {
+    const values = schema.parse({
+      ...baseValues,
+      integration_type: IntegrationTypeEnum.OPENSHIFT,
+      namespace: 'scripts',
+      management_credential_id: 'cred-123',
+      script_image: image,
+    })
+    expect(buildConfiguration(IntegrationTypeEnum.OPENSHIFT, values)).toEqual({
+      integration_type: IntegrationTypeEnum.OPENSHIFT,
+      base_url: values.base_url,
+      namespace: 'scripts',
+      script_image: image || null,
+      ...expectedSecurityDefaults,
+    })
+  })
 
   describe('MCP Server', () => {
     it('returns MCP configuration with base_url and security fields', () => {

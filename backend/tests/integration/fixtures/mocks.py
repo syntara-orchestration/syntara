@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import sys
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -45,3 +46,26 @@ def mock_openrouter_llm() -> Generator[MagicMock, None, None]:
         ),
     ):
         yield mock_llm
+
+
+@pytest.fixture
+def local_script_execution() -> Generator[None, None, None]:
+    """Substitute container execution for workflow tests without a live cluster.
+
+    Keep real script output, failures and timeouts while exercising the surrounding
+    Temporal workflow. The OpenShift HTTP lifecycle is tested separately.
+    """
+    from syntara.workflows.workflow_engine.activities.script_activity import _execute_script_common
+
+    async def execute(
+        language: str,
+        code: str,
+        environment: dict[str, str] | None,
+        timeout_seconds: float,
+        max_output_bytes: int,
+    ) -> dict[str, Any]:
+        command = ["bash", "-c", code] if language == "bash" else [sys.executable, "-c", code]
+        return await _execute_script_common(command, environment, timeout_seconds, max_output_bytes)
+
+    with patch("syntara.workflows.workflow_engine.activities.script_activity.execute_openshift_script", execute):
+        yield
