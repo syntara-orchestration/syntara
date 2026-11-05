@@ -40,6 +40,7 @@ class ActivitySyncMonitorMixin:
     _sync_failed_nodes: Any
     _sync_skipped_nodes: Any
     _sync_detached_nodes: Any
+    _sync_cancelled_step_nodes: Any
     _query_completed_nodes: Any
     _update_execution_status_from_event: Any
     _schedule_describe_probe: Any
@@ -175,6 +176,7 @@ class ActivitySyncMonitorMixin:
                 failed_node_map = self._extract_failed_activities_from_event(event)
             await self._sync_skipped_nodes(metadata, handle)
             await self._sync_detached_nodes(metadata, handle)
+            await self._sync_cancelled_step_nodes(metadata, handle)
             completed_node_ids = await self._query_completed_nodes(metadata, handle)
             if completed_node_ids is None:
                 completed_node_ids = self._extract_completed_nodes_from_event(event)

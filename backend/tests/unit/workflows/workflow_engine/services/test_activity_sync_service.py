@@ -2849,6 +2849,58 @@ class TestSyncNodesToTerminalStatus:
 
         await self.service._sync_detached_nodes(metadata, handle)
 
+    # -- _sync_cancelled_step_nodes tests --
+
+    @pytest.mark.asyncio
+    async def test_cancelled_step_node_marked_as_cancelled(self) -> None:
+        """A cancelled sub-workflow step is persisted CANCELLED (not FAILED), with its message."""
+        activity = self._create_mock_activity_execution("sub-node", status=ActivityStatus.RUNNING)
+        self._mock_session([activity])
+        metadata = self._create_metadata(activity_index_map={"sub-node": 3})
+
+        handle = AsyncMock()
+        handle.query = AsyncMock(return_value={"sub-node": "Sub-workflow cancelled"})
+
+        await self.service._sync_cancelled_step_nodes(metadata, handle)
+
+        handle.query.assert_awaited_once_with("get_cancelled_step_nodes")
+        assert activity.status == ActivityStatus.CANCELLED
+        assert activity.error_details == "Sub-workflow cancelled"
+
+    @pytest.mark.asyncio
+    async def test_cancelled_step_sync_does_not_overwrite_terminal_status(self) -> None:
+        """An already-terminal row is left untouched (CANCELLED cannot clobber a terminal state)."""
+        activity = self._create_mock_activity_execution("sub-node", status=ActivityStatus.COMPLETED)
+        self._mock_session([activity])
+        metadata = self._create_metadata(activity_index_map={"sub-node": 3})
+
+        handle = AsyncMock()
+        handle.query = AsyncMock(return_value={"sub-node": "Sub-workflow cancelled"})
+
+        await self.service._sync_cancelled_step_nodes(metadata, handle)
+
+        assert activity.status == ActivityStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_cancelled_step_sync_noop_when_none(self) -> None:
+        """_sync_cancelled_step_nodes is a no-op when the workflow has no cancelled steps."""
+        metadata = self._create_metadata()
+        handle = AsyncMock()
+        handle.query = AsyncMock(return_value={})
+
+        await self.service._sync_cancelled_step_nodes(metadata, handle)
+
+        self.mock_session_factory.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cancelled_step_sync_query_error_does_not_propagate(self) -> None:
+        """Errors during cancelled step sync should be logged, not raised."""
+        metadata = self._create_metadata()
+        handle = AsyncMock()
+        handle.query = AsyncMock(side_effect=RuntimeError("workflow not reachable"))
+
+        await self.service._sync_cancelled_step_nodes(metadata, handle)
+
     # -- _ensure_activity_records_exist tests --
 
     @pytest.mark.asyncio

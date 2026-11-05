@@ -78,6 +78,7 @@ def _make_workflow_with_depth(depth: int = 0) -> OrchestratorWorkflow:
     wf._converge_branch_nodes = {}
     wf._has_unhandled_failure = False
     wf._cancelled_node = None
+    wf._cancelled_step_nodes = set()
     wf.pre_resolved_outputs = {}
     wf.stop_after_nodes = set()
     init_workflow_runtime(wf)
@@ -655,6 +656,7 @@ class TestSubWorkflowDispatch:
                 await wf._execute_sub_workflow_node(node, {})
 
         assert exc_info.value.non_retryable
+        assert exc_info.value.type == "SubWorkflowCancelledError"
         output = exc_info.value.details[0]["output"]
         assert output["Result"]["child_status"] == "cancelled"
         assert output["StatusCode"] == 1
@@ -751,7 +753,7 @@ class TestChildWorkflowErrorHandling:
         assert output["ErrorMessage"] == "Sub-workflow terminated"
 
     async def test_cancelled_child_preserves_m1_output(self) -> None:
-        """Temporal-level cancellation preserves M1 output and uses SubWorkflowFailedError."""
+        """Temporal-level cancellation preserves M1 output and uses SubWorkflowCancelledError."""
         wf = _make_workflow_with_depth(0)
         setup_result = _make_setup_result()
 
@@ -769,7 +771,7 @@ class TestChildWorkflowErrorHandling:
                 await wf._execute_sub_workflow_node(node, {})
 
         assert exc_info.value.non_retryable
-        assert exc_info.value.type == "SubWorkflowFailedError"
+        assert exc_info.value.type == "SubWorkflowCancelledError"
         output = exc_info.value.details[0]["output"]
         assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
         assert output["Result"]["child_status"] == "cancelled"
@@ -809,7 +811,10 @@ class TestChildWorkflowErrorHandling:
         assert output["ErrorMessage"] == "Sub-workflow timed out"
 
     async def test_cancelled_child_does_not_cancel_parent(self) -> None:
-        """Cancelled child must use SubWorkflowFailedError, not InvocationCancelledError."""
+        """Cancelled child uses SubWorkflowCancelledError, never InvocationCancelledError.
+
+        So a cancelled child step cannot cancel the whole parent run.
+        """
         wf = _make_workflow_with_depth(0)
         setup_result = _make_setup_result()
 
@@ -826,7 +831,7 @@ class TestChildWorkflowErrorHandling:
             with pytest.raises(ApplicationError) as exc_info:
                 await wf._execute_sub_workflow_node(node, {})
 
-        assert exc_info.value.type == "SubWorkflowFailedError"
+        assert exc_info.value.type == "SubWorkflowCancelledError"
         assert exc_info.value.type != "InvocationCancelledError"
 
     async def test_normal_child_failure_path_unchanged(self) -> None:
