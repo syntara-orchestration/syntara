@@ -17,7 +17,7 @@ import {
   FORM_FIELD_BUILDER_INITIAL_ANSWER_DYNAMIC_UNAVAILABLE_HINT,
   FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL,
 } from './formFieldBuilderInitialAnswerCopy'
-import { FormFieldBuilderMultiSelectDefaultCheckboxes } from './FormFieldBuilderMultiSelectDefaultCheckboxes'
+import { FormFieldBuilderMultiSelectDefaultSelect } from './FormFieldBuilderMultiSelectDefaultSelect'
 
 type FormFieldBuilderFieldDefaultEditorProps = {
   index: number
@@ -123,7 +123,7 @@ export function FormFieldBuilderFieldDefaultEditor({
       )
     }
     return (
-      <FormFieldBuilderMultiSelectDefaultCheckboxes
+      <FormFieldBuilderMultiSelectDefaultSelect
         index={index}
         idPrefix={idPrefix}
         isDisabled={isDisabled}
