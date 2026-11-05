@@ -1,52 +1,22 @@
 """Execution Plane target CRUD and resource reads through the AO API boundary.
 
 Query controls mirror syntara.core.models.base.query_params.BaseListParams.
-Documented filters correspond to execution_plane.models.work_item.WorkItem and
-execution_plane.models.execution_target.ExecutionTarget field allowlists; dynamic
-bracket filters are forwarded to EP's execution_plane.query_filters parser.
-
-Followup: remove the duplicated filter fields in ExecutionTargetListParams and
-WorkItemListParams once execution-plane-client publishes list-query metadata.
-The client currently exposes command contracts, not query allowlists. Inferring
-filters from command or response model fields would be incorrect: not every
-field is queryable, and some supported filters are absent from AO responses.
-
-The intended implementation is:
-- Add execution_plane_client.list_queries with lightweight Pydantic metadata for
-  work items, execution targets, and cluster bindings: public filter fields and
-  operators, sortable fields, default sort, page limits, and label support. Keep
-  the client free of SQLModel, SQLAlchemy, FastAPI, and EP service imports.
-- Make EP derive its __filterable_fields__, __sortable_fields__, sort validation,
-  and query documentation from those definitions. Database column aliases and
-  typed filter execution stay inside EP; preserve existing query behavior.
-- Export a helper that renders compact OpenAPI filter parameters from the shared
-  metadata, documenting each base field once with its bracket operators.
-- After releasing the additive client change, update AO's pinned dependency,
-  delete both local list-parameter subclasses, and use BaseListParams plus
-  openapi_extra generated from the imported metadata on these two routes.
-  Continue forwarding raw filters and leaving their validation to EP; preserve
-  empty values, opaque cursors, and omitted sorting.
-- Verify EP metadata against runtime allowlists, column aliases, and OpenAPI;
-  retain PostgreSQL query coverage. Verify AO documentation matches the imported
-  metadata and its forwarding tests still pass, check the built client wheel,
-  and regenerate AO's OpenAPI and TypeScript contracts.
-
-This can follow the current facade change without a coordinated deployment or
-wire-contract change: the local filter fields supply documentation, while raw
-request parameters already drive forwarding. No cluster facade route is needed.
-
-Project/RBAC semantics are a separate followup. This transport alignment retains
-the existing facade authorization checks and adds no project associations.
+The client publishes filterable/sortable field metadata that both EP and the
+facade use for validation. This ensures filter/sort validation happens at the
+facade layer before forwarding to EP, matching syntara's own resource pattern.
 """
 
 from __future__ import annotations
 
+import re
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 from uuid import UUID  # noqa: TC003 — Pydantic resolves model annotations at runtime
 
 import structlog
 from execution_plane_client.models.execution_target import (
+    EXECUTION_TARGET_FILTERABLE_FIELDS,
+    EXECUTION_TARGET_SORTABLE_FIELDS,
     ExecutionTargetCreate,
     ExecutionTargetDeleteAccepted,
     ExecutionTargetHealthResult,
@@ -55,7 +25,12 @@ from execution_plane_client.models.execution_target import (
     ExecutionTargetUpdate,
 )
 from execution_plane_client.models.shared import EPListParams, ResourcesResponse
-from execution_plane_client.models.work_item import WorkItemListParams, WorkItemRead
+from execution_plane_client.models.work_item import (
+    WORK_ITEM_FILTERABLE_FIELDS,
+    WORK_ITEM_SORTABLE_FIELDS,
+    WorkItemListParams,
+    WorkItemRead,
+)
 from fastapi import Depends, HTTPException, Query, Request, Response, status
 from pydantic import ValidationError
 
@@ -89,6 +64,66 @@ _TARGET_RESPONSES: dict[int | str, dict[str, Any]] = {
     502: {"description": "Invalid Execution Plane response"},
     503: {"description": "Execution Plane unavailable"},
 }
+
+
+_BRACKET_PATTERN = re.compile(r"^([a-z][a-z0-9_]*)\[([a-z]+)\]$")
+
+
+def _validate_query_params(
+    query_params: list[tuple[str, str]],
+    filterable_fields: list[str],
+    *,
+    supports_labels: bool = True,
+) -> None:
+    """Validate filter and sort fields against EP metadata before forwarding.
+
+    Raises HTTPException 422 if invalid fields are detected. Matches syntara's
+    server-side validation pattern for its own resources.
+    """
+    excluded = {"limit", "cursor", "sort", "include_total"}
+
+    for key, _value in query_params:
+        if key in excluded:
+            continue
+
+        # Check labels[key] pattern
+        if key.startswith("labels[") and key.endswith("]"):
+            if not supports_labels:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Label filtering not supported for this resource: {key}",
+                )
+            continue
+
+        # Check field[operator] pattern
+        bracket_match = _BRACKET_PATTERN.match(key)
+        field = bracket_match.group(1) if bracket_match else key
+
+        # Validate field is filterable
+        if field not in filterable_fields:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid filter field: {field}",
+            )
+
+
+def _validate_sort(sort_value: str | None, sortable_fields: list[str]) -> None:
+    """Validate sort field against EP metadata.
+
+    Pydantic already validates the pattern (^-?[a-z][a-z0-9_]*$), this validates
+    the field name is in the sortable list.
+    """
+    if not sort_value:
+        return
+
+    # Strip leading '-' for descending sort
+    field = sort_value.lstrip("-")
+
+    if field not in sortable_fields:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid sort field: {field}. Valid fields: {', '.join(sortable_fields)}",
+        )
 
 
 @asynccontextmanager
@@ -207,6 +242,14 @@ async def list_execution_targets(
     params: Annotated[ExecutionTargetListParams, Query()],
 ) -> ResourcesResponse[ExecutionTargetRead]:
     """Read registered execution targets from EP after AO permission checks."""
+    # Validate query params against EP metadata before forwarding
+    _validate_query_params(
+        request.query_params.multi_items(),
+        EXECUTION_TARGET_FILTERABLE_FIELDS,
+        supports_labels=True,
+    )
+    _validate_sort(params.sort, EXECUTION_TARGET_SORTABLE_FIELDS)
+
     try:
         async with ExecutionPlaneHttpClient() as client:
             page = await _list_ep_resources(
@@ -253,6 +296,14 @@ async def list_work_items(
     params: Annotated[WorkItemListParams, Query()],
 ) -> ResourcesResponse[WorkItemRead]:
     """Read work-item state from EP after AO permission checks."""
+    # Validate query params against EP metadata before forwarding
+    _validate_query_params(
+        request.query_params.multi_items(),
+        WORK_ITEM_FILTERABLE_FIELDS,
+        supports_labels=False,  # Work items don't have labels
+    )
+    _validate_sort(params.sort, WORK_ITEM_SORTABLE_FIELDS)
+
     try:
         async with ExecutionPlaneHttpClient() as client:
             page = await _list_ep_resources(

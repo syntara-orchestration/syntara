@@ -237,38 +237,67 @@ export interface components {
       /**
        * Id
        * Format: uuid
+       * @description Execution target unique identifier
        */
       id: string
       /**
        * Cluster Id
        * Format: uuid
+       * @description Parent cluster identifier
        */
       cluster_id: string
-      /** Name */
+      /**
+       * Name
+       * @description Execution target name
+       */
       name: string
+      /** @description Backend execution platform type */
       backend_type: components['schemas']['BackendType']
-      /** Endpoint */
+      /**
+       * Endpoint
+       * @description Execution target API endpoint URL
+       */
       endpoint: string
-      /** Placement */
+      /**
+       * Placement
+       * @description Platform-specific placement configuration
+       */
       placement: components['schemas']['KubernetesPlacement'] | components['schemas']['RHELPlacement']
+      /** @description Execution target lifecycle status */
       status: components['schemas']['TargetStatus']
-      /** Enabled */
+      /**
+       * Enabled
+       * @description Whether the target is enabled for use
+       */
       enabled: boolean
-      /** Is Default */
+      /**
+       * Is Default
+       * @description Whether this is the default target for the cluster
+       */
       is_default: boolean
-      /** Status Message */
-      status_message: string | null
-      /** Labels */
+      /**
+       * Status Message
+       * @description Human-readable status message or error details
+       */
+      status_message?: string | null
+      /**
+       * Labels
+       * @description Key-value labels for the target
+       */
       labels: {
         [key: string]: string
       }
       /**
        * Created At
        * Format: date-time
+       * @description Creation timestamp
        */
       created_at: string
-      /** Last Ran At */
-      last_ran_at: string | null
+      /**
+       * Last Ran At
+       * @description Last execution timestamp
+       */
+      last_ran_at?: string | null
     }
     /**
      * ExecutionTargetUpdate
@@ -489,33 +518,55 @@ export interface components {
       /**
        * Id
        * Format: uuid
+       * @description Work item unique identifier
        */
       id: string
+      /** @description Work item lifecycle status */
       status: components['schemas']['WorkItemStatus']
-      /** Result */
-      result: {
+      /**
+       * Result
+       * @description Work execution result payload
+       */
+      result?: {
         [key: string]: unknown
       } | null
       /**
        * Result Omitted
+       * @description Whether result was omitted due to size
        * @default false
        */
       result_omitted?: boolean
-      /** Result Size Bytes */
+      /**
+       * Result Size Bytes
+       * @description Size of the result in bytes
+       */
       result_size_bytes?: number | null
       /**
        * Created At
        * Format: date-time
+       * @description Creation timestamp
        */
       created_at: string
-      /** Claimed At */
-      claimed_at: string | null
-      /** Completed At */
-      completed_at: string | null
-      /** Resource Cleanup Status */
+      /**
+       * Claimed At
+       * @description Claim timestamp
+       */
+      claimed_at?: string | null
+      /**
+       * Completed At
+       * @description Completion timestamp
+       */
+      completed_at?: string | null
+      /**
+       * Resource Cleanup Status
+       * @description Resource cleanup status
+       */
       resource_cleanup_status: string
-      /** Resource Cleanup Error */
-      resource_cleanup_error: string | null
+      /**
+       * Resource Cleanup Error
+       * @description Resource cleanup error details
+       */
+      resource_cleanup_error?: string | null
     }
     /**
      * WorkItemStatus
@@ -546,49 +597,31 @@ export interface operations {
       query?: {
         limit?: number
         cursor?: string | null
-        /** @description Execution-target sort field; oldest first by default. */
-        sort?:
-          | 'id'
-          | '-id'
-          | 'created_at'
-          | '-created_at'
-          | 'name'
-          | '-name'
-          | 'endpoint'
-          | '-endpoint'
-          | 'status'
-          | '-status'
-          | 'backend_type'
-          | '-backend_type'
-          | 'cluster_id'
-          | '-cluster_id'
-          | 'enabled'
-          | '-enabled'
-          | 'is_default'
-          | '-is_default'
+        /** @description Sort field; prefix with '-' for descending order. */
+        sort?: string
         include_total?: boolean
-        /** @description Target UUID; id[in]=uuid1,uuid2 for membership */
+        /** @description Filter by id */
         id?: string | null
-        /** @description Physical cluster UUID; supports eq and in */
+        /** @description Filter by cluster_id */
         cluster_id?: string | null
-        /** @description Name; supports eq, in, contains, and starts_with */
+        /** @description Filter by name */
         name?: string | null
-        /** @description Endpoint; supports eq, in, contains, and starts_with */
-        endpoint?: string | null
-        /** @description Target status; supports eq and in */
-        status?: string | null
-        /** @description Backend type; supports eq and in */
+        /** @description Filter by backend_type */
         backend_type?: string | null
-        /** @description Boolean; supports eq, in, and isnull */
+        /** @description Filter by endpoint */
+        endpoint?: string | null
+        /** @description Filter by status */
+        status?: string | null
+        /** @description Filter by enabled */
         enabled?: string | null
-        /** @description Boolean; supports eq, in, and isnull */
+        /** @description Filter by is_default */
         is_default?: string | null
-        /** @description Creation time; supports eq, in, gt, gte, lt, lte, and isnull */
-        created_at?: string | null
-        /** @description Last run time; supports ranges and isnull */
-        last_ran_at?: string | null
-        /** @description Status message; supports text operators and isnull */
+        /** @description Filter by status_message */
         status_message?: string | null
+        /** @description Filter by created_at */
+        created_at?: string | null
+        /** @description Filter by last_ran_at */
+        last_ran_at?: string | null
       }
       header?: never
       path?: never
@@ -938,30 +971,22 @@ export interface operations {
       query?: {
         limit?: number
         cursor?: string | null
-        /** @description Work-item sort field; newest first by default. */
-        sort?:
-          | 'created_at'
-          | '-created_at'
-          | 'status'
-          | '-status'
-          | 'resource_cleanup_status'
-          | '-resource_cleanup_status'
-          | 'id'
-          | '-id'
+        /** @description Sort field; prefix with '-' for descending order. */
+        sort?: string
         include_total?: boolean
-        /** @description Work UUID; id[in]=uuid1,uuid2 for membership */
+        /** @description Filter by id */
         id?: string | null
-        /** @description Work status; supports eq and in */
+        /** @description Filter by status */
         status?: string | null
-        /** @description Creation time; supports eq, in, gt, gte, lt, lte, and isnull */
+        /** @description Filter by created_at */
         created_at?: string | null
-        /** @description Claim time; supports ranges and isnull */
+        /** @description Filter by claimed_at */
         claimed_at?: string | null
-        /** @description Completion time; supports ranges and isnull */
+        /** @description Filter by completed_at */
         completed_at?: string | null
-        /** @description Cleanup status; supports eq and in */
+        /** @description Filter by resource_cleanup_status */
         resource_cleanup_status?: string | null
-        /** @description Cleanup error; supports text operators and isnull */
+        /** @description Filter by resource_cleanup_error */
         resource_cleanup_error?: string | null
       }
       header?: never
