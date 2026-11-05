@@ -21,6 +21,7 @@ from temporalio.exceptions import ApplicationError
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.authz.engine import AllowedProjectsResult
 from syntara.core.config.base import get_settings
+from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
@@ -1210,6 +1211,20 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         except Exception:  # noqa: BLE001
             logger.debug("Failed to record retry request metric", exc_info=True)
 
+    def _resolve_retry_trigger_node(
+        self,
+        workflow_definition: dict[str, Any],
+        trigger_node_id: str,
+        retry_kind: RetryKind,
+    ) -> str:
+        """Resolve a retry trigger and record malformed definitions as rejected."""
+        try:
+            resolved_trigger_node_id, _ = resolve_trigger_node(workflow_definition, trigger_node_id)
+        except SafeValueError:
+            self._record_retry_request(retry_kind.value, "rejected")
+            raise
+        return resolved_trigger_node_id
+
     @staticmethod
     async def _get_failed_step_types(session: AsyncSession, execution_id: UUID) -> list[str]:
         """Extract and normalize failed step types from execution activities.
@@ -1300,12 +1315,14 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         # Step 5: Resolve trigger node from the original version's definition
         workflow_def = workflow_version.workflow_definition
         if original.trigger_node_id is None:
-            from syntara.core.exceptions import SafeValueError  # noqa: PLC0415
-
             self._record_retry_request(RetryKind.STANDARD.value, "rejected")
             msg = "Cannot retry execution: original execution has no trigger_node_id recorded"
             raise SafeValueError(msg)
-        trigger_node_id, _ = resolve_trigger_node(workflow_def, original.trigger_node_id)
+        trigger_node_id = self._resolve_retry_trigger_node(
+            workflow_def,
+            original.trigger_node_id,
+            RetryKind.STANDARD,
+        )
 
         recorder = get_metrics_recorder()
         component = ComponentLabel.EXECUTION_SERVICE
@@ -1479,7 +1496,11 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             raise ExecutionNotRetryableFromFailureError(
                 execution_id, "source execution has no trigger_node_id recorded"
             )
-        trigger_node_id, _ = resolve_trigger_node(snapshot_version.workflow_definition, source.trigger_node_id)
+        trigger_node_id = self._resolve_retry_trigger_node(
+            snapshot_version.workflow_definition,
+            source.trigger_node_id,
+            RetryKind.FROM_FAILURE,
+        )
 
         validated_overrides = input_parameter_overrides or {}
         logger.info(
