@@ -11,7 +11,7 @@
 openapi: 3.1.0
 info:
   title: Syntara API
-  version: 1.3.1
+  version: 1.3.2
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -32417,6 +32417,7 @@ components:
           type: string
           format: date-time
           title: Created At
+      additionalProperties: false
       type: object
       required:
         - metric_type
