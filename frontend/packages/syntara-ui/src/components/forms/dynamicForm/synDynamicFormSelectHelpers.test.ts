@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getSelectedScalarValues, optionKey } from './synDynamicFormSelectHelpers'
+import { getSelectedScalarValues, optionKey, filterOptionsByLabel } from './synDynamicFormSelectHelpers'
 
 describe('synDynamicFormSelectHelpers', () => {
   it('optionKey stringifies non-string scalars', () => {
@@ -17,5 +17,14 @@ describe('synDynamicFormSelectHelpers', () => {
     expect(getSelectedScalarValues('east', false)).toEqual(['east'])
     expect(getSelectedScalarValues('', false)).toEqual([])
     expect(getSelectedScalarValues({ bad: true }, false)).toEqual([])
+  })
+
+  it('filterOptionsByLabel matches case-insensitively', () => {
+    const options = [
+      { label: 'US East', value: 'use1' },
+      { label: 'EU West', value: 'euw1' },
+    ]
+    expect(filterOptionsByLabel(options, 'east')).toEqual([options[0]])
+    expect(filterOptionsByLabel(options, '')).toEqual(options)
   })
 })

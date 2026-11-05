@@ -19,6 +19,10 @@ const staticPriorityOptions = {
 }
 const NUMBER_FIELD_LABEL = 'Count'
 
+function getOptionsTypeahead(label: string) {
+  return screen.getByRole('textbox', { name: label })
+}
+
 function renderWithQueryClient(ui: ReactNode) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -152,7 +156,7 @@ describe('SynDynamicForm', () => {
 
     await user.type(screen.getByRole('textbox', { name: 'Notes' }), 'hello')
 
-    await user.click(screen.getByRole('button', { name: 'Priority' }))
+    await user.click(getOptionsTypeahead('Priority'))
     await user.click(await screen.findByRole('option', { name: 'High' }))
 
     await user.click(screen.getByRole('button', { name: 'Send' }))
@@ -342,6 +346,41 @@ describe('SynDynamicForm', () => {
     })
   })
 
+  it('adds a multi-select option while filtering without dropping existing selections', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    const definition = parseFormDefinition({
+      fields: [
+        {
+          type: FormFieldTypeEnum.MULTI_SELECT,
+          value_name: 'tags',
+          label: 'Tags',
+          required: true,
+          options: staticPriorityOptions,
+        },
+      ],
+    })
+
+    renderWithQueryClient(
+      <SynDynamicForm
+        definition={definition}
+        initialValues={{ tags: ['low'] }}
+        onSubmit={onSubmit}
+        submitLabel="Send"
+      />
+    )
+
+    await user.click(getOptionsTypeahead('Tags'))
+    await user.type(getOptionsTypeahead('Tags'), 'hi')
+    await user.click(screen.getByRole('checkbox', { name: 'High' }))
+    await user.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ tags: ['low', 'high'] })
+    })
+  })
+
   it('loads dynamic options via TanStack Query', async () => {
     const user = userEvent.setup()
     const resolveDynamicOptions = vi.fn().mockResolvedValue([
@@ -373,7 +412,7 @@ describe('SynDynamicForm', () => {
       expect(resolveDynamicOptions).toHaveBeenCalled()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Region' }))
+    await user.click(getOptionsTypeahead('Region'))
     expect(await screen.findByRole('option', { name: 'US East' })).toBeInTheDocument()
   })
 
@@ -406,7 +445,7 @@ describe('SynDynamicForm', () => {
       />
     )
 
-    await user.click(screen.getByRole('button', { name: 'Region' }))
+    await user.click(getOptionsTypeahead('Region'))
     expect(await screen.findByRole('option', { name: 'US East' })).toBeInTheDocument()
   })
 
@@ -432,7 +471,7 @@ describe('SynDynamicForm', () => {
 
     renderWithQueryClient(<SynDynamicForm definition={definition} onSubmit={vi.fn()} hideSubmitButton />)
 
-    await user.click(screen.getByRole('button', { name: 'Region' }))
+    await user.click(getOptionsTypeahead('Region'))
     expect(await screen.findByRole('option', { name: 'US East' })).toBeInTheDocument()
   })
 
