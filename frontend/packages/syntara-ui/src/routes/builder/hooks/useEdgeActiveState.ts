@@ -1,107 +1,82 @@
 import { EdgeHandleEnum } from '@syntara/contracts'
-import { useEffect } from 'react'
 
 import type { OnAddNodeFromEdge } from '../types'
 import { markerEnd, type EdgeType } from '../utils/workflowToGraph'
 
-type UseEdgeActiveStateOptions = {
-  isInitialized: boolean
+type ProjectEdgeActiveStateOptions = {
   activeEdgeId: string | null
   activeEdgeButtonNodeId: string | null
   activeEdgeButtonHandle: string | null
   onAddNodeFromEdge?: OnAddNodeFromEdge
-  setEdges: React.Dispatch<React.SetStateAction<EdgeType[]>>
+  isInitialized: boolean
 }
 
-/**
- * Custom hook that manages active state for edges.
- * - Updates default and loop edges (loopBack, loopOutgoing, loopDone) with onAddNode callback, markerEnd, and isActive state
- * - Updates button edges with isActive state based on activeEdgeButtonNodeId and activeEdgeButtonHandle
- */
-export function useEdgeActiveState({
-  isInitialized,
-  activeEdgeId,
-  activeEdgeButtonNodeId,
-  activeEdgeButtonHandle,
-  onAddNodeFromEdge,
-  setEdges,
-}: UseEdgeActiveStateOptions) {
-  // Ensure all default and loop edges have the onAddNode callback, markerEnd, and isActive state
-  useEffect(() => {
-    setEdges((currentEdges) => {
-      let updated = false
-      const updatedEdges = currentEdges.map((edge) => {
-        // Handle default edges and all loop edge types
-        if (
-          edge.type === 'default' ||
-          edge.type === 'loopBack' ||
-          edge.type === 'loopOutgoing' ||
-          edge.type === 'loopDone'
-        ) {
-          const needsData = !edge.data?.onAddNode
-          const needsMarker = !edge.markerEnd
-          const needsActiveUpdate = edge.data?.isActive !== (activeEdgeId === edge.id || edge.data?.isPending)
+const STANDARD_EDGE_TYPES = ['default', 'loopBack', 'loopOutgoing', 'loopDone']
+const SPECIFIC_BUTTON_HANDLES = [
+  EdgeHandleEnum.TRUE,
+  EdgeHandleEnum.FALSE,
+  EdgeHandleEnum.DONE,
+  EdgeHandleEnum.LOOP,
+  EdgeHandleEnum.APPROVED,
+  EdgeHandleEnum.REJECTED,
+] as const
 
-          if (needsData || needsMarker || needsActiveUpdate) {
-            updated = true
-            return {
-              ...edge,
-              markerEnd: edge.markerEnd ?? markerEnd,
-              data: {
-                ...edge.data,
-                onAddNode: edge.data?.onAddNode ?? onAddNodeFromEdge,
-                isActive: activeEdgeId === edge.id || edge.data?.isPending,
-              },
-            }
-          }
-        }
-        return edge
-      })
-      return updated ? updatedEdges : currentEdges
-    })
-  }, [setEdges, onAddNodeFromEdge, activeEdgeId])
+function isStandardEdge(edge: EdgeType): boolean {
+  return STANDARD_EDGE_TYPES.includes(edge.type ?? '')
+}
 
-  // Update button edge active state when activeEdgeButtonNodeId or activeEdgeButtonHandle changes
-  useEffect(() => {
-    if (!isInitialized) {
-      return
+function isButtonEdge(edge: EdgeType): boolean {
+  return edge.type === 'buttonEdge' || edge.id.startsWith('button-')
+}
+
+function projectStandardEdge(
+  edge: EdgeType,
+  activeEdgeId: string | null,
+  onAddNodeFromEdge: OnAddNodeFromEdge | undefined
+): EdgeType {
+  const isActive = activeEdgeId === edge.id || edge.data?.isPending
+  const needsData = onAddNodeFromEdge !== undefined && edge.data?.onAddNode == null
+  const needsMarker = !edge.markerEnd
+  if (!needsData && !needsMarker && edge.data?.isActive === isActive) return edge
+
+  return {
+    ...edge,
+    markerEnd: edge.markerEnd ?? markerEnd,
+    data: {
+      ...edge.data,
+      ...(needsData ? { onAddNode: onAddNodeFromEdge } : {}),
+      isActive,
+    },
+  }
+}
+
+function projectButtonEdge(
+  edge: EdgeType,
+  activeEdgeButtonNodeId: string | null,
+  activeEdgeButtonHandle: string | null
+): EdgeType {
+  const dataSourceHandle = typeof edge.data?.sourceHandle === 'string' ? edge.data.sourceHandle : undefined
+  const edgeHandle = dataSourceHandle ?? edge.sourceHandle ?? 'source'
+  const isSpecificHandle = SPECIFIC_BUTTON_HANDLES.some((handle) => handle === edgeHandle)
+  const matchesNode = activeEdgeButtonNodeId === edge.source
+  const isActive = isSpecificHandle
+    ? matchesNode && activeEdgeButtonHandle === edgeHandle
+    : matchesNode && (activeEdgeButtonHandle === EdgeHandleEnum.SOURCE || !activeEdgeButtonHandle)
+
+  if (edge.data?.isActive === isActive) return edge
+  return { ...edge, data: { ...edge.data, isActive } }
+}
+
+/** Adds render-only active state and callbacks to workflow edges. */
+export function projectEdgeActiveState(edges: EdgeType[], options: ProjectEdgeActiveStateOptions): EdgeType[] {
+  const { activeEdgeId, activeEdgeButtonNodeId, activeEdgeButtonHandle, onAddNodeFromEdge, isInitialized } = options
+  const projectedEdges = edges.map((edge) => {
+    if (isStandardEdge(edge)) return projectStandardEdge(edge, activeEdgeId, onAddNodeFromEdge)
+    if (isInitialized && isButtonEdge(edge)) {
+      return projectButtonEdge(edge, activeEdgeButtonNodeId, activeEdgeButtonHandle)
     }
+    return edge
+  })
 
-    setEdges((currentEdges) =>
-      currentEdges.map((edge) => {
-        if (edge.type === 'buttonEdge' || edge.id.startsWith('button-')) {
-          const nodeId = edge.source
-          const dataSourceHandle = typeof edge.data?.sourceHandle === 'string' ? edge.data.sourceHandle : undefined
-          const edgeHandle = dataSourceHandle ?? edge.sourceHandle ?? 'source'
-
-          // Determine if this button edge should be active
-          // For nodes with specific handles (condition: true/false, loop: done/loop, approval: approved/rejected),
-          // both nodeId AND handle must match
-          // For regular nodes (source handle), nodeId must match and handle should be 'source' or not specified
-          const specificHandles = [
-            EdgeHandleEnum.TRUE,
-            EdgeHandleEnum.FALSE,
-            EdgeHandleEnum.DONE,
-            EdgeHandleEnum.LOOP,
-            EdgeHandleEnum.APPROVED,
-            EdgeHandleEnum.REJECTED,
-          ] as const
-          const isSpecificHandle = (specificHandles as readonly string[]).includes(edgeHandle)
-          const isActive = isSpecificHandle
-            ? activeEdgeButtonNodeId === nodeId && activeEdgeButtonHandle === edgeHandle
-            : activeEdgeButtonNodeId === nodeId &&
-              (activeEdgeButtonHandle === EdgeHandleEnum.SOURCE || !activeEdgeButtonHandle)
-
-          return {
-            ...edge,
-            data: {
-              ...edge.data,
-              isActive,
-            },
-          }
-        }
-        return edge
-      })
-    )
-  }, [activeEdgeButtonNodeId, activeEdgeButtonHandle, isInitialized, setEdges])
+  return projectedEdges.some((edge, index) => edge !== edges[index]) ? projectedEdges : edges
 }

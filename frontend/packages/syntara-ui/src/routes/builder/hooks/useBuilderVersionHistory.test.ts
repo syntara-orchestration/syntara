@@ -4,7 +4,7 @@ import { createElement } from 'react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useBuilderVersionHistory } from './useBuilderVersionHistory'
+import { loadDefinitionIntoStore, useBuilderVersionHistory } from './useBuilderVersionHistory'
 
 const mockLoadWorkflowWithEdges = vi.fn()
 const mockRestoreMutate = vi.fn()
@@ -188,14 +188,32 @@ describe('useBuilderVersionHistory', () => {
     expect(result.current.viewedVersionName).toBe('Release 1.0')
   })
 
-  it('loads version definition into store when viewing a version', () => {
+  it('returns the viewed version definition for the route owner to apply', () => {
     const params = createDefaultParams()
     params.viewingVersion = 2
-    renderHook(() => useBuilderVersionHistory(params), {
+    const { result } = renderHook(() => useBuilderVersionHistory(params), {
       wrapper: makeWrapper(queryClient),
     })
 
-    expect(mockLoadWorkflowWithEdges).toHaveBeenCalled()
+    expect(result.current.viewedVersionDefinition).toEqual({
+      schema_version: '2.0.0',
+      name: 'test',
+      triggers: [],
+      nodes: [],
+      edges: [],
+    })
+    expect(mockLoadWorkflowWithEdges).not.toHaveBeenCalled()
+  })
+
+  it('loads a version definition into the workflow store', () => {
+    const loadWorkflowWithEdges = vi.fn()
+
+    loadDefinitionIntoStore(
+      { schema_version: '2.0.0', name: 'test', triggers: [], nodes: [], edges: [] },
+      loadWorkflowWithEdges
+    )
+
+    expect(loadWorkflowWithEdges).toHaveBeenCalledOnce()
   })
 
   describe('handleExitVersionView', () => {

@@ -1,6 +1,6 @@
 import type { Activity, WorkflowAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, type Dispatch } from 'react'
+import { useCallback, type Dispatch } from 'react'
 
 import { workflowClient } from '../../../client'
 import { useDialogState } from '../../../hooks/useDialogState'
@@ -34,7 +34,7 @@ type UseBuilderVersionHistoryParams = {
   onVersionUpdated?: (version: number) => void
 }
 
-function loadDefinitionIntoStore(
+export function loadDefinitionIntoStore(
   workflowDef: Record<string, unknown>,
   loadWorkflowWithEdges: (
     def: WorkflowDefinition,
@@ -103,14 +103,7 @@ export function useBuilderVersionHistory({
   const viewedVersionName = viewedVersionQuery.data?.name ?? null
   const viewedVersionPublishedAt = viewedVersionQuery.data?.last_published_at ?? null
   const viewedVersionUnpublishedAt = viewedVersionQuery.data?.last_unpublished_at ?? null
-
-  useEffect(() => {
-    if (!isViewingVersion || !viewedVersionQuery.data?.workflow_definition) return
-    const def = viewedVersionQuery.data.workflow_definition as unknown as Record<string, unknown>
-    loadDefinitionIntoStore(def, loadWorkflowWithEdges)
-    markClean()
-    expandAllEvent?.dispatchEvent(new Event('expandAll'))
-  }, [isViewingVersion, viewedVersionQuery.data, loadWorkflowWithEdges, markClean, expandAllEvent])
+  const viewedVersionDefinition = viewedVersionQuery.data?.workflow_definition
 
   const clearVersionParam = useCallback(() => {
     const params = new URLSearchParams(searchParams)
@@ -191,6 +184,7 @@ export function useBuilderVersionHistory({
     viewedVersionName,
     viewedVersionPublishedAt,
     viewedVersionUnpublishedAt,
+    viewedVersionDefinition,
     handleExitVersionView,
     handleConfirmRestore,
     restoreDialog,

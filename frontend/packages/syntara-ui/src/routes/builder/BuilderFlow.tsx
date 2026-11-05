@@ -1,51 +1,53 @@
 import { useReactFlow } from '@xyflow/react'
-import { useCallback, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 
 import {
   useWorkflowStore,
   selectCurrentWorkflow,
   selectWorkflowVersion,
+  selectPositionUndoVersion,
   selectEdges,
   selectTriggers,
   selectActivities,
+  useWorkflowStoreActions,
 } from '../../stores/useWorkflowStore'
 import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
 import { ActiveExecutionContext } from './ActiveExecutionContext'
 import { BuilderFlowCanvas } from './BuilderFlowCanvas'
+import { synchronizeBuilderFlowEdges, type EdgeSynchronizationState } from './hooks/edgeSynchronization'
+import { reconcileBuilderFlowNodes, type NodeUpdateTracking } from './hooks/nodeUpdates'
 import { useBuilderFlowExecutionContext } from './hooks/useBuilderFlowExecutionContext'
 import { useBuilderFlowGraph } from './hooks/useBuilderFlowGraph'
+import { useBuilderFlowProjection } from './hooks/useBuilderFlowProjection'
 import { useBuilderFlowSideEffects } from './hooks/useBuilderFlowSideEffects'
 import { useCanvasInteractions } from './hooks/useCanvasInteractions'
 import { useConnectionHandlers } from './hooks/useConnectionHandlers'
-import { usePositionEventHandlers } from './hooks/usePositionEventHandlers'
+import { restoreNodePositions, usePositionEventHandlers } from './hooks/usePositionEventHandlers'
 import { useWorkflowGraphInit } from './hooks/useWorkflowGraphInit'
 import { useWorkflowInitialization } from './hooks/useWorkflowInitialization'
 import type { BuilderFlowProps } from './types'
 
+function clearBuilderFlowUndoHistory() {
+  const temporal = useWorkflowStore.temporal.getState()
+  if (useWorkflowStore.getState()._preserveHistoryOnLayout) {
+    useWorkflowStore.setState({ _preserveHistoryOnLayout: false })
+  } else {
+    temporal.pause()
+    temporal.clear()
+  }
+  setTimeout(() => temporal.resume(), 200)
+}
+
 export function BuilderFlow(props: BuilderFlowProps) {
-  const {
-    workflowId,
-    canEdit = true,
-    panelOpen,
-    activeEdgeButtonNodeId,
-    activeEdgeButtonHandle,
-    activeEdgeId,
-    executionStatus,
-    copiedRunActivityIds,
-    onNodeClick,
-    onAddNodeFromEdge,
-    onNodesDeleted,
-    disableDeleteKey,
-    disableSpacePanning,
-    readOnly: readOnlyProp,
-    newNodeDesiredPosition,
-    onClearDesiredPosition,
-    selectedActivityId,
-    validationErrors,
-  } = props
+  const { workflowId, canEdit = true, readOnly: readOnlyProp } = props
+  const { panelOpen, activeEdgeButtonNodeId, activeEdgeButtonHandle, activeEdgeId } = props
+  const { newNodeDesiredPosition, onClearDesiredPosition } = props
+  const { executionStatus, copiedRunActivityIds, onNodeClick, onAddNodeFromEdge, onNodesDeleted } = props
+  const { disableDeleteKey, disableSpacePanning, selectedActivityId, validationErrors } = props
 
   const workflowVersion = useWorkflowStore(selectWorkflowVersion)
+  const positionUndoVersion = useWorkflowStore(selectPositionUndoVersion)
   const currentWorkflow = useWorkflowStore(selectCurrentWorkflow)
   const storedEdges = useWorkflowStore(selectEdges)
   const triggers = useWorkflowStore(selectTriggers)
@@ -68,12 +70,7 @@ export function BuilderFlow(props: BuilderFlowProps) {
     triggers,
     activities,
     storedEdges,
-    executionStatus: effectiveExecutionStatus,
-    activityStates,
-    onAddNodeFromEdge,
     workflowVersion,
-    preResolvedNodes,
-    skipInferenceActivityIds: copiedRunActivityIds,
   })
 
   const { nodes, edges, setNodes, setEdges, isDeletingRef } = useWorkflowGraphInit({
@@ -83,6 +80,29 @@ export function BuilderFlow(props: BuilderFlowProps) {
     initialEdges,
   })
 
+  const { setEdges: setStoredEdges } = useWorkflowStoreActions()
+  const newlyAddedNodeIdsRef = useRef(new Set<string>())
+  const nodeUpdateTrackingRef = useRef<NodeUpdateTracking>({
+    previousNodeIds: new Set(initialNodes.map((node) => node.id)),
+    previousInitialNodes: initialNodes,
+    previousInitialEdges: initialEdges,
+  })
+  const nodeUpdateWorkflowVersionRef = useRef(workflowVersion)
+  const edgeSyncTrackingRef = useRef<EdgeSynchronizationState>({
+    lastEdgesSignature: '',
+    isSyncing: false,
+    isFirstSync: true,
+  })
+  const positionUndoVersionRef = useRef(positionUndoVersion)
+
+  useEffect(() => {
+    if (positionUndoVersion === positionUndoVersionRef.current) return
+    positionUndoVersionRef.current = positionUndoVersion
+    const positions = useWorkflowStore.getState().nodePositions
+    if (Object.keys(positions).length === 0) return
+    setNodes((previousNodes) => restoreNodePositions(previousNodes, positions, currentWorkflow?.triggers ?? []))
+  }, [positionUndoVersion, currentWorkflow?.triggers, setNodes])
+
   const { onNodeDragStart, onNodeDrag, onNodeDragStop, onLayout } = usePositionEventHandlers(
     nodes,
     edges,
@@ -90,21 +110,11 @@ export function BuilderFlow(props: BuilderFlowProps) {
     setEdges
   )
 
-  const clearUndoHistory = useCallback(() => {
-    const temporal = useWorkflowStore.temporal.getState()
-    if (useWorkflowStore.getState()._preserveHistoryOnLayout) {
-      useWorkflowStore.setState({ _preserveHistoryOnLayout: false })
-    } else {
-      temporal.pause()
-      temporal.clear()
-    }
-    setTimeout(() => temporal.resume(), 200)
-  }, [])
   const { isInitialized } = useWorkflowInitialization({
     nodes,
     workflowVersion,
     onLayout,
-    onAfterInitialLayout: clearUndoHistory,
+    onAfterInitialLayout: clearBuilderFlowUndoHistory,
   })
 
   const { fitView, screenToFlowPosition } = reactFlowInstance
@@ -115,9 +125,31 @@ export function BuilderFlow(props: BuilderFlowProps) {
     panelOpen,
     fitView,
     isInitialized,
-    selectedActivityId,
     setNodes,
     setEdges,
+  })
+
+  const projectedGraph = useBuilderFlowProjection({
+    nodes,
+    edges,
+    isInitialized,
+    selectedActivityId,
+    activeEdgeId,
+    activeEdgeButtonNodeId,
+    activeEdgeButtonHandle,
+    onAddNodeFromEdge,
+    pendingEdge,
+    buttonEdgeExecutionStatus,
+    isReadOnly,
+    effectiveExecutionStatus,
+    isExecutionDetailView: isExecutionView,
+    currentWorkflow,
+    activityStates,
+    storedEdges,
+    triggers: triggers ?? [],
+    preResolvedNodes,
+    copiedRunActivityIds,
+    validationErrors,
   })
 
   const { onConnect, onConnectStart, onConnectEnd } = useConnectionHandlers({
@@ -130,38 +162,59 @@ export function BuilderFlow(props: BuilderFlowProps) {
     screenToFlowPosition,
   })
 
+  useEffect(() => {
+    if (nodeUpdateWorkflowVersionRef.current !== workflowVersion) {
+      nodeUpdateWorkflowVersionRef.current = workflowVersion
+      nodeUpdateTrackingRef.current = {
+        previousNodeIds: new Set(initialNodes.map((node) => node.id)),
+        previousInitialNodes: initialNodes,
+        previousInitialEdges: initialEdges,
+      }
+      newlyAddedNodeIdsRef.current = new Set()
+      return
+    }
+
+    reconcileBuilderFlowNodes({
+      initialNodes,
+      initialEdges,
+      tracking: nodeUpdateTrackingRef.current,
+      newlyAddedNodeIds: newlyAddedNodeIdsRef.current,
+      isInitialized,
+      setNodes,
+      setEdges,
+    })
+  }, [initialNodes, initialEdges, isInitialized, setNodes, setEdges, workflowVersion])
+
+  useEffect(() => {
+    const tracking = edgeSyncTrackingRef.current
+    tracking.isFirstSync = true
+    tracking.lastEdgesSignature = ''
+  }, [workflowVersion])
+
+  useEffect(() => {
+    synchronizeBuilderFlowEdges({
+      edges,
+      isInitialized,
+      isActiveExecution,
+      state: edgeSyncTrackingRef.current,
+      setStoredEdges,
+    })
+  }, [edges, isInitialized, setStoredEdges, isActiveExecution])
+
   const { onNodesDelete } = useBuilderFlowSideEffects({
     graph: {
       nodes,
       edges,
-      initialNodes,
-      initialEdges,
       setNodes,
       setEdges,
+      newlyAddedNodeIdsRef,
       isDeletingRef,
     },
     workflow: {
-      workflowVersion,
-      currentWorkflow,
       storedEdges,
       isInitialized,
-      isReadOnly,
-    },
-    execution: {
-      isActiveExecution,
-      isExecutionView,
-      effectiveExecutionStatus,
-      activityStates,
-      preResolvedNodes,
-      copiedRunActivityIds,
-      validationErrors,
-      buttonEdgeExecutionStatus,
     },
     panel: {
-      pendingEdge,
-      activeEdgeButtonNodeId,
-      activeEdgeButtonHandle,
-      activeEdgeId,
       newNodeDesiredPosition,
       onClearDesiredPosition,
     },
@@ -184,8 +237,8 @@ export function BuilderFlow(props: BuilderFlowProps) {
         readOnlyProp={readOnlyProp}
         effectiveExecutionStatus={effectiveExecutionStatus}
         isReadOnly={isReadOnly}
-        nodes={nodes}
-        edges={edges}
+        nodes={projectedGraph.nodes}
+        edges={projectedGraph.edges}
         onNodesChange={onNodesChange}
         onNodeDragStart={isReadOnly ? undefined : onNodeDragStart}
         onNodeDrag={isReadOnly ? undefined : onNodeDrag}

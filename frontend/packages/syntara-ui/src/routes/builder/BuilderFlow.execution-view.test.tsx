@@ -16,6 +16,8 @@ const workflowStoreState = {
   nodePositions: {} as Record<string, { x: number; y: number }>,
   triggers: [] as Array<Record<string, unknown>>,
   activities: [] as Array<Record<string, unknown>>,
+  _temporalBatchPending: false,
+  reorderActivitiesFromEdges: vi.fn(),
 }
 
 const executionStoreState = {
@@ -72,37 +74,15 @@ vi.mock('./utils/detectLoopBackNodes', () => ({
 }))
 
 vi.mock('./hooks/useWorkflowInitialization', () => ({
-  useWorkflowInitialization: () => ({
-    isInitialized: true,
+  useWorkflowInitialization: ({ nodes }: { nodes: unknown[] }) => ({
+    isInitialized: nodes.length > 0,
     hasRunInitialLayoutRef: { current: true },
     workflowVersionRef: { current: 1 },
   }),
 }))
 
-vi.mock('./hooks/useNodeUpdates', () => ({
-  useNodeUpdates: () => ({
-    newlyAddedNodeIdsRef: { current: new Set() },
-  }),
-}))
-
 vi.mock('./hooks/useNodePositioning', () => ({
   useNodePositioning: () => {},
-}))
-
-vi.mock('./hooks/useEdgeSynchronization', () => ({
-  useEdgeSynchronization: () => ({}),
-}))
-
-vi.mock('./hooks/useEdgeActiveState', () => ({
-  useEdgeActiveState: () => {},
-}))
-
-vi.mock('./hooks/useButtonEdgeMaintenance', () => ({
-  useButtonEdgeMaintenance: () => {},
-}))
-
-vi.mock('./hooks/usePendingEdgeManagement', () => ({
-  usePendingEdgeManagement: () => {},
 }))
 
 vi.mock('./hooks/useConnectionHandlers', () => ({
@@ -122,6 +102,7 @@ vi.mock('./hooks/useNodeDeletion', () => ({
 vi.mock('../../stores/useWorkflowStore', () => {
   const useWorkflowStore = (selector: (state: Record<string, unknown>) => unknown) => selector(workflowStoreState)
   useWorkflowStore.getState = () => workflowStoreState
+  useWorkflowStore.setState = (updates: Record<string, unknown>) => Object.assign(workflowStoreState, updates)
 
   return {
     useWorkflowStore,

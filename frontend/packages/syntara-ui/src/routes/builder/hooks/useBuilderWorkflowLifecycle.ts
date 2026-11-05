@@ -17,7 +17,6 @@ export function useBuilderWorkflowLifecycle(options: {
   workflowId: string | null
   isNew: boolean
   workflow: WorkflowWithVersion | undefined
-  workflowName: string
   initialViewVersion?: number | null
   workflowsListResources: { name: string }[] | undefined
   workflowsListDataUndefined: boolean
@@ -37,7 +36,6 @@ export function useBuilderWorkflowLifecycle(options: {
     workflowId,
     isNew,
     workflow,
-    workflowName,
     initialViewVersion,
     workflowsListResources,
     workflowsListDataUndefined,
@@ -54,7 +52,6 @@ export function useBuilderWorkflowLifecycle(options: {
   const hasLoadedRef = useRef(false)
   const prevWorkflowIdRef = useRef(workflowId)
   const hasInitedNewWorkflowRef = useRef(false)
-  const hasAppliedDefaultNameRef = useRef(false)
   const hasRefetchedWorkflowsOnceRef = useRef(false)
 
   useEffect(() => {
@@ -63,7 +60,6 @@ export function useBuilderWorkflowLifecycle(options: {
       setStoredEdges([])
       hasLoadedRef.current = false
       hasInitedNewWorkflowRef.current = false
-      hasAppliedDefaultNameRef.current = false
       hasRefetchedWorkflowsOnceRef.current = false
       prevWorkflowIdRef.current = workflowId
     }
@@ -118,17 +114,6 @@ export function useBuilderWorkflowLifecycle(options: {
       })
     })
   }, [workflow, workflowId, isNew, dispatch])
-
-  useEffect(() => {
-    if (!isNew) return
-    if (workflowsListResources === undefined) return
-    if (workflowName !== DEFAULT_WORKFLOW_NAME) return
-    if (hasAppliedDefaultNameRef.current) return
-    const nextName = getNextDefaultWorkflowName(workflowsListResources)
-    if (nextName === DEFAULT_WORKFLOW_NAME) return
-    hasAppliedDefaultNameRef.current = true
-    dispatch({ type: 'SET_WORKFLOW_NAME', payload: nextName })
-  }, [isNew, workflowsListResources, workflowName, dispatch])
 
   useEffect(() => {
     if (!isNew) return
