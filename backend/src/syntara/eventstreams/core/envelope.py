@@ -6,6 +6,7 @@ from pydantic import ConfigDict, Field, JsonValue
 from sqlmodel import SQLModel
 
 from syntara.eventstreams.adapters.source_metadata import SourceMetadata
+from syntara.eventstreams.core.cloudevents import CloudEventAttributes
 
 
 class RawEventHeader(SQLModel):
@@ -55,7 +56,7 @@ class WorkflowEventEnvelope(SQLModel):
     envelope_version: int = Field(default=1, ge=1, le=1, strict=True)
     payload: JsonValue = Field(repr=False)
     original: OriginalEvent = Field(repr=False)
-    cloudevents: None = None
+    cloudevents: CloudEventAttributes | None = Field(default=None, repr=False)
     source_metadata: SourceMetadata = Field(alias="metadata")
 
     model_config: ClassVar[ConfigDict] = ConfigDict(  # type: ignore[assignment]

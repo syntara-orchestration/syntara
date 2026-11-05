@@ -73,6 +73,8 @@ dependencies = [
     "uuid-utils>=0.9.0",
     "pypdf>=6.19.0",
     "nh3>=0.2.21",
+    "rfc3986-validator>=0.1.1,<0.2.0",
+    "rfc3339-validator>=0.1.4,<0.2.0",
 ]
 
 [project.optional-dependencies]
