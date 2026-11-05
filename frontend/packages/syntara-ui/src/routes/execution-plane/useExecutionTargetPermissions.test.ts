@@ -37,6 +37,8 @@ describe('useExecutionTargetPermissions', () => {
     expect(result.current.tooltips.create).toMatch(/configure an execution target/i)
     expect(result.current.tooltips.update).toMatch(/edit this execution target/i)
     expect(result.current.tooltips.update).toContain('execution_target:update')
+    expect(result.current.tooltips.enable).toMatch(/enable or disable this execution target/i)
+    expect(result.current.tooltips.enable).toContain('execution_target:update')
     expect(result.current.tooltips.delete).toMatch(/delete this execution target/i)
     expect(result.current.tooltips.delete).toContain('execution_target:delete')
   })

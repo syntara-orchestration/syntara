@@ -6,6 +6,7 @@ import {
   EmptyStateFooter,
   Stack,
   StackItem,
+  Switch,
   Title,
 } from '@patternfly/react-core'
 import { RhUiArrowLeftIcon, RhUiEditIcon, RhUiSearchIcon, RhUiSyncIcon } from '@patternfly/react-icons'
@@ -42,6 +43,7 @@ import { ExecutionTargetStatusLabel } from './ExecutionTargetStatusLabel'
 import { getNodeSelectors } from './getNodeSelectors'
 import { NodeSelectorsCell } from './NodeSelectorsCell'
 import { useExecutionTargetActions } from './useExecutionTargetActions'
+import { useExecutionTargetEnabledToggle } from './useExecutionTargetEnabledToggle'
 import { useExecutionTargetPermissions } from './useExecutionTargetPermissions'
 
 type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
@@ -144,6 +146,51 @@ function ExecutionTargetNotFound({ onRetry, onBack }: Readonly<{ onRetry: () => 
   )
 }
 
+function ExecutionTargetDetailToolbar({
+  target,
+  onEdit,
+  onToggleEnabled,
+  deleteDialog,
+  permissions,
+}: Readonly<{
+  target: ExecutionTarget
+  onEdit: () => void
+  onToggleEnabled: () => void
+  deleteDialog: { open: (item: ExecutionTarget) => void }
+  permissions: ReturnType<typeof useExecutionTargetPermissions>
+}>) {
+  const toggleBlocked = permissions.isLoading || !permissions.canUpdate
+
+  return (
+    <>
+      <DisabledWithTooltip isDisabled={toggleBlocked} content={permissions.tooltips.enable}>
+        <Switch
+          id="execution-target-enabled-toggle"
+          label={target.enabled ? 'Enabled' : 'Disabled'}
+          isChecked={target.enabled}
+          onChange={toggleBlocked ? () => undefined : onToggleEnabled}
+          aria-disabled={toggleBlocked || undefined}
+          aria-label={`Toggle ${target.name}`}
+        />
+      </DisabledWithTooltip>
+      <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
+        <Button
+          variant="primary"
+          icon={<RhUiEditIcon />}
+          isAriaDisabled={!permissions.canUpdate}
+          onClick={permissions.canUpdate ? onEdit : undefined}
+        >
+          Edit execution target
+        </Button>
+      </DisabledWithTooltip>
+      <SynKebabMenu
+        actions={[buildExecutionTargetDeleteAction(target, deleteDialog, permissions)]}
+        aria-label={`Actions for ${target.name}`}
+      />
+    </>
+  )
+}
+
 export default function ExecutionTargetDetail() {
   const { executionTargetId }: { executionTargetId?: string } = useParams({ strict: false })
   const navigate = useNavigate()
@@ -164,7 +211,18 @@ export default function ExecutionTargetDetail() {
     onSuccess: () => detachPromise(navigate({ to: AppRoute.ExecutionPlane.Root })),
   })
 
-  const target = query.data
+  const serverTarget = query.data
+  const {
+    targets: optimisticTargets,
+    disableDialog,
+    handleToggleEnabled,
+    handleDisable,
+  } = useExecutionTargetEnabledToggle({
+    targets: serverTarget ? [serverTarget] : [],
+    onSuccess: () => query.refetch(),
+  })
+
+  const target = optimisticTargets[0] ?? serverTarget
   const queryState = useQueryState(query, {
     title: 'Error loading execution target',
     onRetry: () => detachPromise(query.refetch()),
@@ -208,22 +266,13 @@ export default function ExecutionTargetDetail() {
         title={target.name}
         docLink={docLink}
         toolbar={
-          <>
-            <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
-              <Button
-                variant="primary"
-                icon={<RhUiEditIcon />}
-                isAriaDisabled={!permissions.canUpdate}
-                onClick={permissions.canUpdate ? () => detachPromise(navigate({ to: editPath })) : undefined}
-              >
-                Edit execution target
-              </Button>
-            </DisabledWithTooltip>
-            <SynKebabMenu
-              actions={[buildExecutionTargetDeleteAction(target, deleteDialog, permissions)]}
-              aria-label={`Actions for ${target.name}`}
-            />
-          </>
+          <ExecutionTargetDetailToolbar
+            target={target}
+            onEdit={() => detachPromise(navigate({ to: editPath }))}
+            onToggleEnabled={() => handleToggleEnabled(target)}
+            deleteDialog={deleteDialog}
+            permissions={permissions}
+          />
         }
       />
       <SynPageBody>
@@ -232,7 +281,12 @@ export default function ExecutionTargetDetail() {
         </SynPanel>
       </SynPageBody>
 
-      <ExecutionTargetDialogs deleteDialog={deleteDialog} onDelete={handleDelete} />
+      <ExecutionTargetDialogs
+        deleteDialog={deleteDialog}
+        onDelete={handleDelete}
+        disableDialog={disableDialog}
+        onDisable={handleDisable}
+      />
     </SynPage>
   )
 }
