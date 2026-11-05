@@ -7,8 +7,16 @@ import { axe } from 'vitest-axe'
 import { executionsClient } from '../../client'
 import { useCanI } from '../../hooks/useCanI'
 
-import { ExecutionDetailHeaderToolbar, ExecutionDetailTitleRowAddons } from './ExecutionDetailPageHeaderParts'
-import { executionDetailHasTitleRowExtras, executionDetailPageHeading } from './executionDetailPageHeaderTitle'
+import {
+  ExecutionDetailHeaderToolbar,
+  ExecutionDetailParentRunLink,
+  ExecutionDetailTitleRowAddons,
+} from './ExecutionDetailPageHeaderParts'
+import {
+  executionDetailHasTitleRowExtras,
+  executionDetailPageHeading,
+  executionHasParentRun,
+} from './executionDetailPageHeaderTitle'
 
 vi.mock('../../hooks/useCanI', () => ({
   useCanI: vi.fn(() => ({ allowed: true, isChecking: false, isError: false })),
@@ -91,6 +99,14 @@ describe('executionDetailPageHeaderTitle', () => {
 
   it('detects when title row extras should render', () => {
     expect(executionDetailHasTitleRowExtras(undefined)).toBe(false)
+  })
+
+  it('detects when an execution has a parent run', () => {
+    expect(executionHasParentRun(undefined)).toBe(false)
+    expect(executionHasParentRun({} as never)).toBe(false)
+    expect(executionHasParentRun({ execution_metadata: { parent_execution_id: 'exec-parent-001' } } as never)).toBe(
+      true
+    )
   })
 })
 
@@ -221,7 +237,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
       status: 'completed' as const,
       execution_metadata: { parent_execution_id: 'exec-parent-001' },
     } as never
-    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    render(<ExecutionDetailParentRunLink execution={execution} />)
     expect(screen.getByTestId('view-parent-run')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'View parent run' })).toBeInTheDocument()
   })
@@ -236,7 +252,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
       status: 'completed' as const,
       execution_metadata: { parent_execution_id: 'exec-parent-001' },
     } as never
-    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    render(<ExecutionDetailParentRunLink execution={execution} />)
     expect(screen.getByRole('link', { name: 'View parent run: Parent Flow' })).toBeInTheDocument()
   })
 
@@ -244,7 +260,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
     const execution = {
       status: 'completed' as const,
     } as never
-    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    render(<ExecutionDetailParentRunLink execution={execution} />)
     expect(screen.queryByTestId('view-parent-run')).not.toBeInTheDocument()
   })
 

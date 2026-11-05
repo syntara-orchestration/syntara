@@ -14,6 +14,7 @@ import { SubWorkflowRunLink } from '../workflows/execution/SubWorkflowRunLink'
 import type { ActivityState } from '../workflows/execution/types'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
+import styles from './ExecutionActivityTable.module.css'
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
 
@@ -87,12 +88,13 @@ function ActivityNameCell({
   type,
   state,
 }: Readonly<{ displayName: string; type?: string; state?: ActivityState }>) {
-  const subWorkflowChild = type === ActivityTypeEnum.SUB_WORKFLOW ? extractSubWorkflowChild(state?.outputData) : null
+  const subWorkflowChild =
+    type === ActivityTypeEnum.SUB_WORKFLOW ? extractSubWorkflowChild(state?.runtimeMetadata, state?.outputData) : null
   return (
     <Td dataLabel="Name">
       {displayName}
       {subWorkflowChild && (
-        <div style={{ marginTop: 'var(--pf-t--global--spacer--xs)' }}>
+        <div className={styles.childRunLink}>
           <SubWorkflowRunLink
             childExecutionId={subWorkflowChild.childExecutionId}
             childName={subWorkflowChild.childName}
@@ -112,7 +114,7 @@ function ActivityErrorRow({
   const columnCount = hasAAPColumn ? 6 : 5
   return (
     <Tr>
-      <Td colSpan={columnCount} style={{ paddingTop: 0 }}>
+      <Td colSpan={columnCount} className={styles.errorCell}>
         <Content component={ContentVariants.small} style={ERROR_STYLE}>
           {errorDetails}
         </Content>
