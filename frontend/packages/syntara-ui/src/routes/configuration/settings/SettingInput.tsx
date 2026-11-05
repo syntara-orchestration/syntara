@@ -16,9 +16,10 @@ import {
 import { RhUiCloseIcon } from '@patternfly/react-icons'
 import type { SettingsAPI } from '@syntara/contracts'
 import React, { useEffect, useRef, useState } from 'react'
-import { z } from 'zod'
 
 import { SynSelect } from '../../../components/SynSelect'
+
+import { getEmailPatternError, getStringPatternError } from './settingValidation'
 
 type RuntimeSetting = SettingsAPI.components['schemas']['RuntimeSettingRead']
 
@@ -36,34 +37,6 @@ type SettingInputProps = {
   readonly stringError: string | null
   readonly onStringError: (error: string | null) => void
   readonly readOnly?: boolean
-}
-
-const emailSchema = z.email({ error: 'Invalid email address' })
-const urlSchema = z
-  .url({ error: 'Must be a valid URL' })
-  .refine((url) => /^https?:\/\//i.test(url), { message: 'Must be an HTTP or HTTPS URL' })
-
-function useStringPatternValidation(
-  valueType: string,
-  value: unknown,
-  pattern: string | undefined,
-  onStringError: (error: string | null) => void
-) {
-  useEffect(() => {
-    if (valueType !== 'string' || !pattern) return
-    const val = (value as string) ?? ''
-    if (!val) {
-      onStringError(null)
-      return
-    }
-    if (pattern === 'url') {
-      const result = urlSchema.safeParse(val)
-      onStringError(result.success ? null : result.error.issues[0].message)
-    } else if (pattern === 'email') {
-      const result = emailSchema.safeParse(val)
-      onStringError(result.success ? null : result.error.issues[0].message)
-    }
-  }, [value, valueType, pattern, onStringError])
 }
 
 type JsonInputProps = {
@@ -90,9 +63,9 @@ function JsonInput({ setting, value, pattern, onChange, stringError, onStringErr
     const trimmed = inputValue.trim()
     if (!trimmed) return
     if (pattern === 'email') {
-      const result = emailSchema.safeParse(trimmed)
-      if (!result.success) {
-        onStringError(result.error.issues[0].message)
+      const error = getEmailPatternError(trimmed)
+      if (error) {
+        onStringError(error)
         return
       }
     }
@@ -219,8 +192,7 @@ export function SettingInput({
 }: SettingInputProps) {
   const schema = (setting.validation_schema ?? {}) as Record<string, unknown>
   const pattern = schema.pattern as string | undefined
-
-  useStringPatternValidation(setting.value_type, value, pattern, onStringError)
+  const stringPatternError = getStringPatternError(setting.value_type, value, pattern)
 
   const readOnlyVariant = readOnly ? ('default' as const) : undefined
 
@@ -289,7 +261,7 @@ export function SettingInput({
         <TextInput
           id={setting.key}
           value={(value as string) ?? ''}
-          validated={stringError ? 'error' : 'default'}
+          validated={stringError || stringPatternError ? 'error' : 'default'}
           readOnlyVariant={readOnlyVariant}
           onChange={(_event, val) => onChange(setting.key, val)}
         />

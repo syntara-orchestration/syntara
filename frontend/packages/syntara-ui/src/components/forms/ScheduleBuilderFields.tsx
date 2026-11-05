@@ -396,8 +396,16 @@ export function ScheduleBuilderFields({
   error = false,
   errorMessage,
 }: ScheduleBuilderFieldsProps) {
-  const { state, dispatch } = useScheduleBuilder(value, timezone, onChange)
+  const { state, dispatch, emitTimezoneChange } = useScheduleBuilder(value, timezone, onChange)
   const { startDate, startTime, endDate, frequency, intervalCount } = state
+  const handleTimezoneChange = useCallback(
+    (nextTimezone: string) => {
+      if (!onTimezoneChange) return
+      onTimezoneChange(nextTimezone)
+      if (nextTimezone !== timezone) emitTimezoneChange(nextTimezone)
+    },
+    [emitTimezoneChange, onTimezoneChange, timezone]
+  )
 
   return (
     <Stack hasGutter data-testid="schedule-builder-fields">
@@ -406,7 +414,7 @@ export function ScheduleBuilderFields({
         startTime={startTime}
         timezone={timezone}
         dispatch={dispatch}
-        onTimezoneChange={onTimezoneChange}
+        onTimezoneChange={handleTimezoneChange}
         required={required}
         error={error}
         errorMessage={errorMessage}
