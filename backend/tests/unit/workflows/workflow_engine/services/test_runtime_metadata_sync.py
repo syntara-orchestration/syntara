@@ -5,6 +5,7 @@ that a websocket patch is emitted only when runtime_metadata changes. No
 populator sets runtime_metadata yet (C1 is additive plumbing).
 """
 
+from typing import Any
 from uuid import uuid4
 
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
@@ -12,7 +13,7 @@ from syntara.workflows.workflow_engine.services.activity_execution_sync import A
 from syntara.workflows.workflow_engine.services.activity_sync_publisher import ActivitySyncPublisherMixin
 
 
-def _activity(runtime_metadata: dict | None = None) -> ActivityExecution:
+def _activity(runtime_metadata: dict[str, Any] | None = None) -> ActivityExecution:
     return ActivityExecution(
         id=uuid4(),
         execution_id=uuid4(),
@@ -24,8 +25,8 @@ def _activity(runtime_metadata: dict | None = None) -> ActivityExecution:
     )
 
 
-def _update(**over: object) -> dict:
-    data = {
+def _update(**over: object) -> dict[str, object]:
+    data: dict[str, object] = {
         "status": ActivityStatus.COMPLETED,
         "started_at": None,
         "completed_at": None,
@@ -68,7 +69,7 @@ class TestRuntimeMetadataPatch:
     """runtime_metadata websocket field-diff: patch only on change."""
 
     @staticmethod
-    def _old(runtime_metadata: dict | None) -> dict:
+    def _old(runtime_metadata: dict[str, Any] | None) -> dict[str, object]:
         return {
             "status": ActivityStatus.RUNNING,
             "started_at": None,

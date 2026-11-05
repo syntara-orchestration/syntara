@@ -1787,14 +1787,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 parent_close_policy=ParentClosePolicy.REQUEST_CANCEL,
             )
         except ChildWorkflowError as exc:
-            child_status, reason = self._classify_child_workflow_failure(exc)
-            output = self._build_sub_workflow_output(setup_result, child_status)
+            err_status, reason = self._classify_child_workflow_failure(exc)
+            output = self._build_sub_workflow_output(setup_result, err_status)
             output["ErrorMessage"] = f"Sub-workflow {reason}"
             msg = f"Sub-workflow {reason}"
             # A cancelled child is a cancelled *step* (shown cancelled, not retried,
             # continue_on_failure still applies) that must not cancel the whole parent
             # run; _handle_node_failure routes SubWorkflowCancelledError accordingly.
-            error_type = "SubWorkflowCancelledError" if child_status == "cancelled" else "SubWorkflowFailedError"
+            error_type = "SubWorkflowCancelledError" if err_status == "cancelled" else "SubWorkflowFailedError"
             raise ApplicationError(msg, {"output": output}, type=error_type, non_retryable=True) from exc
 
         valid_child_statuses = {"completed", "completed_with_errors", "failed", "cancelled"}
