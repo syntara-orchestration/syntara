@@ -3,8 +3,8 @@ import { render } from '@testing-library/react'
 import { cloneElement, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 
-import { StepFormHeaderPortalContext } from '../shared/StepFormHeaderPortalContext'
 import styles from '../../StepEditorLayout.module.css'
+import { StepFormHeaderPortalContext } from '../shared/StepFormHeaderPortalContext'
 
 /**
  * Test utility to render a form component with header content handling.

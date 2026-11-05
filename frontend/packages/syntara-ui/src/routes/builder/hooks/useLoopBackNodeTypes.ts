@@ -8,7 +8,7 @@ import type { EdgeType } from '../utils/workflowToGraph'
  * Apply loop-back node type transformations to a list of nodes.
  * Mutates nothing — returns a new array only when changes are needed.
  */
-export function applyLoopBackNodeTypes(nodes: NodeType[], loopBackNodeIds: Set<string>): NodeType[] {
+function applyLoopBackNodeTypes(nodes: NodeType[], loopBackNodeIds: Set<string>): NodeType[] {
   let hasChanges = false
   const updatedNodes = nodes.map((node) => {
     const shouldBeReversed = loopBackNodeIds.has(node.id)

@@ -49,10 +49,7 @@ export function getToolSelection(strategy: string | undefined, toolIds: string[]
   return { strategy: 'NONE' }
 }
 
-export function findStaleToolInfo(
-  selection: ToolSelection,
-  integrations: IntegrationWithTools[]
-): StaleToolInfo | null {
+function findStaleToolInfo(selection: ToolSelection, integrations: IntegrationWithTools[]): StaleToolInfo | null {
   if (selection.strategy !== 'SELECTED') return null
   const availableIds = new Set(
     integrations.flatMap((integration) => integration.discovered_tools.map((tool) => tool.id))

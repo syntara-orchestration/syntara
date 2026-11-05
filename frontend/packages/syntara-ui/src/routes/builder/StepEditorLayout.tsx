@@ -6,11 +6,12 @@ import type { ReactNode } from 'react'
 
 import { SynPanel } from '../../components/layout/SynPanel'
 import type { NodeType } from '../workflows/canvas/nodes/NodeType'
-import styles from './StepEditorLayout.module.css'
+
 import { useStepExecutionData } from './panels/hooks/useStepExecutionData'
 import { StepEditorPanelBody } from './panels/StepEditorPanelBody'
 import { StepFormHeaderPortalContext } from './step-forms/shared/StepFormHeaderPortalContext'
 import { StepFormTabBarProvider } from './step-forms/shared/StepFormTabBarContext'
+import styles from './StepEditorLayout.module.css'
 import type { WorkflowMetadata } from './types/workflowMetadata'
 
 function DocumentationButton({ href }: Readonly<{ href: string }>) {
