@@ -1,4 +1,4 @@
-import { useEffect, useRef, type Dispatch } from 'react'
+import { useCallback, useRef, type Dispatch } from 'react'
 
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { BuilderAction } from '../builderReducer'
@@ -23,11 +23,11 @@ export function useExecutionCopyToEditor({
   dispatch,
   markDirty,
   showSuccess,
-}: UseExecutionCopyToEditorOptions): void {
+}: UseExecutionCopyToEditorOptions): () => void {
   const hasAppliedRef = useRef(false)
   const currentWorkflow = useWorkflowStore((s) => s.currentWorkflow)
 
-  useEffect(() => {
+  return useCallback(() => {
     if (!executionCopy || hasAppliedRef.current || !currentWorkflow) return
     hasAppliedRef.current = true
 

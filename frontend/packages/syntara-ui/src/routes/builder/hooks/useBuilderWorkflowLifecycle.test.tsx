@@ -55,7 +55,6 @@ function createDeps(overrides: Partial<Parameters<typeof useBuilderWorkflowLifec
     workflowId: 'wf-1' as string | null,
     isNew: false,
     workflow: undefined as WorkflowWithVersion | undefined,
-    workflowName: 'saved-name',
     workflowsListResources: [] as { name: string }[] | undefined,
     workflowsListDataUndefined: false,
     workflowsListIsPending: false,
@@ -205,44 +204,32 @@ describe('useBuilderWorkflowLifecycle', () => {
     })
   })
 
-  it('dispatches SET_WORKFLOW_NAME when default name conflicts with list', async () => {
-    const dispatch = vi.fn()
+  it('initializes a new workflow with the next free name from the list', async () => {
+    const dispatch = vi.fn<(action: BuilderAction) => void>()
+    const loadWorkflowWithEdges = vi.fn()
     renderHook(() =>
       useBuilderWorkflowLifecycle(
         createDeps({
           isNew: true,
           workflowId: null,
-          workflowName: DEFAULT_WORKFLOW_NAME,
           workflowsListResources: [{ name: DEFAULT_WORKFLOW_NAME }],
+          loadWorkflowWithEdges,
           dispatch,
         })
       )
     )
     await waitFor(() => {
-      expect(dispatch).toHaveBeenCalledWith({
-        type: 'SET_WORKFLOW_NAME',
-        payload: `${DEFAULT_WORKFLOW_NAME}-1`,
+      const initAction = dispatch.mock.calls.map(([action]) => action).find((action) => action.type === 'INIT_WORKFLOW')
+      expect(initAction).toEqual({
+        type: 'INIT_WORKFLOW',
+        payload: { name: `${DEFAULT_WORKFLOW_NAME}-1`, description: 'New workflow' },
       })
     })
-  })
-
-  it('does not dispatch SET_WORKFLOW_NAME when default name is still free', async () => {
-    const dispatch = vi.fn()
-    renderHook(() =>
-      useBuilderWorkflowLifecycle(
-        createDeps({
-          isNew: true,
-          workflowId: null,
-          workflowName: DEFAULT_WORKFLOW_NAME,
-          workflowsListResources: [],
-          dispatch,
-        })
-      )
+    expect(loadWorkflowWithEdges).toHaveBeenCalledWith(
+      expect.objectContaining({ name: `${DEFAULT_WORKFLOW_NAME}-1` }),
+      []
     )
-    await waitFor(() => {
-      const setNameCalls = dispatch.mock.calls.filter((c) => (c[0] as BuilderAction).type === 'SET_WORKFLOW_NAME')
-      expect(setNameCalls).toHaveLength(0)
-    })
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'SET_WORKFLOW_NAME' }))
   })
 
   it('refetches workflows list once when new workflow and list was undefined', async () => {

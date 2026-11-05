@@ -1,219 +1,86 @@
-import { renderHook } from '@testing-library/react'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { useEdgeActiveState } from './useEdgeActiveState'
+import type { EdgeType } from '../utils/workflowToGraph'
 
-// Mock dependencies
+import { projectEdgeActiveState } from './useEdgeActiveState'
+
 vi.mock('../utils/workflowToGraph', () => ({
   markerEnd: 'url(#arrow)',
 }))
 
-describe('useEdgeActiveState', () => {
-  const mockSetEdges = vi.fn()
-  const mockOnAddNodeFromEdge = vi.fn()
+function project(edges: EdgeType[], options: Partial<Parameters<typeof projectEdgeActiveState>[1]> = {}) {
+  return projectEdgeActiveState(edges, {
+    activeEdgeId: null,
+    activeEdgeButtonNodeId: null,
+    activeEdgeButtonHandle: null,
+    isInitialized: true,
+    ...options,
+  })
+}
 
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockSetEdges.mockImplementation((updater: ((items: unknown[]) => unknown[]) | unknown[]) => {
-      if (typeof updater === 'function') {
-        return updater([])
-      }
+describe('projectEdgeActiveState', () => {
+  it('adds markers and the add-node callback to default and loop edges', () => {
+    const onAddNodeFromEdge = vi.fn()
+    const edges = [
+      { id: 'default', type: 'default', source: 'a', target: 'b' },
+      { id: 'back', type: 'loopBack', source: 'b', target: 'a' },
+      { id: 'out', type: 'loopOutgoing', source: 'a', target: 'b' },
+      { id: 'done', type: 'loopDone', source: 'a', target: 'b' },
+    ] as EdgeType[]
+
+    const result = project(edges, { onAddNodeFromEdge })
+
+    expect(result).toHaveLength(4)
+    result.forEach((edge) => {
+      expect(edge.markerEnd).toBe('url(#arrow)')
+      expect(edge.data?.onAddNode).toBe(onAddNodeFromEdge)
+      expect(edge.data?.isActive).toBeUndefined()
     })
   })
 
-  it('does nothing when not initialized', () => {
-    renderHook(() =>
-      useEdgeActiveState({
-        isInitialized: false,
-        activeEdgeId: null,
-        activeEdgeButtonNodeId: null,
-        activeEdgeButtonHandle: null,
-        onAddNodeFromEdge: mockOnAddNodeFromEdge,
-        setEdges: mockSetEdges,
-      })
+  it('uses activeEdgeId and preserves a pending edge active state', () => {
+    const result = project(
+      [
+        { id: 'edge-1', type: 'default', source: 'a', target: 'b' },
+        { id: 'edge-2', type: 'default', source: 'b', target: 'c', data: { isPending: true } },
+      ] as EdgeType[],
+      { activeEdgeId: 'edge-1' }
     )
 
-    // First effect runs but second should skip
-    expect(mockSetEdges).toHaveBeenCalled()
+    expect(result.map((edge) => edge.data?.isActive)).toEqual([true, true])
   })
 
-  it('updates default edges with onAddNode and markerEnd', () => {
-    // Track all calls to setEdges
-    const calls: unknown[][] = []
-    mockSetEdges.mockImplementation((updater: ((items: unknown[]) => unknown[]) | unknown[]) => {
-      if (typeof updater === 'function') {
-        const result = updater([{ id: 'edge-1', type: 'default', data: {} }])
-        calls.push(result)
-        return result
-      }
-    })
-
-    renderHook(() =>
-      useEdgeActiveState({
-        isInitialized: true,
-        activeEdgeId: null,
-        activeEdgeButtonNodeId: null,
-        activeEdgeButtonHandle: null,
-        onAddNodeFromEdge: mockOnAddNodeFromEdge,
-        setEdges: mockSetEdges,
-      })
+  it('activates button edges for their source handle', () => {
+    const result = project(
+      [
+        { id: 'button-node-1', type: 'buttonEdge', source: 'node-1', sourceHandle: 'source' },
+        { id: 'button-node-1-true', type: 'buttonEdge', source: 'node-1', sourceHandle: 'true' },
+      ] as EdgeType[],
+      { activeEdgeButtonNodeId: 'node-1', activeEdgeButtonHandle: 'true' }
     )
 
-    // First effect updates default edges
-    const firstCall = calls[0]
-    expect(firstCall).toHaveLength(1)
-    expect((firstCall[0] as { markerEnd: string }).markerEnd).toBe('url(#arrow)')
+    expect(result.map((edge) => edge.data?.isActive)).toEqual([false, true])
   })
 
-  it('sets isActive true when activeEdgeId matches', () => {
-    // Track all calls to setEdges
-    const calls: unknown[][] = []
-    mockSetEdges.mockImplementation((updater: ((items: unknown[]) => unknown[]) | unknown[]) => {
-      if (typeof updater === 'function') {
-        const result = updater([{ id: 'edge-1', type: 'default', data: {} }])
-        calls.push(result)
-        return result
-      }
-    })
+  it('does not project button edge state before initialization', () => {
+    const edges = [{ id: 'button-node-1', type: 'buttonEdge', source: 'node-1', sourceHandle: 'source' }] as EdgeType[]
 
-    renderHook(() =>
-      useEdgeActiveState({
-        isInitialized: true,
-        activeEdgeId: 'edge-1',
-        activeEdgeButtonNodeId: null,
-        activeEdgeButtonHandle: null,
-        onAddNodeFromEdge: mockOnAddNodeFromEdge,
-        setEdges: mockSetEdges,
-      })
-    )
-
-    // First effect updates default edges with isActive
-    const firstCall = calls[0]
-    expect((firstCall[0] as { data: { isActive: boolean } }).data.isActive).toBe(true)
+    expect(project(edges, { activeEdgeButtonNodeId: 'node-1', isInitialized: false })).toBe(edges)
   })
 
-  it('updates loop edge types', () => {
-    // Track all calls to setEdges
-    const calls: unknown[][] = []
-    mockSetEdges.mockImplementation((updater: ((items: unknown[]) => unknown[]) | unknown[]) => {
-      if (typeof updater === 'function') {
-        const result = updater([
-          { id: 'edge-1', type: 'loopBack', data: {} },
-          { id: 'edge-2', type: 'loopOutgoing', data: {} },
-          { id: 'edge-3', type: 'loopDone', data: {} },
-        ])
-        calls.push(result)
-        return result
-      }
-    })
+  it('preserves edge references when all projected fields already match', () => {
+    const callback = vi.fn()
+    const edges = [
+      {
+        id: 'edge-1',
+        type: 'default',
+        source: 'a',
+        target: 'b',
+        markerEnd: 'url(#arrow)',
+        data: { onAddNode: callback, isActive: true },
+      },
+    ] as unknown as EdgeType[]
 
-    renderHook(() =>
-      useEdgeActiveState({
-        isInitialized: true,
-        activeEdgeId: null,
-        activeEdgeButtonNodeId: null,
-        activeEdgeButtonHandle: null,
-        onAddNodeFromEdge: mockOnAddNodeFromEdge,
-        setEdges: mockSetEdges,
-      })
-    )
-
-    // First effect updates loop edges with markerEnd
-    const firstCall = calls[0]
-    expect(firstCall).toHaveLength(3)
-    firstCall.forEach((edge) => {
-      expect((edge as { markerEnd: string }).markerEnd).toBe('url(#arrow)')
-    })
-  })
-
-  it('updates button edge active state', () => {
-    // Track all calls to setEdges
-    const calls: unknown[][] = []
-    mockSetEdges.mockImplementation((updater: ((items: unknown[]) => unknown[]) | unknown[]) => {
-      if (typeof updater === 'function') {
-        const result = updater([{ id: 'button-node-1', type: 'buttonEdge', source: 'node-1', data: {} }])
-        calls.push(result)
-        return result
-      }
-    })
-
-    renderHook(() =>
-      useEdgeActiveState({
-        isInitialized: true,
-        activeEdgeId: null,
-        activeEdgeButtonNodeId: 'node-1',
-        activeEdgeButtonHandle: 'source',
-        onAddNodeFromEdge: mockOnAddNodeFromEdge,
-        setEdges: mockSetEdges,
-      })
-    )
-
-    // Second effect updates button edges - find it by looking at all calls
-    // The second call should be from the button edge effect
-    const secondCall = calls[1]
-    const buttonEdge = secondCall?.find((e) => (e as { type: string }).type === 'buttonEdge') as {
-      data: { isActive: boolean }
-    }
-    expect(buttonEdge?.data?.isActive).toBe(true)
-  })
-
-  it('handles specific handles for condition nodes', () => {
-    // Track all calls to setEdges
-    const calls: unknown[][] = []
-    mockSetEdges.mockImplementation((updater: ((items: unknown[]) => unknown[]) | unknown[]) => {
-      if (typeof updater === 'function') {
-        const result = updater([
-          { id: 'button-node-1-true', type: 'buttonEdge', source: 'node-1', sourceHandle: 'true', data: {} },
-        ])
-        calls.push(result)
-        return result
-      }
-    })
-
-    renderHook(() =>
-      useEdgeActiveState({
-        isInitialized: true,
-        activeEdgeId: null,
-        activeEdgeButtonNodeId: 'node-1',
-        activeEdgeButtonHandle: 'true',
-        onAddNodeFromEdge: mockOnAddNodeFromEdge,
-        setEdges: mockSetEdges,
-      })
-    )
-
-    // Second effect updates button edges
-    const secondCall = calls[1]
-    const buttonEdge = secondCall?.[0] as { data: { isActive: boolean } }
-    expect(buttonEdge?.data?.isActive).toBe(true)
-  })
-
-  it('does not set active for mismatched specific handle', () => {
-    // Track all calls to setEdges
-    const calls: unknown[][] = []
-    mockSetEdges.mockImplementation((updater: ((items: unknown[]) => unknown[]) | unknown[]) => {
-      if (typeof updater === 'function') {
-        const result = updater([
-          { id: 'button-node-1-true', type: 'buttonEdge', source: 'node-1', sourceHandle: 'true', data: {} },
-        ])
-        calls.push(result)
-        return result
-      }
-    })
-
-    renderHook(() =>
-      useEdgeActiveState({
-        isInitialized: true,
-        activeEdgeId: null,
-        activeEdgeButtonNodeId: 'node-1',
-        activeEdgeButtonHandle: 'false', // Mismatched
-        onAddNodeFromEdge: mockOnAddNodeFromEdge,
-        setEdges: mockSetEdges,
-      })
-    )
-
-    // Second effect updates button edges
-    const secondCall = calls[1]
-    const buttonEdge = secondCall?.[0] as { data: { isActive: boolean } }
-    expect(buttonEdge?.data?.isActive).toBe(false)
+    expect(project(edges, { activeEdgeId: 'edge-1', onAddNodeFromEdge: callback })).toBe(edges)
   })
 })

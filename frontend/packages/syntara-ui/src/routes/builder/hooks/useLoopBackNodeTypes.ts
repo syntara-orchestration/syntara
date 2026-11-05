@@ -1,5 +1,3 @@
-import { type Dispatch, type SetStateAction, useEffect } from 'react'
-
 import { FlowNodeType } from '../../../constants'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import { detectLoopBackNodes } from '../utils/detectLoopBackNodes'
@@ -10,7 +8,7 @@ import type { EdgeType } from '../utils/workflowToGraph'
  * Apply loop-back node type transformations to a list of nodes.
  * Mutates nothing — returns a new array only when changes are needed.
  */
-export function applyLoopBackNodeTypes(nodes: NodeType[], loopBackNodeIds: Set<string>): NodeType[] {
+function applyLoopBackNodeTypes(nodes: NodeType[], loopBackNodeIds: Set<string>): NodeType[] {
   let hasChanges = false
   const updatedNodes = nodes.map((node) => {
     const shouldBeReversed = loopBackNodeIds.has(node.id)
@@ -30,9 +28,11 @@ export function applyLoopBackNodeTypes(nodes: NodeType[], loopBackNodeIds: Set<s
         }
       } else if (!shouldBeReversed && currentReverseHandles) {
         hasChanges = true
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { __reverseHandles: _reverseHandles, ...restMetadata } =
-          (node.data as ActivityWithMetadata).metadata ?? {}
+        const restMetadata = Object.fromEntries(
+          Object.entries((node.data as ActivityWithMetadata).metadata ?? {}).filter(
+            ([key]) => key !== '__reverseHandles'
+          )
+        )
         return {
           ...node,
           data: {
@@ -64,21 +64,8 @@ export function applyLoopBackNodeTypes(nodes: NodeType[], loopBackNodeIds: Set<s
   return hasChanges ? updatedNodes : nodes
 }
 
-export function useLoopBackNodeTypes({
-  edges,
-  isInitialized,
-  setNodes,
-}: {
-  edges: EdgeType[]
-  isInitialized: boolean
-  setNodes: Dispatch<SetStateAction<NodeType[]>>
-}) {
-  useEffect(() => {
-    if (!isInitialized) return
-
-    setNodes((currentNodes) => {
-      const loopBackNodeIds = detectLoopBackNodes(edges, currentNodes)
-      return applyLoopBackNodeTypes(currentNodes, loopBackNodeIds)
-    })
-  }, [edges, isInitialized, setNodes])
+export function projectLoopBackNodeTypes(nodes: NodeType[], edges: EdgeType[], isInitialized: boolean): NodeType[] {
+  if (!isInitialized) return nodes
+  const loopBackNodeIds = detectLoopBackNodes(edges, nodes)
+  return applyLoopBackNodeTypes(nodes, loopBackNodeIds)
 }

@@ -204,6 +204,38 @@ describe('RunWorkflowSection', () => {
   })
 
   describe('click behavior', () => {
+    it('routes a single-trigger run request through the event handler', async () => {
+      const user = userEvent.setup()
+      const onRequestWorkflowRun = vi.fn()
+      const dispatch = vi.fn()
+      render(<RunWorkflowSection {...defaultProps} dispatch={dispatch} onRequestWorkflowRun={onRequestWorkflowRun} />)
+
+      await user.click(screen.getByRole('button', { name: /^Run$/i }))
+
+      expect(onRequestWorkflowRun).toHaveBeenCalledOnce()
+      expect(dispatch).not.toHaveBeenCalled()
+    })
+
+    it('passes the selected trigger index to the event handler', async () => {
+      const user = userEvent.setup()
+      const onRequestWorkflowRun = vi.fn()
+      render(
+        <RunWorkflowSection
+          {...defaultProps}
+          triggers={[
+            { id: 'trigger-1', name: 'Manual' },
+            { id: 'trigger-2', name: 'Webhook' },
+          ]}
+          onRequestWorkflowRun={onRequestWorkflowRun}
+        />
+      )
+
+      await user.click(screen.getByRole('button', { name: /Run workflow/i }))
+      await user.click(screen.getByRole('menuitem', { name: 'Webhook' }))
+
+      expect(onRequestWorkflowRun).toHaveBeenCalledWith(1)
+    })
+
     it('dispatches SET_CONFIRM_DIALOG when enabled and clicked', async () => {
       const user = userEvent.setup()
       const dispatch = vi.fn()
