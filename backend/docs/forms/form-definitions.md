@@ -21,7 +21,7 @@ The supported field types are `text`, `textarea`, `masked_text`, `email`, `numbe
 [credential system](../credential.md) and reference credentials from supported workflow nodes.
 
 `FormPromptDefinition` and `FormTriggerDefinition` both inherit from `FormDefinition`. They share
-the common field models and specialize dropdown and multi-select fields to enforce their option
+the common field models and specialized dropdown and multi-select fields to enforce their option
 rules.
 
 #### Dropdown and Multi-Select Options
