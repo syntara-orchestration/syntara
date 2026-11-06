@@ -1004,7 +1004,10 @@ class OrchestrationService:
         stream_id: str,
         client: StreamClient,
     ) -> None:
-        """Handle streaming error with logging and event publishing.
+        """Classify a streaming error and publish it to the stream.
+
+        The exception itself is logged by the caller (the streaming ``except``
+        block) so that a single failure produces a single traceback log entry.
 
         Args:
             exception: The exception that occurred
@@ -1013,8 +1016,6 @@ class OrchestrationService:
             client: StreamClient for publishing events
 
         """
-        logger.exception("Streaming orchestration failed", invocation_id=invocation_id)
-
         # Publish error event with RFC 9457 classification
         error_data = classify_streaming_error(exception, invocation_id=invocation_id)
         await self._publish_stream_event(
