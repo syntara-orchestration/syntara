@@ -6,8 +6,9 @@ HTTP/API concerns in the FastAPI endpoints.
 
 from collections.abc import Iterable
 from datetime import UTC, datetime
+from itertools import chain
 from time import monotonic
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, Final, NamedTuple, NoReturn
 from uuid import UUID, uuid4
 
 import jsonschema
@@ -34,7 +35,6 @@ from syntara.core.services.user_reference_resolution import UserReferenceResolve
 from syntara.forms.services.form_prompt_signal import (
     NotFormPromptSignal,
     RejectedFormPromptSignal,
-    VerifiedFormPromptSignal,
     resolve_verified_form_prompt_signal,
 )
 from syntara.metrics.dependencies import get_metrics_recorder
@@ -85,6 +85,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
 )
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.workflow_engine.signals.processor import resolve_signal_failure_message
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import candidate_node_ids
 
 if TYPE_CHECKING:
     from syntara.metrics.recorder import MetricsRecorder
@@ -92,6 +93,47 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 MAX_CALLBACK_ERROR_MSG_LENGTH = 500
+_FAILURE_SIGNAL_STATUSES: Final[tuple[str, ...]] = ("failed", "cancelled")
+
+
+class CallbackNodeTypeResolution(NamedTuple):
+    """Workflow node-type lookup result, including activity-ID collisions."""
+
+    matches: tuple[tuple[str, NodeType], ...]
+
+    @property
+    def node_type(self) -> NodeType | None:
+        """Return the node type only when exactly one definition matches."""
+        return self.matches[0][1] if len(self.matches) == 1 else None
+
+    @property
+    def is_ambiguous(self) -> bool:
+        """Whether the activity ID matches multiple workflow node definitions."""
+        return len(self.matches) > 1
+
+    @property
+    def node_ids(self) -> tuple[str, ...]:
+        """Return the matching workflow node IDs, sorted by ID."""
+        return tuple(node_id for node_id, _ in self.matches)
+
+    @property
+    def node_types(self) -> tuple[NodeType, ...]:
+        """Return the node types corresponding to ``node_ids``."""
+        return tuple(node_type for _, node_type in self.matches)
+
+
+def _node_identity(node: object) -> tuple[str, str] | None:
+    """Return the ID and raw node type for a trigger dict or workflow node model."""
+    if isinstance(node, dict):
+        node_id = node.get("id")
+        raw_node_type = node.get("type")
+    else:
+        node_id = getattr(node, "id", None)
+        raw_node_type = getattr(node, "type", None)
+
+    if isinstance(node_id, str) and isinstance(raw_node_type, str):
+        return node_id, raw_node_type
+    return None
 
 
 class NormalizedTriggerInput(NamedTuple):
@@ -1081,49 +1123,66 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
     def _resolve_callback_node_type(
         workflow_definition: WorkflowDefinition | None,
         activity_id: str,
-    ) -> NodeType | None:
-        """Resolve a Temporal activity ID using the execution's immutable workflow definition."""
+    ) -> CallbackNodeTypeResolution:
+        """Resolve an activity ID, detecting collisions with generated loop IDs."""
         if workflow_definition is None:
-            return None
+            return CallbackNodeTypeResolution(())
 
-        node_types: dict[str, NodeType] = {}
-        for node in (*workflow_definition.triggers, *workflow_definition.nodes):
-            if isinstance(node, dict):
-                node_id = node.get("id")
-                raw_node_type = node.get("type")
-            else:
-                node_id = getattr(node, "id", None)
-                raw_node_type = getattr(node, "type", None)
-
-            if not isinstance(node_id, str) or not isinstance(raw_node_type, str):
+        candidate_ids = set(candidate_node_ids(activity_id))
+        matches: dict[str, NodeType] = {}
+        for node in chain(workflow_definition.triggers, workflow_definition.nodes):
+            identity = _node_identity(node)
+            if identity is None or identity[0] not in candidate_ids:
                 continue
+
+            node_id, raw_node_type = identity
             try:
-                node_types[node_id] = NodeType(raw_node_type)
+                matches[node_id] = NodeType(raw_node_type)
             except ValueError:
                 continue
 
-        candidate = activity_id
-        while candidate:
-            node_type = node_types.get(candidate)
-            if node_type is not None:
-                return node_type
+        return CallbackNodeTypeResolution(tuple(sorted(matches.items())))
 
-            base_id, separator, iteration = candidate.rpartition("_iter_")
-            if not separator or not iteration.isdecimal():
-                break
-            candidate = base_id
-
-        return None
+    def _reject_form_prompt_callback(
+        self,
+        event: str,
+        *,
+        execution_id: UUID,
+        activity_id: str,
+        reason: str | None = None,
+        **extra: object,
+    ) -> NoReturn:
+        """Log and reject a Form Prompt callback while preserving the caller-specific context."""
+        log_context: dict[str, Any] = {
+            "execution_id": execution_id,
+            "activity_id": activity_id,
+            "acting_user_id": self.user.id,
+        }
+        if reason is not None:
+            log_context["reason"] = reason
+        log_context.update(extra)
+        logger.warning(event, **log_context)
+        raise FormPromptSubmissionRequiredError
 
     async def _resolve_form_prompt_callback_payload(
         self,
         execution_id: UUID,
         activity_id: str,
         workflow_definition: WorkflowDefinition | None,
-        status: object,
+        status: str | None,
     ) -> dict[str, Any] | None:
         """Return persisted Form Prompt output, or None for a generic activity callback."""
-        callback_node_type = self._resolve_callback_node_type(workflow_definition, activity_id)
+        node_type_resolution = self._resolve_callback_node_type(workflow_definition, activity_id)
+        if node_type_resolution.is_ambiguous and NodeType.FORM_PROMPT in node_type_resolution.node_types:
+            self._reject_form_prompt_callback(
+                "Rejected Form Prompt signal with ambiguous workflow node ID",
+                execution_id=execution_id,
+                activity_id=activity_id,
+                matching_node_ids=node_type_resolution.node_ids,
+                matching_node_types=[node_type.value for node_type in node_type_resolution.node_types],
+            )
+
+        callback_node_type = node_type_resolution.node_type
         if callback_node_type is not None and callback_node_type != NodeType.FORM_PROMPT:
             return None
 
@@ -1135,26 +1194,21 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         )
         if isinstance(resolution, NotFormPromptSignal):
             return None
-
-        rejection_reason: str | None = None
         if isinstance(resolution, RejectedFormPromptSignal):
-            rejection_reason = resolution.reason
-        elif status in ("failed", "cancelled"):
-            rejection_reason = "Form Prompt callbacks cannot fail or cancel the activity"
-
-        if rejection_reason is not None:
-            logger.warning(
+            self._reject_form_prompt_callback(
                 "Rejected Form Prompt activity signal",
                 execution_id=execution_id,
                 activity_id=activity_id,
-                acting_user_id=self.user.id,
-                reason=rejection_reason,
+                reason=resolution.reason,
             )
-            raise FormPromptSubmissionRequiredError
-
-        if isinstance(resolution, VerifiedFormPromptSignal):
-            return resolution.payload
-        return None
+        if status in _FAILURE_SIGNAL_STATUSES:
+            self._reject_form_prompt_callback(
+                "Rejected Form Prompt activity signal",
+                execution_id=execution_id,
+                activity_id=activity_id,
+                reason="Form Prompt callbacks cannot fail or cancel the activity",
+            )
+        return resolution.payload
 
     async def handle_activity_callback(
         self,
