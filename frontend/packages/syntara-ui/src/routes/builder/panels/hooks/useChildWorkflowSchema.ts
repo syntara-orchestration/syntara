@@ -1,10 +1,9 @@
 import type { OutputFieldDef, WorkflowAPI } from '@syntara/contracts'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo } from 'react'
 
 import { detachPromise } from '../../../../utils/detachPromise'
 import {
-  ChildWorkflowSchemaFetchError,
   childWorkflowDetailQueryKey,
   childWorkflowVersionQueryKey,
   fetchChildWorkflowDetail,
@@ -188,7 +187,6 @@ function usePublishedWorkflowMetadataQueries(
     data: publishedVersionRead,
     error: publishedVersionError,
     isFetching: isFetchingPublishedVersion,
-    refetch: refetchPublishedVersion,
   } = useQuery({
     queryKey: childWorkflowVersionQueryKey(workflowId ?? '', publishedVersionId ?? '', publishedVersion ?? 0),
     queryFn: () => fetchChildWorkflowVersion(workflowId ?? '', publishedVersion ?? 0),
@@ -199,7 +197,6 @@ function usePublishedWorkflowMetadataQueries(
     data: workflowDetail,
     error: workflowDetailError,
     isFetching: isFetchingWorkflowDetail,
-    refetch: refetchWorkflowDetail,
   } = useQuery({
     queryKey: childWorkflowDetailQueryKey(workflowId ?? '', publishedVersionId ?? ''),
     queryFn: () => fetchChildWorkflowDetail(workflowId ?? ''),
@@ -214,11 +211,9 @@ function usePublishedWorkflowMetadataQueries(
     publishedVersionRead,
     publishedVersionError,
     isFetchingPublishedVersion,
-    refetchPublishedVersion,
     workflowDetail,
     workflowDetailError,
     isFetchingWorkflowDetail,
-    refetchWorkflowDetail,
   }
 }
 
@@ -229,6 +224,19 @@ function getPublishedStepMetadata(
   return workflowDetail?.published_step_metadata?.version_id === publishedVersionId
     ? workflowDetail.published_step_metadata.steps
     : null
+}
+
+function hasPublishedVersionMismatch(
+  workflowDetail: WorkflowAPI.components['schemas']['WorkflowDetailRead'] | undefined,
+  publishedVersionId: string | null,
+  shouldLoadDefinition: boolean
+): boolean {
+  return Boolean(
+    workflowDetail &&
+    shouldLoadDefinition &&
+    publishedVersionId &&
+    workflowDetail.published_step_metadata?.version_id !== publishedVersionId
+  )
 }
 
 function isSchemaLoading({
@@ -259,6 +267,7 @@ export function useChildWorkflowSchema({
   workflowId,
   triggerNodeId,
 }: Readonly<{ workflowId: string | null; triggerNodeId: string | null }>) {
+  const queryClient = useQueryClient()
   const {
     data: invocationSchema,
     error: invocationSchemaError,
@@ -280,11 +289,9 @@ export function useChildWorkflowSchema({
     publishedVersionRead,
     publishedVersionError,
     isFetchingPublishedVersion,
-    refetchPublishedVersion,
     workflowDetail,
     workflowDetailError,
     isFetchingWorkflowDetail,
-    refetchWorkflowDetail,
   } = publishedWorkflowMetadata
 
   const needsTriggerSelection = requiresTriggerSelection(eligibleTriggers, selectedTriggerNodeId)
@@ -299,12 +306,35 @@ export function useChildWorkflowSchema({
   const error = invocationSchemaError ?? workflowDetailError ?? publishedVersionError
   const isTriggerUnavailable = isSelectedTriggerUnavailable(triggerNodeId, selectedTriggerNodeId, childGraph)
   const retry = useCallback(() => {
-    detachPromise(refetchInvocationSchema())
-    if (invocationSchema) {
-      detachPromise(refetchPublishedVersion())
-      detachPromise(refetchWorkflowDetail())
-    }
-  }, [invocationSchema, refetchInvocationSchema, refetchPublishedVersion, refetchWorkflowDetail])
+    detachPromise(
+      (async () => {
+        const latestInvocation = await refetchInvocationSchema()
+        const latestSchema = latestInvocation.data
+        if (latestInvocation.error || !latestSchema || !workflowId) return
+
+        const latestTriggerNodeId = getSelectedTriggerNodeId(latestSchema.triggers, triggerNodeId)
+        if (!shouldLoadPublishedDefinition(workflowId, latestSchema, latestTriggerNodeId)) return
+
+        const latestVersionId = latestSchema.published_version_id
+        const latestVersion = latestSchema.published_version
+        if (!latestVersionId || latestVersion == null) return
+
+        await Promise.all([
+          queryClient.fetchQuery({
+            queryKey: childWorkflowVersionQueryKey(workflowId, latestVersionId, latestVersion),
+            queryFn: () => fetchChildWorkflowVersion(workflowId, latestVersion),
+            staleTime: 5 * 60 * 1000,
+          }),
+          queryClient.fetchQuery({
+            queryKey: childWorkflowDetailQueryKey(workflowId, latestVersionId),
+            queryFn: () => fetchChildWorkflowDetail(workflowId),
+            staleTime: 0,
+          }),
+        ])
+      })()
+    )
+  }, [queryClient, refetchInvocationSchema, triggerNodeId, workflowId])
+  const isVersionMismatch = hasPublishedVersionMismatch(workflowDetail, publishedVersionId, shouldLoadDefinition)
 
   return {
     invocationSchema: invocationSchema ?? null,
@@ -313,6 +343,7 @@ export function useChildWorkflowSchema({
     selectedTriggerNodeId,
     needsTriggerSelection,
     isTriggerUnavailable,
+    isVersionMismatch,
     childSteps,
     isLoading: isSchemaLoading({
       workflowId,
@@ -328,5 +359,3 @@ export function useChildWorkflowSchema({
     retry,
   }
 }
-
-export { ChildWorkflowSchemaFetchError }

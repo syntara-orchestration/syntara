@@ -1,6 +1,6 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -67,6 +67,18 @@ const publishedVersion = {
   updated_at: '2026-01-01T00:00:00Z',
 } satisfies WorkflowAPI.components['schemas']['WorkflowVersionRead']
 
+const latestInvocationSchema = {
+  ...invocationSchema,
+  published_version_id: 'published-v5',
+  published_version: 5,
+} satisfies WorkflowAPI.components['schemas']['WorkflowInvocationSchemaRead']
+
+const latestPublishedVersion = {
+  ...publishedVersion,
+  id: 'published-v5',
+  version: 5,
+} satisfies WorkflowAPI.components['schemas']['WorkflowVersionRead']
+
 const workflowDetail = {
   id: 'child-workflow',
   name: 'Child workflow',
@@ -98,6 +110,19 @@ const workflowDetail = {
             }
           : { type: 'object', properties: { stdout: { type: 'string' } } },
     })),
+  },
+} satisfies WorkflowAPI.components['schemas']['WorkflowDetailRead']
+
+const latestWorkflowDetail = {
+  ...workflowDetail,
+  current_version: 5,
+  published_version_id: 'published-v5',
+  published_version_number: 5,
+  version: latestPublishedVersion,
+  published_step_metadata: {
+    ...workflowDetail.published_step_metadata,
+    version_id: 'published-v5',
+    version: 5,
   },
 } satisfies WorkflowAPI.components['schemas']['WorkflowDetailRead']
 
@@ -155,6 +180,46 @@ describe('useChildWorkflowSchema', () => {
 
     expect(result.current.needsTriggerSelection).toBe(true)
     expect(result.current.childSteps).toEqual([])
+  })
+
+  it('refreshes the invocation schema and loads matching metadata after a republish race', async () => {
+    let invocationSchemaCalls = 0
+    mocks.get.mockImplementation((path: string, options?: { params?: { path?: { version?: number } } }) => {
+      if (path.includes('invocation_schema')) {
+        invocationSchemaCalls += 1
+        return Promise.resolve({
+          data: invocationSchemaCalls === 1 ? invocationSchema : latestInvocationSchema,
+          response: new Response(),
+        })
+      }
+      if (path.includes('/versions/')) {
+        return Promise.resolve({
+          data: options?.params?.path?.version === 5 ? latestPublishedVersion : publishedVersion,
+          response: new Response(),
+        })
+      }
+      return Promise.resolve({ data: latestWorkflowDetail, response: new Response() })
+    })
+
+    const { result } = renderHook(
+      () => useChildWorkflowSchema({ workflowId: 'child-workflow', triggerNodeId: 'deploy' }),
+      { wrapper: createWrapper() }
+    )
+
+    await waitFor(() => expect(result.current.isVersionMismatch).toBe(true))
+    expect(result.current.childSteps[0]?.outputFields).toBeNull()
+
+    act(() => result.current.retry())
+
+    await waitFor(() => {
+      expect(result.current.isVersionMismatch).toBe(false)
+      expect(result.current.publishedVersionId).toBe('published-v5')
+      expect(result.current.childSteps[0]?.outputFields?.map((field) => field.name)).toEqual(['status', 'image_tag'])
+    })
+    expect(invocationSchemaCalls).toBe(2)
+    expect(mocks.get).toHaveBeenCalledWith('/workflows/{workflow_id}/versions/{version}', {
+      params: { path: { workflow_id: 'child-workflow', version: 5 } },
+    })
   })
 
   it('does not expose child details when invocation-schema access is denied', async () => {

@@ -93,6 +93,17 @@ function ChildWorkflowOutputStatus({
     )
   }
 
+  if (schema.isVersionMismatch) {
+    return (
+      <Alert variant="warning" isInline isPlain title="Child workflow changed while loading outputs">
+        Refresh to load fields from the latest published version.{' '}
+        <Button variant="link" isInline onClick={schema.retry}>
+          Refresh outputs
+        </Button>
+      </Alert>
+    )
+  }
+
   if (!schema.isEligible) {
     return (
       <Alert variant="warning" isInline isPlain title="Child workflow is not eligible">
