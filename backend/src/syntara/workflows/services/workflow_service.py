@@ -110,6 +110,41 @@ def _output_schema_for_step(node_type: str) -> dict[str, Any] | None:
     return output_schema
 
 
+def _effective_output_schema_for_node(node: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the node output schema after applying its configured output mapping.
+
+    Output mappings replace executor output fields with their configured keys.
+    Their expressions can combine or transform values, so the mapped fields have
+    unknown types until execution. The workflow engine's status field is added
+    independently of executor output mapping and remains available.
+    """
+    node_type = node.get("type")
+    if not isinstance(node_type, str):
+        return None
+
+    output_schema = _output_schema_for_step(node_type)
+    output_mapping = node.get("outputs")
+    if output_schema is None or output_mapping is None or not isinstance(output_mapping, dict):
+        return output_schema
+
+    properties = output_schema.get("properties")
+    if not isinstance(properties, dict):
+        return output_schema
+
+    effective_properties: dict[str, Any] = {
+        name: {
+            "description": "Output produced by a configured mapping; its type is not statically known.",
+            "x-syntara-output-mapped": True,
+        }
+        for name in output_mapping
+        if isinstance(name, str)
+    }
+    if "status" in properties:
+        effective_properties["status"] = properties["status"]
+
+    return {**output_schema, "properties": effective_properties}
+
+
 def _step_metadata_for_nodes(nodes: object) -> list[WorkflowStepMetadataRead]:
     if not isinstance(nodes, list):
         return []
@@ -125,7 +160,7 @@ def _step_metadata_for_nodes(nodes: object) -> list[WorkflowStepMetadataRead]:
                 WorkflowStepMetadataRead(
                     id=node_id,
                     type=node_type,
-                    output_schema=_output_schema_for_step(node_type),
+                    output_schema=_effective_output_schema_for_node(node),
                 )
             )
     return steps

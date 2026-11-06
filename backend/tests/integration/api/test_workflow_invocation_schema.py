@@ -180,7 +180,15 @@ async def test_workflow_detail_returns_output_schemas_for_the_exact_published_ve
 
     published_version.workflow_definition = {
         **published_version.workflow_definition,
-        "nodes": [{"id": "published_script", "type": "script", "parameters": {}}],
+        "nodes": [
+            {
+                "id": "published_script",
+                "type": "script",
+                "parameters": {},
+                "outputs": {"image_tag": "${result.stdout_json.tag}"},
+            },
+            {"id": "plain_script", "type": "script", "parameters": {}},
+        ],
     }
     draft_version.workflow_definition = {
         **draft_version.workflow_definition,
@@ -196,10 +204,13 @@ async def test_workflow_detail_returns_output_schemas_for_the_exact_published_ve
     assert metadata["version_id"] == str(workflow.published_version_id)
     assert metadata["version"] == 1
     assert body["version"]["workflow_definition"]["nodes"][0]["id"] == "draft_script"
-    assert [step["id"] for step in metadata["steps"]] == ["published_script"]
+    assert [step["id"] for step in metadata["steps"]] == ["published_script", "plain_script"]
     script_schema = metadata["steps"][0]["output_schema"]
-    assert "stdout" in script_schema["properties"]
+    assert set(script_schema["properties"]) == {"image_tag", "status"}
+    assert script_schema["properties"]["image_tag"]["x-syntara-output-mapped"] is True
     assert script_schema["properties"]["status"]["type"] == "string"
+    plain_script_schema = metadata["steps"][1]["output_schema"]
+    assert "stdout" in plain_script_schema["properties"]
 
 
 @pytest.mark.asyncio

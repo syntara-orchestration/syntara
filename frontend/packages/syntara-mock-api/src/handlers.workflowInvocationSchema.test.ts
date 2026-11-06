@@ -61,6 +61,7 @@ describe('workflow invocation schema mock', () => {
               id: 'child_script',
               type: 'script',
               parameters: { language: 'python', code: "print('child')" },
+              outputs: { image_tag: '${result.stdout_json.tag}' },
             },
           ],
           edges: [{ from: 'manual_entry', to: 'child_script' }],
@@ -93,7 +94,22 @@ describe('workflow invocation schema mock', () => {
     expect(detailResult.published_step_metadata).toEqual({
       version_id: expect.any(String),
       version: 1,
-      steps: [{ id: 'child_script', type: 'script', output_schema: { type: 'object' } }],
+      steps: [
+        {
+          id: 'child_script',
+          type: 'script',
+          output_schema: {
+            type: 'object',
+            properties: {
+              image_tag: {
+                description: 'Output produced by a configured mapping; its type is not statically known.',
+                'x-syntara-output-mapped': true,
+              },
+              status: { type: 'string' },
+            },
+          },
+        },
+      ],
     })
 
     const response = await fetch(invocationSchemaUrl)

@@ -1,4 +1,4 @@
-import { getNodeOutputSchema, type OutputFieldDef, type WorkflowAPI } from '@syntara/contracts'
+import type { OutputFieldDef, WorkflowAPI } from '@syntara/contracts'
 import { useQuery } from '@tanstack/react-query'
 import { useCallback, useMemo } from 'react'
 
@@ -14,6 +14,7 @@ import {
   isChildWorkflowAccessDenied,
   isChildWorkflowNotFound,
 } from '../../childWorkflowSchemaApi'
+import { getChildStepOutputFields } from '../utils/subWorkflowOutputSchema'
 
 type ChildWorkflowStepNode = { id: string; name?: string | null; type: string }
 type ChildWorkflowGraph = {
@@ -162,7 +163,7 @@ function buildChildStepSchemas(
         name: step.name?.trim() || step.id,
         type: step.type,
         outputSchema,
-        outputFields: outputSchema ? getNodeOutputSchema(step.type) : null,
+        outputFields: getChildStepOutputFields(step.type, outputSchema),
       }
     })
 }

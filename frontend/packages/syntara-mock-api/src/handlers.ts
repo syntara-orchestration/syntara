@@ -177,11 +177,32 @@ function getPublishedStepMetadata(workflowId: string, workflow: WorkflowWithVers
   const steps = Array.isArray(nodes)
     ? nodes.flatMap((node) => {
         if (!isRecord(node) || typeof node['id'] !== 'string' || typeof node['type'] !== 'string') return []
+        const knownOutputFields = getNodeOutputSchema(node['type'])
+        const outputMapping = node['outputs']
+        const outputSchema = !knownOutputFields
+          ? null
+          : isRecord(outputMapping)
+            ? {
+                type: 'object',
+                properties: {
+                  ...Object.fromEntries(
+                    Object.keys(outputMapping).map((name) => [
+                      name,
+                      {
+                        description: 'Output produced by a configured mapping; its type is not statically known.',
+                        'x-syntara-output-mapped': true,
+                      },
+                    ])
+                  ),
+                  ...(knownOutputFields.some((field) => field.name === 'status') ? { status: { type: 'string' } } : {}),
+                },
+              }
+            : { type: 'object' }
         return [
           {
             id: node['id'],
             type: node['type'],
-            output_schema: getNodeOutputSchema(node['type']) ? { type: 'object' } : null,
+            output_schema: outputSchema,
           },
         ]
       })
