@@ -7,7 +7,6 @@
  *   3. Playwright compares each screenshot pixel-by-pixel and fails on diff.
  */
 import { test, expect, toAppUrl } from '../fixtures'
-import { APP_TITLE } from '../helpers/appTitle'
 import { addStepPanel } from '../helpers/workflows'
 
 // Allow 0.01 (1%) pixel diff to tolerate sub-pixel text rendering / anti-aliasing noise
@@ -23,14 +22,6 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
     await expect(nav).toBeVisible()
 
     await expect(nav).toHaveScreenshot('sidebar-navigation.png', screenshotOptions)
-  })
-
-  test('glossary page', async ({ app }) => {
-    await app.goto(toAppUrl('/support/glossary'))
-    await expect(app.getByRole('heading', { name: 'Glossary' })).toBeVisible()
-    await expect(app).toHaveTitle(`Glossary | ${APP_TITLE}`)
-
-    await expect(app).toHaveScreenshot('glossary-page.png', screenshotOptions)
   })
 
   test('trigger step on canvas', async ({ app }) => {

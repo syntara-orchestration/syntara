@@ -1028,7 +1028,7 @@ describe('Workflows Component', () => {
         expect(screen.getByText('Delete workflow?')).toBeInTheDocument()
         expect(
           screen.getByText(
-            /will be deleted and any in-progress runs will stop immediately. This action cannot be undone/
+            /will be deleted and any in-progress runs will stop immediately\. Its run history will also be permanently deleted\. This action cannot be undone/
           )
         ).toBeInTheDocument()
       })

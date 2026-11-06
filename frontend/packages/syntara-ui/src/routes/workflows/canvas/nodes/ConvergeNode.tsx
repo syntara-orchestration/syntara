@@ -26,7 +26,7 @@ export type ConvergeNode = { type: 'converge' } & Node<ConvergeActivity>
 export function ConvergeStepComponent(props: NodeProps<ConvergeNode>) {
   const metadata = stepMetadata.converge
   const iconColor = getStepTypeColor(ActivityTypeEnum.CONVERGE)
-  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_CONVERGE, 'canvas', iconColor)
+  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_CONVERGE, 'header', iconColor)
   const semanticZoomIcon = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_CONVERGE, 'semanticZoom', iconColor)
   const menuActions = useStepMenuActions({
     nodeId: props.data.id,
@@ -57,6 +57,7 @@ export function ConvergeStepComponent(props: NodeProps<ConvergeNode>) {
         typeLabel: metadata.label,
       }}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
     >
       <StandardStepHeader
