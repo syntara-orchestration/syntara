@@ -16,6 +16,9 @@ jobs:
     permissions:
       contents: read
       actions: read
+      # pulls.list and the issue timeline API need these to detect dequeues
+      pull-requests: read
+      issues: read
     env:
       SLACK_CI_MONITORING_WEBHOOK_URL: ${{ secrets.SLACK_CI_MONITORING_WEBHOOK_URL }}
 

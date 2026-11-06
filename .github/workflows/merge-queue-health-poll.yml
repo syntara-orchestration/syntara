@@ -12,6 +12,8 @@ jobs:
     permissions:
       contents: read
       actions: read
+      # pulls.list needs this to detect recent merge activity
+      pull-requests: read
     env:
       SLACK_CI_MONITORING_WEBHOOK_URL: ${{ secrets.SLACK_CI_MONITORING_WEBHOOK_URL }}
 
