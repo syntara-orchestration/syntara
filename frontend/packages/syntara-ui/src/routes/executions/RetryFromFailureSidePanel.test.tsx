@@ -78,14 +78,14 @@ describe('RetryFromFailureSidePanel', () => {
     expect(
       screen.getByText(/This retry uses the same workflow version as this run, preserving the definition that ran/)
     ).toBeInTheDocument()
-    expect(screen.getByText(/Nodes outside the selected retry scope will not re-execute/)).toBeInTheDocument()
+    expect(screen.getByText(/Steps outside the selected retry scope will not re-execute/)).toBeInTheDocument()
     expect(
-      screen.getByText(/Completed nodes retain their previous result, failed nodes remain failed/)
+      screen.getByText(/Completed steps retain their previous result, failed steps remain failed/)
     ).toBeInTheDocument()
-    expect(screen.getByText(/nodes that did not run remain skipped/)).toBeInTheDocument()
+    expect(screen.getByText(/steps that did not run remain skipped/)).toBeInTheDocument()
     expect(screen.getByText(/may repeat external side effects/)).toBeInTheDocument()
     expect(
-      screen.getByText(/To change the parameters for this retry, select the failed node in Run details/)
+      screen.getByText(/To change the parameters for this retry, select the failed step in Run details/)
     ).toBeInTheDocument()
   })
 
@@ -406,10 +406,8 @@ describe('RetryFromFailureSidePanel', () => {
     })
 
     await user.click(screen.getByRole('radio', { name: 'Choose branches' }))
-    expect(
-      screen.getByRole('heading', { name: 'Select the branches where the retry should begin' })
-    ).toBeInTheDocument()
-    expect(screen.getByText('Failed node: Process inventory')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Select the branches where the retry should begin' })).toBeInTheDocument()
+    expect(screen.getByText('Failed step: Process inventory')).toBeInTheDocument()
     expect(screen.getByText('Output sanitized — retry starts upstream')).toBeInTheDocument()
     await user.click(screen.getByRole('checkbox', { name: 'Call external API' }))
 
