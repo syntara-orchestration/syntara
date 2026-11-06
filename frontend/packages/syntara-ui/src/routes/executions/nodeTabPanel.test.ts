@@ -13,11 +13,11 @@ describe('nodeTabPanelAttrs', () => {
     expect(nodeTabPanelAttrs(false, 'node-7', 'io')).toEqual({})
   })
 
-  it('returns tabpanel ARIA attributes wired to the active tab when the node has tabs', () => {
+  it('returns tabpanel ARIA attributes labelled by the active tab when the node has tabs', () => {
     expect(nodeTabPanelAttrs(true, 'node-7', 'agent-steps')).toEqual({
       id: 'node-7-panel',
       role: 'tabpanel',
-      'aria-labelledby': 'pf-tab-agent-steps-node-7-agent-steps',
+      'aria-label': 'agent-steps',
     })
   })
 

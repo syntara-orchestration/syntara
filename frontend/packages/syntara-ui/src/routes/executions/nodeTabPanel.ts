@@ -11,18 +11,22 @@ export function nodeTabPanelId(idBase: string): string {
 
 /**
  * ARIA props for the shared node-detail content region. When the node has tabs,
- * the region is the tabs' panel (role=tabpanel) labelled by the active tab's
- * button (PatternFly composes a tab button id as `pf-tab-{eventKey}-{id}`).
+ * the region is the tabs' panel (role=tabpanel). It names itself with `aria-label`
+ * (the active tab's key) rather than `aria-labelledby`: PatternFly generates tab
+ * button ids with an internal, unpredictable counter (`pf-tab-{eventKey}-{uid}`),
+ * so an `aria-labelledby` reference to a tab button cannot be formed reliably from
+ * outside PF. Mirrors the SynUrlTabs standalone-tabpanel pattern. The tab points
+ * back at this region via aria-controls (nodeTabPanelId).
  */
 export function nodeTabPanelAttrs(
   hasTabs: boolean,
   idBase: string,
   activeTab: string
-): { id: string; role: 'tabpanel'; 'aria-labelledby': string } | Record<string, never> {
+): { id: string; role: 'tabpanel'; 'aria-label': string } | Record<string, never> {
   if (!hasTabs) return {}
   return {
     id: nodeTabPanelId(idBase),
     role: 'tabpanel',
-    'aria-labelledby': `pf-tab-${activeTab}-${idBase}-${activeTab}`,
+    'aria-label': activeTab,
   }
 }

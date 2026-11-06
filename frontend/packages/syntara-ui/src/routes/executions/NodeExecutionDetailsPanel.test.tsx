@@ -686,13 +686,12 @@ describe('NodeExecutionDetailsPanel', () => {
       // and the selected tab points back at that panel via aria-controls.
       const panel = screen.getByRole('tabpanel')
       const ioTab = screen.getByRole('tab', { name: /Input\/Output/i })
-      expect(panel).toHaveAttribute('aria-labelledby', ioTab.id)
+      expect(panel).toHaveAttribute('aria-label', 'io')
       expect(ioTab).toHaveAttribute('aria-controls', panel.id)
 
-      // The relationship follows the selection when the active tab changes.
+      // The label follows the selection when the active tab changes.
       await user.click(screen.getByRole('tab', { name: /Agent steps/i }))
-      const agentTab = screen.getByRole('tab', { name: /Agent steps/i })
-      expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', agentTab.id)
+      expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-label', 'agent-steps')
     })
 
     it('renders tools used summary from agentic output_data', () => {
