@@ -30,9 +30,10 @@ from execution_plane_client.models.work_item import (
     WORK_ITEM_SORTABLE_FIELDS,
     WorkItemListParams,
     WorkItemRead,
+    WorkItemStatus,
 )
 from fastapi import Depends, HTTPException, Query, Request, Response, status
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from syntara.authz.dependencies import PermissionChecker, ProjectScopeFilter
 from syntara.authz.engine import AllowedProjectsResult  # noqa: TC001 — FastAPI resolves dependency annotations
@@ -58,6 +59,13 @@ logger = structlog.stdlib.get_logger(__name__)
 router = SyntaraRouter(prefix="/api/execution_plane/v1", tags=["Execution Plane"])
 _target_scope = ProjectScopeFilter("execution_target", "read")
 _work_item_scope = ProjectScopeFilter("work_item", "read")
+_ACTIVE_WORK_ITEM_STATUSES: tuple[WorkItemStatus, ...] = (
+    WorkItemStatus.CLAIMED,
+    WorkItemStatus.DISPATCHED,
+    WorkItemStatus.RUNNING,
+    WorkItemStatus.CANCEL_REQUESTED,
+    WorkItemStatus.RECONCILIATION_REQUIRED,
+)
 _TARGET_RESPONSES: dict[int | str, dict[str, Any]] = {
     404: {"description": "Execution target or installed cluster not found"},
     409: {"description": "Cluster not ready or protected target lifecycle conflict"},
@@ -67,6 +75,13 @@ _TARGET_RESPONSES: dict[int | str, dict[str, Any]] = {
 
 
 _BRACKET_PATTERN = re.compile(r"^([a-z][a-z0-9_]*)\[([a-z]+)\]$")
+
+
+class ExecutionTargetUsageRead(BaseModel):
+    """Current workloads that make an execution target unsafe to delete."""
+
+    target_id: UUID
+    active_workload_count: int = Field(ge=0)
 
 
 def _validate_query_params(
@@ -192,6 +207,34 @@ async def get_execution_target_health(target_id: UUID) -> ExecutionTargetHealthR
     """Dispatch a target health command and return EP's shallow typed result."""
     async with _target_client() as client:
         return await get_target_health(client, target_id)
+
+
+@router.get(
+    "/execution_targets/{target_id}/usage",
+    operation_id="get_execution_target_usage",
+    summary="Get execution target usage",
+    responses={**_TARGET_RESPONSES, 200: {"description": "Execution target workload usage"}},
+    dependencies=[Depends(PermissionChecker("execution_target", "read", resource_id_param="target_id"))],
+)
+async def get_execution_target_usage(target_id: UUID) -> ExecutionTargetUsageRead:
+    """Count assigned workloads that EP considers blocking for target deletion."""
+    async with _target_client() as client:
+        target = ExecutionTargetRead.model_validate(await client.get_execution_target(target_id=target_id))
+        if target.id != target_id:
+            raise ExecutionPlaneRejectedError
+        page = ResourcesResponse[WorkItemRead].model_validate(
+            await client.list_work_items(
+                limit=1,
+                include_total=True,
+                filters={
+                    "execution_target_id": str(target_id),
+                    "status[in]": ",".join(status.value for status in _ACTIVE_WORK_ITEM_STATUSES),
+                },
+            )
+        )
+        if page.total is None:
+            raise ExecutionPlaneRejectedError
+        return ExecutionTargetUsageRead(target_id=target_id, active_workload_count=page.total)
 
 
 @router.patch(

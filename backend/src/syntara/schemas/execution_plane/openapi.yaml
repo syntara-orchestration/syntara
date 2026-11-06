@@ -390,6 +390,47 @@ paths:
       x-app-permission:
         resource: execution_target
         action: read
+  /api/execution_plane/v1/execution_targets/{target_id}/usage:
+    get:
+      tags:
+        - Execution Plane
+      summary: Get execution target usage
+      description: Count assigned workloads that EP considers blocking for target deletion.
+      operationId: get_execution_target_usage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: target_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Target Id
+      responses:
+        '200':
+          description: Execution target workload usage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetUsageRead'
+        '404':
+          description: Execution target or installed cluster not found
+        '409':
+          description: Cluster not ready or protected target lifecycle conflict
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: read
   /api/execution_plane/v1/work_items:
     get:
       tags:
@@ -818,6 +859,22 @@ components:
       minProperties: 1
       title: ExecutionTargetUpdate
       description: Patch mutable target fields; placement requires a namespace.
+    ExecutionTargetUsageRead:
+      properties:
+        target_id:
+          type: string
+          format: uuid
+          title: Target Id
+        active_workload_count:
+          type: integer
+          minimum: 0.0
+          title: Active Workload Count
+      type: object
+      required:
+        - target_id
+        - active_workload_count
+      title: ExecutionTargetUsageRead
+      description: Current workloads that make an execution target unsafe to delete.
     HTTPValidationError:
       properties:
         detail:

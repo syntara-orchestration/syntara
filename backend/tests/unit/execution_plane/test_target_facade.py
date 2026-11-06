@@ -62,6 +62,16 @@ def harness(monkeypatch):
 
     def handle(request) -> httpx.Response:
         requests.append(request)
+        if request.url.path == "/v1/work-items":
+            return httpx.Response(
+                200,
+                json={
+                    "resources": [],
+                    "next": None,
+                    "prev": None,
+                    "total": state.get("work_item_total", 0),
+                },
+            )
         if request.url.path == "/v1/clusters":
             return httpx.Response(
                 200,
@@ -304,6 +314,28 @@ async def test_target_health_dispatches_typed_command_and_returns_result(harness
     assert command["command_type"] == "execution_target.health"
     assert command["command_revision"] == 1
     assert command["payload"] == {"resource_id": str(TARGET_ID)}
+
+
+@pytest.mark.asyncio
+async def test_target_usage_counts_active_workloads(harness):
+    app, requests, state = harness
+    state["work_item_total"] = 3
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="https://ao.example") as client:
+        response = await client.get(f"{PREFIX}/{TARGET_ID}/usage")
+
+    assert response.status_code == 200
+    assert response.json() == {"target_id": str(TARGET_ID), "active_workload_count": 3}
+    assert len(requests) == 2
+    assert requests[0].method == "GET"
+    assert requests[0].url.path == f"/v1/execution-targets/{TARGET_ID}"
+    assert requests[1].method == "GET"
+    assert requests[1].url.path == "/v1/work-items"
+    assert dict(requests[1].url.params) == {
+        "limit": "1",
+        "include_total": "true",
+        "execution_target_id": str(TARGET_ID),
+        "status[in]": "claimed,dispatched,running,cancel_requested,reconciliation_required",
+    }
 
 
 @pytest.mark.asyncio
