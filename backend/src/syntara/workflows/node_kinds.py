@@ -1,9 +1,7 @@
 """Step-type identifiers and labels for authoring policies.
 
-Grantable ``kind`` values on the ``step_type:write`` resource are the
-authoring/palette ``NodeType`` values. System-only types such as
-``internal_activity`` are excluded so they cannot be granted via policy.
-Registration does not enforce permissions on workflow writes.
+Policies may target any non-empty ``kind`` string, including types not yet
+registered. Registration does not enforce permissions on workflow writes.
 """
 
 from typing import Any
@@ -13,7 +11,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import NodeTyp
 NODE_RESOURCE_TYPE = "step_type"
 NODE_KIND_LABEL = "kind"
 NODE_ACTION_WRITE = "write"
-# System-only node types are not grantable via authoring policies.
+# Keep system-only types out of the current authoring catalog and display labels.
 _NON_GRANTABLE_NODE_KINDS: frozenset[str] = frozenset({NodeType.INTERNAL_ACTIVITY.value})
 NODE_KINDS: frozenset[str] = frozenset(
     node_type.value for node_type in NodeType if node_type.value not in _NON_GRANTABLE_NODE_KINDS
@@ -59,8 +57,8 @@ def _validate_kind_labels(labels: object, condition: str) -> str | None:
     if NODE_KIND_LABEL not in labels:
         return None
     kind = labels[NODE_KIND_LABEL]
-    if not isinstance(kind, str) or kind not in NODE_KINDS:
-        return f"Unknown step type '{kind}'. Registered step types: {', '.join(sorted(NODE_KINDS))}"
+    if not isinstance(kind, str) or not kind.strip():
+        return "Step type kind must be a non-empty string"
     return None
 
 
