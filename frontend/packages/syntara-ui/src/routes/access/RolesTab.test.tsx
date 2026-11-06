@@ -193,6 +193,44 @@ describe('RolesTab', () => {
   })
 
   describe('Rendering', () => {
+    it('shows the custom step-author role with edit and delete actions', async () => {
+      const user = userEvent.setup()
+      vi.mocked(accessClient.useQuery).mockReturnValue({
+        data: {
+          resources: [
+            {
+              ...mockRoles[0],
+              name: 'step-author',
+              is_builtin: false,
+              description: 'Author all workflow step types',
+              policies: ['step_type:write:any'],
+              scope: 'system',
+              is_system_scoped: true,
+            },
+          ],
+          next: null,
+          total: 1,
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+        isFetching: false,
+        refetch: mockRefetch,
+      })
+
+      render(<RolesTab />, { wrapper: createWrapper() })
+
+      const row = screen.getByRole('row', { name: /step-author/ })
+      expect(within(row).getByText('Custom')).toBeInTheDocument()
+      expect(within(row).queryByText('Built-in')).not.toBeInTheDocument()
+      await user.click(within(row).getByRole('button', { name: 'Kebab toggle' }))
+      expect(await screen.findByRole('menuitem', { name: 'Edit role' })).toBeInTheDocument()
+      expect(screen.getByRole('menuitem', { name: 'Delete role' })).toBeInTheDocument()
+      await user.keyboard('{Escape}')
+      await user.click(within(row).getByRole('button', { name: /Details/ }))
+      expect(screen.getByText('step_type:write:any')).toBeVisible()
+    })
+
     it('renders roles in table', () => {
       render(<RolesTab />, { wrapper: createWrapper() })
 
