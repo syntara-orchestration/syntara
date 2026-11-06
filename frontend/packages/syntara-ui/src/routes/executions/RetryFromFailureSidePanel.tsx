@@ -107,9 +107,7 @@ export function RetryFromFailureSidePanel({
     visiblePoints,
   })
 
-  useLayoutEffect(() => {
-    panelRef.current?.focus()
-  }, [])
+  useLayoutEffect(() => panelRef.current?.focus(), [])
 
   const requestedRetryPointIdsKey = requestedRetryPointIds.join('\u0000')
   const retryPreviewPointIdsKey = getRetryPreviewPointIdsKey({
@@ -180,15 +178,6 @@ export function RetryFromFailureSidePanel({
     })
   }
 
-  const footer = getRetryFooter({
-    onRetry: () =>
-      retry.handleRetry(scopeMode === 'all' ? undefined : requestedRetryPointIds, submitInputParameterOverrides),
-    onCancel: onClose,
-    isRetryDisabled,
-    isRetryPending: retry.isPending,
-    stepCount: activePreview?.total_step_count,
-  })
-
   return (
     <aside
       ref={panelRef}
@@ -197,7 +186,15 @@ export function RetryFromFailureSidePanel({
       aria-label="Retry run from failure review"
       data-testid="retry-from-failure-panel"
     >
-      <SynPanel hasNoPadding isFullHeight isScrollable footer={footer}>
+      <SynPanel hasNoPadding isFullHeight isScrollable footer={
+        <RetryFooter
+          onRetry={() => retry.handleRetry(scopeMode === 'all' ? undefined : requestedRetryPointIds, submitInputParameterOverrides)}
+          onCancel={onClose}
+          isRetryDisabled={isRetryDisabled}
+          isRetryPending={retry.isPending}
+          stepCount={activePreview?.total_step_count}
+        />
+      }>
         <div className={styles.panelInner}>
           <Stack className={styles.panelStack}>
             <StackItem className={styles.headerPadding}>
@@ -277,30 +274,6 @@ function getPanelNotRetriedFailureCount({
   return getNotRetriedFailureCount(failedActivityIds, retryPlanPointIds, workflowEdges)
 }
 
-function getRetryFooter({
-  onRetry,
-  onCancel,
-  isRetryDisabled,
-  isRetryPending,
-  stepCount,
-}: Readonly<{
-  onRetry: () => void
-  onCancel: () => void
-  isRetryDisabled: boolean
-  isRetryPending: boolean
-  stepCount: number | undefined
-}>) {
-  return (
-    <RetryFooter
-      onRetry={onRetry}
-      onCancel={onCancel}
-      isRetryDisabled={isRetryDisabled}
-      isRetryPending={isRetryPending}
-      stepCount={stepCount}
-    />
-  )
-}
-
 function getCurrentRetryPlanAnnouncement({
   shouldAnnounce,
   scopeMode,
@@ -320,17 +293,17 @@ function getCurrentRetryPlanAnnouncement({
 }>): string {
   if (!shouldAnnounce) return ''
   if (scopeMode === 'selected' && selectedCount === 0) {
-    return 'Retry plan updated. Choose one or more failure points to see the retry plan.'
+    return 'Retry plan updated. Choose one or more branches to see the retry plan.'
   }
   if (isLoading) return 'Updating the retry plan for this selection.'
 
-  const scopeLabel = scopeMode === 'all' ? 'All eligible failure points' : getSelectedScopeLabel(selectedCount)
+  const scopeLabel = scopeMode === 'all' ? 'All affected branches' : getSelectedScopeLabel(selectedCount)
   return getRetryPlanAnnouncement({ preview, isError, scopeLabel, visiblePoints })
 }
 
 function getSelectedScopeLabel(selectedCount: number): string {
-  if (selectedCount === 1) return '1 selected failure point'
-  return `${selectedCount} selected failure points`
+  if (selectedCount === 1) return '1 selected branch'
+  return `${selectedCount} selected branches`
 }
 
 function getRetryPlanAnnouncement({
@@ -347,7 +320,7 @@ function getRetryPlanAnnouncement({
   if (isError) return 'Retry plan could not be updated. Change the selection or close and reopen this panel.'
   if (!preview) return 'Retry plan updated. The retry plan is unavailable.'
   if (!preview.eligible) {
-    return `Retry plan updated. ${preview.reason ?? 'The selected failure points cannot be retried.'}`
+    return `Retry plan updated. ${preview.reason ?? 'The selected branches cannot be retried.'}`
   }
 
   const stepSummary = getRetryStepSummary(preview.total_step_count)

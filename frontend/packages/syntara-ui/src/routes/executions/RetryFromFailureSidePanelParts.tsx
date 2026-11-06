@@ -32,7 +32,7 @@ export function SanitizedOutputAlert({ warning }: Readonly<{ warning: string | u
       <Alert
         isInline
         variant="warning"
-        title="Retry plan updated"
+        title="Output sanitized"
         component="h3"
         data-testid="retry-sanitized-output-alert"
       >
@@ -233,9 +233,11 @@ function RetryScopeSelector({
                           point.sanitizedFailedNodeNames.length > 0 ? (
                             <div className={styles.sanitizedReplacementDescription}>
                               {point.sanitizedFailedNodeNames.map((failedNodeName) => (
-                                <div key={failedNodeName}>Failed node: {failedNodeName}</div>
+                                <Content component={ContentVariants.small} key={failedNodeName}>
+                                  Failed node: {failedNodeName}
+                                </Content>
                               ))}
-                              <div>Output sanitized — retry starts upstream</div>
+                              <Content component={ContentVariants.small}>Output sanitized — retry starts upstream</Content>
                             </div>
                           ) : undefined
                         }
@@ -281,8 +283,8 @@ function RetryPlanContent({
 }: RetryPlanContentProps) {
   if (isEmptySelection) {
     return (
-      <Alert isInline variant="info" title="Choose at least one failure point">
-        Select one or more failed steps to see the retry plan for that selection.
+      <Alert isInline variant="info" title="Choose at least one branch">
+        Select one or more branches to see the retry plan for that selection.
       </Alert>
     )
   }
@@ -305,8 +307,8 @@ function RetryPlanContent({
 
   if (!preview) {
     return (
-      <Alert isInline variant="info" title="Choose at least one failure point">
-        Select one or more failed steps to see the retry plan for that selection.
+      <Alert isInline variant="info" title="Choose at least one branch">
+        Select one or more branches to see the retry plan for that selection.
       </Alert>
     )
   }
@@ -314,7 +316,7 @@ function RetryPlanContent({
   if (!preview.eligible) {
     return (
       <Alert isInline variant="warning" title="This retry selection cannot be used" data-testid="retry-rejected">
-        {preview.reason ?? 'The selected failure points cannot be retried.'}
+        {preview.reason ?? 'The selected branches cannot be retried.'}
       </Alert>
     )
   }
