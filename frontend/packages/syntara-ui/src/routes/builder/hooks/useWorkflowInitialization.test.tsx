@@ -149,4 +149,35 @@ describe('useWorkflowInitialization', () => {
 
     expect(mockOnLayout).not.toHaveBeenCalled()
   })
+
+  // AAP-91959: Imported workflows where some nodes (e.g. AAP execution nodes
+  // lacking an assigned integration) have no stored position must still trigger
+  // auto-layout, otherwise those nodes default to {x:0,y:0} and overlap every
+  // other node on the canvas. Checking only "are any positions stored at all"
+  // incorrectly skips layout even though coverage is partial.
+  it('runs layout when stored positions do not cover every node', async () => {
+    workflowStoreState.nodePositions = { 'node-1': { x: 10, y: 20 } }
+    const measuredNodes = [
+      { id: 'node-1', measured: { width: 100, height: 50 } },
+      { id: 'node-2-aap-execution', measured: { width: 100, height: 50 } },
+    ] as never[]
+
+    renderHook(() =>
+      useWorkflowInitialization({
+        nodes: measuredNodes,
+        workflowVersion: 1,
+        onLayout: mockOnLayout,
+      })
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    act(() => {
+      vi.advanceTimersByTime(100)
+    })
+
+    expect(mockOnLayout).toHaveBeenCalled()
+  })
 })
