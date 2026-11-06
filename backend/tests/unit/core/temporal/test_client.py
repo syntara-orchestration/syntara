@@ -517,6 +517,30 @@ class TestInvalidateClient:
         invalidate_client()
         assert client_mod._cached_client is None
 
+    def test_invalidate_matching_client_clears_cache(self) -> None:
+        """Invalidating the exact cached instance clears the cache."""
+        cached = MagicMock()
+        client_mod._cached_client = cached
+
+        invalidate_client(cached)
+
+        assert client_mod._cached_client is None
+
+    def test_invalidate_foreign_client_leaves_cache(self) -> None:
+        """Invalidating a client that is not the cached one must not evict it.
+
+        An explicit-override connection, an injected test client, or a
+        stale client another caller already replaced must never discard
+        the healthy shared connection.
+        """
+        cached = MagicMock()
+        foreign = MagicMock()
+        client_mod._cached_client = cached
+
+        invalidate_client(foreign)
+
+        assert client_mod._cached_client is cached
+
 
 class TestInvalidateOnConnectionError:
     """Tests for invalidate_on_connection_error()."""
@@ -564,3 +588,41 @@ class TestInvalidateOnConnectionError:
         client_mod._cached_client = MagicMock()
         invalidate_on_connection_error(ValueError("something else"))
         assert client_mod._cached_client is not None
+
+    def test_invalidates_only_the_matching_client(self) -> None:
+        """A connection error from a foreign client must not evict the cached one."""
+        cached = MagicMock()
+        foreign = MagicMock()
+        client_mod._cached_client = cached
+
+        invalidate_on_connection_error(
+            RPCError("down", RPCStatusCode.UNAVAILABLE, b""),
+            client=foreign,
+        )
+
+        assert client_mod._cached_client is cached
+
+    def test_invalidates_when_client_matches_cache(self) -> None:
+        """A connection error from the cached client itself clears the cache."""
+        cached = MagicMock()
+        client_mod._cached_client = cached
+
+        invalidate_on_connection_error(
+            RPCError("down", RPCStatusCode.UNAVAILABLE, b""),
+            client=cached,
+        )
+
+        assert client_mod._cached_client is None
+
+    def test_foreign_client_with_non_connection_error_is_ignored(self) -> None:
+        """Non-connection errors never invalidate, regardless of the client."""
+        cached = MagicMock()
+        foreign = MagicMock()
+        client_mod._cached_client = cached
+
+        invalidate_on_connection_error(
+            RPCError("not found", RPCStatusCode.NOT_FOUND, b""),
+            client=foreign,
+        )
+
+        assert client_mod._cached_client is cached

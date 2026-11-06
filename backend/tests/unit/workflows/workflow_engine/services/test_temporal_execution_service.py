@@ -186,7 +186,41 @@ class TestStartWorkflow:
                 trigger_node_id="trigger_manual",
             )
 
-        mock_invalidate.assert_called_once()
+        mock_invalidate.assert_called_once_with(mock_client)
+
+    @pytest.mark.asyncio
+    async def test_start_workflow_connection_error_on_injected_client_spares_shared_cache(
+        self,
+        valid_workflow_dict: dict[str, Any],
+    ) -> None:
+        """A connection error from a non-shared client must not evict the shared one.
+
+        Exercises the real invalidate_on_connection_error implementation
+        (no patching): the service here runs on an injected client that is
+        not the cached shared client, so a connection-class failure on it
+        must leave the healthy shared connection cached.
+        """
+        import syntara.core.temporal.client as client_mod
+
+        shared_client = Mock()
+        injected_client = Mock()
+        injected_client.start_workflow = AsyncMock(
+            side_effect=RPCError("err", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b"")
+        )
+        client_mod._cached_client = shared_client
+        service = TemporalExecutionService(temporal_client=injected_client, task_queue="test-queue")
+
+        try:
+            with pytest.raises(RPCError):
+                await service.start_workflow(
+                    workflow_def=valid_workflow_dict,
+                    workflow_name="test-workflow",
+                    trigger_node_id="trigger_manual",
+                )
+
+            assert client_mod._cached_client is shared_client
+        finally:
+            client_mod._cached_client = None
 
     @pytest.mark.asyncio
     async def test_start_workflow_does_not_invalidate_on_non_connection_error(

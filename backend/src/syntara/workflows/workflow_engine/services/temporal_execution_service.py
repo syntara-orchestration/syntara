@@ -188,7 +188,7 @@ class TemporalExecutionService:
             )
 
         except Exception as exc:
-            invalidate_on_connection_error(exc)
+            invalidate_on_connection_error(exc, self.temporal_client)
             logger.exception("Failed to start workflow", workflow_name=workflow_name)
             raise
 
@@ -224,7 +224,7 @@ class TemporalExecutionService:
                     temporal_workflow_id=temporal_workflow_id,
                 )
                 return
-            invalidate_on_connection_error(e)
+            invalidate_on_connection_error(e, self.temporal_client)
             logger.exception("Failed to cancel workflow", temporal_workflow_id=temporal_workflow_id)
             raise
 
@@ -264,7 +264,7 @@ class TemporalExecutionService:
                     temporal_workflow_id=temporal_workflow_id,
                 )
                 return
-            invalidate_on_connection_error(e)
+            invalidate_on_connection_error(e, self.temporal_client)
             logger.exception(
                 "Failed to complete async activity",
                 activity_id=activity_id,
@@ -308,7 +308,7 @@ class TemporalExecutionService:
                     temporal_workflow_id=temporal_workflow_id,
                 )
                 return
-            invalidate_on_connection_error(e)
+            invalidate_on_connection_error(e, self.temporal_client)
             logger.exception(
                 "Failed to fail async activity",
                 activity_id=activity_id,

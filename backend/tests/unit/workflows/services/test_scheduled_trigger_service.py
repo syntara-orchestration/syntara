@@ -381,7 +381,37 @@ class TestSyncScheduledTriggers:
                 workflow_definition=definition,
             )
 
-        mock_invalidate.assert_called_once()
+        mock_invalidate.assert_called_once_with(client)
+
+    @pytest.mark.parametrize("status", [RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED])
+    async def test_sync_connection_error_on_injected_client_spares_shared_cache(self, status: RPCStatusCode) -> None:
+        """A connection error from an injected test client must not evict the shared one.
+
+        Exercises the real invalidate_on_connection_error implementation
+        (no patching): the service runs on an injected client while the
+        cached shared client is a different, healthy instance, so the
+        failure must leave the shared connection cached.
+        """
+        import syntara.core.temporal.client as client_mod
+
+        shared_client = MagicMock()
+        client_mod._cached_client = shared_client
+        try:
+            client = _make_mock_client()
+            client.create_schedule = AsyncMock(side_effect=RPCError("conn error", status, b""))
+
+            service = ScheduledTriggerService(temporal_client=client)
+            definition = _make_workflow_definition(triggers=[_make_scheduled_trigger("trigger_1")])
+
+            with pytest.raises(ScheduledTriggerSyncError):
+                await service.sync_scheduled_triggers(
+                    workflow_id="wf-123",
+                    workflow_definition=definition,
+                )
+
+            assert client_mod._cached_client is shared_client
+        finally:
+            client_mod._cached_client = None
 
     async def test_sync_unexpected_rpc_error_reraises(self) -> None:
         """RPCError that is not ALREADY_EXISTS or a connection error should propagate."""

@@ -212,8 +212,9 @@ class TestPollCallback:
             (MetricType.TEMPORAL_QUEUE_DEPTH, 7.0),
             {"component": ComponentLabel.TEMPORAL_WORKER, "labels": {"task_queue": "orchestrator-background-queue"}},
         )
-        # Connection error triggers client invalidation so next cycle reconnects.
-        mock_invalidate.assert_called_once()
+        # Connection error triggers client invalidation so next cycle reconnects,
+        # scoped to the client the poller was actually using.
+        mock_invalidate.assert_called_once_with(mock_client)
 
     @pytest.mark.asyncio
     async def test_invalidates_client_on_workflow_count_rpc_error(self) -> None:
@@ -259,8 +260,9 @@ class TestPollCallback:
 
         recorded = [c.args[0] for c in mock_recorder.record.call_args_list]
         assert recorded == [MetricType.TEMPORAL_QUEUE_DEPTH]
-        # Connection error triggers client invalidation so next cycle reconnects.
-        mock_invalidate.assert_called_once()
+        # Connection error triggers client invalidation so next cycle reconnects,
+        # scoped to the client the poller was actually using.
+        mock_invalidate.assert_called_once_with(mock_client)
 
 
 class TestGetQueueDepthPoller:

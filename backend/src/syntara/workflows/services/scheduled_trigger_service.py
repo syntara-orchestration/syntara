@@ -464,7 +464,7 @@ class ScheduledTriggerService:
                     trigger_node_id=trigger_node_id,
                 )
             elif isinstance(e, RPCError) and e.status in CONNECTION_ERRORS:
-                invalidate_on_connection_error(e)
+                invalidate_on_connection_error(e, client)
                 raise
             else:
                 raise
@@ -507,7 +507,7 @@ class ScheduledTriggerService:
             return schedule_ids
         except RPCError as e:
             if e.status in CONNECTION_ERRORS:
-                invalidate_on_connection_error(e)
+                invalidate_on_connection_error(e, client)
                 raise
             logger.warning(
                 "Search attribute query failed, falling back to prefix scan",
@@ -540,7 +540,7 @@ class ScheduledTriggerService:
         except RPCError as e:
             if e.status != RPCStatusCode.NOT_FOUND:
                 if e.status in CONNECTION_ERRORS:
-                    invalidate_on_connection_error(e)
+                    invalidate_on_connection_error(e, client)
                 raise
             logger.debug("No schedule to delete", schedule_id=schedule_id)
             return False

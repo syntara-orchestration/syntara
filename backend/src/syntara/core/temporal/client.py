@@ -192,18 +192,31 @@ async def get_shared_client() -> Client | None:
         return None
 
 
-def invalidate_client() -> None:
+def invalidate_client(client: Client | None = None) -> None:
     """Clear the cached Temporal client so the next call reconnects.
+
+    If *client* is given, the cache is cleared only when it still holds
+    that exact instance (identity, not equality). A caller whose client
+    was never the shared one — an explicit-override connection, an
+    injected test client, or a stale client another caller already
+    replaced — must not evict the healthy shared connection. Pass no
+    argument for an unconditional clear (tests use this as a reset).
 
     Leaves ``_connect_task`` in place. An in-flight connect must keep a
     strong reference; ``get_shared_client`` starts a new task only after
     the current one is done or older than the waiter budget.
     """
     global _cached_client  # noqa: PLW0603
-    _cached_client = None
+    if client is None or _cached_client is client:
+        _cached_client = None
 
 
-def invalidate_on_connection_error(exc: BaseException) -> None:
-    """Invalidate the cached client if *exc* is a connection-class RPC error."""
+def invalidate_on_connection_error(exc: BaseException, client: Client | None = None) -> None:
+    """Invalidate the cached client if *exc* is a connection-class RPC error.
+
+    *client* should be the instance that raised *exc* so the cache is
+    only cleared when that instance is still the cached one; see
+    :func:`invalidate_client` for why identity matters.
+    """
     if isinstance(exc, RPCError) and exc.status in CONNECTION_ERRORS:
-        invalidate_client()
+        invalidate_client(client)

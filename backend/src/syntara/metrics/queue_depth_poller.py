@@ -101,7 +101,7 @@ def _make_poll_callback(
             try:
                 depth = await _query_queue_depth(client, task_queue, settings.temporal_namespace)
             except RPCError as e:
-                invalidate_on_connection_error(e)
+                invalidate_on_connection_error(e, client)
                 logger.debug("queue_depth_poller_rpc_error", task_queue=task_queue, exc_info=True)
                 continue
             recorder.record(
@@ -114,7 +114,7 @@ def _make_poll_callback(
         try:
             running_count = await _query_running_workflow_count(client)
         except RPCError as e:
-            invalidate_on_connection_error(e)
+            invalidate_on_connection_error(e, client)
             logger.debug("workflow_count_poller_rpc_error", exc_info=True)
             return
         recorder.record(
