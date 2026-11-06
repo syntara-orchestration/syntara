@@ -326,6 +326,28 @@ describe('CheckAccessView', () => {
     })
   })
 
+  // AAP-96935: leaving the Project field as "Any project" must query access across
+  // every project the user has a grant on, which requires the explicit
+  // `check_any_project: true` flag -- omitting `resource_project` alone is treated
+  // by the backend as "no project context", not as a wildcard.
+  it('sends check_any_project: true when the project field is left as "Any project"', async () => {
+    const user = userEvent.setup()
+    render(<CheckAccessView {...sampleResourceActions} />, { wrapper })
+
+    await fillForm(user)
+    await user.click(screen.getByRole('button', { name: 'Check access' }))
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith({
+        body: {
+          action: 'read',
+          resource_type: 'project',
+          check_any_project: true,
+        },
+      })
+    })
+  })
+
   it('renders with empty resource actions', async () => {
     const user = userEvent.setup()
     render(<CheckAccessView resourceTypes={[]} actionsByResource={new Map()} />, { wrapper })
