@@ -10,6 +10,7 @@ import {
   DescriptionListTerm,
   Flex,
   FlexItem,
+  FormGroup,
   List,
   ListItem,
   Radio,
@@ -215,12 +216,11 @@ function RetryScopeSelector({
         <StackItem>
           <Stack hasGutter>
             <StackItem>
-              <Title headingLevel="h4" size={TitleSizes.md}>
-                Select the branches where the retry should begin
-              </Title>
-            </StackItem>
-            <StackItem>
-              <div role="group" aria-label="Branches to retry">
+              <FormGroup
+                fieldId={`${scopeId}-retry-points`}
+                role="group"
+                label="Select the branches where the retry should begin"
+              >
                 <List isPlain>
                   {selectablePoints.map((point) => (
                     <ListItem key={point.id}>
@@ -234,10 +234,12 @@ function RetryScopeSelector({
                             <div className={styles.sanitizedReplacementDescription}>
                               {point.sanitizedFailedNodeNames.map((failedNodeName) => (
                                 <Content component={ContentVariants.small} key={failedNodeName}>
-                                  Failed node: {failedNodeName}
+                                  Failed step: {failedNodeName}
                                 </Content>
                               ))}
-                              <Content component={ContentVariants.small}>Output sanitized — retry starts upstream</Content>
+                              <Content component={ContentVariants.small}>
+                                Output sanitized — retry starts upstream
+                              </Content>
                             </div>
                           ) : undefined
                         }
@@ -248,7 +250,7 @@ function RetryScopeSelector({
                     </ListItem>
                   ))}
                 </List>
-              </div>
+              </FormGroup>
             </StackItem>
             {selectedPointIds.length > 0 && selectedPointIds.length < affectedPointCount && (
               <StackItem>
@@ -465,15 +467,15 @@ export function HowRetryWorks() {
       <Stack hasGutter>
         <StackItem>
           <Content component={ContentVariants.p}>
-            This retry uses the same workflow version as this run, preserving the definition that ran. Nodes outside the
-            selected retry scope will not re-execute. Completed nodes retain their previous result, failed nodes remain
-            failed, and nodes that did not run remain skipped. Nodes in the selected scope will be retried and may
+            This retry uses the same workflow version as this run, preserving the definition that ran. Steps outside the
+            selected retry scope will not re-execute. Completed steps retain their previous result, failed steps remain
+            failed, and steps that did not run remain skipped. Steps in the selected scope will be retried and may
             repeat external side effects.
           </Content>
         </StackItem>
         <StackItem>
           <Content component={ContentVariants.p}>
-            To change the parameters for this retry, select the failed node in Run details and choose Edit parameters
+            To change the parameters for this retry, select the failed step in Run details and choose Edit parameters
             for retry.
           </Content>
         </StackItem>

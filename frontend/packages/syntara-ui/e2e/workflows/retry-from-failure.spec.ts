@@ -154,7 +154,7 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await expect(
         panel.getByText(/This retry uses the same workflow version as this run, preserving the definition that ran/)
       ).toBeVisible()
-      await expect(panel.getByText(/Nodes outside the selected retry scope will not re-execute/)).toBeVisible()
+      await expect(panel.getByText(/Steps outside the selected retry scope will not re-execute/)).toBeVisible()
       await expect(panel.getByText(/may repeat external side effects/)).toBeVisible()
       await expect(panel.getByText(/To change the parameters for this retry, select the failed node/)).toBeVisible()
       await expect(panel.getByRole('heading', { name: 'Retry plan' })).toBeVisible()

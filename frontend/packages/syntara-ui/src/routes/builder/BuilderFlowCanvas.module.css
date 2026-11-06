@@ -21,7 +21,6 @@
   --pf-v6-c-spinner--Color: var(--pf-t--global--color--brand--default);
 }
 
-.retryOriginNode :global([data-execution-badge]) {
-  outline: 2px solid var(--pf-t--global--color--status--warning--default);
-  outline-offset: 4px;
+.retryPreviewLabel {
+  white-space: nowrap;
 }

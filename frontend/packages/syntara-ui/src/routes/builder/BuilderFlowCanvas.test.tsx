@@ -7,7 +7,6 @@ import { FlowNodeType } from '../../constants'
 import { type ButtonEdgePlaceholderNode, type NodeType } from '../workflows/canvas/nodes/NodeType'
 
 import { BuilderFlowCanvas } from './BuilderFlowCanvas'
-import canvasStyles from './BuilderFlowCanvas.module.css'
 import type { EdgeType } from './utils/workflowToGraph'
 
 let latestReactFlowProps: Record<string, unknown> | null = null
@@ -28,8 +27,20 @@ vi.mock('@xyflow/react', async () => {
       latestReactFlowProps = props
       return <div data-testid="reactflow">{props.children}</div>
     },
-    NodeToolbar: ({ children, 'data-testid': testId }: { children?: ReactNode; 'data-testid'?: string }) => (
-      <div data-testid={testId}>{children}</div>
+    NodeToolbar: ({
+      children,
+      'data-testid': testId,
+      position,
+      offset,
+    }: {
+      children?: ReactNode
+      'data-testid'?: string
+      position?: string
+      offset?: number
+    }) => (
+      <div data-testid={testId} data-position={position} data-offset={offset}>
+        {children}
+      </div>
     ),
     Background: () => null,
     BackgroundVariant: { Dots: 'dots' },
@@ -170,14 +181,24 @@ describe('BuilderFlowCanvas', () => {
     )
 
     expect(screen.getByTestId('retry-origin-label-retry-origin')).toHaveTextContent('Retry origin')
-    expect(screen.getByTestId('retry-state-label-downstream')).toHaveTextContent('Will retry')
+    expect(screen.getByTestId('retry-state-label-downstream')).toHaveTextContent('In retry scope')
     expect(screen.getByTestId('retry-state-label-retained')).toHaveTextContent('Retains prior result')
     expect(screen.getByTestId('retry-state-label-unselected-failure')).toHaveTextContent('Not retried — remains failed')
+    const retryLabels = [
+      screen.getByTestId('retry-origin-retry-origin'),
+      screen.getByTestId('retry-state-downstream'),
+      screen.getByTestId('retry-state-retained'),
+      screen.getByTestId('retry-state-unselected-failure'),
+    ]
+    expect(retryLabels.every((label) => label.getAttribute('data-position') === 'top')).toBe(true)
+    expect(retryLabels[0]?.getAttribute('data-offset')).not.toBe(retryLabels[1]?.getAttribute('data-offset'))
     const renderedNodes = (
-      latestReactFlowProps as { nodes: Array<{ id: string; className?: string; ariaLabel?: string }> }
+      latestReactFlowProps as {
+        nodes: Array<{ id: string; data: Record<string, unknown>; ariaLabel?: string }>
+      }
     ).nodes
     const originNode = renderedNodes.find((node) => node.id === 'retry-origin')
-    expect(originNode?.className).toContain(canvasStyles.retryOriginNode)
+    expect(originNode?.data.__retryPreviewOrigin).toBe(true)
     expect(originNode?.ariaLabel).toContain('retry origin')
     expect(renderedNodes.find((node) => node.id === 'trigger-0')?.ariaLabel ?? '').not.toContain('retains prior result')
   })
