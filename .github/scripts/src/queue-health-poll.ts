@@ -71,6 +71,8 @@ async function assessHealth(github: GitHubClient, branch: string): Promise<Healt
 /**
  * Determines the health state from the previous workflow run.
  * Used to detect state transitions and avoid duplicate alerts.
+ * Passing eventName restricts the search to runs triggered the same way,
+ * so schedule runs only compare against other schedule runs.
  */
 async function getPreviousHealthState(
   github: GitHubClient,

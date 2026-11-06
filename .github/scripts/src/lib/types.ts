@@ -73,6 +73,7 @@ export const EnvironmentSchema = z.object({
   eventName: z.string().optional(),
 })
 
+/** Builds a validator for a required numeric value passed as a string environment variable. */
 const requiredFiniteNumber = (name: string) =>
   z
     .string({ error: `${name} is required` })

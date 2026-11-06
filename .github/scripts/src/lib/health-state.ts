@@ -33,6 +33,7 @@ type WorkflowJob = {
   steps?: JobStep[] | null
 }
 
+/** Returns whether the named step exists in the run and concluded successfully. */
 function stepSucceeded(steps: JobStep[], name: string): boolean {
   return steps.some((step) => step.name === name && step.conclusion === 'success')
 }
