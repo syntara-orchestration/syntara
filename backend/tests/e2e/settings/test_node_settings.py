@@ -821,6 +821,9 @@ def test_sequential_cof_second_failure_without_cof_is_failed(
                 {"from": "second_fail", "to": "final"},
             ],
         },
+        # Two sequential script nodes pay Execution Plane cold-start and queueing
+        # latency, which can exceed the default 60-second poll budget.
+        timeout=120,
         project_id=first_project_id,
     )
 
