@@ -20,6 +20,7 @@ describe('getEnvironment', () => {
     process.env.GITHUB_REPOSITORY = 'owner/repo'
     process.env.GITHUB_RUN_ID = '12345'
     process.env.GITHUB_HEAD_REF = 'gh-readonly-queue/devel/pr-123-abc'
+    process.env.GITHUB_EVENT_NAME = 'schedule'
 
     const env = getEnvironment()
 
@@ -29,6 +30,7 @@ describe('getEnvironment', () => {
       repository: 'owner/repo',
       runId: 12345,
       headRef: 'gh-readonly-queue/devel/pr-123-abc',
+      eventName: 'schedule',
     })
   })
 
