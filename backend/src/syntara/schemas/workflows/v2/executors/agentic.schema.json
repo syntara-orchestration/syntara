@@ -6,7 +6,8 @@
   "parameterSchema": {
     "type": "object",
     "required": [
-      "prompt"
+      "prompt",
+      "credential_id"
     ],
     "properties": {
       "agent": {
@@ -29,7 +30,8 @@
         ]
       },
       "credential_id": {
-        "$ref": "../common-definitions.schema.json#/$defs/credential_id"
+        "$ref": "../common-definitions.schema.json#/$defs/credential_id",
+        "minLength": 1
       },
       "tool_selection_strategy": {
         "type": "string",
