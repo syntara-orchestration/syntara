@@ -1,0 +1,367 @@
+from __future__ import annotations
+
+import datetime
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeVar, cast
+from uuid import UUID
+
+from attrs import define as _attrs_define
+from attrs import field as _attrs_field
+from dateutil.parser import isoparse
+
+from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.published_workflow_step_metadata_read import PublishedWorkflowStepMetadataRead
+    from ..models.user_reference import UserReference
+    from ..models.validation_result import ValidationResult
+    from ..models.workflow_detail_read_labels import WorkflowDetailReadLabels
+    from ..models.workflow_version_read import WorkflowVersionRead
+
+
+T = TypeVar("T", bound="WorkflowDetailRead")
+
+
+@_attrs_define
+class WorkflowDetailRead:
+    """Workflow detail response with metadata for its published version.
+
+    Attributes:
+        name (str): Workflow name
+        id (UUID):
+        current_version (int):
+        is_enabled (bool):
+        project_id (UUID):
+        created_at (datetime.datetime):
+        updated_at (datetime.datetime):
+        version (WorkflowVersionRead): Schema for workflow version response (GET /workflows/{id}/versions/{version}).
+        description (None | str | Unset): Workflow description
+        labels (WorkflowDetailReadLabels | Unset): Workflow labels
+        is_builtin (bool | Unset):  Default: False.
+        has_validation_issues (bool | Unset):  Default: False.
+        created_by (None | Unset | UserReference): User who created the workflow
+        updated_by (None | Unset | UserReference): User who last modified the workflow
+        published_version_id (None | Unset | UUID):
+        published_version_number (int | None | Unset):
+        validation_result (None | Unset | ValidationResult): Validation findings from the last save operation. Only
+            included in create/update responses; use has_validation_issues for the durable indicator.
+        published_step_metadata (None | PublishedWorkflowStepMetadataRead | Unset): Step IDs, types, and output schemas
+            from the exact published version, when one exists.
+    """
+
+    name: str
+    id: UUID
+    current_version: int
+    is_enabled: bool
+    project_id: UUID
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    version: WorkflowVersionRead
+    description: None | str | Unset = UNSET
+    labels: WorkflowDetailReadLabels | Unset = UNSET
+    is_builtin: bool | Unset = False
+    has_validation_issues: bool | Unset = False
+    created_by: None | Unset | UserReference = UNSET
+    updated_by: None | Unset | UserReference = UNSET
+    published_version_id: None | Unset | UUID = UNSET
+    published_version_number: int | None | Unset = UNSET
+    validation_result: None | Unset | ValidationResult = UNSET
+    published_step_metadata: None | PublishedWorkflowStepMetadataRead | Unset = UNSET
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        from ..models.published_workflow_step_metadata_read import PublishedWorkflowStepMetadataRead
+        from ..models.user_reference import UserReference
+        from ..models.validation_result import ValidationResult
+
+        name = self.name
+
+        id = str(self.id)
+
+        current_version = self.current_version
+
+        is_enabled = self.is_enabled
+
+        project_id = str(self.project_id)
+
+        created_at = self.created_at.isoformat()
+
+        updated_at = self.updated_at.isoformat()
+
+        version = self.version.to_dict()
+
+        description: None | str | Unset
+        if isinstance(self.description, Unset):
+            description = UNSET
+        else:
+            description = self.description
+
+        labels: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.labels, Unset):
+            labels = self.labels.to_dict()
+
+        is_builtin = self.is_builtin
+
+        has_validation_issues = self.has_validation_issues
+
+        created_by: dict[str, Any] | None | Unset
+        if isinstance(self.created_by, Unset):
+            created_by = UNSET
+        elif isinstance(self.created_by, UserReference):
+            created_by = self.created_by.to_dict()
+        else:
+            created_by = self.created_by
+
+        updated_by: dict[str, Any] | None | Unset
+        if isinstance(self.updated_by, Unset):
+            updated_by = UNSET
+        elif isinstance(self.updated_by, UserReference):
+            updated_by = self.updated_by.to_dict()
+        else:
+            updated_by = self.updated_by
+
+        published_version_id: None | str | Unset
+        if isinstance(self.published_version_id, Unset):
+            published_version_id = UNSET
+        elif isinstance(self.published_version_id, UUID):
+            published_version_id = str(self.published_version_id)
+        else:
+            published_version_id = self.published_version_id
+
+        published_version_number: int | None | Unset
+        if isinstance(self.published_version_number, Unset):
+            published_version_number = UNSET
+        else:
+            published_version_number = self.published_version_number
+
+        validation_result: dict[str, Any] | None | Unset
+        if isinstance(self.validation_result, Unset):
+            validation_result = UNSET
+        elif isinstance(self.validation_result, ValidationResult):
+            validation_result = self.validation_result.to_dict()
+        else:
+            validation_result = self.validation_result
+
+        published_step_metadata: dict[str, Any] | None | Unset
+        if isinstance(self.published_step_metadata, Unset):
+            published_step_metadata = UNSET
+        elif isinstance(self.published_step_metadata, PublishedWorkflowStepMetadataRead):
+            published_step_metadata = self.published_step_metadata.to_dict()
+        else:
+            published_step_metadata = self.published_step_metadata
+
+        field_dict: dict[str, Any] = {}
+        field_dict.update(self.additional_properties)
+        field_dict.update(
+            {
+                "name": name,
+                "id": id,
+                "current_version": current_version,
+                "is_enabled": is_enabled,
+                "project_id": project_id,
+                "created_at": created_at,
+                "updated_at": updated_at,
+                "version": version,
+            }
+        )
+        if description is not UNSET:
+            field_dict["description"] = description
+        if labels is not UNSET:
+            field_dict["labels"] = labels
+        if is_builtin is not UNSET:
+            field_dict["is_builtin"] = is_builtin
+        if has_validation_issues is not UNSET:
+            field_dict["has_validation_issues"] = has_validation_issues
+        if created_by is not UNSET:
+            field_dict["created_by"] = created_by
+        if updated_by is not UNSET:
+            field_dict["updated_by"] = updated_by
+        if published_version_id is not UNSET:
+            field_dict["published_version_id"] = published_version_id
+        if published_version_number is not UNSET:
+            field_dict["published_version_number"] = published_version_number
+        if validation_result is not UNSET:
+            field_dict["validation_result"] = validation_result
+        if published_step_metadata is not UNSET:
+            field_dict["published_step_metadata"] = published_step_metadata
+
+        return field_dict
+
+    @classmethod
+    def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.published_workflow_step_metadata_read import PublishedWorkflowStepMetadataRead
+        from ..models.user_reference import UserReference
+        from ..models.validation_result import ValidationResult
+        from ..models.workflow_detail_read_labels import WorkflowDetailReadLabels
+        from ..models.workflow_version_read import WorkflowVersionRead
+
+        d = dict(src_dict)
+        name = d.pop("name")
+
+        id = UUID(d.pop("id"))
+
+        current_version = d.pop("current_version")
+
+        is_enabled = d.pop("is_enabled")
+
+        project_id = UUID(d.pop("project_id"))
+
+        created_at = isoparse(d.pop("created_at"))
+
+        updated_at = isoparse(d.pop("updated_at"))
+
+        version = WorkflowVersionRead.from_dict(d.pop("version"))
+
+        def _parse_description(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        description = _parse_description(d.pop("description", UNSET))
+
+        _labels = d.pop("labels", UNSET)
+        labels: WorkflowDetailReadLabels | Unset
+        if isinstance(_labels, Unset):
+            labels = UNSET
+        else:
+            labels = WorkflowDetailReadLabels.from_dict(_labels)
+
+        is_builtin = d.pop("is_builtin", UNSET)
+
+        has_validation_issues = d.pop("has_validation_issues", UNSET)
+
+        def _parse_created_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                created_by_type_0 = UserReference.from_dict(data)
+
+                return created_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        created_by = _parse_created_by(d.pop("created_by", UNSET))
+
+        def _parse_updated_by(data: object) -> None | Unset | UserReference:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                updated_by_type_0 = UserReference.from_dict(data)
+
+                return updated_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        updated_by = _parse_updated_by(d.pop("updated_by", UNSET))
+
+        def _parse_published_version_id(data: object) -> None | Unset | UUID:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                published_version_id_type_0 = UUID(data)
+
+                return published_version_id_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UUID, data)
+
+        published_version_id = _parse_published_version_id(d.pop("published_version_id", UNSET))
+
+        def _parse_published_version_number(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        published_version_number = _parse_published_version_number(d.pop("published_version_number", UNSET))
+
+        def _parse_validation_result(data: object) -> None | Unset | ValidationResult:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                validation_result_type_0 = ValidationResult.from_dict(data)
+
+                return validation_result_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | ValidationResult, data)
+
+        validation_result = _parse_validation_result(d.pop("validation_result", UNSET))
+
+        def _parse_published_step_metadata(data: object) -> None | PublishedWorkflowStepMetadataRead | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                published_step_metadata_type_0 = PublishedWorkflowStepMetadataRead.from_dict(data)
+
+                return published_step_metadata_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | PublishedWorkflowStepMetadataRead | Unset, data)
+
+        published_step_metadata = _parse_published_step_metadata(d.pop("published_step_metadata", UNSET))
+
+        workflow_detail_read = cls(
+            name=name,
+            id=id,
+            current_version=current_version,
+            is_enabled=is_enabled,
+            project_id=project_id,
+            created_at=created_at,
+            updated_at=updated_at,
+            version=version,
+            description=description,
+            labels=labels,
+            is_builtin=is_builtin,
+            has_validation_issues=has_validation_issues,
+            created_by=created_by,
+            updated_by=updated_by,
+            published_version_id=published_version_id,
+            published_version_number=published_version_number,
+            validation_result=validation_result,
+            published_step_metadata=published_step_metadata,
+        )
+
+        workflow_detail_read.additional_properties = d
+        return workflow_detail_read
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties
