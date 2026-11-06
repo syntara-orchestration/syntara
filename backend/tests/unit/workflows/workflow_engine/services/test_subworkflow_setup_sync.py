@@ -8,6 +8,7 @@ that keys the aggregate row and preserves the I/O owned by
 ``_persist_parent_node_io``.
 """
 
+import asyncio
 import json
 from datetime import UTC, datetime
 from typing import Any, ClassVar
@@ -15,9 +16,11 @@ from unittest.mock import Mock
 from uuid import uuid4
 
 from temporalio.api.enums.v1 import EventType
+from temporalio.converter import DataConverter
 
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution
+from syntara.workflows.workflow_engine.codecs.credential_codec import CredentialPayloadCodec
 from syntara.workflows.workflow_engine.services.activity_execution_sync import ActivityExecutionSyncMixin
 from syntara.workflows.workflow_engine.services.activity_sync_publisher import ActivitySyncPublisherMixin
 from syntara.workflows.workflow_engine.services.activity_sync_service import ActivitySyncService
@@ -813,3 +816,64 @@ class TestIoWebsocketDelta:
         ops = ActivitySyncPublisherMixin._build_field_patch_ops(row, old, 1)
         assert any(op["path"] == "/activities/1/output_data" for op in ops)
         assert all(op["path"] != "/activities/1/status" for op in ops)  # unchanged
+
+
+_CODEC_KEY = bytes(range(32))  # synthetic AES-256-GCM key for tests only
+
+
+def _encrypted_attrs(result: dict[str, object]) -> tuple[Mock, CredentialPayloadCodec]:
+    """Encode a setup result the way the worker stores it (codec may encrypt)."""
+    codec = CredentialPayloadCodec(_CODEC_KEY)
+    stored = asyncio.run(DataConverter(payload_codec=codec).encode([result]))[0]
+    attrs = Mock()
+    attrs.result = Mock(payloads=[stored])
+    return attrs, codec
+
+
+class TestDecodeSetupResultViaCodec:
+    """P1-2: credential-bearing setup results are stored encrypted in history."""
+
+    def test_encrypted_setup_result_lost_without_codec(self) -> None:
+        # Characterizes the bug: a raw parse (no codec) drops the child link.
+        attrs, _ = _encrypted_attrs(_setup_result(input_data={"greeting": "hi", "aap_password": "SYN-x"}))
+        assert ActivitySyncService._decode_setup_result(attrs) is None
+
+    def test_encrypted_setup_result_decoded_with_codec(self) -> None:
+        # The fix: decoding through the codec recovers the dict + child link.
+        res = _setup_result(input_data={"greeting": "hi", "aap_password": "SYN-x"})
+        attrs, codec = _encrypted_attrs(res)
+        decoded = ActivitySyncService._decode_setup_result(attrs, codec)
+        assert decoded is not None
+        assert decoded["child_workflow_id"] == "wf-123"
+
+    def test_generic_auth_type_key_also_encrypts_and_decodes(self) -> None:
+        res = _setup_result(input_data={"greeting": "hi", "auth_type": "bearer"})
+        attrs, codec = _encrypted_attrs(res)
+        assert ActivitySyncService._decode_setup_result(attrs) is None  # raw parse loses it
+        assert ActivitySyncService._decode_setup_result(attrs, codec) is not None  # codec recovers it
+
+    def test_plain_setup_result_passes_through_codec_unchanged(self) -> None:
+        # Safety/idempotency: a non-encrypted payload decodes unchanged.
+        res = _setup_result()
+        attrs, codec = _encrypted_attrs(res)
+        assert ActivitySyncService._decode_setup_result(attrs, codec) == res
+
+    def test_non_codec_object_falls_back_to_raw_parse(self) -> None:
+        # A Mock is not a CredentialPayloadCodec -> raw parse (today's behaviour).
+        plain = _completed(2, 1, _setup_result()).activity_task_completed_event_attributes
+        assert ActivitySyncService._decode_setup_result(plain, Mock()) == _setup_result()
+
+
+class TestBuildIoScrubsCredentials:
+    """P1-2: recognized credential keys are redacted in the persisted input summary."""
+
+    def test_recognized_credential_key_redacted_in_input_parameters(self) -> None:
+        res = _setup_result(input_data={"greeting": "hi", "aap_password": "SYN-x"})
+        io = ActivitySyncService._build_subworkflow_io(res)
+        assert io["input"]["input_parameters"]["aap_password"] == "[REDACTED]"  # noqa: S105
+        assert io["input"]["input_parameters"]["greeting"] == "hi"
+
+    def test_no_credential_keys_leaves_input_parameters_unchanged(self) -> None:
+        res = _setup_result(input_data={"greeting": "hi"})
+        io = ActivitySyncService._build_subworkflow_io(res)
+        assert io["input"]["input_parameters"] == {"greeting": "hi"}
