@@ -1806,7 +1806,7 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
 
         with (
             patch(
-                "syntara.forms.services.form_prompt_signal.resolve_verified_form_prompt_signal",
+                "syntara.workflows.services.activity_callback.resolve_verified_form_prompt_signal",
                 new_callable=AsyncMock,
                 return_value=VerifiedFormPromptSignal(payload=verified_payload),
             ),
@@ -1841,7 +1841,7 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
 
         with (
             patch(
-                "syntara.forms.services.form_prompt_signal.resolve_verified_form_prompt_signal",
+                "syntara.workflows.services.activity_callback.resolve_verified_form_prompt_signal",
                 new_callable=AsyncMock,
                 return_value=RejectedFormPromptSignal(reason="no persisted prompt row"),
             ) as mock_resolver,
@@ -1877,7 +1877,7 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
 
         with (
             patch(
-                "syntara.forms.services.form_prompt_signal.resolve_verified_form_prompt_signal",
+                "syntara.workflows.services.activity_callback.resolve_verified_form_prompt_signal",
                 new_callable=AsyncMock,
             ) as mock_resolver,
             pytest.raises(FormPromptSubmissionRequiredError),
@@ -1900,7 +1900,7 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
 
         with (
             patch(
-                "syntara.forms.services.form_prompt_signal.resolve_verified_form_prompt_signal",
+                "syntara.workflows.services.activity_callback.resolve_verified_form_prompt_signal",
                 new_callable=AsyncMock,
                 return_value=VerifiedFormPromptSignal(payload={"outcome": "submitted"}),
             ),
@@ -1919,7 +1919,7 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
         verified_payload = {"outcome": "submitted", "response_data": {"reason": "persisted"}}
 
         with patch(
-            "syntara.forms.services.form_prompt_signal.resolve_verified_form_prompt_signal",
+            "syntara.workflows.services.activity_callback.resolve_verified_form_prompt_signal",
             new_callable=AsyncMock,
             return_value=VerifiedFormPromptSignal(payload=verified_payload),
         ):

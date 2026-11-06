@@ -538,7 +538,7 @@ class TestFormPromptSignalVerification:
         signal_data = {"status": "completed", "result": {"value": "script"}}
 
         with patch(
-            "syntara.workflows.services.execution_service.resolve_verified_form_prompt_signal",
+            "syntara.workflows.services.activity_callback.resolve_verified_form_prompt_signal",
             new_callable=AsyncMock,
         ) as mock_resolver:
             response = await auth_client.post(
