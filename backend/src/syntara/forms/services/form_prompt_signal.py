@@ -61,12 +61,15 @@ async def resolve_verified_form_prompt_signal(
     session: AsyncSession,
     execution_id: UUID,
     temporal_activity_id: str,
+    *,
+    require_match: bool = False,
 ) -> FormPromptSignalResolution:
     """Resolve a callback ID to its authoritative Form Prompt submission.
 
-    No matching row means the callback belongs to another activity type. A
-    matching row is guarded: it must be uniquely identified and contain a
-    complete persisted submission before the workflow can be resumed.
+    A missing row is rejected when the workflow definition already identified
+    the target as a Form Prompt. Otherwise, no matching row means another
+    activity type. A matching row must be unique and contain a complete
+    persisted submission before the workflow can be resumed.
     """
     result = await session.exec(
         select(FormPrompt)
@@ -76,6 +79,8 @@ async def resolve_verified_form_prompt_signal(
     )
     prompts = result.all()
 
+    if not prompts and require_match:
+        return RejectedFormPromptSignal(reason="no persisted prompt row")
     if not prompts:
         return NotFormPromptSignal()
     if len(prompts) > 1:

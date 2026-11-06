@@ -68,6 +68,20 @@ class TestResolveVerifiedFormPromptSignal:
         session.get.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_rejects_missing_row_when_workflow_definition_identifies_form_prompt(self) -> None:
+        session = _session_with_prompts()
+
+        result = await resolve_verified_form_prompt_signal(
+            session,
+            uuid4(),
+            "form-node",
+            require_match=True,
+        )
+
+        assert isinstance(result, RejectedFormPromptSignal)
+        assert result.reason == "no persisted prompt row"
+
+    @pytest.mark.asyncio
     async def test_rejects_multiple_matching_rows(self) -> None:
         execution_id = uuid4()
         first = create_submitted_form_prompt(execution_id=execution_id, prompt_node_id="first")

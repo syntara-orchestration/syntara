@@ -32,6 +32,7 @@ from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.forms.services.form_prompt_signal import (
+    NotFormPromptSignal,
     RejectedFormPromptSignal,
     VerifiedFormPromptSignal,
     resolve_verified_form_prompt_signal,
@@ -1076,6 +1077,85 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         recorder = get_metrics_recorder()
         await emit_completion_metrics(self.session, execution, recorder)
 
+    @staticmethod
+    def _resolve_callback_node_type(
+        workflow_definition: WorkflowDefinition | None,
+        activity_id: str,
+    ) -> NodeType | None:
+        """Resolve a Temporal activity ID using the execution's immutable workflow definition."""
+        if workflow_definition is None:
+            return None
+
+        node_types: dict[str, NodeType] = {}
+        for node in (*workflow_definition.triggers, *workflow_definition.nodes):
+            if isinstance(node, dict):
+                node_id = node.get("id")
+                raw_node_type = node.get("type")
+            else:
+                node_id = getattr(node, "id", None)
+                raw_node_type = getattr(node, "type", None)
+
+            if not isinstance(node_id, str) or not isinstance(raw_node_type, str):
+                continue
+            try:
+                node_types[node_id] = NodeType(raw_node_type)
+            except ValueError:
+                continue
+
+        candidate = activity_id
+        while candidate:
+            node_type = node_types.get(candidate)
+            if node_type is not None:
+                return node_type
+
+            base_id, separator, iteration = candidate.rpartition("_iter_")
+            if not separator or not iteration.isdecimal():
+                break
+            candidate = base_id
+
+        return None
+
+    async def _resolve_form_prompt_callback_payload(
+        self,
+        execution_id: UUID,
+        activity_id: str,
+        workflow_definition: WorkflowDefinition | None,
+        status: object,
+    ) -> dict[str, Any] | None:
+        """Return persisted Form Prompt output, or None for a generic activity callback."""
+        callback_node_type = self._resolve_callback_node_type(workflow_definition, activity_id)
+        if callback_node_type is not None and callback_node_type != NodeType.FORM_PROMPT:
+            return None
+
+        resolution = await resolve_verified_form_prompt_signal(
+            self.session,
+            execution_id,
+            activity_id,
+            require_match=callback_node_type == NodeType.FORM_PROMPT,
+        )
+        if isinstance(resolution, NotFormPromptSignal):
+            return None
+
+        rejection_reason: str | None = None
+        if isinstance(resolution, RejectedFormPromptSignal):
+            rejection_reason = resolution.reason
+        elif status in ("failed", "cancelled"):
+            rejection_reason = "Form Prompt callbacks cannot fail or cancel the activity"
+
+        if rejection_reason is not None:
+            logger.warning(
+                "Rejected Form Prompt activity signal",
+                execution_id=execution_id,
+                activity_id=activity_id,
+                acting_user_id=self.user.id,
+                reason=rejection_reason,
+            )
+            raise FormPromptSubmissionRequiredError
+
+        if isinstance(resolution, VerifiedFormPromptSignal):
+            return resolution.payload
+        return None
+
     async def handle_activity_callback(
         self,
         execution_id: UUID,
@@ -1099,7 +1179,10 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             TemporalUnavailableError: If Temporal service unavailable
 
         """
-        execution = await self.get_execution(execution_id)
+        execution = await self.get_execution(
+            execution_id,
+            include={ExecutionInclude.WORKFLOW_DEFINITION},
+        )
 
         if self.temporal_service is None:
             operation = "activity callback"
@@ -1115,33 +1198,18 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         status = signal_data.get("status")
         completion_log_context: dict[str, Any] = {"status": status}
-        form_prompt_resolution = await resolve_verified_form_prompt_signal(
-            self.session,
+        form_prompt_payload = await self._resolve_form_prompt_callback_payload(
             execution_id,
             activity_id,
+            execution.workflow_definition,
+            status,
         )
-        rejection_reason: str | None = None
-        if isinstance(form_prompt_resolution, RejectedFormPromptSignal):
-            rejection_reason = form_prompt_resolution.reason
-        elif isinstance(form_prompt_resolution, VerifiedFormPromptSignal):
-            if status in ("failed", "cancelled"):
-                rejection_reason = "Form Prompt callbacks cannot fail or cancel the activity"
-            else:
-                signal_data = form_prompt_resolution.payload
-                completion_log_context = {
-                    "callback_type": "form_prompt",
-                    "outcome": "submitted",
-                }
-
-        if rejection_reason is not None:
-            logger.warning(
-                "Rejected Form Prompt activity signal",
-                execution_id=execution_id,
-                activity_id=activity_id,
-                acting_user_id=self.user.id,
-                reason=rejection_reason,
-            )
-            raise FormPromptSubmissionRequiredError
+        if form_prompt_payload is not None:
+            signal_data = form_prompt_payload
+            completion_log_context = {
+                "callback_type": "form_prompt",
+                "outcome": "submitted",
+            }
 
         if status == "failed":
             error_msg, error_type, has_error_detail = resolve_signal_failure_message(signal_data.get("error"))

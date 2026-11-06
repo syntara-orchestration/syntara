@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, patch
 
@@ -46,6 +47,22 @@ async def _create_signal_form_prompt(
     session.add(prompt)
     await session.commit()
     return prompt
+
+
+def _execution_read_with_node(
+    execution: Execution,
+    *,
+    node_id: str,
+    node_type: str,
+) -> SimpleNamespace:
+    """Build the workflow metadata needed to classify a callback target."""
+    return SimpleNamespace(
+        temporal_workflow_id=execution.temporal_workflow_id,
+        workflow_definition=SimpleNamespace(
+            triggers=[],
+            nodes=[{"id": node_id, "type": node_type}],
+        ),
+    )
 
 
 @pytest.mark.asyncio
@@ -356,6 +373,30 @@ class TestFormPromptSignalVerification:
         )
         return temporal
 
+    async def test_known_form_prompt_without_row_is_rejected(
+        self,
+        auth_client: AsyncClient,
+        test_execution: Execution,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        temporal = self._mock_temporal(monkeypatch)
+        activity_id = "form-node_iter_0"
+
+        with patch(
+            "syntara.workflows.services.execution_service.ExecutionService.get_execution",
+            new_callable=AsyncMock,
+            return_value=_execution_read_with_node(test_execution, node_id="form-node", node_type="form_prompt"),
+        ):
+            response = await auth_client.post(
+                f"/api/v1/executions/{test_execution.id}/activities/{activity_id}/signal",
+                json={"signal_data": {"outcome": "submitted", "response_data": {"reason": "forged"}}},
+            )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.json()["code"] == "FORM_PROMPT_SUBMISSION_REQUIRED"
+        temporal.complete_async_activity.assert_not_awaited()
+        temporal.fail_async_activity.assert_not_awaited()
+
     async def test_pending_prompt_rejects_forged_completion(
         self,
         auth_client: AsyncClient,
@@ -434,10 +475,15 @@ class TestFormPromptSignalVerification:
             responded_by=test_user.id,
         )
 
-        response = await auth_client.post(
-            f"/api/v1/executions/{test_execution.id}/activities/{activity_id}/signal",
-            json={"signal_data": {"outcome": "submitted", "response_data": {"reason": "forged"}}},
-        )
+        with patch(
+            "syntara.workflows.services.execution_service.ExecutionService.get_execution",
+            new_callable=AsyncMock,
+            return_value=_execution_read_with_node(test_execution, node_id="form-node", node_type="form_prompt"),
+        ):
+            response = await auth_client.post(
+                f"/api/v1/executions/{test_execution.id}/activities/{activity_id}/signal",
+                json={"signal_data": {"outcome": "submitted", "response_data": {"reason": "forged"}}},
+            )
 
         assert response.status_code == status.HTTP_200_OK
         temporal.complete_async_activity.assert_awaited_once()
@@ -481,21 +527,26 @@ class TestFormPromptSignalVerification:
         temporal.complete_async_activity.assert_not_awaited()
         temporal.fail_async_activity.assert_not_awaited()
 
-    async def test_activity_without_prompt_row_keeps_generic_completion(
+    async def test_known_non_form_activity_keeps_generic_completion(
         self,
         auth_client: AsyncClient,
         test_execution: Execution,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Deterministically cover the no-prompt fallback; the agentic E2E is race-prone."""
+        """Known non-form nodes skip the Forms lookup; the agentic E2E is race-prone."""
         temporal = self._mock_temporal(monkeypatch)
-        signal_data = {"status": "completed", "result": {"value": "agentic"}}
+        signal_data = {"status": "completed", "result": {"value": "script"}}
 
-        response = await auth_client.post(
-            f"/api/v1/executions/{test_execution.id}/activities/agentic-node/signal",
-            json={"signal_data": signal_data},
-        )
+        with patch(
+            "syntara.workflows.services.execution_service.resolve_verified_form_prompt_signal",
+            new_callable=AsyncMock,
+        ) as mock_resolver:
+            response = await auth_client.post(
+                f"/api/v1/executions/{test_execution.id}/activities/test_activity/signal",
+                json={"signal_data": signal_data},
+            )
 
         assert response.status_code == status.HTTP_200_OK
         temporal.complete_async_activity.assert_awaited_once()
         assert temporal.complete_async_activity.await_args.kwargs["result"] == {"output": signal_data}
+        mock_resolver.assert_not_awaited()
