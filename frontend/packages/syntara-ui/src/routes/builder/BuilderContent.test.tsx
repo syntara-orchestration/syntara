@@ -9,9 +9,11 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { approvalsClient, executionsClient, workflowClient, workflowFetchClient } from '../../client'
 import * as useCursorPaginationModule from '../../hooks/useCursorPagination'
 import { AlertProvider } from '../../providers/alerts'
+import { FeatureFlagsProvider } from '../../providers/feature-flags-provider'
 import { ColorSchemeProvider } from '../../providers/theme/ColorSchemeProvider'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { routerTestState } from '../../test/setup'
+import { toFeatureFlagKey } from '../../utils/feature-flags'
 import { transformExecutionStatusFilter } from '../executions/executionFilters'
 
 type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
@@ -100,13 +102,17 @@ const queryClient = new QueryClient({
   },
 })
 
+const workflowBuilderQolStorageKey = toFeatureFlagKey('workflow_builder_qol')
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>
-    <AlertProvider>
-      <ColorSchemeProvider>
-        <ReactFlowProvider>{children}</ReactFlowProvider>
-      </ColorSchemeProvider>
-    </AlertProvider>
+    <FeatureFlagsProvider>
+      <AlertProvider>
+        <ColorSchemeProvider>
+          <ReactFlowProvider>{children}</ReactFlowProvider>
+        </ColorSchemeProvider>
+      </AlertProvider>
+    </FeatureFlagsProvider>
   </QueryClientProvider>
 )
 
@@ -118,6 +124,16 @@ async function renderBuilder(props: BuilderContentProps) {
     expect(screen.getByPlaceholderText('Workflow name')).toBeInTheDocument()
   })
   return view
+}
+
+async function renderBuilderWithStoredFeatureFlag(storedValue: string | null, props: BuilderContentProps) {
+  if (storedValue === null) {
+    globalThis.localStorage.removeItem(workflowBuilderQolStorageKey)
+  } else {
+    globalThis.localStorage.setItem(workflowBuilderQolStorageKey, storedValue)
+  }
+
+  await renderBuilder(props)
 }
 
 async function clickKebabItem(name: RegExp | string) {
@@ -250,6 +266,7 @@ describe('BuilderContent', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    globalThis.localStorage.removeItem(workflowBuilderQolStorageKey)
     queryClient.clear()
 
     vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: vi.fn() })
@@ -317,6 +334,7 @@ describe('BuilderContent', () => {
   })
 
   afterEach(() => {
+    globalThis.localStorage.removeItem(workflowBuilderQolStorageKey)
     vi.restoreAllMocks()
   })
 
@@ -332,6 +350,38 @@ describe('BuilderContent', () => {
           extraParams: { workflow_id: 'workflow-1' },
         })
       )
+    })
+  })
+
+  describe('workflow builder feature flag proof of concept', () => {
+    it('does not render the proof of concept when the flag is missing', async () => {
+      await renderBuilderWithStoredFeatureFlag(null, {
+        workflow: mockWorkflow,
+        isNew: false,
+        workflowId: 'workflow-1',
+      })
+
+      expect(screen.queryByText('workflow_builder_qol is enabled (test proof of concept)')).not.toBeInTheDocument()
+    })
+
+    it('does not render the proof of concept when the flag has an invalid value', async () => {
+      await renderBuilderWithStoredFeatureFlag('yes', {
+        workflow: mockWorkflow,
+        isNew: false,
+        workflowId: 'workflow-1',
+      })
+
+      expect(screen.queryByText('workflow_builder_qol is enabled (test proof of concept)')).not.toBeInTheDocument()
+    })
+
+    it('renders the proof of concept when the flag is enabled', async () => {
+      await renderBuilderWithStoredFeatureFlag('true', {
+        workflow: mockWorkflow,
+        isNew: false,
+        workflowId: 'workflow-1',
+      })
+
+      expect(screen.getByText('workflow_builder_qol is enabled (test proof of concept)')).toBeInTheDocument()
     })
   })
 

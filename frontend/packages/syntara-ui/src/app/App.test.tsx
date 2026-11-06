@@ -2,6 +2,8 @@ import { RouterProvider } from '@tanstack/react-router'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { toFeatureFlagKey } from '../utils/feature-flags'
+
 import App from './App'
 
 // Stub out the real TanStack router instance (avoids building the full route tree).
@@ -40,6 +42,7 @@ vi.mock('./useAuthProviders', () => ({
 
 describe('App', () => {
   afterEach(() => {
+    globalThis.localStorage.removeItem(toFeatureFlagKey('workflow_builder_qol'))
     vi.clearAllMocks()
   })
 
@@ -49,11 +52,15 @@ describe('App', () => {
     expect(document.body).toBeInTheDocument()
   })
 
-  it('renders RouterProvider with the app router', () => {
+  it('passes the app router and feature flag snapshot to RouterProvider', () => {
+    globalThis.localStorage.setItem(toFeatureFlagKey('workflow_builder_qol'), 'true')
     vi.mocked(RouterProvider).mockReturnValue(null as never)
     render(<App />)
-    expect(vi.mocked(RouterProvider)).toHaveBeenCalled()
     expect(vi.mocked(RouterProvider).mock.lastCall?.[0]).toHaveProperty('router')
+    expect(vi.mocked(RouterProvider).mock.lastCall?.[0]).toHaveProperty(
+      'context.featureFlags.workflow_builder_qol',
+      true
+    )
   })
 
   it('renders the main application structure', async () => {

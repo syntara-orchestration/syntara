@@ -10,6 +10,7 @@ import {
   StackItem,
   Title,
 } from '@patternfly/react-core'
+import type { CSSProperties } from 'react'
 
 import { SynPanel } from '../../components/layout/SynPanel'
 import { AAP_STEP_IDS, RegistryStepId } from '../../constants'
@@ -17,6 +18,7 @@ import { renderStepIcon } from '../workflows/canvas/nodes/renderStepIcon'
 import { getAddStepPanelColor } from '../workflows/canvas/stepTypeColors'
 
 import type { StepSubtypeDefinition, StepTypeDefinition } from './registry/StepRegistry'
+import styles from './StepTypeOptionsList.module.css'
 import { resolveIconForType } from './utils/stepIcons'
 
 export type StepTypeOption = Pick<StepTypeDefinition | StepSubtypeDefinition, 'id' | 'label' | 'icon' | 'description'>
@@ -38,6 +40,7 @@ export function StepTypeOptionsList(props: StepTypeOptionsListProps) {
     return (
       <StackItem key={stepType.id}>
         <SynPanel
+          variant="bordered"
           isGlass={false}
           isScrollable={false}
           onClick={() => props.onSelect(stepType.id)}
@@ -47,18 +50,10 @@ export function StepTypeOptionsList(props: StepTypeOptionsListProps) {
               props.onSelect(stepType.id)
             }
           }}
+          className={accentColor ? styles.stepTypeOption : undefined}
           style={{
             cursor: 'pointer',
-            ...(accentColor
-              ? {
-                  borderTopWidth: 4,
-                  borderTopStyle: 'solid',
-                  borderTopColor: accentColor,
-                  borderRightWidth: 0,
-                  borderBottomWidth: 0,
-                  borderLeftWidth: 0,
-                }
-              : {}),
+            ...(accentColor ? ({ '--step-type-accent': accentColor } as CSSProperties) : {}),
           }}
           role="button"
           tabIndex={0}

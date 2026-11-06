@@ -289,24 +289,6 @@ export const NAV_ITEMS: TNavigationItem[] = [
       },
     ],
   },
-  {
-    label: 'Support',
-    path: AppRoute.Support.Root,
-    children: [
-      {
-        label: 'Documentation',
-        path: AppRoute.Support.Documentation,
-      },
-      {
-        label: 'FAQ',
-        path: AppRoute.Support.FAQ,
-      },
-      {
-        label: 'Glossary',
-        path: AppRoute.Support.Glossary,
-      },
-    ],
-  },
   // Hidden routes (not shown in navigation, but path needed for active-state matching)
   {
     label: 'Edit Workflow',

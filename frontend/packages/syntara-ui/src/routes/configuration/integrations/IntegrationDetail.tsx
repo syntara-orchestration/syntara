@@ -278,6 +278,18 @@ function getFooterState({
   return { isDirty: toolsDirty, isSaving: isToolsSaving, onSave: handleToolsSave, saveLabel: 'Save tools' }
 }
 
+function shouldShowResourcesFooter(
+  isLLM: boolean,
+  tools: ReturnType<typeof useAllIntegrationTools>['tools'],
+  modelsState: ReturnType<typeof useIntegrationModelsState>
+): boolean {
+  if (isLLM) {
+    if (modelsState.isLoading || modelsState.error) return false
+    return modelsState.models.length > 0
+  }
+  return tools.length > 0
+}
+
 function hasResourcesTab(integration: IntegrationsAPI.components['schemas']['IntegrationRead']): boolean {
   return isLLMProvider(integration) || integration.integration_type === IntegrationTypeEnum.MCP_SERVER
 }
@@ -384,7 +396,8 @@ export function IntegrationDetail() {
   if (!integration?.id) return null
 
   const integrationCrumbs = breadcrumbsIntegrationDetail(integration.name)
-  const footer = activeTab === 'resources' ? <ResourcesFooter {...footerState} /> : undefined
+  const showResourcesFooter = shouldShowResourcesFooter(isLLM, tools, modelsState)
+  const footer = activeTab === 'resources' && showResourcesFooter ? <ResourcesFooter {...footerState} /> : undefined
 
   return (
     <SynPage>
