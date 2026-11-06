@@ -11,6 +11,7 @@
 
 .codeBlockContainer {
   height: 30rem;
+  overflow-y: auto;
 }
 
 .buttonGap {
