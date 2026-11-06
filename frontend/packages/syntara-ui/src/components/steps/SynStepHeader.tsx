@@ -1,22 +1,9 @@
-import { Flex } from '@patternfly/react-core'
+import styles from './SynStepHeader.module.css'
 
-export function SynStepHeader(props: Readonly<{ children: React.ReactNode }>) {
+export function SynStepHeader(props: Readonly<{ children: React.ReactNode; className?: string }>) {
   return (
-    <div
-      data-testid="node-header"
-      style={{
-        paddingTop: 'var(--pf-t--global--spacer--md)',
-        paddingLeft: 'var(--pf-t--global--spacer--md)',
-        paddingRight: 'var(--pf-t--global--spacer--md)',
-      }}
-    >
-      <Flex
-        data-testid="node-header-content"
-        alignItems={{ default: 'alignItemsFlexStart' }}
-        justifyContent={{ default: 'justifyContentSpaceBetween' }}
-      >
-        {props.children}
-      </Flex>
+    <div data-testid="node-header" className={[styles.root, props.className].filter(Boolean).join(' ')}>
+      {props.children}
     </div>
   )
 }
