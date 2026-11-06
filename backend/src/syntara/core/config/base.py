@@ -1503,6 +1503,18 @@ class WorkflowEngineSettings(BaseSettings):
         description="Enable Script node execution in workflows (Developer Preview)",
     )
 
+    # The step revision identity AO requests from the script-node workload
+    # image over the container runtime ABI. The default is the legacy
+    # built-in identity served by the Execution Plane test fixture;
+    # production plugin images (syntara-step-types) use namespaced
+    # identities such as "syntara.script-python.script-python" and need
+    # this override until AO resolves step revisions from its own plugin
+    # registry.
+    script_step_revision_id: str = Field(
+        default="script.v1",
+        description="Step revision identity requested from the script-node workload image",
+    )
+
     # Cold-start Execution Plane node dispatch: the AO activity selects the
     # container image per node type and writes it into the WorkItem payload; the
     # EP worker creates a fresh pod from that reference. Keys are workflow node

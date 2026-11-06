@@ -41,7 +41,6 @@ __all__ = ["activity", "asyncio", "execute_script_activity"]
 INITIAL_RETRY_DELAY_SECONDS = 0.5
 MAX_RETRY_DELAY_SECONDS = 10.0
 _NODE_TYPE = "script"
-_STEP_REVISION_ID = "script.v1"
 _DEFAULT_TIMEOUT_SECONDS = 300
 _EXECUTION_PROFILE_FIELD = "execution_profile"
 _EXECUTION_TARGET_SELECTOR_FIELD = "_execution_target_id"
@@ -51,7 +50,7 @@ def _build_invocation(input_config: dict[str, Any], info: Any) -> dict[str, Any]
     """Build the versioned SDK request before AO freezes it for activity retries."""
     return {
         "workflow_run_id": info.workflow_run_id,
-        "step_revision_id": _STEP_REVISION_ID,
+        "step_revision_id": get_settings().script_step_revision_id,
         "inputs": {
             key: value
             for key, value in input_config.items()
