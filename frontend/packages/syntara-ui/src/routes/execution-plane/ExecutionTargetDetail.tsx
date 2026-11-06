@@ -150,20 +150,23 @@ function ExecutionTargetDetailToolbar({
   target,
   onEdit,
   onToggleEnabled,
+  isPatchPending,
   deleteDialog,
   permissions,
 }: Readonly<{
   target: ExecutionTarget
   onEdit: () => void
   onToggleEnabled: () => void
+  isPatchPending: boolean
   deleteDialog: { open: (item: ExecutionTarget) => void }
   permissions: ReturnType<typeof useExecutionTargetPermissions>
 }>) {
-  const toggleBlocked = permissions.isLoading || !permissions.canUpdate
+  const permissionBlocked = permissions.isLoading || !permissions.canUpdate
+  const toggleBlocked = permissionBlocked || isPatchPending
 
   return (
     <>
-      <DisabledWithTooltip isDisabled={toggleBlocked} content={permissions.tooltips.enable}>
+      <DisabledWithTooltip isDisabled={permissionBlocked} content={permissions.tooltips.enable}>
         <Switch
           id="execution-target-enabled-toggle"
           label={target.enabled ? 'Enabled' : 'Disabled'}
@@ -217,6 +220,7 @@ export default function ExecutionTargetDetail() {
     disableDialog,
     handleToggleEnabled,
     handleDisable,
+    isPatchPending,
   } = useExecutionTargetEnabledToggle({
     targets: serverTarget ? [serverTarget] : [],
     onSuccess: () => query.refetch(),
@@ -270,6 +274,7 @@ export default function ExecutionTargetDetail() {
             target={target}
             onEdit={() => detachPromise(navigate({ to: editPath }))}
             onToggleEnabled={() => handleToggleEnabled(target)}
+            isPatchPending={isPatchPending}
             deleteDialog={deleteDialog}
             permissions={permissions}
           />

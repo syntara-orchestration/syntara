@@ -21,12 +21,15 @@ export type UseExecutionTargetEnabledToggleOptions = {
  *
  * Disabling opens an informational confirmation dialog first; enabling patches
  * immediately. Optimistic UI + rollback live in {@link useOptimisticExecutionTargetEnabled}.
+ *
+ * While a PATCH is in flight (`isPatchPending`), further toggles are ignored so
+ * rapid clicks cannot race concurrent updates out of order.
  */
 export function useExecutionTargetEnabledToggle({ targets, onSuccess }: UseExecutionTargetEnabledToggleOptions) {
   const { showAlert } = useAlerts()
   const disableDialog = useDialogState<ExecutionTarget>()
 
-  const { mutateAsync: patchTarget } = executionPlaneClient.useMutation(
+  const { mutateAsync: patchTarget, isPending: isPatchPending } = executionPlaneClient.useMutation(
     'patch',
     '/api/execution_plane/v1/execution_targets/{target_id}'
   )
@@ -52,27 +55,29 @@ export function useExecutionTargetEnabledToggle({ targets, onSuccess }: UseExecu
 
   const handleToggleEnabled = useCallback(
     (target: ExecutionTarget) => {
-      if (!target.id) return
+      if (isPatchPending || !target.id) return
       if (target.enabled) {
         disableDialog.open(target)
         return
       }
       setTargetEnabled(target, true)
     },
-    [disableDialog, setTargetEnabled]
+    [disableDialog, isPatchPending, setTargetEnabled]
   )
 
   const handleDisable = useCallback(() => {
+    if (isPatchPending) return
     const item = disableDialog.item
     disableDialog.close()
     if (!item) return
     setTargetEnabled(item, false)
-  }, [disableDialog, setTargetEnabled])
+  }, [disableDialog, isPatchPending, setTargetEnabled])
 
   return {
     targets: optimisticTargets,
     disableDialog,
     handleToggleEnabled,
     handleDisable,
+    isPatchPending,
   }
 }

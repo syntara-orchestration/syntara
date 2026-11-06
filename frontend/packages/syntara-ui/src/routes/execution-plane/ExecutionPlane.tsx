@@ -45,6 +45,7 @@ function ExecutionPlaneTableContent({
   getSortParams,
   deleteDialog,
   handleToggleEnabled,
+  isPatchPending,
   permissions,
   onEdit,
 }: Readonly<{
@@ -52,10 +53,12 @@ function ExecutionPlaneTableContent({
   getSortParams: (columnField: string) => ThProps['sort']
   deleteDialog: { open: (item: ExecutionTarget) => void }
   handleToggleEnabled: (target: ExecutionTarget) => void
+  isPatchPending: boolean
   permissions: ReturnType<typeof useExecutionTargetPermissions>
   onEdit: (target: ExecutionTarget) => void
 }>) {
-  const toggleBlocked = permissions.isLoading || !permissions.canUpdate
+  const permissionBlocked = permissions.isLoading || !permissions.canUpdate
+  const toggleBlocked = permissionBlocked || isPatchPending
 
   return (
     <>
@@ -95,7 +98,7 @@ function ExecutionPlaneTableContent({
               <NodeSelectorsCell selectors={getNodeSelectors(target.placement)} />
             </Td>
             <Td dataLabel="State">
-              <DisabledWithTooltip isDisabled={toggleBlocked} content={permissions.tooltips.enable}>
+              <DisabledWithTooltip isDisabled={permissionBlocked} content={permissions.tooltips.enable}>
                 <Switch
                   id={`toggle-${target.id}`}
                   label={target.enabled ? 'Enabled' : 'Disabled'}
@@ -163,10 +166,11 @@ export default function ExecutionPlane() {
 
   const results = query.data?.resources ?? []
 
-  const { targets, disableDialog, handleToggleEnabled, handleDisable } = useExecutionTargetEnabledToggle({
-    targets: results,
-    onSuccess: onMutationSuccess,
-  })
+  const { targets, disableDialog, handleToggleEnabled, handleDisable, isPatchPending } =
+    useExecutionTargetEnabledToggle({
+      targets: results,
+      onSuccess: onMutationSuccess,
+    })
 
   useCursorReset({
     itemCount: results.length,
@@ -236,6 +240,7 @@ export default function ExecutionPlane() {
                   getSortParams={getSortParams}
                   deleteDialog={deleteDialog}
                   handleToggleEnabled={handleToggleEnabled}
+                  isPatchPending={isPatchPending}
                   permissions={permissions}
                   onEdit={handleEdit}
                 />

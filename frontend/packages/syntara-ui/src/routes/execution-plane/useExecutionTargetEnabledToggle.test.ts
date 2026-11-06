@@ -11,10 +11,16 @@ import { useExecutionTargetEnabledToggle } from './useExecutionTargetEnabledTogg
 type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
 
 const mockMutateAsync = vi.fn()
+let mockIsPending = false
 
 vi.mock('../../client', () => ({
   executionPlaneClient: {
-    useMutation: vi.fn(() => ({ mutateAsync: mockMutateAsync, isPending: false })),
+    useMutation: vi.fn(() => ({
+      mutateAsync: mockMutateAsync,
+      get isPending() {
+        return mockIsPending
+      },
+    })),
   },
   authMiddleware: { onRequest: vi.fn(({ request }: { request: unknown }) => request) },
   interfaceTagMiddleware: { onRequest: vi.fn() },
@@ -55,6 +61,7 @@ function makeTarget(overrides: Partial<ExecutionTarget> & Pick<ExecutionTarget, 
 describe('useExecutionTargetEnabledToggle', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockIsPending = false
     mockMutateAsync.mockResolvedValue({})
   })
 
@@ -134,6 +141,57 @@ describe('useExecutionTargetEnabledToggle', () => {
       result.current.handleDisable()
     })
 
+    expect(mockMutateAsync).not.toHaveBeenCalled()
+  })
+
+  it('ignores enable toggles while a patch is pending', () => {
+    mockIsPending = true
+    const target = makeTarget({ id: 'et-1', enabled: false })
+    const { result } = renderHook(() => useExecutionTargetEnabledToggle({ targets: [target], onSuccess: vi.fn() }), {
+      wrapper: createWrapper(),
+    })
+
+    expect(result.current.isPatchPending).toBe(true)
+
+    act(() => {
+      result.current.handleToggleEnabled(target)
+    })
+
+    expect(mockMutateAsync).not.toHaveBeenCalled()
+    expect(result.current.disableDialog.isOpen).toBe(false)
+  })
+
+  it('ignores disable confirmation while a patch is pending', () => {
+    mockIsPending = true
+    const target = makeTarget({ id: 'et-1', enabled: true })
+    const { result } = renderHook(() => useExecutionTargetEnabledToggle({ targets: [target], onSuccess: vi.fn() }), {
+      wrapper: createWrapper(),
+    })
+
+    act(() => {
+      result.current.disableDialog.open(target)
+    })
+    act(() => {
+      result.current.handleDisable()
+    })
+
+    expect(mockMutateAsync).not.toHaveBeenCalled()
+    // Pending guard returns before close — dialog stays open so the user can retry.
+    expect(result.current.disableDialog.isOpen).toBe(true)
+  })
+
+  it('ignores opening the disable dialog while a patch is pending', () => {
+    mockIsPending = true
+    const target = makeTarget({ id: 'et-1', enabled: true })
+    const { result } = renderHook(() => useExecutionTargetEnabledToggle({ targets: [target], onSuccess: vi.fn() }), {
+      wrapper: createWrapper(),
+    })
+
+    act(() => {
+      result.current.handleToggleEnabled(target)
+    })
+
+    expect(result.current.disableDialog.isOpen).toBe(false)
     expect(mockMutateAsync).not.toHaveBeenCalled()
   })
 })
