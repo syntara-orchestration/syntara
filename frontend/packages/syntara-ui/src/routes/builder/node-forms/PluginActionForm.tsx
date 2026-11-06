@@ -8,6 +8,7 @@ import {
   SelectOption,
   Stack,
   StackItem,
+  Switch,
 } from '@patternfly/react-core'
 import type { ReactNode, Ref } from 'react'
 import { useMemo, useState } from 'react'
@@ -215,6 +216,21 @@ function PluginInputField({
             </SelectOption>
           ))}
         </SynSelect>
+        {property.description && <FieldHint>{property.description}</FieldHint>}
+      </FormGroup>
+    )
+  }
+
+  if (property.type === 'boolean') {
+    const checked = value === true
+    return (
+      <FormGroup label={property.name} fieldId={fieldId} isRequired={property.isRequired}>
+        <Switch
+          id={fieldId}
+          aria-label={`Toggle ${property.name}`}
+          isChecked={checked}
+          onChange={(_event, isChecked) => form.setValue(formPath, isChecked, { shouldDirty: true })}
+        />
         {property.description && <FieldHint>{property.description}</FieldHint>}
       </FormGroup>
     )

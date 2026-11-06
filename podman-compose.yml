@@ -132,7 +132,7 @@ services:
     ports:
       - ${APP_API_PORT:-8000}:8000
     environment:
-      - APP_DB_HOST=database
+      - APP_DB_HOST=syntara_database_1
       - APP_DB_PORT=5432
       - APP_DB_USER=${APP_DB_USER:-admin}
       - APP_DB_PASSWORD=${APP_DB_PASSWORD:-admin}
@@ -220,7 +220,7 @@ services:
       - default
       - execution-plane # EP API reachable as https://api:8443 (cert SAN 'api')
     environment:
-      - APP_DB_HOST=database
+      - APP_DB_HOST=syntara_database_1
       - APP_DB_PORT=5432
       - APP_DB_USER=${APP_DB_USER:-admin}
       - APP_DB_PASSWORD=${APP_DB_PASSWORD:-admin}
@@ -314,7 +314,7 @@ services:
     extra_hosts:
       - "syntara:host-gateway"
     environment:
-      - APP_DB_HOST=database
+      - APP_DB_HOST=syntara_database_1
       - APP_DB_PORT=5432
       - APP_DB_USER=${APP_DB_USER:-admin}
       - APP_DB_PASSWORD=${APP_DB_PASSWORD:-admin}
