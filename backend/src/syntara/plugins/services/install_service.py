@@ -505,6 +505,18 @@ class PluginInstallService(BaseService):
                 "implementation",
                 f"extracted {extracted} implementation file(s) from the content bundle",
             )
+        custom_runner = sum(
+            1
+            for target in targets
+            if isinstance(target, dict)
+            and isinstance(target.get("runtime"), dict)
+            and target["runtime"].get("kind") == "custom-runner"
+        )
+        if custom_runner > 0:
+            result.record(
+                "custom-runner",
+                f"registered {custom_runner} custom-runner action(s) for Execution Plane dispatch",
+            )
 
     async def _fetch_content_bundle(
         self,
