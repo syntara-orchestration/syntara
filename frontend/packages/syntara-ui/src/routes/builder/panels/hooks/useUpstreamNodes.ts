@@ -1,3 +1,4 @@
+import { ActivityTypeEnum } from '@syntara/contracts'
 import { useMemo, type ComponentType } from 'react'
 
 import { useWorkflowStore } from '../../../../stores/useWorkflowStore'
@@ -9,8 +10,28 @@ export type UpstreamNodeInfo = {
   id: string
   name?: string
   type: string
+  childWorkflowId?: string
+  childTriggerNodeId?: string
   icon?: ComponentType<{ className?: string }>
   iconId?: string
+}
+
+type UpstreamActivity = { id: string; name?: string; type: string; parameters?: unknown }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export function toUpstreamNodeInfo(activity: UpstreamActivity): UpstreamNodeInfo {
+  const parameters =
+    activity.type === ActivityTypeEnum.SUB_WORKFLOW && isRecord(activity.parameters) ? activity.parameters : undefined
+  return {
+    id: activity.id,
+    name: activity.name,
+    type: activity.type,
+    ...(typeof parameters?.['workflow_id'] === 'string' && { childWorkflowId: parameters['workflow_id'] }),
+    ...(typeof parameters?.['trigger_node_id'] === 'string' && { childTriggerNodeId: parameters['trigger_node_id'] }),
+  }
 }
 
 /**
@@ -36,11 +57,7 @@ export function useUpstreamNodes(nodeId: string): UpstreamNodeInfo[] {
 
     if (activities) {
       for (const activity of activities) {
-        nodeMap.set(activity.id, {
-          id: activity.id,
-          name: activity.name,
-          type: activity.type,
-        })
+        nodeMap.set(activity.id, toUpstreamNodeInfo(activity))
       }
     }
 

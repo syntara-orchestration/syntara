@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,6 +11,11 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
+from syntara.workflows.models import (
+    PublishedWorkflowStepMetadataRead,
+    WorkflowReadWithVersion,
+    WorkflowVersionRead,
+)
 from syntara.workflows.models.workflow_version import PublishVersionRequest
 from syntara.workflows.router import (
     get_workflow,
@@ -79,9 +85,29 @@ class TestWorkflowEndpoints:
         mock_version = MagicMock()
         mock_version.id = uuid4()
         mock_service.get_workflow_with_version.return_value = (mock_workflow, mock_version)
-        mock_response = MagicMock()
+        now = datetime.now(UTC)
         workflow_id = uuid4()
-
+        published_step_metadata = PublishedWorkflowStepMetadataRead(version_id=uuid4(), version=1, steps=[])
+        mock_service.get_published_step_metadata.return_value = published_step_metadata
+        version_read = WorkflowVersionRead.model_construct(
+            id=uuid4(),
+            workflow_id=workflow_id,
+            version=1,
+            schema_version="2.0.0",
+            workflow_definition={},
+            created_at=now,
+            updated_at=now,
+        )
+        mock_response = WorkflowReadWithVersion.model_construct(
+            name="test-workflow",
+            id=workflow_id,
+            current_version=1,
+            is_enabled=False,
+            project_id=uuid4(),
+            created_at=now,
+            updated_at=now,
+            version=version_read,
+        )
         with patch(
             "syntara.workflows.router._build_workflow_with_version_response",
             new_callable=AsyncMock,
@@ -90,8 +116,9 @@ class TestWorkflowEndpoints:
             result = await get_workflow(workflow_id=workflow_id, service=mock_service)
 
         mock_service.get_workflow_with_version.assert_awaited_once_with(workflow_id)
+        mock_service.get_published_step_metadata.assert_awaited_once_with(mock_workflow)
         mock_build.assert_awaited_once_with(mock_workflow, mock_version, mock_service)
-        assert result is mock_response
+        assert result.published_step_metadata == published_step_metadata
 
     @pytest.mark.asyncio
     async def test_get_workflow_invocation_schema_delegates_to_service(self) -> None:

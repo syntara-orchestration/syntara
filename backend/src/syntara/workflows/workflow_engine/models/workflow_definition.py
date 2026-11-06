@@ -1098,8 +1098,15 @@ class StandardOutputWrapper(BaseModel):
     to this pattern when the Step SDK is fully implemented.
     """
 
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
     Result: Any = None  # Type varies by step - validated by step-specific models
-    StatusCode: int | None = None
+    StatusCode: int | None = Field(
+        default=None,
+        ge=0,
+        le=255,
+        description="Execution status code (0=success, non-zero=failure per POSIX convention).",
+    )
     StatusMessage: str | None = Field(default=None, max_length=500)
     ErrorMessage: str | None = Field(default=None, max_length=10000)
 

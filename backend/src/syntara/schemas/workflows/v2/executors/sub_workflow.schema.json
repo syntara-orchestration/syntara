@@ -43,6 +43,8 @@
         },
         "StatusCode": {
           "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 255,
           "description": "Execution status code (0=success, non-zero=failure per POSIX convention)"
         },
         "StatusMessage": {
@@ -110,7 +112,9 @@
           "$ref": "#/$defs/SubWorkflowOutputResult"
         },
         "StatusCode": {
-          "type": ["integer", "null"]
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 255
         },
         "StatusMessage": {
           "type": ["string", "null"],

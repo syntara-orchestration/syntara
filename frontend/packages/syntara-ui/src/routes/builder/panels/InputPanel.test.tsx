@@ -12,12 +12,30 @@ function renderWithProvider(ui: React.ReactElement) {
 }
 
 const mockUseUpstreamNodes = vi.fn<(...args: unknown[]) => { id: string; name: string; type: string }[]>()
-vi.mock('./hooks/useUpstreamNodes', () => ({
-  useUpstreamNodes: (...args: unknown[]) =>
-    mockUseUpstreamNodes(...args) as { id: string; name: string; type: string }[],
-}))
+vi.mock('./hooks/useUpstreamNodes', () => {
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const mockActivities = vi.fn<() => { id: string; name: string; type: string }[] | undefined>()
+  return {
+    useUpstreamNodes: (...args: unknown[]) =>
+      mockUseUpstreamNodes(...args) as { id: string; name: string; type: string }[],
+    toUpstreamNodeInfo: (activity: { id: string; name?: string; type: string; parameters?: unknown }) => {
+      const parameters =
+        activity.type === 'sub_workflow' && isRecord(activity.parameters) ? activity.parameters : undefined
+      return {
+        id: activity.id,
+        name: activity.name,
+        type: activity.type,
+        ...(typeof parameters?.['workflow_id'] === 'string' && { childWorkflowId: parameters['workflow_id'] }),
+        ...(typeof parameters?.['trigger_node_id'] === 'string' && {
+          childTriggerNodeId: parameters['trigger_node_id'],
+        }),
+      }
+    },
+  }
+})
+
+const mockActivities = vi.fn<() => { id: string; name: string; type: string; parameters?: unknown }[] | undefined>()
 const mockTriggers = vi.fn<() => { id: string; name: string; type: string }[] | undefined>()
 vi.mock('../../../stores/useWorkflowStore', () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>

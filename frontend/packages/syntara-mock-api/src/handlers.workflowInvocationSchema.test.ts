@@ -56,8 +56,14 @@ describe('workflow invocation schema mock', () => {
             },
             { id: 'child_entry_secondary', type: 'subworkflow_trigger', parameters: {} },
           ],
-          nodes: [],
-          edges: [],
+          nodes: [
+            {
+              id: 'child_script',
+              type: 'script',
+              parameters: { language: 'python', code: "print('child')" },
+            },
+          ],
+          edges: [{ from: 'manual_entry', to: 'child_script' }],
         },
       }),
     })
@@ -79,6 +85,16 @@ describe('workflow invocation schema mock', () => {
       body: JSON.stringify({ expected_version: 1 }),
     })
     expect(publishResponse.status).toBe(200)
+
+    const detailResponse = await fetch(`${baseUrl}/api/v1/workflows/${workflowId}`)
+    expect(detailResponse.status).toBe(200)
+    const detailResult: unknown = await detailResponse.json()
+    if (!isRecord(detailResult)) throw new Error('workflow detail response was not an object')
+    expect(detailResult.published_step_metadata).toEqual({
+      version_id: expect.any(String),
+      version: 1,
+      steps: [{ id: 'child_script', type: 'script', output_schema: { type: 'object' } }],
+    })
 
     const response = await fetch(invocationSchemaUrl)
     expect(response.status).toBe(200)

@@ -453,6 +453,115 @@ export interface components {
       version: components['schemas']['WorkflowVersionRead']
     }
     /**
+     * WorkflowDetailRead
+     * @description Workflow detail response with metadata for its published version.
+     */
+    WorkflowDetailRead: {
+      /**
+       * Name
+       * @description Workflow name
+       */
+      name: string
+      /**
+       * Description
+       * @description Workflow description
+       */
+      description?: string | null
+      /**
+       * Labels
+       * @description Workflow labels
+       */
+      labels?: {
+        [key: string]: string
+      }
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Current Version */
+      current_version: number
+      /**
+       * Is Builtin
+       * @default false
+       */
+      is_builtin?: boolean
+      /** Is Enabled */
+      is_enabled: boolean
+      /**
+       * Has Validation Issues
+       * @default false
+       */
+      has_validation_issues?: boolean
+      /**
+       * Created By
+       * @description User who created the workflow
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the workflow
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
+      /**
+       * Project Id
+       * Format: uuid
+       */
+      project_id: string
+      /** Published Version Id */
+      published_version_id?: string | null
+      /** Published Version Number */
+      published_version_number?: number | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+      /** @description Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator. */
+      validation_result?: components['schemas']['ValidationResult'] | null
+      /** @description Current active version details */
+      version: components['schemas']['WorkflowVersionRead']
+      /** @description Step IDs, types, and output schemas from the exact published version, when one exists. */
+      published_step_metadata?: components['schemas']['PublishedWorkflowStepMetadataRead'] | null
+    }
+    /**
+     * PublishedWorkflowStepMetadataRead
+     * @description Step metadata tied to the exact published workflow version.
+     */
+    PublishedWorkflowStepMetadataRead: {
+      /**
+       * Version Id
+       * Format: uuid
+       */
+      version_id: string
+      /** Version */
+      version: number
+      /** Steps */
+      steps: components['schemas']['WorkflowStepMetadataRead'][]
+    }
+    /**
+     * WorkflowStepMetadataRead
+     * @description Published workflow step metadata used by the variable picker.
+     */
+    WorkflowStepMetadataRead: {
+      /** Id */
+      id: string
+      /** Type */
+      type: string
+      /**
+       * Output Schema
+       * @description JSON Schema for this step's output, or null when the step type has no output model.
+       */
+      output_schema?: {
+        [key: string]: unknown
+      } | null
+    }
+    /**
      * WorkflowInvocationTriggerSchema
      * @description One dedicated Subworkflow Trigger available for Reference mode.
      */
@@ -2757,7 +2866,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['WorkflowReadWithVersion']
+          'application/json': components['schemas']['WorkflowDetailRead']
         }
       }
       400: components['responses']['BadRequestError']

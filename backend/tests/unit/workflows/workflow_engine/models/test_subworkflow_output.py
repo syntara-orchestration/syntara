@@ -51,6 +51,21 @@ class TestStandardOutputWrapper:
         assert wrapper.StatusCode == 0
         assert wrapper.StatusMessage == "Deployment successful"
 
+    @pytest.mark.parametrize("status_code", [-1, 256])
+    def test_status_code_matches_step_sdk_range(self, status_code: int) -> None:
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            StandardOutputWrapper(StatusCode=status_code)
+
+    def test_wrapper_fields_are_immutable(self) -> None:
+        from pydantic import ValidationError
+
+        wrapper = StandardOutputWrapper(StatusCode=0)
+        assert StandardOutputWrapper.model_config.get("frozen") is True
+        with pytest.raises(ValidationError, match="frozen"):
+            wrapper.StatusCode = 1
+
 
 class TestSubWorkflowOutputStandardWrapper:
     """Verify SubWorkflowOutput follows StandardOutputWrapper structure."""
@@ -63,6 +78,14 @@ class TestSubWorkflowOutputStandardWrapper:
         """All StandardOutputWrapper fields default to None per NodeOutput pattern."""
         output = SubWorkflowOutput()
         assert getattr(output, field_name) is None
+
+    def test_subworkflow_output_inherits_wrapper_immutability(self) -> None:
+        from pydantic import ValidationError
+
+        output = SubWorkflowOutput(StatusCode=0)
+        assert SubWorkflowOutput.model_config.get("frozen") is True
+        with pytest.raises(ValidationError, match="frozen"):
+            output.StatusCode = 1
 
 
 class TestSubWorkflowOutputResultContract:

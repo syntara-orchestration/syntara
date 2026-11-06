@@ -24,7 +24,7 @@ import { parseTriggerIndex } from '../../../utils/triggerNodeIds'
 import type { WorkflowMetadata } from '../types/workflowMetadata'
 import { useIsVersionView } from '../VersionViewContext'
 
-import { useUpstreamNodes, type UpstreamNodeInfo } from './hooks/useUpstreamNodes'
+import { toUpstreamNodeInfo, useUpstreamNodes, type UpstreamNodeInfo } from './hooks/useUpstreamNodes'
 import { InputEmptyState } from './InputEmptyState'
 import { InputNodeContent, InputPanelNodeSection } from './InputNodeContent'
 import { MockDataEditor } from './MockDataEditor'
@@ -49,7 +49,7 @@ function computeEffectiveUpstream(params: {
   upstreamNodes: UpstreamNodeInfo[]
   sourceNodeId: string | null | undefined
   sourceAncestors: UpstreamNodeInfo[]
-  activities: { id: string; name?: string; type: string }[] | undefined
+  activities: { id: string; name?: string; type: string; parameters?: unknown }[] | undefined
   triggers: { id: string; name?: string; type: string }[] | undefined
 }): UpstreamNodeInfo[] {
   const { upstreamNodes, sourceNodeId, sourceAncestors, activities, triggers } = params
@@ -58,7 +58,7 @@ function computeEffectiveUpstream(params: {
 
   const activity = activities?.find((a) => a.id === sourceNodeId)
   if (activity) {
-    return [{ id: activity.id, name: activity.name ?? activity.id, type: activity.type }, ...sourceAncestors]
+    return [toUpstreamNodeInfo(activity), ...sourceAncestors]
   }
 
   const trigger = triggers?.find((t) => t.id === sourceNodeId)

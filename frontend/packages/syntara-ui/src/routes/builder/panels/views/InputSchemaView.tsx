@@ -13,19 +13,29 @@ export type InputSchemaViewProps = {
   data: Record<string, unknown> | null
   nodeId: string
   searchTerm?: string
+  hierarchical?: boolean
 }
 
-function buildTreeData(
-  data: Record<string, unknown>,
-  nodeId: string,
-  parentPath: string[] = [],
+type BuildTreeDataOptions = {
+  data: Record<string, unknown>
+  nodeId: string
+  parentPath?: string[]
   searchTerm?: string
-): TreeViewDataItem[] {
+  hierarchical: boolean
+}
+
+function buildTreeData({
+  data,
+  nodeId,
+  parentPath = [],
+  searchTerm,
+  hierarchical,
+}: Readonly<BuildTreeDataOptions>): TreeViewDataItem[] {
   return Object.entries(data).map(([key, value]) => {
     const currentPath = [...parentPath, key]
     const typeLabel = getTypeLabelFromValue(value)
 
-    if (isExpandable(value)) {
+    if (hierarchical && isExpandable(value)) {
       return {
         id: toTreeItemId([nodeId, ...currentPath]),
         name: (
@@ -35,7 +45,13 @@ function buildTreeData(
         ),
         defaultExpanded: true,
         hasBadge: false,
-        children: buildTreeData(value, nodeId, currentPath, searchTerm),
+        children: buildTreeData({
+          data: value,
+          nodeId,
+          parentPath: currentPath,
+          searchTerm,
+          hierarchical,
+        }),
       }
     }
 
@@ -110,7 +126,7 @@ function LeafNode({ fieldKey, value, typeLabel, nodeId, fieldPath, expression, s
   )
 
   const label = `${typeLabel} ${fieldKey}`
-  const secondary = formatLeafValue(value)
+  const secondary = isExpandable(value) ? JSON.stringify(value) : formatLeafValue(value)
 
   return (
     <DraggableTreeLeaf
@@ -122,12 +138,12 @@ function LeafNode({ fieldKey, value, typeLabel, nodeId, fieldPath, expression, s
   )
 }
 
-export function InputSchemaView({ data, nodeId, searchTerm }: Readonly<InputSchemaViewProps>) {
+export function InputSchemaView({ data, nodeId, searchTerm, hierarchical = true }: Readonly<InputSchemaViewProps>) {
   const expressionNodeId = canvasNodeIdForExpression(nodeId)
   const treeData = useMemo(() => {
     if (!data) return []
-    return buildTreeData(data, expressionNodeId, [], searchTerm)
-  }, [data, expressionNodeId, searchTerm])
+    return buildTreeData({ data, nodeId: expressionNodeId, searchTerm, hierarchical })
+  }, [data, expressionNodeId, hierarchical, searchTerm])
 
   if (!data || treeData.length === 0) {
     return null

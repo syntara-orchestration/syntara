@@ -213,7 +213,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkflowReadWithVersion'
+                $ref: '#/components/schemas/WorkflowDetailRead'
         '400':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
         '401':
@@ -919,6 +919,12 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowRead
     WorkflowReadWithVersion:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowReadWithVersion
+    WorkflowDetailRead:
+      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowDetailRead
+    PublishedWorkflowStepMetadataRead:
+      $ref: ./shared-schemas.yaml#/components/schemas/PublishedWorkflowStepMetadataRead
+    WorkflowStepMetadataRead:
+      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowStepMetadataRead
     WorkflowInvocationTriggerSchema:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowInvocationTriggerSchema
     WorkflowInvocationSchemaRead:
