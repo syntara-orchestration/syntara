@@ -446,6 +446,42 @@ class TestPreviewRetryFromFailure:
         assert data["sanitized_node_ids"] == []
         assert data["sanitized_replacements"] == {"step_2": ["step_1"]}
 
+    async def test_preview_accepts_explicit_sanitized_replacement(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
+    ) -> None:
+        """Selecting the sanitized replacement retries that path instead of rejecting."""
+        execution = await _eligible_execution(test_db_session, test_workflow, test_user)
+        await _add_completed_activity(test_db_session, execution, "step_1", {"token": "[REDACTED]", "stderr": ""})
+        result = await test_db_session.exec(
+            select(WorkflowVersion).where(
+                WorkflowVersion.workflow_id == test_workflow.id,
+                WorkflowVersion.version == test_workflow.current_version,
+            )
+        )
+        version = result.one()
+        definition = dict(version.workflow_definition)
+        definition["nodes"] = [
+            dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.token}"})
+            if node.get("id") == "step_2"
+            else node
+            for node in definition.get("nodes", [])
+        ]
+        version.workflow_definition = definition
+        test_db_session.add(version)
+        await test_db_session.commit()
+
+        response = await auth_client.get(
+            f"/api/v1/executions/{execution.id}/retry_from_failure_preview",
+            params=[("retry_point_ids", "step_1")],
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data["eligible"] is True
+        assert data["eligible_point_ids"] == ["step_1"]
+        assert data["auto_included_node_ids"] == []
+        assert data["sanitized_replacements"] == {"step_2": ["step_1"]}
+
     async def test_preview_rejects_failure_under_completed_converge(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
     ) -> None:

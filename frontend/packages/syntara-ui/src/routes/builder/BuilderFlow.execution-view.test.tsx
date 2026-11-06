@@ -392,7 +392,7 @@ describe('BuilderFlow execution view', () => {
     })
   })
 
-  it('marks a step whose start predates the retry baseline as replayed', () => {
+  it('marks reused activity output while keeping a rerun trigger distinct', () => {
     setWorkflowState({
       currentWorkflow: {
         id: 'workflow-retry',
@@ -446,7 +446,8 @@ describe('BuilderFlow execution view', () => {
         unknown
       >
 
-    expect(stateOf('trigger-0').replayed).toBe(true)
+    expect(stateOf('trigger-0').replayed).toBe(false)
+    expect(stateOf('trigger-0').started_at).toBe('2026-10-09T11:00:00Z')
     expect(stateOf('task-replayed').replayed).toBe(true)
     expect(stateOf('task-fresh').replayed).toBe(false)
   })

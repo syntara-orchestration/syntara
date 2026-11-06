@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -7,6 +8,8 @@ import { type ButtonEdgePlaceholderNode, type NodeType } from '../workflows/canv
 
 import { BuilderFlowCanvas } from './BuilderFlowCanvas'
 import type { EdgeType } from './utils/workflowToGraph'
+
+let latestReactFlowProps: Record<string, unknown> | null = null
 
 const flowStore = vi.hoisted(() => ({
   state: {
@@ -20,10 +23,29 @@ const flowStore = vi.hoisted(() => ({
 vi.mock('@xyflow/react', async () => {
   const { useRef, useSyncExternalStore } = await import('react')
   return {
-    ReactFlow: ({ children }: { children?: React.ReactNode }) => <div data-testid="reactflow">{children}</div>,
+    ReactFlow: (props: Record<string, unknown> & { children?: ReactNode }) => {
+      latestReactFlowProps = props
+      return <div data-testid="reactflow">{props.children}</div>
+    },
+    NodeToolbar: ({
+      children,
+      'data-testid': testId,
+      position,
+      offset,
+    }: {
+      children?: ReactNode
+      'data-testid'?: string
+      position?: string
+      offset?: number
+    }) => (
+      <div data-testid={testId} data-position={position} data-offset={offset}>
+        {children}
+      </div>
+    ),
     Background: () => null,
     BackgroundVariant: { Dots: 'dots' },
     ConnectionLineType: { SmoothStep: 'smoothstep' },
+    Position: { Top: 'top', Bottom: 'bottom' },
     useStore: (
       selector: (state: typeof flowStore.state) => unknown,
       equalityFn?: (previous: unknown, next: unknown) => boolean
@@ -100,6 +122,7 @@ describe('BuilderFlowCanvas', () => {
     flowStore.state = { transform: [0, 0, 1], nodes }
     flowStore.listeners.clear()
     flowStore.updateNodeInternals.mockClear()
+    latestReactFlowProps = null
   })
 
   it('renders the React Flow canvas shell', () => {
@@ -108,6 +131,76 @@ describe('BuilderFlowCanvas', () => {
     expect(screen.getByTestId('reactflow')).toBeInTheDocument()
     expect(screen.getByTestId('canvas-controls')).toBeInTheDocument()
     expect(screen.getByTestId('undo-redo')).toBeInTheDocument()
+  })
+
+  it('shows retry path labels and highlights the retry origin', () => {
+    const retryNodes = [
+      {
+        id: 'trigger-0',
+        type: FlowNodeType.TRIGGER,
+        position: { x: 0, y: 0 },
+        data: { name: 'Trigger', __executionState: { status: 'completed' } },
+      },
+      {
+        id: 'retry-origin',
+        type: FlowNodeType.TASK,
+        position: { x: 100, y: 0 },
+        data: { name: 'Call API', __executionState: { status: 'failed' } },
+      },
+      {
+        id: 'downstream',
+        type: FlowNodeType.TASK,
+        position: { x: 200, y: 0 },
+        data: { name: 'Publish', __executionState: { status: 'skipped' } },
+      },
+      {
+        id: 'retained',
+        type: FlowNodeType.TASK,
+        position: { x: 100, y: 100 },
+        data: { name: 'Retained', __executionState: { status: 'completed' } },
+      },
+      {
+        id: 'unselected-failure',
+        type: FlowNodeType.TASK,
+        position: { x: 200, y: 100 },
+        data: { name: 'Other failure', __executionState: { status: 'failed' } },
+      },
+    ] as unknown as NodeType[]
+    const retryEdges = [
+      { id: 'edge-1', source: 'retry-origin', target: 'downstream' },
+      { id: 'edge-2', source: 'trigger-0', target: 'retry-origin' },
+    ] as EdgeType[]
+
+    render(
+      <BuilderFlowCanvas
+        {...defaultProps}
+        nodes={retryNodes}
+        edges={retryEdges}
+        retryPreviewNodeIds={['retry-origin']}
+      />
+    )
+
+    expect(screen.getByTestId('retry-origin-label-retry-origin')).toHaveTextContent('Retry origin')
+    expect(screen.getByTestId('retry-state-label-downstream')).toHaveTextContent('In retry scope')
+    expect(screen.getByTestId('retry-state-label-retained')).toHaveTextContent('Retains prior result')
+    expect(screen.getByTestId('retry-state-label-unselected-failure')).toHaveTextContent('Not retried — remains failed')
+    const retryLabels = [
+      screen.getByTestId('retry-origin-retry-origin'),
+      screen.getByTestId('retry-state-downstream'),
+      screen.getByTestId('retry-state-retained'),
+      screen.getByTestId('retry-state-unselected-failure'),
+    ]
+    expect(retryLabels.every((label) => label.getAttribute('data-position') === 'top')).toBe(true)
+    expect(retryLabels[0]?.getAttribute('data-offset')).not.toBe(retryLabels[1]?.getAttribute('data-offset'))
+    const renderedNodes = (
+      latestReactFlowProps as {
+        nodes: Array<{ id: string; data: Record<string, unknown>; ariaLabel?: string }>
+      }
+    ).nodes
+    const originNode = renderedNodes.find((node) => node.id === 'retry-origin')
+    expect(originNode?.data.__retryPreviewOrigin).toBe(true)
+    expect(originNode?.ariaLabel).toContain('retry origin')
+    expect(renderedNodes.find((node) => node.id === 'trigger-0')?.ariaLabel ?? '').not.toContain('retains prior result')
   })
 
   it('does not update node internals when initially above the semantic zoom threshold', () => {

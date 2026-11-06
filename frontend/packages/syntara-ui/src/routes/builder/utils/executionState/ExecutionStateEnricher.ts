@@ -262,8 +262,9 @@ export class ExecutionStateEnricher {
   /**
    * Enrich trigger node data with execution state.
    *
-   * Trigger nodes are treated the same as regular activity nodes — their status
-   * is read directly from `activityStates` using the trigger's real ID.
+   * Trigger status and source timestamps are read from `activityStates` using
+   * the trigger's real ID. Triggers execute again for retries, so their preserved
+   * source timestamps must not mark them as reused output.
    *
    * @param options - Trigger data and execution context used to enrich it
    * @returns Trigger data enriched with execution metadata
@@ -273,7 +274,6 @@ export class ExecutionStateEnricher {
     triggerData,
     executionStatus,
     activityStates,
-    replayBaselineAt,
   }: {
     triggerRealId: string | undefined
     triggerData: T
@@ -306,7 +306,7 @@ export class ExecutionStateEnricher {
         started_at: triggerState?.startedAt ?? undefined,
         completed_at: triggerState?.completedAt ?? undefined,
         error_details: triggerState?.errorDetails ?? undefined,
-        replayed: isReplayedStep(triggerState?.startedAt, replayBaselineAt),
+        replayed: false,
       },
     }
   }
