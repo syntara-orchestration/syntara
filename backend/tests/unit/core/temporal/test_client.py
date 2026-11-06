@@ -12,6 +12,7 @@ import pytest
 from temporalio.service import RPCError, RPCStatusCode
 
 import syntara.core.temporal.client as client_mod
+from syntara.core.config.base import get_settings
 from syntara.core.temporal.client import (
     CONNECTION_ERRORS,
     get_shared_client,
@@ -78,8 +79,9 @@ class TestGetSharedClient:
             OSError("connection refused"),
             RuntimeError("event loop closed"),
             RPCError("down", RPCStatusCode.UNAVAILABLE, b""),
+            TimeoutError("connect timed out"),
         ],
-        ids=["OSError", "RuntimeError", "RPCError"],
+        ids=["OSError", "RuntimeError", "RPCError", "TimeoutError"],
     )
     async def test_returns_none_on_connect_error(self, exc: Exception) -> None:
         """Should return None when Temporal is unreachable."""
@@ -118,11 +120,12 @@ class TestGetSharedClient:
         ) as mock_connect:
             await get_shared_client()
 
+        settings = get_settings()
         call_args = mock_connect.call_args
-        # First positional arg is the address
-        assert call_args[0][0] is not None
-        # namespace kwarg is present
-        assert "namespace" in call_args[1]
+        # First positional arg is the configured address
+        assert call_args[0][0] == settings.temporal_address
+        # namespace kwarg comes from settings
+        assert call_args[1]["namespace"] == settings.temporal_namespace
         # tls kwarg is present
         assert "tls" in call_args[1]
 
