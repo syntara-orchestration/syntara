@@ -2505,6 +2505,44 @@ class TestExtractFailedActivityErrors:
         assert result == "One or more workflow activities failed"
 
 
+class TestExtractCancelledActivitiesFromEvent:
+    """Test _extract_cancelled_activities_from_event static method (P2-2 fallback)."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(
+            temporal_client=AsyncMock(),
+            session_factory=AsyncMock(),
+        )
+
+    def _make_completed_event(self, result_data: dict[str, object]) -> Mock:
+        import json
+
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+        payload = Mock()
+        payload.data = json.dumps(result_data).encode()
+        event.workflow_execution_completed_event_attributes.result.payloads = [payload]
+        return event
+
+    def test_extracts_cancelled_activities(self) -> None:
+        event = self._make_completed_event(
+            {"status": "completed_with_errors", "cancelled_activities": {"sub-1": "Sub-workflow cancelled"}}
+        )
+        result = self.service._extract_cancelled_activities_from_event(event)
+        assert result == {"sub-1": "Sub-workflow cancelled"}
+
+    def test_returns_empty_without_cancelled_activities(self) -> None:
+        event = self._make_completed_event({"status": "completed", "failed_activities": {}})
+        result = self.service._extract_cancelled_activities_from_event(event)
+        assert result == {}
+
+    def test_returns_empty_for_non_completed_event(self) -> None:
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED
+        result = self.service._extract_cancelled_activities_from_event(event)
+        assert result == {}
+
+
 class TestExtractFailedActivitiesFromEvent:
     """Test _extract_failed_activities_from_event static method."""
 
@@ -4291,6 +4329,7 @@ class TestRunMonitorLoop:
             patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value={}),
             patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
             patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_cancelled_step_nodes", new_callable=AsyncMock, return_value={}),
             patch.object(self.service, "_query_completed_nodes", new_callable=AsyncMock, return_value=set()),
         ):
             result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)

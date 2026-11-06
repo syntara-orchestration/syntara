@@ -658,7 +658,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             ),
             "completed_activities": list(node_outputs.keys()),
             "completed_nodes": self._completed_node_ids(),
-            "failed_activities": self.failed_nodes,
+            # Mirror the two queries so the completion payload (the finalizer's
+            # fallback when get_failed_nodes / get_cancelled_step_nodes time out)
+            # agrees with them: cancelled steps are excluded from failed_activities
+            # and reported under cancelled_activities, so a query-failure fallback
+            # never persists a cancelled step as FAILED.
+            "failed_activities": self.get_failed_nodes(),
+            "cancelled_activities": self.get_cancelled_step_nodes(),
         }
 
     async def _schedule_successors(

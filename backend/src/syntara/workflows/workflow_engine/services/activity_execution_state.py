@@ -195,6 +195,30 @@ class ActivityExecutionStateMixin:
         return {}
 
     @staticmethod
+    def _extract_cancelled_activities_from_event(event: HistoryEvent) -> dict[str, str]:
+        """Extract ``cancelled_activities`` from a workflow completion event result.
+
+        Mirrors ``_extract_failed_activities_from_event``: a reliable fallback when
+        the ``get_cancelled_step_nodes`` query fails, so cancelled sub-workflow steps
+        are persisted CANCELLED rather than lost (or, via the failed-activities
+        fallback, mislabelled FAILED).
+        """
+        if event.event_type != EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED:
+            return {}
+        completed_attrs = event.workflow_execution_completed_event_attributes
+        if not completed_attrs or not completed_attrs.result or not completed_attrs.result.payloads:
+            return {}
+        try:
+            result_data = json.loads(completed_attrs.result.payloads[0].data)
+            if isinstance(result_data, dict):
+                ca = result_data.get("cancelled_activities", {})
+                if isinstance(ca, dict):
+                    return ca
+        except Exception:  # noqa: BLE001
+            logger.debug("Could not parse cancelled_activities from workflow result", exc_info=True)
+        return {}
+
+    @staticmethod
     def _extract_completed_nodes_from_event(event: HistoryEvent) -> set[str]:
         """Extract successfully-completed node IDs from a workflow completion event.
 
