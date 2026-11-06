@@ -287,6 +287,18 @@ describe('CredentialSelector', () => {
     expect(screen.getByText('API Credential')).toBeInTheDocument()
   })
 
+  it('keeps the picker accessible when its visual label is hidden', async () => {
+    mockUseQueryLegacy()
+    const user = userEvent.setup()
+    const { container } = renderSelector({ label: 'Runtime credential', hideLabel: true })
+
+    expect(screen.queryByText('Runtime credential')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Runtime credential' }))
+    expect(screen.getByRole('listbox', { name: 'Runtime credential options' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Staging Token' })).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
   it('shows dropdown with credential list when clicked', async () => {
     const user = userEvent.setup()
     mockUseQueryLegacy()
@@ -397,6 +409,16 @@ describe('CredentialSelector', () => {
     expect(screen.getByText('Production API Key')).toBeInTheDocument()
     expect(screen.getByText('Staging Token')).toBeInTheDocument()
     expect(screen.getByText('Dev Bearer Token')).toBeInTheDocument()
+  })
+
+  it('does not offer incompatible credentials while credential types are unavailable', async () => {
+    const user = userEvent.setup()
+    mockUseQuery({ credentialTypes: { data: undefined, isPending: true } })
+    renderSelector({ compatibleTypeNames: ['Kafka'] })
+    await user.click(screen.getByRole('button', { name: 'Credential' }))
+    expect(screen.queryByRole('option', { name: 'Production API Key' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Staging Token' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Dev Bearer Token' })).not.toBeInTheDocument()
   })
 
   it('shows selected credential name on toggle after selection', async () => {

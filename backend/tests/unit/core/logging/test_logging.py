@@ -21,12 +21,25 @@ from pydantic import SecretStr
 
 from syntara.core.config.base import LogLevel
 from syntara.core.logging.logging import (
+    KafkaDiagnosticFilter,
     SyntaraLogRecordRenderer,
     build_syntara_formatter,
     build_syntara_json_formatter,
     build_syntara_text_formatter,
     configure_app_logging,
 )
+
+
+@pytest.mark.parametrize("name", ["aiokafka.producer.producer", "aiokafka.conn", "aiokafka.producer.sender"])
+def test_kafka_diagnostics_never_emit_message_bytes_or_raw_errors(name: str) -> None:
+    record = logging.LogRecord(name, logging.DEBUG, __file__, 1, "Sending value=%s", (b"private-message",), None)
+    record.exc_text = "password=private-password"
+    record.stack_info = "private-stack"
+    assert KafkaDiagnosticFilter().filter(record)
+    for formatter in (build_syntara_json_formatter(), build_syntara_text_formatter()):
+        rendered = formatter.format(record)
+        assert "private-" not in rendered
+        assert "details suppressed" in rendered
 
 
 class TestSyntaraLogRecordRenderer:

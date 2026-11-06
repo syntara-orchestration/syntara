@@ -1,4 +1,4 @@
-import { ExecutorTypeEnum, TriggerTypeEnum, type TaskActivity } from '@syntara/contracts'
+import { ActivityTypeEnum, ExecutorTypeEnum, TriggerTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { describe, expect, it, vi } from 'vitest'
 
 import { RegistryNodeId } from '../../../../constants'
@@ -40,6 +40,7 @@ vi.mock('./nodeMetadata', () => ({
   executorMetadata: {
     [ExecutorTypeEnum.SCRIPT]: { icon: () => null },
     [ExecutorTypeEnum.HTTP_REQUEST]: { icon: () => null },
+    [ActivityTypeEnum.KAFKA_PUBLISH]: { icon: () => null },
     [ExecutorTypeEnum.AGENTIC]: { icon: () => null },
     [ExecutorTypeEnum.AAP_JOB_TEMPLATE]: { icon: () => null },
     [ExecutorTypeEnum.APPROVAL]: { icon: () => null },
@@ -60,6 +61,18 @@ describe('nodeIconResolver', () => {
         name: 'API',
       } as TaskActivity)
       expect(result.id).toBe(RegistryNodeId.ACTION_API)
+    })
+
+    it('returns the Kafka Publish icon instead of falling back to Script', () => {
+      const result = getTaskIconDescriptor({
+        type: ActivityTypeEnum.KAFKA_PUBLISH,
+        id: 'publish',
+        name: 'Publish outcome',
+        parameters: { integration_id: 'integration', topic: 'outcomes', payload: null },
+      })
+
+      expect(result.id).toBe(RegistryNodeId.ACTION_KAFKA)
+      expect(result.icon).toBeDefined()
     })
 
     it('returns agent icon for agentic', () => {

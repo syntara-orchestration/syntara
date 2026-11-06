@@ -10,6 +10,7 @@ from pydantic import Discriminator, Field, field_validator
 from sqlmodel import SQLModel
 
 from syntara.core.constants import JsonbLimits
+from syntara.workflows.workflow_engine.models.kafka_publish import KafkaPublishParameters
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     AAPJobTemplateExecutorParameters,
     AAPWorkflowJobTemplateExecutorParameters,
@@ -75,6 +76,14 @@ class HTTPRequestNode(WorkflowNodeBase):
 
     type: Literal["http_request"]
     parameters: APIExecutorParameters
+    settings: NodeSettingsFull | None = None
+
+
+class KafkaPublishNode(WorkflowNodeBase):
+    """Publish one JSON record using a step-selected Kafka connection."""
+
+    type: Literal["kafka_publish"]
+    parameters: KafkaPublishParameters
     settings: NodeSettingsFull | None = None
 
 
@@ -146,6 +155,7 @@ _AllNodeTypes = (
     AAPJobTemplateNode
     | AAPWorkflowJobTemplateNode
     | HTTPRequestNode
+    | KafkaPublishNode
     | AgenticNode
     | ScriptNode
     | ApprovalNode

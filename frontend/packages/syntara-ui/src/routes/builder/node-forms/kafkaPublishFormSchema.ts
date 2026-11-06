@@ -1,0 +1,156 @@
+import type { WorkflowAPI } from '@syntara/contracts'
+import { z } from 'zod'
+
+import { nodeSettingsSchema } from './shared/nodeSettingsSchema'
+
+export const KAFKA_MAX_HEADERS = 128
+const fullTemplate = /^\$\{[\s\S]+\}$/
+const templateExpression = /\$\{[^}]+\}/
+const reference = z
+  .string()
+  .regex(/^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i, 'Use a literal resource UUID')
+const encodedValue = z.strictObject({ encoding: z.enum(['utf-8', 'base64']), value: z.string() })
+const header = z.strictObject({ name: z.string(), value: encodedValue.nullable() })
+
+/** Check saved value structures against the generated contract, allowing incomplete draft destinations to be edited. */
+export const kafkaPublishParametersSchema = z.strictObject({
+  integration_id: z.string().default(''),
+  credential_id: z.string().nullable().optional(),
+  topic: z.string().default(''),
+  payload: z.unknown(),
+  key: encodedValue.nullable().optional(),
+  headers: z.union([z.array(header), z.string()]).optional(),
+}) satisfies z.ZodType<WorkflowAPI.components['schemas']['KafkaPublishParameters']>
+
+const byteFields = z.object({ encoding: z.enum(['null', 'utf-8', 'base64']), value: z.string() })
+
+function parseJsonOrTemplate(text: string): unknown {
+  const trimmed = text.trim()
+  if (fullTemplate.test(trimmed)) return trimmed
+  return JSON.parse(trimmed) as unknown
+}
+
+function validJson(text: string): boolean {
+  try {
+    return z.json().safeParse(parseJsonOrTemplate(text)).success
+  } catch {
+    return false
+  }
+}
+
+function validBytes(value: z.infer<typeof byteFields>): boolean {
+  return (
+    value.encoding !== 'base64' || templateExpression.test(value.value) || z.base64().safeParse(value.value).success
+  )
+}
+
+export const kafkaPublishFormSchema = z
+  .object({
+    name: z.string(),
+    integration_id: reference.or(z.literal('')).refine((value) => value !== '', 'Select a Kafka integration'),
+    credential_id: z.union([reference, z.literal('')]),
+    credential_required: z.boolean(),
+    connection_ready: z.boolean(),
+    topic: z
+      .string()
+      .min(1, 'Enter a topic')
+      .max(249, 'Topic names can contain at most 249 characters')
+      .regex(/^[a-zA-Z0-9._-]+$/, 'Enter one literal Kafka topic name')
+      .refine((value) => value !== '.' && value !== '..', 'Enter one literal Kafka topic name'),
+    payload: z.string().min(1, 'Enter a JSON payload').refine(validJson, 'Enter valid JSON or a full-value template'),
+    key: byteFields,
+    headers_mode: z.enum(['entries', 'template']),
+    headers: z.array(z.object({ name: z.string(), ...byteFields.shape })),
+    headers_template: z.string(),
+    settings: nodeSettingsSchema,
+  })
+  .superRefine((data, ctx) => {
+    if (data.integration_id && !data.connection_ready) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['connection_ready'],
+        message: 'Kafka connection settings are not available',
+      })
+    }
+    if (data.connection_ready && data.credential_required && !data.credential_id) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['credential_id'],
+        message: 'Select a runtime Kafka credential for SASL_SSL',
+      })
+    }
+    if (!validBytes(data.key)) {
+      ctx.addIssue({ code: 'custom', path: ['key', 'value'], message: 'Enter valid standard Base64 or a template' })
+    }
+    if (data.headers_mode === 'template') {
+      if (!fullTemplate.test(data.headers_template.trim())) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['headers_template'],
+          message: 'Enter a full-value template, such as ${trigger.payload.headers}',
+        })
+      }
+      return
+    }
+    if (data.headers.length > KAFKA_MAX_HEADERS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['headers'],
+        message: 'Use at most 128 header entries, including duplicates and null values',
+      })
+    }
+    data.headers.forEach((entry, index) => {
+      if (!validBytes(entry)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['headers', index, 'value'],
+          message: 'Enter valid standard Base64 or a template',
+        })
+      }
+    })
+  })
+
+export type KafkaPublishFormData = z.infer<typeof kafkaPublishFormSchema>
+
+function buildBytes(value: z.infer<typeof byteFields>): WorkflowAPI.components['schemas']['KafkaEncodedValue'] | null {
+  return value.encoding === 'null' ? null : { encoding: value.encoding, value: value.value }
+}
+
+export function buildKafkaPublishParameters(
+  data: KafkaPublishFormData
+): WorkflowAPI.components['schemas']['KafkaPublishParameters'] {
+  return {
+    integration_id: data.integration_id,
+    credential_id: data.credential_id || null,
+    topic: data.topic,
+    payload: parseJsonOrTemplate(data.payload),
+    key: buildBytes(data.key),
+    headers:
+      data.headers_mode === 'template'
+        ? data.headers_template.trim()
+        : data.headers.map((entry) => ({ name: entry.name, value: buildBytes(entry) })),
+  }
+}
+
+export function kafkaPublishInitialFields(
+  parameters: WorkflowAPI.components['schemas']['KafkaPublishParameters']
+): Partial<KafkaPublishFormData> {
+  return {
+    integration_id: parameters.integration_id,
+    credential_id: parameters.credential_id ?? '',
+    topic: parameters.topic,
+    payload:
+      typeof parameters.payload === 'string' && fullTemplate.test(parameters.payload)
+        ? parameters.payload
+        : (JSON.stringify(parameters.payload, null, 2) ?? ''),
+    key: parameters.key ?? { encoding: 'null', value: '' },
+    headers_mode: typeof parameters.headers === 'string' ? 'template' : 'entries',
+    headers_template: typeof parameters.headers === 'string' ? parameters.headers : '',
+    headers: Array.isArray(parameters.headers)
+      ? parameters.headers.map((entry) => ({
+          name: entry.name,
+          ...(entry.value ?? { encoding: 'null' as const, value: '' }),
+        }))
+      : [],
+  }
+}

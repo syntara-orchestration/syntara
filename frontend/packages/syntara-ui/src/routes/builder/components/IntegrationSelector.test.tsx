@@ -1,5 +1,5 @@
 import type { IntegrationsAPI } from '@syntara/contracts'
-import { IntegrationStatusEnum } from '@syntara/contracts'
+import { IntegrationStatusEnum, IntegrationTypeEnum } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -7,16 +7,10 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { integrationsClient } from '../../../client'
-
 import { IntegrationSelector } from './IntegrationSelector'
 
-vi.mock('../../../client', () => ({
-  integrationsClient: {
-    useQuery: vi.fn(),
-    useMutation: vi.fn(),
-  },
-}))
+const { integrationsQuery } = vi.hoisted(() => ({ integrationsQuery: vi.fn() }))
+vi.mock('./useAllIntegrations', () => ({ useAllIntegrations: integrationsQuery }))
 
 type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
@@ -52,30 +46,30 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 )
 
 function mockQuerySuccess(resources = mockIntegrations) {
-  vi.mocked(integrationsClient.useQuery).mockReturnValue({
-    data: { resources, next: null, prev: null },
+  integrationsQuery.mockReturnValue({
+    data: resources,
     isPending: false,
     isError: false,
     refetch: vi.fn(),
-  } as ReturnType<typeof integrationsClient.useQuery>)
+  })
 }
 
 function mockQueryLoading() {
-  vi.mocked(integrationsClient.useQuery).mockReturnValue({
+  integrationsQuery.mockReturnValue({
     data: undefined,
     isPending: true,
     isError: false,
     refetch: vi.fn(),
-  } as ReturnType<typeof integrationsClient.useQuery>)
+  })
 }
 
 function mockQueryError() {
-  vi.mocked(integrationsClient.useQuery).mockReturnValue({
+  integrationsQuery.mockReturnValue({
     data: undefined,
     isPending: false,
     isError: true,
     refetch: vi.fn(),
-  } as ReturnType<typeof integrationsClient.useQuery>)
+  })
 }
 
 function renderSelector(props: Partial<Parameters<typeof IntegrationSelector>[0]> = {}) {
@@ -85,6 +79,43 @@ function renderSelector(props: Partial<Parameters<typeof IntegrationSelector>[0]
 }
 
 describe('IntegrationSelector', () => {
+  it('uses the Kafka API and workflow project scope for Kafka selection', () => {
+    mockQuerySuccess([])
+    renderSelector({ integrationType: IntegrationTypeEnum.KAFKA, projectId: 'project-id', label: 'Kafka integration' })
+    expect(integrationsQuery).toHaveBeenCalledWith(IntegrationTypeEnum.KAFKA, 'project-id')
+  })
+
+  it('shows Kafka broker addresses and availability in the integration menu', async () => {
+    const kafkaIntegration = {
+      id: 'kafka-integration',
+      name: 'Kafka Cluster (Demo)',
+      integration_type: IntegrationTypeEnum.KAFKA,
+      validation_status: IntegrationStatusEnum.AVAILABLE,
+      configuration: {
+        integration_type: IntegrationTypeEnum.KAFKA,
+        bootstrap_servers: ['broker-1.example.invalid:9093', 'broker-2.example.invalid:9093'],
+        security_protocol: 'SASL_SSL',
+      },
+    } satisfies IntegrationsAPI.components['schemas']['KafkaIntegrationRead']
+    integrationsQuery.mockReturnValue({ data: [kafkaIntegration], isPending: false, isError: false })
+    const user = userEvent.setup()
+    const { container } = render(
+      <IntegrationSelector
+        integrationType={IntegrationTypeEnum.KAFKA}
+        label="Integration"
+        isRequired
+        placeholder="Select a Kafka integration"
+        onChange={vi.fn()}
+      />,
+      { wrapper }
+    )
+
+    expect(screen.getByRole('button', { name: 'Integration' })).toHaveTextContent('Select a Kafka integration')
+    await user.click(screen.getByRole('button', { name: 'Integration' }))
+    expect(screen.getByRole('option', { name: /Kafka Cluster \(Demo\)/ })).toHaveTextContent('Available')
+    expect(screen.getByText('broker-1.example.invalid:9093, broker-2.example.invalid:9093')).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
   beforeEach(() => {
     mockQuerySuccess()
   })
@@ -233,20 +264,12 @@ describe('IntegrationSelector', () => {
 
   it('passes project_id to the integrations query when projectId is provided', () => {
     renderSelector({ projectId: 'proj-123' })
-    expect(integrationsClient.useQuery).toHaveBeenCalledWith('get', '/integrations', {
-      params: {
-        query: { integration_type: 'mcp_server', enabled: true, project_id: 'proj-123' },
-      },
-    })
+    expect(integrationsQuery).toHaveBeenCalledWith(IntegrationTypeEnum.MCP_SERVER, 'proj-123')
   })
 
   it('does not include project_id in the query when projectId is omitted', () => {
     renderSelector()
-    expect(integrationsClient.useQuery).toHaveBeenCalledWith('get', '/integrations', {
-      params: {
-        query: { integration_type: 'mcp_server', enabled: true },
-      },
-    })
+    expect(integrationsQuery).toHaveBeenCalledWith(IntegrationTypeEnum.MCP_SERVER, undefined)
   })
 
   it('renders only project-scoped integrations when projectId filters the result set', async () => {

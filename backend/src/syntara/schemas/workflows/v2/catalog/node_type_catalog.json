@@ -120,6 +120,15 @@
       "since": "2.0.0"
     },
     {
+      "type": "kafka_publish",
+      "name": "Kafka Publish",
+      "description": "Publish one JSON record to a fixed Kafka topic and return acknowledgment metadata",
+      "labels": {"category": "executor"},
+      "schema_ref": "../executors/kafka_publish.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
       "type": "agentic",
       "name": "Task Agent",
       "description": "Execute task agent tasks with asynchronous completion",

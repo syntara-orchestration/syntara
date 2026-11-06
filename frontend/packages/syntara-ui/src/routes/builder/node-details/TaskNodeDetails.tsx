@@ -41,6 +41,7 @@ import {
 } from '../utils/aapHelpers'
 
 import { AIAgentNodeDetails } from './AIAgentNodeDetails'
+import { KafkaPublishNodeDetails } from './KafkaPublishNodeDetails'
 
 /**
  * Stored AAP config supports both snake_case (API) and camelCase (legacy) field names.
@@ -545,6 +546,17 @@ export function TaskNodeDetails({
       <AIAgentNodeDetails
         taskData={taskData}
         nodeId={nodeId}
+        onClose={onClose}
+        onHeaderContentChange={onHeaderContentChange}
+        projectId={projectId}
+      />
+    )
+  }
+
+  if (taskData.type === ActivityTypeEnum.KAFKA_PUBLISH) {
+    return (
+      <KafkaPublishNodeDetails
+        taskData={taskData}
         onClose={onClose}
         onHeaderContentChange={onHeaderContentChange}
         projectId={projectId}

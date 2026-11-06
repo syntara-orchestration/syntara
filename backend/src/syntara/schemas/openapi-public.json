@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Syntara API",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "description": "A distributed multi-agent workflow orchestration system"
   },
   "servers": [
@@ -52894,13 +52894,15 @@
           "workflow_definition": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/WorkflowDefinition"
+                "additionalProperties": true,
+                "type": "object"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Workflow definition from the executed version. Only included when requested via ?include=workflow_definition query parameter."
+            "description": "Workflow definition from the executed version. Only included when requested via ?include=workflow_definition query parameter.",
+            "title": "Workflow Definition"
           },
           "activities": {
             "anyOf": [
@@ -53187,6 +53189,7 @@
           "agentic",
           "approval",
           "http_request",
+          "kafka_publish",
           "internal_activity",
           "script"
         ]
@@ -54957,6 +54960,9 @@
                   "$ref": "#/components/schemas/HTTPRequestNode"
                 },
                 {
+                  "$ref": "#/components/schemas/KafkaPublishNode"
+                },
+                {
                   "$ref": "#/components/schemas/AgenticNode"
                 },
                 {
@@ -54994,7 +55000,8 @@
                   "loop": "#/components/schemas/LoopNode",
                   "script": "#/components/schemas/ScriptNode",
                   "switch": "#/components/schemas/SwitchNode",
-                  "wait": "#/components/schemas/WaitNode"
+                  "wait": "#/components/schemas/WaitNode",
+                  "kafka_publish": "#/components/schemas/KafkaPublishNode"
                 }
               }
             },
@@ -58002,6 +58009,216 @@
         ],
         "title": "SubscriptionRetireRequest",
         "description": "Safe retirement by default; disposition requires its separate grant."
+      },
+      "KafkaEncodedValue": {
+        "properties": {
+          "encoding": {
+            "type": "string",
+            "enum": [
+              "utf-8",
+              "base64"
+            ],
+            "title": "Encoding"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "encoding",
+          "value"
+        ],
+        "title": "KafkaEncodedValue",
+        "description": "Explicit text or binary representation; empty bytes remain distinct from null."
+      },
+      "KafkaPublishHeader": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KafkaEncodedValue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "KafkaPublishHeader",
+        "description": "One ordered header; duplicate names and null values are intentional."
+      },
+      "KafkaPublishParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
+            "title": "Integration Id"
+          },
+          "credential_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Id"
+          },
+          "topic": {
+            "not": {
+              "enum": [
+                ".",
+                ".."
+              ]
+            },
+            "type": "string",
+            "maxLength": 249,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "title": "Topic"
+          },
+          "payload": {
+            "title": "Payload",
+            "description": "Required JSON value; explicit null publishes JSON null, not a tombstone"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KafkaEncodedValue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "headers": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KafkaPublishHeader"
+                },
+                "type": "array"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Headers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "integration_id",
+          "topic",
+          "payload"
+        ],
+        "title": "KafkaPublishParameters",
+        "description": "Fixed destination and a templated JSON message, with no producer overrides."
+      },
+      "KafkaPublishNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "kafka_publish",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/KafkaPublishParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsFull"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "KafkaPublishNode",
+        "description": "Publish one JSON record using a step-selected Kafka connection."
       }
     },
     "securitySchemes": {

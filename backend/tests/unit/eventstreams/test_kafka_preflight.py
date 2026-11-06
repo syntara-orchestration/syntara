@@ -6,7 +6,14 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from aiokafka.errors import IncompatibleBrokerVersion, KafkaConnectionError
+from aiokafka.errors import (
+    AuthenticationFailedError,
+    IncompatibleBrokerVersion,
+    KafkaConnectionError,
+    SaslAuthenticationFailed,
+    UnknownError,
+    UnsupportedSaslMechanismError,
+)
 from aiokafka.protocol.metadata import MetadataRequest_v4, MetadataRequest_v5, MetadataResponse_v4, MetadataResponse_v5
 
 from syntara.eventstreams.adapters.kafka_preflight import NonCreatingMetadataRequest
@@ -150,3 +157,16 @@ async def test_bootstrap_fallback_is_bounded_and_uses_same_runtime_identity() ->
         assert (await preflight(config, CREDENTIAL, "alerts")).success
     assert create.call_count == 2
     assert all(c.kwargs["sasl_plain_username"] == "runtime" for c in create.call_args_list)
+
+
+@pytest.mark.parametrize(
+    "error", [AuthenticationFailedError, SaslAuthenticationFailed, UnsupportedSaslMechanismError, UnknownError]
+)
+async def test_terminal_failure_is_not_hidden_by_bootstrap_fallback(error: type[Exception]) -> None:
+    from syntara.eventstreams.adapters.kafka_preflight import _connect
+
+    config = KafkaConfiguration(bootstrap_servers=["one.example.com:9093", "two.example.com:9093"])
+    with patch(f"{MODULE}.create_conn", side_effect=error("private-value")) as create:
+        with pytest.raises(error):
+            await _connect(config, {})
+    assert create.call_count == 1
