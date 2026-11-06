@@ -12,77 +12,10 @@ if TYPE_CHECKING:
     from contextlib import AbstractContextManager
 
 from syntara.metrics.queue_depth_poller import (
-    _ensure_client,
     _make_poll_callback,
     _query_queue_depth,
-    _query_running_workflow_count,
     get_queue_depth_poller,
 )
-
-
-class TestEnsureClient:
-    """Tests for _ensure_client lazy connection helper."""
-
-    @pytest.fixture(autouse=True)
-    def _reset_module_client(self) -> None:
-        """Reset the module-level cached client before each test."""
-        import syntara.metrics.queue_depth_poller as mod
-
-        mod._temporal_client = None
-
-    @pytest.mark.asyncio
-    async def test_connects_on_first_call(self) -> None:
-        """First call should attempt to connect and return the client."""
-        mock_client = MagicMock()
-        with patch(
-            "syntara.metrics.queue_depth_poller.Client.connect",
-            new_callable=AsyncMock,
-            return_value=mock_client,
-        ):
-            result = await _ensure_client("localhost:7233", "default")
-
-        assert result is mock_client
-
-    @pytest.mark.asyncio
-    async def test_returns_cached_client_on_subsequent_calls(self) -> None:
-        """Second call should return the cached client without reconnecting."""
-        mock_client = MagicMock()
-        with patch(
-            "syntara.metrics.queue_depth_poller.Client.connect",
-            new_callable=AsyncMock,
-            return_value=mock_client,
-        ) as mock_connect:
-            first = await _ensure_client("localhost:7233", "default")
-            second = await _ensure_client("localhost:7233", "default")
-
-        assert first is second
-        mock_connect.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_returns_none_on_connection_failure(self) -> None:
-        """Connection failures should return None without raising."""
-        with patch(
-            "syntara.metrics.queue_depth_poller.Client.connect",
-            new_callable=AsyncMock,
-            side_effect=OSError("connection refused"),
-        ):
-            result = await _ensure_client("bad-host:7233", "default")
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_returns_none_on_rpc_error(self) -> None:
-        """RPCError during connect should return None."""
-        from temporalio.service import RPCError, RPCStatusCode
-
-        with patch(
-            "syntara.metrics.queue_depth_poller.Client.connect",
-            new_callable=AsyncMock,
-            side_effect=RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b""),
-        ):
-            result = await _ensure_client("bad-host:7233", "default")
-
-        assert result is None
 
 
 class TestQueryQueueDepth:
@@ -128,43 +61,13 @@ class TestQueryQueueDepth:
         assert depth == 0
 
 
-class TestQueryRunningWorkflowCount:
-    """Tests for _query_running_workflow_count visibility API helper."""
-
-    @pytest.mark.asyncio
-    async def test_returns_count_from_temporal(self) -> None:
-        """Should return the count from Temporal's count_workflows response."""
-        mock_result = MagicMock()
-        mock_result.count = 42
-
-        mock_client = MagicMock()
-        mock_client.count_workflows = AsyncMock(return_value=mock_result)
-
-        count = await _query_running_workflow_count(mock_client)
-        assert count == 42
-        mock_client.count_workflows.assert_called_once_with("ExecutionStatus='Running'")
-
-    @pytest.mark.asyncio
-    async def test_returns_zero_when_no_running_workflows(self) -> None:
-        """Should return 0 when no workflows are running."""
-        mock_result = MagicMock()
-        mock_result.count = 0
-
-        mock_client = MagicMock()
-        mock_client.count_workflows = AsyncMock(return_value=mock_result)
-
-        count = await _query_running_workflow_count(mock_client)
-        assert count == 0
-
-
 class TestPollCallback:
-    """Tests for the poll callback produced by _make_poll_callback."""
+    """Tests for the poll callback produced by _make_poll_callback.
 
-    @pytest.fixture(autouse=True)
-    def _reset_module_client(self) -> None:
-        import syntara.metrics.queue_depth_poller as mod
-
-        mod._temporal_client = None
+    The poller delegates connection management to get_shared_client() from
+    syntara.core.temporal.client; tests patch that function directly rather
+    than the removed Client.connect call.
+    """
 
     @pytest.mark.asyncio
     async def test_records_metric_per_queue_with_task_queue_label(self) -> None:
@@ -174,13 +77,13 @@ class TestPollCallback:
         mock_resp.stats.approximate_backlog_count = 5
         mock_resp.task_queue_status = None
         mock_client.workflow_service.describe_task_queue = AsyncMock(return_value=mock_resp)
-        mock_client.count_workflows = AsyncMock(return_value=MagicMock(count=10))
+        mock_client.count_workflows = AsyncMock(return_value=MagicMock(count=0))
 
         mock_recorder = MagicMock()
 
         with (
             patch(
-                "syntara.metrics.queue_depth_poller.Client.connect",
+                "syntara.metrics.queue_depth_poller.get_shared_client",
                 new_callable=AsyncMock,
                 return_value=mock_client,
             ),
@@ -189,16 +92,14 @@ class TestPollCallback:
                 return_value=mock_recorder,
             ),
         ):
-            callback = _make_poll_callback("localhost:7233", "default", ["orchestrator-workflow-queue"])
+            callback = _make_poll_callback(task_queues=["orchestrator-workflow-queue"])
             await callback(None)
 
         from syntara.metrics.types import ComponentLabel, MetricType
 
-        queue_depth_calls = [
-            c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.TEMPORAL_QUEUE_DEPTH
-        ]
-        assert len(queue_depth_calls) == 1
-        assert queue_depth_calls[0] == (
+        depth_calls = [c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.TEMPORAL_QUEUE_DEPTH]
+        assert len(depth_calls) == 1
+        assert depth_calls[0] == (
             (MetricType.TEMPORAL_QUEUE_DEPTH, 5.0),
             {"component": ComponentLabel.TEMPORAL_WORKER, "labels": {"task_queue": "orchestrator-workflow-queue"}},
         )
@@ -214,12 +115,11 @@ class TestPollCallback:
         mock_client.count_workflows = AsyncMock(return_value=MagicMock(count=0))
 
         mock_recorder = MagicMock()
-
         queues = ["orchestrator-workflow-queue", "orchestrator-background-queue"]
 
         with (
             patch(
-                "syntara.metrics.queue_depth_poller.Client.connect",
+                "syntara.metrics.queue_depth_poller.get_shared_client",
                 new_callable=AsyncMock,
                 return_value=mock_client,
             ),
@@ -228,45 +128,47 @@ class TestPollCallback:
                 return_value=mock_recorder,
             ),
         ):
-            callback = _make_poll_callback("localhost:7233", "default", queues)
+            callback = _make_poll_callback(task_queues=queues)
             await callback(None)
 
         from syntara.metrics.types import ComponentLabel, MetricType
 
-        queue_depth_calls = [
-            c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.TEMPORAL_QUEUE_DEPTH
-        ]
-        assert len(queue_depth_calls) == 2
-        recorded_queues = {c.kwargs["labels"]["task_queue"] for c in queue_depth_calls}
+        depth_calls = [c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.TEMPORAL_QUEUE_DEPTH]
+        assert len(depth_calls) == 2
+        recorded_queues = {c.kwargs["labels"]["task_queue"] for c in depth_calls}
         assert recorded_queues == set(queues)
-        for call in queue_depth_calls:
+        for call in depth_calls:
             assert call.args == (MetricType.TEMPORAL_QUEUE_DEPTH, 3.0)
             assert call.kwargs["component"] == ComponentLabel.TEMPORAL_WORKER
 
     @pytest.mark.asyncio
     async def test_skips_recording_when_client_unavailable(self) -> None:
-        """Callback should not record when Temporal connection fails."""
+        """Callback should not record when get_shared_client returns None."""
         mock_recorder = MagicMock()
 
         with (
             patch(
-                "syntara.metrics.queue_depth_poller.Client.connect",
+                "syntara.metrics.queue_depth_poller.get_shared_client",
                 new_callable=AsyncMock,
-                side_effect=OSError("refused"),
+                return_value=None,
             ),
             patch(
                 "syntara.metrics.queue_depth_poller.get_metrics_recorder",
                 return_value=mock_recorder,
             ),
         ):
-            callback = _make_poll_callback("bad:7233", "default", ["q"])
+            callback = _make_poll_callback(task_queues=["q"])
             await callback(None)
 
         mock_recorder.record.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_continues_remaining_queues_on_rpc_error(self) -> None:
-        """An RPCError on one queue should not abort polling of the remaining queues."""
+        """An RPCError on one queue should not abort polling of the remaining queues.
+
+        A connection-level error (UNAVAILABLE) also triggers invalidate_client()
+        so the next poll cycle will reconnect.
+        """
         from temporalio.service import RPCError, RPCStatusCode
 
         mock_client = MagicMock()
@@ -281,12 +183,12 @@ class TestPollCallback:
                 ok_resp,
             ]
         )
-        mock_client.count_workflows = AsyncMock(return_value=MagicMock(count=3))
+        mock_client.count_workflows = AsyncMock(return_value=MagicMock(count=0))
         mock_recorder = MagicMock()
 
         with (
             patch(
-                "syntara.metrics.queue_depth_poller.Client.connect",
+                "syntara.metrics.queue_depth_poller.get_shared_client",
                 new_callable=AsyncMock,
                 return_value=mock_client,
             ),
@@ -294,101 +196,24 @@ class TestPollCallback:
                 "syntara.metrics.queue_depth_poller.get_metrics_recorder",
                 return_value=mock_recorder,
             ),
+            patch(
+                "syntara.core.temporal.client.invalidate_client",
+            ) as mock_invalidate,
         ):
-            callback = _make_poll_callback(
-                "localhost:7233", "default", ["orchestrator-workflow-queue", "orchestrator-background-queue"]
-            )
+            callback = _make_poll_callback(task_queues=["orchestrator-workflow-queue", "orchestrator-background-queue"])
             await callback(None)
 
         from syntara.metrics.types import ComponentLabel, MetricType
 
-        queue_depth_calls = [
-            c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.TEMPORAL_QUEUE_DEPTH
-        ]
-        assert len(queue_depth_calls) == 1
-        assert queue_depth_calls[0] == (
+        # Polling continues: second queue is recorded despite first erroring.
+        depth_calls = [c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.TEMPORAL_QUEUE_DEPTH]
+        assert len(depth_calls) == 1
+        assert depth_calls[0] == (
             (MetricType.TEMPORAL_QUEUE_DEPTH, 7.0),
             {"component": ComponentLabel.TEMPORAL_WORKER, "labels": {"task_queue": "orchestrator-background-queue"}},
         )
-
-    @pytest.mark.asyncio
-    async def test_records_active_workflows_count(self) -> None:
-        """Callback should emit ACTIVE_WORKFLOWS from Temporal count_workflows."""
-        mock_client = MagicMock()
-        mock_resp = MagicMock()
-        mock_resp.stats.approximate_backlog_count = 0
-        mock_resp.task_queue_status = None
-        mock_client.workflow_service.describe_task_queue = AsyncMock(return_value=mock_resp)
-        mock_client.count_workflows = AsyncMock(return_value=MagicMock(count=15))
-
-        mock_recorder = MagicMock()
-
-        with (
-            patch(
-                "syntara.metrics.queue_depth_poller.Client.connect",
-                new_callable=AsyncMock,
-                return_value=mock_client,
-            ),
-            patch(
-                "syntara.metrics.queue_depth_poller.get_metrics_recorder",
-                return_value=mock_recorder,
-            ),
-        ):
-            callback = _make_poll_callback("localhost:7233", "default", ["orchestrator-workflow-queue"])
-            await callback(None)
-
-        from syntara.metrics.types import ComponentLabel, MetricType
-
-        workflow_count_calls = [
-            c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.ACTIVE_WORKFLOWS
-        ]
-        assert len(workflow_count_calls) == 1
-        assert workflow_count_calls[0] == (
-            (MetricType.ACTIVE_WORKFLOWS, 15.0),
-            {"component": ComponentLabel.TEMPORAL_WORKER},
-        )
-
-    @pytest.mark.asyncio
-    async def test_count_workflows_rpc_error_does_not_affect_queue_depth(self) -> None:
-        """An RPCError from count_workflows should not prevent queue depth recording."""
-        from temporalio.service import RPCError, RPCStatusCode
-
-        mock_client = MagicMock()
-        mock_resp = MagicMock()
-        mock_resp.stats.approximate_backlog_count = 4
-        mock_resp.task_queue_status = None
-        mock_client.workflow_service.describe_task_queue = AsyncMock(return_value=mock_resp)
-        mock_client.count_workflows = AsyncMock(
-            side_effect=RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b""),
-        )
-
-        mock_recorder = MagicMock()
-
-        with (
-            patch(
-                "syntara.metrics.queue_depth_poller.Client.connect",
-                new_callable=AsyncMock,
-                return_value=mock_client,
-            ),
-            patch(
-                "syntara.metrics.queue_depth_poller.get_metrics_recorder",
-                return_value=mock_recorder,
-            ),
-        ):
-            callback = _make_poll_callback("localhost:7233", "default", ["orchestrator-workflow-queue"])
-            await callback(None)
-
-        from syntara.metrics.types import MetricType
-
-        queue_depth_calls = [
-            c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.TEMPORAL_QUEUE_DEPTH
-        ]
-        assert len(queue_depth_calls) == 1
-
-        workflow_count_calls = [
-            c for c in mock_recorder.record.call_args_list if c.args[0] == MetricType.ACTIVE_WORKFLOWS
-        ]
-        assert len(workflow_count_calls) == 0
+        # Connection error triggers client invalidation so next cycle reconnects.
+        mock_invalidate.assert_called_once()
 
 
 class TestGetQueueDepthPoller:

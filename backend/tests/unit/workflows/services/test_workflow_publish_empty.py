@@ -10,12 +10,12 @@ from uuid import UUID, uuid4
 import pytest
 
 from syntara.core.models.user_reference import UserReference, UserReferenceType
+from syntara.core.temporal import client as temporal_client_mod
 from syntara.workflows.exceptions import (
     ScheduledTriggerSyncError,
     TriggerValidationError,
     WorkflowPublishValidationError,
 )
-from syntara.workflows.services import scheduled_trigger_service as scheduled_trigger_service_mod
 from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.services.workflow_service import WorkflowService, _pending_schedule_delete_tasks
 
@@ -972,7 +972,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
             patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
             patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as mock_wh_cls,
             patch(
-                "syntara.workflows.services.scheduled_trigger_service.Client.connect",
+                "syntara.core.temporal.client.Client.connect",
                 new=_hang_connect,
             ),
         ):
@@ -981,18 +981,20 @@ class TestScheduledTriggerSyncGracefulDegradation:
                 result = await asyncio.wait_for(mock_service.unpublish_workflow(workflow_id), timeout=1.0)
                 await asyncio.wait_for(connect_started.wait(), timeout=1.0)
                 mock_commit.assert_awaited()
-                assert not scheduled_trigger_service_mod._client_lock.locked()
+                assert not temporal_client_mod._client_lock.locked()
                 pending = _pending_delete_tasks()
                 assert len(pending) == 1
                 assert not pending[0].done()
             finally:
                 await _cancel_background_deletes()
-                connect_task = scheduled_trigger_service_mod._connect_task
+                connect_task = temporal_client_mod._connect_task
                 if connect_task is not None:
                     connect_task.cancel()
                     await asyncio.gather(connect_task, return_exceptions=True)
-                    scheduled_trigger_service_mod._connect_task = None
-                    scheduled_trigger_service_mod._connect_started_at = None
+                    temporal_client_mod._connect_task = None
+                    temporal_client_mod._connect_started_at = None
+                    temporal_client_mod._pending_connect_tasks.clear()
+                    temporal_client_mod._cached_client = None
 
         assert result == mock_workflow
         assert mock_workflow.published_version_id is None

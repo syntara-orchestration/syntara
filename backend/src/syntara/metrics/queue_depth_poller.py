@@ -16,17 +16,19 @@ aggregation at scrape time.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from temporalio.api.enums.v1 import TaskQueueKind, TaskQueueType
 from temporalio.api.taskqueue.v1 import TaskQueue
 from temporalio.api.workflowservice.v1 import DescribeTaskQueueRequest
-from temporalio.client import Client
 from temporalio.service import RPCError
 
+if TYPE_CHECKING:
+    from temporalio.client import Client
+
 from syntara.core.config.base import get_settings
-from syntara.core.tls.temporal import build_temporal_tls_config
+from syntara.core.temporal.client import get_shared_client, invalidate_on_connection_error
 from syntara.core.workers.periodic import PeriodicWorker
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
@@ -34,27 +36,6 @@ from syntara.metrics.types import ComponentLabel, MetricType
 logger = structlog.stdlib.get_logger(__name__)
 
 _POLL_INTERVAL_SECONDS = 5.0
-
-# Module-level client so the connection is established once and reused
-# across polling cycles.
-_temporal_client: Client | None = None
-
-
-async def _ensure_client(address: str, namespace: str) -> Client | None:
-    """Return a cached Temporal client, connecting on first call."""
-    global _temporal_client  # noqa: PLW0603
-    if _temporal_client is not None:
-        return _temporal_client
-    try:
-        _temporal_client = await Client.connect(address, namespace=namespace, tls=build_temporal_tls_config())
-    except (RPCError, OSError, RuntimeError):
-        logger.warning(
-            "queue_depth_poller_connect_failed",
-            temporal_address=address,
-            exc_info=True,
-        )
-        return None
-    return _temporal_client
 
 
 async def _query_queue_depth(client: Client, task_queue: str, namespace: str) -> int:
@@ -97,8 +78,6 @@ async def _query_running_workflow_count(client: Client) -> int:
 
 
 def _make_poll_callback(
-    temporal_address: str,
-    namespace: str,
     task_queues: list[str],
 ) -> Any:  # noqa: ANN401
     """Build the async callback consumed by ``PeriodicWorker``.
@@ -113,14 +92,16 @@ def _make_poll_callback(
     """
 
     async def _poll(_sf: object) -> None:
-        client = await _ensure_client(temporal_address, namespace)
+        client = await get_shared_client()
         if client is None:
             return
+        settings = get_settings()
         recorder = get_metrics_recorder()
         for task_queue in task_queues:
             try:
-                depth = await _query_queue_depth(client, task_queue, namespace)
-            except RPCError:
+                depth = await _query_queue_depth(client, task_queue, settings.temporal_namespace)
+            except RPCError as e:
+                invalidate_on_connection_error(e)
                 logger.debug("queue_depth_poller_rpc_error", task_queue=task_queue, exc_info=True)
                 continue
             recorder.record(
@@ -155,10 +136,6 @@ def get_queue_depth_poller() -> PeriodicWorker:
     return PeriodicWorker(
         name="temporal-queue-depth-poller",
         interval_seconds=_POLL_INTERVAL_SECONDS,
-        callback=_make_poll_callback(
-            temporal_address=settings.temporal_address,
-            namespace=settings.temporal_namespace,
-            task_queues=task_queues,
-        ),
+        callback=_make_poll_callback(task_queues=task_queues),
         coordinate=False,
     )

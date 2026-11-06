@@ -1,6 +1,6 @@
 """Unit tests for async activity completion methods in TemporalExecutionService."""
 
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from temporalio.service import RPCError, RPCStatusCode
@@ -63,6 +63,39 @@ class TestCompleteAsyncActivity:
         with pytest.raises(RPCError, match="connection refused"):
             await service.complete_async_activity("wf-123", "node-1", {"output": {}})
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED])
+    async def test_invalidates_client_on_connection_error(self, status: RPCStatusCode) -> None:
+        service, mock_client = _make_service()
+        mock_handle = AsyncMock()
+        mock_handle.complete.side_effect = RPCError("err", status=status, raw_grpc_status=b"")
+        mock_client.get_async_activity_handle.return_value = mock_handle
+
+        with (
+            patch("syntara.core.temporal.client.invalidate_client") as mock_invalidate,
+            pytest.raises(RPCError),
+        ):
+            await service.complete_async_activity("wf-123", "node-1", {"output": {}})
+
+        mock_invalidate.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_does_not_invalidate_on_non_connection_error(self) -> None:
+        service, mock_client = _make_service()
+        mock_handle = AsyncMock()
+        mock_handle.complete.side_effect = RPCError(
+            "bad request", status=RPCStatusCode.INVALID_ARGUMENT, raw_grpc_status=b""
+        )
+        mock_client.get_async_activity_handle.return_value = mock_handle
+
+        with (
+            patch("syntara.core.temporal.client.invalidate_client") as mock_invalidate,
+            pytest.raises(RPCError),
+        ):
+            await service.complete_async_activity("wf-123", "node-1", {"output": {}})
+
+        mock_invalidate.assert_not_called()
+
 
 class TestFailAsyncActivity:
     """Tests for TemporalExecutionService.fail_async_activity."""
@@ -108,3 +141,38 @@ class TestFailAsyncActivity:
 
         with pytest.raises(RPCError, match="connection refused"):
             await service.fail_async_activity("wf-123", "node-1", RuntimeError("err"))
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED])
+    async def test_invalidates_client_on_connection_error(self, status: RPCStatusCode) -> None:
+        service, mock_client = _make_service()
+        mock_handle = AsyncMock()
+        mock_handle.fail.side_effect = RPCError("err", status=status, raw_grpc_status=b"")
+        mock_client.get_async_activity_handle.return_value = mock_handle
+        error = RuntimeError("err")
+
+        with (
+            patch("syntara.core.temporal.client.invalidate_client") as mock_invalidate,
+            pytest.raises(RPCError),
+        ):
+            await service.fail_async_activity("wf-123", "node-1", error)
+
+        mock_invalidate.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_does_not_invalidate_on_non_connection_error(self) -> None:
+        service, mock_client = _make_service()
+        mock_handle = AsyncMock()
+        mock_handle.fail.side_effect = RPCError(
+            "bad request", status=RPCStatusCode.INVALID_ARGUMENT, raw_grpc_status=b""
+        )
+        mock_client.get_async_activity_handle.return_value = mock_handle
+        error = RuntimeError("err")
+
+        with (
+            patch("syntara.core.temporal.client.invalidate_client") as mock_invalidate,
+            pytest.raises(RPCError),
+        ):
+            await service.fail_async_activity("wf-123", "node-1", error)
+
+        mock_invalidate.assert_not_called()
