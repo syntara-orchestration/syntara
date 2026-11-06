@@ -1085,7 +1085,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         """Handle an external callback for an async-completion activity.
 
         Routes the callback to either complete or fail the Temporal activity
-        based on the signal_data status field. Form Prompt callbacks are reconciled 
+        based on the signal_data status field. Form Prompt callbacks are reconciled
         against their persisted submission.
 
         Args:
