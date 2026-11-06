@@ -183,11 +183,20 @@ class TestListCredentials:
 
     @pytest.mark.asyncio
     async def test_list_returns_masked_metadata(
-        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str
+        self,
+        auth_client: AsyncClient,
+        bearer_type: CredentialType,
+        test_project_id: str,
+        test_db_session: AsyncSession,
     ) -> None:
+        from sqlmodel import select as sa_select
+
+        from syntara.credentials.models.credential import Credential
+
         # Create two credentials
+        created_ids = []
         for i in range(2):
-            await auth_client.post(
+            r = await auth_client.post(
                 "/api/v1/credentials",
                 json={
                     "name": f"List Test {i} {uuid4().hex[:8]}",
@@ -196,11 +205,39 @@ class TestListCredentials:
                     "inputs": {"token": f"secret-{i}"},
                 },
             )
+            assert r.status_code == 201, r.text
+            created_ids.append(r.json()["id"])
+
+        # Check each credential is reachable individually (different code path from list)
+        for cred_id in created_ids:
+            get_resp = await auth_client.get(f"/api/v1/credentials/{cred_id}")
+            assert get_resp.status_code == 200, (
+                f"Individual GET {cred_id} returned {get_resp.status_code}: {get_resp.text}"
+            )
+
+        # Direct DB count — tells us whether the issue is DB isolation or list visibility
+        db_rows = (await test_db_session.exec(sa_select(Credential))).all()
+
+        # Verify the authz override is in place and returns allowed_projects
+        from syntara.api.main import app as _app
+        from syntara.authz.dependencies import get_authz_evaluator as _get_authz_evaluator
+
+        override_present = _get_authz_evaluator in _app.dependency_overrides
+        if override_present:
+            _mock_eval = _app.dependency_overrides[_get_authz_evaluator]()
+            _mock_result = _mock_eval.evaluate({})
+        else:
+            _mock_result = None
 
         resp = await auth_client.get("/api/v1/credentials")
         assert resp.status_code == 200
         body = resp.json()
-        assert len(body["resources"]) >= 2
+        assert len(body["resources"]) >= 2, (
+            f"DB has {len(db_rows)} credential(s), "
+            f"individual GETs succeeded for {created_ids}, "
+            f"authz override present={override_present}, mock_eval_result={_mock_result}, "
+            f"list returned: {body}"
+        )
         # All inputs should be masked
         for resource in body["resources"]:
             if resource["inputs"]:
@@ -886,12 +923,14 @@ class TestEnabledFilter:
                 "inputs": {"token": "ghi"},
             },
         )
+        assert create_resp.status_code == 201, create_resp.text
         cred_id = create_resp.json()["id"]
-        await auth_client.patch(f"/api/v1/credentials/{cred_id}", json={"enabled": False})
+        patch_resp = await auth_client.patch(f"/api/v1/credentials/{cred_id}", json={"enabled": False})
+        assert patch_resp.status_code == 200, patch_resp.text
 
         resp = await auth_client.get("/api/v1/credentials?enabled=false")
         assert resp.status_code == 200
-        assert len(resp.json()["resources"]) >= 1
+        assert len(resp.json()["resources"]) >= 1, f"Expected >=1 disabled credential, got: {resp.json()}"
         for resource in resp.json()["resources"]:
             assert resource["enabled"] is False
 
