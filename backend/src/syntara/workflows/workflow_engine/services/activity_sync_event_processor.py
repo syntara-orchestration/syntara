@@ -25,6 +25,10 @@ logger = structlog.stdlib.get_logger(__name__)
 class ActivitySyncEventProcessorMixin:
     """Handlers for Temporal activity task history events."""
 
+    # Provided by the composed ActivitySyncService; declared here for type-checkers
+    # (mirrors the stub on the monitor mixin) so self.temporal_client resolves.
+    temporal_client: Any
+
     _SUBWORKFLOW_SETUP_PREFIX = "__internal__setup_sub_workflow_"
 
     def _process_activity_scheduled(self, event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
