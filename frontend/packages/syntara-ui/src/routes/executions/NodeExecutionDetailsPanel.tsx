@@ -266,7 +266,7 @@ function NodeDetailsHeader({
         <FlexItem>
           <Stack>
             <StackItem>
-              <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
+              <Title headingLevel="h2" size={TitleSizes.md} className={styles.nodeTitle}>
                 {nodeName}
               </Title>
             </StackItem>
@@ -448,7 +448,7 @@ export function NodeExecutionDetailsPanel({
 
       <StackItem
         isFilled
-        style={{ minHeight: 0, overflow: 'hidden' }}
+        className={styles.nodeContentRegion}
         {...nodeTabPanelAttrs(hasNodeTabs, tabsBaseId, activeTab)}
       >
         <NodeContentArea
