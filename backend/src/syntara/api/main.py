@@ -6,7 +6,7 @@ import ssl
 import sys
 import time
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -70,6 +70,7 @@ from syntara.core.middleware.request_body_size import (
 )
 from syntara.core.models.user import User
 from syntara.core.router_discovery import _get_lock_file_path, discover_and_register_routers, iter_api_routes
+from syntara.core.temporal.client import get_shared_client as get_shared_temporal_client
 from syntara.core.websocket.manager import get_connection_lifecycle_manager
 from syntara.core.websocket.router import build_websocket_router
 from syntara.files.health import validate_file_storage_at_startup
@@ -165,6 +166,21 @@ def _init_rate_limiting(app: FastAPI) -> RateLimitRedisClient:
     app.state.rate_limit_token_bucket = TokenBucket(redis_client=redis_client)
     logger.info("Rate limiting components initialized")
     return redis_client
+
+
+async def _warm_temporal_client() -> None:
+    """Best-effort warmup of the shared Temporal client.
+
+    Pre-connects so the first API request does not pay the gRPC handshake
+    cost. Runs as a background task during startup: a slow or unreachable
+    Temporal server must not delay startup (and pod readiness) by the
+    connect timeout. Never raises — the client reconnects lazily on first
+    real use if the warmup is skipped.
+    """
+    if await get_shared_temporal_client() is None:
+        logger.warning("temporal_client_warmup_skipped", reason="server unavailable at startup")
+    else:
+        logger.info("temporal_client_warmed")
 
 
 async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
@@ -267,6 +283,10 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
     metrics_cleanup_worker = get_metrics_cleanup_worker()
     metrics_cleanup_worker.start()
 
+    # Best-effort Temporal client warmup, fire-and-forget so a slow Temporal
+    # server cannot delay startup. Tracked in resources for shutdown cleanup.
+    temporal_warmup_task = asyncio.create_task(_warm_temporal_client(), name="temporal-client-warmup")
+
     queue_depth_poller = get_queue_depth_poller()
     queue_depth_poller.start()
 
@@ -300,11 +320,20 @@ async def _lifespan_startup(app: FastAPI) -> dict[str, Any]:  # noqa: PLR0915
         "schedule_reconciliation_worker": schedule_reconciliation_worker,
         "runtime_settings": runtime_settings,
         "rate_limit_redis": rate_limit_redis,
+        "temporal_warmup_task": temporal_warmup_task,
     }
 
 
 async def _lifespan_shutdown(resources: dict[str, Any]) -> None:
     """Clean up application resources during shutdown."""
+    # Cancel a still-running warmup so shutdown does not wait on it; the
+    # shared client's shielded connect survives the cancellation.
+    warmup_task = resources.get("temporal_warmup_task")
+    if warmup_task is not None and not warmup_task.done():
+        warmup_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await warmup_task
+
     await resources["schedule_reconciliation_worker"].stop()
     await resources["multipart_cleanup_worker"].stop()
     await resources["queue_depth_poller"].stop()
