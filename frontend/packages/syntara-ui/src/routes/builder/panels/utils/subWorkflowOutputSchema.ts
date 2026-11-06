@@ -3,6 +3,68 @@ import { ActivityTypeEnum, getNodeOutputSchema, type OutputFieldDef } from '@syn
 import type { ChildWorkflowStepSchema } from '../hooks/useChildWorkflowSchema'
 import type { InputSchemaPreviewNode } from '../views/InputSchemaPreview'
 
+const MAPPED_OUTPUT_SCHEMA_MARKER = 'x-syntara-output-mapped'
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function schemaFieldType(schema: Record<string, unknown>): OutputFieldDef['type'] | null {
+  const schemaType = Array.isArray(schema['type'])
+    ? schema['type'].find((type): type is string => typeof type === 'string' && type !== 'null')
+    : schema['type']
+
+  switch (schemaType) {
+    case 'string':
+      return 'string'
+    case 'integer':
+    case 'number':
+      return 'number'
+    case 'boolean':
+      return 'boolean'
+    case 'object':
+      return 'object'
+    case 'array':
+      return 'array'
+    default:
+      if (isRecord(schema['properties']) || schema['additionalProperties'] !== undefined) return 'object'
+      if (schema['items'] !== undefined) return 'array'
+      return null
+  }
+}
+
+/** Convert the published node schema to picker fields, honoring mapped output names. */
+export function getChildStepOutputFields(
+  stepType: string,
+  outputSchema: Record<string, unknown> | null
+): OutputFieldDef[] | null {
+  const knownFields = getNodeOutputSchema(stepType)
+  if (!outputSchema) return null
+
+  const properties = outputSchema['properties']
+  if (!isRecord(properties)) return knownFields
+
+  const knownFieldsByName = new Map((knownFields ?? []).map((field) => [field.name, field]))
+  return Object.entries(properties).map(([name, value]) => {
+    const property = isRecord(value) ? value : {}
+    const knownField = knownFieldsByName.get(name)
+    const isMappedOutput = property[MAPPED_OUTPUT_SCHEMA_MARKER] === true
+    const type = isMappedOutput ? 'unknown' : (schemaFieldType(property) ?? knownField?.type ?? 'unknown')
+    const description =
+      typeof property['description'] === 'string' ? property['description'] : (knownField?.description ?? '')
+
+    return {
+      name,
+      type,
+      description,
+      ...(!isMappedOutput && knownField?.children ? { children: knownField.children } : {}),
+      ...(!isMappedOutput && knownField?.additionalProperties
+        ? { additionalProperties: knownField.additionalProperties }
+        : {}),
+    }
+  })
+}
+
 function toPreviewNode(field: OutputFieldDef, parentPath: string[]): InputSchemaPreviewNode {
   const fieldPath = [...parentPath, field.name]
   return {

@@ -29,6 +29,7 @@ const childDefinition = {
       name: 'Shared output',
       type: 'script',
       parameters: { language: 'python', code: 'print("shared")' },
+      outputs: { image_tag: '${result.stdout_json.tag}' },
     },
     {
       id: 'validate-script',
@@ -83,7 +84,19 @@ const workflowDetail = {
     steps: childDefinition.nodes.map((node) => ({
       id: node.id,
       type: node.type,
-      output_schema: { type: 'object', properties: { stdout: { type: 'string' } } },
+      output_schema:
+        node.id === 'shared-script'
+          ? {
+              type: 'object',
+              properties: {
+                status: { type: 'string' },
+                image_tag: {
+                  description: 'Output produced by a configured mapping; its type is not statically known.',
+                  'x-syntara-output-mapped': true,
+                },
+              },
+            }
+          : { type: 'object', properties: { stdout: { type: 'string' } } },
     })),
   },
 } satisfies WorkflowAPI.components['schemas']['WorkflowDetailRead']
@@ -121,7 +134,10 @@ describe('useChildWorkflowSchema', () => {
     expect(result.current.publishedVersion).toBe(4)
     expect(result.current.childSteps.map((step) => step.id)).toEqual(['shared-script'])
     expect(result.current.childSteps[0]?.outputSchema).toMatchObject({ type: 'object' })
-    expect(result.current.childSteps[0]?.outputFields).not.toBeNull()
+    expect(result.current.childSteps[0]?.outputFields?.map((field) => field.name)).toEqual(['status', 'image_tag'])
+    expect(result.current.childSteps[0]?.outputFields?.find((field) => field.name === 'image_tag')?.type).toBe(
+      'unknown'
+    )
     expect(mocks.get).toHaveBeenCalledWith('/workflows/{workflow_id}/versions/{version}', {
       params: { path: { workflow_id: 'child-workflow', version: 4 } },
     })
