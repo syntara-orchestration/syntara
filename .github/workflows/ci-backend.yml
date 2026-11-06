@@ -977,7 +977,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: ./.github/actions/konflux-gate
         with:
-          check-name: 'Integration Service / conforma-on-pull-request-{branch} / ansible-automation-orchestrator-backend-{branch}'
+          check-name: 'Red Hat Konflux / conforma-on-pull-request-{branch} / ansible-automation-orchestrator-backend-{branch}'
           pipeline-check-name: 'Konflux kflux-prd-rh03 / ansible-automation-orchestrator-backend-{branch}-on-pull-request'
           timeout-minutes: '85'
 
@@ -1034,9 +1034,6 @@ jobs:
     if: always()
     steps:
       - name: Check required jobs passed
-        env:
-          # Konflux API tests run on feature-base PRs for signal; failures do not block merge.
-          FEATURE_BASE_PR: ${{ github.event_name == 'pull_request' && (startsWith(github.base_ref, 'feature/') || startsWith(github.base_ref, 'feat/')) }}
         run: |
           # If no backend changes, pass immediately
           if [[ "${{ needs.changes.outputs.backend }}" == "false" ]]; then
@@ -1076,12 +1073,6 @@ jobs:
               snyk-sca)              result="${{ needs.snyk-sca.result }}" ;;
             esac
             echo "$job: $result"
-            if [[ "$FEATURE_BASE_PR" == "true" && "$job" == "konflux-api-tests-gate" ]]; then
-              if [[ "$result" == "failure" ]]; then
-                echo "::warning::konflux-api-tests-gate failed on a feature-base PR (informational only)"
-              fi
-              continue
-            fi
             if [[ ! "$result" =~ ^($ok)$ ]]; then
               echo "::error::Required job '$job' has result '$result'"
               exit 1

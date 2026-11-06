@@ -9,7 +9,7 @@ import {
   safeParseFormDefinition,
   type FormDefinitionSchemaInput,
 } from '../../forms'
-import { zodResolver } from '../../routes/builder/node-forms/shared/formSchemaUtils'
+import { zodResolver } from '../../routes/builder/step-forms/shared/formSchemaUtils'
 
 import type { FormDefinitionFieldServerError } from './formFieldBuilder/formDefinitionFieldServerError'
 import styles from './formFieldBuilder/formFieldBuilder.module.css'

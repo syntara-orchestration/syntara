@@ -30,7 +30,7 @@ Your goal is to author comprehensive, production-grade end-to-end tests using Pl
 - **Navigation:** `toAppUrl('/path')` helper for all URLs
 - **Unique names:** `buildUniqueName(prefix)` for all test data
 - **Locators:** `getByRole` > `getByLabel` > `getByPlaceholder` > `getByText` > `getByTestId`
-- **Helpers:** `createBasicWorkflow`, `addNodePanel` (opens **Add step** UI), `fillCodeEditor`, `closeNodeEditorPanel`
+- **Helpers:** `createBasicWorkflow`, `addStepPanel` (opens **Add step** UI), `fillCodeEditor`, `closeStepEditorPanel`
 
 ### Commands
 
@@ -56,12 +56,12 @@ test('my test', { tag: ['@local-only'] }, async ({ app }) => { ... })
 | Tag | What it marks | Runs in | Excluded from | Mechanism |
 |---|---|---|---|---|
 | `@pr-check` | Fast, reliable describe blocks covering the most critical user paths — intended as a quick PR gate subset | All CI environments (full suite always runs; `--grep @pr-check` selects this subset locally) | _(no current CI filter — tag exists for manual use and future CI optimization)_ | `--grep @pr-check` |
-| `@local-only` | Visual regression screenshot tests (`e2e/visual-regression/`) | Local development via `npm run e2e:visual-regression` | All CI | `playwright.config.ts` `testIgnore: **/visual-regression/**` + in-test `test.skip(!!process.env.CI)` |
+| `@local-only` | Mock-dependent audits (`a11y-audit`) and screenshot suites (page screenshots and PF6 token snapshots) | Mock mode; page screenshots are discoverable by default, the a11y audit is opt-in, and dedicated baseline workflows run page screenshots in CI | Standard real-backend E2E skips the visual-regression directory and the a11y audit. The tag itself does not exclude tests from every CI workflow. | `--grep @local-only` or `--grep-invert '@local-only'` |
 
 ### Tag rules
 
 - **`@pr-check`** — Tag a `test.describe` when the tests inside are fast (under ~30 s total), reliable (no flaky backend dependencies), and cover the most critical user paths. Do NOT tag slow, data-dependent, or flaky describe blocks.
-- **`@local-only`** — Reserved for visual regression tests. Do not apply to functional tests.
+- **`@local-only`** — Use for tests that rely on seeded mock data or local/OS-specific screenshot baselines. It is a Playwright selection tag, not a blanket CI exclusion; configure each test/workflow's environment behavior explicitly. Do not apply it to general functional tests.
 
 ### Never commit `test.fixme` as a long-term state
 
@@ -143,7 +143,7 @@ To test against the real Syntara backend instead of the mock API:
 Read all files in `frontend/packages/syntara-ui/e2e/`:
 
 - `fixtures.ts` — custom `{ app }` fixture definition and `toAppUrl` helper
-- `helpers/workflows.ts` — `buildUniqueName`, `createBasicWorkflow`, `addNodePanel` (Add step panel), `fillCodeEditor`, `closeNodeEditorPanel`
+- `helpers/workflows.ts` — `buildUniqueName`, `createBasicWorkflow`, `addStepPanel` (Add step panel), `fillCodeEditor`, `closeStepEditorPanel`
 - All `*.spec.ts` files — naming conventions, structure, assertion style, cleanup patterns
 
 ### Step 2: Extract conventions
@@ -153,7 +153,7 @@ From the existing tests, note:
 - **File naming:** `feature-name.spec.ts` (kebab-case)
 - **Test titles:** Descriptive, user-action-based ("user creates and saves a multi-step workflow")
 - **Scoping:** Some files use `test.describe()` blocks (accessibility, filtering), others use top-level tests
-- **Conditional skipping:** `test.skip(!condition, 'reason')` for environment-dependent tests (see [Data-Dependent Tests](#data-dependent-tests--fail-when-expected-data-is-missing) for when to use `test.skip` vs `expect`)
+- **Conditional skipping:** `test.skip(!condition, 'reason')` for environment-dependent tests (see [Data-Dependent Tests](#data-dependent-tests-fail-when-expected-data-is-missing) for when to use `test.skip` vs `expect`)
 - **Multi-tab testing:** Some tests use `{ app, context }` to test URL sharing across tabs
 
 **CRITICAL:** New tests MUST match existing style. A reviewer should not be able to distinguish new tests from existing ones.
@@ -356,7 +356,7 @@ test('user creates and verifies a workflow', async ({ app }) => {
 - ✅ Use `{ app }` fixture (NOT `{ page }`)
 - ✅ Use `toAppUrl('/path')` for navigation
 - ✅ Use `buildUniqueName(prefix)` for unique test data
-- ✅ Use existing helpers (`createBasicWorkflow`, `addNodePanel` for the **Add step** panel, etc.)
+- ✅ Use existing helpers (`createBasicWorkflow`, `addStepPanel` for the **Add step** panel, etc.)
 
 **Asserting API calls**
 
@@ -479,8 +479,8 @@ The CSS-selector ban applies equally to **locators** and **assertions**. Any `.p
 **Scoping locators to containers:**
 
 ```typescript
-// ✅ Scoped to Add step panel (helper name is addNodePanel)
-const panel = addNodePanel(app)
+// ✅ Scoped to Add step panel (helper name is addStepPanel)
+const panel = addStepPanel(app)
 await panel.getByRole('button', { name: 'Action', exact: true }).click()
 
 // ✅ Scoped to a row

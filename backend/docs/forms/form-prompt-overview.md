@@ -205,7 +205,7 @@ batches. After submission, the Forms API calls the workflows-owned
 waiting activity.
 
 The API returns a creation receipt to the worker, a full prompt to the responder, and a
-compact row for task lists. See the [Forms API specification](../../src/syntara/schemas/forms/openapi.yaml)
+compact row for task lists. See the [Forms API specification](https://github.com/syntara-orchestration/syntara/blob/devel/backend/src/syntara/schemas/forms/openapi.yaml)
 and [OpenAPI Spec Management](../standards/openapi-spec-management.md).
 
 ## Authorization
@@ -310,4 +310,4 @@ For steps to add a field type or form parameter, see
 - [Expression System](../workflow-engine/expression-system.md) — the `${...}` namespace
 - [Authorization](../authorization.md) — RBAC, PermissionChecker, VisibilityFilter
 - [Audit](../audit.md) — audit event pipeline and transactional outbox
-- [Forms API Specification](../../src/syntara/schemas/forms/openapi.yaml)
+- [Forms API Specification](https://github.com/syntara-orchestration/syntara/blob/devel/backend/src/syntara/schemas/forms/openapi.yaml)

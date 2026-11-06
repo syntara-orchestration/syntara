@@ -81,4 +81,4 @@ export function useWorkflowEngineDefaults() {
   return { defaults: data ?? null, isLoading: isPending }
 }
 
-export type TimeoutNodeType = keyof WorkflowEngineDefaults['timeoutSeconds']
+export type TimeoutStepType = keyof WorkflowEngineDefaults['timeoutSeconds']

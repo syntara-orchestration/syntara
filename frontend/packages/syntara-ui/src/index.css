@@ -4,8 +4,6 @@
 :root {
   --syntara-form-max-width: 600px;
   --syntara-disabled-opacity: 0.5;
-  --syntara-nav-logo-size: 28px;
-  --syntara-nav-flyout-min-width: 12.5rem;
   --syntara-builder-side-panel-width: 25rem;
   --syntara-table-cell-max-width: 25rem;
 }

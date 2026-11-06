@@ -1,5 +1,6 @@
 export const AppRoute = {
   Dashboard: '/dashboard',
+  FeatureFlagDemo: '/feature-flag-demo',
   WorkflowBuilder: {
     New: '/workflow-builder/new',
     Edit: '/workflow-builder/:workflowId',

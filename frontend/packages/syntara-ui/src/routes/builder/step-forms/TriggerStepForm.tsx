@@ -1,0 +1,518 @@
+import {
+  Alert,
+  Content,
+  ContentVariants,
+  FormGroup,
+  MenuToggle,
+  type MenuToggleElement,
+  SelectList,
+  SelectOption,
+  Stack,
+  StackItem,
+} from '@patternfly/react-core'
+import { MissedSchedulePolicyEnum, ScheduleTypeEnum, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
+import type { FormEvent, ReactNode } from 'react'
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useFormContext, useWatch } from 'react-hook-form'
+
+import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
+import type { FormDefinitionFieldServerError } from '../../../components/forms/formFieldBuilder/formDefinitionFieldServerError'
+import { ScheduleBuilderFields } from '../../../components/forms/ScheduleBuilderFields'
+import {
+  CRON_EXPRESSION_HELP,
+  EXECUTION_CONFLICT_HELP,
+  SCHEDULE_EXPRESSION_HELP,
+} from '../../../components/forms/scheduleHelpText'
+import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormField } from '../../../components/forms/SynFormField'
+import { SynTextField } from '../../../components/forms/SynTextField'
+import { SynSelect } from '../../../components/SynSelect'
+import { useSynForm } from '../../../hooks/useSynForm'
+import { detachPromise } from '../../../utils/detachPromise'
+import { useEffectiveFormDefinitionServerValidationErrors } from '../hooks/useEffectiveFormDefinitionServerValidationErrors'
+import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
+import { partitionFormTriggerServerValidationErrors } from '../utils/partitionFormTriggerServerValidationErrors'
+import { useIsVersionView } from '../VersionViewContext'
+
+import { buildTriggerFormDefaults } from './buildTriggerFormDefaults'
+import { EdaFields } from './EdaTriggerFields'
+import { FormTriggerConfigurationFields } from './FormTriggerConfigurationFields'
+import { ManualTriggerFields } from './ManualTriggerFields'
+import { ActivityNameField } from './shared/ActivityNameField'
+import { StepFormContainer } from './shared/StepFormContainer'
+import stepFormStyles from './shared/stepFormStyles.module.css'
+import { StepFormTabsLayout } from './shared/StepFormTabsLayout'
+import {
+  TriggerFormFieldBuilderCommitRefContext,
+  type TriggerFormFieldBuilderCommitHandlers,
+} from './triggerFormFieldBuilderCommitContext'
+import { normalizeWebhookPath, triggerFormSchema, type TriggerFormData } from './triggerFormSchema'
+import { useApplyServerValidationToTriggerForm } from './useApplyServerValidationToTriggerForm'
+import { WebhookFields } from './WebhookTriggerFields'
+
+const executionConflictLabelHelp = (
+  <FieldHelpPopover headerContent="Execution conflict policy" helpText={EXECUTION_CONFLICT_HELP} />
+)
+const scheduleExpressionLabelHelp = (
+  <FieldHelpPopover headerContent="Schedule expression" helpText={SCHEDULE_EXPRESSION_HELP} />
+)
+const cronExpressionLabelHelp = <FieldHelpPopover headerContent="Cron expression" helpText={CRON_EXPRESSION_HELP} />
+
+export type { TriggerFormData }
+
+type TriggerStepFormProps = Readonly<{
+  onSubmit: (data: TriggerFormData) => void
+  initialData?: Partial<TriggerFormData>
+  onHeaderContentChange?: (content: ReactNode | null) => void
+  serverValidationErrors?: ReadonlyArray<{ fieldPath?: string | null; message: string }>
+}>
+
+// ── Execution conflict policy options ────────────────────────────────────
+
+const conflictPolicyOptions = [
+  {
+    value: MissedSchedulePolicyEnum.SKIP,
+    label: 'Skip (Default)',
+    description:
+      'If the previous run is still in progress, the new run is ignored. Only one instance of the workflow runs at a time.',
+  },
+  {
+    value: MissedSchedulePolicyEnum.BUFFER_ONE,
+    label: 'Buffer one',
+    description:
+      'If runs were skipped because the previous one was still in progress, the system will queue one catch-up execution and then resume the normal schedule.',
+  },
+  {
+    value: MissedSchedulePolicyEnum.BUFFER_ALL,
+    label: 'Buffer all',
+    description: 'Every scheduled run is queued, even if previous runs are still in progress.',
+  },
+  {
+    value: MissedSchedulePolicyEnum.ALLOW_ALL,
+    label: 'Allow all',
+    description:
+      'Start every scheduled run immediately, even if previous runs are still in progress. Multiple runs may execute concurrently.',
+  },
+  {
+    value: MissedSchedulePolicyEnum.CANCEL_OTHER,
+    label: 'Cancel other',
+    description: 'Cancel the currently in-progress run and start the new one. Only the latest scheduled run executes.',
+  },
+]
+
+// ── Sub-components (module-scoped per S6478) ─────────────────────────────
+
+function ExecutionConflictPolicyField({
+  value,
+  onChange,
+  isDisabled,
+}: Readonly<{
+  value: string
+  onChange: (val: string) => void
+  isDisabled: boolean
+}>) {
+  const [isOpen, setIsOpen] = useState(false)
+  const selectedLabel = conflictPolicyOptions.find((o) => o.value === value)?.label ?? 'Skip'
+
+  const handleSelect = useCallback(
+    (_event: React.MouseEvent | undefined, val: string | number | undefined) => {
+      if (val === undefined) return
+      onChange(String(val))
+      setIsOpen(false)
+    },
+    [onChange]
+  )
+
+  const renderToggle = useCallback(
+    (toggleRef: React.Ref<MenuToggleElement>) => (
+      <MenuToggle
+        ref={toggleRef}
+        onClick={() => setIsOpen((prev) => !prev)}
+        isExpanded={isOpen}
+        isFullWidth
+        isDisabled={isDisabled}
+        aria-label="Execution conflict policy"
+      >
+        {selectedLabel}
+      </MenuToggle>
+    ),
+    [isOpen, selectedLabel, isDisabled]
+  )
+
+  return (
+    <StackItem>
+      <FormGroup
+        label="Execution conflict policy"
+        labelHelp={executionConflictLabelHelp}
+        fieldId="execution-conflict-policy"
+        isRequired
+      >
+        <SynSelect
+          id="execution-conflict-policy"
+          isOpen={isOpen}
+          selected={value}
+          onSelect={handleSelect}
+          onOpenChange={setIsOpen}
+          shouldFocusToggleOnSelect
+          toggle={renderToggle}
+        >
+          <SelectList aria-label="Execution conflict policy options">
+            {conflictPolicyOptions.map((option) => (
+              <SelectOption key={option.value} value={option.value} description={option.description}>
+                {option.label}
+              </SelectOption>
+            ))}
+          </SelectList>
+        </SynSelect>
+      </FormGroup>
+    </StackItem>
+  )
+}
+
+function ScheduleTypeSelect({
+  value = ScheduleTypeEnum.INTERVAL,
+  onChange,
+  isDisabled,
+}: {
+  value?: string
+  onChange: (value: string) => void
+  isDisabled?: boolean
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  return (
+    <SynSelect
+      id="schedule-expression"
+      isOpen={isOpen}
+      selected={value}
+      onSelect={(_event, val) => {
+        onChange(String(val))
+        setIsOpen(false)
+      }}
+      onOpenChange={setIsOpen}
+      toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
+        <MenuToggle
+          ref={toggleRef}
+          onClick={() => setIsOpen((prev) => !prev)}
+          isExpanded={isOpen}
+          isFullWidth
+          isDisabled={isDisabled}
+          aria-label="Schedule expression"
+        >
+          {value === ScheduleTypeEnum.INTERVAL ? 'Visual schedule builder' : 'Custom cron expression'}
+        </MenuToggle>
+      )}
+    >
+      <SelectList>
+        <SelectOption value={ScheduleTypeEnum.INTERVAL}>Visual schedule builder</SelectOption>
+        <SelectOption value={ScheduleTypeEnum.CRON}>Custom cron expression</SelectOption>
+      </SelectList>
+    </SynSelect>
+  )
+}
+
+function ScheduleIntervalFields({
+  intervalError,
+  isEndDateError,
+}: Readonly<{
+  intervalError?: { message?: string }
+  isEndDateError: boolean
+}>) {
+  const timezone = useWatch<TriggerFormData, 'timezone'>({ name: 'timezone' })
+  const { setValue } = useFormContext<TriggerFormData>()
+
+  return (
+    <SynFormField name="interval" label="" hideFormGroupLabel hideFooter>
+      {({ field }) => (
+        <ScheduleBuilderFields
+          value={typeof field.value === 'string' ? field.value : ''}
+          onChange={field.onChange}
+          timezone={timezone ?? 'UTC'}
+          onTimezoneChange={(tz) => setValue('timezone', tz, { shouldDirty: true })}
+          required
+          error={!!intervalError && !isEndDateError}
+          errorMessage={intervalError?.message}
+        />
+      )}
+    </SynFormField>
+  )
+}
+
+// ── Main form fields ─────────────────────────────────────────────────────
+
+function TriggerFormFields({
+  onHeaderContentChange,
+  validationErrors,
+  formDefinitionFieldErrors,
+}: Readonly<{
+  onHeaderContentChange?: (content: ReactNode | null) => void
+  formDefinitionFieldErrors?: ReadonlyArray<FormDefinitionFieldServerError>
+  validationErrors?: {
+    interval?: { message?: string }
+    cron?: { message?: string }
+    inputSchema?: { message?: string }
+    webhookPath?: { message?: string }
+    form_definition?: { message?: string }
+    message?: { message?: string }
+    submit_label?: { message?: string }
+    success_message?: { message?: string }
+  }
+}>) {
+  const isVersionView = useIsVersionView()
+  const {
+    control,
+    register,
+    formState: { errors: contextErrors },
+  } = useFormContext<TriggerFormData>()
+  const errors = validationErrors ?? contextErrors
+  const triggerType = useWatch({ control, name: 'triggerType' })
+  const scheduleType = useWatch({ control, name: 'scheduleType' })
+
+  const isEndDateError = Boolean(errors.interval?.message?.toLowerCase().includes('end date'))
+
+  useEffect(() => {
+    if (!errors.interval) return
+    const target = isEndDateError ? 'schedule-end-date' : 'schedule-start-date'
+    document.getElementById(target)?.focus()
+  }, [errors.interval, isEndDateError])
+
+  useEffect(() => {
+    if (errors.cron) document.getElementById('cron-expression')?.focus()
+  }, [errors.cron])
+
+  const nameField = useMemo(
+    () => (
+      <ActivityNameField control={control} fieldId="trigger-name" placeholder="Enter trigger name" ariaLabel="Name" />
+    ),
+    [control]
+  )
+
+  useEffect(() => {
+    onHeaderContentChange?.(nameField)
+    return () => {
+      onHeaderContentChange?.(null)
+    }
+  }, [nameField, onHeaderContentChange])
+
+  const parametersContent = (
+    <Stack hasGutter className={stepFormStyles.nodeFormParametersStack}>
+      <input type="hidden" {...register('triggerType')} />
+
+      {triggerType === TriggerTypeEnum.MANUAL_TRIGGER && (
+        <fieldset disabled={isVersionView} className={stepFormStyles.disabledFieldset}>
+          <ManualTriggerFields errors={errors} />
+        </fieldset>
+      )}
+
+      {triggerType === TriggerTypeEnum.SCHEDULED && (
+        <>
+          <StackItem>
+            <Alert variant="info" isInline title="Schedule activation" component="h4">
+              <Content component={ContentVariants.p}>
+                This schedule will only take effect once the workflow is published. Changes to the schedule are applied
+                on the next publish.
+              </Content>
+            </Alert>
+          </StackItem>
+
+          <StackItem>
+            <SynFormField
+              name="scheduleType"
+              label="Schedule expression"
+              labelHelp={scheduleExpressionLabelHelp}
+              fieldId="schedule-expression"
+              isRequired
+            >
+              {({ field }) => (
+                <ScheduleTypeSelect
+                  value={field.value as TriggerFormData['scheduleType']}
+                  onChange={field.onChange}
+                  isDisabled={isVersionView}
+                />
+              )}
+            </SynFormField>
+          </StackItem>
+
+          {scheduleType === ScheduleTypeEnum.INTERVAL && (
+            <fieldset disabled={isVersionView} className={stepFormStyles.disabledFieldset}>
+              <Stack hasGutter>
+                <StackItem>
+                  <ScheduleIntervalFields intervalError={errors.interval} isEndDateError={isEndDateError} />
+                </StackItem>
+
+                <SynFormField name="missedSchedulePolicy" label="" hideFormGroupLabel hideFooter>
+                  {({ field }) => (
+                    <ExecutionConflictPolicyField
+                      value={(field.value as TriggerFormData['missedSchedulePolicy']) ?? MissedSchedulePolicyEnum.SKIP}
+                      onChange={field.onChange}
+                      isDisabled={isVersionView}
+                    />
+                  )}
+                </SynFormField>
+              </Stack>
+            </fieldset>
+          )}
+
+          {scheduleType === ScheduleTypeEnum.CRON && (
+            <fieldset disabled={isVersionView} className={stepFormStyles.disabledFieldset}>
+              <Stack hasGutter>
+                <StackItem>
+                  <SynTextField
+                    name="cron"
+                    label="Cron expression"
+                    ariaLabel="Cron expression"
+                    labelHelp={cronExpressionLabelHelp}
+                    fieldId="cron-expression"
+                    isRequired
+                    placeholder="0 9 * * 1"
+                    hint="Format: [Minute] [Hour] [Day of the Month] [Month] [Day of the Week]"
+                    isDisabled={isVersionView}
+                  />
+                </StackItem>
+
+                <SynFormField name="missedSchedulePolicy" label="" hideFormGroupLabel hideFooter>
+                  {({ field }) => (
+                    <ExecutionConflictPolicyField
+                      value={(field.value as TriggerFormData['missedSchedulePolicy']) ?? MissedSchedulePolicyEnum.SKIP}
+                      onChange={field.onChange}
+                      isDisabled={isVersionView}
+                    />
+                  )}
+                </SynFormField>
+              </Stack>
+            </fieldset>
+          )}
+        </>
+      )}
+
+      {triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER && (
+        <fieldset disabled={isVersionView} className={stepFormStyles.disabledFieldset}>
+          <Stack hasGutter>
+            <WebhookFields />
+          </Stack>
+        </fieldset>
+      )}
+
+      {triggerType === TriggerTypeEnum.EDA_TRIGGER && (
+        <fieldset disabled={isVersionView} className={stepFormStyles.disabledFieldset}>
+          <Stack hasGutter>
+            <EdaFields />
+          </Stack>
+        </fieldset>
+      )}
+
+      {triggerType === TriggerTypeEnum.FORM_TRIGGER && (
+        <StackItem className={stepFormStyles.formTriggerParameters}>
+          <FormTriggerConfigurationFields
+            formDefinitionError={errors.form_definition}
+            serverFieldErrors={formDefinitionFieldErrors}
+          />
+        </StackItem>
+      )}
+    </Stack>
+  )
+
+  return <StepFormTabsLayout parametersContent={parametersContent} hideSettingsTab />
+}
+
+export function TriggerStepForm({
+  onSubmit,
+  initialData,
+  onHeaderContentChange,
+  serverValidationErrors,
+}: TriggerStepFormProps) {
+  const [defaultValues] = useState<TriggerFormData>(() => buildTriggerFormDefaults(initialData))
+  const builderHandlersRef = useRef<TriggerFormFieldBuilderCommitHandlers | null>(null)
+
+  const form = useSynForm({
+    schema: triggerFormSchema,
+    defaultValues,
+  })
+
+  const triggerType = useWatch({ control: form.control, name: 'triggerType' })
+  const formDefinition = useWatch({ control: form.control, name: 'form_definition' })
+  const readPreparedFormDefinition = useCallback(() => builderHandlersRef.current?.readPreparedDefinition(), [])
+  const effectiveServerValidationErrors = useEffectiveFormDefinitionServerValidationErrors(
+    formDefinition,
+    serverValidationErrors,
+    {
+      applyFormDefinitionValidityCheck: triggerType === TriggerTypeEnum.FORM_TRIGGER,
+      readPreparedDefinition: readPreparedFormDefinition,
+    }
+  )
+
+  const formDefinitionFieldErrors = useMemo(
+    () => partitionFormTriggerServerValidationErrors(effectiveServerValidationErrors).formFieldErrors,
+    [effectiveServerValidationErrors]
+  )
+
+  useApplyServerValidationToTriggerForm(form, effectiveServerValidationErrors)
+
+  const {
+    formState: { errors },
+  } = form
+
+  const syncFormDefinitionFromBuilder = useCallback(() => {
+    const handlers = builderHandlersRef.current
+    if (!handlers) {
+      return
+    }
+    handlers.flush()
+    const prepared = handlers.readPreparedDefinition()
+    form.setValue('form_definition', prepared, { shouldDirty: true, shouldValidate: false })
+  }, [form])
+
+  const handleSubmit = useCallback(
+    (data: TriggerFormData) => {
+      const isManual = data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER
+      const isScheduled = data.triggerType === TriggerTypeEnum.SCHEDULED
+      const isWebhookStyle = WEBHOOK_TRIGGER_TYPES.has(data.triggerType)
+      const isFormTrigger = data.triggerType === TriggerTypeEnum.FORM_TRIGGER
+
+      const cleanedData: TriggerFormData = {
+        name: data.name,
+        triggerType: data.triggerType,
+        inputSchema: isManual || isWebhookStyle ? data.inputSchema : undefined,
+        scheduleType: isScheduled ? data.scheduleType : undefined,
+        interval: isScheduled && data.scheduleType === ScheduleTypeEnum.INTERVAL ? data.interval : undefined,
+        cron: isScheduled && data.scheduleType === ScheduleTypeEnum.CRON ? data.cron : undefined,
+        timezone: isScheduled ? data.timezone : undefined,
+        missedSchedulePolicy: isScheduled ? data.missedSchedulePolicy : undefined,
+        webhookPath: isWebhookStyle ? normalizeWebhookPath(data.webhookPath ?? '') : undefined,
+        authorizedServiceAccountIds: isWebhookStyle ? data.authorizedServiceAccountIds : undefined,
+        form_definition: isFormTrigger ? data.form_definition : undefined,
+        message: isFormTrigger ? data.message : undefined,
+        submit_label: isFormTrigger ? data.submit_label : undefined,
+        success_message: isFormTrigger ? data.success_message : undefined,
+        css_override: isFormTrigger ? data.css_override : undefined,
+      }
+      onSubmit(cleanedData)
+    },
+    [onSubmit]
+  )
+
+  const submitWithFlush = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      syncFormDefinitionFromBuilder()
+      detachPromise(form.handleSubmit(handleSubmit)(event))
+    },
+    [form, handleSubmit, syncFormDefinitionFromBuilder]
+  )
+
+  const autoSubmitRef = use(StepEditorAutoSubmitContext)
+  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit, syncFormDefinitionFromBuilder)
+
+  return (
+    <TriggerFormFieldBuilderCommitRefContext.Provider value={builderHandlersRef}>
+      <StepFormContainer formId="trigger-step-form" onSubmit={submitWithFlush}>
+        <SynForm form={form}>
+          <TriggerFormFields
+            onHeaderContentChange={onHeaderContentChange}
+            validationErrors={errors}
+            formDefinitionFieldErrors={formDefinitionFieldErrors}
+          />
+        </SynForm>
+      </StepFormContainer>
+    </TriggerFormFieldBuilderCommitRefContext.Provider>
+  )
+}

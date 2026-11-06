@@ -15,12 +15,12 @@
  */
 
 import { test, expect, toAppUrl } from './fixtures'
-import { addWebhookTrigger } from './helpers/v2-nodes'
+import { addWebhookTrigger } from './helpers/v2-steps'
 import {
   buildUniqueName,
   clickAddConnectedStep,
   clickSaveAndWait,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   deleteWorkflow,
   fillCodeEditor,
   selectProjectIfRequired,
@@ -47,7 +47,7 @@ test.describe('Webhook Trigger', () => {
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Process payload')
       await fillCodeEditor(app, { value: 'print("processing webhook")' })
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
       // Save workflow (select project right before save)
       // Pin the workflow to the service account's own project. `ensureProject`
@@ -85,7 +85,7 @@ test.describe('Webhook Trigger', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
 
     // Wait for trigger selection and select Webhook trigger
-    await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
 
     // Type a path
@@ -107,7 +107,7 @@ test.describe('Webhook Trigger', () => {
     try {
       await app.goto(toAppUrl('/workflow-builder/new'))
 
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
       await app.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
 
       // Clear the auto-generated path — trigger fields are optional by design
@@ -138,7 +138,7 @@ test.describe('Webhook Trigger', () => {
   test('webhook form validates invalid path characters', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
 
-    await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
 
     // Enter invalid characters
@@ -171,7 +171,7 @@ test.describe('Webhook Trigger', () => {
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Action')
       await fillCodeEditor(app, { value: 'print("ok")' })
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
       // Save and verify canvas shows normalized path (lowercase, no leading slash)
       // Pin the workflow to the service account's own project. `ensureProject`
@@ -212,7 +212,7 @@ test.describe('Webhook Trigger', () => {
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Handle event')
       await fillCodeEditor(app, { value: 'print("event")' })
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
 
       // Save workflow
       // Pin the workflow to the service account's own project. `ensureProject`

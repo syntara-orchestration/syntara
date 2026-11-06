@@ -12,8 +12,8 @@ import { isExecutionCancellable } from '../executionCancellable'
 import { executionRefetchInterval } from '../executionPolling'
 
 import { useExecutionDetailPanelState } from './useExecutionDetailPanelState'
-import { useExecutionNodeClick } from './useExecutionNodeClick'
 import { useExecutionRunHistory } from './useExecutionRunHistory'
+import { useExecutionStepClick } from './useExecutionStepClick'
 import { useExecutionStreaming, useSyncActivityStore } from './useExecutionStreaming'
 import { useExecutionWorkflow } from './useExecutionWorkflow'
 import { useForkWorkflow } from './useForkWorkflow'
@@ -79,7 +79,7 @@ export function useExecutionDetailPageModel() {
 
   const activityNameMap = useActivityNamesForExecution(execution?.workflow_definition, activities)
 
-  const nodeClick = useExecutionNodeClick(executionId, execution?.workflow_definition ?? undefined)
+  const nodeClick = useExecutionStepClick(executionId, execution?.workflow_definition ?? undefined)
   const {
     approvals,
     currentIndex,

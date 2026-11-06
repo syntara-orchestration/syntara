@@ -5,8 +5,8 @@
 import { expect, type Page } from '../fixtures'
 
 import { scrollFormFieldBuilderIntoView, setFormFieldLabel } from './formFieldBuilder'
-import { addScriptOnHandle, openFormPromptCreateForm } from './v2-nodes'
-import { closeNodeEditorPanel, triggerLayout } from './workflows'
+import { addScriptOnHandle, openFormPromptCreateForm } from './v2-steps'
+import { closeStepEditorPanel, triggerLayout } from './workflows'
 
 export const FORM_PROMPT_NODE_FORM_TEST_ID = 'form-prompt-node-form'
 
@@ -162,7 +162,7 @@ export async function configureOpenFormPromptNode(
 export async function createFormPromptNodeFromOpenForm(page: Page) {
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 15_000 })
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 }
 
 export async function wireFormPromptSubmittedBranch(page: Page, nodeName: string, scriptTitle?: string) {

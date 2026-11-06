@@ -16,11 +16,11 @@ import {
   openWorkflowInBuilder,
   deleteWorkflow,
   openBuilderById,
-  runSingleWorkflowNode,
+  runSingleWorkflowStep,
 } from '../helpers/workflows'
 import { createWorkflowViaApi, deleteWorkflowViaApi } from '../utils/api'
 
-// Skipped: runSingleWorkflowNode times out waiting for execution results in CI — requires backend execution engine
+// Skipped: runSingleWorkflowStep times out waiting for execution results in CI — requires backend execution engine
 test.describe.skip('Test Single Step from Canvas', () => {
   let workflowId: string
 
@@ -56,10 +56,10 @@ test.describe.skip('Test Single Step from Canvas', () => {
     await deleteWorkflowViaApi(app, workflowId)
   })
 
-  test('single workflow node can be tested from the canvas using prior node data', async ({ app }) => {
+  test('single workflow step can be tested from the canvas using prior step data', async ({ app }) => {
     await openBuilderById(app, workflowId)
 
-    await runSingleWorkflowNode(app, 'Say Goodbye')
+    await runSingleWorkflowStep(app, 'Say Goodbye')
     await expect(app.getByRole('row', { name: /Manual Trigger/i })).toBeVisible({ timeout: 15_000 })
     await expect(app.getByRole('row', { name: /Say Hello/i })).toBeVisible({ timeout: 15_000 })
     await expect(app.getByRole('row', { name: /Say Goodbye/i })).toBeVisible({ timeout: 15_000 })
@@ -75,10 +75,10 @@ test.describe.skip('Test Single Step from Canvas', () => {
     ).toBeVisible({ timeout: 15_000 })
   })
 
-  test('single workflow node can be tested from the canvas using pinned data', async ({ app }) => {
+  test('single workflow step can be tested from the canvas using pinned data', async ({ app }) => {
     await openBuilderById(app, workflowId)
 
-    await runSingleWorkflowNode(app, 'Say Goodbye', '{"hello_node":{"stdout":"mocked"}}')
+    await runSingleWorkflowStep(app, 'Say Goodbye', '{"hello_node":{"stdout":"mocked"}}')
     await expect(app.getByRole('row', { name: /Manual Trigger/i })).toBeVisible({ timeout: 15_000 })
     await expect(app.getByRole('row', { name: /Say Hello/i })).toBeVisible({ timeout: 15_000 })
     await expect(app.getByRole('row', { name: /Say Goodbye/i })).toBeVisible({ timeout: 15_000 })
@@ -95,8 +95,8 @@ test.describe.skip('Test Single Step from Canvas', () => {
   })
 })
 
-// Skipped: real-time node status assertion times out — depends on WebSocket updates and execution engine timing
-test.skip('running execution displays real-time per-node status on the canvas', async ({ app }) => {
+// Skipped: real-time step status assertion times out — depends on WebSocket updates and execution engine timing
+test.skip('running execution displays real-time per-step status on the canvas', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-node-live-status')
 
   const { id: workflowId } = await createWorkflowViaApi({
@@ -140,8 +140,8 @@ test.skip('running execution displays real-time per-node status on the canvas', 
   }
 })
 
-// Skipped: failed node error details assertion times out — depends on execution engine completing and error propagation
-test.skip('failed node details including error messages are displayed', async ({ app }) => {
+// Skipped: failed step error details assertion times out — depends on execution engine completing and error propagation
+test.skip('failed step details including error messages are displayed', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-failed-node')
 
   const { id: workflowId } = await createWorkflowViaApi({
@@ -180,8 +180,8 @@ test.skip('failed node details including error messages are displayed', async ({
   }
 })
 
-// Skipped: per-node I/O inspection times out — depends on execution engine completing and run history data availability
-test.skip('per-node input and output data can be inspected from run history', async ({ app }) => {
+// Skipped: per-step I/O inspection times out — depends on execution engine completing and run history data availability
+test.skip('per-step input and output data can be inspected from run history', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-inspect-per-node')
 
   const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Say Hello')

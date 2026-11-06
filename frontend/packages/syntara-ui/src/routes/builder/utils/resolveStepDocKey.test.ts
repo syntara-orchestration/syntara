@@ -2,7 +2,7 @@ import { ExecutorTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import type { Node } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 
-import { FlowNodeType, RegistryNodeId } from '../../../constants'
+import { FlowNodeType, RegistryStepId } from '../../../constants'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 
 import { resolveStepDocKey } from './resolveStepDocKey'
@@ -19,24 +19,24 @@ function makeNode(type: string, data: Record<string, unknown> = {}): Node<NodeTy
 describe('resolveStepDocKey', () => {
   describe('add mode', () => {
     it.each([
-      [RegistryNodeId.TRIGGER, RegistryNodeId.TRIGGER_MANUAL, 'manualTrigger'],
-      [RegistryNodeId.TRIGGER, RegistryNodeId.TRIGGER_SCHEDULED, 'scheduleTrigger'],
-      [RegistryNodeId.TRIGGER, RegistryNodeId.TRIGGER_WEBHOOK, 'webhookTrigger'],
-      [RegistryNodeId.TRIGGER, RegistryNodeId.TRIGGER_EDA, 'eventDrivenAnsibleTrigger'],
-      [RegistryNodeId.ACTION, RegistryNodeId.ACTION_API, 'restApi'],
-      [RegistryNodeId.LOGIC, RegistryNodeId.LOGIC_CONDITION, 'conditional'],
-      [RegistryNodeId.LOGIC, RegistryNodeId.LOGIC_CONVERGE, 'converge'],
-      [RegistryNodeId.LOGIC, RegistryNodeId.LOGIC_LOOP, 'loop'],
-      [RegistryNodeId.LOGIC, RegistryNodeId.LOGIC_SWITCH, 'switch'],
-      [RegistryNodeId.LOGIC, RegistryNodeId.LOGIC_WAIT, 'wait'],
-      [RegistryNodeId.AAP_EXECUTION, RegistryNodeId.AAP_JOB_TEMPLATE, 'launchAapJobTemplate'],
-      [RegistryNodeId.AAP_EXECUTION, RegistryNodeId.AAP_WORKFLOW_TEMPLATE, 'launchAapWorkflowTemplate'],
-    ] as const)('maps %s / %s to %s', (nodeTypeId, nodeSubtypeId, expectedKey) => {
+      [RegistryStepId.TRIGGER, RegistryStepId.TRIGGER_MANUAL, 'manualTrigger'],
+      [RegistryStepId.TRIGGER, RegistryStepId.TRIGGER_SCHEDULED, 'scheduleTrigger'],
+      [RegistryStepId.TRIGGER, RegistryStepId.TRIGGER_WEBHOOK, 'webhookTrigger'],
+      [RegistryStepId.TRIGGER, RegistryStepId.TRIGGER_EDA, 'eventDrivenAnsibleTrigger'],
+      [RegistryStepId.ACTION, RegistryStepId.ACTION_API, 'restApi'],
+      [RegistryStepId.LOGIC, RegistryStepId.LOGIC_CONDITION, 'conditional'],
+      [RegistryStepId.LOGIC, RegistryStepId.LOGIC_CONVERGE, 'converge'],
+      [RegistryStepId.LOGIC, RegistryStepId.LOGIC_LOOP, 'loop'],
+      [RegistryStepId.LOGIC, RegistryStepId.LOGIC_SWITCH, 'switch'],
+      [RegistryStepId.LOGIC, RegistryStepId.LOGIC_WAIT, 'wait'],
+      [RegistryStepId.AAP_EXECUTION, RegistryStepId.AAP_JOB_TEMPLATE, 'launchAapJobTemplate'],
+      [RegistryStepId.AAP_EXECUTION, RegistryStepId.AAP_WORKFLOW_TEMPLATE, 'launchAapWorkflowTemplate'],
+    ] as const)('maps %s / %s to %s', (stepTypeId, stepSubtypeId, expectedKey) => {
       expect(
         resolveStepDocKey({
           mode: 'add',
-          nodeTypeId,
-          nodeSubtypeId,
+          stepTypeId,
+          stepSubtypeId,
           selectedNode: null,
         })
       ).toBe(expectedKey)
@@ -46,19 +46,19 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'add',
-          nodeTypeId: RegistryNodeId.ACTION,
-          nodeSubtypeId: RegistryNodeId.ACTION_SCRIPT,
+          stepTypeId: RegistryStepId.ACTION,
+          stepSubtypeId: RegistryStepId.ACTION_SCRIPT,
           selectedNode: null,
         })
       ).toBeNull()
     })
 
-    it('maps leaf nodeTypeId without subtype (agent, approval)', () => {
+    it('maps leaf stepTypeId without subtype (agent, approval)', () => {
       expect(
         resolveStepDocKey({
           mode: 'add',
-          nodeTypeId: RegistryNodeId.AGENT,
-          nodeSubtypeId: null,
+          stepTypeId: RegistryStepId.AGENT,
+          stepSubtypeId: null,
           selectedNode: null,
         })
       ).toBe('taskAgent')
@@ -66,8 +66,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'add',
-          nodeTypeId: RegistryNodeId.APPROVAL,
-          nodeSubtypeId: null,
+          stepTypeId: RegistryStepId.APPROVAL,
+          stepSubtypeId: null,
           selectedNode: null,
         })
       ).toBe('approval')
@@ -77,8 +77,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'add',
-          nodeTypeId: RegistryNodeId.TRIGGER,
-          nodeSubtypeId: null,
+          stepTypeId: RegistryStepId.TRIGGER,
+          stepSubtypeId: null,
           selectedNode: null,
         })
       ).toBe('builder')
@@ -86,8 +86,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'add',
-          nodeTypeId: RegistryNodeId.ACTION,
-          nodeSubtypeId: null,
+          stepTypeId: RegistryStepId.ACTION,
+          stepSubtypeId: null,
           selectedNode: null,
         })
       ).toBe('builder')
@@ -95,8 +95,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'add',
-          nodeTypeId: RegistryNodeId.LOGIC,
-          nodeSubtypeId: null,
+          stepTypeId: RegistryStepId.LOGIC,
+          stepSubtypeId: null,
           selectedNode: null,
         })
       ).toBe('builder')
@@ -104,8 +104,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'add',
-          nodeTypeId: RegistryNodeId.AAP_EXECUTION,
-          nodeSubtypeId: null,
+          stepTypeId: RegistryStepId.AAP_EXECUTION,
+          stepSubtypeId: null,
           selectedNode: null,
         })
       ).toBe('builder')
@@ -115,8 +115,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'add',
-          nodeTypeId: null,
-          nodeSubtypeId: null,
+          stepTypeId: null,
+          stepSubtypeId: null,
           selectedNode: null,
         })
       ).toBe('builder')
@@ -133,8 +133,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'edit',
-          nodeTypeId: null,
-          nodeSubtypeId: null,
+          stepTypeId: null,
+          stepSubtypeId: null,
           selectedNode: makeNode(FlowNodeType.TRIGGER, { name: 'T', triggerType }),
         })
       ).toBe(expectedKey)
@@ -144,8 +144,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'edit',
-          nodeTypeId: null,
-          nodeSubtypeId: null,
+          stepTypeId: null,
+          stepSubtypeId: null,
           selectedNode: makeNode(FlowNodeType.TRIGGER, { name: 'T' }),
         })
       ).toBe('manualTrigger')
@@ -160,8 +160,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'edit',
-          nodeTypeId: null,
-          nodeSubtypeId: null,
+          stepTypeId: null,
+          stepSubtypeId: null,
           selectedNode: makeNode(FlowNodeType.TASK, { type: executor, name: 'Task' }),
         })
       ).toBe(expectedKey)
@@ -171,8 +171,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'edit',
-          nodeTypeId: null,
-          nodeSubtypeId: null,
+          stepTypeId: null,
+          stepSubtypeId: null,
           selectedNode: makeNode(FlowNodeType.TASK, { type: ExecutorTypeEnum.SCRIPT, name: 'Task' }),
         })
       ).toBeNull()
@@ -182,8 +182,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'edit',
-          nodeTypeId: null,
-          nodeSubtypeId: null,
+          stepTypeId: null,
+          stepSubtypeId: null,
           selectedNode: makeNode(FlowNodeType.TASK_REVERSED, {
             type: ExecutorTypeEnum.SCRIPT,
             name: 'Task',
@@ -196,8 +196,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'edit',
-          nodeTypeId: null,
-          nodeSubtypeId: null,
+          stepTypeId: null,
+          stepSubtypeId: null,
           selectedNode: makeNode(FlowNodeType.TASK_REVERSED, {
             type: ExecutorTypeEnum.HTTP_REQUEST,
             name: 'Task',
@@ -217,8 +217,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'edit',
-          nodeTypeId: null,
-          nodeSubtypeId: null,
+          stepTypeId: null,
+          stepSubtypeId: null,
           selectedNode: makeNode(flowType, { name: 'Step' }),
         })
       ).toBe(expectedKey)
@@ -228,8 +228,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'edit',
-          nodeTypeId: null,
-          nodeSubtypeId: null,
+          stepTypeId: null,
+          stepSubtypeId: null,
           selectedNode: makeNode(FlowNodeType.TASK, { type: 'unknown', name: 'Task' }),
         })
       ).toBe('builder')
@@ -239,8 +239,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'edit',
-          nodeTypeId: null,
-          nodeSubtypeId: null,
+          stepTypeId: null,
+          stepSubtypeId: null,
           selectedNode: makeNode(FlowNodeType.GENERIC, { name: 'Generic' }),
         })
       ).toBe('builder')
@@ -248,8 +248,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'edit',
-          nodeTypeId: null,
-          nodeSubtypeId: null,
+          stepTypeId: null,
+          stepSubtypeId: null,
           selectedNode: makeNode(FlowNodeType.PLACEHOLDER, {}),
         })
       ).toBe('builder')
@@ -259,8 +259,8 @@ describe('resolveStepDocKey', () => {
       expect(
         resolveStepDocKey({
           mode: 'edit',
-          nodeTypeId: null,
-          nodeSubtypeId: null,
+          stepTypeId: null,
+          stepSubtypeId: null,
           selectedNode: null,
         })
       ).toBe('builder')
@@ -271,8 +271,8 @@ describe('resolveStepDocKey', () => {
     expect(
       resolveStepDocKey({
         mode: null,
-        nodeTypeId: RegistryNodeId.AGENT,
-        nodeSubtypeId: null,
+        stepTypeId: RegistryStepId.AGENT,
+        stepSubtypeId: null,
         selectedNode: null,
       })
     ).toBe('builder')

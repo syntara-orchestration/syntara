@@ -24,13 +24,13 @@ import {
   addManualTrigger,
   addScriptOnHandle,
   configureFormPromptFallbackRouting,
-} from '../helpers/v2-nodes'
+} from '../helpers/v2-steps'
 import { triggerVerifyWorkflow } from '../helpers/workflow-verify'
 import {
   buildUniqueName,
   createWorkflowWithTrigger,
   deleteWorkflow,
-  saveAndCloseNodeForm,
+  saveAndCloseStepForm,
   saveWorkflow,
   selectProjectIfRequired,
   triggerLayout,
@@ -213,7 +213,7 @@ test.describe('Form prompt workflow creation', () => {
       await addFormPromptNode(app, FORM_PROMPT_NODE_NAME)
       await openFormPromptNodeForEditing(app, FORM_PROMPT_NODE_NAME)
       await configureFormPromptFallbackRouting(app)
-      await saveAndCloseNodeForm(app, true)
+      await saveAndCloseStepForm(app, true)
 
       await triggerLayout(app)
       await addScriptOnHandle(app, 'submitted', `${FORM_PROMPT_NODE_NAME} submitted path`, 'print("submitted")')
