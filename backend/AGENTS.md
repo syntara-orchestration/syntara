@@ -70,6 +70,27 @@ Syntara is a distributed multi-agent system that enables coordinated AI agents t
    - Quality check requirements change
    - Database schema or migrations are modified
 
+7. **Temporal and external execution changes**: Add focused tests that assert
+   behavior at the runtime boundary, not only configuration or in-memory state:
+   - Verify cancellation reaches the external process or job and that persisted
+     execution state remains accurate after reconciliation.
+   - Check configured timeouts, output limits, and payload sizes against the
+     executor's actual runtime and protocol limits.
+   - Exercise mixed explicit retry selections and assert that unselected
+     branches are not scheduled or modified.
+   - Test effective actor and project-scope authorization when an activity
+     executes; save-time validation alone does not cover the runtime path.
+   - Assert exported Prometheus samples, including metric names, labels, and
+     units, and verify emitted event payloads.
+   - For API boundaries, assert response status and shape against the OpenAPI
+     contract.
+
+   See [Execution Lifecycle](docs/workflow-engine/execution-lifecycle.md),
+   [Access Control](docs/standards/access-control.md),
+   [Observability](docs/standards/observability.md), and
+   [OpenAPI Spec Management](docs/standards/openapi-spec-management.md) for the
+   related contracts.
+
 ### Standards Reference
 
 Consult these standards when making changes.
