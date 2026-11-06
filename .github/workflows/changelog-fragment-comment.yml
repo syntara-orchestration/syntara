@@ -1,7 +1,6 @@
 ---
 # Walk phase: companion workflow for changelog fragment enforcement.
 # Consumes reusable workflow from ansible/actions (PR #167).
-# Jira: AAP-97532 (AC4), AAP-92950
 name: "OpenAPI: Changelog Fragment Comment"
 
 on:

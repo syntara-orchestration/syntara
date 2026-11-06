@@ -1,12 +1,11 @@
 ---
 # Walk phase: consumes reusable oasdiff workflow from ansible/actions (PR #161).
 # Replaces the inlined crawl-phase implementation.
-# Jira: AAP-97532 (AC1, AC2, AC4)
 name: OpenAPI Breaking Changes
 
 on:
   pull_request:
-    branches: [devel, early-access, AAP-97532/**]
+    branches: [devel, early-access]
     paths:
       - 'backend/src/syntara/schemas/openapi.yaml'
       - '.github/workflows/openapi-breaking-changes*.yml'
