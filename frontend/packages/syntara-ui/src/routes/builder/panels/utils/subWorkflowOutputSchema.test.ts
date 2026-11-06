@@ -110,4 +110,32 @@ describe('buildSubWorkflowOutputSchemaTree', () => {
     )
     expect(childResult?.children?.some((field) => field.name === 'stdout')).toBe(false)
   })
+
+  it('does not add another output envelope around a nested Sub-workflow step', () => {
+    const nestedOutputFields = getNodeOutputSchema(ActivityTypeEnum.SUB_WORKFLOW)
+    expect(nestedOutputFields).not.toBeNull()
+
+    const tree = buildSubWorkflowOutputSchemaTree([
+      {
+        id: 'nested_call',
+        name: 'Call nested workflow',
+        type: ActivityTypeEnum.SUB_WORKFLOW,
+        outputSchema: { type: 'object' },
+        outputFields: nestedOutputFields,
+      },
+    ])
+    const result = tree.find((field) => field.name === 'Result')
+    const outputs = result?.children?.find((field) => field.name === 'outputs')
+    const nestedStep = outputs?.children?.find((field) => field.fieldPath.at(-1) === 'nested_call')
+    const nestedResult = nestedStep?.children?.find((field) => field.name === 'Result')
+    const childExecutionId = nestedResult?.children?.find((field) => field.name === 'child_execution_id')
+    const statusCode = nestedStep?.children?.find((field) => field.name === 'StatusCode')
+
+    expect(buildExpression({ nodeId: 'invoke_parent', fieldPath: childExecutionId?.fieldPath ?? [] })).toBe(
+      '${invoke_parent.Result.outputs.nested_call.Result.child_execution_id}'
+    )
+    expect(buildExpression({ nodeId: 'invoke_parent', fieldPath: statusCode?.fieldPath ?? [] })).toBe(
+      '${invoke_parent.Result.outputs.nested_call.StatusCode}'
+    )
+  })
 })
