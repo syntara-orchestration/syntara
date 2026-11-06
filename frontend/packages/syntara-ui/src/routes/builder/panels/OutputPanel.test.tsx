@@ -491,6 +491,52 @@ describe('OutputPanel', () => {
     })
   })
 
+  describe('Trigger node mock data schema-awareness (AAP-89681)', () => {
+    // AAP-89681: a trigger's "output" to the workflow is the event payload defined by its own
+    // configured input schema. Setting mock data on a trigger node's Output panel should template
+    // the editor from that input schema, not fall back to a blank object as if it were a generic step.
+    it('templates the mock data skeleton from the trigger input schema', async () => {
+      const user = userEvent.setup()
+      const triggerId = 'alert-trigger-1'
+
+      vi.mocked(useWorkflowStore).mockImplementation(
+        ((selector: (state: unknown) => unknown) =>
+          selector({
+            currentWorkflow: {
+              workflow: { activities: [] },
+              triggers: [
+                {
+                  id: triggerId,
+                  type: 'alert_trigger',
+                  name: 'Alert Trigger',
+                  parameters: {
+                    input_schema: {
+                      type: 'object',
+                      properties: {
+                        event_type: { type: 'string' },
+                        severity: { type: 'string' },
+                        host: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          })) as never
+      )
+
+      renderWithProviders(<OutputPanel nodeId={triggerId} />)
+
+      await user.click(screen.getByRole('button', { name: /set mock data/i }))
+
+      const editor = screen.getByRole('textbox', { name: /mock data editor/i })
+
+      expect(editor).toHaveDisplayValue(/event_type/)
+      expect(editor).toHaveDisplayValue(/severity/)
+      expect(editor).toHaveDisplayValue(/host/)
+    })
+  })
+
   describe('renderView exhaustiveness', () => {
     it('handles all view types correctly', async () => {
       const user = userEvent.setup()
