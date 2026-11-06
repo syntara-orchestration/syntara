@@ -31,6 +31,7 @@ function makeSchemaState(overrides: Partial<ChildWorkflowSchemaState> = {}): Chi
     selectedTriggerNodeId: null,
     needsTriggerSelection: false,
     isTriggerUnavailable: false,
+    isVersionMismatch: false,
     childSteps: [],
     isLoading: false,
     error: null,
@@ -165,6 +166,20 @@ describe('InputNodeContent for Sub-workflow steps', () => {
     expect(screen.getByText('T child_workflow_id')).toBeInTheDocument()
     expect(screen.queryByText('T stdout')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(retry).toHaveBeenCalledOnce()
+  })
+
+  it('explains when the child changes versions during lookup and offers refresh', async () => {
+    const retry = vi.fn()
+    vi.mocked(useChildWorkflowSchema).mockReturnValue(
+      makeSchemaState({ isEligible: true, isVersionMismatch: true, retry })
+    )
+    const user = userEvent.setup()
+
+    renderInputNodeContent()
+
+    expect(screen.getByText('Child workflow changed while loading outputs')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Refresh outputs' }))
     expect(retry).toHaveBeenCalledOnce()
   })
 
