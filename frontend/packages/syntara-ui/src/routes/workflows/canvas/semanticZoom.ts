@@ -4,8 +4,8 @@
  */
 export const SEMANTIC_ZOOM_MAX_SCALE = 0.5
 
-/** Square icon tile width/height in flow coordinates when semantic zoom is active. */
-export const SEMANTIC_ZOOM_TILE_SIZE_PX = 224
+/** Square icon tile width/height in flow coordinates when semantic zoom is active (matches full step width). */
+export const SEMANTIC_ZOOM_TILE_SIZE_PX = 300
 
 /** Vertical center of connection handles on the tile (not the label panel). */
 export const SEMANTIC_ZOOM_TILE_HANDLE_TOP_PX = SEMANTIC_ZOOM_TILE_SIZE_PX / 2

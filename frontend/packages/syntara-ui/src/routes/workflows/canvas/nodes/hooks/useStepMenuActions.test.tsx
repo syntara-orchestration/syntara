@@ -263,24 +263,24 @@ describe('useStepMenuActions', () => {
   })
 
   describe('with StepActionsContext — control flow steps', () => {
-    it('returns only replace and delete for control flow steps', () => {
+    it('returns view details, replace, and delete for control flow steps', () => {
       const { result } = renderHook(
         () => useStepMenuActions({ nodeId: 'condition-1', stepCategory: StepMenuCategory.CONTROL_FLOW }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
       const labels = result.current.map((a) => a.label)
-      expect(labels).toEqual(['Replace', '', 'Delete'])
+      expect(labels).toEqual(['View step details', 'Replace', '', 'Delete'])
     })
 
-    it('omits view details, run, duplicate, and disable for control flow steps', () => {
+    it('omits run, duplicate, and disable for control flow steps', () => {
       const { result } = renderHook(
         () => useStepMenuActions({ nodeId: 'loop-1', stepCategory: StepMenuCategory.CONTROL_FLOW }),
         { wrapper: withNodeActions(defaultNodeActions) }
       )
 
       const ids = result.current.map((a) => a.id)
-      expect(ids).not.toContain('view-details')
+      expect(ids).toContain('view-details')
       expect(ids).not.toContain('run-step')
       expect(ids).not.toContain('duplicate')
       expect(ids).not.toContain('toggle-disabled')

@@ -25,7 +25,6 @@ vi.mock('../routes/configuration/settings/Settings', () => ({ default: () => <di
 vi.mock('../routes/configuration/settings/SettingsCategoryRoute', () => ({
   SettingsCategoryRoute: () => <div>SettingsCategoryRoute</div>,
 }))
-vi.mock('../routes/documentation/glossary/Glossary', () => ({ default: () => <div>Glossary</div> }))
 vi.mock('../routes/feature-flags/feature-flag-demo-page', () => ({
   FeatureFlagDemo: () => <div>FeatureFlagDemo</div>,
 }))
@@ -115,7 +114,6 @@ const lazyRouteNames = [
   'EditIntegration',
   'Settings',
   'SettingsCategoryRoute',
-  'Glossary',
   'FeatureFlagDemo',
   'Approvals',
   'AccessManagement',
