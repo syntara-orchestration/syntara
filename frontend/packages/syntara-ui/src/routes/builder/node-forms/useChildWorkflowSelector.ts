@@ -2,14 +2,19 @@ import type { ProjectsAPI, WorkflowAPI } from '@syntara/contracts'
 import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 
-import { workflowClient, workflowFetchClient } from '../../../client'
+import { workflowClient } from '../../../client'
 import { detachPromise } from '../../../utils/detachPromise'
 import { accessFetchClient } from '../../access/accessClient'
+import {
+  ChildWorkflowSchemaFetchError,
+  fetchInvocationSchema,
+  invocationSchemaQueryKey,
+  type InvocationSchema,
+  type InvocationTrigger,
+} from '../childWorkflowSchemaApi'
 
 const WORKFLOW_PAGE_SIZE = 20
 
-type InvocationSchema = WorkflowAPI.components['schemas']['WorkflowInvocationSchemaRead']
-type InvocationTrigger = WorkflowAPI.components['schemas']['WorkflowInvocationTriggerSchema']
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 type ProjectWorkflowListQuery = NonNullable<ProjectsAPI.operations['list_project_workflows']['parameters']['query']> & {
   is_enabled?: boolean
@@ -136,38 +141,12 @@ function getWorkflowErrorMessage({
   return 'Unable to verify some workflows.'
 }
 
-export class InvocationSchemaFetchError extends Error {
-  readonly status: number
-
-  constructor(status: number) {
-    super(`Failed to load child workflow invocation schema (${status})`)
-    this.name = 'InvocationSchemaFetchError'
-    this.status = status
-  }
+export function isInvocationSchemaForbidden(error: unknown): error is ChildWorkflowSchemaFetchError {
+  return error instanceof ChildWorkflowSchemaFetchError && error.status === 403
 }
 
-export function isInvocationSchemaForbidden(error: unknown): error is InvocationSchemaFetchError {
-  return error instanceof InvocationSchemaFetchError && error.status === 403
-}
-
-export function isInvocationSchemaNotFound(error: unknown): error is InvocationSchemaFetchError {
-  return error instanceof InvocationSchemaFetchError && error.status === 404
-}
-
-async function fetchInvocationSchema(workflowId: string): Promise<InvocationSchema> {
-  const { data, error, response } = await workflowFetchClient.GET('/workflows/{workflow_id}/invocation_schema', {
-    params: { path: { workflow_id: workflowId } },
-  })
-
-  if (error || !data) {
-    throw new InvocationSchemaFetchError(response.status)
-  }
-
-  return data
-}
-
-function invocationSchemaQueryKey(workflowId: string) {
-  return ['workflow-invocation-schema', workflowId] as const
+export function isInvocationSchemaNotFound(error: unknown): error is ChildWorkflowSchemaFetchError {
+  return error instanceof ChildWorkflowSchemaFetchError && error.status === 404
 }
 
 /**
@@ -302,4 +281,5 @@ export function useChildWorkflowSelector({
   }
 }
 
+export { ChildWorkflowSchemaFetchError as InvocationSchemaFetchError }
 export type { InvocationTrigger }

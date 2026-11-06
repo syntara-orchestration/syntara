@@ -8,6 +8,7 @@ import asyncio
 import threading
 from collections.abc import Iterable
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
@@ -53,11 +54,13 @@ from syntara.workflows.exceptions import (
     WorkflowVersionNotFoundError,
 )
 from syntara.workflows.models import (
+    PublishedWorkflowStepMetadataRead,
     Workflow,
     WorkflowInvocationSchemaRead,
     WorkflowInvocationTriggerSchema,
     WorkflowListResponse,
     WorkflowRead,
+    WorkflowStepMetadataRead,
     WorkflowVersion,
 )
 from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution
@@ -78,7 +81,7 @@ from syntara.workflows.validators import (
     validate_workflow_references,
     workflow_validator,
 )
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+from syntara.workflows.workflow_engine.models.workflow_definition import NODE_OUTPUT_MODELS, NodeType
 
 if TYPE_CHECKING:
     from syntara.workflows.models import WorkflowVersionListResponse, WorkflowVersionRead
@@ -89,6 +92,78 @@ logger = structlog.stdlib.get_logger(__name__)
 # Strong refs so the event loop does not GC detached schedule-delete tasks.
 _pending_schedule_delete_tasks: set[asyncio.Task[None]] = set()
 _SCHEDULE_DELETE_TASK_PREFIX = "delete-scheduled-triggers-"
+
+
+@lru_cache(maxsize=32)
+def _output_schema_for_step(node_type: str) -> dict[str, Any] | None:
+    try:
+        output_model = NODE_OUTPUT_MODELS.get(NodeType(node_type))
+    except ValueError:
+        return None
+    if output_model is None:
+        return None
+
+    output_schema = output_model.model_json_schema()
+    properties = output_schema.setdefault("properties", {})
+    if isinstance(properties, dict):
+        properties.setdefault("status", {"type": "string", "description": "Node execution status."})
+    return output_schema
+
+
+def _effective_output_schema_for_node(node: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the node output schema after applying its configured output mapping.
+
+    Output mappings replace executor output fields with their configured keys.
+    Their expressions can combine or transform values, so the mapped fields have
+    unknown types until execution. The workflow engine's status field is added
+    independently of executor output mapping and remains available.
+    """
+    node_type = node.get("type")
+    if not isinstance(node_type, str):
+        return None
+
+    output_schema = _output_schema_for_step(node_type)
+    output_mapping = node.get("outputs")
+    if output_schema is None or output_mapping is None or not isinstance(output_mapping, dict):
+        return output_schema
+
+    properties = output_schema.get("properties")
+    if not isinstance(properties, dict):
+        return output_schema
+
+    effective_properties: dict[str, Any] = {
+        name: {
+            "description": "Output produced by a configured mapping; its type is not statically known.",
+            "x-syntara-output-mapped": True,
+        }
+        for name in output_mapping
+        if isinstance(name, str)
+    }
+    if "status" in properties:
+        effective_properties["status"] = properties["status"]
+
+    return {**output_schema, "properties": effective_properties}
+
+
+def _step_metadata_for_nodes(nodes: object) -> list[WorkflowStepMetadataRead]:
+    if not isinstance(nodes, list):
+        return []
+
+    steps: list[WorkflowStepMetadataRead] = []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        node_id = node.get("id")
+        node_type = node.get("type")
+        if isinstance(node_id, str) and isinstance(node_type, str):
+            steps.append(
+                WorkflowStepMetadataRead(
+                    id=node_id,
+                    type=node_type,
+                    output_schema=_effective_output_schema_for_node(node),
+                )
+            )
+    return steps
 
 
 def _on_schedule_delete_done(task: asyncio.Task[None]) -> None:
@@ -1073,6 +1148,23 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             published_version=published_version.version,
             is_eligible=bool(invocation_triggers),
             triggers=invocation_triggers,
+        )
+
+    async def get_published_step_metadata(self, workflow: Workflow) -> PublishedWorkflowStepMetadataRead | None:
+        """Return step output schemas from the exact published workflow version."""
+        if workflow.published_version_id is None:
+            return None
+
+        published_version = await self.session.get(WorkflowVersion, workflow.published_version_id)
+        if published_version is None:
+            return None
+
+        definition = published_version.workflow_definition
+        steps = _step_metadata_for_nodes(definition.get("nodes") if isinstance(definition, dict) else None)
+        return PublishedWorkflowStepMetadataRead(
+            version_id=published_version.id,
+            version=published_version.version,
+            steps=steps,
         )
 
     async def get_version_for_export(

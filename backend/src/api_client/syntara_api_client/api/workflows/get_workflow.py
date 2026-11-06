@@ -7,7 +7,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
-from ...models.workflow_read_with_version import WorkflowReadWithVersion
+from ...models.workflow_detail_read import WorkflowDetailRead
 from ...types import Response
 
 
@@ -24,9 +24,9 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | WorkflowReadWithVersion | None:
+) -> ErrorData | WorkflowDetailRead | None:
     if response.status_code == 200:
-        response_200 = WorkflowReadWithVersion.from_dict(response.json())
+        response_200 = WorkflowDetailRead.from_dict(response.json())
 
         return response_200
 
@@ -78,7 +78,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | WorkflowReadWithVersion]:
+) -> Response[ErrorData | WorkflowDetailRead]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -93,7 +93,7 @@ def sync_detailed(
     workflow_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Response[ErrorData | WorkflowReadWithVersion]:
+) -> Response[ErrorData | WorkflowDetailRead]:
     """Get workflow
 
      Get a workflow by ID including its current active version.
@@ -106,7 +106,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | WorkflowReadWithVersion]
+        Response[ErrorData | WorkflowDetailRead]
     """
 
     kwargs = _get_kwargs(
@@ -124,7 +124,7 @@ def sync(
     workflow_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> ErrorData | WorkflowReadWithVersion | None:
+) -> ErrorData | WorkflowDetailRead | None:
     """Get workflow
 
      Get a workflow by ID including its current active version.
@@ -137,7 +137,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | WorkflowReadWithVersion
+        ErrorData | WorkflowDetailRead
     """
 
     return sync_detailed(
@@ -150,7 +150,7 @@ async def asyncio_detailed(
     workflow_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Response[ErrorData | WorkflowReadWithVersion]:
+) -> Response[ErrorData | WorkflowDetailRead]:
     """Get workflow
 
      Get a workflow by ID including its current active version.
@@ -163,7 +163,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | WorkflowReadWithVersion]
+        Response[ErrorData | WorkflowDetailRead]
     """
 
     kwargs = _get_kwargs(
@@ -179,7 +179,7 @@ async def asyncio(
     workflow_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> ErrorData | WorkflowReadWithVersion | None:
+) -> ErrorData | WorkflowDetailRead | None:
     """Get workflow
 
      Get a workflow by ID including its current active version.
@@ -192,7 +192,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | WorkflowReadWithVersion
+        ErrorData | WorkflowDetailRead
     """
 
     return (

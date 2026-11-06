@@ -34,6 +34,7 @@ from syntara.workflows.models import (
     ValidationSeverity,
     Workflow,
     WorkflowCreate,
+    WorkflowDetailRead,
     WorkflowInvocationSchemaRead,
     WorkflowListParams,
     WorkflowListResponse,
@@ -336,15 +337,22 @@ async def list_workflows(
     dependencies=[Depends(_wf_perm_read)],
     operation_id="get_workflow",
     response_description="Workflow details",
-    response_model=WorkflowReadWithVersion,
+    response_model=WorkflowDetailRead,
 )
 async def get_workflow(
     workflow_id: UUID,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
-) -> WorkflowReadWithVersion:
+) -> WorkflowDetailRead:
     """Get a workflow by ID including its current active version."""
     workflow, current_version = await service.get_workflow_with_version(workflow_id)
-    return await _build_workflow_with_version_response(workflow, current_version, service)
+    response = await _build_workflow_with_version_response(workflow, current_version, service)
+    published_step_metadata = await service.get_published_step_metadata(workflow)
+    return WorkflowDetailRead.model_validate(
+        {
+            **response.model_dump(),
+            "published_step_metadata": published_step_metadata,
+        }
+    )
 
 
 @router.get(

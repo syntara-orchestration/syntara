@@ -9,6 +9,7 @@ import type * as WorkflowAPI from '@syntara/contracts/src/workflow-api.js'
 import type { Approval, Tool, WorkflowWithVersion, WorkflowsResponse } from '@syntara/contracts'
 import {
   ExecutionStatusEnum,
+  getNodeOutputSchema,
   IntegrationStatusEnum,
   IntegrationTypeEnum,
   WorkflowVersionStatusEnum,
@@ -161,6 +162,53 @@ function getOrCreateVersionStore(workflowId: string, workflow: WorkflowWithVersi
     ])
   }
   return workflowVersionStore.get(workflowId)!
+}
+
+function getPublishedStepMetadata(workflowId: string, workflow: WorkflowWithVersion) {
+  const publishedVersionId = workflow.published_version_id
+  if (typeof publishedVersionId !== 'string') return null
+
+  const publishedVersion = getOrCreateVersionStore(workflowId, workflow).find(
+    (version) => version.id === publishedVersionId && version.status === WorkflowVersionStatusEnum.PUBLISHED
+  )
+  if (!publishedVersion || !isRecord(publishedVersion.workflow_definition)) return null
+
+  const nodes = publishedVersion.workflow_definition['nodes']
+  const steps = Array.isArray(nodes)
+    ? nodes.flatMap((node) => {
+        if (!isRecord(node) || typeof node['id'] !== 'string' || typeof node['type'] !== 'string') return []
+        const knownOutputFields = getNodeOutputSchema(node['type'])
+        const outputMapping = node['outputs']
+        const outputSchema = !knownOutputFields
+          ? null
+          : isRecord(outputMapping)
+            ? {
+                type: 'object',
+                properties: {
+                  ...Object.fromEntries(
+                    Object.keys(outputMapping).map((name) => [
+                      name,
+                      {
+                        description: 'Output produced by a configured mapping; its type is not statically known.',
+                        'x-syntara-output-mapped': true,
+                      },
+                    ])
+                  ),
+                  ...(knownOutputFields.some((field) => field.name === 'status') ? { status: { type: 'string' } } : {}),
+                },
+              }
+            : { type: 'object' }
+        return [
+          {
+            id: node['id'],
+            type: node['type'],
+            output_schema: outputSchema,
+          },
+        ]
+      })
+    : []
+
+  return { version_id: publishedVersion.id, version: publishedVersion.version, steps }
 }
 
 /** Mock seed data may use camelCase timestamps; API uses snake_case */
@@ -1098,7 +1146,10 @@ export const handlers = [
         { status: 404 }
       )
     }
-    return HttpResponse.json(body)
+    return HttpResponse.json({
+      ...body,
+      published_step_metadata: getPublishedStepMetadata(String(workflowId), body),
+    })
   }),
   http.get('/api/v1/workflows/:workflowId/invocation_schema', ({ params }) => {
     const workflowId = String(params.workflowId)

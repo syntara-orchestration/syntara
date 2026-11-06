@@ -40,20 +40,62 @@ const TYPE_MAP = {
   array: 'array',
 }
 
-function mapType(jsonSchemaType) {
-  if (jsonSchemaType === undefined || jsonSchemaType === null) {
+function mapType(schema) {
+  const schemaType = Array.isArray(schema.type) ? schema.type.find((type) => type !== 'null') : schema.type
+  if (schemaType === undefined || schemaType === null) {
+    if (schema.properties || schema.additionalProperties) return 'object'
     return 'unknown'
   }
-  return TYPE_MAP[jsonSchemaType] ?? 'unknown'
+  return TYPE_MAP[schemaType] ?? 'unknown'
 }
 
 // ---------------------------------------------------------------------------
-// Extract output fields from a completed-result schema object
+// Resolve local schema references and extract output fields recursively
 // ---------------------------------------------------------------------------
 
-function extractFields(completedResult) {
-  const properties = completedResult.properties ?? {}
-  const required = completedResult.required ?? []
+function mergeSchemas(base, override) {
+  const merged = { ...base, ...override }
+  if (base.properties || override.properties) {
+    merged.properties = { ...(base.properties ?? {}), ...(override.properties ?? {}) }
+  }
+  if (base.required || override.required) {
+    merged.required = [...new Set([...(base.required ?? []), ...(override.required ?? [])])]
+  }
+  return merged
+}
+
+function resolveSchema(schema, root, resolving = new Set()) {
+  if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return {}
+
+  let resolved = {}
+  const reference = schema.$ref
+  if (typeof reference === 'string' && reference.startsWith('#/$defs/')) {
+    if (resolving.has(reference)) return {}
+    const definitionName = reference.slice('#/$defs/'.length).replace(/~1/g, '/').replace(/~0/g, '~')
+    const definition = root.$defs?.[definitionName]
+    if (definition) {
+      const nextResolving = new Set(resolving)
+      nextResolving.add(reference)
+      resolved = resolveSchema(definition, root, nextResolving)
+    }
+  }
+
+  if (Array.isArray(schema.allOf)) {
+    for (const item of schema.allOf) {
+      resolved = mergeSchemas(resolved, resolveSchema(item, root, resolving))
+    }
+  }
+
+  const local = { ...schema }
+  delete local.$ref
+  delete local.allOf
+  return mergeSchemas(resolved, local)
+}
+
+function extractFields(schema, root, resolving = new Set()) {
+  const resolved = resolveSchema(schema, root, resolving)
+  const properties = resolved.properties ?? {}
+  const required = resolved.required ?? []
 
   // Build the ordered field list: required fields first (in order), then
   // remaining optional fields in their natural iteration order.
@@ -62,12 +104,18 @@ function extractFields(completedResult) {
   const orderedKeys = [...required, ...optionalKeys]
 
   return orderedKeys.map((name) => {
-    const prop = properties[name] ?? {}
-    return {
+    const prop = resolveSchema(properties[name] ?? {}, root, resolving)
+    const field = {
       name,
-      type: mapType(prop.type),
+      type: mapType(prop),
       description: prop.description ?? '',
     }
+
+    if (prop.properties) field.children = extractFields(prop, root, resolving)
+    if (prop.additionalProperties && typeof prop.additionalProperties === 'object') {
+      field.additionalProperties = extractFields(prop.additionalProperties, root, resolving)
+    }
+    return field
   })
 }
 
@@ -80,7 +128,7 @@ console.log(`Reading catalog: ${catalogPath}`)
 const catalog = JSON.parse(readFileSync(catalogPath, 'utf-8'))
 const catalogDir = dirname(catalogPath)
 
-/** @type {Record<string, Array<{name: string, type: string, description: string}>>} */
+/** @type {Record<string, Array<{name: string, type: string, description: string, children?: object[], additionalProperties?: object[]}>>} */
 const schemas = {}
 
 const realSchemasDir = realpathSync(schemasDir)
@@ -100,7 +148,7 @@ for (const nodeType of catalog.node_types) {
     continue
   }
 
-  const resultSchema = schema.resultSchema
+  const resultSchema = resolveSchema(schema.resultSchema, schema)
   if (!resultSchema) {
     console.warn(`  WARN: No resultSchema in "${nodeType.type}", skipping.`)
     continue
@@ -115,7 +163,7 @@ for (const nodeType of catalog.node_types) {
     continue
   }
 
-  const fields = extractFields(completedResult)
+  const fields = extractFields(completedResult, schema)
   schemas[nodeType.type] = fields
   console.log(`  ${nodeType.type}: ${fields.length} fields`)
 }
@@ -130,7 +178,11 @@ function quote(s) {
 }
 
 function fieldToLiteral(f) {
-  return `{ name: ${quote(f.name)}, type: ${quote(f.type)}, description: ${quote(f.description)} }`
+  const children = f.children ? `, children: [${f.children.map(fieldToLiteral).join(', ')}]` : ''
+  const additionalProperties = f.additionalProperties
+    ? `, additionalProperties: [${f.additionalProperties.map(fieldToLiteral).join(', ')}]`
+    : ''
+  return `{ name: ${quote(f.name)}, type: ${quote(f.type)}, description: ${quote(f.description)}${children}${additionalProperties} }`
 }
 
 const entries = Object.entries(schemas)
@@ -146,6 +198,8 @@ export interface OutputFieldDef {
   name: string
   type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'unknown'
   description: string
+  children?: OutputFieldDef[]
+  additionalProperties?: OutputFieldDef[]
 }
 
 export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {\n`
