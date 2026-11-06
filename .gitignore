@@ -98,6 +98,8 @@ data/uploads/
 # IDE / Editor
 .idea/
 .vscode/
+# Cursor settings stay private by default. CI allows only the shared UX rule
+# documented in .github/AI_AGENT_POLICY.md.
 .cursor/
 .cursorignore
 .cursorindexingignore

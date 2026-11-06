@@ -45,7 +45,11 @@ skills (and commands, when present). In particular the following stay private:
 - `.claude/settings.json` and `.claude/settings.local.json`
 - `.claude/hooks/` and any other non-skill / non-command agent runtime files
 - `CLAUDE.local.md`, `AGENTS.local.md`
-- Editor/AI local dirs such as `.cursor/`, `.gemini/`
+- Editor/AI local dirs such as `.cursor/` and `.gemini/` remain private, except
+  `frontend/.cursor/rules/patternfly-ux-design-system.mdc`. This is a reviewed,
+  shared Cursor rule condensed from
+  `.agents/skills/frontend-patternfly-ux/SKILL.md`, which is the source of
+  truth. Keep the two files in sync. No other `.cursor/` files may be tracked.
 
 Do not force-add ignored agent settings or hooks in a pull request.
 
