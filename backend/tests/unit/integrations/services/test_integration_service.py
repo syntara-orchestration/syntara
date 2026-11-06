@@ -15,6 +15,7 @@ from syntara.core.models import User, UserReference
 from syntara.integrations.exceptions import (
     IntegrationNameConflictError,
     IntegrationNotFoundError,
+    IntegrationTypeConflictError,
 )
 from syntara.integrations.models.integration import (
     Integration,
@@ -124,6 +125,22 @@ class TestCreateIntegration:
 
         with pytest.raises(IntegrationNameConflictError, match="Integration with name 'Duplicate' already exists"):
             await integration_service.create_integration(data)
+
+    @pytest.mark.asyncio
+    async def test_create_duplicate_openshift_type_raises(
+        self, test_db_session: AsyncSession, integration_service: IntegrationService
+    ) -> None:
+        data = IntegrationCreate(
+            name="OpenShift One",
+            integration_type=IntegrationType.OPENSHIFT,
+            configuration={"integration_type": "openshift", "base_url": "https://api.example.com"},
+        )
+        await integration_service.create_integration(data)
+
+        duplicate = data.model_copy(update={"name": "OpenShift Two"})
+
+        with pytest.raises(IntegrationTypeConflictError, match="openshift"):
+            await integration_service.create_integration(duplicate)
 
     @pytest.mark.asyncio
     async def test_create_default_scope_global(

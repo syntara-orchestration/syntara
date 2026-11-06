@@ -48,6 +48,7 @@ from syntara.integrations.exceptions import (
     IntegrationNotFoundError,
     IntegrationRefreshNotSupportedError,
     IntegrationScopeError,
+    IntegrationTypeConflictError,
 )
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type, resolve_mcp_bearer_token
 from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
@@ -130,9 +131,14 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
         return "uq_integrations_name" in str(e)
 
+    def _is_duplicate_openshift_integration_error(self, e: IntegrityError) -> bool:
+        return "uq_integrations_single_openshift" in str(e)
+
     async def _handle_integrity_error(self, e: IntegrityError, integration_name: str) -> NoReturn:
         if self._is_duplicate_name_error(e):
             raise IntegrationNameConflictError(integration_name) from e
+        if self._is_duplicate_openshift_integration_error(e):
+            raise IntegrationTypeConflictError(IntegrationType.OPENSHIFT.value) from e
         raise e
 
     async def _raise_if_name_exists(self, name: str) -> None:
