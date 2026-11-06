@@ -1,7 +1,6 @@
 ---
 # Walk phase: consumes reusable approval workflow from ansible/actions (PR #164).
 # Replaces the inlined crawl-phase label guard with GitHub App-based auth.
-# Jira: AAP-97532 (AC2), AAP-91965
 name: Breaking Change Label Guard
 
 on:
@@ -16,7 +15,7 @@ permissions:
 jobs:
   authorize:
     # djyasin/actions for test; production: ansible/actions@<tag>
-    uses: djyasin/actions/.github/workflows/approval-label-authorization.yml@AAP-91965_approvers-team-label # PR #164
+    uses: djyasin/actions/.github/workflows/approval-label-authorization.yml@approvers-team-label # PR #164
     with:
       approval-label: breaking-change-approved
       team-slug: ansible-staff-eng-leads

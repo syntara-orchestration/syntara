@@ -1,7 +1,6 @@
 ---
 # Walk phase: consumes reusable comment workflow from ansible/actions (PR #161).
 # Replaces the inlined crawl-phase comment scripts.
-# Jira: AAP-97532 (AC1)
 name: OpenAPI Breaking Changes Comment
 
 on:
