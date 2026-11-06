@@ -333,9 +333,12 @@ class TestCreateTemporalExecutionService:
 
     @pytest.mark.asyncio
     async def test_create_temporal_execution_service_shared_client_unavailable(self) -> None:
-        """Falls back to Client.connect when shared client is unavailable."""
-        mock_client = Mock()
+        """Without overrides, an unavailable shared client raises OSError.
 
+        The factory must not open an ad hoc per-request connection when the
+        shared client is down — that would reintroduce a connection storm
+        during exactly the outage window where it hurts most.
+        """
         with (
             patch(
                 "syntara.workflows.workflow_engine.services.temporal_execution_service.get_shared_client",
@@ -344,12 +347,10 @@ class TestCreateTemporalExecutionService:
             ),
             patch("syntara.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class,
         ):
-            mock_client_class.connect = AsyncMock(return_value=mock_client)
-            service = await create_temporal_execution_service()
+            with pytest.raises(OSError, match="shared client unavailable"):
+                await create_temporal_execution_service()
 
-        assert isinstance(service, TemporalExecutionService)
-        assert service.temporal_client is mock_client
-        mock_client_class.connect.assert_awaited_once()
+        mock_client_class.connect.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_create_temporal_execution_service_custom_params(self) -> None:
@@ -375,19 +376,15 @@ class TestCreateTemporalExecutionService:
             assert len(call_args[1]["interceptors"]) == 1
 
     @pytest.mark.asyncio
-    async def test_create_temporal_execution_service_fallback_timeout_raises_oserror(self) -> None:
-        """TimeoutError from fallback Client.connect is re-raised as OSError."""
-        with (
-            patch(
-                "syntara.workflows.workflow_engine.services.temporal_execution_service.get_shared_client",
-                new_callable=AsyncMock,
-                return_value=None,
-            ),
-            patch("syntara.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class,
-        ):
+    async def test_create_temporal_execution_service_override_timeout_raises_oserror(self) -> None:
+        """TimeoutError from an explicit-override Client.connect is re-raised as OSError."""
+        with patch("syntara.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class:
             mock_client_class.connect = AsyncMock(side_effect=TimeoutError)
             with pytest.raises(OSError, match="timed out"):
-                await create_temporal_execution_service()
+                await create_temporal_execution_service(
+                    temporal_address="temporal.example.com:7233",
+                    namespace="production",
+                )
 
 
 class TestBuiltinWorkflowRouting:

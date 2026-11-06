@@ -327,8 +327,10 @@ async def create_temporal_execution_service(
     When called **without** explicit address/namespace overrides (the
     normal FastAPI DI path), this uses :func:`get_shared_client` so all
     API routes share a single gRPC connection instead of opening a new
-    one per request.  Falls back to a fresh ``Client.connect`` when the
-    shared client is unavailable.
+    one per request.  If the shared client is unavailable the factory
+    raises ``OSError`` — callers degrade gracefully rather than opening
+    an ad hoc per-request connection, which would reintroduce a
+    connection storm exactly when Temporal is struggling.
 
     When explicit overrides are provided (e.g. from tests or CLI tools),
     a fresh ``Client.connect`` is used so the override takes effect.
@@ -341,6 +343,10 @@ async def create_temporal_execution_service(
     Returns:
         TemporalExecutionService instance
 
+    Raises:
+        OSError: If no overrides were given and the shared client is
+            unavailable, or if an override connect times out.
+
     Example:
         >>> service = await create_temporal_execution_service()
         >>> result = await service.start_yaml_workflow(...)
@@ -352,10 +358,14 @@ async def create_temporal_execution_service(
     has_overrides = temporal_address is not None or namespace is not None
     if not has_overrides:
         shared = await get_shared_client()
-        if shared is not None:
-            return TemporalExecutionService(shared, task_queue, background_task_queue=settings.background_task_queue)
-        logger.warning("shared_temporal_client_unavailable", fallback="per-request connect")
+        if shared is None:
+            msg = "Temporal shared client unavailable"
+            raise OSError(msg)
+        return TemporalExecutionService(shared, task_queue, background_task_queue=settings.background_task_queue)
 
+    # Deliberate connection to an explicitly requested server — not a
+    # fallback during an outage of the configured one, so it does not
+    # reintroduce per-request connection storms.
     try:
         client = await asyncio.wait_for(
             Client.connect(
@@ -367,7 +377,7 @@ async def create_temporal_execution_service(
             timeout=CONNECT_TIMEOUT_SECONDS,
         )
     except TimeoutError:
-        msg = "Temporal connect timed out (fallback path)"
+        msg = "Temporal connect timed out (explicit override)"
         raise OSError(msg) from None
     # TODO: Handle how TemporalExecutionService is dispatched/deployed  # noqa: TD002, TD003
     # via containerization. This will be addressed in a future Containerization & Deployment ticket.
