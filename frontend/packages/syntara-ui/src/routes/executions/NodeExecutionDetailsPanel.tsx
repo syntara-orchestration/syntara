@@ -387,9 +387,10 @@ export function NodeExecutionDetailsPanel({
   const isAgenticNode = nodeType === ActivityTypeEnum.AGENTIC
   const isSubWorkflowNode = nodeType === ActivityTypeEnum.SUB_WORKFLOW
   // Tab/panel wiring: the Input/Output and Agent steps tabs render their content in a
-  // shared region below. Give that region role="tabpanel" and point its aria-labelledby
-  // at the active tab's button so assistive tech gets the tab-to-panel relationship
-  // (PatternFly composes a tab button's id as `pf-tab-{eventKey}-{id}`).
+  // shared region below. Give that region role="tabpanel" with an aria-label (the active
+  // tab's key); PatternFly's tab-button ids carry an unpredictable internal counter, so
+  // aria-labelledby cannot reference them reliably. The tab points at this region via
+  // aria-controls (nodeTabPanelId).
   const hasNodeTabs = isAgenticNode
   const tabsBaseId = useId()
   const { inputData, outputData, isLoading, error, refetch } = useNodeExecutionDetails(
