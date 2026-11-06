@@ -85,20 +85,23 @@ function buildChildStepGroup(step: ChildWorkflowStepSchema, outputsPath: string[
       ?.find((field) => field.name === 'Result')
       ?.children?.find((field) => field.name === 'outputs')?.additionalProperties ?? []
 
-  const children = wrapperFields.map((wrapperField) => {
-    const wrapperPath = [...stepPath, wrapperField.name]
-    if (wrapperField.name === 'Result') {
-      return {
-        name: wrapperField.name,
-        type: wrapperField.type,
-        description: wrapperField.description,
-        fieldPath: wrapperPath,
-        isGroup: true,
-        children: (step.outputFields ?? []).map((field) => toPreviewNode(field, wrapperPath)),
-      }
-    }
-    return toPreviewNode(wrapperField, stepPath)
-  })
+  const children =
+    step.type === ActivityTypeEnum.SUB_WORKFLOW
+      ? (step.outputFields ?? []).map((field) => toPreviewNode(field, stepPath))
+      : wrapperFields.map((wrapperField) => {
+          const wrapperPath = [...stepPath, wrapperField.name]
+          if (wrapperField.name === 'Result') {
+            return {
+              name: wrapperField.name,
+              type: wrapperField.type,
+              description: wrapperField.description,
+              fieldPath: wrapperPath,
+              isGroup: true,
+              children: (step.outputFields ?? []).map((field) => toPreviewNode(field, wrapperPath)),
+            }
+          }
+          return toPreviewNode(wrapperField, stepPath)
+        })
 
   return {
     name: step.name,
