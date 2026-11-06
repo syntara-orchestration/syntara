@@ -75,9 +75,37 @@ describe('Kafka credential connection', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
+  it('shows optional credential setup without a warning when authentication is not required', async () => {
+    const { container } = renderConnection({ isRequired: false, isCompact: true, credentialLabel: 'Kafka credential' })
+
+    expect(screen.getByText('Kafka credential optional')).toBeInTheDocument()
+    expect(screen.queryByRole('img', { hidden: true })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set up connection' })).toBeEnabled()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
   it('waits for credential queries before allowing setup', () => {
     renderConnection({ isPending: true })
     expect(screen.getByRole('button', { name: 'Set up connection' })).toBeDisabled()
     expect(screen.queryByRole('img', { hidden: true })).not.toBeInTheDocument()
+  })
+
+  it('restores focus after the selected credential finishes loading', async () => {
+    const user = userEvent.setup()
+    const { rerender } = renderConnection()
+    await user.click(screen.getByRole('button', { name: 'Set up connection' }))
+    rerender(
+      <KafkaCredentialConnection isPending isDisabled={false}>
+        {(onSelected) => <Button onClick={onSelected}>Choose credential</Button>}
+      </KafkaCredentialConnection>
+    )
+    await user.click(screen.getByRole('button', { name: 'Choose credential' }))
+    expect(screen.queryByRole('button', { name: 'Choose credential' })).not.toBeInTheDocument()
+    rerender(
+      <KafkaCredentialConnection credentialName="Orders runtime" isPending={false} isDisabled={false}>
+        {(onSelected) => <Button onClick={onSelected}>Choose credential</Button>}
+      </KafkaCredentialConnection>
+    )
+    expect(screen.getByRole('button', { name: 'Change' })).toHaveFocus()
   })
 })

@@ -1,6 +1,7 @@
-import { RhUiPlugFillIcon } from '@patternfly/react-icons'
 import { ActivityTypeEnum } from '@syntara/contracts'
 
+import KafkaIcon from '../../../../assets/kafka.svg?react'
+import { RegistryNodeId } from '../../../../constants'
 import { useWorkflowStore } from '../../../../stores/useWorkflowStore'
 import { buildKafkaPublishParameters, type KafkaPublishFormData } from '../../node-forms/kafkaPublishFormSchema'
 import { KafkaPublishNodeForm } from '../../node-forms/KafkaPublishNodeForm'
@@ -11,11 +12,12 @@ export default function registerKafkaPublishNode() {
   NodeRegistry.register<KafkaPublishFormData>({
     id: ActivityTypeEnum.KAFKA_PUBLISH,
     label: 'Kafka Publish',
-    icon: RhUiPlugFillIcon,
+    icon: KafkaIcon,
     category: 'action',
-    description: 'Publish a JSON message to a Kafka topic.',
+    parentId: RegistryNodeId.ACTION,
+    description: 'Publish a structured message to a Kafka topic.',
     keywords: ['kafka', 'publish', 'message', 'json'],
-    order: 35,
+    order: 0,
     formComponent: KafkaPublishNodeForm,
     enabled: true,
     onSubmit: (data, onSuccess, onError) => {

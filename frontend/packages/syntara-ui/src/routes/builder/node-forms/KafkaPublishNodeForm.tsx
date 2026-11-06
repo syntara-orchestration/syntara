@@ -44,7 +44,7 @@ function KafkaPublishFields({ projectId }: Readonly<{ projectId?: string }>) {
       <StackItem>
         <SynTextField
           name="topic"
-          label="Topic"
+          label="Target topic"
           fieldId="publish-topic"
           isRequired
           isDisabled={readOnly}
