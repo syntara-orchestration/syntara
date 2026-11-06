@@ -9,8 +9,10 @@ from temporalio.api.history.v1 import HistoryEvent
 from syntara.telemetry.events.workflow_error import RETRY_REASON_MAX_LENGTH
 from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.datetime import ensure_timezone_aware
+from syntara.workflows.workflow_engine.codecs.credential_codec import CredentialPayloadCodec
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
+from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     innermost_iteration_index,
     strip_loop_iteration_suffixes,
@@ -230,7 +232,7 @@ class ActivitySyncEventProcessorMixin:
         """
         update["status"] = ActivityStatus.RUNNING
         update["completed_at"] = None
-        setup_result = self._decode_setup_result(attrs)
+        setup_result = self._decode_setup_result(attrs, self.temporal_client.data_converter.payload_codec)
         if setup_result is not None:
             update["_subworkflow_io"] = self._build_subworkflow_io(setup_result)
             if update.get("_subworkflow_iteration") is None:
@@ -240,18 +242,28 @@ class ActivitySyncEventProcessorMixin:
         metadata.pending_sync_event_ids.add(scheduled_id)
 
     @staticmethod
-    def _decode_setup_result(attrs: Any) -> dict[str, Any] | None:  # noqa: ANN401
+    def _decode_setup_result(
+        attrs: Any,  # noqa: ANN401
+        codec: CredentialPayloadCodec | None = None,
+    ) -> dict[str, Any] | None:
         """Decode the sub-workflow setup activity's JSON result payload.
 
-        Returns the parsed dict, or ``None`` when the payload is absent or
-        unparseable (defensive: the summaries/metadata are best-effort UI data).
+        When a credential payload codec is provided, the payload is decrypted
+        first: credential-bearing setup results are stored ``binary/encrypted``
+        in history, so a raw ``json.loads`` would throw and silently drop the
+        child link and I/O summary. Non-encrypted payloads pass through
+        unchanged. Returns the parsed dict, or ``None`` when the payload is
+        absent or unparseable (defensive: the summaries are best-effort UI data).
         """
         if not attrs.result or not attrs.result.payloads:
             return None
+        payload = attrs.result.payloads[0]
         try:
-            result_data = json.loads(attrs.result.payloads[0].data)
+            if isinstance(codec, CredentialPayloadCodec):
+                payload = codec.decode_payload(payload)
+            result_data = json.loads(payload.data)
         except Exception:  # noqa: BLE001
-            logger.warning("Failed to parse sub-workflow setup result", exc_info=True)
+            logger.warning("Failed to decode/parse sub-workflow setup result", exc_info=True)
             return None
         return result_data if isinstance(result_data, dict) else None
 
@@ -286,7 +298,7 @@ class ActivitySyncEventProcessorMixin:
             "workflow_id": setup_result.get("child_workflow_id"),
             "workflow_name": setup_result.get("child_workflow_name"),
             "trigger_node_id": setup_result.get("trigger_node_id"),
-            "input_parameters": setup_result.get("input_data") or {},
+            "input_parameters": scrub_credentials(setup_result.get("input_data") or {}),
         }
         output_data = {
             "workflow_id": setup_result.get("child_workflow_id"),
