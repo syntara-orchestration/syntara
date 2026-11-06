@@ -31,6 +31,7 @@ import { getExecutionPlaneFilterDefinitions } from './executionPlaneFilters'
 import { executionPlaneDefaultSort, executionPlaneTableColumns } from './executionPlaneTableColumns'
 import { buildExecutionTargetDeleteAction } from './executionTargetDeleteAction'
 import { ExecutionTargetDialogs } from './ExecutionTargetDialogs'
+import { buildExecutionTargetEditAction } from './executionTargetEditAction'
 import { ExecutionTargetStatusLabel } from './ExecutionTargetStatusLabel'
 import { getNodeSelectors } from './getNodeSelectors'
 import { NodeSelectorsCell } from './NodeSelectorsCell'
@@ -44,11 +45,13 @@ function ExecutionPlaneTableContent({
   getSortParams,
   deleteDialog,
   permissions,
+  onEdit,
 }: Readonly<{
   rows: ExecutionTarget[]
   getSortParams: (columnField: string) => ThProps['sort']
   deleteDialog: { open: (item: ExecutionTarget) => void }
   permissions: ReturnType<typeof useExecutionTargetPermissions>
+  onEdit: (target: ExecutionTarget) => void
 }>) {
   return (
     <>
@@ -94,7 +97,10 @@ function ExecutionPlaneTableContent({
             </Td>
             <Td isActionCell>
               <SynKebabMenu
-                actions={[buildExecutionTargetDeleteAction(target, deleteDialog, permissions)]}
+                actions={[
+                  buildExecutionTargetEditAction(target, permissions, onEdit),
+                  buildExecutionTargetDeleteAction(target, deleteDialog, permissions),
+                ]}
                 aria-label={`Actions for ${target.name}`}
               />
             </Td>
@@ -158,6 +164,10 @@ export default function ExecutionPlane() {
     ? () => detachPromise(navigate({ to: AppRoute.ExecutionPlane.Create }))
     : undefined
 
+  const handleEdit = (target: ExecutionTarget) => {
+    detachPromise(navigate({ to: AppRoute.ExecutionPlane.Edit.replace(':executionTargetId', target.id) }))
+  }
+
   return (
     <SynPage>
       <SynPageTitle segments={['Execution Plane']} />
@@ -208,6 +218,7 @@ export default function ExecutionPlane() {
                   getSortParams={getSortParams}
                   deleteDialog={deleteDialog}
                   permissions={permissions}
+                  onEdit={handleEdit}
                 />
               </SynListPanelTable>
             }

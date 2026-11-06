@@ -14,7 +14,7 @@ import {
   WorkflowVersionStatusEnum,
 } from '@syntara/contracts'
 import { credentials, credentialTypes, credentialWorkflows } from './resources/credentials'
-import { executionTargets, MOCK_DELETE_CONFLICT_LABEL } from './resources/executionTargets'
+import { executionTargets, MOCK_DELETE_CONFLICT_LABEL, MOCK_UPDATE_CONFLICT_LABEL } from './resources/executionTargets'
 import { integrations } from './resources/integrations'
 import { models } from './resources/models'
 import { workflows } from './resources/workflows'
@@ -686,6 +686,252 @@ export const handlers = [
         Location: `/api/execution_plane/v1/execution_targets/${id}`,
       },
     })
+  }),
+
+  /**
+   * PATCH execution target — partial update (minProperties: 1).
+   * 422 with FastAPI-style `detail[].loc` for field mapping; 409 for name clashes,
+   * clearing the default flag, or the mock concurrent-edit label.
+   */
+  http.patch('/api/execution_plane/v1/execution_targets/:target_id', async ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (!canWriteExecutionTarget(username)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:update',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const targetId = params.target_id as string
+    const target = executionTargets.find((item) => item.id === targetId)
+    if (!target) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: `Execution target ${targetId} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+
+    if (target.labels?.[MOCK_UPDATE_CONFLICT_LABEL]) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Execution target was modified by another user. Reload and try again.',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    const body = (await request.json()) as {
+      name?: string | null
+      placement?: {
+        type?: 'kubernetes'
+        namespace?: string | null
+        node_selectors?: string[]
+        tolerations?: string[]
+      } | null
+      labels?: Record<string, string> | null
+      is_default?: boolean | null
+      enabled?: boolean | null
+    }
+
+    const providedKeys = Object.keys(body).filter((key) => body[key as keyof typeof body] !== undefined)
+    if (providedKeys.length === 0) {
+      return HttpResponse.json(
+        {
+          detail: [
+            {
+              loc: ['body'],
+              msg: 'At least one field is required',
+              type: 'value_error',
+            },
+          ],
+        },
+        { status: 422 }
+      )
+    }
+
+    if ('name' in body) {
+      if (body.name === null || typeof body.name !== 'string' || body.name.trim().length === 0) {
+        return HttpResponse.json(
+          {
+            detail: [
+              {
+                loc: ['body', 'name'],
+                msg: 'Name cannot be empty',
+                type: 'value_error',
+              },
+            ],
+          },
+          { status: 422 }
+        )
+      }
+      if (body.name.trim().length > 255) {
+        return HttpResponse.json(
+          {
+            detail: [
+              {
+                loc: ['body', 'name'],
+                msg: 'Name must be 255 characters or fewer',
+                type: 'value_error',
+              },
+            ],
+          },
+          { status: 422 }
+        )
+      }
+    }
+
+    if ('placement' in body) {
+      if (body.placement === null || typeof body.placement !== 'object') {
+        return HttpResponse.json(
+          {
+            detail: [
+              {
+                loc: ['body', 'placement'],
+                msg: 'Placement cannot be cleared',
+                type: 'value_error',
+              },
+            ],
+          },
+          { status: 422 }
+        )
+      }
+      const namespace = body.placement.namespace?.trim() ?? ''
+      if (!namespace) {
+        return HttpResponse.json(
+          {
+            detail: [
+              {
+                loc: ['body', 'placement', 'namespace'],
+                msg: 'Namespace is required',
+                type: 'value_error',
+              },
+            ],
+          },
+          { status: 422 }
+        )
+      }
+    }
+
+    if ('labels' in body && (body.labels === null || typeof body.labels !== 'object')) {
+      return HttpResponse.json(
+        {
+          detail: [
+            {
+              loc: ['body', 'labels'],
+              msg: 'Labels cannot be cleared',
+              type: 'value_error',
+            },
+          ],
+        },
+        { status: 422 }
+      )
+    }
+
+    if ('is_default' in body && body.is_default === null) {
+      return HttpResponse.json(
+        {
+          detail: [
+            {
+              loc: ['body', 'is_default'],
+              msg: 'is_default cannot be null',
+              type: 'value_error',
+            },
+          ],
+        },
+        { status: 422 }
+      )
+    }
+
+    if ('enabled' in body && body.enabled === null) {
+      return HttpResponse.json(
+        {
+          detail: [
+            {
+              loc: ['body', 'enabled'],
+              msg: 'enabled cannot be null',
+              type: 'value_error',
+            },
+          ],
+        },
+        { status: 422 }
+      )
+    }
+
+    const nextName = typeof body.name === 'string' ? body.name.trim() : undefined
+    if (
+      nextName &&
+      executionTargets.some((item) => item.id !== targetId && item.name.toLowerCase() === nextName.toLowerCase())
+    ) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: `An execution target named "${nextName}" already exists`,
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    if (body.is_default === false && target.is_default) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Cannot clear the default flag; promote another target first',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    if (nextName !== undefined) {
+      target.name = nextName
+    }
+
+    if (body.placement) {
+      const namespace = body.placement.namespace?.trim() ?? ''
+      target.placement = {
+        type: 'kubernetes',
+        namespace,
+        node_selectors: body.placement.node_selectors ?? [],
+        tolerations: body.placement.tolerations ?? [],
+      }
+    }
+
+    if (body.labels) {
+      target.labels = { ...body.labels }
+    }
+
+    if (typeof body.enabled === 'boolean') {
+      target.enabled = body.enabled
+    }
+
+    if (body.is_default === true) {
+      for (const item of executionTargets) {
+        item.is_default = item.id === targetId
+      }
+    }
+
+    return HttpResponse.json(target)
   }),
 
   /**
