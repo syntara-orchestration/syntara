@@ -266,46 +266,54 @@ const reactHooksAndA11yProbes = [
   ],
 ]
 
-const reactEffectWarningProbes = [
+const reactEffectRuleProbes = [
   [
     'derived state',
     "import { useEffect, useState } from 'react'; export function Probe({ first, last }: { first: string; last: string }) { const [fullName, setFullName] = useState(''); useEffect(() => { setFullName(first + last) }, [first, last]); return <span>{fullName}</span> }",
     'reactYouMightNotNeedAnEffect/no-derived-state',
+    1,
   ],
   [
     'chained state update',
     "import { useEffect, useState } from 'react'; export function Probe() { const [round] = useState(1); const [isOver, setIsOver] = useState(false); useEffect(() => { if (round > 10) setIsOver(true) }, [round]); return <span>{String(isOver)}</span> }",
     'reactYouMightNotNeedAnEffect/no-chain-state-updates',
+    1,
   ],
   [
     'effect used as event handler',
     "import { useEffect } from 'react'; export function Probe({ product, show }: { product: { isInCart: boolean; name: string }; show: (text: string) => void }) { useEffect(() => { if (product.isInCart) show(`Added ${product.name}`) }, [product, show]); return null }",
     'reactYouMightNotNeedAnEffect/no-event-handler',
+    1,
   ],
   [
     'state adjusted when prop changes',
     "import { useEffect, useState } from 'react'; export function Probe({ items }: { items: string[] }) { const [selection, setSelection] = useState<string | null>(null); useEffect(() => { setSelection(null) }, [items]); return <div>{selection}</div> }",
     'reactYouMightNotNeedAnEffect/no-adjust-state-on-prop-change',
+    1,
   ],
   [
     'all state reset when prop changes',
     "import { useEffect, useState } from 'react'; export function Probe({ items }: { items: string[] }) { const [selection, setSelection] = useState<string | null>(null); useEffect(() => { setSelection(null) }, [items]); return null }",
     'reactYouMightNotNeedAnEffect/no-reset-all-state-on-prop-change',
+    2,
   ],
   [
     'live state passed to parent',
     "import { useEffect, useState } from 'react'; export function Probe({ onChange }: { onChange: (value: number) => void }) { const [value] = useState(0); useEffect(() => { onChange(value) }, [onChange, value]); return null }",
     'reactYouMightNotNeedAnEffect/no-pass-live-state-to-parent',
+    1,
   ],
   [
     'query data passed to parent',
     "import { useEffect } from 'react'; import { useQuery } from '@tanstack/react-query'; export function Probe({ onDataFetched }: { onDataFetched: (data: number) => void }) { const { data } = useQuery({ queryKey: ['probe'], queryFn: async () => 1 }); useEffect(() => { onDataFetched(data) }, [data, onDataFetched]); return null }",
     'reactYouMightNotNeedAnEffect/no-pass-data-to-parent',
+    1,
   ],
   [
     'state initialized in effect',
     "import { useEffect, useState } from 'react'; export function Probe() { const [value, setValue] = useState(0); useEffect(() => { setValue(1) }, []); return <span>{value}</span> }",
     'reactYouMightNotNeedAnEffect/no-initialize-state',
+    1,
   ],
 ]
 
@@ -457,12 +465,12 @@ describe('flat ESLint config rule inheritance', () => {
     expect(messages.some((message) => message.ruleId === 'jsx-a11y/no-noninteractive-tabindex')).toBe(false)
   })
 
-  it.each(reactEffectWarningProbes)(
-    'surfaces the configured React effect warning: %s',
-    async (_name, _code, expectedRuleId) => {
+  it.each(reactEffectRuleProbes)(
+    'uses the configured React effect rule severity: %s',
+    async (_name, _code, expectedRuleId, expectedSeverity) => {
       const config = await eslint.calculateConfigForFile('src/routes/access-management/AssignRoleModal.tsx')
 
-      expect(config?.rules[expectedRuleId]?.[0]).toBe(1)
+      expect(config?.rules[expectedRuleId]?.[0]).toBe(expectedSeverity)
     },
     30_000
   )
