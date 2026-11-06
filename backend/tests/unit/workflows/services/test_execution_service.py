@@ -1802,10 +1802,13 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
             "prompt_id": str(uuid4()),
         }
 
-        with patch(
-            "syntara.forms.services.form_prompt_signal.resolve_verified_form_prompt_signal",
-            new_callable=AsyncMock,
-            return_value=VerifiedFormPromptSignal(payload=verified_payload),
+        with (
+            patch(
+                "syntara.forms.services.form_prompt_signal.resolve_verified_form_prompt_signal",
+                new_callable=AsyncMock,
+                return_value=VerifiedFormPromptSignal(payload=verified_payload),
+            ),
+            patch("syntara.workflows.services.execution_service.logger") as mock_logger,
         ):
             await service.handle_activity_callback(
                 uuid4(),
@@ -1816,6 +1819,12 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
         mock_temporal.complete_async_activity.assert_awaited_once()
         assert mock_temporal.complete_async_activity.await_args.kwargs["result"] == {"output": verified_payload}
         mock_temporal.fail_async_activity.assert_not_awaited()
+        completed_log = next(
+            call for call in mock_logger.info.call_args_list if call.args[0] == "Activity callback handled"
+        )
+        assert completed_log.kwargs["callback_type"] == "form_prompt"
+        assert completed_log.kwargs["outcome"] == "submitted"
+        assert "status" not in completed_log.kwargs
 
     @pytest.mark.parametrize("signal_status", ["failed", "cancelled"])
     @pytest.mark.asyncio

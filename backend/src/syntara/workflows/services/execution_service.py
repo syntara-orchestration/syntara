@@ -1114,6 +1114,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         )
 
         status = signal_data.get("status")
+        completion_log_context: dict[str, Any] = {"status": status}
         form_prompt_resolution = await resolve_verified_form_prompt_signal(
             self.session,
             execution_id,
@@ -1127,6 +1128,10 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                 rejection_reason = "Form Prompt callbacks cannot fail or cancel the activity"
             else:
                 signal_data = form_prompt_resolution.payload
+                completion_log_context = {
+                    "callback_type": "form_prompt",
+                    "outcome": "submitted",
+                }
 
         if rejection_reason is not None:
             logger.warning(
@@ -1181,7 +1186,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             "Activity callback handled",
             activity_id=activity_id,
             execution_id=execution_id,
-            status=status,
+            **completion_log_context,
         )
 
     async def cancel_execution(self, execution_id: UUID) -> None:
