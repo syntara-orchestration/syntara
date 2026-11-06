@@ -84,6 +84,38 @@ describe('IntegrationSelector', () => {
     renderSelector({ integrationType: IntegrationTypeEnum.KAFKA, projectId: 'project-id', label: 'Kafka integration' })
     expect(integrationsQuery).toHaveBeenCalledWith(IntegrationTypeEnum.KAFKA, 'project-id')
   })
+
+  it('shows Kafka broker addresses and availability in the integration menu', async () => {
+    const kafkaIntegration = {
+      id: 'kafka-integration',
+      name: 'Kafka Cluster (Demo)',
+      integration_type: IntegrationTypeEnum.KAFKA,
+      validation_status: IntegrationStatusEnum.AVAILABLE,
+      configuration: {
+        integration_type: IntegrationTypeEnum.KAFKA,
+        bootstrap_servers: ['broker-1.example.invalid:9093', 'broker-2.example.invalid:9093'],
+        security_protocol: 'SASL_SSL',
+      },
+    } satisfies IntegrationsAPI.components['schemas']['KafkaIntegrationRead']
+    integrationsQuery.mockReturnValue({ data: [kafkaIntegration], isPending: false, isError: false })
+    const user = userEvent.setup()
+    const { container } = render(
+      <IntegrationSelector
+        integrationType={IntegrationTypeEnum.KAFKA}
+        label="Integration"
+        isRequired
+        placeholder="Select a Kafka integration"
+        onChange={vi.fn()}
+      />,
+      { wrapper }
+    )
+
+    expect(screen.getByRole('button', { name: 'Integration' })).toHaveTextContent('Select a Kafka integration')
+    await user.click(screen.getByRole('button', { name: 'Integration' }))
+    expect(screen.getByRole('option', { name: /Kafka Cluster \(Demo\)/ })).toHaveTextContent('Available')
+    expect(screen.getByText('broker-1.example.invalid:9093, broker-2.example.invalid:9093')).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
   beforeEach(() => {
     mockQuerySuccess()
   })

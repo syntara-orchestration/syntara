@@ -287,6 +287,18 @@ describe('CredentialSelector', () => {
     expect(screen.getByText('API Credential')).toBeInTheDocument()
   })
 
+  it('keeps the picker accessible when its visual label is hidden', async () => {
+    mockUseQueryLegacy()
+    const user = userEvent.setup()
+    const { container } = renderSelector({ label: 'Runtime credential', hideLabel: true })
+
+    expect(screen.queryByText('Runtime credential')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Runtime credential' }))
+    expect(screen.getByRole('listbox', { name: 'Runtime credential options' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Staging Token' })).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
   it('shows dropdown with credential list when clicked', async () => {
     const user = userEvent.setup()
     mockUseQueryLegacy()

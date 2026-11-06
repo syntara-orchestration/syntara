@@ -53,17 +53,19 @@ export function renderNodeIcon(
 
   const isAapIcon = AAP_NODE_IDS.has(nodeId as (typeof RegistryNodeId)[keyof typeof RegistryNodeId])
   const isEdaIcon = nodeId === RegistryNodeId.TRIGGER_EDA
+  const isKafkaIcon = nodeId === RegistryNodeId.ACTION_KAFKA
   const isCustomIcon = isAapIcon || isEdaIcon
   const shouldRotateIcon = nodeId === RegistryNodeId.LOGIC_CONDITION || nodeId === RegistryNodeId.LOGIC_CONVERGE
   const { size, iconSize, customIconScale, customIconOffsetY } = getVariantConfig(nodeId)[variant]
 
   const iconStyle: CSSProperties = {
     ...(shouldRotateIcon && { transform: 'rotate(90deg)' }),
-    ...(color && {
-      color,
-      // Override PatternFly Icon's inner content color so the SVG (fill: currentColor) picks it up
-      ['--pf-v6-c-icon__content--Color' as string]: color,
-    }),
+    ...(color &&
+      !isKafkaIcon && {
+        color,
+        // Override PatternFly Icon's inner content color so the SVG (fill: currentColor) picks it up
+        ['--pf-v6-c-icon__content--Color' as string]: color,
+      }),
   }
 
   return (

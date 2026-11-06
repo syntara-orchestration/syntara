@@ -88,17 +88,28 @@ export function AddNodePanel(props: AddNodePanelProps) {
   // because triggers cannot be connection targets
   const nodeTypes = useMemo(() => {
     const allNodes = NodeRegistry.getAll()
+    const groupedNodes = allNodes
+      .filter((node) => !node.parentId)
+      .map((node) => ({
+        ...node,
+        subtypes: [
+          ...(node.subtypes ?? []),
+          ...allNodes
+            .filter((child) => child.parentId === node.id)
+            .map(({ id, label, icon, description, order }) => ({ id, label, icon, description, order })),
+        ],
+      }))
     if (props.hasNoWorkflowNodes) {
-      return allNodes.filter((node) => node.category === 'trigger')
+      return groupedNodes.filter((node) => node.category === 'trigger')
     }
     if (props.sourceNodeId || props.replacementNodeId) {
-      return allNodes.filter((node) => node.category !== 'trigger')
+      return groupedNodes.filter((node) => node.category !== 'trigger')
     }
-    return allNodes
+    return groupedNodes
   }, [props.replacementNodeId, props.hasNoWorkflowNodes, props.sourceNodeId])
 
   const handleNodeClick = (nodeId: string) => {
-    const nodeDef = NodeRegistry.get(nodeId)
+    const nodeDef = nodeTypes.find((node) => node.id === nodeId)
     if (nodeDef?.subtypes?.length) {
       setSelectedNodeType(nodeId)
       return
@@ -109,7 +120,7 @@ export function AddNodePanel(props: AddNodePanelProps) {
 
   // Selected step type definition (may show subtype list)
   const enforcedSelectedNodeType = props.hasNoWorkflowNodes ? 'trigger' : selectedNodeType
-  const selectedNode = enforcedSelectedNodeType ? NodeRegistry.get(enforcedSelectedNodeType) : null
+  const selectedNode = nodeTypes.find((node) => node.id === enforcedSelectedNodeType)
   const isShowingSubtypeList = !!selectedNode?.subtypes?.length
 
   const panelTitle =
@@ -156,7 +167,12 @@ export function AddNodePanel(props: AddNodePanelProps) {
                   .sort((a, b) => (a.subtype.order ?? a.index) - (b.subtype.order ?? b.index))
                   .map(({ subtype }) => subtype)}
                 onSelect={(subtypeId) => {
-                  props.onSelectNode(selectedNode.id, subtypeId)
+                  const registeredChild = NodeRegistry.get(subtypeId)
+                  if (registeredChild?.parentId === selectedNode.id) {
+                    props.onSelectNode(registeredChild.id, null)
+                  } else {
+                    props.onSelectNode(selectedNode.id, subtypeId)
+                  }
                   setSelectedNodeType(null)
                 }}
               />

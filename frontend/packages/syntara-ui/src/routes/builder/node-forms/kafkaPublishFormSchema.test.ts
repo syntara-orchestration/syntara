@@ -133,6 +133,16 @@ describe('Kafka Publish form contract', () => {
     expect(kafkaPublishFormSchema.safeParse(valid).success).toBe(true)
   })
 
+  it('blocks an unloaded connection without marking the selected integration as invalid', () => {
+    const result = kafkaPublishFormSchema.safeParse({ ...valid, connection_ready: false })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues).toContainEqual(expect.objectContaining({ path: ['connection_ready'] }))
+      expect(result.error.issues).not.toContainEqual(expect.objectContaining({ path: ['integration_id'] }))
+    }
+  })
+
   it.each(['integration_id', 'credential_id'])('rejects a templated %s', (name) => {
     expect(kafkaPublishFormSchema.safeParse({ ...valid, [name]: '${trigger.id}' }).success).toBe(false)
   })

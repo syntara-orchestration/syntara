@@ -25,6 +25,9 @@ vi.mock('../../../client', () => ({
 vi.mock('../hooks/useWorkflowEngineDefaults', () => ({
   useWorkflowEngineDefaults: () => ({ defaults: null, isLoading: false }),
 }))
+vi.mock('../../workflows/canvas/nodes/hooks/useCredentialName', () => ({
+  useCredentialName: (id?: string) => ({ name: id ? 'Publish runtime credential' : undefined, isPending: false }),
+}))
 
 vi.mock('../../../stores/useWorkflowStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../stores/useWorkflowStore')>()),
@@ -33,7 +36,7 @@ vi.mock('../../../stores/useWorkflowStore', async (importOriginal) => ({
 vi.mock('../components/IntegrationSelector', () => ({
   IntegrationSelector: ({ value, onChange, isDisabled }: IntegrationSelectorProps) => (
     <label>
-      Kafka integration
+      Integration
       <input value={value ?? ''} disabled={isDisabled} onChange={(event) => onChange(event.target.value)} />
     </label>
   ),
@@ -87,11 +90,52 @@ describe('Kafka Publish builder', () => {
 
   it('offers labeled message controls and has no accessibility violations', async () => {
     const { container } = render(<KafkaPublishNodeForm onSubmit={vi.fn()} />)
-    expect(screen.getByRole('textbox', { name: 'Topic' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Target topic' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'JSON payload' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Message key encoding' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Header source' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add header' })).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('shows credential setup only after an integration is selected', async () => {
+    connection.protocol = 'SASL_SSL'
+    const user = userEvent.setup()
+    const { container } = render(<KafkaPublishNodeForm onSubmit={vi.fn()} />)
+
+    expect(screen.queryByRole('button', { name: 'Set up connection' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Runtime credential' })).not.toBeInTheDocument()
+    await user.type(screen.getByRole('textbox', { name: 'Integration' }), parameters.integration_id)
+    expect(screen.queryByText('Wait for the selected Kafka connection settings to load')).not.toBeInTheDocument()
+    expect(screen.getByText('Kafka credential not configured')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Set up connection' }))
+    expect(screen.getByRole('textbox', { name: 'Runtime credential' })).toBeEnabled()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('textbox', { name: 'Runtime credential' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set up connection' })).toHaveFocus()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('shows the selected credential and preserves it when changing is cancelled', async () => {
+    connection.protocol = 'SASL_SSL'
+    const user = userEvent.setup()
+    const { container } = render(
+      <KafkaPublishNodeForm onSubmit={vi.fn()} initialData={{ integration_id: parameters.integration_id }} />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Set up connection' }))
+    await user.click(screen.getByRole('textbox', { name: 'Runtime credential' }))
+    await user.paste('22222222-2222-4222-8222-222222222222')
+    expect(screen.getByText('Publish runtime credential')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Runtime credential' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Change' })).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: 'Change' }))
+    expect(screen.getByRole('textbox', { name: 'Runtime credential' })).toHaveValue(
+      '22222222-2222-4222-8222-222222222222'
+    )
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByText('Publish runtime credential')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Change' })).toHaveFocus()
     expect(await axe(container)).toHaveNoViolations()
   })
 
@@ -157,7 +201,7 @@ describe('Kafka Publish builder', () => {
     expect(await axe(container)).toHaveNoViolations()
     await user.click(parametersTab)
     expect(screen.getByRole('textbox', { name: 'JSON payload' })).toHaveValue('null')
-    expect(screen.getByRole('textbox', { name: 'Topic' })).toHaveValue('outcomes')
+    expect(screen.getByRole('textbox', { name: 'Target topic' })).toHaveValue('outcomes')
   })
 
   it('requires a runtime Kafka credential for SASL_SSL and scopes compatible choices', async () => {
@@ -176,13 +220,17 @@ describe('Kafka Publish builder', () => {
         </Button>
       </>
     )
-    expect(screen.getByRole('textbox', { name: 'Runtime credential' })).toHaveAttribute('aria-required', 'true')
-    expect(screen.getByRole('status', { name: 'Credential compatibility' })).toHaveTextContent('Kafka:workflow-project')
+    expect(screen.getByText('Kafka credential not configured')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Runtime credential' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByText('Select a runtime Kafka credential for SASL_SSL')).toBeInTheDocument()
     expect(onSubmit).not.toHaveBeenCalled()
     expect(await axe(container)).toHaveNoViolations()
-    await user.type(screen.getByRole('textbox', { name: 'Runtime credential' }), '22222222-2222-4222-8222-222222222222')
+    await user.click(screen.getByRole('button', { name: 'Set up connection' }))
+    expect(screen.getByRole('textbox', { name: 'Runtime credential' })).toHaveAttribute('aria-required', 'true')
+    expect(screen.getByRole('status', { name: 'Credential compatibility' })).toHaveTextContent('Kafka:workflow-project')
+    await user.click(screen.getByRole('textbox', { name: 'Runtime credential' }))
+    await user.paste('22222222-2222-4222-8222-222222222222')
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce())
   })
@@ -207,8 +255,13 @@ describe('Kafka Publish builder', () => {
       </>
     )
     connection.protocol = 'SSL'
-    await user.clear(screen.getByRole('textbox', { name: 'Kafka integration' }))
-    await user.type(screen.getByRole('textbox', { name: 'Kafka integration' }), '33333333-3333-4333-8333-333333333333')
+    await user.click(screen.getByRole('button', { name: 'Change' }))
+    await user.clear(screen.getByRole('textbox', { name: 'Integration' }))
+    await user.type(screen.getByRole('textbox', { name: 'Integration' }), '33333333-3333-4333-8333-333333333333')
+    expect(screen.queryByRole('textbox', { name: 'Runtime credential' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Publish runtime credential')).not.toBeInTheDocument()
+    expect(screen.getByText('Kafka credential optional')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Set up connection' }))
     expect(screen.getByRole('textbox', { name: 'Runtime credential' })).toHaveValue('')
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() =>
@@ -303,6 +356,8 @@ describe('Kafka Publish builder', () => {
       </VersionViewContext>
     )
     for (const textbox of screen.getAllByRole('textbox')) expect(textbox).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Set up connection' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Message key encoding' })).toBeDisabled()
     expect(screen.queryByRole('button', { name: 'Add header' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Remove header/ })).not.toBeInTheDocument()
@@ -330,7 +385,7 @@ describe('Kafka Publish builder', () => {
     expect(screen.queryByText('sensitive diagnostic')).not.toBeInTheDocument()
   })
 
-  it('keeps credential selection disabled while connection settings are loading and recovers after loading', async () => {
+  it('blocks saving while connection settings load without showing an integration warning', async () => {
     integrationQuery.mockReturnValue({ data: undefined, isError: false })
     const user = userEvent.setup()
     const onSubmit = vi.fn()
@@ -345,9 +400,12 @@ describe('Kafka Publish builder', () => {
         </Button>
       </>
     )
-    expect(screen.getByRole('textbox', { name: 'Runtime credential' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Set up connection' })).toBeDisabled()
+    expect(screen.queryByRole('textbox', { name: 'Runtime credential' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Save' }))
-    expect(await screen.findByText('Wait for the selected Kafka connection settings to load')).toBeInTheDocument()
+    expect(onSubmit).not.toHaveBeenCalled()
+    expect(screen.queryByText('Wait for the selected Kafka connection settings to load')).not.toBeInTheDocument()
+    expect(screen.queryByText('Kafka connection settings are not available')).not.toBeInTheDocument()
     expect(screen.queryByText('Select a runtime Kafka credential for SASL_SSL')).not.toBeInTheDocument()
     integrationQuery.mockReturnValue({ data: { configuration: { security_protocol: 'SSL' } }, isError: false })
     view.rerender(
@@ -362,9 +420,7 @@ describe('Kafka Publish builder', () => {
         </Button>
       </>
     )
-    await waitFor(() =>
-      expect(screen.queryByText('Wait for the selected Kafka connection settings to load')).not.toBeInTheDocument()
-    )
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Set up connection' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce())
   })

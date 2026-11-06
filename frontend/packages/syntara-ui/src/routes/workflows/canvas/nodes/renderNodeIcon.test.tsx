@@ -105,6 +105,15 @@ describe('renderNodeIcon', () => {
     expect(iconWrapper.style.color).toBe('')
   })
 
+  it('preserves the neutral Kafka logo instead of tinting it with the action accent', () => {
+    const view = buildNodeIconView(MockIcon, RegistryNodeId.ACTION_KAFKA, 'list', 'purple')
+    render(<>{view}</>)
+
+    const iconWrapper = screen.getByTestId('node-icon-wrapper')
+    expect(iconWrapper.style.color).toBe('')
+    expect(iconWrapper.style.getPropertyValue('--pf-v6-c-icon__content--Color')).toBe('')
+  })
+
   it('uses canvas variant by default (md size)', () => {
     const view = buildNodeIconView(MockIcon, 'test-node')
     render(<>{view}</>)

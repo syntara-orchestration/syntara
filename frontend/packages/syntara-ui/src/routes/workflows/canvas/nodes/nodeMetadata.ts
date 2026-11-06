@@ -17,6 +17,7 @@ import type { ComponentType } from 'react'
 
 import AnsibleIcon from '../../../../assets/ansible-automation-platform.svg?react'
 import EdaIcon from '../../../../assets/eda.svg?react'
+import KafkaIcon from '../../../../assets/kafka.svg?react'
 
 export type NodeMetadata = {
   icon?: ComponentType<{ className?: string }>
@@ -110,7 +111,7 @@ export const executorMetadata: Record<string, ExecutorDisplayMetadata> = {
   script: { icon: RhUiCodeIcon, label: 'Script' },
   agentic: { icon: RhUiRobotIcon, label: 'Task Agent' },
   http_request: { icon: RhUiPlugFillIcon, label: 'REST API' },
-  kafka_publish: { icon: RhUiPlugFillIcon, label: 'Kafka Publish' },
+  kafka_publish: { icon: KafkaIcon, label: 'Kafka Publish' },
   aap_job_template: aapJobExecutorDisplay,
   aap_workflow_job_template: aapWorkflowExecutorDisplay,
   /** Internal key from detectTaskNodeType (agentic + ansible connector prompt), not an API executor string */

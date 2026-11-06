@@ -1,6 +1,8 @@
 import { ActivityTypeEnum } from '@syntara/contracts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import KafkaIcon from '../../../../assets/kafka.svg?react'
+import { RegistryNodeId } from '../../../../constants'
 import { NodeRegistry } from '../NodeRegistry'
 
 import registerKafkaPublishNode from './registerKafkaPublishNode'
@@ -14,6 +16,17 @@ describe('Kafka Publish registration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     NodeRegistry.unregister(ActivityTypeEnum.KAFKA_PUBLISH)
+  })
+
+  it('places Kafka Publish under Action with its own logo and description', () => {
+    registerKafkaPublishNode()
+
+    expect(NodeRegistry.get(ActivityTypeEnum.KAFKA_PUBLISH)).toMatchObject({
+      parentId: RegistryNodeId.ACTION,
+      icon: KafkaIcon,
+      description: 'Publish a structured message to a Kafka topic.',
+      order: 0,
+    })
   })
 
   it('adds a configured action with native JSON and the normal retry settings', () => {

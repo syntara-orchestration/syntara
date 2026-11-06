@@ -68,8 +68,8 @@ export const kafkaPublishFormSchema = z
     if (data.integration_id && !data.connection_ready) {
       ctx.addIssue({
         code: 'custom',
-        path: ['integration_id'],
-        message: 'Wait for the selected Kafka connection settings to load',
+        path: ['connection_ready'],
+        message: 'Kafka connection settings are not available',
       })
     }
     if (data.connection_ready && data.credential_required && !data.credential_id) {

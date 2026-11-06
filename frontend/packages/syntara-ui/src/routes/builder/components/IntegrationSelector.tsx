@@ -47,8 +47,9 @@ function StatusBadge({ status }: Readonly<{ status: IntegrationStatus }>) {
   )
 }
 
-function getIntegrationBaseUrl(integration: IntegrationRead): string {
+function getIntegrationDescription(integration: IntegrationRead): string {
   const config = integration.configuration
+  if (config && 'bootstrap_servers' in config) return config.bootstrap_servers.join(', ')
   if (config && 'base_url' in config) return String(config.base_url ?? '')
   return ''
 }
@@ -60,6 +61,7 @@ export type IntegrationSelectorProps = {
   label?: string
   fieldId?: string
   isDisabled?: boolean
+  isRequired?: boolean
   placeholder?: string
   helpText?: React.ReactNode
   /** When provided, filters integrations to those that are global or assigned to this project. */
@@ -102,9 +104,8 @@ function IntegrationMenuToggle(
 }
 
 /**
- * A PatternFly Select dropdown for choosing an MCP server integration.
- * Fetches integrations from the API filtered to mcp_server type.
- * Displays each integration's name and validation status badge.
+ * Select an MCP server or Kafka integration within the workflow's project scope.
+ * Shows each integration's name, connection details and validation status.
  */
 export function IntegrationSelector({
   value,
@@ -112,6 +113,7 @@ export function IntegrationSelector({
   label = 'MCP server integration',
   fieldId = 'integration-selector',
   isDisabled = false,
+  isRequired = false,
   placeholder = 'Select an MCP server integration...',
   helpText,
   projectId,
@@ -161,7 +163,7 @@ export function IntegrationSelector({
   const resolvedLabelHelp = resolveFormGroupLabelHelp(label, labelHelp, helpText)
 
   return (
-    <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId}>
+    <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId} isRequired={isRequired}>
       <SynSelect
         id={fieldId}
         isOpen={isOpen}
@@ -180,7 +182,7 @@ export function IntegrationSelector({
               key={integration.id}
               value={integration.id}
               isSelected={integration.id === value}
-              description={getIntegrationBaseUrl(integration)}
+              description={getIntegrationDescription(integration)}
             >
               <span>{integration.name}</span>{' '}
               {integration.validation_status && <StatusBadge status={integration.validation_status} />}
