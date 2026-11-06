@@ -179,6 +179,27 @@ describe('useAutoApprovalDetection', () => {
     expect(onApprovalDetected).not.toHaveBeenCalled()
   })
 
+  it('does not fetch when shouldProbeWaitingNode rejects the waiting node', () => {
+    const fetchForStep = vi.fn()
+    const onApprovalDetected = vi.fn()
+
+    renderHook(() =>
+      useAutoApprovalDetection({
+        executionId: 'exec-1',
+        fetchForStep,
+        onApprovalDetected,
+        shouldProbeWaitingNode: () => false,
+      })
+    )
+
+    act(() => {
+      testHelpers.setStatus('form-prompt-1', 'waiting')
+    })
+
+    expect(fetchForStep).not.toHaveBeenCalled()
+    expect(onApprovalDetected).not.toHaveBeenCalled()
+  })
+
   it('re-fetches when a node leaves waiting and enters waiting again', async () => {
     const fetchForStep = vi.fn().mockResolvedValue(mockApproval)
     const onApprovalDetected = vi.fn()

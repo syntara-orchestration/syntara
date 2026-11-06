@@ -484,14 +484,17 @@ test.describe('Approval Workflow Operations', () => {
     // substring match and collides with the workflow link button on execution detail.
     const workflowName = buildUniqueName('e2e-ui29')
     const approvalNodeName = buildUniqueName('gate')
-    const { id: workflowId } = await createWorkflowViaApi({
-      app,
-      name: workflowName,
-      triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    })
-    await openWorkflowInBuilder(app, workflowName, workflowId)
+    let workflowId: string | undefined
 
     try {
+      const created = await createWorkflowViaApi({
+        app,
+        name: workflowName,
+        triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+      })
+      workflowId = created.id
+      await openWorkflowInBuilder(app, workflowName, workflowId)
+
       // Add approval node with a unique name so we can find it in the approvals list
       await addApprovalStepWithBranch(app, approvalNodeName)
       await app.getByRole('button', { name: 'Save workflow' }).click()

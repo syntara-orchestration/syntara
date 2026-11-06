@@ -8,20 +8,26 @@ type UseAutoApprovalDetectionOptions = {
   executionId: string | undefined
   fetchForStep: (approvalNodeId: string) => Promise<Approval | null>
   onApprovalDetected: (approval: Approval) => void
+  /**
+   * WAITING is used by human-in-the-loop steps (e.g. approvals and form prompts).
+   * Callers that only care about approvals should pass a predicate that limits
+   * which canvas node IDs trigger `fetchForStep`.
+   */
+  shouldProbeWaitingNode?: (canvasNodeId: string) => boolean
 }
 
 /**
- * Watches the execution store for any activity entering "waiting" status.
- * The "waiting" status is exclusively used by approval nodes, so any node
- * that enters this state triggers an approval fetch.
+ * Watches the execution store for any activity entering "waiting" status and
+ * runs `fetchForStep` for the first matching node.
  *
- * This enables auto-show behavior: when a live execution reaches an approval
- * node, the approval review panel opens automatically.
+ * WAITING is not approval-exclusive — use `shouldProbeWaitingNode` when the
+ * fetch only applies to approval steps (e.g. in the workflow builder).
  */
 export function useAutoApprovalDetection({
   executionId,
   fetchForStep,
   onApprovalDetected,
+  shouldProbeWaitingNode,
 }: UseAutoApprovalDetectionOptions): void {
   const detectedNodeIds = useRef(new Set<string>())
   const fetchingRef = useRef(false)
@@ -42,6 +48,10 @@ export function useAutoApprovalDetection({
     for (const [nodeId, state] of activityStates) {
       if (state?.status !== ACTIVITY_STATUS.WAITING) {
         detectedNodeIds.current.delete(nodeId)
+        continue
+      }
+
+      if (shouldProbeWaitingNode && !shouldProbeWaitingNode(nodeId)) {
         continue
       }
 
@@ -71,7 +81,7 @@ export function useAutoApprovalDetection({
         })
       break
     }
-  }, [executionId, fetchForStep, onApprovalDetected])
+  }, [executionId, fetchForStep, onApprovalDetected, shouldProbeWaitingNode])
 
   useEffect(() => {
     scanRef.current = checkAndFetch
