@@ -215,7 +215,7 @@ describe('BuilderContent - Delete Workflow', () => {
       expect(screen.getByText('Delete workflow?')).toBeInTheDocument()
       expect(
         screen.getByText(
-          /will be deleted and any in-progress runs will stop immediately\. This action cannot be undone\./
+          /will be permanently deleted\. This action cannot be undone\. Deletion cannot proceed while runs are in progress/
         )
       ).toBeInTheDocument()
     })
@@ -249,7 +249,7 @@ describe('BuilderContent - Delete Workflow', () => {
     await screen.findByText('Delete workflow?')
     await user.click(
       screen.getByRole('checkbox', {
-        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+        name: /I understand this workflow will be permanently deleted/,
       })
     )
     await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
@@ -295,7 +295,7 @@ describe('BuilderContent - Delete Workflow', () => {
     await screen.findByText('Delete workflow?')
     await user.click(
       screen.getByRole('checkbox', {
-        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+        name: /I understand this workflow will be permanently deleted/,
       })
     )
     await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
