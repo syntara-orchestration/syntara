@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.models import Project
@@ -159,6 +160,49 @@ async def test_get_workflow_includes_only_published_subworkflow_trigger_schemas(
 
 
 @pytest.mark.asyncio
+async def test_workflow_detail_returns_output_schemas_for_the_exact_published_version(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: str,
+) -> None:
+    workflow = await _create_workflow(test_db_session, test_user, UUID(test_project_id), published=True)
+    assert workflow.published_version_id is not None
+    published_version = await test_db_session.get(WorkflowVersion, workflow.published_version_id)
+    draft_result = await test_db_session.exec(
+        select(WorkflowVersion).where(
+            WorkflowVersion.workflow_id == workflow.id,
+            WorkflowVersion.version == 2,
+        )
+    )
+    draft_version = draft_result.one()
+    assert published_version is not None
+
+    published_version.workflow_definition = {
+        **published_version.workflow_definition,
+        "nodes": [{"id": "published_script", "type": "script", "parameters": {}}],
+    }
+    draft_version.workflow_definition = {
+        **draft_version.workflow_definition,
+        "nodes": [{"id": "draft_script", "type": "script", "parameters": {}}],
+    }
+    await test_db_session.flush()
+
+    response = await auth_client.get(f"/api/v1/workflows/{workflow.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    metadata = body["published_step_metadata"]
+    assert metadata["version_id"] == str(workflow.published_version_id)
+    assert metadata["version"] == 1
+    assert body["version"]["workflow_definition"]["nodes"][0]["id"] == "draft_script"
+    assert [step["id"] for step in metadata["steps"]] == ["published_script"]
+    script_schema = metadata["steps"][0]["output_schema"]
+    assert "stdout" in script_schema["properties"]
+    assert script_schema["properties"]["status"]["type"] == "string"
+
+
+@pytest.mark.asyncio
 async def test_invocation_schema_requires_a_published_version_but_plain_get_does_not(
     auth_client: AsyncClient,
     test_db_session: AsyncSession,
@@ -171,6 +215,7 @@ async def test_invocation_schema_requires_a_published_version_but_plain_get_does
     ordinary_response = await auth_client.get(path)
     assert ordinary_response.status_code == 200
     assert "invocation_schema" not in ordinary_response.json()
+    assert ordinary_response.json()["published_step_metadata"] is None
 
     schema_response = await auth_client.get(f"{path}/invocation_schema")
     assert schema_response.status_code == 404
@@ -206,6 +251,9 @@ async def test_invocation_schema_requires_workflow_read_permission(
     )
 
     assert response.status_code == 403
+
+    detail_response = await auth_client.get(f"/api/v1/workflows/{workflow.id}")
+    assert detail_response.status_code == 403
 
 
 @pytest.mark.asyncio
