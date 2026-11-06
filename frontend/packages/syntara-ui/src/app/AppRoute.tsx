@@ -1,5 +1,6 @@
 export const AppRoute = {
   Dashboard: '/dashboard',
+  FeatureFlagDemo: '/feature-flag-demo',
   WorkflowBuilder: {
     New: '/workflow-builder/new',
     Edit: '/workflow-builder/:workflowId',
@@ -76,11 +77,5 @@ export const AppRoute = {
   MyProfile: {
     Root: '/my-profile',
     Tab: '/my-profile/:tab',
-  },
-  Support: {
-    Root: '/support/glossary',
-    Documentation: '/support/documentation',
-    FAQ: '/support/faq',
-    Glossary: '/support/glossary',
   },
 }

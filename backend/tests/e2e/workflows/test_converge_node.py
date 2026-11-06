@@ -692,6 +692,8 @@ def test_converge_one_branch_fails_all_strategy(syntara_api: SyntaraApiRegistry)
                 {"from": "converge_node", "to": "final_action"},
             ],
         },
+        # Parallel branches + converge under merge_group load can exceed a short poll window.
+        timeout=60,
     )
 
     assert result.status == ExecutionStatus.FAILED

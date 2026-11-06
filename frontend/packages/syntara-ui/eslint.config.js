@@ -699,7 +699,6 @@ export default tseslint.config(
       '**/routes/**/IntegrationTools.tsx',
       '**/routes/**/ExecutionPlane.tsx',
       '**/routes/**/ExecutionTargetDetail.tsx',
-      '**/routes/**/Glossary.tsx',
       '**/routes/**/Settings.tsx',
       '**/routes/**/Approvals.tsx',
       '**/routes/**/Authentication.tsx',

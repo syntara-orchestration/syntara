@@ -5,13 +5,21 @@
   overflow: visible;
 }
 
+/*
+ * Preview is counter-scaled and extends outside the tile; raise the entire React Flow node
+ * so neighboring tiles do not paint over the hover/focus card.
+ */
+:global(.react-flow__node:has([data-semantic-zoom-preview-open='true'])) {
+  z-index: 10000 !important;
+}
+
 .tileRegion {
   position: relative;
   width: 100%;
   height: var(--syn-step-semantic-zoom-tile-size, 224px);
 }
 
-.tooltipTrigger {
+.tileFocusTarget {
   display: block;
   width: 100%;
   height: 100%;
@@ -19,13 +27,13 @@
   border: none;
   padding: 0;
   margin: 0;
-  cursor: pointer;
+  cursor: default;
   font: inherit;
   color: inherit;
   text-align: inherit;
 }
 
-.tooltipTrigger:focus-visible {
+.tileFocusTarget:focus-visible {
   outline: 2px solid var(--pf-t--global--color--brand--default);
   outline-offset: 2px;
 }
@@ -62,37 +70,34 @@
   pointer-events: none;
 }
 
-.actions {
+.preview {
   position: absolute;
-  top: var(--pf-t--global--spacer--md);
-  right: var(--pf-t--global--spacer--md);
-  display: flex;
-  align-items: center;
-  gap: var(--pf-t--global--spacer--md);
-  padding: var(--pf-t--global--spacer--md);
-  border-radius: var(--pf-t--global--border--radius--medium);
-  background-color: var(--pf-t--global--background--color--floating--default);
-  box-shadow: var(--pf-t--global--box-shadow--sm);
-  opacity: 0;
+  left: 50%;
+  top: 50%;
+  /*
+   * Counter the canvas viewport zoom so the preview reads at ~full step width on screen
+   * (flow coords are scaled by React Flow transform[2]).
+   */
+  transform: translate(-50%, -50%) scale(var(--syn-step-semantic-zoom-preview-inverse-scale, 1));
+  width: var(--syn-step-semantic-zoom-preview-width, 300px);
+  z-index: 1;
   pointer-events: none;
-  z-index: 2;
 }
 
-.root:hover .actions,
-.root:focus-within .actions,
-.root[data-selected='true'] .actions {
-  opacity: 1;
+.previewOpen {
   pointer-events: auto;
 }
 
-.actionControl :global(.pf-v6-c-button),
-.actionControl :global(.pf-v6-c-menu-toggle) {
-  min-width: 3.1625rem;
-  min-height: 3.1625rem;
-  padding: var(--pf-t--global--spacer--md);
+.previewCard {
+  box-sizing: border-box;
+  width: 100%;
+  border-radius: var(--pf-t--global--border--radius--medium);
+  background-color: var(--pf-t--global--background--color--floating--default);
+  box-shadow: var(--pf-t--global--box-shadow--md);
+  border-top-width: 4px;
+  border-top-style: solid;
 }
 
-.actionControl :global(svg) {
-  width: calc(var(--pf-t--global--icon--size--xl) * 1.15);
-  height: calc(var(--pf-t--global--icon--size--xl) * 1.15);
+.previewHeader {
+  padding: 0;
 }

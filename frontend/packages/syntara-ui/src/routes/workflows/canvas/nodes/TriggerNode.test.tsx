@@ -72,6 +72,17 @@ describe('TriggerStepComponent', () => {
     expect(screen.getByLabelText('Step actions menu')).toBeInTheDocument()
   })
 
+  it('keeps the high contrast panel edge on the trigger pill radius', () => {
+    render(<TriggerStepComponent {...createNodeProps()} />)
+
+    expect(screen.getByTestId('trigger-step')).toHaveStyle({
+      borderTopLeftRadius: '45px',
+      borderBottomLeftRadius: '45px',
+      '--pf-v6-c-panel--BorderRadius':
+        '45px var(--pf-t--global--border--radius--medium) var(--pf-t--global--border--radius--medium) 45px',
+    })
+  })
+
   it('hides the step actions menu in execution view', () => {
     render(
       <ExecutionViewContext.Provider value={true}>
@@ -80,6 +91,14 @@ describe('TriggerStepComponent', () => {
     )
 
     expect(screen.queryByLabelText('Step actions menu')).not.toBeInTheDocument()
+  })
+
+  it('does not render the manual details line under the type label', () => {
+    render(<TriggerStepComponent {...createNodeProps()} />)
+
+    expect(screen.getByRole('heading', { name: 'Trigger' })).toBeInTheDocument()
+    expect(screen.getByText('Manual trigger')).toBeInTheDocument()
+    expect(screen.queryByText('Manual')).not.toBeInTheDocument()
   })
 
   it('renders "Manual trigger" when the manual trigger details are shown', () => {
@@ -166,7 +185,7 @@ describe('TriggerStepComponent', () => {
     )
 
     expect(screen.getByText('Webhook: /jira-updates')).toBeInTheDocument()
-    expect(screen.queryByText('Webhook trigger')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Webhook trigger')).toHaveLength(1)
   })
 
   it('hides the step menu when nodesConnectable is false', () => {
@@ -202,7 +221,7 @@ describe('TriggerStepComponent', () => {
     )
 
     expect(screen.getByText('EDA: /eda-events')).toBeInTheDocument()
-    expect(screen.queryByText('Event-Driven Ansible trigger')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Event-Driven Ansible trigger')).toHaveLength(1)
   })
 
   it('has no accessibility violations', async () => {

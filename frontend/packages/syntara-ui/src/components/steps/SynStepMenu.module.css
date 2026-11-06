@@ -1,0 +1,10 @@
+.menuWrapper {
+  display: inline-flex;
+  max-width: max-content;
+}
+
+.menuWrapper :global(.pf-v6-c-dropdown) {
+  display: inline-flex;
+  width: auto;
+  max-width: max-content;
+}
