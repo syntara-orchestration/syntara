@@ -16,19 +16,9 @@ Write tests that verify **what** your code does, not **how** it does it. Tests s
 
 ---
 
-## Test Integrity: Use Independent Expected Values
+## Test Integrity: No Tautological Tests
 
-A test is useful only if it can fail when the application has a bug.
-
-- The test must execute production code. Import the real function, hook, or component. Do not copy its logic into the test.
-- The assertion must compare the application result with an independent expected value. Use a literal, a separate fixture, or a value from the written requirement.
-- Do not calculate both sides of an assertion with the same function or helper. Do not compare a value with itself or with a field that the test assigned immediately before the assertion.
-- Do not apply the same transformation to both sides of an assertion. Examples include sorting, mapping, filtering, or formatting both values before comparison.
-- Do not write a runtime test for a type-only declaration. A test-created object does not prove that a type declaration works.
-- Component tests must render the real component, perform a user action when relevant, and assert an observable result such as visible text, a changed control, a callback, or a network request.
-- If a test cannot exercise application behavior, remove it. Do not keep it only to increase coverage.
-
-Before adding or changing a test, identify the production subject and the regression that the test must prevent. Then verify that the test would fail if that behavior were removed or changed. During review, check the test body for copied production logic and for expected values derived from the same implementation.
+Tests must exercise production behavior and compare results with independent expected values, such as literals, fixtures, or requirements. Do not derive expectations from the code under test, copy its logic, or use runtime tests to validate types. Remove tests that could pass when the behavior regresses.
 
 ---
 
@@ -673,7 +663,7 @@ it('shows a fallback title while loading', () => {
 })
 ```
 
-Do not call the production `toPageTitle` helper to build the expected value. The page component uses that helper, so doing this would allow the same formatting bug to affect both sides of the assertion.
+Use the full expected title; do not call the production `toPageTitle` helper to build it.
 
 **E2E:** Existing feature specs assert page titles when they navigate to a page. Add `expect(app).toHaveTitle(...)` to the relevant feature spec when adding a page or route.
 
