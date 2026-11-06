@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any
 from temporalio import workflow
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterator, Mapping, Sequence
 
 LOOP_ITERATION_UNIQUE_IDS_PATCH = "loop-iteration-unique-ids"
 
@@ -52,6 +52,18 @@ def use_unique_loop_iteration_ids() -> bool:
 def strip_loop_iteration_suffixes(activity_id: str) -> str:
     """Return the canvas node ID, removing every trailing ``_iter_N`` suffix."""
     return _LOOP_ITER_CHAIN_RE.sub("", activity_id)
+
+
+def candidate_node_ids(activity_id: str) -> Iterator[str]:
+    """Yield an activity ID and each candidate base ID with one loop suffix removed."""
+    candidate = activity_id
+    yield candidate
+
+    while match := _LOOP_ITER_CAPTURE_RE.search(candidate):
+        candidate = candidate[: match.start()]
+        if not candidate:
+            break
+        yield candidate
 
 
 def innermost_iteration_index(activity_id: str) -> int | None:

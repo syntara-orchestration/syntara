@@ -70,6 +70,7 @@ from syntara.workflows.models.execution import (
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.services.activity_callback import resolve_form_prompt_callback_payload
 from syntara.workflows.services.invocation_cancellation import cancel_invocations_for_execution
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
 from syntara.workflows.workflow_engine.models.workflow_definition import (
@@ -1079,19 +1080,24 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         """Handle an external callback for an async-completion activity.
 
         Routes the callback to either complete or fail the Temporal activity
-        based on the signal_data status field.
+        based on the signal_data status field. Form Prompt callbacks are reconciled
+        against their persisted submission.
 
         Args:
             execution_id: Execution ID
             activity_id: Activity ID from workflow definition
-            signal_data: Callback payload (must contain "status" field)
+            signal_data: Callback payload, interpreted by activity type
 
         Raises:
             ExecutionNotFoundError: If execution not found
+            FormPromptSubmissionRequiredError: If a Form Prompt has no valid persisted submission
             TemporalUnavailableError: If Temporal service unavailable
 
         """
-        execution = await self.get_execution(execution_id)
+        execution = await self.get_execution(
+            execution_id,
+            include={ExecutionInclude.WORKFLOW_DEFINITION},
+        )
 
         if self.temporal_service is None:
             operation = "activity callback"
@@ -1106,6 +1112,22 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         )
 
         status = signal_data.get("status")
+        completion_log_context: dict[str, Any] = {"status": status}
+        form_prompt_payload = await resolve_form_prompt_callback_payload(
+            self.session,
+            execution_id,
+            activity_id,
+            execution.workflow_definition,
+            status,
+            acting_user_id=self.user.id,
+        )
+        if form_prompt_payload is not None:
+            signal_data = form_prompt_payload
+            completion_log_context = {
+                "callback_type": "form_prompt",
+                "outcome": "submitted",
+            }
+
         if status == "failed":
             error_msg, error_type, has_error_detail = resolve_signal_failure_message(signal_data.get("error"))
             error_msg = error_msg[:MAX_CALLBACK_ERROR_MSG_LENGTH]
@@ -1149,7 +1171,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             "Activity callback handled",
             activity_id=activity_id,
             execution_id=execution_id,
-            status=status,
+            **completion_log_context,
         )
 
     async def cancel_execution(self, execution_id: UUID) -> None:

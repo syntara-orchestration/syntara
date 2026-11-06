@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     approval_temporal_activity_id,
+    candidate_node_ids,
     innermost_iteration_index,
     join_loop_iteration_id,
     loop_control_activity_id,
@@ -11,6 +12,26 @@ from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     matches_loop_iteration_id,
     strip_loop_iteration_suffixes,
 )
+
+
+def test_candidate_node_ids_without_loop_suffix() -> None:
+    assert list(candidate_node_ids("approval")) == ["approval"]
+
+
+def test_candidate_node_ids_single_loop_suffix() -> None:
+    assert list(candidate_node_ids("approval_iter_3")) == ["approval_iter_3", "approval"]
+
+
+def test_candidate_node_ids_nested_loop_suffixes() -> None:
+    assert list(candidate_node_ids("approval_iter_1_iter_0")) == [
+        "approval_iter_1_iter_0",
+        "approval_iter_1",
+        "approval",
+    ]
+
+
+def test_candidate_node_ids_stops_at_non_numeric_suffix() -> None:
+    assert list(candidate_node_ids("approval_iter_n")) == ["approval_iter_n"]
 
 
 def test_strip_loop_iteration_suffixes_plain_id() -> None:

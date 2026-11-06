@@ -4,6 +4,7 @@ These tests verify the business logic layer for execution management.
 """
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any, ClassVar
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
@@ -15,9 +16,11 @@ from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.models.pagination import ResourcesResponseBase
 from syntara.core.models.user_reference import UserReference, UserReferenceType
+from syntara.forms.services.form_prompt_signal import RejectedFormPromptSignal, VerifiedFormPromptSignal
 from syntara.metrics.interface_tag import interface_context_var
 from syntara.workflows.exceptions import (
     ExecutionNotFoundError,
+    FormPromptSubmissionRequiredError,
     TriggerValidationError,
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
@@ -1729,6 +1732,9 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
     def _make_service(self) -> tuple[ExecutionService, AsyncMock]:
         """Create an ExecutionService with mocked temporal_service."""
         mock_session = AsyncMock(spec=AsyncSession)
+        query_result = Mock()
+        query_result.all.return_value = []
+        mock_session.exec.return_value = query_result
         mock_user = Mock(spec=User)
         mock_user.id = uuid4()
         mock_temporal = AsyncMock()
@@ -1740,6 +1746,7 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
         """Create a mock execution with temporal_workflow_id."""
         mock_execution = Mock()
         mock_execution.temporal_workflow_id = temporal_workflow_id
+        mock_execution.workflow_definition = None
         return mock_execution
 
     @pytest.mark.asyncio
@@ -1784,6 +1791,143 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
 
         mock_temporal.complete_async_activity.assert_called_once()
         mock_temporal.fail_async_activity.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_form_prompt_completes_from_verified_database_payload(self) -> None:
+        service, mock_temporal = self._make_service()
+        service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
+        verified_payload = {
+            "outcome": "submitted",
+            "response_data": {"reason": "persisted"},
+            "responded_by": "responder",
+            "responded_at": "2026-11-06T12:00:00+00:00",
+            "prompt_id": str(uuid4()),
+        }
+
+        with (
+            patch(
+                "syntara.workflows.services.activity_callback.resolve_verified_form_prompt_signal",
+                new_callable=AsyncMock,
+                return_value=VerifiedFormPromptSignal(payload=verified_payload),
+            ),
+            patch("syntara.workflows.services.execution_service.logger") as mock_logger,
+        ):
+            await service.handle_activity_callback(
+                uuid4(),
+                "form-activity",
+                {"outcome": "submitted", "response_data": {"reason": "forged"}},
+            )
+
+        mock_temporal.complete_async_activity.assert_awaited_once()
+        assert mock_temporal.complete_async_activity.await_args.kwargs["result"] == {"output": verified_payload}
+        mock_temporal.fail_async_activity.assert_not_awaited()
+        completed_log = next(
+            call for call in mock_logger.info.call_args_list if call.args[0] == "Activity callback handled"
+        )
+        assert completed_log.kwargs["callback_type"] == "form_prompt"
+        assert completed_log.kwargs["outcome"] == "submitted"
+        assert "status" not in completed_log.kwargs
+
+    @pytest.mark.asyncio
+    async def test_known_form_prompt_rejects_signal_before_prompt_row_exists(self) -> None:
+        service, mock_temporal = self._make_service()
+        execution = self._mock_execution()
+        execution.workflow_definition = SimpleNamespace(
+            triggers=[],
+            nodes=[SimpleNamespace(id="form-node", type=NodeType.FORM_PROMPT.value)],
+        )
+        service.get_execution = AsyncMock(return_value=execution)  # type: ignore[method-assign]
+        execution_id = uuid4()
+
+        with (
+            patch(
+                "syntara.workflows.services.activity_callback.resolve_verified_form_prompt_signal",
+                new_callable=AsyncMock,
+                return_value=RejectedFormPromptSignal(reason="no persisted prompt row"),
+            ) as mock_resolver,
+            pytest.raises(FormPromptSubmissionRequiredError),
+        ):
+            await service.handle_activity_callback(
+                execution_id,
+                "form-node_iter_0",
+                {"outcome": "submitted", "response_data": {"reason": "forged"}},
+            )
+
+        mock_resolver.assert_awaited_once_with(
+            service.session,
+            execution_id,
+            "form-node_iter_0",
+            require_match=True,
+        )
+        mock_temporal.complete_async_activity.assert_not_awaited()
+        mock_temporal.fail_async_activity.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_loop_activity_id_collision_with_form_prompt_fails_closed(self) -> None:
+        service, mock_temporal = self._make_service()
+        execution = self._mock_execution()
+        execution.workflow_definition = SimpleNamespace(
+            triggers=[],
+            nodes=[
+                {"id": "form", "type": NodeType.FORM_PROMPT.value},
+                {"id": "form_iter_0", "type": NodeType.SCRIPT.value},
+            ],
+        )
+        service.get_execution = AsyncMock(return_value=execution)  # type: ignore[method-assign]
+
+        with (
+            patch(
+                "syntara.workflows.services.activity_callback.resolve_verified_form_prompt_signal",
+                new_callable=AsyncMock,
+            ) as mock_resolver,
+            pytest.raises(FormPromptSubmissionRequiredError),
+        ):
+            await service.handle_activity_callback(
+                uuid4(),
+                "form_iter_0",
+                {"status": "completed", "response_data": {"reason": "forged"}},
+            )
+
+        mock_resolver.assert_not_awaited()
+        mock_temporal.complete_async_activity.assert_not_awaited()
+        mock_temporal.fail_async_activity.assert_not_awaited()
+
+    @pytest.mark.parametrize("signal_status", ["failed", "cancelled"])
+    @pytest.mark.asyncio
+    async def test_form_prompt_rejects_failure_and_cancellation_signals(self, signal_status: str) -> None:
+        service, mock_temporal = self._make_service()
+        service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
+
+        with (
+            patch(
+                "syntara.workflows.services.activity_callback.resolve_verified_form_prompt_signal",
+                new_callable=AsyncMock,
+                return_value=VerifiedFormPromptSignal(payload={"outcome": "submitted"}),
+            ),
+            pytest.raises(FormPromptSubmissionRequiredError),
+        ):
+            await service.handle_activity_callback(uuid4(), "form-activity", {"status": signal_status})
+
+        mock_temporal.complete_async_activity.assert_not_awaited()
+        mock_temporal.fail_async_activity.assert_not_awaited()
+
+    @pytest.mark.parametrize("signal_status", [[], {}])
+    @pytest.mark.asyncio
+    async def test_form_prompt_non_string_status_does_not_raise(self, signal_status: object) -> None:
+        service, mock_temporal = self._make_service()
+        service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
+        verified_payload = {"outcome": "submitted", "response_data": {"reason": "persisted"}}
+
+        with patch(
+            "syntara.workflows.services.activity_callback.resolve_verified_form_prompt_signal",
+            new_callable=AsyncMock,
+            return_value=VerifiedFormPromptSignal(payload=verified_payload),
+        ):
+            await service.handle_activity_callback(uuid4(), "form-node", {"status": signal_status})
+
+        mock_temporal.complete_async_activity.assert_awaited_once()
+        assert mock_temporal.complete_async_activity.await_args.kwargs["result"] == {"output": verified_payload}
+        mock_temporal.fail_async_activity.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_fails_activity_on_failed_status(self) -> None:

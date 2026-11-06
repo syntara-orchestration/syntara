@@ -172,6 +172,7 @@ class FormPrompt(BaseFormPrompt, table=True):
             "loop_iteration_path",
             name="uix_execution_prompt_node_path",
         ),
+        Index("ix_form_prompts_execution_temporal_activity", "execution_id", "temporal_activity_id"),
         Index("ix_form_prompts_labels", "labels", postgresql_using="gin"),
     )
 
