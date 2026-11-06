@@ -69,6 +69,7 @@ async def _create_workflow(
     *,
     published: bool,
     eligible: bool = True,
+    version_name: str | None = None,
 ) -> Workflow:
     workflow = Workflow(
         name=f"invocation-schema-{uuid4().hex[:8]}",
@@ -85,6 +86,7 @@ async def _create_workflow(
         version=1,
         schema_version="2.0.0",
         workflow_definition=_version_definition(eligible=eligible),
+        name=version_name,
         created_by=user.id,
     )
     session.add(published_version)
@@ -123,7 +125,9 @@ async def test_get_workflow_includes_only_published_subworkflow_trigger_schemas(
     test_user: User,
     test_project_id: str,
 ) -> None:
-    workflow = await _create_workflow(test_db_session, test_user, UUID(test_project_id), published=True)
+    workflow = await _create_workflow(
+        test_db_session, test_user, UUID(test_project_id), published=True, version_name="Release Candidate"
+    )
     path = f"/api/v1/workflows/{workflow.id}"
 
     ordinary_response = await auth_client.get(path)
@@ -135,10 +139,16 @@ async def test_get_workflow_includes_only_published_subworkflow_trigger_schemas(
 
     assert response.status_code == 200
     body = response.json()
+    # The published version's created_at is a live timestamp; assert it is present, then drop it
+    # so the rest of the contract can be compared exactly.
+    created_at = body.pop("published_version_created_at")
+    assert isinstance(created_at, str)
+    assert created_at
     assert body == {
         "workflow_id": str(workflow.id),
         "published_version_id": str(workflow.published_version_id),
         "published_version": 1,
+        "published_version_name": "Release Candidate",
         "is_eligible": True,
         "triggers": [
             {
@@ -228,10 +238,16 @@ async def test_published_workflow_without_subworkflow_trigger_returns_empty_sche
     )
 
     assert response.status_code == 200
-    assert response.json() == {
+    body = response.json()
+    # No version name set, so the name is null and clients fall back to the creation date.
+    created_at = body.pop("published_version_created_at")
+    assert isinstance(created_at, str)
+    assert created_at
+    assert body == {
         "workflow_id": str(workflow.id),
         "published_version_id": str(workflow.published_version_id),
         "published_version": 1,
+        "published_version_name": None,
         "is_eligible": False,
         "triggers": [],
     }

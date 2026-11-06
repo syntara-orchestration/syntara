@@ -83,6 +83,7 @@ const ADD_PANEL_TRIGGER_IDS: ReadonlySet<string> = new Set([
   RegistryNodeId.TRIGGER_SCHEDULED,
   RegistryNodeId.TRIGGER_WEBHOOK,
   RegistryNodeId.TRIGGER_EDA,
+  RegistryNodeId.TRIGGER_SUBWORKFLOW,
 ])
 
 const ADD_PANEL_LOGIC_IDS: ReadonlySet<string> = new Set([

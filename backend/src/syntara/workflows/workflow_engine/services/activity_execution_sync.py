@@ -146,6 +146,7 @@ class ActivityExecutionSyncMixin:
         output_data: dict[str, Any] | None,
         *,
         is_loop_control: bool = False,
+        preserve_io: bool = False,
     ) -> dict[str, Any]:
         """Update an ActivityExecution record with new data from Temporal events.
 
@@ -157,6 +158,9 @@ class ActivityExecutionSyncMixin:
             input_data: Scrubbed input data
             output_data: Scrubbed output data
             is_loop_control: Whether this is a loop control node
+            preserve_io: When True, leave ``input_data``/``output_data`` untouched
+                (the sub-workflow setup path: those columns are owned by
+                ``_persist_parent_node_io`` and must not be clobbered)
 
         Returns:
             Dictionary of old field values before the update
@@ -169,14 +173,20 @@ class ActivityExecutionSyncMixin:
             "error_details": existing.error_details,
             "retry_count": existing.retry_count,
             "output_data": existing.output_data,
+            "runtime_metadata": existing.runtime_metadata,
             "iteration": existing.iteration,
         }
 
         existing.status = activity_data["status"]
         existing.started_at = activity_data["started_at"] or (existing.started_at if is_loop_control else None)
         existing.completed_at = activity_data["completed_at"]
-        existing.input_data = input_data or {}
-        existing.output_data = output_data
+        if not preserve_io:
+            existing.input_data = input_data or {}
+            existing.output_data = output_data
+        # Preserve runtime_metadata when a partial update omits the key; an explicit
+        # null (key present, value None) clears it. No populator sets it yet (C1).
+        if "runtime_metadata" in activity_data:
+            existing.runtime_metadata = activity_data["runtime_metadata"]
         existing.error_details = activity_data["error_details"]
         existing.retry_count = activity_data["retry_count"]
         if activity_data.get("iteration") is not None and not is_loop_control:
@@ -329,6 +339,10 @@ class ActivityExecutionSyncMixin:
         """
         activity_id = activity_data["activity_id"]
 
+        # Sub-workflow setup: keyed to the canvas node, not a normal activity.
+        if activity_data.get("_subworkflow_setup"):
+            return self._sync_subworkflow_setup(activity_data, existing_activities, metadata)
+
         # Skip internal activities (defense in depth)
         if activity_id.startswith("__internal__"):
             return None
@@ -395,6 +409,104 @@ class ActivityExecutionSyncMixin:
             is_loop_control=is_loop_control,
         )
         return existing, old_values, is_new
+
+    def _sync_subworkflow_setup(
+        self,
+        activity_data: dict[str, Any],
+        existing_activities: dict[str, ActivityExecution],
+        metadata: ExecutionMonitorMetadata,
+    ) -> tuple[ActivityExecution, dict[str, Any], bool] | None:
+        """Sync a sub-workflow node's lifecycle + I/O from its setup activity.
+
+        Keyed to the canvas node's aggregate row (created upfront). This is the sole
+        writer of the node's ``input_data``/``output_data`` (reconstructed from the
+        setup result in ``_subworkflow_io``); there is no direct activity-side
+        writer. Behaviour:
+
+        - STARTED (no payload yet): status RUNNING + started_at only; I/O preserved
+          (``preserve_io=True``).
+        - COMPLETED (payload present): writes the reconstructed I/O summaries and,
+          for a non-iterated node, ``runtime_metadata``, through the shared writer.
+          ``for_each`` overwrites the single aggregate row per iteration, so the
+          last iteration's setup result wins (preserving prior behaviour).
+        - Terminal row: an I/O-only, set-if-empty backfill (see
+          ``_backfill_terminal_subworkflow_io``) — never touches status/timestamps/
+          error_details/runtime_metadata and never overwrites non-empty I/O, so a
+          node terminalized mid-setup still shows its invocation I/O with no
+          terminal-state regression.
+
+        Reuses the shared writer/publisher so deltas are emitted like any other
+        activity update.
+        """
+        activity_id = activity_data["activity_id"]
+        existing = existing_activities.get(activity_id)
+        if existing is None:
+            logger.warning(
+                "Sub-workflow node row not found for setup sync (should exist upfront)",
+                activity_id=activity_id,
+                execution_id=metadata.execution_id,
+            )
+            return None
+
+        io_summary = activity_data.get("_subworkflow_io")
+
+        if existing.status in TERMINAL_ACTIVITY_STATUSES:
+            return self._backfill_terminal_subworkflow_io(existing, io_summary)
+
+        if io_summary is not None:
+            old_values = self._update_activity_record(
+                existing,
+                activity_data,
+                io_summary["input"],
+                io_summary["output"],
+                preserve_io=False,
+            )
+        else:
+            old_values = self._update_activity_record(
+                existing,
+                activity_data,
+                existing.input_data,
+                existing.output_data,
+                preserve_io=True,
+            )
+        return existing, old_values, False
+
+    @staticmethod
+    def _backfill_terminal_subworkflow_io(
+        existing: ActivityExecution,
+        io_summary: dict[str, dict[str, Any]] | None,
+    ) -> tuple[ActivityExecution, dict[str, Any], bool] | None:
+        """I/O-only, set-if-empty backfill for a sub-workflow row already terminal.
+
+        Never modifies status/started_at/completed_at/error_details/runtime_metadata
+        and never overwrites non-empty input/output, so a node terminalized
+        mid-setup (e.g. parent cancel / converge detach) still shows its invocation
+        I/O without any terminal-state regression. Idempotent: a second application
+        is a no-op. Committed by the existing synchronizer transaction — not a new
+        writer.
+        """
+        if io_summary is None:
+            return None
+        old_output = existing.output_data
+        wrote = False
+        if existing.input_data in (None, {}) and io_summary["input"]:
+            existing.input_data = io_summary["input"]
+            wrote = True
+        if existing.output_data is None and io_summary["output"]:
+            existing.output_data = io_summary["output"]
+            wrote = True
+        if not wrote:
+            return None
+        old_values = {
+            "status": existing.status,
+            "started_at": existing.started_at,
+            "completed_at": existing.completed_at,
+            "error_details": existing.error_details,
+            "output_data": old_output,
+            "runtime_metadata": existing.runtime_metadata,
+            "iteration": existing.iteration,
+        }
+        return existing, old_values, False
 
     @staticmethod
     def _io_after_query_failure(

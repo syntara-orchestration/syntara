@@ -1,8 +1,10 @@
 import { Button, FlexItem } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
 
+import { executionsClient } from '../../client'
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
 import { SynLabel } from '../../components/labels/SynLabel'
+import { SynLink } from '../../components/SynLink'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { StatusLabel } from '../builder/ExecutionStatus'
 import { RunHistoryToggleButton } from '../builder/RunHistoryToggleButton'
@@ -38,6 +40,36 @@ export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ executio
         </FlexItem>
       ) : null}
     </>
+  )
+}
+
+/**
+ * "View parent run" link for a sub-workflow execution. Rendered as secondary context
+ * directly beneath the title (via SynPageHeader `titleSubRow`) so the parent relationship
+ * reads as context for this run and stays grouped with its title. Resolves the parent
+ * workflow name from its execution id so the return link matches the forward link, and
+ * renders nothing for a top-level execution.
+ */
+export function ExecutionDetailParentRunLink({ execution }: Readonly<{ execution: Execution | undefined }>) {
+  const parentExecutionId =
+    typeof execution?.execution_metadata?.parent_execution_id === 'string'
+      ? execution.execution_metadata.parent_execution_id
+      : undefined
+  const parentQuery = executionsClient.useQuery(
+    'get',
+    '/executions/{execution_id}',
+    { params: { path: { execution_id: parentExecutionId ?? '' } } },
+    { enabled: Boolean(parentExecutionId) }
+  )
+  const parentName = parentQuery.data?.workflow_name ?? null
+
+  if (!parentExecutionId) {
+    return null
+  }
+  return (
+    <div data-testid="view-parent-run">
+      <SynLink to={`/executions/${parentExecutionId}`}>View parent run{parentName ? `: ${parentName}` : ''}</SynLink>
+    </div>
   )
 }
 

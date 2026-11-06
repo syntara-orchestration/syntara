@@ -3,6 +3,8 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { formatDateTime } from '../../../utils/dateUtils'
+
 import { InvocationSchemaFetchError, useChildWorkflowSelector } from './useChildWorkflowSelector'
 
 const mocks = vi.hoisted(() => ({
@@ -89,6 +91,8 @@ describe('useChildWorkflowSelector', () => {
             workflow_id: workflowId,
             published_version_id: `version-${workflowId}`,
             published_version: workflowId === 'workflow-4' ? 1 : 4,
+            published_version_name: workflowId === 'workflow-1' ? 'Spring Release' : null,
+            published_version_created_at: '2024-02-01T09:00:00Z',
             is_eligible: isEligible,
             triggers: isEligible
               ? [{ trigger_node_id: 'sub-trigger', name: 'Subworkflow Trigger', input_schema: {} }]
@@ -123,7 +127,12 @@ describe('useChildWorkflowSelector', () => {
 
     await waitFor(() => expect(result.current.options).toHaveLength(1))
 
-    expect(result.current.options[0]).toMatchObject({ value: 'workflow-1', label: 'Eligible workflow (v4)' })
+    expect(result.current.options[0]).toMatchObject({
+      value: 'workflow-1',
+      label: 'Eligible workflow',
+      description: 'Version: Spring Release',
+    })
+    expect(result.current.options[0].label).not.toMatch(/\(v\d+\)/)
     expect(mocks.projectWorkflowsGet).toHaveBeenCalledWith('/projects/{project_id}/workflows', {
       params: {
         path: { project_id: 'project-1' },
@@ -200,7 +209,7 @@ describe('useChildWorkflowSelector', () => {
     })
     expect(result.current.options[1]).toMatchObject({
       value: 'workflow-4',
-      label: 'Eligible workflow on page two (v1)',
+      label: 'Eligible workflow on page two',
     })
   })
 
@@ -211,10 +220,11 @@ describe('useChildWorkflowSelector', () => {
     )
 
     await waitFor(() => expect(result.current.selectedOption?.value).toBe('workflow-private'))
-    expect(result.current.selectedWorkflowLabel).toBe('Selected workflow outside this page (v7)')
+    expect(result.current.selectedWorkflowLabel).toBe('Selected workflow outside this page')
     expect(result.current.selectedOption).toMatchObject({
       value: 'workflow-private',
-      label: 'Selected workflow outside this page (v7)',
+      label: 'Selected workflow outside this page',
+      description: `Version: ${formatDateTime('2024-02-01T09:00:00Z')}`,
     })
     expect(mocks.invocationSchemaGet).toHaveBeenCalledWith('/workflows/{workflow_id}/invocation_schema', {
       params: { path: { workflow_id: 'workflow-private' } },

@@ -15,3 +15,7 @@ export function executionDetailPageHeading(execution: Execution | undefined, exe
 export function executionDetailHasTitleRowExtras(execution: Execution | undefined): boolean {
   return Boolean(execution?.status || execution?.created_at)
 }
+
+export function executionHasParentRun(execution: Execution | undefined): boolean {
+  return typeof execution?.execution_metadata?.parent_execution_id === 'string'
+}

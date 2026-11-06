@@ -29,6 +29,19 @@ vi.mock('../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
+vi.mock('@tanstack/react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-router')>()
+  return {
+    ...actual,
+    Link: ({ to, children, ...rest }: { to: string; children?: ReactNode } & Record<string, unknown>) => (
+      <a href={to} {...rest}>
+        {children}
+      </a>
+    ),
+    useNavigate: () => vi.fn(),
+  }
+})
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 })
@@ -296,7 +309,7 @@ describe('NodeExecutionDetailsPanel', () => {
     // Start and end render as two separate <time> elements (via PatternFly Timestamp)
     // joined by " - ". Timestamps render in local timezone, so just verify the date
     // appears twice rather than asserting an exact combined string.
-    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(2)
+    expect(screen.getAllByText(/Jan.*1.*2024|1.*Jan.*2024/i)).toHaveLength(2)
   })
 
   it('renders only start timestamp when completion time is missing', () => {
@@ -309,7 +322,7 @@ describe('NodeExecutionDetailsPanel', () => {
     }
     render(<NodeExecutionDetailsPanel {...propsWithoutCompletedAt} />, { wrapper })
 
-    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(1)
+    expect(screen.getAllByText(/Jan.*1.*2024|1.*Jan.*2024/i)).toHaveLength(1)
     expect(screen.queryByText(/ - /)).not.toBeInTheDocument()
   })
 
@@ -658,6 +671,29 @@ describe('NodeExecutionDetailsPanel', () => {
       expect(screen.getByText('Parameters')).toBeInTheDocument()
     })
 
+    it('associates the active tab with its content via a labelled tab panel', async () => {
+      const user = userEvent.setup()
+      mockUseQuery.mockReturnValue({
+        data: mockAgenticActivityData,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<NodeExecutionDetailsPanel {...agenticProps} />, { wrapper })
+
+      // The displayed content is exposed as a tab panel labelled by the selected tab,
+      // and the selected tab points back at that panel via aria-controls.
+      const panel = screen.getByRole('tabpanel')
+      const ioTab = screen.getByRole('tab', { name: /Input\/Output/i })
+      expect(panel).toHaveAttribute('aria-label', 'io')
+      expect(ioTab).toHaveAttribute('aria-controls', panel.id)
+
+      // The label follows the selection when the active tab changes.
+      await user.click(screen.getByRole('tab', { name: /Agent steps/i }))
+      expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-label', 'agent-steps')
+    })
+
     it('renders tools used summary from agentic output_data', () => {
       mockUseQuery.mockReturnValue({
         data: {
@@ -687,6 +723,132 @@ describe('NodeExecutionDetailsPanel', () => {
 
       expect(screen.getByText('Tools used')).toBeInTheDocument()
       expect(screen.getByText('search (2), fetch (1)')).toBeInTheDocument()
+    })
+  })
+
+  describe('sub-workflow node', () => {
+    const subWorkflowProps = {
+      nodeId: 'run_child',
+      nodeName: 'Run Child',
+      executionId: 'exec-parent-1',
+      nodeState: {
+        activityId: 'run_child',
+        status: 'completed' as const,
+        startedAt: '2024-01-01T10:00:00Z',
+        completedAt: '2024-01-01T10:00:02Z',
+      },
+      nodeType: 'sub_workflow',
+    }
+
+    beforeEach(() => {
+      // The sub-workflow node's own persisted output carries the child-execution reference.
+      mockUseQuery.mockReturnValue({
+        data: {
+          resources: [
+            {
+              activity_name: 'run_child',
+              node_type: 'sub_workflow',
+              status: 'completed',
+              output_data: {
+                workflow_id: 'wf-1',
+                workflow_name: 'Child WF',
+                child_execution_id: 'child-1',
+                child_workflow_version: 1,
+              },
+              input_data: { input_parameters: { username: 'rohit' } },
+            },
+          ],
+        },
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+    })
+
+    it('shows Input/Output content with a contextual child-run link and no Child activities tab', () => {
+      render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
+
+      // Input/Output panes render directly; a sub-workflow node has no tab bar.
+      expect(screen.getByText('Parameters')).toBeInTheDocument()
+      expect(screen.getByText('Output')).toBeInTheDocument()
+      expect(screen.queryByRole('tab', { name: 'Child activities' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('tab')).not.toBeInTheDocument()
+      // Contextual link to the child run, in the selected-activity header.
+      expect(screen.getByRole('link', { name: /View sub-workflow run: Child WF/i })).toBeInTheDocument()
+    })
+
+    it('does not render any inline child-activity inspection UI', () => {
+      render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
+
+      // No output-view toggle, no composed child-activity view, no child-step inspection.
+      expect(screen.queryByText('Output view:')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'With child data' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Saved output' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'About output views' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /View child execution/i })).not.toBeInTheDocument()
+    })
+
+    it('shows the persisted (saved) output without injecting child-step data', () => {
+      render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
+
+      expect(screen.getAllByText(/child_execution_id/).length).toBeGreaterThan(0)
+      expect(screen.queryAllByText(/child_activities/)).toHaveLength(0)
+    })
+
+    it('links to the child execution by its id', () => {
+      render(<NodeExecutionDetailsPanel {...subWorkflowProps} />, { wrapper })
+
+      expect(screen.getByRole('link', { name: /View sub-workflow run: Child WF/i })).toHaveAttribute(
+        'href',
+        '/executions/child-1'
+      )
+    })
+
+    it('links to the running child from live runtimeMetadata while the node stays RUNNING', () => {
+      // No output_data yet (child not terminal) and the node is RUNNING. The live child
+      // reference arrives via the execution store's runtimeMetadata (WebSocket field patch),
+      // not via a status-change refetch — so the link must come from nodeState.runtimeMetadata.
+      mockUseQuery.mockReturnValue({
+        data: {
+          resources: [
+            {
+              activity_name: 'run_child',
+              node_type: 'sub_workflow',
+              status: 'running',
+              output_data: null,
+              input_data: { input_parameters: { username: 'rohit' } },
+            },
+          ],
+        },
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(
+        <NodeExecutionDetailsPanel
+          {...subWorkflowProps}
+          nodeState={{
+            activityId: 'run_child',
+            status: 'running',
+            startedAt: '2024-01-01T10:00:00Z',
+            runtimeMetadata: { child_execution_id: 'child-live', child_workflow_name: 'Live Child' },
+          }}
+        />,
+        { wrapper }
+      )
+
+      expect(screen.getByRole('link', { name: /View sub-workflow run: Live Child/i })).toHaveAttribute(
+        'href',
+        '/executions/child-live'
+      )
+    })
+
+    it('does not render a Child activities tab or header link for non sub-workflow nodes', () => {
+      render(<NodeExecutionDetailsPanel {...defaultProps} nodeType="script" />, { wrapper })
+
+      expect(screen.queryByRole('tab', { name: 'Child activities' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /View sub-workflow run/i })).not.toBeInTheDocument()
     })
   })
 })

@@ -159,6 +159,16 @@ describe('formatElapsedTime', () => {
     expect(formatElapsedTime(0)).toBe('0s')
   })
 
+  it('shows millisecond precision for positive sub-second durations', () => {
+    expect(formatElapsedTime(650)).toBe('650ms')
+    expect(formatElapsedTime(1)).toBe('1ms')
+    expect(formatElapsedTime(999)).toBe('999ms')
+  })
+
+  it('switches to seconds at exactly 1s', () => {
+    expect(formatElapsedTime(1000)).toBe('1s')
+  })
+
   it('floors negative to zero', () => {
     expect(formatElapsedTime(-1000)).toBe('0s')
   })

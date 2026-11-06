@@ -1,0 +1,1012 @@
+"""Unit tests for Sub-workflow (Reference Mode) POC — ANSTRAT-2347.
+
+Covers:
+- SubWorkflowSetupActivity: depth limit, missing params, invalid workflow_id,
+  trigger validation, idempotent retry
+- OrchestratorWorkflow dispatch: _execute_sub_workflow_node calls setup activity
+  then execute_child_workflow with correct args and ParentClosePolicy
+"""
+
+from __future__ import annotations
+
+import contextlib
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4, uuid5
+
+import pytest
+from temporalio.exceptions import (
+    ApplicationError,
+    ChildWorkflowError,
+    TerminatedError,
+)
+from temporalio.exceptions import CancelledError as TemporalCancelledError
+from temporalio.exceptions import TimeoutError as TemporalTimeoutError
+from temporalio.workflow import ParentClosePolicy
+
+from syntara.workflows.workflow_engine.activities.sub_workflow_setup_activity import (
+    _MAX_SUB_WORKFLOW_DEPTH,
+    _SUB_WORKFLOW_NAMESPACE,
+    SubWorkflowSetupActivity,
+)
+from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.workflow_engine.graph import _NODE_SETTINGS_CLASS, ActivityNode
+from syntara.workflows.workflow_engine.models.workflow_definition import (
+    NODE_OUTPUT_MODELS,
+    ActivityName,
+    NodeSettingsNoRetry,
+    NodeType,
+    SubWorkflowOutput,
+)
+from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_setup_activity() -> SubWorkflowSetupActivity:
+    session_factory = MagicMock()
+    return SubWorkflowSetupActivity(session_factory=session_factory, task_queue="test-queue")
+
+
+def _make_workflow_with_depth(depth: int = 0) -> OrchestratorWorkflow:
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+    wf.execution_id = "parent-exec-001"
+    wf._created_by_user_id = str(uuid4())
+    wf._sub_workflow_depth = depth
+    wf._project_id = str(uuid4())
+    wf.resolver = MagicMock()
+    wf.skipped_nodes = set()
+    wf.failed_nodes = {}
+    wf.node_inputs = {}
+    wf.node_control_data = {}
+    wf.loop_state = {}
+    wf.loop_body_map = {}
+    wf.loop_iteration_results = {}
+    wf._timeout_tasks = {}
+    wf._timed_out_converge_nodes = set()
+    wf._detached_nodes = set()
+    wf._cof_failed_nodes = set()
+    wf._converge_branch_nodes = {}
+    wf._has_unhandled_failure = False
+    wf._cancelled_node = None
+    wf._cancelled_step_nodes = set()
+    wf.pre_resolved_outputs = {}
+    wf.stop_after_nodes = set()
+    init_workflow_runtime(wf)
+    return wf
+
+
+def _make_setup_result(**overrides: object) -> dict[str, Any]:
+    defaults: dict[str, Any] = {
+        "execution_id": "child-exec-001",
+        "temporal_workflow_id": "child-wf-child-exec-001",
+        "workflow_definition": {"schema_version": "2.0.0", "triggers": [], "nodes": [], "edges": []},
+        "trigger_node_id": "trigger_1",
+        "input_data": {"key": "value"},
+        "task_queue": "test-queue",
+        "workflow_metadata": {"sub_workflow_depth": 1},
+        "child_workflow_id": str(uuid4()),
+        "child_workflow_name": "child-workflow",
+        "child_workflow_version": 1,
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+def _make_child_workflow_def(
+    trigger_id: str = "trigger_1",
+    trigger_type: str = NodeType.SUBWORKFLOW_TRIGGER,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "2.0.0",
+        "triggers": [{"id": trigger_id, "type": trigger_type, "parameters": {}}],
+        "nodes": [{"id": "node_a", "type": "script", "parameters": {}}],
+        "edges": [{"from": trigger_id, "to": "node_a"}],
+    }
+
+
+def _mock_session_factory(*sessions: AsyncMock) -> MagicMock:
+    """Build a session factory that yields a different session per `async with` call."""
+    call_count = 0
+
+    async def aenter(_self: object) -> AsyncMock:
+        nonlocal call_count
+        idx = min(call_count, len(sessions) - 1)
+        call_count += 1
+        return sessions[idx]
+
+    ctx = MagicMock()
+    ctx.__aenter__ = aenter
+    ctx.__aexit__ = AsyncMock(return_value=False)
+    return MagicMock(return_value=ctx)
+
+
+# ---------------------------------------------------------------------------
+# SubWorkflowSetupActivity tests
+# ---------------------------------------------------------------------------
+
+
+class TestSetupActivityDepthLimit:
+    """Depth-check guardrail in setup activity."""
+
+    async def test_depth_at_max_raises_non_retryable(self) -> None:
+        activity = _make_setup_activity()
+        with pytest.raises(ApplicationError, match="nesting depth") as exc_info:
+            await activity.run(
+                parameters={"workflow_id": str(uuid4()), "trigger_node_id": "t1"},
+                parent_execution_id="parent-001",
+                parent_node_id="sub_wf_node",
+                created_by_user_id=str(uuid4()),
+                current_depth=_MAX_SUB_WORKFLOW_DEPTH,
+            )
+        assert exc_info.value.non_retryable
+
+    async def test_depth_below_max_does_not_raise_depth_error(self) -> None:
+        """Depth below max should pass the depth check (fails later on DB lookup)."""
+        activity = _make_setup_activity()
+
+        mock_session = AsyncMock()
+        mock_session.get = AsyncMock(return_value=None)
+        exec_result = MagicMock()
+        exec_result.first.return_value = None
+        mock_session.exec = AsyncMock(return_value=exec_result)
+
+        activity._session_factory = _mock_session_factory(mock_session)
+
+        with pytest.raises(ApplicationError, match="WorkflowNotPublishedError"):
+            await activity.run(
+                parameters={"workflow_id": str(uuid4()), "trigger_node_id": "t1"},
+                parent_execution_id="parent-001",
+                parent_node_id="sub_wf_node",
+                created_by_user_id=str(uuid4()),
+                current_depth=_MAX_SUB_WORKFLOW_DEPTH - 1,
+            )
+
+
+class TestSetupActivityValidation:
+    """Parameter validation in setup activity."""
+
+    async def test_missing_workflow_id_raises(self) -> None:
+        activity = _make_setup_activity()
+        with pytest.raises(ApplicationError, match="workflow_id") as exc_info:
+            await activity.run(
+                parameters={},
+                parent_execution_id="parent-001",
+                parent_node_id="sub_wf_node",
+                created_by_user_id=str(uuid4()),
+                current_depth=0,
+            )
+        assert exc_info.value.non_retryable
+
+    async def test_missing_trigger_node_id_raises(self) -> None:
+        activity = _make_setup_activity()
+        with pytest.raises(ApplicationError, match="trigger_node_id") as exc_info:
+            await activity.run(
+                parameters={"workflow_id": str(uuid4())},
+                parent_execution_id="parent-001",
+                parent_node_id="sub_wf_node",
+                created_by_user_id=str(uuid4()),
+                current_depth=0,
+            )
+        assert exc_info.value.non_retryable
+
+    async def test_invalid_workflow_id_format_raises(self) -> None:
+        activity = _make_setup_activity()
+        with pytest.raises(ApplicationError, match="Invalid workflow_id") as exc_info:
+            await activity.run(
+                parameters={"workflow_id": "not-a-uuid", "trigger_node_id": "t1"},
+                parent_execution_id="parent-001",
+                parent_node_id="sub_wf_node",
+                created_by_user_id=str(uuid4()),
+                current_depth=0,
+            )
+        assert exc_info.value.non_retryable
+
+    async def test_missing_created_by_raises_config_error(self) -> None:
+        """A3: a missing/invalid actor id is a non-retryable ConfigError, not a retryable ValueError."""
+        for bad in ("", "not-a-uuid", None):
+            activity = _make_setup_activity()
+            with pytest.raises(ApplicationError, match="created_by_user_id") as exc_info:
+                await activity.run(
+                    parameters={"workflow_id": str(uuid4()), "trigger_node_id": "t1"},
+                    parent_execution_id="parent-001",
+                    parent_node_id="sub_wf_node",
+                    created_by_user_id=bad,  # type: ignore[arg-type]
+                    current_depth=0,
+                )
+            assert exc_info.value.non_retryable
+            assert exc_info.value.type == "ConfigError"
+
+
+class TestSetupActivityTriggerValidation:
+    """Trigger type and existence checks."""
+
+    def test_wrong_trigger_type_raises(self) -> None:
+        workflow_def = _make_child_workflow_def(trigger_type="manual_trigger")
+        with pytest.raises(ApplicationError, match="InvalidTriggerType"):
+            SubWorkflowSetupActivity._validate_trigger(workflow_def, "trigger_1")
+
+    def test_missing_trigger_raises(self) -> None:
+        workflow_def = _make_child_workflow_def()
+        with pytest.raises(ApplicationError, match="TriggerNotFoundError"):
+            SubWorkflowSetupActivity._validate_trigger(workflow_def, "nonexistent_trigger")
+
+    def test_valid_subworkflow_trigger_passes(self) -> None:
+        workflow_def = _make_child_workflow_def()
+        SubWorkflowSetupActivity._validate_trigger(workflow_def, "trigger_1")
+
+
+class TestSetupActivityIdempotency:
+    """Idempotent retry returns existing execution without creating."""
+
+    async def test_existing_execution_returns_without_creating(self) -> None:
+        activity = _make_setup_activity()
+        child_wf_id = uuid4()
+        parent_exec_id = "parent-exec-001"
+        parent_node_id = "sub_wf_node"
+        user_id = str(uuid4())
+
+        expected_child_exec_id = uuid5(_SUB_WORKFLOW_NAMESPACE, f"{parent_exec_id}:{parent_node_id}")
+
+        mock_workflow = MagicMock()
+        mock_workflow.id = child_wf_id
+        mock_workflow.name = "child-wf"
+        mock_workflow.project_id = uuid4()
+        mock_workflow.created_by = uuid4()
+
+        mock_version = MagicMock()
+        mock_version.id = uuid4()
+        mock_version.version = 1
+        mock_version.workflow_definition = _make_child_workflow_def()
+
+        existing_execution = MagicMock()
+        existing_execution.workflow_id = child_wf_id
+        existing_execution.workflow_version_id = mock_version.id
+        existing_execution.temporal_workflow_id = f"child-wf-{expected_child_exec_id}"
+        existing_execution.input_data = None
+        existing_execution.created_at = None
+
+        mock_session_resume = AsyncMock()
+        mock_session_resume.get = AsyncMock(
+            side_effect=[existing_execution, mock_version, mock_workflow],
+        )
+
+        mock_session_persist = AsyncMock()
+        persist_result = MagicMock()
+        persist_result.first.return_value = None
+        mock_session_persist.exec = AsyncMock(return_value=persist_result)
+
+        activity._session_factory = _mock_session_factory(mock_session_resume, mock_session_persist)
+
+        with patch(
+            "syntara.workflows.utils.workflow_metadata.resolve_user_display_name",
+            return_value="Author",
+        ):
+            result = await activity.run(
+                parameters={"workflow_id": str(child_wf_id), "trigger_node_id": "trigger_1"},
+                parent_execution_id=parent_exec_id,
+                parent_node_id=parent_node_id,
+                created_by_user_id=user_id,
+                current_depth=0,
+            )
+
+        assert result["execution_id"] == str(expected_child_exec_id)
+        mock_session_resume.add.assert_not_called()
+
+    async def test_retry_preserves_pinned_version(self) -> None:
+        """On retry, the definition comes from the pinned version, not a re-resolved one."""
+        activity = _make_setup_activity()
+        child_wf_id = uuid4()
+        parent_exec_id = "parent-exec-002"
+        parent_node_id = "sub_wf_node"
+
+        expected_child_exec_id = uuid5(_SUB_WORKFLOW_NAMESPACE, f"{parent_exec_id}:{parent_node_id}")
+
+        pinned_def = _make_child_workflow_def(trigger_id="t1")
+        mock_version = MagicMock()
+        mock_version.id = uuid4()
+        mock_version.version = 3
+        mock_version.workflow_definition = pinned_def
+
+        mock_workflow = MagicMock()
+        mock_workflow.id = child_wf_id
+        mock_workflow.name = "child-wf"
+        mock_workflow.project_id = uuid4()
+        mock_workflow.created_by = uuid4()
+
+        existing_execution = MagicMock()
+        existing_execution.workflow_id = child_wf_id
+        existing_execution.workflow_version_id = mock_version.id
+        existing_execution.temporal_workflow_id = f"child-wf-{expected_child_exec_id}"
+        existing_execution.input_data = {"pinned": True}
+        existing_execution.created_at = None
+
+        mock_session_resume = AsyncMock()
+        mock_session_resume.get = AsyncMock(
+            side_effect=[existing_execution, mock_version, mock_workflow],
+        )
+        mock_session_persist = AsyncMock()
+        persist_result = MagicMock()
+        persist_result.first.return_value = None
+        mock_session_persist.exec = AsyncMock(return_value=persist_result)
+
+        activity._session_factory = _mock_session_factory(mock_session_resume, mock_session_persist)
+
+        with patch(
+            "syntara.workflows.utils.workflow_metadata.resolve_user_display_name",
+            return_value="Author",
+        ):
+            result = await activity.run(
+                parameters={"workflow_id": str(child_wf_id), "trigger_node_id": "t1"},
+                parent_execution_id=parent_exec_id,
+                parent_node_id=parent_node_id,
+                created_by_user_id=str(uuid4()),
+                current_depth=0,
+            )
+
+        assert result["workflow_definition"] == pinned_def
+        assert result["input_data"] == {"pinned": True}
+        assert result["child_workflow_version"] == 3
+
+
+class TestSetupActivityExecution:
+    """Happy-path: creates child execution and returns launch data."""
+
+    async def test_creates_execution_and_returns_launch_data(self) -> None:
+        activity = _make_setup_activity()
+        child_wf_id = uuid4()
+        parent_exec_id = "parent-exec-001"
+        parent_node_id = "sub_wf_node"
+        user_id = str(uuid4())
+
+        mock_workflow = MagicMock()
+        mock_workflow.id = child_wf_id
+        mock_workflow.name = "child-wf"
+        mock_workflow.project_id = uuid4()
+        mock_workflow.created_by = uuid4()
+
+        mock_version = MagicMock()
+        mock_version.id = uuid4()
+        mock_version.version = 2
+        mock_version.workflow_definition = _make_child_workflow_def()
+
+        mock_session_idempotency = AsyncMock()
+        mock_session_idempotency.get = AsyncMock(return_value=None)
+
+        mock_session_create = AsyncMock()
+        exec_result = MagicMock()
+        exec_result.first.return_value = (mock_workflow, mock_version)
+        mock_session_create.exec = AsyncMock(return_value=exec_result)
+
+        mock_session_persist = AsyncMock()
+        persist_result = MagicMock()
+        persist_result.first.return_value = None
+        mock_session_persist.exec = AsyncMock(return_value=persist_result)
+
+        activity._session_factory = _mock_session_factory(
+            mock_session_idempotency,
+            mock_session_create,
+            mock_session_persist,
+        )
+
+        with patch(
+            "syntara.workflows.utils.workflow_metadata.resolve_user_display_name",
+            return_value="Author",
+        ):
+            result = await activity.run(
+                parameters={
+                    "workflow_id": str(child_wf_id),
+                    "trigger_node_id": "trigger_1",
+                    "input_mapping": {"x": 1},
+                },
+                parent_execution_id=parent_exec_id,
+                parent_node_id=parent_node_id,
+                created_by_user_id=user_id,
+                current_depth=0,
+            )
+
+        assert result["trigger_node_id"] == "trigger_1"
+        assert result["input_data"] == {"x": 1}
+        assert result["task_queue"] == "test-queue"
+        assert result["child_workflow_name"] == "child-wf"
+        assert result["child_workflow_version"] == 2
+        assert result["workflow_metadata"]["sub_workflow_depth"] == 1
+        mock_session_create.add.assert_called_once()
+        mock_session_create.commit.assert_called_once()
+
+
+class TestSetupActivityDeterministicId:
+    """uuid5 child execution ID is stable across retries."""
+
+    def test_child_execution_id_is_deterministic(self) -> None:
+        parent_exec_id = "parent-exec-001"
+        parent_node_id = "sub_wf_node"
+        expected = uuid5(_SUB_WORKFLOW_NAMESPACE, f"{parent_exec_id}:{parent_node_id}")
+        same = uuid5(_SUB_WORKFLOW_NAMESPACE, f"{parent_exec_id}:{parent_node_id}")
+        assert expected == same
+
+    def test_different_nodes_produce_different_ids(self) -> None:
+        parent_exec_id = "parent-exec-001"
+        id_a = uuid5(_SUB_WORKFLOW_NAMESPACE, f"{parent_exec_id}:node_a")
+        id_b = uuid5(_SUB_WORKFLOW_NAMESPACE, f"{parent_exec_id}:node_b")
+        assert id_a != id_b
+
+
+class TestSetupActivityRegistration:
+    """Temporal activity decorator matches enum name."""
+
+    def test_activity_name_matches_enum(self) -> None:
+        activity = _make_setup_activity()
+        defn = getattr(activity.run, "__temporal_activity_definition")
+        assert defn.name == ActivityName.SUB_WORKFLOW
+
+
+# ---------------------------------------------------------------------------
+# OrchestratorWorkflow dispatch tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _mock_temporal_workflow() -> Generator[MagicMock]:
+    """Mock the Temporal workflow module to avoid sandbox errors."""
+    mock_logger = MagicMock()
+    with (
+        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf,
+        patch("syntara.workflows.workflow_engine.converge_mixin.workflow", mock_wf),
+    ):
+        mock_wf.logger = mock_logger
+        mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
+        yield mock_wf
+
+
+@pytest.mark.usefixtures("_mock_temporal_workflow")
+class TestSubWorkflowDispatch:
+    """OrchestratorWorkflow._execute_sub_workflow_node integration."""
+
+    async def test_dispatch_routes_sub_workflow_node(self) -> None:
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "completed"})
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={"workflow_id": str(uuid4()), "trigger_node_id": "trigger_1"},
+            )
+
+            result = await wf._execute_sub_workflow_node(node, node.parameters)
+
+        assert result["output"]["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert result["output"]["Result"]["child_status"] == "completed"
+        assert result["output"]["StatusCode"] == 0
+        assert result["output"]["StatusMessage"] == "Sub-workflow completed successfully"
+        assert result["output"]["ErrorMessage"] is None
+        assert result["output"]["Result"]["outputs"] is None
+
+    async def test_execute_activity_args(self) -> None:
+        wf = _make_workflow_with_depth(2)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "completed"})
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={"workflow_id": "wf-123", "trigger_node_id": "t1"},
+            )
+
+            await wf._execute_sub_workflow_node(node, node.parameters)
+
+            call_kwargs = mock_wf.execute_activity.call_args
+            assert call_kwargs[0][0] == ActivityName.SUB_WORKFLOW
+            args = call_kwargs[1]["args"]
+            assert args[0] == node.parameters
+            assert args[1] == wf.execution_id
+            assert args[2] == "sub_wf_1"
+            assert args[3] == wf._created_by_user_id
+            assert args[4] == 2
+
+    async def test_child_workflow_args(self) -> None:
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "completed"})
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            await wf._execute_sub_workflow_node(node, {})
+
+            child_call = mock_wf.execute_child_workflow.call_args
+            assert child_call[0][0] == "orchestrator_workflow"
+            positional_args = child_call[1]["args"]
+            assert positional_args[0] == setup_result["workflow_definition"]
+            assert positional_args[1] == setup_result["execution_id"]
+            assert positional_args[2] == setup_result["trigger_node_id"]
+            assert positional_args[3] == setup_result["input_data"]
+            assert positional_args[4] is False
+            assert positional_args[8] == setup_result["workflow_metadata"]
+            assert child_call[1]["id"] == setup_result["temporal_workflow_id"]
+            assert child_call[1]["task_queue"] == setup_result["task_queue"]
+            assert child_call[1]["parent_close_policy"] == ParentClosePolicy.REQUEST_CANCEL
+
+    async def test_child_non_dict_result_raises(self) -> None:
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value="unexpected")
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError, match="Sub-workflow returned unexpected status") as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.non_retryable
+        output = exc_info.value.details[0]["output"]
+        assert output["Result"]["child_status"] is None
+        assert output["StatusCode"] == 1
+
+    async def test_child_failed_raises_application_error(self) -> None:
+        """Child failure must propagate as ApplicationError so the engine records it as failed."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "failed"})
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError, match="Sub-workflow failed") as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.non_retryable
+        assert exc_info.value.type == "SubWorkflowFailedError"
+        output = exc_info.value.details[0]["output"]
+        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert output["Result"]["child_status"] == "failed"
+        assert output["StatusCode"] == 1
+        assert output["ErrorMessage"] == "Sub-workflow failed"
+
+    async def test_failed_child_error_message_includes_failing_step(self) -> None:
+        """A4: a failing child surfaces one failing step + message in ErrorMessage (string only)."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(
+                return_value={"status": "failed", "failed_activities": {"step_a": "boom"}}
+            )
+            node = ActivityNode(node_id="sub_wf_1", node_type=NodeType.SUB_WORKFLOW, parameters={})
+            with pytest.raises(ApplicationError) as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.type == "SubWorkflowFailedError"
+        assert exc_info.value.non_retryable
+        error_message = exc_info.value.details[0]["output"]["ErrorMessage"]
+        assert "step_a" in error_message
+        assert "boom" in error_message
+        assert len(error_message) <= 10000
+
+    def test_classifier_child_status_within_published_enum(self) -> None:
+        """A2-P1: the classifier only yields child_status values the published schema allows."""
+        from temporalio.exceptions import TimeoutType
+
+        allowed = {"completed", "completed_with_errors", "failed", "cancelled"}
+        causes = [
+            TemporalCancelledError(),
+            TemporalTimeoutError("t", type=TimeoutType.START_TO_CLOSE, last_heartbeat_details=[]),
+            TerminatedError("x"),
+            RuntimeError("other"),
+        ]
+        for cause in causes:
+            child_status, reason = OrchestratorWorkflow._classify_child_workflow_failure(
+                _make_child_workflow_error(cause)
+            )
+            assert child_status in allowed
+            assert isinstance(reason, str)
+            assert reason
+
+    async def test_child_cancelled_raises_application_error(self) -> None:
+        """Child cancellation must also propagate as ApplicationError."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "cancelled"})
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError, match="Sub-workflow cancelled") as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.non_retryable
+        assert exc_info.value.type == "SubWorkflowCancelledError"
+        output = exc_info.value.details[0]["output"]
+        assert output["Result"]["child_status"] == "cancelled"
+        assert output["StatusCode"] == 1
+
+    async def test_child_completed_with_errors_succeeds_when_patched(self) -> None:
+        """A1: with the patch active, completed_with_errors is a successful parent step."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "completed_with_errors"})
+            mock_wf.patched = MagicMock(return_value=True)
+
+            node = ActivityNode(node_id="sub_wf_1", node_type=NodeType.SUB_WORKFLOW, parameters={})
+            result = await wf._execute_sub_workflow_node(node, {})
+
+        output = result["output"]
+        assert output["StatusCode"] == 0
+        assert output["Result"]["child_status"] == "completed_with_errors"
+        assert output["StatusMessage"] == "Sub-workflow completed with errors"
+        assert output["ErrorMessage"] is None
+
+    async def test_child_completed_with_errors_raises_when_unpatched(self) -> None:
+        """A1: in-flight (pre-patch) executions keep the old raise on replay."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "completed_with_errors"})
+            mock_wf.patched = MagicMock(return_value=False)
+
+            node = ActivityNode(node_id="sub_wf_1", node_type=NodeType.SUB_WORKFLOW, parameters={})
+            with pytest.raises(ApplicationError, match="Sub-workflow completed_with_errors"):
+                await wf._execute_sub_workflow_node(node, {})
+
+
+# ---------------------------------------------------------------------------
+# ChildWorkflowError handling - Temporal-level child failures (D1-D3)
+# ---------------------------------------------------------------------------
+
+
+def _make_child_workflow_error(cause: Exception) -> ChildWorkflowError:
+    """Build a ChildWorkflowError with a specific cause for testing."""
+    exc = ChildWorkflowError(
+        "child workflow failed",
+        namespace="default",
+        workflow_id="test-child-wf-id",
+        run_id="test-run-id",
+        workflow_type="orchestrator_workflow",
+        initiated_event_id=1,
+        started_event_id=2,
+        retry_state=None,
+    )
+    exc.__cause__ = cause
+    return exc
+
+
+class TestChildWorkflowErrorHandling:
+    """Verify M1 output is preserved when execute_child_workflow raises ChildWorkflowError."""
+
+    async def test_terminated_child_preserves_m1_output(self) -> None:
+        """External termination preserves child_execution_id and metadata."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(
+                side_effect=_make_child_workflow_error(TerminatedError("terminated by user"))
+            )
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError, match="Sub-workflow terminated") as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.non_retryable
+        assert exc_info.value.type == "SubWorkflowFailedError"
+        output = exc_info.value.details[0]["output"]
+        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert output["Result"]["child_workflow_id"] == setup_result["child_workflow_id"]
+        assert output["Result"]["child_workflow_name"] == setup_result["child_workflow_name"]
+        assert output["Result"]["child_workflow_version"] == setup_result["child_workflow_version"]
+        # A2-P1: child_status stays within the published enum; the "terminated"
+        # reason is preserved in ErrorMessage instead.
+        assert output["Result"]["child_status"] == "failed"
+        assert output["StatusCode"] == 1
+        assert output["ErrorMessage"] == "Sub-workflow terminated"
+
+    async def test_cancelled_child_preserves_m1_output(self) -> None:
+        """Temporal-level cancellation preserves M1 output and uses SubWorkflowCancelledError."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(side_effect=_make_child_workflow_error(TemporalCancelledError()))
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError, match="Sub-workflow cancelled") as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.non_retryable
+        assert exc_info.value.type == "SubWorkflowCancelledError"
+        output = exc_info.value.details[0]["output"]
+        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert output["Result"]["child_status"] == "cancelled"
+        assert output["StatusCode"] == 1
+
+    async def test_timed_out_child_preserves_m1_output(self) -> None:
+        """Child timeout preserves M1 output."""
+        from temporalio.exceptions import TimeoutType
+
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(
+                side_effect=_make_child_workflow_error(
+                    TemporalTimeoutError("timeout", type=TimeoutType.START_TO_CLOSE, last_heartbeat_details=[])
+                )
+            )
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError, match="Sub-workflow timed out") as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.non_retryable
+        assert exc_info.value.type == "SubWorkflowFailedError"
+        output = exc_info.value.details[0]["output"]
+        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
+        # A2-P1: timeout maps to child_status "failed"; reason preserved in ErrorMessage.
+        assert output["Result"]["child_status"] == "failed"
+        assert output["StatusCode"] == 1
+        assert output["ErrorMessage"] == "Sub-workflow timed out"
+
+    async def test_cancelled_child_does_not_cancel_parent(self) -> None:
+        """Cancelled child uses SubWorkflowCancelledError, never InvocationCancelledError.
+
+        So a cancelled child step cannot cancel the whole parent run.
+        """
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(side_effect=_make_child_workflow_error(TemporalCancelledError()))
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError) as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        assert exc_info.value.type == "SubWorkflowCancelledError"
+        assert exc_info.value.type != "InvocationCancelledError"
+
+    async def test_normal_child_failure_path_unchanged(self) -> None:
+        """Normal child failure (returns dict) still works after ChildWorkflowError handling."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "failed"})
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            with pytest.raises(ApplicationError, match="Sub-workflow failed") as exc_info:
+                await wf._execute_sub_workflow_node(node, {})
+
+        output = exc_info.value.details[0]["output"]
+        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert output["Result"]["child_status"] == "failed"
+
+    async def test_normal_child_success_path_unchanged(self) -> None:
+        """Normal child success still returns output without raising."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "completed"})
+
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={},
+            )
+
+            result = await wf._execute_sub_workflow_node(node, {})
+
+        output = result["output"]
+        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert output["Result"]["child_status"] == "completed"
+        assert output["StatusCode"] == 0
+        assert output["ErrorMessage"] is None
+
+    async def test_m1_output_propagated_through_handle_node_failure(self) -> None:
+        """Verify _handle_node_failure persists M1 output to the resolver namespace."""
+        wf = _make_workflow_with_depth(0)
+        setup_result = _make_setup_result()
+
+        m1_output = OrchestratorWorkflow._build_sub_workflow_output(setup_result, "terminated")
+        app_error = ApplicationError(
+            "Sub-workflow terminated",
+            {"output": m1_output},
+            type="SubWorkflowFailedError",
+            non_retryable=True,
+        )
+
+        mock_graph = MagicMock()
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow"):
+            wf._handle_node_failure("sub_wf_1", app_error, mock_graph, {})
+
+        assert "sub_wf_1" in wf.failed_nodes
+        set_call = wf.resolver.set_namespace.call_args  # type: ignore[attr-defined]
+        persisted = set_call[0][1]
+        assert persisted["Result"]["child_execution_id"] == setup_result["execution_id"]
+        assert persisted["Result"]["child_status"] == "terminated"
+        assert persisted["StatusCode"] == 1
+        assert persisted["status"] == "failed"
+
+
+# ---------------------------------------------------------------------------
+# Setup activity — disabled-workflow error
+# ---------------------------------------------------------------------------
+
+
+class TestSetupActivityDisabledWorkflow:
+    """Verify that a published but disabled child raises WorkflowDisabledError."""
+
+    async def test_disabled_workflow_raises_workflow_disabled_error(self) -> None:
+        from unittest.mock import MagicMock
+
+        disabled_wf_id = str(uuid4())
+
+        mock_row = MagicMock()
+        mock_workflow = MagicMock()
+        mock_workflow.is_enabled = False
+        mock_workflow.id = disabled_wf_id
+        mock_version = MagicMock()
+        mock_row.first.return_value = (mock_workflow, mock_version)
+
+        mock_session = AsyncMock()
+        mock_session.get = AsyncMock(return_value=None)
+        mock_session.exec = AsyncMock(return_value=mock_row)
+
+        @contextlib.asynccontextmanager
+        async def mock_factory() -> AsyncIterator[AsyncMock]:
+            yield mock_session
+
+        setup = SubWorkflowSetupActivity(session_factory=mock_factory, task_queue="test-queue")  # type: ignore[arg-type]
+
+        with pytest.raises(ApplicationError, match="disabled") as exc_info:
+            await setup.run(
+                parameters={
+                    "workflow_id": disabled_wf_id,
+                    "trigger_node_id": "trigger",
+                    "input_mapping": {},
+                },
+                parent_execution_id="parent-exec-1",
+                parent_node_id="sub_wf_node",
+                created_by_user_id=str(uuid4()),
+                current_depth=0,
+            )
+
+        assert exc_info.value.type == "WorkflowDisabledError"
+        assert exc_info.value.non_retryable
+
+
+# ---------------------------------------------------------------------------
+# Model / enum registration tests
+# ---------------------------------------------------------------------------
+
+
+class TestSubWorkflowModels:
+    """Enum, output model, and settings registration."""
+
+    def test_node_type_enum_exists(self) -> None:
+        assert NodeType.SUB_WORKFLOW.value == "sub_workflow"
+
+    def test_activity_name_enum_exists(self) -> None:
+        assert ActivityName.SUB_WORKFLOW.value == "execute_sub_workflow_activity"
+
+    def test_output_model_registered(self) -> None:
+        assert NodeType.SUB_WORKFLOW in NODE_OUTPUT_MODELS
+        assert NODE_OUTPUT_MODELS[NodeType.SUB_WORKFLOW] is SubWorkflowOutput
+
+    def test_output_model_fields(self) -> None:
+        output = SubWorkflowOutput()
+        assert output.Result is None
+        assert output.StatusCode is None
+        assert output.StatusMessage is None
+        assert output.ErrorMessage is None
+
+    def test_node_settings_class_registered(self) -> None:
+        assert NodeType.SUB_WORKFLOW in _NODE_SETTINGS_CLASS
+        assert _NODE_SETTINGS_CLASS[NodeType.SUB_WORKFLOW] is NodeSettingsNoRetry
+
+
+class TestDepthInitialization:
+    """sub_workflow_depth read from workflow_metadata during state init."""
+
+    def test_depth_from_workflow_metadata(self) -> None:
+        wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+        wf._initialize_state(
+            execution_id="exec-1",
+            workflow_metadata={"sub_workflow_depth": 5, "workflow_context": {}},
+        )
+        assert wf._sub_workflow_depth == 5
+
+    def test_depth_defaults_to_zero(self) -> None:
+        wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+        wf._initialize_state(execution_id="exec-1", workflow_metadata={})
+        assert wf._sub_workflow_depth == 0
+
+    def test_depth_non_int_defaults_to_zero(self) -> None:
+        wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+        wf._initialize_state(
+            execution_id="exec-1",
+            workflow_metadata={"sub_workflow_depth": "invalid"},
+        )
+        assert wf._sub_workflow_depth == 0
+
+    def test_no_metadata_defaults_to_zero(self) -> None:
+        wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+        wf._initialize_state(execution_id="exec-1")
+        assert wf._sub_workflow_depth == 0

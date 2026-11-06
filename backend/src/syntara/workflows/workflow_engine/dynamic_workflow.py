@@ -13,8 +13,10 @@ from typing import Any, ClassVar, cast
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-from temporalio.exceptions import ActivityError, ApplicationError
+from temporalio.exceptions import ActivityError, ApplicationError, ChildWorkflowError, TerminatedError
+from temporalio.exceptions import CancelledError as TemporalCancelledError
 from temporalio.exceptions import TimeoutError as TemporalTimeoutError
+from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
     from syntara.core.exceptions import SafeValueError
@@ -55,7 +57,18 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeType,
 )
 from syntara.workflows.workflow_engine.unified_eval import safe_eval_with_namespace
-from syntara.workflows.workflow_engine.utils.loop_iteration_ids import loop_control_activity_id
+from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
+    join_loop_iteration_id,
+    loop_control_activity_id,
+    loop_index_chain,
+)
+
+# Dedicated Temporal patch for iteration-aware sub-workflow child identity. A
+# dedicated id (not the loop-iteration patch) ensures existing in-flight
+# sub-workflow executions replay with their original activity scheduling even
+# when they already marked the loop-iteration patch via a loop or approval.
+_SUBWORKFLOW_ITERATION_IDS_PATCH = "subworkflow-iteration-unique-ids"
+_SUBWORKFLOW_COMPLETED_WITH_ERRORS_PATCH = "subworkflow-completed-with-errors-success"
 
 # Trigger types allowed for dynamic dispatch via Temporal activities.
 # Each entry must have a corresponding @activity.defn with a matching name.
@@ -176,12 +189,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         self._project_id: str = ""
         self._created_by_user_id: str = ""
+        self._sub_workflow_depth: int = 0
         if workflow_metadata:
             for ns_key, ns_data in workflow_metadata.items():
                 self.resolver.set_namespace(ns_key, ns_data)
             wf_ctx = workflow_metadata.get("workflow_context", {})
             self._project_id = wf_ctx.get("workflow", {}).get("project_id", "")
             self._created_by_user_id = wf_ctx.get("execution", {}).get("created_by_user_id", "")
+            depth = workflow_metadata.get("sub_workflow_depth", 0)
+            self._sub_workflow_depth = depth if isinstance(depth, int) else 0
 
         self.node_inputs: dict[str, dict[str, Any]] = {}
         self.node_control_data: dict[str, dict[str, Any]] = {}
@@ -198,6 +214,10 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self._secret_values: set[str] = set()
         self._has_unhandled_failure: bool = False
         self._cancelled_node: str | None = None
+        # Sub-workflow nodes whose child was cancelled: cancelled *steps* that stay in
+        # failed_nodes for flow-control but are surfaced as CANCELLED (not FAILED) and do
+        # not cancel the whole parent run (unlike _cancelled_node).
+        self._cancelled_step_nodes: set[str] = set()
         self._runtime_settings = {}  # populated by run() after settings fetch
         self.pre_resolved_outputs: dict[str, dict[str, Any]] = pre_resolved_outputs or {}
         self.stop_after_nodes: set[str] = set(stop_after_nodes) if stop_after_nodes else set()
@@ -373,6 +393,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         app_error = self._extract_application_error(error)
         error_message = self._resolve_failure_message(node_id, error, app_error, graph)
         is_cancellation = app_error is not None and app_error.type == "InvocationCancelledError"
+        is_cancelled_step = app_error is not None and app_error.type == "SubWorkflowCancelledError"
 
         namespace_entry = self._extract_failure_output(node_id, app_error, graph)
 
@@ -392,8 +413,16 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             workflow.logger.info(f"Node {node_id} cancelled: {error_message}")
         else:
             self.failed_nodes[node_id] = error_message
-            namespace_entry["status"] = "failed"
-            workflow.logger.error(f"Node {node_id} failed: {error_message}")
+            if is_cancelled_step:
+                # Cancelled sub-workflow step: stays in failed_nodes for flow-control
+                # (continue_on_failure, downstream skip, converge, run-status) but is
+                # surfaced CANCELLED, not FAILED, and does NOT set self._cancelled_node.
+                self._cancelled_step_nodes.add(node_id)
+                namespace_entry["status"] = "cancelled"
+                workflow.logger.info(f"Node {node_id} sub-workflow cancelled: {error_message}")
+            else:
+                namespace_entry["status"] = "failed"
+                workflow.logger.error(f"Node {node_id} failed: {error_message}")
         namespace_entry["error"] = error_message
 
         self.resolver.set_namespace(node_id, namespace_entry)
@@ -628,7 +657,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 {k: self._scrub_data(v) for k, v in self.node_inputs.items()} if include_node_results else {}
             ),
             "completed_activities": list(node_outputs.keys()),
-            "failed_activities": self.failed_nodes,
+            "completed_nodes": self._completed_node_ids(),
+            # Mirror the two queries so the completion payload (the finalizer's
+            # fallback when get_failed_nodes / get_cancelled_step_nodes time out)
+            # agrees with them: cancelled steps are excluded from failed_activities
+            # and reported under cancelled_activities, so a query-failure fallback
+            # never persists a cancelled step as FAILED.
+            "failed_activities": self.get_failed_nodes(),
+            "cancelled_activities": self.get_cancelled_step_nodes(),
         }
 
     async def _schedule_successors(
@@ -1682,7 +1718,167 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if node_type == NodeType.LOOP:
             return await self._execute_loop_node(node_id, node, resolved_parameters, timeout_seconds=timeout_seconds)
 
-        return {"output": {"status": "skipped", "reason": f"Unsupported node type: {node_type}"}}
+        if node_type == NodeType.SUB_WORKFLOW:
+            result = await self._execute_sub_workflow_node(node, resolved_parameters)
+        else:
+            result = {"output": {"status": "skipped", "reason": f"Unsupported node type: {node_type}"}}
+        return result
+
+    async def _execute_sub_workflow_node(
+        self,
+        node: ActivityNode,
+        resolved_parameters: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Execute a sub-workflow node via Reference Mode.
+
+        Calls the setup activity to resolve and prepare the child execution,
+        then starts the child OrchestratorWorkflow via execute_child_workflow.
+        """
+        # Iteration-aware invocation identity: the canvas node id plus one
+        # _iter_{n} suffix per enclosing loop, so a sub_workflow node inside a
+        # for_each derives a distinct child per iteration; outside a loop it is
+        # exactly node.id. The whole scheduling change is gated behind a
+        # dedicated patch so existing in-flight executions replay with their
+        # original (pre-change) activity id and args.
+        if workflow.patched(_SUBWORKFLOW_ITERATION_IDS_PATCH):
+            invocation_node_id = join_loop_iteration_id(
+                node.id, loop_index_chain(node.id, self.loop_body_map, self.node_control_data)
+            )
+            setup_args: list[Any] = [
+                resolved_parameters,
+                self.execution_id,
+                node.id,
+                self._created_by_user_id,
+                self._sub_workflow_depth,
+                invocation_node_id,
+            ]
+            setup_activity_id = f"__internal__setup_sub_workflow_{invocation_node_id}"
+        else:
+            setup_args = [
+                resolved_parameters,
+                self.execution_id,
+                node.id,
+                self._created_by_user_id,
+                self._sub_workflow_depth,
+            ]
+            setup_activity_id = f"__internal__setup_sub_workflow_{node.id}"
+
+        setup_result: dict[str, Any] = cast(
+            "dict[str, Any]",
+            await workflow.execute_activity(
+                ActivityName.SUB_WORKFLOW,
+                args=setup_args,
+                activity_id=setup_activity_id,
+                start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                retry_policy=RetryPolicy(maximum_attempts=3),
+            ),
+        )
+
+        try:
+            child_result = await workflow.execute_child_workflow(
+                "orchestrator_workflow",
+                args=[
+                    setup_result["workflow_definition"],
+                    setup_result["execution_id"],
+                    setup_result["trigger_node_id"],
+                    setup_result["input_data"],
+                    False,
+                    None,
+                    None,
+                    None,
+                    setup_result["workflow_metadata"],
+                ],
+                id=setup_result["temporal_workflow_id"],
+                task_queue=setup_result["task_queue"],
+                parent_close_policy=ParentClosePolicy.REQUEST_CANCEL,
+            )
+        except ChildWorkflowError as exc:
+            err_status, reason = self._classify_child_workflow_failure(exc)
+            output = self._build_sub_workflow_output(setup_result, err_status)
+            output["ErrorMessage"] = f"Sub-workflow {reason}"
+            msg = f"Sub-workflow {reason}"
+            # A cancelled child is a cancelled *step* (shown cancelled, not retried,
+            # continue_on_failure still applies) that must not cancel the whole parent
+            # run; _handle_node_failure routes SubWorkflowCancelledError accordingly.
+            error_type = "SubWorkflowCancelledError" if err_status == "cancelled" else "SubWorkflowFailedError"
+            raise ApplicationError(msg, {"output": output}, type=error_type, non_retryable=True) from exc
+
+        valid_child_statuses = {"completed", "completed_with_errors", "failed", "cancelled"}
+        raw_status = child_result.get("status") if isinstance(child_result, dict) else None
+        child_status: str | None = raw_status if raw_status in valid_child_statuses else None
+        # A ``completed_with_errors`` child has finished (its own continue_on_failure
+        # nodes absorbed their failures), so the parent step succeeds. Gated behind a
+        # Temporal patch so in-flight executions keep the pre-patch raise on replay.
+        if workflow.patched(_SUBWORKFLOW_COMPLETED_WITH_ERRORS_PATCH):
+            is_success = child_status in {"completed", "completed_with_errors"}
+        else:
+            is_success = child_status == "completed"
+        status_detail = child_status or "returned unexpected status"
+        output = self._build_sub_workflow_output(setup_result, child_status)
+        if is_success:
+            output["StatusCode"] = 0
+            output["StatusMessage"] = (
+                "Sub-workflow completed with errors"
+                if child_status == "completed_with_errors"
+                else "Sub-workflow completed successfully"
+            )
+            output["ErrorMessage"] = None
+
+        if not is_success:
+            msg = f"Sub-workflow {status_detail}"
+            if child_status == "failed" and isinstance(child_result, dict):
+                # Surface one failing child step + message. ``failed_activities`` is a
+                # dict keyed by node id; its order is not guaranteed to be chronological,
+                # so this reports "a" failing step, not "the first" one.
+                failed = child_result.get("failed_activities") or {}
+                if failed:
+                    step_id = next(iter(failed))
+                    detail = f"child step '{step_id}' failed: {failed[step_id]}"
+                    output["ErrorMessage"] = f"{output['ErrorMessage']} — {detail}"[:10000]
+                    msg = f"{msg} — {detail}"
+            # A child that returns status "cancelled" is a cancelled *step*, same as a
+            # Temporal-cancelled child (see the ChildWorkflowError path); surface it as
+            # cancelled, not failed, so it is not stored FAILED.
+            error_type = "SubWorkflowCancelledError" if child_status == "cancelled" else "SubWorkflowFailedError"
+            raise ApplicationError(msg, {"output": output}, type=error_type, non_retryable=True)
+
+        return {"output": output}
+
+    @staticmethod
+    def _classify_child_workflow_failure(exc: ChildWorkflowError) -> tuple[str, str]:
+        """Map a ChildWorkflowError cause to ``(child_status, reason)``.
+
+        ``child_status`` stays within the published ``child_status`` enum
+        (``completed``/``completed_with_errors``/``failed``/``cancelled``); a
+        timeout or termination is a parent-step ``failed`` while ``reason``
+        preserves the specific Temporal cause for the ``ErrorMessage``.
+        """
+        cause = exc.cause
+        if isinstance(cause, TemporalCancelledError):
+            return "cancelled", "cancelled"
+        if isinstance(cause, TemporalTimeoutError):
+            return "failed", "timed out"
+        if isinstance(cause, TerminatedError):
+            return "failed", "terminated"
+        return "failed", "failed"
+
+    @staticmethod
+    def _build_sub_workflow_output(setup_result: dict[str, Any], child_status: str | None) -> dict[str, Any]:
+        """Build the M1 output dict from setup metadata and child status."""
+        status_detail = child_status or "returned unexpected status"
+        return {
+            "Result": {
+                "child_execution_id": setup_result["execution_id"],
+                "child_workflow_id": setup_result.get("child_workflow_id"),
+                "child_workflow_name": setup_result.get("child_workflow_name"),
+                "child_workflow_version": setup_result.get("child_workflow_version"),
+                "child_status": child_status,
+                "outputs": None,
+            },
+            "StatusCode": 1,
+            "StatusMessage": f"Sub-workflow {status_detail}",
+            "ErrorMessage": f"Sub-workflow {status_detail}",
+        }
 
     def _process_node_result(self, node: ActivityNode, result: dict[str, Any]) -> dict[str, Any]:
         """Extract control data and output from an activity result."""
@@ -1791,6 +1987,38 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         """
         return list(self.skipped_nodes)
 
+    def _completed_node_ids(self) -> list[str]:
+        """Node IDs whose namespace is marked ``status == "completed"``.
+
+        This positive completion marker is set only on successful node
+        completion (``_process_completed_task``). Failed nodes carry
+        ``status == "failed"`` and skipped/disabled nodes have an empty
+        namespace, so both are excluded without inferring completion from the
+        absence of other states. Used by the ``get_completed_nodes`` query and
+        surfaced in the completion result as ``completed_nodes`` so the activity
+        finalizer has an authoritative source even if the query fails.
+        """
+        return [
+            node_id
+            for node_id, namespace in self.resolver.get_all_namespaces().items()
+            if isinstance(namespace, dict) and namespace.get("status") == "completed"
+        ]
+
+    @workflow.query
+    def get_completed_nodes(self) -> list[str]:
+        """Query to get node IDs that completed successfully.
+
+        Consumed by ActivitySyncService when finalizing an execution to mark
+        sub-workflow activity rows COMPLETED: a sub-workflow node executes via
+        an internal setup activity plus a child workflow, so no
+        ACTIVITY_TASK_COMPLETED event ever reaches its per-node activity row.
+
+        Returns:
+            List of node IDs whose namespace is marked completed.
+
+        """
+        return self._completed_node_ids()
+
     @workflow.query
     def get_detached_nodes(self) -> list[str]:
         """Query to get list of detached node IDs.
@@ -1829,4 +2057,21 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             Dict mapping node ID to error message
 
         """
-        return dict(self.failed_nodes)
+        return {node_id: msg for node_id, msg in self.failed_nodes.items() if node_id not in self._cancelled_step_nodes}
+
+    @workflow.query
+    def get_cancelled_step_nodes(self) -> dict[str, str]:
+        """Query cancelled sub-workflow step node IDs and their messages.
+
+        Consumed by ActivitySyncService to sync these nodes to ActivityStatus.CANCELLED
+        (mirroring get_detached_nodes). A cancelled child sub-workflow is a cancelled
+        *step*: it stays in failed_nodes for flow-control but is reported here and
+        excluded from get_failed_nodes, so it is persisted CANCELLED rather than FAILED.
+
+        Returns:
+            Dict mapping cancelled step node ID to its message.
+
+        """
+        return {
+            node_id: self.failed_nodes.get(node_id, "Sub-workflow cancelled") for node_id in self._cancelled_step_nodes
+        }

@@ -46,6 +46,11 @@ export type SynPageHeaderProps = Readonly<{
   /** Optional project selector after the title row. Ignored when `titleSlot` is set. */
   projectSelector?: ReactNode
   /**
+   * Optional content rendered on its own row directly below the title row — secondary
+   * context grouped with the title (e.g. a parent-run link). Ignored when `titleSlot` is set.
+   */
+  titleSubRow?: ReactNode
+  /**
    * Replaces the composed title row (including the default `Title`). Use when the header cannot be
    * expressed as plain text plus optional leading/addons (e.g. editable workflow name in the builder).
    */
@@ -75,7 +80,7 @@ function renderTitleRegion(props: SynPageHeaderProps): ReactNode {
     return props.titleSlot
   }
 
-  const { title, docLink, titleLeading, titleAddons, projectSelector, titleProps } = props
+  const { title, docLink, titleLeading, titleAddons, projectSelector, titleSubRow, titleProps } = props
 
   const useCompositeRow =
     isRenderableSlot(titleLeading) ||
@@ -83,15 +88,11 @@ function renderTitleRegion(props: SynPageHeaderProps): ReactNode {
     isRenderableSlot(projectSelector) ||
     docLink !== undefined
 
-  if (!useCompositeRow) {
-    return (
-      <Title headingLevel="h1" {...titleProps}>
-        {title}
-      </Title>
-    )
-  }
-
-  return (
+  const titleRow = !useCompositeRow ? (
+    <Title headingLevel="h1" {...titleProps}>
+      {title}
+    </Title>
+  ) : (
     <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapMd' }} flexWrap={{ default: 'wrap' }}>
       {isRenderableSlot(titleLeading) && (
         <FlexItem style={{ display: 'flex', alignItems: 'center' }}>{titleLeading}</FlexItem>
@@ -109,6 +110,17 @@ function renderTitleRegion(props: SynPageHeaderProps): ReactNode {
       {isRenderableSlot(titleAddons) ? titleAddons : null}
       {isRenderableSlot(projectSelector) && <FlexItem>{projectSelector}</FlexItem>}
     </Flex>
+  )
+
+  if (!isRenderableSlot(titleSubRow)) {
+    return titleRow
+  }
+
+  return (
+    <Stack className={styles.titleStack}>
+      <StackItem>{titleRow}</StackItem>
+      <StackItem>{titleSubRow}</StackItem>
+    </Stack>
   )
 }
 

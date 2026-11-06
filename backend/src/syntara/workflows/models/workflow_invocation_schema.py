@@ -1,5 +1,6 @@
 """Response models for sub-workflow invocation schema discovery."""
 
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -20,5 +21,7 @@ class WorkflowInvocationSchemaRead(SQLModel):
     workflow_id: UUID
     published_version_id: UUID
     published_version: int
+    published_version_name: str | None = None
+    published_version_created_at: datetime | None = None
     is_eligible: bool
     triggers: list[WorkflowInvocationTriggerSchema]

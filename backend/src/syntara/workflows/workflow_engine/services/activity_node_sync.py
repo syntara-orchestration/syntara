@@ -145,6 +145,58 @@ class ActivityNodeSyncMixin:
                 execution_id=metadata.execution_id,
             )
 
+    async def _sync_cancelled_step_nodes(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+    ) -> dict[str, str] | None:
+        """Query cancelled sub-workflow step nodes and mark them CANCELLED in the database.
+
+        A cancelled child sub-workflow is a cancelled *step*: it stays in the workflow's
+        failed_nodes for flow-control but is excluded from get_failed_nodes, so without
+        this it would be left non-terminal and _finalize_non_terminal_activities would
+        label it SKIPPED. Writing CANCELLED first wins that race; the finalizer's
+        terminal-status guard then leaves the record untouched (mirrors _sync_detached_nodes).
+
+        Returns:
+            Map of cancelled node ID to message, or ``None`` when the query fails,
+            so the caller can fall back to the completion payload (mirrors
+            _sync_failed_nodes).
+
+        """
+        try:
+            cancelled_node_map: dict[str, str] = await handle.query("get_cancelled_step_nodes")
+        except Exception:
+            logger.exception(
+                "Error querying cancelled step nodes",
+                execution_id=metadata.execution_id,
+            )
+            return None
+
+        await self._sync_cancelled_step_fallback(metadata, cancelled_node_map)
+        return cancelled_node_map
+
+    async def _sync_cancelled_step_fallback(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        cancelled_node_map: dict[str, str],
+    ) -> None:
+        """Mark the given cancelled step nodes CANCELLED (query path and payload fallback share this)."""
+        if not cancelled_node_map:
+            return
+        try:
+            await self._sync_nodes_to_terminal_status(
+                metadata,
+                node_ids=list(cancelled_node_map.keys()),
+                target_status=ActivityStatus.CANCELLED,
+                error_map=cancelled_node_map,
+            )
+        except Exception:
+            logger.exception(
+                "Error syncing cancelled step nodes to cancelled status",
+                execution_id=metadata.execution_id,
+            )
+
     async def _ensure_activity_records_exist(
         self,
         metadata: ExecutionMonitorMetadata,
@@ -235,6 +287,39 @@ class ActivityNodeSyncMixin:
             return None
         else:
             return failed_node_map
+
+    async def _query_completed_nodes(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+    ) -> set[str] | None:
+        """Query the workflow for node IDs that completed successfully (read-only).
+
+        A sub-workflow node executes via an internal setup activity plus a child
+        workflow, so no ACTIVITY_TASK_COMPLETED event reaches its per-node
+        activity row; the row stays PENDING until finalization. This query lets
+        the finalizer mark such rows COMPLETED instead of SKIPPED.
+
+        Unlike ``_sync_failed_nodes`` this performs no database write: the
+        completion finalizer applies the FAILED > COMPLETED > SKIPPED precedence.
+
+        Returns:
+            Set of node IDs that completed successfully, or ``None`` when the
+            query fails (distinguishes "no completions" from "query error"). The
+            caller falls back to the completion event payload rather than
+            treating an unavailable query as evidence the node was skipped.
+
+        """
+        try:
+            completed_node_ids: list[str] = await handle.query("get_completed_nodes")
+        except Exception:
+            logger.exception(
+                "Error querying completed nodes; falling back to completion event payload",
+                execution_id=metadata.execution_id,
+            )
+            return None
+        else:
+            return set(completed_node_ids)
 
     async def _sync_nodes_to_terminal_status(
         self,
