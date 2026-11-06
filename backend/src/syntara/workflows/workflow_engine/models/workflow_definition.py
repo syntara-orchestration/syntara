@@ -707,6 +707,13 @@ class AAPJobTemplateExecutorParameters(AAPResourceReferenceMixin, TemplateAwareB
         default=None,
         description="Override instance group by name (requires organization_name for lookup)",
     )
+    use_input_variables: bool | None = Field(
+        default=None,
+        description=(
+            "UI-only marker indicating the 'Use input variables' toggle is enabled in the "
+            "Workflow Builder. Has no effect on execution."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_references(self) -> "AAPJobTemplateExecutorParameters":
