@@ -415,17 +415,17 @@ async def test_create_project_policy_wildcard_eligible(test_db_session: AsyncSes
 
 
 # ---------------------------------------------------------------------------
-# Deny-effect rejection (AAP-74620)
+# Non-step deny rejection preserves recovery permissions (AAP-74620)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_create_deny_policy_rejected(test_db_session: AsyncSession, test_user: User) -> None:
-    """Deny-effect policies are not supported and must be rejected."""
-    from syntara.authz.exceptions import DenyEffectNotSupportedError
+async def test_create_non_step_deny_policy_rejected(test_db_session: AsyncSession, test_user: User) -> None:
+    """Deny-effect policies on recovery and non-step resources must be rejected."""
+    from syntara.authz.exceptions import DenyEffectNotAllowedError
 
     svc = PolicyService(test_db_session, test_user)
-    with pytest.raises(DenyEffectNotSupportedError, match="not supported"):
+    with pytest.raises(DenyEffectNotAllowedError, match="may only target"):
         await svc.create_policy(
             name="deny-workflow-read",
             statements=[{"effect": "deny", "actions": ["workflow:read"], "scope": "any"}],
@@ -433,9 +433,11 @@ async def test_create_deny_policy_rejected(test_db_session: AsyncSession, test_u
 
 
 @pytest.mark.asyncio
-async def test_create_deny_policy_rejected_project_scoped(test_db_session: AsyncSession, test_user: User) -> None:
-    """Project-scoped deny-effect policies are also rejected."""
-    from syntara.authz.exceptions import DenyEffectNotSupportedError
+async def test_create_non_step_deny_policy_rejected_project_scoped(
+    test_db_session: AsyncSession, test_user: User
+) -> None:
+    """Project scoping does not permit a deny on non-step resources."""
+    from syntara.authz.exceptions import DenyEffectNotAllowedError
     from syntara.authz.models.project import Project
 
     project = Project(name="deny-proj-1", labels={})
@@ -444,7 +446,7 @@ async def test_create_deny_policy_rejected_project_scoped(test_db_session: Async
     await test_db_session.refresh(project)
 
     svc = PolicyService(test_db_session, test_user)
-    with pytest.raises(DenyEffectNotSupportedError, match="not supported"):
+    with pytest.raises(DenyEffectNotAllowedError, match="may only target"):
         await svc.create_policy(
             name="deny-wf-read-proj",
             statements=[{"effect": "deny", "actions": ["workflow:read"], "scope": "project"}],
@@ -453,9 +455,9 @@ async def test_create_deny_policy_rejected_project_scoped(test_db_session: Async
 
 
 @pytest.mark.asyncio
-async def test_update_policy_to_deny_rejected(test_db_session: AsyncSession, test_user: User) -> None:
-    """Updating a policy to add deny-effect statements is rejected."""
-    from syntara.authz.exceptions import DenyEffectNotSupportedError
+async def test_update_policy_to_non_step_deny_rejected(test_db_session: AsyncSession, test_user: User) -> None:
+    """Updating a policy cannot introduce a deny on non-step resources."""
+    from syntara.authz.exceptions import DenyEffectNotAllowedError
 
     svc = PolicyService(test_db_session, test_user)
     policy = await svc.create_policy(
@@ -463,7 +465,7 @@ async def test_update_policy_to_deny_rejected(test_db_session: AsyncSession, tes
         statements=[{"effect": "allow", "actions": ["workflow:read"], "scope": "any"}],
     )
 
-    with pytest.raises(DenyEffectNotSupportedError, match="not supported"):
+    with pytest.raises(DenyEffectNotAllowedError, match="may only target"):
         await svc.update_policy(
             policy_id=policy.id,
             statements=[{"effect": "deny", "actions": ["workflow:read"], "scope": "any"}],

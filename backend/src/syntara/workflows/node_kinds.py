@@ -1,9 +1,7 @@
 """Step-type identifiers and labels for authoring policies.
 
-Grantable ``kind`` values on the ``step_type:write`` resource are the
-authoring/palette ``NodeType`` values. System-only types such as
-``internal_activity`` are excluded so they cannot be granted via policy.
-Registration does not enforce permissions on workflow writes.
+Policies may target any non-empty ``kind`` string, including types not yet
+registered. Registration does not enforce permissions on workflow writes.
 """
 
 from typing import Any
@@ -13,11 +11,33 @@ from syntara.workflows.workflow_engine.models.workflow_definition import NodeTyp
 NODE_RESOURCE_TYPE = "step_type"
 NODE_KIND_LABEL = "kind"
 NODE_ACTION_WRITE = "write"
-# System-only node types are not grantable via authoring policies.
+# Keep system-only types out of the current authoring catalog and display labels.
 _NON_GRANTABLE_NODE_KINDS: frozenset[str] = frozenset({NodeType.INTERNAL_ACTIVITY.value})
 NODE_KINDS: frozenset[str] = frozenset(
     node_type.value for node_type in NodeType if node_type.value not in _NON_GRANTABLE_NODE_KINDS
 )
+NODE_KIND_DISPLAY_LABELS: dict[str, str] = {
+    "manual_trigger": "Manual trigger",
+    "scheduled_trigger": "Schedule trigger",
+    "webhook_trigger": "Webhook trigger",
+    "eda_trigger": "Event-Driven Ansible trigger",
+    "condition": "Conditional",
+    "converge": "Converge",
+    "loop": "Loop",
+    "switch": "Switch",
+    "wait": "Wait",
+    "aap_job_template": "AAP Job Template",
+    "aap_workflow_job_template": "AAP Workflow Template",
+    "agentic": "Task Agent",
+    "approval": "Approval",
+    "http_request": "REST API",
+    "script": "Script",
+}
+
+
+def node_kind_display_label(kind: str) -> str:
+    """Human-readable label for a step type; falls back to title-cased kind."""
+    return NODE_KIND_DISPLAY_LABELS.get(kind, kind.replace("_", " ").title())
 
 
 def node_labels(node: dict[str, Any]) -> dict[str, str]:
@@ -37,8 +57,8 @@ def _validate_kind_labels(labels: object, condition: str) -> str | None:
     if NODE_KIND_LABEL not in labels:
         return None
     kind = labels[NODE_KIND_LABEL]
-    if not isinstance(kind, str) or kind not in NODE_KINDS:
-        return f"Unknown step type '{kind}'. Registered step types: {', '.join(sorted(NODE_KINDS))}"
+    if not isinstance(kind, str) or not kind.strip():
+        return "Step type kind must be a non-empty string"
     return None
 
 
