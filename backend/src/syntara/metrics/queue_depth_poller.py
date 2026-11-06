@@ -113,7 +113,8 @@ def _make_poll_callback(
 
         try:
             running_count = await _query_running_workflow_count(client)
-        except RPCError:
+        except RPCError as e:
+            invalidate_on_connection_error(e)
             logger.debug("workflow_count_poller_rpc_error", exc_info=True)
             return
         recorder.record(

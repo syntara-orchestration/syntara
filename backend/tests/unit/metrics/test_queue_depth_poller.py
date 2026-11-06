@@ -215,6 +215,53 @@ class TestPollCallback:
         # Connection error triggers client invalidation so next cycle reconnects.
         mock_invalidate.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_invalidates_client_on_workflow_count_rpc_error(self) -> None:
+        """A connection-level error from count_workflows triggers invalidate_client().
+
+        The workflow-count loop must follow the same invalidation convention
+        as the queue-depth loop above it so a broken shared client is not
+        left cached for the rest of the process.
+        """
+        from temporalio.service import RPCError, RPCStatusCode
+
+        mock_client = MagicMock()
+
+        ok_resp = MagicMock()
+        ok_resp.stats.approximate_backlog_count = 7
+        ok_resp.task_queue_status = None
+        mock_client.workflow_service.describe_task_queue = AsyncMock(return_value=ok_resp)
+        mock_client.count_workflows = AsyncMock(
+            side_effect=RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b""),
+        )
+        mock_recorder = MagicMock()
+
+        with (
+            patch(
+                "syntara.metrics.queue_depth_poller.get_shared_client",
+                new_callable=AsyncMock,
+                return_value=mock_client,
+            ),
+            patch(
+                "syntara.metrics.queue_depth_poller.get_metrics_recorder",
+                return_value=mock_recorder,
+            ),
+            patch(
+                "syntara.core.temporal.client.invalidate_client",
+            ) as mock_invalidate,
+        ):
+            callback = _make_poll_callback(task_queues=["orchestrator-workflow-queue"])
+            await callback(None)
+
+        # Queue depth still recorded; the workflow-count failure only skips
+        # the ACTIVE_WORKFLOWS record.
+        from syntara.metrics.types import MetricType
+
+        recorded = [c.args[0] for c in mock_recorder.record.call_args_list]
+        assert recorded == [MetricType.TEMPORAL_QUEUE_DEPTH]
+        # Connection error triggers client invalidation so next cycle reconnects.
+        mock_invalidate.assert_called_once()
+
 
 class TestGetQueueDepthPoller:
     """Tests for the get_queue_depth_poller factory."""
