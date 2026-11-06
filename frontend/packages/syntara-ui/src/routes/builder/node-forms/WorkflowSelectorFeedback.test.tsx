@@ -60,6 +60,7 @@ describe('WorkflowSelectorFeedback', () => {
   it('tells the user to select a project when eligibility help shows without a project', () => {
     render(<WorkflowSelectorFeedback {...buildProps({ showEligibilityHelp: true, hasProject: false })} />)
     expect(screen.getByText('Select a project to choose a child workflow.')).toBeInTheDocument()
+    expect(screen.queryByText(/enabled, published workflows in this project/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Refresh workflows' })).not.toBeInTheDocument()
   })
 
@@ -68,6 +69,7 @@ describe('WorkflowSelectorFeedback', () => {
       <WorkflowSelectorFeedback {...buildProps({ showEligibilityHelp: true, hasProject: true, hasSearchTerm: true })} />
     )
     expect(screen.getByText('No workflows match your search.')).toBeInTheDocument()
+    expect(screen.getByText(/enabled, published workflows in this project/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Refresh workflows' })).not.toBeInTheDocument()
   })
 
@@ -79,6 +81,7 @@ describe('WorkflowSelectorFeedback', () => {
       />
     )
     expect(screen.getByText('No eligible workflows found.')).toBeInTheDocument()
+    expect(screen.getByText(/enabled, published workflows in this project/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Refresh workflows' }))
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
