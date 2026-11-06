@@ -18,16 +18,14 @@ from syntara_api_client.models.service_account_credential_create import ServiceA
 from syntara_api_client.models.service_account_credential_type import ServiceAccountCredentialType
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
     from syntara_api_client.api import SyntaraApiRegistry
 
 
-def create_sa(api: SyntaraApiRegistry, project_id: UUID, prefix: str = "e2e-sa", **overrides: Any) -> Any:  # noqa: ANN401
+def create_sa(api: SyntaraApiRegistry, prefix: str = "e2e-sa", **overrides: Any) -> Any:  # noqa: ANN401
     """Create a service account and return the parsed response."""
     name = overrides.pop("name", unique_name(prefix))
     resp = api.service_accounts.create(
-        body=ServiceAccountCreate(name=name, project_id=project_id, **overrides),
+        body=ServiceAccountCreate(name=name, **overrides),
     )
     assert resp.status_code == HTTPStatus.CREATED, f"Expected 201, got {resp.status_code}: {resp.content!r}"
     return resp.assert_and_get()
@@ -35,11 +33,10 @@ def create_sa(api: SyntaraApiRegistry, project_id: UUID, prefix: str = "e2e-sa",
 
 def create_sa_with_credential(
     api: SyntaraApiRegistry,
-    project_id: UUID,
 ) -> tuple[Any, str, str]:
     """Create a service account with a credential. Returns (sa, client_id, client_secret)."""
     sa = api.service_accounts.create(
-        body=ServiceAccountCreate(name=unique_name("e2e-sa"), project_id=project_id),
+        body=ServiceAccountCreate(name=unique_name("e2e-sa")),
     ).assert_and_get()
 
     cred = _retry_api_call(

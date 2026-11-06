@@ -53,8 +53,7 @@ const mockServiceAccounts: ServiceAccountRead[] = [
     name: 'deploy-bot',
     description: 'Deployment automation',
     status: 'active',
-    project_id: 'proj-1',
-    project_name: 'default',
+
     last_authenticated_at: '2024-06-15T10:00:00Z',
     created_by: { id: 'u-004', name: 'admin', type: 'user' },
     updated_by: null,
@@ -67,8 +66,7 @@ const mockServiceAccounts: ServiceAccountRead[] = [
     name: 'ci-runner',
     description: null,
     status: 'disabled',
-    project_id: 'proj-1',
-    project_name: 'default',
+
     last_authenticated_at: null,
     created_by: { id: 'u-004', name: 'admin', type: 'user' },
     updated_by: null,
@@ -123,6 +121,8 @@ describe('ServiceAccountsTab', () => {
       canUpdate: true,
       canDelete: true,
       canRotateSecret: true,
+      canEnable: true,
+      canDisable: true,
       isLoading: false,
       isError: false,
       tooltips: { create: '', update: '', delete: '', rotateSecret: '' },
@@ -146,32 +146,10 @@ describe('ServiceAccountsTab', () => {
     render(<ServiceAccountsTab />, { wrapper })
 
     expect(screen.getByRole('columnheader', { name: /name/i })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: /owning project/i })).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: /owning project/i })).not.toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: /created/i })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: /last authenticated/i })).toBeInTheDocument()
     expect(screen.getByRole('columnheader', { name: /state/i })).toBeInTheDocument()
-  })
-
-  it('renders owning project as a link when project exists', () => {
-    render(<ServiceAccountsTab />, { wrapper })
-
-    const links = screen.getAllByRole('link', { name: 'default' })
-    expect(links.length).toBeGreaterThanOrEqual(1)
-    expect(links[0]).toHaveAttribute('href', '/system-administration/access-management/projects/proj-1')
-  })
-
-  it('renders owning project as project ID when project_name is null', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({
-        resources: [{ ...mockServiceAccounts[0], project_name: null }],
-        next_cursor: null,
-      })
-    )
-
-    render(<ServiceAccountsTab />, { wrapper })
-
-    expect(screen.getByText('proj-1')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'proj-1' })).not.toBeInTheDocument()
   })
 
   it('shows Create service account button', () => {
@@ -345,12 +323,14 @@ describe('ServiceAccountsTab', () => {
     expect(screen.getByText(/service accounts provide programmatic access/i)).toBeInTheDocument()
   })
 
-  it('disables toggle switches when canUpdate is false', () => {
+  it('disables toggle switches without management permissions', () => {
     vi.mocked(useServiceAccountPermissions).mockReturnValue({
       canCreate: true,
       canUpdate: false,
       canDelete: true,
       canRotateSecret: true,
+      canEnable: false,
+      canDisable: false,
       isLoading: false,
       isError: false,
       tooltips: { create: '', update: 'Insufficient permissions', delete: '', rotateSecret: '' },
@@ -368,6 +348,8 @@ describe('ServiceAccountsTab', () => {
       canUpdate: true,
       canDelete: true,
       canRotateSecret: true,
+      canEnable: true,
+      canDisable: true,
       isLoading: false,
       isError: false,
       tooltips: { create: 'Insufficient permissions', update: '', delete: '', rotateSecret: '' },
@@ -384,6 +366,8 @@ describe('ServiceAccountsTab', () => {
       canUpdate: true,
       canDelete: false,
       canRotateSecret: true,
+      canEnable: true,
+      canDisable: true,
       isLoading: false,
       isError: false,
       tooltips: { create: '', update: '', delete: 'Insufficient permissions', rotateSecret: '' },
@@ -405,6 +389,8 @@ describe('ServiceAccountsTab', () => {
       canUpdate: false,
       canDelete: true,
       canRotateSecret: true,
+      canEnable: true,
+      canDisable: true,
       isLoading: false,
       isError: false,
       tooltips: { create: '', update: 'Insufficient permissions', delete: '', rotateSecret: '' },

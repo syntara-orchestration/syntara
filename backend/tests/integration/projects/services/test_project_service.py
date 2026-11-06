@@ -800,3 +800,40 @@ async def test_delete_non_builtin_project_succeeds(seeded_db: AsyncSession, test
     await svc.delete_project(project.id)
     with pytest.raises(ProjectNotFoundError):
         await svc.get_project(project.id)
+
+
+@pytest.mark.asyncio
+async def test_project_deletion_preserves_shared_service_account(seeded_db: AsyncSession, test_user: User) -> None:
+    from syntara.service_accounts.models.service_account import ServiceAccount
+    from syntara.service_accounts.models.service_account_credential import (
+        ServiceAccountCredential,
+        ServiceAccountCredentialType,
+    )
+    from syntara.service_accounts.services.service_account_service import ServiceAccountService
+
+    projects = ProjectService(seeded_db, test_user)
+    first = await projects.create_project(name="first-shared-project")
+    second = await projects.create_project(name="second-shared-project")
+    account = await ServiceAccountService(seeded_db, test_user).create_service_account(
+        name="shared-bot", project_id=first.id
+    )
+    credential = ServiceAccountCredential(
+        service_account_id=account.id,
+        created_by=test_user.id,
+        credential_type=ServiceAccountCredentialType.CLIENT_CREDENTIALS,
+        identifier="nx_sa_shared_project_test",
+        hashed_secret="test-hash",  # noqa: S106
+    )
+    seeded_db.add(credential)
+    for project_id in (first.id, second.id):
+        seeded_db.add(RoleAssignment(principal_id=account.id, role_name="project-user", project_id=project_id))
+    seeded_db.add(RoleAssignment(principal_id=account.id, role_name="admin"))
+    await seeded_db.commit()
+    account_id, credential_id, first_id, second_id = account.id, credential.id, first.id, second.id
+    await projects.delete_project(first_id)
+    await seeded_db.refresh(account)
+    assert account.project_id is None
+    assert await seeded_db.get(ServiceAccount, account_id) is not None
+    assert await seeded_db.get(ServiceAccountCredential, credential_id) is not None
+    assignments = (await seeded_db.exec(select(RoleAssignment).where(RoleAssignment.principal_id == account_id))).all()
+    assert {assignment.project_id for assignment in assignments} == {None, second_id}

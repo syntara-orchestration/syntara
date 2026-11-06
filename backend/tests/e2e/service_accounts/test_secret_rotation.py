@@ -51,7 +51,7 @@ class TestSecretRotationGracePeriod:
     ) -> None:
         """During the grace period, both old and new secrets are accepted."""
         sa = syntara_api.service_accounts.create(
-            body=ServiceAccountCreate(name=unique_name("e2e-sa"), project_id=first_project_id),
+            body=ServiceAccountCreate(name=unique_name("e2e-sa")),
         ).assert_and_get()
 
         try:
@@ -95,7 +95,7 @@ class TestSecretRotationGraceExpiry:
     ) -> None:
         """After the grace period, only the new secret works."""
         sa = syntara_api.service_accounts.create(
-            body=ServiceAccountCreate(name=unique_name("e2e-sa"), project_id=first_project_id),
+            body=ServiceAccountCreate(name=unique_name("e2e-sa")),
         ).assert_and_get()
 
         try:

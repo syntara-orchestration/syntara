@@ -5,7 +5,6 @@ from typing import Any, TypeVar, cast
 from uuid import UUID
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
@@ -18,19 +17,16 @@ class ServiceAccountCreate:
 
     Attributes:
         name (str): Human-readable name for the service account
-        project_id (UUID): Project to create the service account in
         description (None | str | Unset): Optional description of the service account's purpose
+        project_id (None | Unset | UUID): Optional creation context; this does not limit the service account's access
     """
 
     name: str
-    project_id: UUID
     description: None | str | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    project_id: None | Unset | UUID = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
-
-        project_id = str(self.project_id)
 
         description: None | str | Unset
         if isinstance(self.description, Unset):
@@ -38,16 +34,25 @@ class ServiceAccountCreate:
         else:
             description = self.description
 
+        project_id: None | str | Unset
+        if isinstance(self.project_id, Unset):
+            project_id = UNSET
+        elif isinstance(self.project_id, UUID):
+            project_id = str(self.project_id)
+        else:
+            project_id = self.project_id
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "name": name,
-                "project_id": project_id,
             }
         )
         if description is not UNSET:
             field_dict["description"] = description
+        if project_id is not UNSET:
+            field_dict["project_id"] = project_id
 
         return field_dict
 
@@ -55,8 +60,6 @@ class ServiceAccountCreate:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
         name = d.pop("name")
-
-        project_id = UUID(d.pop("project_id"))
 
         def _parse_description(data: object) -> None | str | Unset:
             if data is None:
@@ -67,27 +70,27 @@ class ServiceAccountCreate:
 
         description = _parse_description(d.pop("description", UNSET))
 
+        def _parse_project_id(data: object) -> None | Unset | UUID:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                project_id_type_0 = UUID(data)
+
+                return project_id_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UUID, data)
+
+        project_id = _parse_project_id(d.pop("project_id", UNSET))
+
         service_account_create = cls(
             name=name,
-            project_id=project_id,
             description=description,
+            project_id=project_id,
         )
 
-        service_account_create.additional_properties = d
         return service_account_create
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

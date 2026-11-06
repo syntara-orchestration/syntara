@@ -28,11 +28,10 @@ class ServiceAccountRead:
         id (UUID):
         name (str):
         status (ServiceAccountStatus): Operational status of a service account.
-        project_id (UUID):
         created_at (datetime.datetime):
         updated_at (datetime.datetime):
         description (None | str | Unset):
-        project_name (None | str | Unset):
+        project_id (None | Unset | UUID): Project where the service account was created; informational only
         last_authenticated_at (datetime.datetime | None | Unset):
         created_by (None | Unset | UserReference): User who created the service account
         updated_by (None | Unset | UserReference): User who last modified the service account
@@ -42,11 +41,10 @@ class ServiceAccountRead:
     id: UUID
     name: str
     status: ServiceAccountStatus
-    project_id: UUID
     created_at: datetime.datetime
     updated_at: datetime.datetime
     description: None | str | Unset = UNSET
-    project_name: None | str | Unset = UNSET
+    project_id: None | Unset | UUID = UNSET
     last_authenticated_at: datetime.datetime | None | Unset = UNSET
     created_by: None | Unset | UserReference = UNSET
     updated_by: None | Unset | UserReference = UNSET
@@ -62,8 +60,6 @@ class ServiceAccountRead:
 
         status = self.status.value
 
-        project_id = str(self.project_id)
-
         created_at = self.created_at.isoformat()
 
         updated_at = self.updated_at.isoformat()
@@ -74,11 +70,13 @@ class ServiceAccountRead:
         else:
             description = self.description
 
-        project_name: None | str | Unset
-        if isinstance(self.project_name, Unset):
-            project_name = UNSET
+        project_id: None | str | Unset
+        if isinstance(self.project_id, Unset):
+            project_id = UNSET
+        elif isinstance(self.project_id, UUID):
+            project_id = str(self.project_id)
         else:
-            project_name = self.project_name
+            project_id = self.project_id
 
         last_authenticated_at: None | str | Unset
         if isinstance(self.last_authenticated_at, Unset):
@@ -115,15 +113,14 @@ class ServiceAccountRead:
                 "id": id,
                 "name": name,
                 "status": status,
-                "project_id": project_id,
                 "created_at": created_at,
                 "updated_at": updated_at,
             }
         )
         if description is not UNSET:
             field_dict["description"] = description
-        if project_name is not UNSET:
-            field_dict["project_name"] = project_name
+        if project_id is not UNSET:
+            field_dict["project_id"] = project_id
         if last_authenticated_at is not UNSET:
             field_dict["last_authenticated_at"] = last_authenticated_at
         if created_by is not UNSET:
@@ -147,8 +144,6 @@ class ServiceAccountRead:
 
         status = ServiceAccountStatus(d.pop("status"))
 
-        project_id = UUID(d.pop("project_id"))
-
         created_at = isoparse(d.pop("created_at"))
 
         updated_at = isoparse(d.pop("updated_at"))
@@ -162,14 +157,22 @@ class ServiceAccountRead:
 
         description = _parse_description(d.pop("description", UNSET))
 
-        def _parse_project_name(data: object) -> None | str | Unset:
+        def _parse_project_id(data: object) -> None | Unset | UUID:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                project_id_type_0 = UUID(data)
 
-        project_name = _parse_project_name(d.pop("project_name", UNSET))
+                return project_id_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UUID, data)
+
+        project_id = _parse_project_id(d.pop("project_id", UNSET))
 
         def _parse_last_authenticated_at(data: object) -> datetime.datetime | None | Unset:
             if data is None:
@@ -233,11 +236,10 @@ class ServiceAccountRead:
             id=id,
             name=name,
             status=status,
-            project_id=project_id,
             created_at=created_at,
             updated_at=updated_at,
             description=description,
-            project_name=project_name,
+            project_id=project_id,
             last_authenticated_at=last_authenticated_at,
             created_by=created_by,
             updated_by=updated_by,

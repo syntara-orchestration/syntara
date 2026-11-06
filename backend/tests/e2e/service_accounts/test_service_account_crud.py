@@ -42,12 +42,12 @@ class TestCreateServiceAccount:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID
     ) -> None:
         """POST /service_accounts returns 201 with required fields populated."""
-        sa = create_sa(syntara_api, first_project_id, description="E2E test account")
+        sa = create_sa(syntara_api, description="E2E test account")
 
         try:
             assert sa.name.startswith("e2e-sa-")
             assert sa.status == ServiceAccountStatus.ACTIVE
-            assert sa.project_id == first_project_id
+            assert "project_id" not in sa.to_dict()
             assert sa.description == "E2E test account"
             assert sa.created_at is not None
             assert sa.updated_at is not None
@@ -61,7 +61,7 @@ class TestCreateServiceAccount:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID
     ) -> None:
         """POST /service_accounts/{id}/credentials returns identifier (nx_sa_ prefixed) and high-entropy secret."""
-        sa = create_sa(syntara_api, first_project_id)
+        sa = create_sa(syntara_api)
 
         try:
             cred_resp = syntara_api.service_account_credentials.create(
@@ -91,7 +91,7 @@ class TestReadServiceAccount:
 
     def test_get_detail_omits_secret(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """GET /service_accounts/{id} response has no client_secret field."""
-        sa = create_sa(syntara_api, first_project_id)
+        sa = create_sa(syntara_api)
 
         try:
             syntara_api.service_account_credentials.create(
@@ -108,7 +108,7 @@ class TestReadServiceAccount:
 
     def test_list_omits_secret(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """GET /service_accounts list entries have no client_secret field."""
-        sa = create_sa(syntara_api, first_project_id)
+        sa = create_sa(syntara_api)
 
         try:
             syntara_api.service_account_credentials.create(
@@ -127,7 +127,7 @@ class TestReadServiceAccount:
 
     def test_get_credential_omits_secret(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """GET /service_accounts/{id}/credentials/{cred_id} omits client_secret."""
-        sa = create_sa(syntara_api, first_project_id)
+        sa = create_sa(syntara_api)
 
         try:
             cred = syntara_api.service_account_credentials.create(
@@ -152,7 +152,7 @@ class TestUpdateServiceAccount:
 
     def test_update_name_and_description(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """PATCH /service_accounts/{id} updates name and description."""
-        sa = create_sa(syntara_api, first_project_id, description="original")
+        sa = create_sa(syntara_api, description="original")
 
         try:
             new_name = unique_name("e2e-sa-updated")
@@ -174,7 +174,7 @@ class TestUpdateServiceAccount:
 
     def test_update_preserves_credentials(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """PATCH does not alter existing credentials."""
-        sa = create_sa(syntara_api, first_project_id)
+        sa = create_sa(syntara_api)
 
         try:
             cred = syntara_api.service_account_credentials.create(
@@ -205,14 +205,14 @@ class TestDeleteServiceAccount:
 
     def test_delete_returns_204(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """DELETE /service_accounts/{id} returns 204."""
-        sa = create_sa(syntara_api, first_project_id)
+        sa = create_sa(syntara_api)
 
         resp = syntara_api.service_accounts.delete(service_account_id=sa.id)
         assert resp.status_code == HTTPStatus.NO_CONTENT
 
     def test_get_after_delete_returns_404(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """GET /service_accounts/{id} returns 404 after soft-delete."""
-        sa = create_sa(syntara_api, first_project_id)
+        sa = create_sa(syntara_api)
         syntara_api.service_accounts.delete(service_account_id=sa.id)
 
         resp = syntara_api.service_accounts.get(service_account_id=sa.id)
@@ -220,7 +220,7 @@ class TestDeleteServiceAccount:
 
     def test_deleted_excluded_from_list(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
         """Soft-deleted service accounts do not appear in list results."""
-        sa = create_sa(syntara_api, first_project_id)
+        sa = create_sa(syntara_api)
         syntara_api.service_accounts.delete(service_account_id=sa.id)
 
         list_resp = syntara_api.service_accounts.list().assert_and_get()

@@ -365,53 +365,53 @@ def _session_returning_sa_ids(found: list[UUID]) -> AsyncMock:
 
 
 class TestSanitizeWebhookServiceAccounts:
-    """Import sanitizer strips SA IDs that are not in the target project."""
+    """Import sanitizer strips missing SA IDs, independent of projects."""
 
     @pytest.mark.asyncio
-    async def test_strips_all_foreign_ids(self) -> None:
+    async def test_strips_all_missing_ids(self) -> None:
         foreign = str(uuid4())
         definition = _webhook_definition([foreign])
         session = _session_returning_sa_ids([])
-        findings = await _sanitize_webhook_service_accounts(session, definition, uuid4())
+        findings = await _sanitize_webhook_service_accounts(session, definition)
         assert len(findings) == 1
         assert "service account(s)" in findings[0].message
         assert findings[0].node_id == "snow_trigger"
         assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == []
 
     @pytest.mark.asyncio
-    async def test_keeps_project_sa_and_drops_foreign(self) -> None:
-        project_sa = uuid4()
+    async def test_keeps_existing_sa_and_drops_missing(self) -> None:
+        existing_sa = uuid4()
         foreign = str(uuid4())
-        definition = _webhook_definition([foreign, str(project_sa)])
-        session = _session_returning_sa_ids([project_sa])
-        findings = await _sanitize_webhook_service_accounts(session, definition, uuid4())
+        definition = _webhook_definition([foreign, str(existing_sa)])
+        session = _session_returning_sa_ids([existing_sa])
+        findings = await _sanitize_webhook_service_accounts(session, definition)
         assert len(findings) == 1
-        assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == [str(project_sa)]
+        assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == [str(existing_sa)]
 
     @pytest.mark.asyncio
-    async def test_no_op_when_all_in_project(self) -> None:
-        project_sa = uuid4()
-        definition = _webhook_definition([str(project_sa)])
-        session = _session_returning_sa_ids([project_sa])
-        findings = await _sanitize_webhook_service_accounts(session, definition, uuid4())
+    async def test_no_op_when_all_exist(self) -> None:
+        existing_sa = uuid4()
+        definition = _webhook_definition([str(existing_sa)])
+        session = _session_returning_sa_ids([existing_sa])
+        findings = await _sanitize_webhook_service_accounts(session, definition)
         assert findings == []
-        assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == [str(project_sa)]
+        assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == [str(existing_sa)]
 
     @pytest.mark.asyncio
-    async def test_keeps_uppercase_uuid_when_sa_in_project(self) -> None:
-        project_sa = uuid4()
-        definition = _webhook_definition([str(project_sa).upper()])
-        session = _session_returning_sa_ids([project_sa])
-        findings = await _sanitize_webhook_service_accounts(session, definition, uuid4())
+    async def test_keeps_uppercase_uuid_when_sa_exists(self) -> None:
+        existing_sa = uuid4()
+        definition = _webhook_definition([str(existing_sa).upper()])
+        session = _session_returning_sa_ids([existing_sa])
+        findings = await _sanitize_webhook_service_accounts(session, definition)
         assert findings == []
-        assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == [str(project_sa)]
+        assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == [str(existing_sa)]
 
     @pytest.mark.asyncio
-    async def test_eda_trigger_strips_foreign_ids(self) -> None:
+    async def test_eda_trigger_strips_missing_ids(self) -> None:
         foreign = str(uuid4())
         definition = _webhook_definition([foreign], trigger_type="eda_trigger", trigger_id="eda_1")
         session = _session_returning_sa_ids([])
-        findings = await _sanitize_webhook_service_accounts(session, definition, uuid4())
+        findings = await _sanitize_webhook_service_accounts(session, definition)
         assert len(findings) == 1
         assert findings[0].node_id == "eda_1"
         assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == []

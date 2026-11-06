@@ -5,30 +5,24 @@ import {
   ClipboardCopy,
   Form,
   FormGroup,
-  MenuToggle,
   Modal,
   ModalBody,
   ModalFooter,
   ModalHeader,
-  SelectList,
-  SelectOption,
   TextInput,
 } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
-import { type FormEvent, type Ref, useCallback, useMemo, useState } from 'react'
+import { type FormEvent, useCallback, useState } from 'react'
 
 import { tanstackRouter } from '../../../app/tanstackRouter'
 import { SynForm } from '../../../components/forms/SynForm'
-import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
 import { SynTextField } from '../../../components/forms/SynTextField'
-import { SynSelect } from '../../../components/SynSelect'
 import { useSynForm } from '../../../hooks/useSynForm'
 import { useAlerts } from '../../../providers/alerts'
 import { formatExpirationDate } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { accessClient } from '../../access/accessClient'
-import { useSelectableProjects } from '../../access/useAllProjects'
 import { getServiceAccountDetailPath } from '../accessManagementPaths'
 
 import { CredentialExpirationField } from './CredentialExpirationField'
@@ -55,73 +49,6 @@ type CredentialsResult = {
   expiresAt?: string | null
 }
 
-function ProjectSelectToggle({
-  toggleRef,
-  label,
-  isOpen,
-  onToggle,
-  onBlur,
-}: Readonly<{
-  toggleRef: Ref<HTMLButtonElement>
-  label: string
-  isOpen: boolean
-  onToggle: () => void
-  onBlur: () => void
-}>) {
-  return (
-    <MenuToggle ref={toggleRef} onClick={onToggle} onBlur={onBlur} isExpanded={isOpen} isFullWidth>
-      {label}
-    </MenuToggle>
-  )
-}
-
-function ProjectSelect({
-  value,
-  onChange,
-  onBlur,
-  projects,
-}: Readonly<{
-  value: string
-  onChange: (value: string) => void
-  onBlur: () => void
-  projects: ReadonlyArray<{ id: string; name: string }>
-}>) {
-  const [isOpen, setIsOpen] = useState(false)
-  const selectedLabel = projects.find((p) => p.id === value)?.name ?? 'Select a project'
-
-  return (
-    <SynSelect
-      id="sa-project"
-      aria-label="Project"
-      isOpen={isOpen}
-      onOpenChange={setIsOpen}
-      onSelect={(_e, val) => {
-        onChange(String(val))
-        setIsOpen(false)
-      }}
-      selected={value}
-      toggle={(ref) => (
-        <ProjectSelectToggle
-          toggleRef={ref}
-          label={selectedLabel}
-          isOpen={isOpen}
-          onToggle={() => setIsOpen(!isOpen)}
-          onBlur={onBlur}
-        />
-      )}
-      shouldFocusToggleOnSelect
-    >
-      <SelectList>
-        {projects.map((p) => (
-          <SelectOption key={p.id} value={p.id} isSelected={p.id === value}>
-            {p.name}
-          </SelectOption>
-        ))}
-      </SelectList>
-    </SynSelect>
-  )
-}
-
 function CredentialsRevealPhase({
   credentials,
   onClose,
@@ -141,12 +68,12 @@ function CredentialsRevealPhase({
             service account has no permissions yet — assign roles on the Assignments tab to grant access.
           </Alert>
           <FormGroup label="Client ID" fieldId="sa-cred-identifier">
-            <ClipboardCopy isReadOnly hoverTip="Copy" clickTip="Copied">
+            <ClipboardCopy isReadOnly textAriaLabel="Client ID" hoverTip="Copy" clickTip="Copied">
               {credentials.identifier}
             </ClipboardCopy>
           </FormGroup>
           <FormGroup label="Client secret" fieldId="sa-cred-client-secret">
-            <ClipboardCopy isReadOnly hoverTip="Copy" clickTip="Copied">
+            <ClipboardCopy isReadOnly textAriaLabel="Client secret" hoverTip="Copy" clickTip="Copied">
               {credentials.client_secret}
             </ClipboardCopy>
           </FormGroup>
@@ -207,7 +134,6 @@ function useCreateServiceAccountSubmit({
           body: {
             name: formData.name,
             description: formData.description ?? undefined,
-            project_id: formData.project_id,
           },
         },
         {
@@ -269,7 +195,6 @@ function CreateServiceAccountFormPhase({
   onListRefresh: () => void
   maxLifetimeDays?: number
 }>) {
-  const { projects } = useSelectableProjects()
   const {
     value: expiresAt,
     error: dateError,
@@ -280,17 +205,9 @@ function CreateServiceAccountFormPhase({
   } = useCredentialExpirationDate(maxLifetimeDays)
   const { submit, isPending } = useCreateServiceAccountSubmit({ expiresAt, onCreated, onCancel, onListRefresh })
 
-  const projectOptions = useMemo(
-    () =>
-      projects
-        .filter((p): p is typeof p & { id: string } => typeof p.id === 'string')
-        .map((p) => ({ id: p.id, name: p.name })),
-    [projects]
-  )
-
   const form = useSynForm({
     schema: createServiceAccountSchema,
-    defaultValues: { name: '', description: '', project_id: '' },
+    defaultValues: { name: '', description: '' },
     onClose: onCancel,
   })
   const { handleSubmit, handleError, handleClose } = form
@@ -315,22 +232,6 @@ function CreateServiceAccountFormPhase({
       <ModalBody>
         <Form id="create-service-account-form" onSubmit={handleFormSubmit}>
           <SynForm form={form}>
-            <SynFormField
-              name="project_id"
-              label="Project"
-              fieldId="sa-project"
-              isRequired
-              labelHelp={serviceAccountHelp.project}
-            >
-              {({ field }) => (
-                <ProjectSelect
-                  value={field.value as string}
-                  onChange={field.onChange}
-                  onBlur={field.onBlur}
-                  projects={projectOptions}
-                />
-              )}
-            </SynFormField>
             <SynTextField
               name="name"
               label="Name"

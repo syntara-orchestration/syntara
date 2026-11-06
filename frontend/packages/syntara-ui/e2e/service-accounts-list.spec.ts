@@ -61,8 +61,7 @@ async function interceptCreateServiceAccountFlow(app: Page, saName: string) {
             name: saName,
             description: null,
             status: 'active',
-            project_id: MOCK_PROJECT_UUID,
-            project_name: 'default',
+
             last_authenticated_at: null,
             created_by: { id: 'u-001', name: 'alice', type: 'user' },
             updated_by: null,
@@ -136,7 +135,7 @@ test.describe('UI-1: Service Accounts List Page — Columns and Layout', () => {
     await goToServiceAccountsList(app)
 
     await expect(app.getByRole('columnheader', { name: /name/i })).toBeVisible()
-    await expect(app.getByRole('columnheader', { name: /owning project/i })).toBeVisible()
+    await expect(app.getByRole('columnheader', { name: /owning project/i })).toHaveCount(0)
     await expect(app.getByRole('columnheader', { name: /created/i })).toBeVisible()
     await expect(app.getByRole('columnheader', { name: /last authenticated/i })).toBeVisible()
     await expect(app.getByRole('columnheader', { name: /state/i })).toBeVisible()
@@ -162,15 +161,6 @@ test.describe('UI-1: Service Accounts List Page — Columns and Layout', () => {
     const link = app.getByRole('link', { name: activeSA.name })
     await expect(link).toBeVisible()
     await expect(link).toHaveAttribute('href', new RegExp(activeSA.id))
-  })
-
-  test('shows owning project as a link', async ({ app }) => {
-    await goToServiceAccountsList(app)
-    await filterServiceAccountByName(app, prefix)
-
-    const activeRow = app.getByRole('row', { name: new RegExp(activeSA.name) })
-    const projectLink = activeRow.getByRole('link', { name: 'default' })
-    await expect(projectLink).toBeVisible()
   })
 })
 
@@ -231,14 +221,11 @@ test.describe('UI-3: Create Service Account — Form and One-Time Secret Modal',
     await expect(modal).toBeVisible()
 
     // Verify form fields are present
-    await expect(modal.getByRole('button', { name: 'Select a project' })).toBeVisible()
+    await expect(modal.getByRole('button', { name: 'Select a project' })).toHaveCount(0)
     await expect(modal.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
     await expect(modal.getByRole('textbox', { name: 'Description', exact: true })).toBeVisible()
 
-    // Fill form: project first, then name and description
-    // Project Select menu is portaled to document body (PatternFly default)
-    await modal.getByRole('button', { name: 'Select a project' }).click()
-    await app.getByRole('option', { name: 'default', exact: true }).click()
+    // Fill the independent identity fields.
 
     await modal.getByRole('textbox', { name: 'Name', exact: true }).fill(saName)
     await modal.getByRole('textbox', { name: 'Description', exact: true }).fill('E2E test service account')
@@ -277,10 +264,6 @@ test.describe('UI-4: Create Service Account — Validation Errors', () => {
 
     const modal = app.getByRole('dialog')
 
-    // Select a project so only name is missing
-    await modal.getByRole('button', { name: 'Select a project' }).click()
-    await app.getByRole('option', { name: 'default', exact: true }).click()
-
     // Submit without filling name
     await modal.getByRole('button', { name: 'Create service account' }).click()
 
@@ -290,22 +273,18 @@ test.describe('UI-4: Create Service Account — Validation Errors', () => {
     await modal.getByRole('button', { name: 'Cancel' }).click()
   })
 
-  test('shows validation error when project is not selected', async ({ app }) => {
+  test('submits creation from the keyboard without a project', async ({ app }) => {
+    const name = buildUniqueName('sa-keyboard')
+    await interceptCreateServiceAccountFlow(app, name)
     await goToServiceAccountsList(app)
     await app.getByRole('button', { name: 'Create service account' }).click()
-
     const modal = app.getByRole('dialog')
-
-    // Fill name but don't select project
-    await modal.getByRole('textbox', { name: 'Name', exact: true }).fill('valid-name')
-
-    // Submit without selecting project
-    await modal.getByRole('button', { name: 'Create service account' }).click()
-
-    // The error text "Select a project" appears as helper text below the select (distinct from the button text)
-    await expect(modal.getByText('Select a project')).toHaveCount(2)
-
-    await modal.getByRole('button', { name: 'Cancel' }).click()
+    const nameInput = modal.getByRole('textbox', { name: 'Name', exact: true })
+    await nameInput.fill(name)
+    await nameInput.press('Enter')
+    await expect(modal.getByText('Save these credentials now')).toBeVisible()
+    await modal.getByLabel('I have saved the credentials').check()
+    await modal.locator('footer').getByRole('button', { name: 'Close' }).click()
   })
 
   test('shows validation error for invalid name format', async ({ app }) => {
@@ -313,10 +292,6 @@ test.describe('UI-4: Create Service Account — Validation Errors', () => {
     await app.getByRole('button', { name: 'Create service account' }).click()
 
     const modal = app.getByRole('dialog')
-
-    // Select project
-    await modal.getByRole('button', { name: 'Select a project' }).click()
-    await app.getByRole('option', { name: 'default', exact: true }).click()
 
     // Fill name with uppercase characters (invalid)
     await modal.getByRole('textbox', { name: 'Name', exact: true }).fill('Invalid-Name')
@@ -350,8 +325,7 @@ test.describe('UI-13: Create Service Account — Zero-Role Creation Allowed', ()
             name: saName,
             description: null,
             status: 'active',
-            project_id: MOCK_PROJECT_UUID,
-            project_name: 'default',
+
             last_authenticated_at: null,
             created_by: { id: 'u-001', name: 'alice', type: 'user' },
             updated_by: null,
@@ -380,8 +354,6 @@ test.describe('UI-13: Create Service Account — Zero-Role Creation Allowed', ()
     const modal = app.getByRole('dialog')
 
     // Fill only required fields — no role assignment
-    await modal.getByRole('button', { name: 'Select a project' }).click()
-    await app.getByRole('option', { name: 'default', exact: true }).click()
     await modal.getByRole('textbox', { name: 'Name', exact: true }).fill(saName)
 
     // Submit

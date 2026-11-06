@@ -465,7 +465,6 @@ async def test_resolve_effective_policies_service_account_direct_role(seeded_db:
         name=f"sa-{uuid4().hex[:8]}",
         client_id=f"nx_sa_{uuid4().hex[:16]}",
         hashed_secret="$argon2id$v=19$m=65536,t=3,p=4$test",  # noqa: S106
-        project_id=project.id,
         created_by=test_user.id,
     )
     seeded_db.add(sa)

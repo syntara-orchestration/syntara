@@ -283,7 +283,7 @@ export function AssignProjectRoleModal({
 
   const serviceAccountsQuery = accessClient.useQuery(
     'get',
-    '/service_accounts',
+    '/service_accounts/directory',
     {
       params: {
         query: {

@@ -17,12 +17,12 @@ class ServiceAccountNotFoundError(ServiceAccountError):
 
 @fastapi_exception(handler="syntara.service_accounts.error_handlers.service_account_name_conflict_handler")
 class ServiceAccountNameConflictError(ServiceAccountError):
-    """Exception raised when a service account name already exists in the project."""
+    """Exception raised when a service account name already exists."""
 
     def __init__(self, name: str) -> None:
         """Initialize exception with service account name."""
         self.name = name
-        super().__init__(f"Service account with name '{name}' already exists in this project")
+        super().__init__(f"Service account with name '{name}' already exists")
 
 
 @fastapi_exception(handler="syntara.service_accounts.error_handlers.sa_credential_not_found_handler")

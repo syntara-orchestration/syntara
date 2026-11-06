@@ -145,8 +145,7 @@ export function AssignRoleModal({
 }: Readonly<AssignRoleModalProps>) {
   const queryClient = useQueryClient()
   const { showAlert } = useAlerts()
-  const defaultScope =
-    principalType === RolePrincipalType.SERVICE_ACCOUNT ? RoleAssignmentScope.PROJECT : RoleAssignmentScope.SYSTEM
+  const defaultScope = RoleAssignmentScope.SYSTEM
 
   const form = useSynForm({
     schema: assignRoleFormSchema,
@@ -239,23 +238,21 @@ export function AssignRoleModal({
       <ModalBody>
         <Form id="assign-role-form" onSubmit={handleSubmit(onSubmit)}>
           <SynForm form={form}>
-            {principalType !== RolePrincipalType.SERVICE_ACCOUNT && (
-              <SynFormField<AssignRoleFormData, 'scope'> name="scope" label="Scope" fieldId="scope-select" isRequired>
-                {({ field }) => (
-                  <SingleSelect
-                    id="scope-select"
-                    ariaLabel="Scope"
-                    value={field.value}
-                    onChange={(value) => {
-                      field.onChange(value)
-                      setValue('projectId', '', { shouldValidate: true })
-                      setValue('roleIds', [])
-                    }}
-                    options={roleAssignmentScopeOptions}
-                  />
-                )}
-              </SynFormField>
-            )}
+            <SynFormField<AssignRoleFormData, 'scope'> name="scope" label="Scope" fieldId="scope-select" isRequired>
+              {({ field }) => (
+                <SingleSelect
+                  id="scope-select"
+                  ariaLabel="Scope"
+                  value={field.value}
+                  onChange={(value) => {
+                    field.onChange(value)
+                    setValue('projectId', '', { shouldValidate: true })
+                    setValue('roleIds', [], { shouldValidate: true })
+                  }}
+                  options={roleAssignmentScopeOptions}
+                />
+              )}
+            </SynFormField>
             {scope === RoleAssignmentScope.PROJECT && (
               <SynFormField<AssignRoleFormData, 'projectId'>
                 name="projectId"

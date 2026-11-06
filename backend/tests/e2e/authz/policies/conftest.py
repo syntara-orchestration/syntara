@@ -503,12 +503,4 @@ E2E_COVERAGE_EXEMPT: set[str] = {
     "service_account:rotate_secret:any",
     "service_account:disable:any",
     "service_account:enable:any",
-    # Service accounts (project-scoped)
-    "service_account:create:project",
-    "service_account:read:project",
-    "service_account:update:project",
-    "service_account:delete:project",
-    "service_account:rotate_secret:project",
-    "service_account:disable:project",
-    "service_account:enable:project",
 }

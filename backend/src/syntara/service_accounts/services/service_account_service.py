@@ -10,18 +10,21 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.authz.engine import AllowedProjectsResult
 from syntara.authz.models.assignments import RoleAssignment
-from syntara.authz.models.project import Project
-from syntara.core.exceptions import assert_project_id_unchanged
 from syntara.core.models import User
+from syntara.core.queries.project_queries import assert_project_alive
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.service_accounts.exceptions import ServiceAccountNameConflictError, ServiceAccountNotFoundError
 from syntara.service_accounts.models.service_account import ServiceAccount, ServiceAccountStatus
 from syntara.service_accounts.models.service_account_credential import ServiceAccountCredential
-from syntara.service_accounts.schemas import ServiceAccountListResponse, ServiceAccountRead
+from syntara.service_accounts.schemas import (
+    ServiceAccountDirectoryEntry,
+    ServiceAccountDirectoryListResponse,
+    ServiceAccountListResponse,
+    ServiceAccountRead,
+)
 from syntara.settings.cache.settings_cache import get_runtime_settings
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -45,29 +48,33 @@ class ServiceAccountService(UserReferenceResolverMixin, BaseService):
     async def create_service_account(
         self,
         name: str,
-        project_id: UUID,
         *,
         description: str | None = None,
+        project_id: UUID | None = None,
     ) -> ServiceAccount:
         """Create a new service account.
 
         Args:
             name: Human-readable name.
-            project_id: Project to create the service account in.
             description: Optional description.
+            project_id: Optional project where the account was created.
 
         Returns:
             The created ServiceAccount.
 
         Raises:
-            ServiceAccountNameConflictError: If name already exists in the project.
+            ServiceAccountNameConflictError: If name already exists.
+            ProjectNotFoundError: If the optional project context does not exist.
 
         """
+        if project_id is not None:
+            await assert_project_alive(self.session, project_id)
+
         service_account = ServiceAccount(
             name=name,
             description=description,
-            status=ServiceAccountStatus.ACTIVE,
             project_id=project_id,
+            status=ServiceAccountStatus.ACTIVE,
             created_by=self.user.id,
             updated_by=self.user.id,
         )
@@ -87,7 +94,6 @@ class ServiceAccountService(UserReferenceResolverMixin, BaseService):
         logger.info(
             "Service account created",
             service_account_id=str(service_account.id),
-            project_id=str(project_id),
         )
 
         return service_account
@@ -95,29 +101,31 @@ class ServiceAccountService(UserReferenceResolverMixin, BaseService):
     async def to_read(self, service_account: ServiceAccount) -> ServiceAccountRead:
         """Convert a ServiceAccount to a read response (no secret)."""
         read = ServiceAccountRead.model_validate(service_account)
-        project_name = await self._resolve_project_info(service_account.project_id)
-        if project_name:
-            read.project_name = project_name
         await self.resolve_user_references([read])
         return read
 
-    async def _resolve_project_info(self, project_id: UUID) -> str | None:
-        result = await self.session.exec(
-            select(Project.name).where(
-                Project.id == project_id,
-            )
+    async def list_directory(
+        self,
+        limit: int = 20,
+        cursor: str | None = None,
+        sort: str | None = None,
+        query_params_items: Iterable[tuple[str, str]] | None = None,
+        *,
+        include_total: bool = False,
+    ) -> ServiceAccountDirectoryListResponse:
+        """Return identity fields only, using the normal filtering and pagination."""
+        return await self.list_resources(
+            model=ServiceAccount,
+            response_type=ServiceAccountDirectoryListResponse,
+            response_type_converter=lambda account: ServiceAccountDirectoryEntry.model_validate(
+                account, from_attributes=True
+            ),
+            limit=limit,
+            cursor=cursor,
+            sort=sort or "name",
+            query_params_items=query_params_items,
+            include_total=include_total,
         )
-        return result.first()
-
-    async def _resolve_project_infos(self, project_ids: set[UUID]) -> dict[UUID, str]:
-        if not project_ids:
-            return {}
-        result = await self.session.exec(
-            select(Project.id, Project.name).where(
-                Project.id.in_(project_ids),  # type: ignore[attr-defined]
-            )
-        )
-        return dict(result.all())
 
     async def get_service_account(self, service_account_id: UUID) -> ServiceAccount:
         """Get a service account by ID.
@@ -146,7 +154,7 @@ class ServiceAccountService(UserReferenceResolverMixin, BaseService):
         query_params_items: Iterable[tuple[str, str]] | None = None,
         *,
         include_total: bool = False,
-        allowed_projects: AllowedProjectsResult | None = None,
+        id_restriction: list[UUID] | None = None,
     ) -> ServiceAccountListResponse:
         """List service accounts with filtering, sorting, and pagination."""
         response = await self.list_resources(
@@ -157,14 +165,9 @@ class ServiceAccountService(UserReferenceResolverMixin, BaseService):
             sort=sort,
             query_params_items=query_params_items,
             include_total=include_total,
-            allowed_projects=allowed_projects,
+            id_restriction=id_restriction,
         )
-        project_ids = {r.project_id for r in response.resources}
-        project_infos = await self._resolve_project_infos(project_ids)
-        for resource in response.resources:
-            name = project_infos.get(resource.project_id)
-            if name:
-                resource.project_name = name
+        await self.resolve_user_references(response.resources)
         response.max_lifetime_days = await get_runtime_settings().get_int(
             "service_accounts.credential_max_lifetime_days"
         )
@@ -174,7 +177,6 @@ class ServiceAccountService(UserReferenceResolverMixin, BaseService):
         self,
         service_account_id: UUID,
         *,
-        project_id: UUID | None = None,
         name: str | None = None,
         description: str | None = None,
     ) -> ServiceAccount:
@@ -186,8 +188,6 @@ class ServiceAccountService(UserReferenceResolverMixin, BaseService):
 
         """
         service_account = await self.get_service_account(service_account_id)
-
-        assert_project_id_unchanged(service_account.project_id, project_id)
 
         if name is not None:
             service_account.name = name

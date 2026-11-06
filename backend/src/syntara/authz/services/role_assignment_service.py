@@ -526,7 +526,7 @@ class RoleAssignmentService:
         return self._to_dict(assignment, pn, prn, pt)
 
     async def _validate_principal_id(self, principal_id: UUID) -> tuple[str, str]:
-        """Validate that a principal exists and return (name, label)."""
+        """Validate principal existence, returning (name, label)."""
         from syntara.core.models.principal import Principal  # noqa: PLC0415
 
         principal = await self.session.get(Principal, principal_id)
