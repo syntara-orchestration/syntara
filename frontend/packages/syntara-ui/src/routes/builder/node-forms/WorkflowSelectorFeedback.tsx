@@ -2,6 +2,9 @@ import { Alert, Button, HelperText, HelperTextItem } from '@patternfly/react-cor
 
 const ELIGIBILITY_HELP_TEXT_NO_SEARCH = 'No eligible workflows found.'
 const ELIGIBILITY_HELP_TEXT_WITH_SEARCH = 'No workflows match your search.'
+const ELIGIBILITY_GUIDANCE_TEXT =
+  'This picker shows enabled, published workflows in this project with a Sub-workflow Trigger. ' +
+  'To add one, publish a child workflow in this project that has a Sub-workflow Trigger, then refresh.'
 const NO_PROJECT_TEXT = 'Select a project to choose a child workflow.'
 
 export function WorkflowSelectorFeedback({
@@ -51,6 +54,7 @@ export function WorkflowSelectorFeedback({
       {showEligibilityHelp && hasProject && (
         <HelperText>
           <HelperTextItem>{eligibilityHelpText}</HelperTextItem>
+          <HelperTextItem>{ELIGIBILITY_GUIDANCE_TEXT}</HelperTextItem>
         </HelperText>
       )}
       {showEligibilityHelp && hasProject && !hasSearchTerm && (
