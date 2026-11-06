@@ -5,7 +5,7 @@ Covers:
 - Invalid webhook path rejection
 - Optional input_schema field
 - Template expression bypass
-- Required authorized_service_account_ids with min 1 entry
+- Optional authorized_service_account_ids (empty allowed on drafts)
 """
 
 import uuid
@@ -110,16 +110,16 @@ async def test_webhook_path_template_expression_bypass() -> None:
     assert config.webhook_path == "${input.path}"
 
 
-async def test_authorized_service_account_ids_required() -> None:
-    """Creating a webhook without authorized_service_account_ids should fail."""
-    with pytest.raises(ValidationError, match="authorized_service_account_ids"):
-        WebhookTriggerParameters.model_validate({"webhook_path": "test-hook"})
+async def test_authorized_service_account_ids_defaults_when_missing() -> None:
+    """Omitting authorized_service_account_ids should default to an empty list."""
+    config = WebhookTriggerParameters.model_validate({"webhook_path": "test-hook"})
+    assert config.authorized_service_account_ids == []
 
 
-async def test_authorized_service_account_ids_rejects_empty_list() -> None:
-    """An empty authorized_service_account_ids list should be rejected."""
-    with pytest.raises(ValidationError):
-        WebhookTriggerParameters(webhook_path="test-hook", authorized_service_account_ids=[])
+async def test_authorized_service_account_ids_accepts_empty_list() -> None:
+    """An empty authorized_service_account_ids list should be accepted for drafts."""
+    config = WebhookTriggerParameters(webhook_path="test-hook", authorized_service_account_ids=[])
+    assert config.authorized_service_account_ids == []
 
 
 async def test_authorized_service_account_ids_accepts_one() -> None:

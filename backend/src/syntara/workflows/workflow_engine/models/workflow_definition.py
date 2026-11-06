@@ -363,7 +363,7 @@ class APIExecutorParameters(TemplateAwareBaseModel):
     query_params: dict[str, Any] = Field(default_factory=dict)
     credential_id: str | None = Field(
         default=None,
-        description="Orchestrator credential UUID for authentication or Secret URL.",
+        description="Syntara credential UUID for authentication or Secret URL.",
     )
 
     @field_validator("url")
@@ -391,7 +391,7 @@ class IntegrationConnectionConfig(BaseModel):
 
     integration_id: str = Field(description="UUID of the integration")
     credential_id: str = Field(
-        description="Orchestrator credential UUID for execution calls (distinct from management credential)"
+        description="Syntara credential UUID for execution calls (distinct from management credential)"
     )
 
     @field_validator("integration_id", "credential_id")
@@ -412,7 +412,7 @@ class AgenticExecutorParameters(TemplateAwareBaseModel, populate_by_name=True):
     )
     credential_id: str | None = Field(
         default=None,
-        description="Orchestrator credential UUID for LLM provider authentication",
+        description="Syntara credential UUID for LLM provider authentication",
     )
     file_ids: list[str] = Field(
         default_factory=list,
@@ -538,7 +538,7 @@ class AAPResourceReferenceMixin(BaseModel):
     credential_id: str | None = Field(
         default=None,
         description=(
-            "Orchestrator credential UUID for Ansible Automation Platform API authentication. "
+            "Syntara credential UUID for Ansible Automation Platform API authentication. "
             "Separate from legacy credentials list."
         ),
     )
@@ -839,7 +839,7 @@ class WaitNodeParameters(BaseModel):
 class ApprovalNodeParameters(BaseModel):
     """Parameters for approval gate nodes."""
 
-    credential_id: str | None = Field(default=None, description="Orchestrator credential UUID")
+    credential_id: str | None = Field(default=None, description="Syntara credential UUID")
     approver_users: list[str] | None = Field(default=None, max_length=100, description="Usernames who can approve")
     approver_groups: list[str] | None = Field(
         default=None, max_length=50, description="Group names whose members can approve"
@@ -866,7 +866,10 @@ class WebhookTriggerParameters(TemplateAwareBaseModel):
             webhook payloads. If set, requests with non-conforming payloads
             are rejected with 422 Unprocessable Content.
         authorized_service_account_ids: UUIDs of service accounts authorized
-            to invoke this trigger endpoint.
+            to invoke this trigger endpoint. May be empty on unpublished drafts;
+            at least one is required to publish (enforced by the trigger JSON
+            schema). See docs/service-accounts.md for the runtime-safety
+            rationale.
 
     """
 
@@ -881,8 +884,11 @@ class WebhookTriggerParameters(TemplateAwareBaseModel):
         description="Optional JSON Schema (Draft-07) for validating incoming webhook payloads",
     )
     authorized_service_account_ids: list[uuid.UUID] = Field(
-        min_length=1,
-        description="UUIDs of service accounts authorized to invoke this trigger endpoint",
+        default_factory=list,
+        description=(
+            "UUIDs of service accounts authorized to invoke this trigger endpoint. "
+            "May be empty on unpublished drafts; at least one is required to publish."
+        ),
     )
 
     @field_validator("input_schema")

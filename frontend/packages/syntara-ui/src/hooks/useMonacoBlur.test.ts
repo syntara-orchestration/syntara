@@ -102,14 +102,15 @@ describe('useMonacoBlur', () => {
   it('useEffect sets up blur listener when onBlur is added after editor mount', () => {
     const onBlur = vi.fn()
     type Props = { onBlur?: (value: string) => void }
+    const initialProps: Props = { onBlur: undefined }
     const { result, rerender } = renderHook(({ onBlur: ob }: Props) => useMonacoBlur('code', ob), {
-      initialProps: { onBlur: undefined } as Props,
+      initialProps,
     })
     const editor = createMockEditor()
     act(() => {
       result.current.handleEditorDidMount(editor as unknown as MonacoEditor)
     })
-    rerender({ onBlur } as Props)
+    rerender({ onBlur })
     const calls = editor.onDidBlurEditorText.mock.calls as unknown[][]
     const blurCallback = calls[0]?.[0] as (() => void) | undefined
     expect(blurCallback).toBeTypeOf('function')

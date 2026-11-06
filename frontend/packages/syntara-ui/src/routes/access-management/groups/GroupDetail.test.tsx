@@ -10,7 +10,13 @@ import { routerTestState, MockLink } from '../../../test/setup'
 import { accessClient, accessFetchClient } from '../../access/accessClient'
 import { useGroupPermissions } from '../useGroupPermissions'
 
-import { GroupDetail } from './GroupDetail'
+import {
+  GroupDetail,
+  GroupDetailAssignmentsTabRoute,
+  GroupDetailDetailsTabRoute,
+  GroupDetailMembersTabRoute,
+  GroupDetailUnknownTabRoute,
+} from './GroupDetail'
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -38,11 +44,20 @@ const VALID_GROUP_ID = 'g-1234-5678-abcd'
 let mockLocationValue = `/system-administration/access-management/groups/${VALID_GROUP_ID}`
 const mockUseParams = vi.fn(() => ({ groupId: VALID_GROUP_ID }))
 
+function GroupDetailTestOutlet() {
+  const tab = mockLocationValue.split('/').at(-1)
+  if (tab === 'members') return <GroupDetailMembersTabRoute />
+  if (tab === 'roles') return <GroupDetailAssignmentsTabRoute />
+  if (tab === 'unknown') return <GroupDetailUnknownTabRoute />
+  return <GroupDetailDetailsTabRoute />
+}
+
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router')
   return {
     ...actual,
     Link: MockLink,
+    Outlet: GroupDetailTestOutlet,
     useParams: () => mockUseParams(),
     useNavigate: () => routerTestState.navigate,
     useRouterState: (opts?: { select?: (s: { location: { pathname: string; searchStr: string } }) => unknown }) => {
@@ -198,7 +213,7 @@ function mockSuccessQueries(group = mockGroup, members = mockMembersData, roleAs
   vi.mocked(accessClient.useMutation).mockReturnValue({
     mutate: vi.fn(),
     isPending: false,
-  } as never)
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +226,7 @@ describe('GroupDetail', () => {
     routerTestState.navigate.mockClear()
     mockLocationValue = `/system-administration/access-management/groups/${VALID_GROUP_ID}`
     mockUseParams.mockReturnValue({ groupId: VALID_GROUP_ID })
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
     vi.mocked(useGroupPermissions).mockReturnValue({
       canCreate: true,
       canUpdate: true,

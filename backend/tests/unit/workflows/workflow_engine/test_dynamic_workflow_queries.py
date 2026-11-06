@@ -14,7 +14,7 @@ import asyncio
 import copy
 from collections.abc import Generator
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -181,6 +181,35 @@ class TestGetActivityOutputQuery:
         assert wf.get_activity_output("trigger") == {"url": "http://example.com"}
 
 
+# ---------------------------------------------------------------------------
+# Tests: get_activity_output_when_ready update handler
+# ---------------------------------------------------------------------------
+
+
+class TestGetActivityOutputWhenReady:
+    """Test the get_activity_output_when_ready update handler."""
+
+    @pytest.fixture(autouse=True)
+    def _patch_wait_condition(self, _mock_temporal_workflow: MagicMock) -> None:
+        _mock_temporal_workflow.wait_condition = AsyncMock()
+
+    @pytest.mark.asyncio
+    async def test_returns_output_when_namespace_exists(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("node_a", {"status": "ok", "result": 42})
+        output = await wf.get_activity_output_when_ready("node_a")
+        assert output == {"status": "ok", "result": 42}
+
+    @pytest.mark.asyncio
+    async def test_scrubs_credentials_in_output(self) -> None:
+        wf = _make_workflow()
+        wf.resolver.set_namespace("node_a", {"result": "ok", "bearer_token": "secret"})
+        output = await wf.get_activity_output_when_ready("node_a")
+        assert output is not None
+        assert output["bearer_token"] == REDACTED
+        assert output["result"] == "ok"
+
+
 # --- _determine_output_port ---
 
 
@@ -235,6 +264,85 @@ class TestArePredecessorsComplete:
         wf = _make_workflow(skipped_nodes={"node_b"})
         graph = _build_fanin_graph()
         wf.resolver.set_namespace("node_a", {"result": "a"})
+        assert wf._are_predecessors_complete("converge_node", graph) is True
+
+    def test_loop_still_iterating_blocks_converge(self) -> None:
+        """A loop predecessor that last routed to 'iterate' is not complete."""
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("loop_node", {"id": "loop_node", "type": "loop", "parameters": {}})
+        backend.add_node("other_step", {"id": "other_step", "type": "script", "parameters": {}})
+        backend.add_node("converge_node", {"id": "converge_node", "type": "converge", "parameters": {}})
+        backend.add_edge("trigger", "loop_node", None)
+        backend.add_edge("trigger", "other_step", None)
+        backend.add_edge("loop_node", "converge_node", {"from_port": "complete"})
+        backend.add_edge("other_step", "converge_node", None)
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf.resolver.set_namespace("loop_node", {"iteration_count": 0, "status": "completed"})
+        wf.node_control_data["loop_node"] = {"next_port": "iterate"}
+        wf.resolver.set_namespace("other_step", {"result": "done"})
+
+        assert wf._are_predecessors_complete("converge_node", graph) is False
+
+    def test_loop_completed_allows_converge(self) -> None:
+        """A loop predecessor that last routed to 'complete' satisfies the gate."""
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("loop_node", {"id": "loop_node", "type": "loop", "parameters": {}})
+        backend.add_node("other_step", {"id": "other_step", "type": "script", "parameters": {}})
+        backend.add_node("converge_node", {"id": "converge_node", "type": "converge", "parameters": {}})
+        backend.add_edge("trigger", "loop_node", None)
+        backend.add_edge("trigger", "other_step", None)
+        backend.add_edge("loop_node", "converge_node", {"from_port": "complete"})
+        backend.add_edge("other_step", "converge_node", None)
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow()
+        wf.resolver.set_namespace("loop_node", {"iteration_count": 3, "status": "completed"})
+        wf.node_control_data["loop_node"] = {"next_port": "complete"}
+        wf.resolver.set_namespace("other_step", {"result": "done"})
+
+        assert wf._are_predecessors_complete("converge_node", graph) is True
+
+    def test_failed_predecessor_blocks_converge_all(self) -> None:
+        """A failed (non-CoF) predecessor blocks the ALL gate."""
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("loop_node", {"id": "loop_node", "type": "loop", "parameters": {}})
+        backend.add_node("other_step", {"id": "other_step", "type": "script", "parameters": {}})
+        backend.add_node("converge_node", {"id": "converge_node", "type": "converge", "parameters": {}})
+        backend.add_edge("trigger", "loop_node", None)
+        backend.add_edge("trigger", "other_step", None)
+        backend.add_edge("loop_node", "converge_node", {"from_port": "complete"})
+        backend.add_edge("other_step", "converge_node", None)
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow(failed_nodes={"loop_node": "body failed"})
+        wf.resolver.set_namespace("loop_node", {"status": "failed"})
+        wf.resolver.set_namespace("other_step", {"result": "done"})
+
+        assert wf._are_predecessors_complete("converge_node", graph) is False
+
+    def test_cof_failed_predecessor_allows_converge_all(self) -> None:
+        """A CoF-failed predecessor counts as completed for the ALL gate."""
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("loop_node", {"id": "loop_node", "type": "loop", "parameters": {}})
+        backend.add_node("other_step", {"id": "other_step", "type": "script", "parameters": {}})
+        backend.add_node("converge_node", {"id": "converge_node", "type": "converge", "parameters": {}})
+        backend.add_edge("trigger", "loop_node", None)
+        backend.add_edge("trigger", "other_step", None)
+        backend.add_edge("loop_node", "converge_node", {"from_port": "complete"})
+        backend.add_edge("other_step", "converge_node", None)
+        graph = WorkflowGraph(backend)
+
+        wf = _make_workflow(failed_nodes={"loop_node": "body failed"})
+        wf._cof_failed_nodes.add("loop_node")
+        wf.resolver.set_namespace("loop_node", {"status": "failed"})
+        wf.resolver.set_namespace("other_step", {"result": "done"})
+
         assert wf._are_predecessors_complete("converge_node", graph) is True
 
 

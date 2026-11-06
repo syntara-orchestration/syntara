@@ -7,13 +7,14 @@
  * - UI-14: Claim data configuration screen
  */
 import { type Page } from './fixtures'
-import { test, expect } from './fixtures'
+import { test, expect, toAppUrl } from './fixtures'
 import {
   expandGroupMappingAdvanced,
   fillMinimalOidcProviderFields,
   gotoAddOidcProviderWizard,
   gotoClaimMappingWizardStep,
   gotoGroupMappingEdit,
+  identityProviderDetailUrl,
   MINIMAL_OIDC_PROVIDER_CONFIGURATION,
 } from './helpers/identity-providers'
 import { buildUniqueName } from './helpers/workflows'
@@ -21,6 +22,19 @@ import { createIdentityProviderViaApi, deleteIdentityProviderViaApi, findIdentit
 
 const VALID_JMESPATH = "groups[?starts_with(@, 'syntara-')]"
 const INVALID_JMESPATH = '[[[bad'
+
+/**
+ * Narrow the identity providers list to one provider before asserting on its row.
+ *
+ * The table is a single unfiltered page of 20 sorted by `name` ascending, so a
+ * provider created here renders only while fewer than 20 sort before it. Other
+ * specs seed providers in bulk — `pagination.spec.ts` creates 21 in its
+ * `beforeAll` — which under `fullyParallel` silently moves this row to page 2.
+ */
+async function filterProvidersByName(app: Page, providerName: string): Promise<void> {
+  await app.getByPlaceholder('Filter by name').fill(providerName)
+  await app.getByRole('button', { name: 'Apply filter' }).click()
+}
 
 async function createMappingTestProvider(app: Page, namePrefix: string): Promise<string> {
   const provider = await createIdentityProviderViaApi(app, {
@@ -52,6 +66,36 @@ async function selectMappedGroupForRow(app: Page, groupName: string): Promise<vo
   await groupSelect.fill(groupName)
   await app.getByRole('option', { name: new RegExp(`^${groupName}\\b`) }).click()
 }
+
+test.describe('Identity provider — detail tab routes', () => {
+  test('group mapping deep links and browser history select the matching tab', async ({ app }) => {
+    const providerId = await createMappingTestProvider(app, 'e2e-idp-nested-tabs')
+    const groupMappingPath = identityProviderDetailUrl(providerId, 'group-mapping')
+    const detailsPath = identityProviderDetailUrl(providerId, 'details')
+
+    try {
+      await app.goto(toAppUrl(groupMappingPath))
+      const groupMappingTab = app.getByRole('tab', { name: /^Group mapping$/i })
+      await expect(groupMappingTab).toHaveAttribute('aria-selected', 'true')
+      await expect(app.getByRole('button', { name: /Add manually/i })).toBeVisible()
+
+      const detailsTab = app.getByRole('tab', { name: /^Details$/i })
+      await detailsTab.click()
+      await expect(app).toHaveURL(toAppUrl(detailsPath))
+      await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goBack()
+      await expect(app).toHaveURL(toAppUrl(groupMappingPath))
+      await expect(groupMappingTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goForward()
+      await expect(app).toHaveURL(toAppUrl(detailsPath))
+      await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
+    } finally {
+      await deleteIdentityProviderViaApi(app, providerId)
+    }
+  })
+})
 
 test.describe('UI-11: Auto group mapping — configuration screen', () => {
   test('saves auto group extraction expression without manual mapping rows', async ({ app }) => {
@@ -157,6 +201,7 @@ test.describe('UI-13: JMESPath filter — entry and validation error', () => {
         await app.getByRole('button', { name: /Add provider/i }).click()
 
         await expect(app.getByText('Identity provider created')).toBeVisible()
+        await filterProvidersByName(app, providerName)
         await expect(app.getByRole('row', { name: new RegExp(providerName) })).toBeVisible()
 
         const created = await findIdentityProviderByName(app, providerName)
@@ -185,6 +230,7 @@ test.describe('UI-14: Claim data configuration screen', () => {
       await app.getByRole('button', { name: /Add provider/i }).click()
 
       await expect(app.getByText('Identity provider created')).toBeVisible()
+      await filterProvidersByName(app, providerName)
       await expect(app.getByRole('row', { name: new RegExp(providerName) })).toBeVisible()
 
       const created = await findIdentityProviderByName(app, providerName)

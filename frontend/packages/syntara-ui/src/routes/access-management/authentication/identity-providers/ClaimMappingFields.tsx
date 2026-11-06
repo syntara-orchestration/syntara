@@ -1,5 +1,4 @@
 import {
-  FormGroup,
   FormHelperText,
   HelperText,
   HelperTextItem,
@@ -12,8 +11,9 @@ import {
 } from '@patternfly/react-core'
 import { RhUiErrorIcon } from '@patternfly/react-icons'
 import type { ReactElement, Ref } from 'react'
-import { Controller, type Control, type ControllerFieldState, type ControllerRenderProps } from 'react-hook-form'
+import type { ControllerFieldState, ControllerRenderProps } from 'react-hook-form'
 
+import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynSelect } from '../../../../components/SynSelect'
 
 import { type IdentityProviderFormData } from './identityProviderFormSchema'
@@ -23,7 +23,6 @@ import { type ClaimMappingFieldTypeahead, useClaimMappingFieldTypeahead } from '
 const CUSTOM_OPTION = '__custom__'
 
 export type ClaimMappingFieldsProps = {
-  control: Control<IdentityProviderFormData>
   claimsSupported?: string[] | null
   claimAliases?: Record<string, string[]> | null
   isReadOnly?: boolean
@@ -78,13 +77,17 @@ function claimMappingHandleOpenChange(
   claimMappingOnOpenChange(setFilterValue, open)
 }
 
-function claimMappingTypeaheadChange(
-  setFilterValue: (value: string) => void,
-  setIsOpen: (value: boolean) => void,
-  isOpen: boolean,
-  _event: unknown,
+function claimMappingTypeaheadChange({
+  setFilterValue,
+  setIsOpen,
+  isOpen,
+  val,
+}: {
+  setFilterValue: (value: string) => void
+  setIsOpen: (value: boolean) => void
+  isOpen: boolean
   val: string
-): void {
+}): void {
   setFilterValue(val)
   if (!isOpen) setIsOpen(true)
 }
@@ -118,8 +121,8 @@ function ClaimMappingTypeaheadToggle({
     toggleClaimMenuExpanded(setIsOpen)
   }
 
-  function handleMainChange(event: unknown, val: string): void {
-    claimMappingTypeaheadChange(setFilterValue, setIsOpen, isOpen, event, val)
+  function handleMainChange(_event: unknown, val: string): void {
+    claimMappingTypeaheadChange({ setFilterValue, setIsOpen, isOpen, val })
   }
 
   function handleMainClick(): void {
@@ -186,7 +189,6 @@ function ClaimMappingSelectOptions({
 }
 
 type ClaimFieldProps = {
-  control: Control<IdentityProviderFormData>
   name: ClaimMappingFieldName
   label: string
   hint: string
@@ -216,7 +218,7 @@ type ClaimFieldBodyProps = Readonly<{
 }>
 
 function ClaimFieldBody({ meta, controller, typeahead }: ClaimFieldBodyProps) {
-  const { name, label, hint, options, isRequired = true, isReadOnly, labelHelp } = meta
+  const { name, hint, options, isRequired = true, isReadOnly } = meta
   const { field, fieldState } = controller
   const { useCustom, setUseCustom, isOpen, setIsOpen, filterValue, setFilterValue, filteredOptions } = typeahead
 
@@ -234,7 +236,7 @@ function ClaimFieldBody({ meta, controller, typeahead }: ClaimFieldBodyProps) {
   }
 
   return (
-    <FormGroup label={label} fieldId={name} isRequired={isRequired} labelHelp={labelHelp}>
+    <>
       {showDropdown ? (
         <SynSelect
           id={name}
@@ -283,13 +285,12 @@ function ClaimFieldBody({ meta, controller, typeahead }: ClaimFieldBodyProps) {
           </HelperTextItem>
         </HelperText>
       </FormHelperText>
-    </FormGroup>
+    </>
   )
 }
 
 /** One claim row (typeahead or text). Local UI state is owned by `useClaimMappingFieldTypeahead`. */
 function ClaimField({
-  control,
   name,
   label,
   hint,
@@ -301,22 +302,26 @@ function ClaimField({
   const typeahead = useClaimMappingFieldTypeahead(options)
 
   return (
-    <Controller
+    <SynFormField<IdentityProviderFormData, ClaimMappingFieldName>
       name={name}
-      control={control}
-      render={({ field, fieldState }) => (
+      label={label}
+      fieldId={name}
+      isRequired={isRequired}
+      labelHelp={labelHelp}
+      hideFooter
+    >
+      {({ field, fieldState }) => (
         <ClaimFieldBody
           meta={{ name, label, hint, options, isRequired, isReadOnly, labelHelp }}
           controller={{ field, fieldState }}
           typeahead={typeahead}
         />
       )}
-    />
+    </SynFormField>
   )
 }
 
 export function UserClaimMappingFields({
-  control,
   claimsSupported,
   claimAliases,
   isReadOnly,
@@ -324,7 +329,6 @@ export function UserClaimMappingFields({
   return (
     <>
       <ClaimField
-        control={control}
         name="claimMapping.subject"
         label="Subject claim"
         hint="IdP claim for the unique user identifier (e.g. sub)"
@@ -333,7 +337,6 @@ export function UserClaimMappingFields({
         labelHelp={idpHelp.subjectClaim}
       />
       <ClaimField
-        control={control}
         name="claimMapping.email"
         label="Email claim"
         hint="IdP claim for the user email (e.g. email, mail, upn)"
@@ -342,7 +345,6 @@ export function UserClaimMappingFields({
         labelHelp={idpHelp.emailClaim}
       />
       <ClaimField
-        control={control}
         name="claimMapping.username"
         label="Username claim"
         hint="IdP claim for the username (e.g. preferred_username)"
@@ -350,7 +352,6 @@ export function UserClaimMappingFields({
         isReadOnly={isReadOnly}
       />
       <ClaimField
-        control={control}
         name="claimMapping.firstName"
         label="First name claim"
         hint="IdP claim for the first name (e.g. given_name, givenName)"
@@ -358,7 +359,6 @@ export function UserClaimMappingFields({
         isReadOnly={isReadOnly}
       />
       <ClaimField
-        control={control}
         name="claimMapping.lastName"
         label="Last name claim"
         hint="IdP claim for the last name (e.g. family_name, familyName)"

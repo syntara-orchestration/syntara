@@ -3,30 +3,32 @@ import { ActivityTypeEnum, type ApprovalActivity as ApprovalNodeType } from '@sy
 import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynDetailList } from '../../../../components/details/SynDetailList'
+import { SynStep } from '../../../../components/steps/SynStep'
+import { SynStepBody } from '../../../../components/steps/SynStepBody'
 import type { ActivityStatus } from '../../execution/types'
-import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
+import { getStepTypeColor } from '../stepTypeColors'
 
 import { BranchHandle, BranchHandles } from './common/BranchHandle'
 import { renderText } from './common/detailRenderers'
-import { NodeBody } from './common/NodeBody'
-import { NodeComponent } from './common/NodeComponent'
-import { StandardNodeHeader } from './common/StandardNodeHeader'
-import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
-import { nodeMetadata } from './nodeMetadata'
-import { renderNodeIcon } from './renderNodeIcon'
+import { StandardStepHeader } from './common/StandardStepHeader'
+import { StepMenuCategory, useStepMenuActions } from './hooks/useStepMenuActions'
+import { renderStepIcon } from './renderStepIcon'
+import { stepMetadata } from './stepMetadata'
 
 export type ApprovalNode = { type: 'approval' } & Node<ApprovalNodeType>
 
-export function ApprovalNodeComponent(props: NodeProps<ApprovalNode>) {
-  const metadata = nodeMetadata.approval
-  const menuActions = useNodeMenuActions({
+export function ApprovalStepComponent(props: NodeProps<ApprovalNode>) {
+  const metadata = stepMetadata.approval
+  const menuActions = useStepMenuActions({
     nodeId: props.data.id,
-    nodeType: MenuNodeType.ACTIVITY,
+    stepCategory: StepMenuCategory.ACTIVITY,
     disabled: props.data.settings?.disabled ?? false,
   })
 
-  const iconNode = renderNodeIcon(metadata.icon, 'approval', 'canvas', getNodeTypeColor(ActivityTypeEnum.APPROVAL))
+  const iconColor = getStepTypeColor(ActivityTypeEnum.APPROVAL)
+  const iconNode = renderStepIcon(metadata.icon, 'approval', 'header', iconColor)
+  const semanticZoomIcon = renderStepIcon(metadata.icon, 'approval', 'semanticZoom', iconColor)
   const taskExecutor = metadata.label
 
   // Extract execution state if present
@@ -48,14 +50,14 @@ export function ApprovalNodeComponent(props: NodeProps<ApprovalNode>) {
   const approvalConfig = (props.data.parameters ?? {}) as { approver_timeout?: number }
 
   return (
-    <NodeComponent
+    <SynStep
       className={metadata.className}
       nodeProps={props}
       disableSource
       collapsible={false}
       executionState={executionState}
       showExecutionBadge={showExecutionBadge}
-      topBarColor={getNodeTypeColor('approval')}
+      topBarColor={getStepTypeColor('approval')}
       semanticZoomSummary={{
         title: semanticZoomActivityTitle(props.data.name, `Untitled ${taskExecutor}`),
         typeLabel: taskExecutor,
@@ -64,9 +66,12 @@ export function ApprovalNodeComponent(props: NodeProps<ApprovalNode>) {
         { id: 'approved', ariaLabel: 'Approved branch output' },
         { id: 'rejected', ariaLabel: 'Rejected branch output' },
       ]}
+      semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
+      semanticZoomMenuActions={menuActions}
     >
       <>
-        <StandardNodeHeader
+        <StandardStepHeader
           icon={iconNode}
           title={props.data.name ?? 'Untitled Approval'}
           subtitle={taskExecutor}
@@ -75,11 +80,11 @@ export function ApprovalNodeComponent(props: NodeProps<ApprovalNode>) {
         />
         <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapNone' }}>
           <FlexItem grow={{ default: 'grow' }} style={{ minWidth: 0 }}>
-            <NodeBody>
+            <SynStepBody>
               {approvalConfig.approver_timeout != null && (
                 <SynDetailList>{renderText('Timeout', `${approvalConfig.approver_timeout}s`)}</SynDetailList>
               )}
-            </NodeBody>
+            </SynStepBody>
           </FlexItem>
           <div style={{ paddingBottom: 'var(--pf-t--global--spacer--md)' }}>
             <BranchHandles>
@@ -93,6 +98,6 @@ export function ApprovalNodeComponent(props: NodeProps<ApprovalNode>) {
           </div>
         </Flex>
       </>
-    </NodeComponent>
+    </SynStep>
   )
 }

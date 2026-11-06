@@ -26,6 +26,7 @@ from syntara.core.exceptions import SafeValueError, assert_project_id_unchanged
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
@@ -71,7 +72,7 @@ from syntara.workflows.validators import (
 )
 
 if TYPE_CHECKING:
-    from syntara.workflows.models import WorkflowVersionListResponse
+    from syntara.workflows.models import WorkflowVersionListResponse, WorkflowVersionRead
     from syntara.workflows.utils.serialization import VersionPublishTimestamps
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -122,7 +123,7 @@ class WorkflowConvertResourceMixin(ConvertResourceMixin):
         return WorkflowRead.model_validate(resource)
 
 
-class WorkflowService(BaseService):
+class WorkflowService(UserReferenceResolverMixin, BaseService):
     """Service for workflow business logic.
 
     This service encapsulates all workflow-related business operations,
@@ -145,6 +146,7 @@ class WorkflowService(BaseService):
         error_type: str | None = None,
         new_version_created: bool = False,
         change_summary: dict[str, Any] | None = None,
+        user_id: UUID | None = None,
     ) -> None:
         AuditEventDispatcher.dispatch(
             WorkflowLifecycleEvent(
@@ -163,6 +165,7 @@ class WorkflowService(BaseService):
                     workflow_name=workflow_name,
                     version=version,
                     change_summary=change_summary,
+                    user_id=user_id,
                 )
             )
 
@@ -574,8 +577,9 @@ class WorkflowService(BaseService):
             labels: Optional key-value labels
             workflow_definition: V2 workflow definition as dict (triggers + nodes + edges)
             project_id: Project to assign workflow to
-            is_import: When True, missing LLM models are cleared with warnings
-                instead of raising errors (allows import of workflows from other instances)
+            is_import: When True, missing LLM models and webhook/EDA service
+                accounts are cleared with warnings instead of raising errors
+                (allows import of workflows from other instances)
 
         Returns:
             Tuple of (created workflow, initial version, validation result)
@@ -712,6 +716,7 @@ class WorkflowService(BaseService):
             version=version.version,
             project_id=workflow.project_id,
             new_version_created=True,
+            user_id=self.user.id,
         )
 
         return workflow, version, result
@@ -801,7 +806,6 @@ class WorkflowService(BaseService):
         workflow = await self.get_workflow_by_id(workflow_id)
         published_version_id = workflow.published_version_id
 
-        username_map: dict[UUID, str] = {}
         ever_published_ids: set[UUID] = set()
         publish_ts: dict[UUID, VersionPublishTimestamps] = {}
 
@@ -809,23 +813,16 @@ class WorkflowService(BaseService):
             nonlocal ever_published_ids
             if not versions:
                 return
-            user_ids = {v.created_by for v in versions if v.created_by is not None}
-            if user_ids:
-                rows = await self.session.exec(
-                    select(User.id, User.username).where(User.id.in_(user_ids))  # type: ignore[attr-defined]
-                )
-                username_map.update({row[0]: row[1] for row in rows})
-
             version_ids = [v.id for v in versions]
             batch_published, batch_ts = await self.get_publish_context(version_ids)
             ever_published_ids.update(batch_published)
             publish_ts.update(batch_ts)
 
         def convert_version(version: WorkflowVersion) -> WorkflowVersionRead:
+            # created_by is left as a raw id here; BaseService resolves every
+            # declared user-reference field after conversion.
             version_dict = deserialize_workflow_version(version, published_version_id, ever_published_ids, publish_ts)
-            version_read = WorkflowVersionRead.model_validate(version_dict)
-            version_read.created_by_username = username_map.get(version.created_by)
-            return version_read
+            return WorkflowVersionRead.model_validate(version_dict)
 
         merged_params = [("workflow_id", str(workflow_id))]
         if query_params_items:
@@ -842,6 +839,37 @@ class WorkflowService(BaseService):
             query_params_items=merged_params,
             include_total=include_total,
         )
+
+    async def to_version_read(
+        self,
+        version: "WorkflowVersion",
+        published_version_id: UUID | None,
+        ever_published: set[UUID],
+        publish_ts: dict[UUID, "VersionPublishTimestamps"],
+    ) -> "WorkflowVersionRead":
+        """Convert a WorkflowVersion to its response model, with user references resolved.
+
+        Single-version responses are built here rather than in the router so no
+        endpoint can hand back a version whose created_by is still a raw id.
+        """
+        from syntara.workflows.models import WorkflowVersionRead  # noqa: PLC0415
+        from syntara.workflows.utils.serialization import deserialize_workflow_version  # noqa: PLC0415
+
+        read = WorkflowVersionRead.model_validate(
+            deserialize_workflow_version(version, published_version_id, ever_published, publish_ts)
+        )
+        await self.resolve_user_references([read])
+        return read
+
+    async def to_read(self, workflow: Workflow) -> WorkflowRead:
+        """Convert a Workflow to its response model, with user references resolved.
+
+        Every single-workflow response is built here so no endpoint can return a
+        WorkflowRead whose created_by/updated_by are still raw principal ids.
+        """
+        read = WorkflowRead.model_validate(workflow, from_attributes=True)
+        await self.resolve_user_references([read])
+        return read
 
     async def populate_published_version_numbers(self, workflows: list[WorkflowRead]) -> None:
         """Batch-populate published_version_number on WorkflowRead objects."""
@@ -925,12 +953,6 @@ class WorkflowService(BaseService):
         When the workflow is currently published, returns the published version's definition
         rather than the new draft being saved. This preserves live webhook behaviour during
         saves so that in-flight requests are not affected by an unfinished draft.
-
-        Consequence: existing published workflows whose trigger configuration contains an
-        empty ``authorized_service_account_ids`` list cannot be *saved* while published —
-        the sync validates the OLD published JSON and 422s. The repair path is to add a
-        service account to the trigger and then **Publish** the updated definition directly
-        (the Publish flow supplies the new definition inline, bypassing this lookup).
         """
         if workflow.published_version_id is not None:
             pub_result = await self.session.exec(
@@ -1300,6 +1322,7 @@ class WorkflowService(BaseService):
             project_id=workflow.project_id,
             new_version_created=new_version is not None,
             change_summary=change_summary,
+            user_id=self.user.id,
         )
 
         return workflow, current_version, validation_result
@@ -1422,6 +1445,8 @@ class WorkflowService(BaseService):
                     version=target_version.version,
                     workflow_name=workflow.name,
                     project_id=workflow.project_id,
+                    published_version_id=target_version.id,
+                    user_id=self.user.id,
                     error_type=type(exc).__name__,
                 )
             )
@@ -1454,6 +1479,8 @@ class WorkflowService(BaseService):
                 version=target_version.version,
                 workflow_name=workflow.name,
                 project_id=workflow.project_id,
+                published_version_id=target_version.id,
+                user_id=self.user.id,
             )
         )
 
@@ -1621,6 +1648,7 @@ class WorkflowService(BaseService):
             project_id=workflow.project_id,
             new_version_created=True,
             change_summary=restore_change_summary,
+            user_id=self.user.id,
         )
         AuditEventDispatcher.dispatch(
             WorkflowVersionRestoredEvent(

@@ -6,8 +6,8 @@ import {
   RhUiMinusCircleIcon,
   RhUiTrashIcon,
 } from '@patternfly/react-icons'
-import { useNavigate, useParams } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
+import { createContext, use, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsCredentialDetail, breadcrumbsCredentialEarlyShell } from '../../../app/breadcrumbBuilders'
@@ -20,6 +20,7 @@ import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { SynErrorState } from '../../../components/states/SynErrorState'
+import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { useQueryState } from '../../../components/states/useQueryState'
 import type { KebabAction } from '../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
@@ -47,6 +48,68 @@ import { useDisableCredentialState } from './useDisableCredentialState'
 
 type CredentialTab = 'details' | 'workflows' | 'integrations'
 const ALL_CREDENTIAL_TABS: CredentialTab[] = ['details', 'workflows', 'integrations']
+const CREDENTIAL_TAB_PANEL_LABELS: Readonly<Record<CredentialTab, string>> = {
+  details: 'Details',
+  workflows: 'Workflows',
+  integrations: 'Integrations',
+}
+
+type CredentialDetailTabContextValue = {
+  credential: Credential
+  credentialId: string
+  credentialTypeDisplayText: string
+  hasDescription: boolean
+  credInputs: Record<string, unknown>
+  typeFields: FieldDefinition[]
+}
+
+const CredentialDetailTabContext = createContext<CredentialDetailTabContextValue | null>(null)
+
+function useCredentialDetailTabContext() {
+  const context = use(CredentialDetailTabContext)
+  if (!context) throw new Error('Credential detail tab routes must be rendered inside CredentialDetail')
+  return context
+}
+
+export function CredentialDetailsTabRoute() {
+  const { credential, credentialTypeDisplayText, hasDescription, credInputs, typeFields } =
+    useCredentialDetailTabContext()
+
+  return (
+    <Stack hasGutter className={styles.detailsTabContent}>
+      <StackItem>
+        <DescriptionList isHorizontal>
+          <SynDetail label="Name">{credential.name}</SynDetail>
+          {hasDescription ? <SynDetail label="Description">{credential.description}</SynDetail> : null}
+          <SynDetail label="Type">{credentialTypeDisplayText}</SynDetail>
+          <SynDetail label="Workflows">{formatCount(credential.workflow_count)}</SynDetail>
+          <SynDetail label="Integrations">{formatCount(credential.integration_count)}</SynDetail>
+          <SynDetail label="Last modified">
+            <UserTimestamp user={credential.updated_by} timestamp={credential.updated_at} subtleTimestamp={false} />
+          </SynDetail>
+          <SynDetail label="Created">
+            <UserTimestamp user={credential.created_by} timestamp={credential.created_at} subtleTimestamp={false} />
+          </SynDetail>
+          <SynDetail label="State">
+            <EnabledStateLabel enabled={credential.enabled ?? false} />
+          </SynDetail>
+
+          <DynamicCredentialFields typeFields={typeFields} credInputs={credInputs} />
+        </DescriptionList>
+      </StackItem>
+    </Stack>
+  )
+}
+
+export function CredentialWorkflowsTabRoute() {
+  const { credentialId } = useCredentialDetailTabContext()
+  return <CredentialWorkflowsTab credentialId={credentialId} />
+}
+
+export function CredentialIntegrationsTabRoute() {
+  const { credentialId } = useCredentialDetailTabContext()
+  return <CredentialIntegrationsTab credentialId={credentialId} />
+}
 
 function getTypeDisplayText(typeName: string | undefined, typeLoadError: boolean): string {
   if (typeName) return typeName
@@ -90,6 +153,63 @@ function DynamicCredentialFields({ typeFields, credInputs }: Readonly<DynamicFie
   })
 }
 
+type CredentialDetailToolbarProps = {
+  credential: Credential
+  canUpdate: boolean
+  canDelete: boolean
+  isPermissionsLoading: boolean
+  tooltips: { update: string; enable: string; delete: string }
+  onToggleEnabled: () => void
+  onEditClick: () => void
+  onDeleteClick: () => void
+}
+
+function CredentialDetailToolbar({
+  credential,
+  canUpdate,
+  canDelete,
+  isPermissionsLoading,
+  tooltips,
+  onToggleEnabled,
+  onEditClick,
+  onDeleteClick,
+}: Readonly<CredentialDetailToolbarProps>) {
+  const updateDisabled = isPermissionsLoading || !canUpdate
+  const deleteDisabled = isPermissionsLoading || !canDelete
+  const deleteTooltip = isPermissionsLoading || canDelete ? undefined : { content: tooltips.delete }
+
+  const kebabActions: KebabAction[] = [
+    {
+      key: 'delete',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete credential</IconLabel>,
+      isDanger: true,
+      isAriaDisabled: deleteDisabled,
+      tooltipProps: deleteTooltip,
+      onClick: onDeleteClick,
+    },
+  ]
+
+  return (
+    <>
+      <DisabledWithTooltip isDisabled={updateDisabled} content={tooltips.enable}>
+        <Switch
+          id="credential-detail-toggle"
+          label="Enabled"
+          isChecked={credential.enabled}
+          isDisabled={updateDisabled}
+          onChange={onToggleEnabled}
+        />
+      </DisabledWithTooltip>
+      <DisabledWithTooltip isDisabled={updateDisabled} content={tooltips.update}>
+        <Button variant="primary" icon={<RhUiEditIcon />} isAriaDisabled={updateDisabled} onClick={onEditClick}>
+          Edit credential
+        </Button>
+      </DisabledWithTooltip>
+      <SynKebabMenu actions={kebabActions} aria-label="Credential actions" />
+    </>
+  )
+}
+
 function filterTabsByPermission(
   permissionsLoading: boolean,
   canReadWorkflows: boolean,
@@ -100,7 +220,7 @@ function filterTabsByPermission(
   return ALL_CREDENTIAL_TABS.filter((tab) => tabPermissions[tab] ?? true)
 }
 
-// eslint-disable-next-line max-lines-per-function -- detail page with multiple tabs, dialogs, and toolbar actions
+// eslint-disable-next-line max-lines-per-function, complexity -- detail page: early returns for loading/error/access gate + tabs/dialogs/toolbar push both metrics over threshold
 export default function CredentialDetail() {
   const credentialsDocLink = useDocLink('credentials')
   const { credentialId }: { credentialId: string } = useParams({ strict: false })
@@ -113,7 +233,27 @@ export default function CredentialDetail() {
     [canReadWorkflows, canReadIntegrations, permissionsLoading]
   )
   const [editModalOpen, setEditModalOpen] = useState(false)
-  const { canUpdate, canDelete, tooltips } = useCredentialPermissions()
+
+  // Fetch credential before permission checks so project_id is available
+  const credQuery = credentialsClient.useQuery(
+    'get',
+    '/credentials/{credential_id}',
+    { params: { path: { credential_id: credentialId } } },
+    { enabled: !!credentialId }
+  )
+  const credential = credQuery.data
+
+  const {
+    canRead,
+    canUpdate,
+    canDelete,
+    isLoading: isPermissionsLoading,
+    isReadChecking,
+    tooltips,
+  } = useCredentialPermissions({
+    resourceProject: credential?.project_id,
+    enabled: !!credential?.project_id,
+  })
   const {
     credentialToDelete,
     affectedWorkflows: deleteAffectedWorkflows,
@@ -141,15 +281,6 @@ export default function CredentialDetail() {
 
   const { showAlert } = useAlerts()
 
-  // Fetch credential
-  const credQuery = credentialsClient.useQuery(
-    'get',
-    '/credentials/{credential_id}',
-    { params: { path: { credential_id: credentialId } } },
-    { enabled: !!credentialId }
-  )
-  const credential = credQuery.data
-
   // Fetch credential type
   const typeQuery = credentialsClient.useQuery(
     'get',
@@ -166,6 +297,24 @@ export default function CredentialDetail() {
     const inputs = credType.inputs as Record<string, unknown>
     return (inputs?.fields as FieldDefinition[]) ?? []
   }, [credType])
+
+  const credInputs = useMemo(() => credential?.inputs ?? {}, [credential?.inputs])
+  const credentialTypeDisplayText = getTypeDisplayText(credType?.name, typeLoadError)
+  const hasDescription = Boolean(credential?.description?.trim())
+  const tabContextValue = useMemo<CredentialDetailTabContextValue | null>(
+    () =>
+      credential?.id
+        ? {
+            credential,
+            credentialId: credential.id,
+            credentialTypeDisplayText,
+            hasDescription,
+            credInputs,
+            typeFields,
+          }
+        : null,
+    [credential, credentialTypeDisplayText, hasDescription, credInputs, typeFields]
+  )
 
   // Mutations
   const { mutate: patchCredential, isPending: isPatchPending } = credentialsClient.useMutation(
@@ -234,19 +383,6 @@ export default function CredentialDetail() {
     onSettled: closeDeleteDialog,
   })
 
-  const kebabActions: KebabAction[] = [
-    {
-      key: 'delete',
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete credential</IconLabel>,
-      isDanger: true,
-      isAriaDisabled: !canDelete,
-      tooltipProps: canDelete ? undefined : { content: tooltips.delete },
-      onClick: () => {
-        if (credential) openDeleteDialog(credential)
-      },
-    },
-  ]
-
   const queryState = useQueryState(credQuery, {
     title: 'Error loading credential',
     onRetry: () => detachPromise(credQuery.refetch()),
@@ -280,147 +416,131 @@ export default function CredentialDetail() {
 
   if (!credential?.id) return null
 
-  const credInputs = credential.inputs ?? {}
-  const credentialTypeDisplayText = getTypeDisplayText(credType?.name, typeLoadError)
-  const hasDescription = Boolean(credential.description?.trim())
+  if (isReadChecking) {
+    return (
+      <SynPage>
+        <SynPageTitle segments={['Credential', 'Credentials']} />
+        <SynPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            <SynLoadingState />
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
+    )
+  }
+
+  if (!canRead) {
+    return (
+      <SynPage>
+        <SynPageTitle segments={['Credential', 'Credentials']} />
+        <SynPageHeader title="Credential" breadcrumbs={breadcrumbsCredentialEarlyShell('Credential')} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            <SynErrorState title="Access Denied" message={tooltips.read} />
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
+    )
+  }
 
   const credentialCrumbs = breadcrumbsCredentialDetail(credential.name)
 
+  if (!tabContextValue) return null
+
   return (
-    <SynPage>
-      <SynPageTitle segments={[credential.name, 'Credentials']} />
-      <SynPageHeader
-        breadcrumbs={credentialCrumbs}
-        title={credential.name}
-        docLink={credentialsDocLink}
-        toolbar={
-          <>
-            <DisabledWithTooltip isDisabled={!canUpdate} content={tooltips.enable}>
-              <Switch
-                id="credential-detail-toggle"
-                label="Enabled"
-                isChecked={credential.enabled}
-                isDisabled={!canUpdate}
-                onChange={handleToggleEnabled}
-              />
-            </DisabledWithTooltip>
-            <DisabledWithTooltip isDisabled={!canUpdate} content={tooltips.update}>
-              <Button
-                variant="primary"
-                icon={<RhUiEditIcon />}
-                isAriaDisabled={!canUpdate}
-                onClick={() => setEditModalOpen(true)}
-              >
-                Edit credential
-              </Button>
-            </DisabledWithTooltip>
-            <SynKebabMenu actions={kebabActions} aria-label="Credential actions" />
-          </>
-        }
-      />
+    <CredentialDetailTabContext.Provider value={tabContextValue}>
+      <SynPage>
+        <SynPageTitle segments={[credential.name, 'Credentials']} />
+        <SynPageHeader
+          breadcrumbs={credentialCrumbs}
+          title={credential.name}
+          docLink={credentialsDocLink}
+          toolbar={
+            <CredentialDetailToolbar
+              credential={credential}
+              canUpdate={canUpdate}
+              canDelete={canDelete}
+              isPermissionsLoading={isPermissionsLoading}
+              tooltips={tooltips}
+              onToggleEnabled={handleToggleEnabled}
+              onEditClick={() => setEditModalOpen(true)}
+              onDeleteClick={() => openDeleteDialog(credential)}
+            />
+          }
+        />
 
-      <SynPageBody>
-        <SynPanel isFullHeight className={styles.tabsFullHeight}>
-          <SynUrlTabs
-            basePath={credentialBasePath}
-            defaultTab="details"
-            validTabs={validTabs}
-            aria-label="Credential details"
-          >
-            <Tab eventKey="details" title="Details">
-              <Stack hasGutter style={{ padding: 'var(--pf-t--global--spacer--lg)' }}>
-                <StackItem>
-                  <DescriptionList isHorizontal>
-                    <SynDetail label="Name">{credential.name}</SynDetail>
-                    {hasDescription ? <SynDetail label="Description">{credential.description}</SynDetail> : null}
-                    <SynDetail label="Type">{credentialTypeDisplayText}</SynDetail>
-                    <SynDetail label="Workflows">{formatCount(credential.workflow_count)}</SynDetail>
-                    <SynDetail label="Integrations">{formatCount(credential.integration_count)}</SynDetail>
-                    <SynDetail label="Last modified">
-                      <UserTimestamp
-                        user={credential.updated_by}
-                        timestamp={credential.updated_at}
-                        subtleTimestamp={false}
-                      />
-                    </SynDetail>
-                    <SynDetail label="Created">
-                      <UserTimestamp
-                        user={credential.created_by}
-                        timestamp={credential.created_at}
-                        subtleTimestamp={false}
-                      />
-                    </SynDetail>
-                    <SynDetail label="State">
-                      <EnabledStateLabel enabled={credential.enabled ?? false} />
-                    </SynDetail>
+        <SynPageBody>
+          <SynPanel isFullHeight className={styles.tabsFullHeight}>
+            <SynUrlTabs
+              basePath={credentialBasePath}
+              defaultTab="details"
+              validTabs={validTabs}
+              aria-label="Credential details"
+              renderPanel={() => <Outlet />}
+              routePanelLayout="detail"
+              tabPanelLabels={CREDENTIAL_TAB_PANEL_LABELS}
+            >
+              <Tab eventKey="details" title="Details" />
 
-                    <DynamicCredentialFields typeFields={typeFields} credInputs={credInputs} />
-                  </DescriptionList>
-                </StackItem>
-              </Stack>
-            </Tab>
+              {validTabs.includes('workflows') && (
+                <Tab
+                  eventKey="workflows"
+                  title={
+                    <>
+                      Workflows <Badge isRead>{credential.workflow_count ?? 0}</Badge>
+                    </>
+                  }
+                />
+              )}
 
-            {validTabs.includes('workflows') && (
-              <Tab
-                eventKey="workflows"
-                title={
-                  <>
-                    Workflows <Badge isRead>{credential.workflow_count ?? 0}</Badge>
-                  </>
-                }
-              >
-                <CredentialWorkflowsTab credentialId={credential.id} />
-              </Tab>
-            )}
+              {validTabs.includes('integrations') && (
+                <Tab
+                  eventKey="integrations"
+                  title={
+                    <>
+                      Integrations <Badge isRead>{credential.integration_count ?? 0}</Badge>
+                    </>
+                  }
+                />
+              )}
+            </SynUrlTabs>
+          </SynPanel>
+        </SynPageBody>
 
-            {validTabs.includes('integrations') && (
-              <Tab
-                eventKey="integrations"
-                title={
-                  <>
-                    Integrations <Badge isRead>{credential.integration_count ?? 0}</Badge>
-                  </>
-                }
-              >
-                <CredentialIntegrationsTab credentialId={credential.id} />
-              </Tab>
-            )}
-          </SynUrlTabs>
-        </SynPanel>
-      </SynPageBody>
+        <DisableCredentialDialog
+          credential={credentialToDisable}
+          affectedWorkflows={affectedWorkflows}
+          workflowsFetchError={workflowsFetchError}
+          isLoadingWorkflows={disableIsLoadingWorkflows}
+          affectedIntegrations={disableAffectedIntegrations}
+          integrationsFetchError={disableIntegrationsFetchError}
+          isLoadingIntegrations={disableIsLoadingIntegrations}
+          isLoading={isPatchPending}
+          onConfirm={handleConfirmDisable}
+          onClose={closeDisableDialog}
+        />
 
-      <DisableCredentialDialog
-        credential={credentialToDisable}
-        affectedWorkflows={affectedWorkflows}
-        workflowsFetchError={workflowsFetchError}
-        isLoadingWorkflows={disableIsLoadingWorkflows}
-        affectedIntegrations={disableAffectedIntegrations}
-        integrationsFetchError={disableIntegrationsFetchError}
-        isLoadingIntegrations={disableIsLoadingIntegrations}
-        isLoading={isPatchPending}
-        onConfirm={handleConfirmDisable}
-        onClose={closeDisableDialog}
-      />
+        <DeleteCredentialDialog
+          credential={credentialToDelete}
+          affectedWorkflows={deleteAffectedWorkflows}
+          workflowsFetchError={deleteWorkflowsFetchError}
+          isLoadingWorkflows={deleteIsLoadingWorkflows}
+          affectedIntegrations={deleteAffectedIntegrations}
+          integrationsFetchError={deleteIntegrationsFetchError}
+          isLoadingIntegrations={deleteIsLoadingIntegrations}
+          isLoading={isDeletePending}
+          onConfirm={() => handleConfirmDelete(credentialToDelete)}
+          onClose={closeDeleteDialog}
+        />
 
-      <DeleteCredentialDialog
-        credential={credentialToDelete}
-        affectedWorkflows={deleteAffectedWorkflows}
-        workflowsFetchError={deleteWorkflowsFetchError}
-        isLoadingWorkflows={deleteIsLoadingWorkflows}
-        affectedIntegrations={deleteAffectedIntegrations}
-        integrationsFetchError={deleteIntegrationsFetchError}
-        isLoadingIntegrations={deleteIsLoadingIntegrations}
-        isLoading={isDeletePending}
-        onConfirm={() => handleConfirmDelete(credentialToDelete)}
-        onClose={closeDeleteDialog}
-      />
-
-      <CredentialFormModal
-        isOpen={editModalOpen}
-        onClose={() => setEditModalOpen(false)}
-        credentialToEdit={credential}
-        onSuccess={() => detachPromise(credQuery.refetch())}
-      />
-    </SynPage>
+        <CredentialFormModal
+          isOpen={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          credentialToEdit={credential}
+          onSuccess={() => detachPromise(credQuery.refetch())}
+        />
+      </SynPage>
+    </CredentialDetailTabContext.Provider>
   )
 }

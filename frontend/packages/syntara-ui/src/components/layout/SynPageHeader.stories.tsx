@@ -1,5 +1,5 @@
 import { Button, Switch } from '@patternfly/react-core'
-import type { Meta, StoryObj } from '@storybook/react-vite'
+import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { useState } from 'react'
 
 import { SynKebabMenu } from '../SynKebabMenu'
@@ -29,6 +29,31 @@ const kebabActions = [
   { key: 'sep', isSeparator: true },
   { key: 'delete', title: 'Delete', isDanger: true, onClick: () => {} },
 ]
+
+const LONG_DETAIL_TITLE =
+  'production-openshift-cluster-west-2-integration-with-an-unreasonably-long-automation-name-for-layout-regression'
+
+function LongTitleDetailPageHeader() {
+  const [enabled, setEnabled] = useState(true)
+  return (
+    <SynPageHeader
+      title={LONG_DETAIL_TITLE}
+      breadcrumbs={[{ label: 'Integrations', href: '/configuration/integrations' }, { label: LONG_DETAIL_TITLE }]}
+      toolbar={
+        <>
+          <Switch
+            id="long-title-detail-switch"
+            label="Enabled"
+            isChecked={enabled}
+            onChange={(_event, checked) => setEnabled(checked)}
+          />
+          <Button variant="secondary">Edit</Button>
+          <SynKebabMenu aria-label="More actions" actions={kebabActions} />
+        </>
+      }
+    />
+  )
+}
 
 function DetailPageToolbarHeader() {
   const [enabled, setEnabled] = useState(true)
@@ -153,6 +178,19 @@ export const WithKebab: Story = {
   args: {
     toolbar: <SynKebabMenu aria-label="More actions" actions={kebabActions} />,
   },
+}
+
+export const LongTitleDetailPage: Story = {
+  name: 'Detail page — long title + toolbar',
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Regression guard for detail pages: a very long resource name wraps across lines while toolbar controls keep their natural width and stay visible without overlapping.',
+      },
+    },
+  },
+  render: () => <LongTitleDetailPageHeader />,
 }
 
 export const DetailPageToolbar: Story = {

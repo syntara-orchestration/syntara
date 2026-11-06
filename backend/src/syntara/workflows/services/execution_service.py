@@ -24,6 +24,7 @@ from syntara.core.config.base import get_settings
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
@@ -40,7 +41,10 @@ from syntara.workflows.exceptions import (
     WorkflowNotPublishedError,
 )
 from syntara.workflows.json_schema_validation import apply_schema_defaults
-from syntara.workflows.models.activity_execution import ActivityExecution, ActivityExecutionListResponse
+from syntara.workflows.models.activity_execution import (
+    ActivityExecution,
+    ActivityExecutionListResponse,
+)
 from syntara.workflows.models.execution import (
     TERMINAL_EXECUTION_STATUSES,
     ActivityData,
@@ -175,7 +179,7 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
         return result
 
 
-class ExecutionService(BaseService):
+class ExecutionService(UserReferenceResolverMixin, BaseService):
     """Service for execution business logic.
 
     This service encapsulates all execution-related business operations,
@@ -520,7 +524,7 @@ class ExecutionService(BaseService):
             mode=ExecutionMode.STANDARD.value,
         )
 
-        return self.convert_resource_mixin.convert_resource(execution)  # type: ignore[no-any-return]
+        return await self._to_read(execution)
 
     async def create_execution_by_name(
         self,
@@ -847,7 +851,18 @@ class ExecutionService(BaseService):
         # Intentionally omitting total_workflows/active_workflows gauge increments
         # to avoid skewing production metrics with test executions
 
-        return self.convert_resource_mixin.convert_resource(execution)  # type: ignore[no-any-return]
+        return await self._to_read(execution)
+
+    async def _to_read(self, execution: Execution, include: set[ExecutionInclude] | None = None) -> ExecutionRead:
+        """Convert an Execution to its response model, with user references resolved.
+
+        Every ExecutionRead this service hands out is built here, so no endpoint can
+        return one with unresolved created_by/updated_by.
+        """
+        mixin = ExecutionsConvertResourceMixin(include) if include is not None else self.convert_resource_mixin
+        read: ExecutionRead = mixin.convert_resource(execution)
+        await self.resolve_user_references([read])
+        return read
 
     async def get_execution(self, execution_id: UUID, *, include: set[ExecutionInclude] | None = None) -> ExecutionRead:
         """Get an execution by ID.
@@ -883,9 +898,7 @@ class ExecutionService(BaseService):
 
         await self._emit_completion_metrics(execution)
 
-        # We need to use an "include"-aware instance of ExecutionsConvertResourceMixin
-        mixin: ExecutionsConvertResourceMixin = ExecutionsConvertResourceMixin(include)
-        return mixin.convert_resource(execution)
+        return await self._to_read(execution, include if include is not None else set())
 
     async def list_executions(
         self,
@@ -964,12 +977,12 @@ class ExecutionService(BaseService):
         if query_params_items:
             execution_filter.extend(query_params_items)
 
-        # Pass identity converter — the service's default mixin converts to ExecutionRead,
-        # but ActivityExecution is used directly as the response model.
+        # The internal control_data field is excluded from the public model schema
+        # and serialization.
         return await self.list_resources(
             model=ActivityExecution,
             response_type=ActivityExecutionListResponse,
-            response_type_converter=lambda a: a,
+            response_type_converter=lambda activity: activity,
             limit=limit,
             cursor=cursor,
             sort=sort or "-created_at",
@@ -1038,10 +1051,23 @@ class ExecutionService(BaseService):
                 activity_id=activity_id,
                 error=error,
             )
+        elif status == "cancelled":
+            reason = signal_data.get("reason", "Invocation cancelled")
+            msg = f"InvocationCancelledError: {reason}"[:MAX_CALLBACK_ERROR_MSG_LENGTH]
+            error = ApplicationError(
+                msg,
+                type="InvocationCancelledError",
+                non_retryable=True,
+            )
+            await self.temporal_service.fail_async_activity(
+                temporal_workflow_id=execution.temporal_workflow_id,
+                activity_id=activity_id,
+                error=error,
+            )
         else:
-            # Fail-open: any non-"failed" status (including "approved", "rejected",
-            # "completed") completes the activity. The workflow routes based on the
-            # output data (e.g., approval decision), not the Temporal activity state.
+            # Fail-open: any non-"failed"/non-"cancelled" status (including "approved",
+            # "rejected", "completed") completes the activity. The workflow routes based
+            # on the output data (e.g., approval decision), not the Temporal activity state.
             await self.temporal_service.complete_async_activity(
                 temporal_workflow_id=execution.temporal_workflow_id,
                 activity_id=activity_id,
@@ -1109,6 +1135,33 @@ class ExecutionService(BaseService):
                 error_type=type(exc).__name__,
             )
             raise
+
+        # Best-effort: cancel any in-flight agentic invocations linked to
+        # this execution.  Agentic activities use async-completion so the
+        # Temporal cancel above does not reach the running agent process.
+        try:
+            from syntara.agent_orchestrator.services.invocation_service import (  # noqa: PLC0415
+                InvocationService,
+            )
+            from syntara.workflows.services.invocation_cancellation import (  # noqa: PLC0415
+                cancel_invocations_for_execution,
+            )
+
+            # InvocationService owns the rest: it marks each invocation CANCELLED
+            # and cancels the builtin workflow running it.  It is constructed
+            # here rather than inside the bridge module so temporal_service --
+            # this service's dependency -- does not have to travel through a
+            # module that never uses it.
+            await cancel_invocations_for_execution(
+                self.session,
+                execution_id,
+                InvocationService(self.session, self.user, temporal_service=self.temporal_service),
+            )
+        except Exception:
+            logger.exception(
+                "Best-effort invocation cancellation failed",
+                execution_id=execution_id,
+            )
 
         self._emit_lifecycle_event(
             execution_id=execution.id,

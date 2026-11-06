@@ -19,8 +19,6 @@ nodes:
         echo "Fetching data A"
         sleep 0.1
         echo '{"source": "A", "count": 10}'
-    outputs:
-      data: $.stdout
 
   - id: fetch_data_b
     type: script
@@ -30,8 +28,6 @@ nodes:
         echo "Fetching data B"
         sleep 0.3
         echo '{"source": "B", "count": 20}'
-    outputs:
-      data: $.stdout
 
   - id: fetch_data_c
     type: script
@@ -41,8 +37,6 @@ nodes:
         echo "Fetching data C"
         sleep 0.1
         echo '{"source": "C", "count": 30}'
-    outputs:
-      data: $.stdout
 
   - id: parallel_work_join
     type: join
@@ -66,8 +60,6 @@ nodes:
         echo "Processing aggregated data from all sources"
         echo "All parallel tasks have completed"
         echo "Total sources: 3"
-    outputs:
-      result: $.stdout
 
   - id: send_notification
     name: Send Completion Notification
@@ -77,24 +69,22 @@ nodes:
       code: |
         echo "Notification: All data fetching and aggregation complete"
         echo "Ready for next stage"
-    outputs:
-      status: $.stdout
 edges:
-  - source: parallel_work_fork
-    target: fetch_data_a
-  - source: parallel_work_fork
-    target: fetch_data_b
-  - source: parallel_work_fork
-    target: fetch_data_c
-  - source: fetch_data_a
-    target: parallel_work_join
-  - source: fetch_data_b
-    target: parallel_work_join
-  - source: fetch_data_c
-    target: parallel_work_join
-  - source: parallel_work_join
-    target: aggregate_data
-  - source: aggregate_data
-    target: process_aggregated_data
-  - source: process_aggregated_data
-    target: send_notification
+  - from: parallel_work_fork
+    to: fetch_data_a
+  - from: parallel_work_fork
+    to: fetch_data_b
+  - from: parallel_work_fork
+    to: fetch_data_c
+  - from: fetch_data_a
+    to: parallel_work_join
+  - from: fetch_data_b
+    to: parallel_work_join
+  - from: fetch_data_c
+    to: parallel_work_join
+  - from: parallel_work_join
+    to: aggregate_data
+  - from: aggregate_data
+    to: process_aggregated_data
+  - from: process_aggregated_data
+    to: send_notification

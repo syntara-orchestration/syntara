@@ -2,20 +2,21 @@ import { ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynDetailList } from '../../../../components/details/SynDetailList'
+import { SynStep } from '../../../../components/steps/SynStep'
+import { SynStepBody } from '../../../../components/steps/SynStepBody'
 import { FlowNodeType } from '../../../../constants'
 import type { ActivityStatus } from '../../execution/types'
-import { getNodeTypeColor } from '../nodeTypeColors'
+import { getStepTypeColor } from '../stepTypeColors'
 
 import { renderCondition, renderJson, renderText } from './common/detailRenderers'
-import { detectTaskNodeType, type TaskActivityWithMetadata } from './common/detectTaskNodeType'
-import { NodeBody } from './common/NodeBody'
-import { NodeComponent } from './common/NodeComponent'
-import { StandardNodeHeader } from './common/StandardNodeHeader'
+import { detectTaskExecutorType, type TaskActivityWithMetadata } from './common/detectTaskExecutorType'
+import { StandardStepHeader } from './common/StandardStepHeader'
 import { useCredentialName } from './hooks/useCredentialName'
-import { MenuNodeType, useNodeMenuActions } from './hooks/useNodeMenuActions'
-import { getTaskIconDescriptor } from './nodeIconResolver'
-import { nodeMetadata, executorMetadata } from './nodeMetadata'
-import { renderNodeIcon } from './renderNodeIcon'
+import { StepMenuCategory, useStepMenuActions } from './hooks/useStepMenuActions'
+import { renderStepIcon } from './renderStepIcon'
+import { getTaskIconDescriptor } from './stepIconResolver'
+import { stepMetadata, executorMetadata } from './stepMetadata'
+import { getTaskCanvasIcon } from './taskCanvasIcon'
 import { getTaskSemanticLabels } from './taskSemanticLabels'
 
 type AAPJobTemplateConfig = {
@@ -44,7 +45,7 @@ type AgenticConfig = {
   file_ids?: string[]
 }
 
-function AgenticNodeDetails({ config, toolsText }: { config: AgenticConfig; toolsText?: string }) {
+function AgenticStepDetails({ config, toolsText }: { config: AgenticConfig; toolsText?: string }) {
   const { name: credentialName } = useCredentialName(config.credential_id)
   const fileCount = config.file_ids?.length ?? 0
   return (
@@ -59,11 +60,11 @@ function AgenticNodeDetails({ config, toolsText }: { config: AgenticConfig; tool
 
 export type TaskNode = { type: typeof FlowNodeType.TASK } & Node<TaskActivity>
 
-export function TaskNodeComponent(props: NodeProps<TaskNode>) {
-  const metadata = nodeMetadata.task
-  const menuActions = useNodeMenuActions({
+export function TaskStepComponent(props: NodeProps<TaskNode>) {
+  const metadata = stepMetadata.task
+  const menuActions = useStepMenuActions({
     nodeId: props.data.id,
-    nodeType: MenuNodeType.ACTIVITY,
+    stepCategory: StepMenuCategory.ACTIVITY,
     disabled: props.data.settings?.disabled ?? false,
   })
 
@@ -81,21 +82,26 @@ export function TaskNodeComponent(props: NodeProps<TaskNode>) {
   const showExecutionBadge =
     (props.data as { metadata?: { __showExecutionBadge?: boolean } }).metadata?.__showExecutionBadge === true
 
+  const iconColor = getStepTypeColor(FlowNodeType.TASK, props.data)
+
   return (
-    <NodeComponent
+    <SynStep
       className={metadata.className}
       nodeProps={props}
       executionState={executionState}
       showExecutionBadge={showExecutionBadge}
-      topBarColor={getNodeTypeColor(FlowNodeType.TASK, props.data)}
+      topBarColor={iconColor}
       semanticZoomSummary={getTaskSemanticLabels(props.data)}
+      semanticZoomIcon={getTaskCanvasIcon(props.data, iconColor, 'semanticZoom')}
+      semanticZoomPreviewIcon={getTaskCanvasIcon(props.data, iconColor, 'header')}
+      semanticZoomMenuActions={menuActions}
     >
       <TaskActivityDetails
         data={props.data}
         menuActions={menuActions}
-        iconColor={getNodeTypeColor(FlowNodeType.TASK, props.data)}
+        iconColor={getStepTypeColor(FlowNodeType.TASK, props.data)}
       />
-    </NodeComponent>
+    </SynStep>
   )
 }
 
@@ -104,18 +110,18 @@ export function TaskActivityDetails(
   props: Readonly<{
     data: TaskActivity
     showJson?: boolean
-    menuActions?: ReturnType<typeof useNodeMenuActions>
+    menuActions?: ReturnType<typeof useStepMenuActions>
     /** Optional color so icon matches node type accent (same as top bar) */
     iconColor?: string
   }>
 ) {
   // Detect the actual node type — in v2, activity.type IS the executor
-  const { actualExecutor } = detectTaskNodeType(props.data)
+  const { actualExecutor } = detectTaskExecutorType(props.data)
   const dataWithMetadata = props.data as TaskActivityWithMetadata
 
   const executorMeta = executorMetadata[actualExecutor] ?? executorMetadata[props.data.type ?? '']
   const { id: iconId } = getTaskIconDescriptor(props.data)
-  const iconNode = renderNodeIcon(executorMeta?.icon, iconId, 'canvas', props.iconColor)
+  const iconNode = renderStepIcon(executorMeta?.icon, iconId, 'header', props.iconColor)
   const taskExecutorLabel = executorMeta?.label ?? 'Task'
   const taskExecutor = actualExecutor || (props.data.type ?? '')
   const config = props.data.parameters ?? {}
@@ -140,7 +146,7 @@ export function TaskActivityDetails(
 
   return (
     <>
-      <StandardNodeHeader
+      <StandardStepHeader
         icon={iconNode}
         badge={undefined}
         title={props.data.name}
@@ -148,7 +154,7 @@ export function TaskActivityDetails(
         expandable
         menuActions={props.menuActions}
       />
-      <NodeBody>
+      <SynStepBody>
         <SynDetailList>
           {renderCondition(dataWithMetadata.condition)}
           {taskExecutor === ExecutorTypeEnum.SCRIPT && (
@@ -171,11 +177,11 @@ export function TaskActivityDetails(
             aapWorkflowConfig?.workflow_job_template_name
           )}
           {taskExecutor === ExecutorTypeEnum.AGENTIC && (
-            <AgenticNodeDetails config={config as AgenticConfig} toolsText={toolsText} />
+            <AgenticStepDetails config={config as AgenticConfig} toolsText={toolsText} />
           )}
           {taskExecutor !== ExecutorTypeEnum.SCRIPT && renderJson(props.data, props.showJson)}
         </SynDetailList>
-      </NodeBody>
+      </SynStepBody>
     </>
   )
 }

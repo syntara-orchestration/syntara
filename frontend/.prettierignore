@@ -25,4 +25,7 @@ out
 # Git
 .git
 
+# Synced verbatim from backend — backend is the source of truth, do not reformat
+packages/syntara-mock-api/src/examples/
+
 *.yaml

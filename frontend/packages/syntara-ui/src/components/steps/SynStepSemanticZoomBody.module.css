@@ -1,0 +1,103 @@
+.root {
+  position: relative;
+  width: 100%;
+  height: fit-content;
+  overflow: visible;
+}
+
+/*
+ * Preview is counter-scaled and extends outside the tile; raise the entire React Flow node
+ * so neighboring tiles do not paint over the hover/focus card.
+ */
+:global(.react-flow__node:has([data-semantic-zoom-preview-open='true'])) {
+  z-index: 10000 !important;
+}
+
+.tileRegion {
+  position: relative;
+  width: 100%;
+  height: var(--syn-step-semantic-zoom-tile-size, 224px);
+}
+
+.tileFocusTarget {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: default;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+}
+
+.tileFocusTarget:focus-visible {
+  outline: 2px solid var(--pf-t--global--color--brand--default);
+  outline-offset: 2px;
+}
+
+.tile {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--pf-t--global--border--radius--medium);
+  background-color: var(--pf-t--global--background--color--floating--default);
+  box-shadow: var(--pf-t--global--box-shadow--sm);
+  border-top: 6px solid var(--syn-step-semantic-zoom-accent, transparent);
+}
+
+.tileDashed {
+  border: 2px dashed rgba(196, 181, 253, 0.5);
+  border-top: 2px dashed rgba(196, 181, 253, 0.5);
+}
+
+.tileSelected {
+  outline: 2px solid var(--pf-t--global--color--brand--default);
+  outline-offset: 2px;
+}
+
+.iconSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.preview {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /*
+   * Counter the canvas viewport zoom so the preview reads at ~full step width on screen
+   * (flow coords are scaled by React Flow transform[2]).
+   */
+  transform: translate(-50%, -50%) scale(var(--syn-step-semantic-zoom-preview-inverse-scale, 1));
+  width: var(--syn-step-semantic-zoom-preview-width, 300px);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.previewOpen {
+  pointer-events: auto;
+}
+
+.previewCard {
+  box-sizing: border-box;
+  width: 100%;
+  border-radius: var(--pf-t--global--border--radius--medium);
+  background-color: var(--pf-t--global--background--color--floating--default);
+  box-shadow: var(--pf-t--global--box-shadow--md);
+  border-top-width: 4px;
+  border-top-style: solid;
+}
+
+.previewHeader {
+  padding: 0;
+}

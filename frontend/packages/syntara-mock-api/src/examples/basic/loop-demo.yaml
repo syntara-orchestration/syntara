@@ -5,11 +5,14 @@ description: Demonstrates forEach loop
 triggers:
   - id: trigger_manual
     type: manual_trigger
-inputs:
-  items:
-    type: array
-    description: List of items to process
-    default: [apple, banana, cherry]
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          items:
+            type: array
+            description: List of items to process
+            default: [apple, banana, cherry]
 nodes:
   - id: process_items
     type: loop
@@ -23,11 +26,11 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_ITEM: ${loop.item}
+        INPUT_INDEX: ${loop.index}
       code: |
         echo "Processing item #$INPUT_INDEX: $INPUT_ITEM"
-    inputs:
-      item: ${item}
-      index: ${idx}
 
   - id: summary
     type: script
@@ -36,8 +39,8 @@ nodes:
       code: |
         echo "All items processed!"
 edges:
-  - source: process_items
-    target: process_item
+  - from: process_items
+    to: process_item
     port: body
-  - source: process_items
-    target: summary
+  - from: process_items
+    to: summary

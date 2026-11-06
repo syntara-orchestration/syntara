@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import pytest
@@ -40,14 +39,6 @@ async def test_users(test_db_session: AsyncSession) -> dict[str, User]:
             password_hash=hash_password("password"),
             is_enabled=True,
         ),
-        "charlie": User(
-            username="charlie",
-            email="charlie@example.com",
-            first_name="Charlie",
-            password_hash=hash_password("password"),
-            is_enabled=True,
-            deleted_at=datetime.now(UTC),  # Soft-deleted user
-        ),
     }
 
     for user in users.values():
@@ -67,11 +58,6 @@ async def test_groups(test_db_session: AsyncSession) -> dict[str, Group]:
     groups = {
         "approvers": Group(name="approvers", description="Approvers group"),
         "admins": Group(name="admins", description="Admins group"),
-        "deleted-group": Group(
-            name="deleted-group",
-            description="Deleted group",
-            deleted_at=datetime.now(UTC),
-        ),
     }
 
     for group in groups.values():
@@ -121,13 +107,13 @@ class TestResolveUsernamesToIds:
         assert alice.id in result
 
     @pytest.mark.asyncio
-    async def test_deleted_user_filtered_out(self, service: ApproverResolutionService, test_users: dict[str, User]):
-        """Test that deleted users are filtered out."""
+    async def test_deleted_user_not_found(self, service: ApproverResolutionService, test_users: dict[str, User]):
+        """Test that non-existent usernames (e.g. hard-deleted users) are not resolved."""
         alice = test_users["alice"]
 
         result = await service.resolve_usernames_to_ids(["alice", "charlie"])
 
-        # Only alice should be returned (charlie is soft-deleted)
+        # Only alice should be returned (charlie does not exist)
         assert len(result) == 1
         assert alice.id in result
 
@@ -149,22 +135,22 @@ class TestResolveUsernamesToIds:
 
         result = await service.resolve_usernames_to_ids(["alice", "nonexistent", "bob", "charlie", "another-fake"])
 
-        # Only alice and bob should be returned
+        # Only alice and bob should be returned (charlie and others do not exist)
         assert len(result) == 2
         assert alice.id in result
         assert bob.id in result
 
     @pytest.mark.asyncio
-    async def test_filtering_behavior_with_nonexistent_and_deleted_users(
+    async def test_filtering_behavior_with_nonexistent_users(
         self, service: ApproverResolutionService, test_users: dict[str, User]
     ):
-        """Test that nonexistent and deleted users are filtered correctly."""
+        """Test that nonexistent usernames are filtered correctly."""
         alice = test_users["alice"]
 
-        # Should filter out both nonexistent and deleted users
+        # Should filter out non-existent usernames
         result = await service.resolve_usernames_to_ids(["alice", "nonexistent", "charlie"])
 
-        # Only alice should be returned (charlie is deleted, nonexistent doesn't exist)
+        # Only alice should be returned (charlie and nonexistent don't exist)
         assert len(result) == 1
         assert alice.id in result
 
@@ -222,13 +208,13 @@ class TestResolveGroupNamesToIds:
         assert approvers.id in result
 
     @pytest.mark.asyncio
-    async def test_deleted_group_filtered_out(self, service: ApproverResolutionService, test_groups: dict[str, Group]):
-        """Test that deleted groups are filtered out."""
+    async def test_deleted_group_not_found(self, service: ApproverResolutionService, test_groups: dict[str, Group]):
+        """Test that non-existent groups (e.g. hard-deleted) are not resolved."""
         approvers = test_groups["approvers"]
 
         result = await service.resolve_group_names_to_ids(["approvers", "deleted-group"])
 
-        # Only approvers should be returned (deleted-group is soft-deleted)
+        # Only approvers should be returned (deleted-group does not exist)
         assert len(result) == 1
         assert approvers.id in result
 
@@ -252,22 +238,22 @@ class TestResolveGroupNamesToIds:
             ["approvers", "nonexistent", "admins", "deleted-group", "another-fake"]
         )
 
-        # Only approvers and admins should be returned
+        # Only approvers and admins should be returned (others do not exist)
         assert len(result) == 2
         assert approvers.id in result
         assert admins.id in result
 
     @pytest.mark.asyncio
-    async def test_filtering_behavior_with_nonexistent_and_deleted_groups(
+    async def test_filtering_behavior_with_nonexistent_groups(
         self, service: ApproverResolutionService, test_groups: dict[str, Group]
     ):
-        """Test that nonexistent and deleted groups are filtered correctly."""
+        """Test that nonexistent group names are filtered correctly."""
         approvers = test_groups["approvers"]
 
-        # Should filter out both nonexistent and deleted groups
+        # Should filter out non-existent group names
         result = await service.resolve_group_names_to_ids(["approvers", "nonexistent", "deleted-group"])
 
-        # Only approvers should be returned (deleted-group is deleted, nonexistent doesn't exist)
+        # Only approvers should be returned (deleted-group and nonexistent don't exist)
         assert len(result) == 1
         assert approvers.id in result
 

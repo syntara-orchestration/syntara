@@ -36,15 +36,6 @@ vi.mock('../../components/details/SynCodeBlock', () => ({
   SynCodeBlock: ({ jsonObject }: { jsonObject: unknown }) => <pre>{JSON.stringify(jsonObject)}</pre>,
 }))
 
-vi.mock('wouter', async () => {
-  const React = await import('react')
-  return {
-    useLocation: () => ['/system-administration/access-management/policies', vi.fn()],
-    useSearch: () => '',
-    useSearchParams: () => React.useState(new URLSearchParams()),
-  }
-})
-
 const samplePolicies: PolicyRead[] = [
   {
     id: 'p1',
@@ -96,7 +87,7 @@ function setupPoliciesQuery(policies: PolicyRead[], options?: { total?: number; 
     isError: false,
     error: null,
     refetch: mockRefetch,
-  } as never)
+  })
 }
 
 describe('PoliciesTab', () => {
@@ -123,7 +114,7 @@ describe('PoliciesTab', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     render(<PoliciesTab />, { wrapper })
 
@@ -138,7 +129,7 @@ describe('PoliciesTab', () => {
       isError: true,
       error: new Error('Network error'),
       refetch: mockRefetch,
-    } as never)
+    })
 
     render(<PoliciesTab />, { wrapper })
 
@@ -410,7 +401,7 @@ describe('PoliciesTab', () => {
     const user = userEvent.setup()
     let returnEmpty = false
 
-    vi.mocked(accessClient.useQuery).mockImplementation((() => ({
+    vi.mocked(accessClient.useQuery).mockImplementation(() => ({
       data: {
         resources: returnEmpty ? [] : samplePolicies,
         total: returnEmpty ? 0 : samplePolicies.length,
@@ -422,7 +413,7 @@ describe('PoliciesTab', () => {
       isError: false,
       error: null,
       refetch: mockRefetch,
-    })) as unknown as typeof accessClient.useQuery)
+    }))
 
     render(<PoliciesTab />, { wrapper })
 
@@ -468,7 +459,7 @@ describe('PoliciesTab', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
       render(<PoliciesTab />, { wrapper })
 
       expect(screen.getByText('No policies yet')).toBeInTheDocument()
@@ -482,7 +473,7 @@ describe('PoliciesTab', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
       render(<PoliciesTab />, { wrapper })
 
       expect(screen.getByText('No policies yet')).toBeInTheDocument()
@@ -577,7 +568,7 @@ describe('PoliciesTab', () => {
         isError: false,
         error: null,
         refetch: mockRefetch,
-      } as never)
+      })
       render(<PoliciesTab />, { wrapper })
 
       expect(screen.getByText('admin-policy')).toBeInTheDocument()

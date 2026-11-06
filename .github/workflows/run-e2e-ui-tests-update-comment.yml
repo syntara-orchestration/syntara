@@ -28,7 +28,7 @@ permissions:
 jobs:
   post-results:
     name: Post E2E Results
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Only update comments for manually dispatched E2E runs, not regular CI,
     # scheduled runs, or merge-queue runs.
     if: github.event.workflow_run.event == 'workflow_dispatch'

@@ -34,6 +34,9 @@ from syntara_api_client.models.execution_status import ExecutionStatus
 
 pytestmark = [pytest.mark.e2e]
 
+# Cancel while paused on approval: Temporal + API propagation can exceed 60s on loaded CI runners.
+_CANCEL_WHILE_PAUSED_POLL_SECONDS = 120
+
 
 def _workflow_definition_with_nodes(
     workflow_name: str,
@@ -525,8 +528,8 @@ class TestWorkflowExecution:
             f"Expected 202 Accepted, got {cancel_response.status_code}: {cancel_response.content!r}"
         )
 
-        max_polls = 20
         poll_interval = 1
+        max_polls = _CANCEL_WHILE_PAUSED_POLL_SECONDS // poll_interval
         cancelled_execution = None
 
         for _ in range(max_polls):
@@ -541,7 +544,7 @@ class TestWorkflowExecution:
             time.sleep(poll_interval)
 
         assert cancelled_execution is not None, (
-            f"Execution did not transition to cancelled within {max_polls * poll_interval}s. "
+            f"Execution did not transition to cancelled within {_CANCEL_WHILE_PAUSED_POLL_SECONDS}s. "
             f"Last status: {current_execution.status!s}"
         )
 
@@ -801,6 +804,7 @@ class TestNodeFailurePropagation:
                     {"from": "node_b", "to": "node_c"},
                 ],
             },
+            timeout=45,
         )
 
         # Overall execution must fail.
@@ -861,6 +865,7 @@ class TestNodeFailurePropagation:
                     {"from": "node_b", "to": "node_c"},
                 ],
             },
+            timeout=45,
         )
 
         assert result.status == ExecutionStatus.FAILED, f"Expected 'failed', got '{result.status}'"
@@ -918,6 +923,7 @@ class TestNodeFailurePropagation:
                     {"from": "branch_fail", "to": "join"},
                 ],
             },
+            timeout=45,
         )
 
         # The workflow as a whole fails because one branch failed.
@@ -927,10 +933,12 @@ class TestNodeFailurePropagation:
 
         activities = {a.activity_id: a for a in (result.activities or [])}
 
-        # The healthy branch must have completed.
+        # The healthy branch must not be skipped. If it finished before the
+        # converge failed it is completed; if it was still in flight it is
+        # detached and reported as cancelled (AAP-90400).
         assert activities.get("branch_ok") is not None
-        assert activities["branch_ok"].status == "completed", (
-            f"branch_ok should complete independently of branch_fail, got {activities['branch_ok'].status}"
+        assert activities["branch_ok"].status in ("completed", "cancelled"), (
+            f"branch_ok should complete or be detached, got {activities['branch_ok'].status}"
         )
 
         # The failing branch must be marked failed.

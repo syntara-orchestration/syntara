@@ -1,5 +1,6 @@
 """Switch node activity for v2 workflows."""
 
+import asyncio
 from typing import Any
 
 import structlog
@@ -111,8 +112,12 @@ async def switch(
             continue
 
         try:
-            # Tier 2 evaluation: AST-based with direct namespace lookup
-            evaluated = safe_eval_with_namespace(case_condition, namespace)
+            # Tier 2 evaluation: AST-based with direct namespace lookup.
+            # Offloaded to a worker thread because the `matches` operator runs a
+            # bounded subprocess (see unified_eval._re_search_bounded); running it
+            # inline would block this async activity's shared event loop, stalling
+            # every other activity and Temporal's polling/heartbeat coroutines.
+            evaluated = await asyncio.to_thread(safe_eval_with_namespace, case_condition, namespace)
         except (ValueError, KeyError, TypeError, IndexError) as e:
             # RuntimeError intentionally NOT caught: Temporal infrastructure errors
             # (heartbeat timeout, cancellation) should propagate and fail loudly.

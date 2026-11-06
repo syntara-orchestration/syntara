@@ -12,7 +12,7 @@
  */
 
 import { test, expect } from '../fixtures'
-import { buildUniqueName, openBuilderById } from '../helpers/workflows'
+import { buildUniqueName, openBuilderById, expectCanvasStepTitleVisible } from '../helpers/workflows'
 import { createWorkflowViaApi, deleteWorkflowViaApi } from '../utils/api'
 
 const TRIGGER_NAME = 'Manual trigger'
@@ -21,12 +21,14 @@ const SECONDARY_TRIGGER_NAME = 'Secondary trigger'
 test.describe('Multiple triggers', () => {
   test('shows Run button (not dropdown) when workflow has a single trigger', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-single-trigger')
-    const { id: workflowId } = await createWorkflowViaApi(app, workflowName, [
-      { id: 'trigger_1', type: 'manual_trigger', name: TRIGGER_NAME, parameters: {} },
-    ])
+    const { id: workflowId } = await createWorkflowViaApi({
+      app,
+      name: workflowName,
+      triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: TRIGGER_NAME, parameters: {} }],
+    })
     try {
       await openBuilderById(app, workflowId)
-      await expect(app.getByText(TRIGGER_NAME)).toBeVisible({ timeout: 30_000 })
+      await expectCanvasStepTitleVisible(app, TRIGGER_NAME, { timeout: 30_000 })
       // Single trigger: Run renders as a plain button
       await expect(app.getByRole('button', { name: 'Run' })).toBeVisible()
       // Dropdown toggle only appears when multiple triggers exist
@@ -38,19 +40,23 @@ test.describe('Multiple triggers', () => {
 
   test('shows Run dropdown listing all trigger names when workflow has multiple triggers', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-multi-trigger')
-    const { id: workflowId } = await createWorkflowViaApi(app, workflowName, [
-      { id: 'trigger_1', type: 'manual_trigger', name: TRIGGER_NAME, parameters: {} },
-      { id: 'trigger_2', type: 'manual_trigger', name: SECONDARY_TRIGGER_NAME, parameters: {} },
-    ])
+    const { id: workflowId } = await createWorkflowViaApi({
+      app,
+      name: workflowName,
+      triggers: [
+        { id: 'trigger_1', type: 'manual_trigger', name: TRIGGER_NAME, parameters: {} },
+        { id: 'trigger_2', type: 'manual_trigger', name: SECONDARY_TRIGGER_NAME, parameters: {} },
+      ],
+    })
     try {
       await openBuilderById(app, workflowId)
-      await expect(app.getByText(TRIGGER_NAME)).toBeVisible({ timeout: 30_000 })
+      await expectCanvasStepTitleVisible(app, TRIGGER_NAME, { timeout: 30_000 })
       // Multiple triggers: Run becomes a MenuToggle (aria-label="Run workflow") instead of a plain button
       const runToggle = app.getByRole('button', { name: 'Run workflow' })
       await expect(runToggle).toBeVisible()
       await runToggle.click()
-      await expect(app.getByRole('menuitem', { name: TRIGGER_NAME })).toBeVisible()
-      await expect(app.getByRole('menuitem', { name: SECONDARY_TRIGGER_NAME })).toBeVisible()
+      await expect(app.getByRole('menuitem', { name: TRIGGER_NAME, exact: true })).toBeVisible()
+      await expect(app.getByRole('menuitem', { name: SECONDARY_TRIGGER_NAME, exact: true })).toBeVisible()
     } finally {
       await deleteWorkflowViaApi(app, workflowId)
     }
@@ -58,19 +64,25 @@ test.describe('Multiple triggers', () => {
 
   test('selecting a trigger from the Run dropdown opens the run confirmation dialog', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-trigger-select')
-    const { id: workflowId } = await createWorkflowViaApi(app, workflowName, [
-      { id: 'trigger_1', type: 'manual_trigger', name: TRIGGER_NAME, parameters: {} },
-      { id: 'trigger_2', type: 'manual_trigger', name: SECONDARY_TRIGGER_NAME, parameters: {} },
-    ])
+    const { id: workflowId } = await createWorkflowViaApi({
+      app,
+      name: workflowName,
+      triggers: [
+        { id: 'trigger_1', type: 'manual_trigger', name: TRIGGER_NAME, parameters: {} },
+        { id: 'trigger_2', type: 'manual_trigger', name: SECONDARY_TRIGGER_NAME, parameters: {} },
+      ],
+    })
     try {
       await openBuilderById(app, workflowId)
-      await expect(app.getByText(TRIGGER_NAME)).toBeVisible({ timeout: 30_000 })
+      await expectCanvasStepTitleVisible(app, TRIGGER_NAME, { timeout: 30_000 })
       await app.getByRole('button', { name: 'Run workflow' }).click()
-      await app.getByRole('menuitem', { name: TRIGGER_NAME }).click()
+      await app.getByRole('menuitem', { name: TRIGGER_NAME, exact: true }).click()
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()
-      // Dialog title confirms the correct workflow is being run
-      await expect(dialog.getByRole('heading', { name: new RegExp(`Run ${workflowName}`) })).toBeVisible()
+      await expect(dialog.getByRole('heading', { name: 'Run workflow?' })).toBeVisible()
+      await expect(
+        dialog.getByText(new RegExp(`You are about to manually run the workflow.*${workflowName}`))
+      ).toBeVisible()
       await dialog.getByRole('button', { name: 'Cancel' }).click()
       await expect(dialog).not.toBeVisible()
     } finally {
@@ -80,17 +92,21 @@ test.describe('Multiple triggers', () => {
 
   test('shows "Trigger N" fallback name for triggers without an explicit name', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-fallback-name')
-    const { id: workflowId } = await createWorkflowViaApi(app, workflowName, [
-      { id: 'trigger_1', type: 'manual_trigger', name: TRIGGER_NAME, parameters: {} },
-      { id: 'trigger_2', type: 'manual_trigger', parameters: {} }, // no name — falls back to "Trigger 2"
-    ])
+    const { id: workflowId } = await createWorkflowViaApi({
+      app,
+      name: workflowName,
+      triggers: [
+        { id: 'trigger_1', type: 'manual_trigger', name: TRIGGER_NAME, parameters: {} },
+        { id: 'trigger_2', type: 'manual_trigger', parameters: {} }, // no name — falls back to "Trigger 2"
+      ],
+    })
     try {
       await openBuilderById(app, workflowId)
-      await expect(app.getByText(TRIGGER_NAME)).toBeVisible({ timeout: 30_000 })
+      await expectCanvasStepTitleVisible(app, TRIGGER_NAME, { timeout: 30_000 })
       await app.getByRole('button', { name: 'Run workflow' }).click()
       // trigger.name ?? `Trigger ${index + 1}` — unnamed trigger at index 1 becomes "Trigger 2"
-      await expect(app.getByRole('menuitem', { name: TRIGGER_NAME })).toBeVisible()
-      await expect(app.getByRole('menuitem', { name: 'Trigger 2' })).toBeVisible()
+      await expect(app.getByRole('menuitem', { name: TRIGGER_NAME, exact: true })).toBeVisible()
+      await expect(app.getByRole('menuitem', { name: 'Trigger 2', exact: true })).toBeVisible()
     } finally {
       await deleteWorkflowViaApi(app, workflowId)
     }

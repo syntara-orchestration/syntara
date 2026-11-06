@@ -5,24 +5,32 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "check-dequeue-burst": "tsx src/dequeue-burst-alert.ts",
-    "check-queue-health": "tsx src/queue-health-poll.ts",
-    "send-unhealthy-alert": "tsx src/send-unhealthy-alert.ts",
-    "send-recovery-alert": "tsx src/send-recovery-alert.ts",
+    "check:jira-references": "tsx src/check-jira-references.ts",
+    "check:pr-description": "tsx src/check-pr-description.ts",
+    "check:pr-title": "tsx src/check-pr-title.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "notify:dequeue-burst": "tsx src/dequeue-burst-alert.ts",
+    "notify:queue-health": "tsx src/queue-health-poll.ts",
+    "notify:recovery-alert": "tsx src/send-recovery-alert.ts",
+    "notify:unhealthy-alert": "tsx src/send-unhealthy-alert.ts",
+    "notify:visual-regression-pr": "tsx src/visual-regression-pr-notification.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "tsc": "tsc --noEmit"
   },
   "dependencies": {
-    "@octokit/graphql": "8.2.1",
-    "@octokit/rest": "21.0.2",
-    "zod": "3.24.1"
+    "@octokit/graphql": "9.0.5",
+    "@octokit/rest": "22.0.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@types/node": "22.13.0",
-    "msw": "2.8.5",
-    "tsx": "4.19.2",
-    "typescript": "5.7.3",
-    "vitest": "3.1.2"
+    "@types/node": "26.6.5",
+    "graphql": "17.0.2",
+    "msw": "3.0.3",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
   }
 }

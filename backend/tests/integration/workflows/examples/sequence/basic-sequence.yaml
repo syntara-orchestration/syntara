@@ -17,8 +17,6 @@ nodes:
         echo "Step 1: Starting"
         sleep 1
         echo "Step 1: Complete"
-    outputs:
-      result: $.stdout
 
   - id: step2
     name: Second Step
@@ -29,8 +27,6 @@ nodes:
         echo "Step 2: Starting"
         sleep 1
         echo "Step 2: Complete"
-    outputs:
-      result: $.stdout
 
   - id: step3
     name: Third Step
@@ -41,10 +37,8 @@ nodes:
         echo "Step 3: Starting"
         sleep 1
         echo "Step 3: Complete"
-    outputs:
-      result: $.stdout
 edges:
-  - source: step1
-    target: step2
-  - source: step2
-    target: step3
+  - from: step1
+    to: step2
+  - from: step2
+    to: step3

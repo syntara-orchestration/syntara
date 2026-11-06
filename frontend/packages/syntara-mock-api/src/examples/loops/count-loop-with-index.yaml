@@ -18,12 +18,10 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_ITERATION_NUM: ${loop.index}
       code: |
         echo "Iteration number: ${INPUT_ITERATION_NUM}"
-    inputs:
-      iteration_num: ${iteration_num}
-    outputs:
-      result: $.stdout
 edges:
   - from: trigger_manual
     to: count_with_index

@@ -1,6 +1,6 @@
 .PHONY: help install format lint test test-all typecheck dev gen-contracts \
        services-up services-down services-logs secrets db-migrate db-seed admin-password setup sync \
-       pre-commit-install
+       pre-commit-install docs-serve docs-build
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -10,6 +10,7 @@ help: ## Show available targets
 install: ## Install backend and frontend dependencies
 	$(MAKE) -C backend install
 	cd frontend && npm ci
+	cd .github/scripts && npm ci
 	$(MAKE) pre-commit-install
 
 pre-commit-install: ## Install pre-commit hooks
@@ -37,7 +38,7 @@ _ensure-env:
 format: ## Format both codebases
 	$(MAKE) -C backend format
 	cd frontend && npm run format
-	frontend/node_modules/.bin/prettier --config frontend/.prettierrc --write .github/scripts
+	npm --prefix .github/scripts run format
 
 lint: ## Lint both codebases
 	$(MAKE) -C backend lint
@@ -121,6 +122,14 @@ run-standards-checks-backend: ## Run backend standards checks (API specs, code q
 	$(MAKE) -C backend verify-test-structure
 
 run-standards-checks-all: run-standards-checks-frontend run-standards-checks-backend ## Run all standards checks (frontend + backend)
+
+# --- Documentation ---
+
+docs-serve: ## Serve documentation locally with live reload (port 8080)
+	mkdocs serve --dev-addr 127.0.0.1:8080
+
+docs-build: ## Build documentation (strict mode, treats warnings as errors)
+	mkdocs build --strict
 
 # --- Upstream sync (transition period) ---
 

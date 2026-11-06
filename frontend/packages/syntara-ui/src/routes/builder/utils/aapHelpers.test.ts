@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import type { AAPJobTemplateFormData } from '../node-forms/aapJobTemplateSchema'
-import type { AAPWorkflowTemplateFormData } from '../node-forms/aapWorkflowTemplateSchema'
+import type { AAPJobTemplateFormData } from '../step-forms/aapJobTemplateSchema'
+import type { AAPWorkflowTemplateFormData } from '../step-forms/aapWorkflowTemplateSchema'
 
 import {
   buildAAPConfig,
   buildAAPWorkflowTemplateConfig,
   buildExpressionModeActivity,
   buildWorkflowExpressionModeActivity,
+  isWorkflowTemplateInputVariablesMode,
+  resolveWorkflowUseInputVariables,
   hasExpressionValue,
+  isJobTemplateInputVariablesMode,
   validateJobTemplateId,
   validateWorkflowTemplateId,
 } from './aapHelpers'
@@ -169,6 +172,11 @@ describe('buildAAPConfig', () => {
     expect(result?.tags).toBeUndefined()
   })
 
+  it('includes useInputVariables when the toggle is on', () => {
+    const result = buildAAPConfig(makeFormData({ use_input_variables: true }))
+    expect(result?.useInputVariables).toBe(true)
+  })
+
   it('includes credentialId when set', () => {
     const result = buildAAPConfig(makeFormData({ credential_id: 'cred-123' }))
     expect(result?.credentialId).toBe('cred-123')
@@ -231,6 +239,83 @@ describe('buildExpressionModeActivity', () => {
     expect(activity.parameters.organization_name).toBe('${trigger.org}')
     expect(activity.parameters).not.toHaveProperty('job_template_id')
   })
+
+  it('persists use_input_variables without a job template id', () => {
+    const activity = buildExpressionModeActivity('node-1', 'AAP Job', makeFormData({ use_input_variables: true }))
+
+    expect(activity.parameters.use_input_variables).toBe(true)
+    expect(activity.parameters).not.toHaveProperty('job_template_id')
+  })
+})
+
+describe('isJobTemplateInputVariablesMode', () => {
+  it('returns true when use_input_variables is set without expressions', () => {
+    expect(isJobTemplateInputVariablesMode(makeFormData({ use_input_variables: true }))).toBe(true)
+  })
+
+  it('returns true when organization or template contains an expression', () => {
+    expect(isJobTemplateInputVariablesMode(makeFormData({ job_template_name: '${inputs.jt}' }))).toBe(true)
+  })
+
+  it('returns false when toggle is off and names have no expressions', () => {
+    expect(isJobTemplateInputVariablesMode(makeFormData({ job_template_name: 'Deploy' }))).toBe(false)
+  })
+})
+
+describe('resolveWorkflowUseInputVariables', () => {
+  it('returns true when use_input_variables is stored on the activity config', () => {
+    expect(
+      resolveWorkflowUseInputVariables(
+        { use_input_variables: true },
+        {
+          organizationName: '',
+          workflowTemplateName: '',
+          inventoryName: '',
+          limit: '',
+          scmBranch: '',
+          tags: '',
+          skipTags: '',
+          extraVars: '',
+        }
+      )
+    ).toBe(true)
+  })
+
+  it('returns true when stored field values contain expressions', () => {
+    expect(
+      resolveWorkflowUseInputVariables(
+        {},
+        {
+          organizationName: '${trigger.org}',
+          workflowTemplateName: '',
+          inventoryName: '',
+          limit: '',
+          scmBranch: '',
+          tags: '',
+          skipTags: '',
+          extraVars: '',
+        }
+      )
+    ).toBe(true)
+  })
+})
+
+describe('isWorkflowTemplateInputVariablesMode', () => {
+  it('returns true when use_input_variables is set without expressions', () => {
+    expect(isWorkflowTemplateInputVariablesMode(makeWorkflowFormData({ use_input_variables: true }))).toBe(true)
+  })
+
+  it('returns true when organization or workflow template contains an expression', () => {
+    expect(
+      isWorkflowTemplateInputVariablesMode(makeWorkflowFormData({ workflow_job_template_name: '${inputs.workflow}' }))
+    ).toBe(true)
+  })
+
+  it('returns false when toggle is off and names have no expressions', () => {
+    expect(
+      isWorkflowTemplateInputVariablesMode(makeWorkflowFormData({ workflow_job_template_name: 'Deploy Workflow' }))
+    ).toBe(false)
+  })
 })
 
 describe('hasExpressionValue', () => {
@@ -238,6 +323,11 @@ describe('hasExpressionValue', () => {
     expect(hasExpressionValue('${trigger.value}')).toBe(true)
     expect(hasExpressionValue('normal', '${expr}')).toBe(true)
     expect(hasExpressionValue(undefined, '${expr}', 'test')).toBe(true)
+  })
+
+  it('returns true for extra_vars JSON that embeds ${ expressions', () => {
+    expect(hasExpressionValue(undefined, undefined, '{"app_version": "${inputs.version}"}')).toBe(true)
+    expect(hasExpressionValue(JSON.stringify({ app_version: '${inputs.version}' }, null, 2))).toBe(true)
   })
 
   it('returns false when no values contain ${', () => {
@@ -404,5 +494,16 @@ describe('buildWorkflowExpressionModeActivity', () => {
     // Activity config uses snake_case API field names
     expect(activity.parameters.scm_branch).toBe('${vars.branch}')
     expect(activity.parameters.labels).toEqual(['auto-deploy'])
+  })
+
+  it('persists use_input_variables without a workflow template id', () => {
+    const activity = buildWorkflowExpressionModeActivity(
+      'node-4',
+      'AAP Workflow',
+      makeWorkflowFormData({ use_input_variables: true })
+    )
+
+    expect(activity.parameters.use_input_variables).toBe(true)
+    expect(activity.parameters).not.toHaveProperty('workflow_job_template_id')
   })
 })

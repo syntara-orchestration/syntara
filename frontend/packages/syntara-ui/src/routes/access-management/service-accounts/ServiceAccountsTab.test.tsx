@@ -55,9 +55,8 @@ const mockServiceAccounts: ServiceAccountRead[] = [
     status: 'active',
     project_id: 'proj-1',
     project_name: 'default',
-    is_project_deleted: false,
     last_authenticated_at: '2024-06-15T10:00:00Z',
-    created_by: 'admin',
+    created_by: { id: 'u-004', name: 'admin', type: 'user' },
     updated_by: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
@@ -70,9 +69,8 @@ const mockServiceAccounts: ServiceAccountRead[] = [
     status: 'disabled',
     project_id: 'proj-1',
     project_name: 'default',
-    is_project_deleted: false,
     last_authenticated_at: null,
-    created_by: 'admin',
+    created_by: { id: 'u-004', name: 'admin', type: 'user' },
     updated_by: null,
     created_at: '2024-02-01T00:00:00Z',
     updated_at: '2024-02-01T00:00:00Z',
@@ -131,10 +129,10 @@ describe('ServiceAccountsTab', () => {
     })
 
     vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ resources: mockServiceAccounts, next_cursor: null }) as never
+      buildQueryResult({ resources: mockServiceAccounts, next_cursor: null })
     )
 
-    vi.mocked(accessClient.useMutation).mockReturnValue(buildMutationResult() as never)
+    vi.mocked(accessClient.useMutation).mockReturnValue(buildMutationResult())
   })
 
   it('renders service accounts in a table', () => {
@@ -162,27 +160,12 @@ describe('ServiceAccountsTab', () => {
     expect(links[0]).toHaveAttribute('href', '/system-administration/access-management/projects/proj-1')
   })
 
-  it('renders owning project as plain text with Deleted label when project is deleted', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({
-        resources: [{ ...mockServiceAccounts[0], project_name: 'old-project', is_project_deleted: true }],
-        next_cursor: null,
-      }) as never
-    )
-
-    render(<ServiceAccountsTab />, { wrapper })
-
-    expect(screen.getByText('old-project')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'old-project' })).not.toBeInTheDocument()
-    expect(screen.getByText('Deleted')).toBeInTheDocument()
-  })
-
   it('renders owning project as project ID when project_name is null', () => {
     vi.mocked(accessClient.useQuery).mockReturnValue(
       buildQueryResult({
         resources: [{ ...mockServiceAccounts[0], project_name: null }],
         next_cursor: null,
-      }) as never
+      })
     )
 
     render(<ServiceAccountsTab />, { wrapper })
@@ -198,7 +181,7 @@ describe('ServiceAccountsTab', () => {
   })
 
   it('renders empty state when no service accounts exist', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [], next_cursor: null }) as never)
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [], next_cursor: null }))
 
     render(<ServiceAccountsTab />, { wrapper })
 
@@ -284,7 +267,7 @@ describe('ServiceAccountsTab', () => {
       expect(screen.getByText('Disable service account?')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable service account' }))
     expect(mockDisableMutate).toHaveBeenCalled()
   })
 
@@ -337,7 +320,7 @@ describe('ServiceAccountsTab', () => {
 
     const ackCheckbox = screen.getByRole('checkbox', { name: /i understand/i })
     await user.click(ackCheckbox)
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete service account' }))
     expect(mockDeleteMutate).toHaveBeenCalled()
   })
 
@@ -446,7 +429,7 @@ describe('ServiceAccountsTab', () => {
     })
 
     it('has no accessibility violations in empty state', async () => {
-      vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [], next_cursor: null }) as never)
+      vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ resources: [], next_cursor: null }))
 
       const { container } = render(<ServiceAccountsTab />, { wrapper })
 

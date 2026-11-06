@@ -7,6 +7,7 @@ import { useCallback, useMemo } from 'react'
 import { IconLabel } from '../../components/IconLabel'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { SynCodeTruncateCell } from '../../components/table/SynCodeTruncateCell'
 import { useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
@@ -94,22 +95,28 @@ function PoliciesTableBody({
     <>
       <Thead>
         <Tr>
-          <Th sort={getSortParams(0)}>Name</Th>
-          <Th>Description</Th>
-          <Th sort={getSortParams(2)}>Scope</Th>
-          <Th>Statements</Th>
-          <Th sort={getSortParams(4)}>Project</Th>
-          <Th sort={getSortParams(5)}>Type</Th>
-          <Th screenReaderText="Actions" />
+          <Th width={25} sort={getSortParams(0)}>
+            Name
+          </Th>
+          <Th width={20}>Description</Th>
+          <Th width={15} sort={getSortParams(2)}>
+            Scope
+          </Th>
+          <Th width={15}>Statements</Th>
+          <Th width={15} sort={getSortParams(4)}>
+            Project
+          </Th>
+          <Th width={15} sort={getSortParams(5)}>
+            Type
+          </Th>
+          <Th width={10} screenReaderText="Actions" />
         </Tr>
       </Thead>
       <Tbody>
         {policies.map((policy) => (
           <Tr key={policy.id} data-testid={`policy-row-${policy.id}`}>
             <Td dataLabel="Name">
-              <code>
-                <Truncate content={policy.name} />
-              </code>
+              <SynCodeTruncateCell content={policy.name} />
             </Td>
             <Td dataLabel="Description">
               <Truncate content={policy.description ?? '-'} />
@@ -166,7 +173,13 @@ export function PoliciesTab() {
   const policies = useMemo(() => (data?.resources ?? []).map(toPolicyRead), [data?.resources])
   const refetch = useCallback(() => detachPromise(policiesQuery.refetch()), [policiesQuery])
 
-  useCursorReset(policies.length, hasActiveFilters, cursor, policiesQuery.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: policies.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: policiesQuery.isFetching,
+    resetPagination,
+  })
 
   const showToolbar = policies.length > 0 || hasActiveFilters
   const policyJsonItem = policyJsonDialog.item

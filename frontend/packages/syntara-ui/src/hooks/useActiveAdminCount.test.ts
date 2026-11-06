@@ -58,14 +58,14 @@ describe('useActiveAdminCount', () => {
   it('returns 0 when no admins group is found', () => {
     // First call: groups query returns no groups
     // Second call: members query returns empty (no group id)
-    mockUseQuery.mockReturnValueOnce(emptyResult as never).mockReturnValueOnce(emptyResult as never)
+    mockUseQuery.mockReturnValueOnce(emptyResult).mockReturnValueOnce(emptyResult)
 
     const { result } = renderHook(() => useActiveAdminCount())
     expect(result.current).toBe(0)
   })
 
   it('returns 0 when groups data is undefined', () => {
-    mockUseQuery.mockReturnValueOnce(undefinedResult as never).mockReturnValueOnce(undefinedResult as never)
+    mockUseQuery.mockReturnValueOnce(undefinedResult).mockReturnValueOnce(undefinedResult)
 
     const { result } = renderHook(() => useActiveAdminCount())
     expect(result.current).toBe(0)
@@ -73,13 +73,13 @@ describe('useActiveAdminCount', () => {
 
   it('returns the count of enabled members in the admins group', () => {
     mockUseQuery
-      .mockReturnValueOnce(groupsResult([{ id: 'admins-id', name: 'admins', is_builtin: true }]) as never)
+      .mockReturnValueOnce(groupsResult([{ id: 'admins-id', name: 'admins', is_builtin: true }]))
       .mockReturnValueOnce(
         membersResult([
           { id: 'user-1', is_enabled: true },
           { id: 'user-2', is_enabled: true },
           { id: 'user-3', is_enabled: true },
-        ]) as never
+        ])
       )
 
     const { result } = renderHook(() => useActiveAdminCount())
@@ -88,14 +88,14 @@ describe('useActiveAdminCount', () => {
 
   it('filters out disabled members from the count', () => {
     mockUseQuery
-      .mockReturnValueOnce(groupsResult([{ id: 'admins-id', name: 'admins', is_builtin: true }]) as never)
+      .mockReturnValueOnce(groupsResult([{ id: 'admins-id', name: 'admins', is_builtin: true }]))
       .mockReturnValueOnce(
         membersResult([
           { id: 'user-1', is_enabled: true },
           { id: 'user-2', is_enabled: false },
           { id: 'user-3', is_enabled: true },
           { id: 'user-4', is_enabled: false },
-        ]) as never
+        ])
       )
 
     const { result } = renderHook(() => useActiveAdminCount())
@@ -103,7 +103,7 @@ describe('useActiveAdminCount', () => {
   })
 
   it('skips queries when enabled is false', () => {
-    mockUseQuery.mockReturnValue(undefinedResult as never)
+    mockUseQuery.mockReturnValue(undefinedResult)
 
     renderHook(() => useActiveAdminCount(false))
 
@@ -117,8 +117,8 @@ describe('useActiveAdminCount', () => {
 
   it('ignores non-builtin groups named admins', () => {
     mockUseQuery
-      .mockReturnValueOnce(groupsResult([{ id: 'custom-id', name: 'admins', is_builtin: false }]) as never)
-      .mockReturnValueOnce(emptyResult as never)
+      .mockReturnValueOnce(groupsResult([{ id: 'custom-id', name: 'admins', is_builtin: false }]))
+      .mockReturnValueOnce(emptyResult)
 
     const { result } = renderHook(() => useActiveAdminCount())
     // No builtin admins group found, so members query gets empty group_id

@@ -32,9 +32,9 @@ import {
 import { FlatExecutionsTableBody, GroupedExecutionsTableBody } from './ExecutionsTableBody'
 import { executionDefaultSort, executionTableColumns } from './executionTableColumns'
 
-function buildFilterFieldDefinitions(executions: Execution[]): FilterFieldDefinition[] {
+function buildFilterFieldDefinitions(executions: Execution[], projectId: string | null): FilterFieldDefinition[] {
   return [
-    getExecutionWorkflowFilterDefinition(),
+    getExecutionWorkflowFilterDefinition(projectId),
     getExecutionStatusFilterDefinition(),
     getExecutionVersionFilterFromExecutions(executions),
     getExecutionCreatedAtFilterDefinition(),
@@ -86,9 +86,18 @@ export default function Executions() {
 
   const executions = useMemo(() => (executionsQuery.data?.resources ?? []) as Execution[], [executionsQuery.data])
 
-  useCursorReset(executions.length, hasActiveFilters, cursor, executionsQuery.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: executions.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: executionsQuery.isFetching,
+    resetPagination,
+  })
 
-  const filterFieldDefinitions = useMemo(() => buildFilterFieldDefinitions(executions), [executions])
+  const filterFieldDefinitions = useMemo(
+    () => buildFilterFieldDefinitions(executions, selectedProjectId),
+    [executions, selectedProjectId]
+  )
 
   const builtinProjectIds = useMemo(
     () => new Set(projectsForGrouping.filter((p) => p.is_builtin).map((p) => p.id)),
@@ -181,15 +190,25 @@ export default function Executions() {
                 <SynScrollableTableContainer caption="Executions table" footer={getFooterProps(executionsQuery.data)}>
                   <Thead>
                     <Tr>
-                      <Th modifier="nowrap">Run ID</Th>
-                      <Th modifier="nowrap" sort={getSortParams('workflow_id')}>
+                      <Th width={20} modifier="nowrap">
+                        Run ID
+                      </Th>
+                      <Th width={20} modifier="nowrap" sort={getSortParams('workflow_id')}>
                         Workflow name
                       </Th>
-                      <Th sort={getSortParams('status')}>Status</Th>
-                      <Th modifier="nowrap">Version</Th>
-                      <Th sort={getSortParams('created_at')}>Created at</Th>
-                      <Th sort={getSortParams('completed_at')}>Completed at</Th>
-                      <Th screenReaderText="Actions" />
+                      <Th width={15} sort={getSortParams('status')}>
+                        Status
+                      </Th>
+                      <Th width={15} modifier="nowrap">
+                        Version
+                      </Th>
+                      <Th width={15} sort={getSortParams('created_at')}>
+                        Created at
+                      </Th>
+                      <Th width={15} sort={getSortParams('completed_at')}>
+                        Completed at
+                      </Th>
+                      <Th width={10} screenReaderText="Actions" />
                     </Tr>
                   </Thead>
                   {isAllProjects && groupedExecutions ? (

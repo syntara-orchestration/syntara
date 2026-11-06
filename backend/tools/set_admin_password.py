@@ -45,7 +45,6 @@ async def set_admin_password(password: str) -> None:
         result = await session.exec(
             select(User).where(
                 User.username == BOOTSTRAP_ADMIN_USERNAME,
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         admin = result.one_or_none()
@@ -78,7 +77,6 @@ async def set_admin_password(password: str) -> None:
             await session.exec(
                 select(Group).where(
                     Group.name == ADMINS_GROUP_NAME,
-                    Group.deleted_at.is_(None),  # type: ignore[union-attr]
                 )
             )
         ).one_or_none()

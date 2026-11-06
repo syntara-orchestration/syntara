@@ -24,20 +24,26 @@
 import { test, expect, toAppUrl } from './fixtures'
 import {
   addManualTrigger,
-  addScriptNode,
-  addHttpRequestNode,
-  addAgenticNode,
-  addAapNode,
-  addApprovalNodeWithBranch,
-  addConditionNodeWithBranch,
-  addLoopNodeWithBody,
-  addScriptOnHandle,
+  addScriptStep,
+  addHttpRequestStep,
+  addAgenticStep,
+  addAapStep,
+  addApprovalStepWithBranch,
+  addConditionStepWithBranch,
+  addLoopStepWithBody,
+  addScriptStepOnHandle,
   createLlmIntegration,
   deleteLlmIntegration,
-} from './helpers/v2-nodes'
-import { addConvergeNode } from './helpers/v2-nodes-converge'
-import { buildUniqueName, selectProjectIfRequired, deleteWorkflow, triggerLayout } from './helpers/workflows'
-import { apiRequest, createWorkflowViaApi, deleteWorkflowViaApi } from './utils/api'
+} from './helpers/v2-steps'
+import { addConvergeStep } from './helpers/v2-steps-converge'
+import {
+  buildUniqueName,
+  clickSaveAndWait,
+  selectProjectIfRequired,
+  deleteWorkflow,
+  triggerLayout,
+} from './helpers/workflows'
+import { apiRequest, createWorkflowViaApi, deleteWorkflowViaApi, ensureProject } from './utils/api'
 
 /** Inline v2 schema type (formerly in toV2Definition.ts stub, now replaced by generated contracts). */
 type V2WorkflowDefinition = {
@@ -75,6 +81,13 @@ function getV2DefFromRequest(request: { postDataJSON: () => unknown }): V2Workfl
   return payload.workflow_definition
 }
 
+/** POST /workflows create only — excludes /validate and /{id}/… sub-resources. */
+function isWorkflowCreateRequest(request: { url: () => string; method: () => string }): boolean {
+  if (request.method() !== 'POST') return false
+  const path = new URL(request.url()).pathname.replace(/\/$/, '')
+  return path.endsWith('/workflows')
+}
+
 /** Extract v2 workflow definition from an API response body. */
 function getV2DefFromResponse(body: unknown): V2WorkflowDefinition {
   const data = body as {
@@ -99,13 +112,13 @@ test.describe('V2 Workflow Schema Migration', () => {
 
     // Build a minimal workflow: manual trigger → script
     await addManualTrigger(app)
-    await addScriptNode(app, 'Validate input', 'print("validating")')
+    await addScriptStep(app, 'Validate input', 'print("validating")')
 
     // Intercept the POST /workflows request (select project first to avoid name reset)
-    const saveRequestPromise = app.waitForRequest((req) => req.url().includes('/workflows') && req.method() === 'POST')
+    const saveRequestPromise = app.waitForRequest(isWorkflowCreateRequest)
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
-    await app.getByRole('button', { name: 'Save' }).click()
+    await clickSaveAndWait(app)
     const saveRequest = await saveRequestPromise
     const def = getV2DefFromRequest(saveRequest)
 
@@ -141,21 +154,23 @@ test.describe('V2 Workflow Schema Migration', () => {
   test('creates and saves all v2 executor node types', async ({ app }) => {
     test.setTimeout(120_000)
     const workflowName = buildUniqueName('v2-all-executors')
-    await app.goto(toAppUrl('/workflow-builder/new'))
-
-    // Create LLM integration for agentic node
+    // Create the LLM integration before opening the builder so the first
+    // integrations fetch already includes it (avoids a stale model dropdown).
     const llmIntegrationName = buildUniqueName('test-llm-integration')
+    const project = await ensureProject(app)
     const llmIntegration = await createLlmIntegration(app, llmIntegrationName)
 
     try {
+      await app.goto(toAppUrl('/workflow-builder/new'))
+
       // Manual trigger + all 5 executor types
       // Note: Approval node must have a branch completed to be valid
       await addManualTrigger(app, 'Start workflow')
-      await addScriptNode(app, 'Run script', 'echo "hello"')
-      await addHttpRequestNode(app, 'Fetch data', 'https://api.example.com/data')
-      await addAgenticNode(app, 'AI analysis', 'Analyze the fetched data')
-      await addAapNode(app, 'Deploy with Ansible')
-      await addApprovalNodeWithBranch(app, 'Approve deployment')
+      await addScriptStep(app, 'Run script', 'echo "hello"')
+      await addHttpRequestStep(app, 'Fetch data', 'https://api.example.com/data')
+      await addAgenticStep(app, 'AI analysis', 'Analyze the fetched data', llmIntegrationName)
+      await addAapStep(app, 'Deploy with Ansible')
+      await addApprovalStepWithBranch(app, 'Approve deployment')
       // After approval, the workflow ends (the WithBranch helper adds a script on approved branch)
       await triggerLayout(app)
 
@@ -163,9 +178,14 @@ test.describe('V2 Workflow Schema Migration', () => {
       const saveRequestPromise = app.waitForRequest(
         (req) => req.url().includes('/workflows') && req.method() === 'POST'
       )
-      await selectProjectIfRequired(app)
+      // Pin the workflow to the LLM credential's project. `createLlmIntegration`
+      // seeds the credential under `ensureProject`'s `default`, while an unnamed
+      // `selectProjectIfRequired` picks whichever project the dropdown lists
+      // first — and the backend rejects the save with "One or more credential
+      // references are invalid or belong to a different project" when they differ.
+      await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await clickSaveAndWait(app)
       const saveRequest = await saveRequestPromise
       const def = getV2DefFromRequest(saveRequest)
 
@@ -192,8 +212,8 @@ test.describe('V2 Workflow Schema Migration', () => {
       // Edges form a chain: trigger → script → http → ai → aap → approval
       expect(def.edges.length).toBeGreaterThanOrEqual(5)
 
-      // Verify workflow appears in workflows list
-      await expect(app).toHaveURL(/workflow-builder\/.+/)
+      // Must leave /new — `.+` alone matches "new" and navigates before save finishes
+      await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/, { timeout: 15_000 })
       await app.goto(toAppUrl('/workflows'))
       await app.getByPlaceholder('Filter by name').fill(workflowName)
       await app.getByRole('button', { name: 'Apply filter' }).click()
@@ -216,19 +236,16 @@ test.describe('V2 Workflow Schema Migration', () => {
     try {
       // Manual trigger + all 3 control flow types
       await addManualTrigger(app, 'Start')
-      await addConditionNodeWithBranch(app, 'Check condition')
-      await addLoopNodeWithBody(app, 'Iterate items')
-      await addConvergeNode(app, 'Merge branches', 'done')
+      await addConditionStepWithBranch(app, 'Check condition')
+      await addLoopStepWithBody(app, 'Iterate items')
+      await addConvergeStep(app, 'Merge branches', 'done')
       // Attach the unused false stub last, when it is the unique remaining branch port.
-      await addScriptOnHandle(app, 'false', 'Check condition - false action', 'print("condition is false")')
+      await addScriptStepOnHandle(app, 'false', 'Check condition - false action', 'print("condition is false")')
 
-      // Intercept save
-      const saveRequestPromise = app.waitForRequest(
-        (req) => req.url().includes('/workflows') && req.method() === 'POST'
-      )
+      const saveRequestPromise = app.waitForRequest(isWorkflowCreateRequest)
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await clickSaveAndWait(app)
       const saveRequest = await saveRequestPromise
       const def = getV2DefFromRequest(saveRequest)
 
@@ -283,11 +300,11 @@ test.describe('V2 Workflow Schema Migration', () => {
     const workflowName = buildUniqueName('v2-comprehensive')
 
     // Create workflow via API with all 9 v2 node types
-    const { id: workflowId } = await createWorkflowViaApi(
+    const { id: workflowId } = await createWorkflowViaApi({
       app,
-      workflowName,
-      [{ id: 'trigger_1', type: 'manual_trigger', name: 'Start workflow', parameters: {} }],
-      [
+      name: workflowName,
+      triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Start workflow', parameters: {} }],
+      nodes: [
         {
           id: 'node_1',
           type: 'script',
@@ -313,7 +330,7 @@ test.describe('V2 Workflow Schema Migration', () => {
         },
         { id: 'node_8', type: 'converge', name: 'Merge results', parameters: { strategy: 'all' } },
       ],
-      [
+      edges: [
         { from: 'trigger_1', to: 'node_1' },
         { from: 'node_1', to: 'node_2' },
         { from: 'node_2', to: 'node_3' },
@@ -323,8 +340,8 @@ test.describe('V2 Workflow Schema Migration', () => {
         { from: 'node_6', to: 'node_7', from_port: 'true' },
         { from: 'node_7', to: 'node_7_body', from_port: 'iterate' },
         { from: 'node_7', to: 'node_8', from_port: 'complete' },
-      ]
-    )
+      ],
+    })
 
     try {
       const getResp = await apiRequest(app, 'get', `/workflows/${workflowId}`)
@@ -333,10 +350,10 @@ test.describe('V2 Workflow Schema Migration', () => {
       // Navigate to the workflow in the builder
       await app.goto(toAppUrl('/workflow-builder/' + workflowId))
 
-      // Every node should be present on the canvas after loading.
+      // Every step should be present on the canvas after loading.
       // Use accessible group names (not getByText) since React Flow may
       // not render text labels at small zoom levels with many nodes.
-      const nodeNames = [
+      const stepNames = [
         'Start workflow',
         'Validate input',
         'Fetch API data',
@@ -347,10 +364,10 @@ test.describe('V2 Workflow Schema Migration', () => {
         'Process items',
         'Merge results',
       ]
-      for (const nodeName of nodeNames) {
+      for (const stepName of stepNames) {
         await expect(
-          app.locator('.react-flow').getByRole('button', { name: new RegExp(`^${nodeName}(,|$)`) }),
-          `node "${nodeName}" should be present after reload`
+          app.locator('.react-flow').getByRole('button', { name: new RegExp(`^${stepName}(,|$)`) }),
+          `step "${stepName}" should be present after reload`
         ).toBeAttached({ timeout: 15_000 })
       }
     } finally {
@@ -368,11 +385,11 @@ test.describe('V2 Workflow Schema Migration', () => {
 
     // Create and save a simple workflow (select project first to avoid name reset)
     await addManualTrigger(app)
-    await addScriptNode(app, 'Test script', 'print("test")')
+    await addScriptStep(app, 'Test script', 'print("test")')
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
-    await app.getByRole('button', { name: 'Save' }).click()
-    await expect(app).toHaveURL(/workflow-builder\/.+/)
+    await clickSaveAndWait(app)
+    await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/, { timeout: 15_000 })
 
     // Navigate to workflows list, find the saved workflow, and reopen it.
     // This is more reliable than page.reload() which can lose session context.
@@ -426,18 +443,17 @@ test.describe('V2 Workflow Schema Migration', () => {
     try {
       // Create a simple workflow
       await addManualTrigger(app)
-      await addScriptNode(app, 'Original script', 'print("original")')
+      await addScriptStep(app, 'Original script', 'print("original")')
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/(?!new)/)
+      await clickSaveAndWait(app)
 
       // Add a second node (edit the workflow)
-      await addScriptNode(app, 'Added script', 'print("added")')
+      await addScriptStep(app, 'Added script', 'print("added")')
 
       // Re-save and capture the PATCH payload
       const patchPromise = app.waitForRequest((req) => req.url().includes('/workflows/') && req.method() === 'PATCH')
-      await app.getByRole('button', { name: 'Save' }).click()
+      await clickSaveAndWait(app)
       const patchRequest = await patchPromise
       const editedDef = getV2DefFromRequest(patchRequest)
 
@@ -446,9 +462,9 @@ test.describe('V2 Workflow Schema Migration', () => {
 
       // Both original and added nodes should be in the definition
       expect(editedDef.nodes.length).toBeGreaterThanOrEqual(2)
-      const nodeNames = editedDef.nodes.map((n) => n.name)
-      expect(nodeNames).toContain('Original script')
-      expect(nodeNames).toContain('Added script')
+      const stepNames = editedDef.nodes.map((n) => n.name)
+      expect(stepNames).toContain('Original script')
+      expect(stepNames).toContain('Added script')
 
       // Edges should connect trigger → original → added
       expect(editedDef.edges.length).toBeGreaterThanOrEqual(2)
@@ -468,13 +484,13 @@ test.describe('V2 Workflow Schema Migration', () => {
     try {
       // Create a workflow with a condition node (produces true/false port edges)
       await addManualTrigger(app)
-      await addConditionNodeWithBranch(app, 'Branch check')
+      await addConditionStepWithBranch(app, 'Branch check')
 
       // Save
-      const savePromise = app.waitForRequest((req) => req.url().includes('/workflows') && req.method() === 'POST')
+      const savePromise = app.waitForRequest(isWorkflowCreateRequest)
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save' }).click()
+      await clickSaveAndWait(app)
       const saveRequest = await savePromise
       const savedDef = getV2DefFromRequest(saveRequest)
 
@@ -484,7 +500,6 @@ test.describe('V2 Workflow Schema Migration', () => {
       expect(conditionEdges.length).toBeGreaterThanOrEqual(1)
 
       // Navigate away and reload the workflow
-      await expect(app).toHaveURL(/workflow-builder\/(?!new)/)
       await app.goto(toAppUrl('/workflows'))
       await app.getByPlaceholder('Filter by name').fill(workflowName)
       await app.getByRole('button', { name: 'Apply filter' }).click()

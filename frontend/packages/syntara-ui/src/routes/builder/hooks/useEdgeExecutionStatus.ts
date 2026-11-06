@@ -60,13 +60,13 @@ export function useEdgeExecutionStatus({
 
     setEdges((currentEdges) =>
       currentEdges.map((edge) => {
-        const edgeExecutionStatus = executionStateEnricher.determineEdgeStatus(
-          edge,
-          activityStates,
-          activities,
-          triggerDisplayToRealId,
-          storedEdges
-        )
+        const edgeExecutionStatus = executionStateEnricher.determineEdgeStatus({
+          edge: edge,
+          activityStates: activityStates,
+          activities: activities,
+          triggerDisplayToRealId: triggerDisplayToRealId,
+          edges: storedEdges,
+        })
 
         if (edge.data?.executionStatus !== edgeExecutionStatus) {
           return {

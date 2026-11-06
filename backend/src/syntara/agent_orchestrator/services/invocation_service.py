@@ -16,15 +16,17 @@ Key design decisions:
 
 from collections.abc import AsyncGenerator, Callable, Iterable
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
 import structlog
 from fastapi import UploadFile
+from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
     from syntara.workflows.services.execution_service import ExecutionService
+    from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 from syntara.agent_orchestrator.models import (
     Invocation,
@@ -34,9 +36,11 @@ from syntara.agent_orchestrator.models import (
     InvocationStatus,
 )
 from syntara.agent_orchestrator.models.request import CancellationResult
+from syntara.agent_orchestrator.utils.cancellation import get_invocation_cancel_key
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.emitter import request_id_context_var
 from syntara.authz.engine import AllowedProjectsResult
+from syntara.core.cache.stream import StreamClient
 from syntara.core.constants import CONTEXT_KEY_FILE_IDS
 from syntara.core.database.session import get_db
 from syntara.core.exceptions import SafeValueError
@@ -64,6 +68,7 @@ class InvocationService(BaseService):
         session_factory: Callable[[], AsyncGenerator[AsyncSession, None]] = get_db,
         file_manager_factory: Callable[[], FileManager] = get_file_manager,
         execution_service: "ExecutionService | None" = None,
+        temporal_service: "TemporalExecutionService | None" = None,
     ) -> None:
         """Initialize service with database session.
 
@@ -73,12 +78,16 @@ class InvocationService(BaseService):
             session_factory: Session factory for background tasks (defaults to get_db)
             file_manager_factory: Factory function for creating FileManager
             execution_service: Service for creating workflow executions
+            temporal_service: Service for cancelling Temporal workflows. Without
+                it, cancelling an invocation still marks it CANCELLED but cannot
+                stop the builtin workflow running it.
 
         """
         super().__init__(session, user)
         self.file_manager = file_manager_factory()
         self.session_factory = session_factory
         self.execution_service = execution_service
+        self.temporal_service = temporal_service
 
     async def _handle_file_uploads(self, files: list[UploadFile], project_id: UUID) -> list[FileMetadata]:
         if not files:
@@ -116,7 +125,7 @@ class InvocationService(BaseService):
 
     async def _start_builtin_workflows(
         self,
-        invocation_id: UUID,
+        invocation: Invocation,
         file_ids: list[str] | None = None,
     ) -> None:
         """Start built-in workflows for this invocation.
@@ -125,13 +134,19 @@ class InvocationService(BaseService):
         document conversion workflows. Workflows are started via Temporal
         (non-blocking RPC) so this returns quickly.
 
+        The agent execution's id is recorded on ``invocation.agent_execution_id``
+        so cancellation can reach its Temporal workflow by primary key instead
+        of scanning ``executions.input_data``.
+
         Args:
-            invocation_id: Invocation ID to execute
+            invocation: Invocation to execute
             file_ids: Optional file UUIDs to convert
 
         """
         if not self.execution_service:
             return
+
+        invocation_id = invocation.id
 
         from syntara.workflows.constants import (  # noqa: PLC0415
             BUILTIN_PROJECT_NAME,
@@ -152,8 +167,12 @@ class InvocationService(BaseService):
                     logger.warning("Builtin workflow 'Document Conversion' not found, skipping")
 
         try:
-            await self.execution_service.create_execution_by_name(
+            agent_execution = await self.execution_service.create_execution_by_name(
                 workflow_name=BUILTIN_WORKFLOW_AGENT_EXECUTION,
+                # invocation_id stays in input_data: it is the builtin workflow's
+                # trigger binding (${trigger.invocation_id}), which the worker
+                # needs.  agent_execution_id below is the reverse link, used for
+                # cancellation.
                 input_data={
                     "invocation_id": str(invocation_id),
                     "actor_id": str(self.user.id),
@@ -164,6 +183,25 @@ class InvocationService(BaseService):
             )
         except WorkflowNotFoundError as exc:
             raise BuiltinWorkflowMissingError(BUILTIN_WORKFLOW_AGENT_EXECUTION) from exc
+
+        # Link the invocation to the execution now running it.  Dirty-attribute
+        # flush emits an UPDATE of this column alone, so a concurrent worker
+        # write of `status` cannot be clobbered.
+        #
+        # Best-effort: the invocation is already committed and the Temporal
+        # workflow is already started, so raising here would 500 a request whose
+        # side effects have all happened.  A NULL link only means the cancel
+        # path cannot reach the Temporal workflow for this invocation.
+        try:
+            invocation.agent_execution_id = agent_execution.id
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            logger.exception(
+                "Failed to link invocation to agent execution",
+                invocation_id=invocation_id,
+                agent_execution_id=agent_execution.id,
+            )
 
     async def create_invocation(
         self,
@@ -301,7 +339,7 @@ class InvocationService(BaseService):
             raise
 
         # Start builtin workflows AFTER successful commit
-        await self._start_builtin_workflows(invocation_id, file_ids=new_file_ids or None)
+        await self._start_builtin_workflows(invocation, file_ids=new_file_ids or None)
 
         return invocation
 
@@ -319,6 +357,56 @@ class InvocationService(BaseService):
 
         """
         return await self.session.get(Invocation, invocation_id)
+
+    async def _cancel_agent_execution(self, invocation_id: UUID) -> None:
+        """Cancel the builtin workflow execution running this invocation.
+
+        Owned here rather than by ExecutionService: cancelling an invocation is
+        this service's job, and splitting it left ``cancel_invocation`` a half
+        cancel — the row went CANCELLED while the Temporal workflow ran on — that
+        every future caller would inherit.
+
+        The execution is found by primary key through
+        ``Invocation.agent_execution_id``, written server-side when the workflow
+        was started.  That replaces a scan of caller-writable
+        ``executions.input_data``, so no is_builtin filtering is needed here; the
+        link is trustworthy by construction.
+
+        Best-effort throughout.  The cancel has already committed, so raising
+        would 500 a request whose effect already landed and a client retry would
+        then get NOT_CANCELLABLE.
+        """
+        # Guarded first so services constructed without a temporal service —
+        # every non-cancel call site — do no work at all.
+        if self.temporal_service is None:
+            return
+
+        from syntara.workflows.models.execution import (  # noqa: PLC0415
+            TERMINAL_EXECUTION_STATUSES,
+            Execution,
+        )
+
+        try:
+            # Re-read the link after the status commit rather than trusting the
+            # instance loaded before it: the FK is written a round-trip after the
+            # execution starts, so a cancel racing invocation creation can see it
+            # appear in between.
+            agent_execution_id = await self.session.scalar(
+                select(Invocation.agent_execution_id).where(Invocation.id == invocation_id)
+            )
+            if agent_execution_id is None:
+                return
+
+            agent_execution = await self.session.get(Execution, agent_execution_id)
+            if agent_execution is None or agent_execution.status in TERMINAL_EXECUTION_STATUSES:
+                return
+
+            await self.temporal_service.cancel_workflow(temporal_workflow_id=agent_execution.temporal_workflow_id)
+        except Exception:
+            logger.exception(
+                "Failed to cancel builtin agent execution",
+                invocation_id=invocation_id,
+            )
 
     async def cancel_invocation(self, invocation_id: UUID, reason: str = "User cancelled") -> CancellationResult:
         """Cancel a running invocation.
@@ -372,34 +460,87 @@ class InvocationService(BaseService):
             )
             return CancellationResult.NOT_CANCELLABLE
 
-        # Update invocation with cancellation details using existing fields
-        invocation.status = InvocationStatus.CANCELLED
-        invocation.error_message = f"User cancelled: {reason}"
-        invocation.completed_at = datetime.now(UTC)
-
-        # Store cancellation metadata in checkpoint_data for debugging
+        now = datetime.now(UTC)
+        error_message = f"User cancelled: {reason}"
         cancellation_data: dict[str, object] = {
-            "cancelled_at": invocation.completed_at.isoformat(),
+            "cancelled_at": now.isoformat(),
             "cancelled_by": str(self.user.id),
             "reason": reason,
         }
+        checkpoint_data: dict[str, object] = dict(invocation.checkpoint_data) if invocation.checkpoint_data else {}
+        checkpoint_data.update(cancellation_data)
 
-        # Merge with existing checkpoint_data if it exists
-        if invocation.checkpoint_data:
-            invocation.checkpoint_data.update(cancellation_data)
-        else:
-            invocation.checkpoint_data = cancellation_data
+        # Conditional UPDATE so a concurrent COMPLETED/FAILED write cannot be
+        # overwritten by a stale in-memory CANCELLED assignment.
+        stmt = (
+            update(Invocation)
+            .where(Invocation.id == invocation_id)  # type: ignore[arg-type]
+            .where(col(Invocation.status).in_((InvocationStatus.CREATED, InvocationStatus.RUNNING)))
+            .values(
+                status=InvocationStatus.CANCELLED,
+                error_message=error_message,
+                completed_at=now,
+                checkpoint_data=checkpoint_data,
+            )
+        )
+        result = await self.session.exec(stmt)
+        if not bool(cast("Any", result).rowcount > 0):
+            await self.session.refresh(invocation)
+            logger.warning(
+                "Cancellation failed: Invocation not in cancellable state",
+                invocation_id=invocation_id,
+                status=invocation.status.value,
+            )
+            AuditEventDispatcher.dispatch(
+                InvocationCancelledEvent(
+                    invocation_id=invocation_id,
+                    result=InvocationCancellationResult.NOT_CANCELLABLE,
+                    reason=reason,
+                    current_status=invocation.status,
+                    activity_id=activity_id,
+                    activity_name=activity_name,
+                )
+            )
+            return CancellationResult.NOT_CANCELLABLE
 
-        # Clean up uploaded and converted files associated with this invocation
-        cleaned_file_ids = await self._cleanup_invocation_files(invocation)
+        invocation.status = InvocationStatus.CANCELLED
+        invocation.error_message = error_message
+        invocation.completed_at = now
+        invocation.checkpoint_data = checkpoint_data
 
         # Note: Document conversion workflows will complete harmlessly even for
-        # cancelled invocations. Execution workflow cancellation is handled by Temporal.
+        # cancelled invocations. The builtin workflow running this invocation is
+        # cancelled below, via _cancel_agent_execution.
 
+        cleaned_file_ids: list[UUID] = []
         try:
             await self.session.commit()
 
             logger.info("Invocation cancelled successfully", invocation_id=invocation_id, reason=reason)
+
+            # Signal the running agent loop via Redis so it stops.  The
+            # terminal cancelled stream event is published by
+            # orchestration_service when the agent actually stops.
+            await self._signal_cancellation(invocation_id)
+
+            # Stop the builtin workflow running this invocation so it does not
+            # linger as a RUNNING execution.  The DB status above is what
+            # actually stops the agent; this is the tidy-up.
+            await self._cancel_agent_execution(invocation_id)
+
+            # Clean up files AFTER the signal is sent.  The agent may still be
+            # executing a tool at this point (see _cancellation_watcher known
+            # limitation) so in-flight tools could see missing files — this is
+            # accepted since the invocation is already cancelled in the DB.
+            # Best-effort: cleanup failures must not 500 a cancel that already
+            # committed — a client retry would get NOT_CANCELLABLE.
+            try:
+                cleaned_file_ids = await self._cleanup_invocation_files(invocation)
+            except Exception:
+                logger.exception(
+                    "File cleanup failed after cancellation, continuing",
+                    invocation_id=invocation_id,
+                )
 
             # Dispatch success audit event
             AuditEventDispatcher.dispatch(
@@ -428,7 +569,44 @@ class InvocationService(BaseService):
                     activity_name=activity_name,
                 )
             )
+            try:
+                await self.session.rollback()
+            except Exception:
+                logger.exception(
+                    "Failed to rollback after invocation cancel commit error",
+                    invocation_id=invocation_id,
+                )
             raise
+
+    async def _signal_cancellation(self, invocation_id: UUID) -> None:
+        """Set Redis cancellation key so the agent loop detects cancellation.
+
+        Only sets the cancel key — does NOT publish a terminal ``cancelled``
+        event to the stream.  The orchestration service publishes the terminal
+        event when the agent actually stops, ensuring no stream traffic appears
+        after the terminal marker.
+
+        Best-effort: Redis failures are logged but do not prevent cancellation.
+        """
+        from syntara.workflows.workflow_engine.constants import AGENT_EXECUTION_TIMEOUT_SECONDS  # noqa: PLC0415
+
+        cancel_key_ttl_seconds = AGENT_EXECUTION_TIMEOUT_SECONDS
+        try:
+            async with StreamClient() as client:
+                cancel_key = get_invocation_cancel_key(invocation_id)
+                await client.set_key(cancel_key, "1", cancel_key_ttl_seconds)
+
+                logger.info(
+                    "Cancellation signal sent via Redis",
+                    invocation_id=invocation_id,
+                )
+        except Exception:
+            logger.exception(
+                "Failed to signal cancellation via Redis,"
+                " agent may continue to completion if Redis stays healthy"
+                " (DB fallback only runs when Redis itself errors)",
+                invocation_id=invocation_id,
+            )
 
     async def _cleanup_files_from_paths(
         self, files_to_cleanup: list[str], invocation_id: UUID, *, context: str = ""

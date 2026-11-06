@@ -12,6 +12,31 @@ import { routerTestState } from '../../test/setup'
 import { accessClient, accessFetchClient } from '../access/accessClient'
 
 import { AccessManagement } from './AccessManagement'
+import { GroupsTab } from './GroupsTab'
+import { UsersTab } from './UsersTab'
+
+function AccessManagementTestOutlet() {
+  return routerTestState.pathname.endsWith('/groups') ? <GroupsTab /> : <UsersTab />
+}
+
+vi.mock('@tanstack/react-router', async () => {
+  const actual = await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router')
+  const { MockLink } = await import('../../test/setup')
+  return {
+    ...actual,
+    Link: MockLink,
+    Outlet: AccessManagementTestOutlet,
+    useNavigate: () => routerTestState.navigate,
+    useRouterState: (opts?: { select?: (s: { location: { pathname: string; searchStr: string } }) => unknown }) => {
+      const state = { location: { pathname: routerTestState.pathname, searchStr: routerTestState.searchStr } }
+      return opts?.select ? opts.select(state) : state
+    },
+    useRouter: () => ({
+      history: { push: routerTestState.historyPush },
+      state: { location: { pathname: routerTestState.pathname, searchStr: routerTestState.searchStr } },
+    }),
+  }
+})
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -58,11 +83,11 @@ describe('AccessManagement', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
     vi.mocked(usersClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
     vi.mocked(accessClient.useQuery).mockReturnValue({
       data: { resources: [] },
       isPending: false,
@@ -70,15 +95,15 @@ describe('AccessManagement', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn(),
-    } as never)
+    })
     vi.mocked(accessClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
     vi.mocked(adminClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
     vi.mocked(accessFetchClient.POST).mockImplementation((path: string) => {
       if (path === '/authz/what_can_i') {
         return Promise.resolve({ data: { resources: [], next: null } } as never)

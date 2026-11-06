@@ -13,6 +13,7 @@ from ..models.workflow_version_read_status import WorkflowVersionReadStatus
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.user_reference import UserReference
     from ..models.workflow_version_read_workflow_definition import WorkflowVersionReadWorkflowDefinition
 
 
@@ -29,7 +30,6 @@ class WorkflowVersionRead:
         version (int):
         schema_version (str):
         workflow_definition (WorkflowVersionReadWorkflowDefinition):
-        created_by (UUID):
         created_at (datetime.datetime):
         updated_at (datetime.datetime):
         change_description (None | str | Unset):
@@ -37,7 +37,7 @@ class WorkflowVersionRead:
         last_published_at (datetime.datetime | None | Unset):
         last_unpublished_at (datetime.datetime | None | Unset):
         name (None | str | Unset):
-        created_by_username (None | str | Unset):
+        created_by (None | Unset | UserReference): User who created the version
     """
 
     id: UUID
@@ -45,7 +45,6 @@ class WorkflowVersionRead:
     version: int
     schema_version: str
     workflow_definition: WorkflowVersionReadWorkflowDefinition
-    created_by: UUID
     created_at: datetime.datetime
     updated_at: datetime.datetime
     change_description: None | str | Unset = UNSET
@@ -53,10 +52,12 @@ class WorkflowVersionRead:
     last_published_at: datetime.datetime | None | Unset = UNSET
     last_unpublished_at: datetime.datetime | None | Unset = UNSET
     name: None | str | Unset = UNSET
-    created_by_username: None | str | Unset = UNSET
+    created_by: None | Unset | UserReference = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.user_reference import UserReference
+
         id = str(self.id)
 
         workflow_id = str(self.workflow_id)
@@ -66,8 +67,6 @@ class WorkflowVersionRead:
         schema_version = self.schema_version
 
         workflow_definition = self.workflow_definition.to_dict()
-
-        created_by = str(self.created_by)
 
         created_at = self.created_at.isoformat()
 
@@ -105,11 +104,13 @@ class WorkflowVersionRead:
         else:
             name = self.name
 
-        created_by_username: None | str | Unset
-        if isinstance(self.created_by_username, Unset):
-            created_by_username = UNSET
+        created_by: dict[str, Any] | None | Unset
+        if isinstance(self.created_by, Unset):
+            created_by = UNSET
+        elif isinstance(self.created_by, UserReference):
+            created_by = self.created_by.to_dict()
         else:
-            created_by_username = self.created_by_username
+            created_by = self.created_by
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -120,7 +121,6 @@ class WorkflowVersionRead:
                 "version": version,
                 "schema_version": schema_version,
                 "workflow_definition": workflow_definition,
-                "created_by": created_by,
                 "created_at": created_at,
                 "updated_at": updated_at,
             }
@@ -135,13 +135,14 @@ class WorkflowVersionRead:
             field_dict["last_unpublished_at"] = last_unpublished_at
         if name is not UNSET:
             field_dict["name"] = name
-        if created_by_username is not UNSET:
-            field_dict["created_by_username"] = created_by_username
+        if created_by is not UNSET:
+            field_dict["created_by"] = created_by
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.user_reference import UserReference
         from ..models.workflow_version_read_workflow_definition import WorkflowVersionReadWorkflowDefinition
 
         d = dict(src_dict)
@@ -154,8 +155,6 @@ class WorkflowVersionRead:
         schema_version = d.pop("schema_version")
 
         workflow_definition = WorkflowVersionReadWorkflowDefinition.from_dict(d.pop("workflow_definition"))
-
-        created_by = UUID(d.pop("created_by"))
 
         created_at = isoparse(d.pop("created_at"))
 
@@ -220,14 +219,22 @@ class WorkflowVersionRead:
 
         name = _parse_name(d.pop("name", UNSET))
 
-        def _parse_created_by_username(data: object) -> None | str | Unset:
+        def _parse_created_by(data: object) -> None | Unset | UserReference:
             if data is None:
                 return data
             if isinstance(data, Unset):
                 return data
-            return cast(None | str | Unset, data)
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                created_by_type_0 = UserReference.from_dict(data)
 
-        created_by_username = _parse_created_by_username(d.pop("created_by_username", UNSET))
+                return created_by_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UserReference, data)
+
+        created_by = _parse_created_by(d.pop("created_by", UNSET))
 
         workflow_version_read = cls(
             id=id,
@@ -235,7 +242,6 @@ class WorkflowVersionRead:
             version=version,
             schema_version=schema_version,
             workflow_definition=workflow_definition,
-            created_by=created_by,
             created_at=created_at,
             updated_at=updated_at,
             change_description=change_description,
@@ -243,7 +249,7 @@ class WorkflowVersionRead:
             last_published_at=last_published_at,
             last_unpublished_at=last_unpublished_at,
             name=name,
-            created_by_username=created_by_username,
+            created_by=created_by,
         )
 
         workflow_version_read.additional_properties = d

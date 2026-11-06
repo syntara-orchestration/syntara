@@ -6,23 +6,26 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/index.ts",
+    "test": "vitest run",
+    "vitest": "vitest run",
     "lint": "eslint src/resources/ src/utils/",
     "podman:build": "podman build --platform linux/amd64,linux/arm64 --tag syntara-mock-api -f Containerfile ../..",
     "podman:run": "podman run --rm -p 3000:3000 syntara-mock-api"
   },
   "dependencies": {
-    "@syntara/contracts": "file:../syntara-contracts",
     "@mswjs/http-middleware": "^0.10.3",
+    "@syntara/contracts": "file:../syntara-contracts",
     "jmespath": "^0.16.0",
-    "js-yaml": "^4.1.1",
-    "msw": "^2.14.6",
-    "tsx": "^4.22.3",
-    "uuid": "^14.0.0"
+    "js-yaml": "^5.4.2",
+    "msw": "^3.0.1",
+    "tsx": "^4.23.15",
+    "uuid": "^14.0.2"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.6.0",
-    "eslint": "^10.9.0",
-    "typescript-eslint": "^8.61.0"
+    "eslint": "^10.11.0",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
   }
 }

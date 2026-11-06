@@ -78,7 +78,7 @@ async def get_user_by_username(username: str) -> User | None:
 async def get_admin_user() -> User:
     """Get the admin user."""
     async with AsyncSessionLocal() as session:
-        result = await session.exec(select(User).filter(User.username == "admin", User.deleted_at.is_(None)))  # type: ignore[arg-type]
+        result = await session.exec(select(User).filter(User.username == "admin"))  # type: ignore[arg-type]
         user = result.first()
         if not user:
             msg = "No admin user found. Run 'uv run python tools/set_admin_password.py' to create one."

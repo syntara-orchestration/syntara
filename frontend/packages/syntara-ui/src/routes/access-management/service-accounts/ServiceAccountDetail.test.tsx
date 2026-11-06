@@ -11,7 +11,13 @@ import { AlertProvider } from '../../../providers/alerts'
 import { routerTestState } from '../../../test/setup'
 import { accessClient } from '../../access/accessClient'
 
-import { ServiceAccountDetail } from './ServiceAccountDetail'
+import {
+  ServiceAccountDetail,
+  ServiceAccountDetailAssignmentsTabRoute,
+  ServiceAccountDetailCredentialsTabRoute,
+  ServiceAccountDetailDetailsTabRoute,
+  ServiceAccountDetailUnknownTabRoute,
+} from './ServiceAccountDetail'
 import type { ServiceAccountRead } from './serviceAccountTypes'
 import { useServiceAccountPermissions } from './useServiceAccountPermissions'
 
@@ -31,6 +37,30 @@ vi.mock('../../access/accessClient', () => ({
 
 vi.mock('./useServiceAccountPermissions')
 
+function ServiceAccountDetailTestOutlet() {
+  const tab = routerTestState.pathname.split('/').at(-1)
+  if (tab === 'credentials') return <ServiceAccountDetailCredentialsTabRoute />
+  if (tab === 'assignments') return <ServiceAccountDetailAssignmentsTabRoute />
+  if (tab && !['details', 'sa-1'].includes(tab)) return <ServiceAccountDetailUnknownTabRoute />
+  return <ServiceAccountDetailDetailsTabRoute />
+}
+
+vi.mock('@tanstack/react-router', async () => {
+  const actual = await vi.importActual('@tanstack/react-router')
+  const { routerTestState, MockLink } = await import('../../../test/setup')
+  return {
+    ...actual,
+    Link: MockLink,
+    Outlet: ServiceAccountDetailTestOutlet,
+    useNavigate: () => routerTestState.navigate,
+    useParams: vi.fn(() => ({})),
+    useRouterState: (opts?: { select?: (state: { location: { pathname: string; searchStr: string } }) => unknown }) => {
+      const state = { location: { pathname: routerTestState.pathname, searchStr: routerTestState.searchStr } }
+      return opts?.select ? opts.select(state) : state
+    },
+  }
+})
+
 vi.mock('./CredentialsTab', () => ({
   CredentialsTab: () => <div data-testid="credentials-tab" />,
 }))
@@ -46,7 +76,7 @@ const mockServiceAccount: ServiceAccountRead = {
   status: 'active',
   project_id: 'proj-1',
   last_authenticated_at: '2024-06-15T10:00:00Z',
-  created_by: 'admin',
+  created_by: { id: 'u-004', name: 'admin', type: 'user' },
   updated_by: null,
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2024-01-01T00:00:00Z',
@@ -114,9 +144,9 @@ describe('ServiceAccountDetail', () => {
       tooltips: { create: '', update: '', delete: '', rotateSecret: '' },
     })
 
-    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult(mockServiceAccount) as never)
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult(mockServiceAccount))
 
-    vi.mocked(accessClient.useMutation).mockReturnValue(buildMutationResult() as never)
+    vi.mocked(accessClient.useMutation).mockReturnValue(buildMutationResult())
   })
 
   it('renders the service account name as heading', () => {
@@ -208,7 +238,7 @@ describe('ServiceAccountDetail', () => {
       expect(screen.getByText('Disable service account?')).toBeInTheDocument()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable service account' }))
     expect(mockDisableMutate).toHaveBeenCalled()
   })
 
@@ -223,9 +253,7 @@ describe('ServiceAccountDetail', () => {
       return buildMutationResult()
     }) as never)
 
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, status: 'disabled' }) as never
-    )
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ ...mockServiceAccount, status: 'disabled' }))
 
     const user = userEvent.setup()
     render(<ServiceAccountDetail />, { wrapper })
@@ -253,7 +281,7 @@ describe('ServiceAccountDetail', () => {
         isError: true,
         error: new Error('Not found'),
         data: undefined,
-      }) as never
+      })
     )
 
     render(<ServiceAccountDetail />, { wrapper })
@@ -269,7 +297,7 @@ describe('ServiceAccountDetail', () => {
         error: new Error('Not found'),
         data: undefined,
         refetch: mockRefetch,
-      }) as never
+      })
     )
 
     const user = userEvent.setup()
@@ -282,9 +310,7 @@ describe('ServiceAccountDetail', () => {
   })
 
   it('shows outline disabled state label on details tab', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, status: 'disabled' }) as never
-    )
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ ...mockServiceAccount, status: 'disabled' }))
 
     render(<ServiceAccountDetail />, { wrapper })
 
@@ -292,9 +318,7 @@ describe('ServiceAccountDetail', () => {
   })
 
   it('shows Disabled state for disabled service accounts', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, status: 'disabled' }) as never
-    )
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ ...mockServiceAccount, status: 'disabled' }))
 
     render(<ServiceAccountDetail />, { wrapper })
 
@@ -304,7 +328,7 @@ describe('ServiceAccountDetail', () => {
 
   it('renders owning project as a link when project_name is present', () => {
     vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, project_name: 'my-project', is_project_deleted: false }) as never
+      buildQueryResult({ ...mockServiceAccount, project_name: 'my-project' })
     )
 
     render(<ServiceAccountDetail />, { wrapper })
@@ -315,9 +339,7 @@ describe('ServiceAccountDetail', () => {
   })
 
   it('renders owning project as plain text when project_name is null', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, project_name: null }) as never
-    )
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ ...mockServiceAccount, project_name: null }))
 
     render(<ServiceAccountDetail />, { wrapper })
 
@@ -325,21 +347,9 @@ describe('ServiceAccountDetail', () => {
     expect(screen.queryByRole('link', { name: 'proj-1' })).not.toBeInTheDocument()
   })
 
-  it('renders owning project as plain text with Deleted label when project is deleted', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, project_name: 'old-project', is_project_deleted: true }) as never
-    )
-
-    render(<ServiceAccountDetail />, { wrapper })
-
-    expect(screen.getByText('old-project')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'old-project' })).not.toBeInTheDocument()
-    expect(screen.getByText('Deleted')).toBeInTheDocument()
-  })
-
   it('shows Never for last authenticated when never used', () => {
     vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, last_authenticated_at: null }) as never
+      buildQueryResult({ ...mockServiceAccount, last_authenticated_at: null })
     )
 
     render(<ServiceAccountDetail />, { wrapper })
@@ -382,7 +392,7 @@ describe('ServiceAccountDetail', () => {
 
     const ackCheckbox = screen.getByRole('checkbox', { name: /i understand/i })
     await user.click(ackCheckbox)
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'Delete service account' }))
     expect(mockDeleteMutate).toHaveBeenCalled()
     expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.AccessManagement.ServiceAccounts })
   })
@@ -394,7 +404,7 @@ describe('ServiceAccountDetail', () => {
         isLoading: true,
         isSuccess: false,
         data: undefined,
-      }) as never
+      })
     )
 
     render(<ServiceAccountDetail />, { wrapper })
@@ -403,9 +413,7 @@ describe('ServiceAccountDetail', () => {
   })
 
   it('hides description row when description is null', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, description: null }) as never
-    )
+    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ ...mockServiceAccount, description: null }))
 
     render(<ServiceAccountDetail />, { wrapper })
 

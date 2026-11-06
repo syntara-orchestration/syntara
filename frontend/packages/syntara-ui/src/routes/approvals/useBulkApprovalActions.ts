@@ -6,6 +6,24 @@ import { useAlerts } from '../../providers/alerts'
 
 type DecisionType = 'approved' | 'rejected'
 
+const BULK_DECISION_COPY: Record<
+  DecisionType,
+  { actionLabel: string; actionPastTense: string; actionNoun: string; successTitle: string }
+> = {
+  approved: {
+    actionLabel: 'approved',
+    actionPastTense: 'Approved',
+    actionNoun: 'approval',
+    successTitle: 'Approvals submitted',
+  },
+  rejected: {
+    actionLabel: 'rejected',
+    actionPastTense: 'Rejected',
+    actionNoun: 'rejection',
+    successTitle: 'Approvals rejected',
+  },
+}
+
 export function useBulkApprovalActions(selectedApprovalIds: Set<string>, onSuccess: () => void) {
   const { showSuccess, showAlert } = useAlerts()
   const handleError = useMutationErrorHandler()
@@ -21,10 +39,7 @@ export function useBulkApprovalActions(selectedApprovalIds: Set<string>, onSucce
       notes: note,
     }))
 
-    const actionLabel = status === 'approved' ? 'approved' : 'rejected'
-    const actionPastTense = status === 'approved' ? 'Approved' : 'Rejected'
-    const actionNoun = status === 'approved' ? 'approval' : 'rejection'
-    const successTitle = status === 'approved' ? 'Approvals submitted' : 'Approvals rejected'
+    const { actionLabel, actionPastTense, actionNoun, successTitle } = BULK_DECISION_COPY[status]
 
     bulkDecisionMutation.mutate(
       { body: { decisions } },

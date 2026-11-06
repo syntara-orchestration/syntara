@@ -78,9 +78,7 @@ class ApproverResolutionService:
             return []
 
         stmt = (
-            select(User.id)
-            .where(User.username.in_(usernames))  # type: ignore[attr-defined]
-            .where(User.deleted_at.is_(None))  # type: ignore[union-attr]
+            select(User.id).where(User.username.in_(usernames))  # type: ignore[attr-defined]
         )
         result = await self.session.execute(stmt)
         user_ids = result.scalars().all()
@@ -117,9 +115,7 @@ class ApproverResolutionService:
             return []
 
         stmt = (
-            select(Group.id)
-            .where(Group.name.in_(group_names))  # type: ignore[attr-defined]
-            .where(Group.deleted_at.is_(None))  # type: ignore[union-attr]
+            select(Group.id).where(Group.name.in_(group_names))  # type: ignore[attr-defined]
         )
         result = await self.session.execute(stmt)
         group_ids = result.scalars().all()

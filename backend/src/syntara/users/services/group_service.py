@@ -47,6 +47,7 @@ from syntara.core.models.user_schemas import GroupMemberListResponse, GroupMembe
 from syntara.core.queries.user_queries import get_user_by_id
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
+from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.core.utils.filters import Filter
 from syntara.identity_providers.models.identity_provider import IdentityProvider
 
@@ -62,7 +63,7 @@ class GroupConvertResourceMixin(ConvertResourceMixin):
 logger = structlog.stdlib.get_logger(__name__)
 
 
-class GroupsService(BaseService):
+class GroupsService(UserReferenceResolverMixin, BaseService):
     """Service for group business logic.
 
     This service encapsulates all group-related business operations,
@@ -117,7 +118,6 @@ class GroupsService(BaseService):
             .join(User, User.id == user_groups.c.user_id)  # type: ignore[arg-type]
             .where(
                 user_groups.c.group_id.in_(group_ids),
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .group_by(user_groups.c.group_id)
         )
@@ -132,6 +132,12 @@ class GroupsService(BaseService):
         """Convert Group to GroupRead with member_count."""
         group_read = GroupRead.model_validate(group)
         group_read.member_count = member_count
+        return group_read
+
+    async def to_group_read(self, group: Group, member_count: int = 0) -> GroupRead:
+        """Convert Group to GroupRead and resolve created_by to UserReference."""
+        group_read = self.enrich_group_read(group, member_count)
+        await self.resolve_user_references([group_read])
         return group_read
 
     async def create_group(
@@ -244,7 +250,6 @@ class GroupsService(BaseService):
         result = await self.session.exec(
             select(Group).filter(
                 Group.id == group_id,  # type: ignore[arg-type]
-                Group.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         group = result.one_or_none()
@@ -300,7 +305,11 @@ class GroupsService(BaseService):
         return group
 
     async def delete_group(self, group_id: UUID) -> None:
-        """Soft delete a group.
+        """Hard-delete a group and clean up linked resources.
+
+        Deletes non-builtin role assignments for the group, then removes
+        the group row. DB CASCADE handles: user_groups, user_idp_groups,
+        idp_group_mapping_entries, approval_approver_groups.
 
         Args:
             group_id: UUID of group to delete
@@ -313,7 +322,17 @@ class GroupsService(BaseService):
         group = await self.get_group_by_id(group_id)
         if group.is_builtin:
             raise BuiltinGroupDeleteError(group.name)
-        group.soft_delete(self.user.id)
+
+        from syntara.authz.models.assignments import RoleAssignment  # noqa: PLC0415
+
+        await self.session.exec(
+            delete(RoleAssignment).where(
+                col(RoleAssignment.group_id) == group_id,
+                col(RoleAssignment.is_builtin) == False,  # noqa: E712
+            )
+        )
+
+        await self.session.delete(group)
         await self.session.commit()
 
     # ========================================================================
@@ -454,7 +473,6 @@ class GroupsService(BaseService):
             .join(user_groups, User.id == user_groups.c.user_id)  # type: ignore[arg-type]
             .where(
                 user_groups.c.group_id == group_id,
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .order_by(col(User.username))
         )
@@ -541,7 +559,6 @@ class GroupsService(BaseService):
             .join(user_groups, Group.id == user_groups.c.group_id)  # type: ignore[arg-type]
             .where(
                 user_groups.c.user_id == user_id,
-                Group.deleted_at.is_(None),  # type: ignore[union-attr]
             )
             .order_by(col(Group.name))
         )
@@ -569,6 +586,8 @@ class GroupsService(BaseService):
             read = UserGroupRead.model_validate(g)
             read.membership_sources = sources.get(g.id, [MembershipSource(type="manual")])
             resources.append(read)
+
+        await self.resolve_user_references(resources)
 
         return UserGroupListResponse(resources=resources, next=next_cursor)
 
@@ -687,7 +706,6 @@ class GroupsService(BaseService):
         auth_result = await self.session.exec(
             select(Group.id).where(
                 Group.name == AUTHENTICATED_GROUP_NAME,
-                Group.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         auth_group_id = auth_result.first()
@@ -701,7 +719,6 @@ class GroupsService(BaseService):
         result = await self.session.exec(
             select(Group.id).filter(
                 col(Group.id).in_(desired),
-                Group.deleted_at.is_(None),  # type: ignore[union-attr]
             )
         )
         found = set(result.all())
@@ -823,7 +840,6 @@ class GroupsService(BaseService):
             .where(
                 user_groups.c.group_id == group_id,
                 col(User.id) != exclude_user_id,
-                User.deleted_at.is_(None),  # type: ignore[union-attr]
                 col(User.is_enabled) == True,  # noqa: E712
             )
         )

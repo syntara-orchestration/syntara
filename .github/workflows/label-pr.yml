@@ -10,7 +10,7 @@ permissions:
   pull-requests: write
 jobs:
   label:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: actions/labeler@f27b608878404679385c85cfa523b85ccb86e213 # v6.1.0

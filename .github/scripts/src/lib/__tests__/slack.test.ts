@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { http, HttpResponse } from 'msw'
+import { http, HttpResponse } from 'msw/http'
 import { server } from '../../__tests__/setup.js'
 import { SlackNotifier } from '../slack.js'
 

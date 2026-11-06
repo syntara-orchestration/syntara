@@ -1,0 +1,183 @@
+import { TextInput } from '@patternfly/react-core'
+import { useState, type ReactElement } from 'react'
+import type { Control, FieldPath, FieldValues } from 'react-hook-form'
+
+import { SynFormField } from './SynFormField'
+
+export type SynTextFieldProps<
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+> = {
+  /** RHF field name — must match a key in the form schema. */
+  name: TName
+  /**
+   * RHF `control` object from `useForm` or `useSynForm`. When omitted the
+   * field reads from the nearest `FormProvider` context.
+   */
+  control?: Control<TFieldValues>
+  /** Label text rendered above the input. */
+  label: string
+  /**
+   * HTML `id` used as `FormGroup.fieldId` and on the `TextInput`.
+   * Defaults to the `name` prop.
+   */
+  fieldId?: string
+  /** Marks the field as required with a visual indicator. */
+  isRequired?: boolean
+  /**
+   * Popover content shown next to the label via PatternFly `FormGroup.labelHelp`.
+   * Must be a `ReactElement` — PF6 does not accept plain nodes.
+   */
+  labelHelp?: ReactElement
+  /**
+   * Static helper text shown below the input when there is no validation error.
+   * Replaced by the error message when a validation error is present.
+   */
+  hint?: string
+  /** Placeholder text shown inside the input when empty. */
+  placeholder?: string
+  /** Disables the input. */
+  isDisabled?: boolean
+  /**
+   * Accessible name when the visible `FormGroup` label is hidden or not exposed
+   * to assistive tech.
+   */
+  ariaLabel?: string
+  /**
+   * When true, omits the visible `FormGroup` label (e.g. compact header name inputs).
+   */
+  hideFormGroupLabel?: boolean
+  /** HTML `autocomplete` attribute forwarded to the underlying `TextInput`. */
+  autoComplete?: string
+  /** Input type. Defaults to `'text'`. */
+  type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url' | 'number'
+  /** Forwarded to `TextInput` when `type="number"`. */
+  min?: number
+  /** Forwarded to `TextInput` when `type="number"`. */
+  max?: number
+  /** Forwarded to `TextInput` when `type="number"`. */
+  step?: number
+}
+
+function optionalNumberFromInput(value: string | number | undefined): number | undefined {
+  if (value === '' || value === undefined || value === null) return undefined
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isNaN(n) ? undefined : n
+}
+
+function isPartialNumberInput(value: string): boolean {
+  return value === '-' || value.endsWith('.') || value.endsWith('e') || value.endsWith('E')
+}
+
+function numberInputDisplayValue(draft: string | null, fieldValue: unknown): string {
+  if (draft !== null) return draft
+  if (fieldValue === undefined || fieldValue === null) return ''
+  if (typeof fieldValue === 'number') return String(fieldValue)
+  if (typeof fieldValue === 'string') return fieldValue
+  return ''
+}
+
+/**
+ * A single-line text input bound to a react-hook-form field.
+ *
+ * Combines `SynFormField` + PatternFly `TextInput` with all RHF bindings
+ * (`value`, `onChange`, `onBlur`, `name`, `validated`) pre-wired.
+ *
+ * @example
+ * ```tsx
+ * <SynTextField
+ *   name="name"
+ *   control={control}
+ *   label="Group name"
+ *   isRequired
+ *   placeholder="Enter group name"
+ *   labelHelp={groupHelp.name}
+ * />
+ * ```
+ */
+export function SynTextField<
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+>({
+  name,
+  control,
+  label,
+  fieldId,
+  isRequired,
+  labelHelp,
+  hint,
+  placeholder,
+  isDisabled,
+  hideFormGroupLabel,
+  ariaLabel,
+  autoComplete,
+  type = 'text',
+  min,
+  max,
+  step,
+}: Readonly<SynTextFieldProps<TFieldValues, TName>>) {
+  const resolvedFieldId = fieldId ?? name
+  const isNumberInput = type === 'number'
+  const [numberDraft, setNumberDraft] = useState<string | null>(null)
+
+  return (
+    <SynFormField
+      name={name}
+      control={control}
+      label={label}
+      fieldId={resolvedFieldId}
+      isRequired={isRequired}
+      labelHelp={labelHelp}
+      hint={hint}
+      hideFormGroupLabel={hideFormGroupLabel}
+    >
+      {({ field, fieldState, describedBy }) => {
+        const displayValue = isNumberInput ? numberInputDisplayValue(numberDraft, field.value) : (field.value ?? '')
+
+        return (
+          <TextInput
+            id={resolvedFieldId}
+            type={type}
+            aria-label={ariaLabel}
+            aria-describedby={describedBy}
+            aria-required={isRequired ? true : undefined}
+            placeholder={placeholder}
+            validated={fieldState.error ? 'error' : 'default'}
+            value={displayValue}
+            onChange={(_event, value) => {
+              if (isNumberInput) {
+                if (value === '') {
+                  setNumberDraft('')
+                  field.onChange(undefined)
+                  return
+                }
+                setNumberDraft(value)
+                if (!isPartialNumberInput(value)) {
+                  field.onChange(optionalNumberFromInput(value))
+                  setNumberDraft(null)
+                }
+              } else {
+                field.onChange(value)
+              }
+            }}
+            onBlur={() => {
+              if (isNumberInput) {
+                const raw = numberDraft ?? displayValue
+                field.onChange(optionalNumberFromInput(String(raw)))
+                setNumberDraft(null)
+              }
+              field.onBlur()
+            }}
+            name={field.name}
+            isRequired={isRequired}
+            isDisabled={isDisabled}
+            autoComplete={autoComplete}
+            min={isNumberInput ? min : undefined}
+            max={isNumberInput ? max : undefined}
+            step={isNumberInput ? step : undefined}
+          />
+        )
+      }}
+    </SynFormField>
+  )
+}

@@ -18,6 +18,7 @@ export type BuilderDialogPropsParams = {
   dispatch: Dispatch<BuilderAction>
   handleRunWorkflow: (inputData?: Record<string, unknown>, triggerNodeId?: string) => void
   handleDeleteWorkflow: () => void
+  isDeleting: boolean
   runStepDialog: DialogState<RunStepDialogData>
   lastRunStepNodeIdRef: React.MutableRefObject<string | null>
   pendingImport: PendingImportData | null
@@ -39,6 +40,7 @@ export function useBuilderDialogProps(params: BuilderDialogPropsParams) {
     dispatch,
     handleRunWorkflow,
     handleDeleteWorkflow,
+    isDeleting,
     runStepDialog,
     lastRunStepNodeIdRef,
     pendingImport,
@@ -65,6 +67,7 @@ export function useBuilderDialogProps(params: BuilderDialogPropsParams) {
     dispatch,
     handleRunWorkflow,
     handleDeleteWorkflow,
+    isDeleting,
     triggerName: (selectedTrigger as { name?: string } | undefined)?.name ?? 'Trigger',
     triggerNodeId: (selectedTrigger as { id?: string } | undefined)?.id,
     triggerInputSchema: ((selectedTrigger as { parameters?: Record<string, unknown> } | undefined)?.parameters

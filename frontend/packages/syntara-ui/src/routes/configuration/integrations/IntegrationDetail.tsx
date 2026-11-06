@@ -243,7 +243,7 @@ function ResourcesFooter({
   isDirty,
   isSaving,
   onSave,
-  saveLabel = 'Save changes',
+  saveLabel = 'Save tools',
 }: Readonly<{ isDirty: boolean; isSaving: boolean; onSave: () => void; saveLabel?: string }>) {
   return (
     <ActionGroup>
@@ -254,22 +254,40 @@ function ResourcesFooter({
   )
 }
 
-function getFooterState(
-  isLLM: boolean,
-  modelsState: ReturnType<typeof useIntegrationModelsState>,
-  toolsDirty: boolean,
-  isToolsSaving: boolean,
+function getFooterState({
+  isLLM,
+  modelsState,
+  toolsDirty,
+  isToolsSaving,
+  handleToolsSave,
+}: {
+  isLLM: boolean
+  modelsState: ReturnType<typeof useIntegrationModelsState>
+  toolsDirty: boolean
+  isToolsSaving: boolean
   handleToolsSave: () => void
-) {
+}) {
   if (isLLM) {
     return {
       isDirty: modelsState.isDirty,
       isSaving: modelsState.isSaving,
       onSave: modelsState.handleSave,
-      saveLabel: 'Save model changes',
+      saveLabel: 'Save models',
     }
   }
-  return { isDirty: toolsDirty, isSaving: isToolsSaving, onSave: handleToolsSave, saveLabel: 'Save changes' }
+  return { isDirty: toolsDirty, isSaving: isToolsSaving, onSave: handleToolsSave, saveLabel: 'Save tools' }
+}
+
+function shouldShowResourcesFooter(
+  isLLM: boolean,
+  tools: ReturnType<typeof useAllIntegrationTools>['tools'],
+  modelsState: ReturnType<typeof useIntegrationModelsState>
+): boolean {
+  if (isLLM) {
+    if (modelsState.isLoading || modelsState.error) return false
+    return modelsState.models.length > 0
+  }
+  return tools.length > 0
 }
 
 function hasResourcesTab(integration: IntegrationsAPI.components['schemas']['IntegrationRead']): boolean {
@@ -340,7 +358,7 @@ export function IntegrationDetail() {
   // Models state (LLM providers)
   const modelsState = useIntegrationModelsState(integrationId, isLLM)
 
-  const footerState = getFooterState(isLLM, modelsState, toolsDirty, isToolsSaving, handleToolsSave)
+  const footerState = getFooterState({ isLLM, modelsState, toolsDirty, isToolsSaving, handleToolsSave })
 
   const queryState = useQueryState(query, {
     title: 'Error loading integration',
@@ -378,7 +396,8 @@ export function IntegrationDetail() {
   if (!integration?.id) return null
 
   const integrationCrumbs = breadcrumbsIntegrationDetail(integration.name)
-  const footer = activeTab === 'resources' ? <ResourcesFooter {...footerState} /> : undefined
+  const showResourcesFooter = shouldShowResourcesFooter(isLLM, tools, modelsState)
+  const footer = activeTab === 'resources' && showResourcesFooter ? <ResourcesFooter {...footerState} /> : undefined
 
   return (
     <SynPage>

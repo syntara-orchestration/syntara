@@ -19,6 +19,7 @@ from syntara.core.models.base.named import NamedResource
 from syntara.core.models.base.query_params import BaseListParams
 from syntara.core.models.base.user_owned import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.core.utils.sqlmodel import DiscriminatedJSONB, postgres_enum_column
 from syntara.integrations.models.integration_configuration import (
     IntegrationConfiguration,
@@ -158,6 +159,19 @@ class Integration(NamedResource, UserOwnedResource, table=True):
         default=None,
         description="Timestamp of last successful resource refresh (unchanged on failure)",
         sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
+    )
+
+    # Validation/refresh are background-worker writes, not user edits; don't bump updated_at for them.
+    __updated_at_exempt_fields__: ClassVar[frozenset[str]] = frozenset(
+        {
+            "validation_status",
+            "validation_error",
+            "last_validated_at",
+            "refresh_status",
+            "refresh_error",
+            "last_refreshed_at",
+            "last_successful_refresh_at",
+        }
     )
 
     __filterable_fields__: ClassVar[list[str]] = [
@@ -371,20 +385,17 @@ class IntegrationCreate(SQLModel):
         return self
 
 
-class IntegrationRead(NamedResource, UserOwnedResource):
+class IntegrationRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource):
     """Schema for integration API responses."""
 
-    created_by: str | UUID | None = Field(description="Username or UUID of the creator")  # type: ignore[assignment]
-    updated_by: str | UUID | None = Field(default=None, description="Username or UUID of the last modifier")  # type: ignore[assignment]
+    created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the integration")  # type: ignore[assignment]
+    updated_by: UserReference | UUID | str | None = Field(
+        default=None, description="User who last modified the integration"
+    )  # type: ignore[assignment]
 
     FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, Any]] = {
         **NamedResource.FIELD_SCHEMA_EXTRAS,
         **UserOwnedResource.FIELD_SCHEMA_EXTRAS,
-        "created_by": {
-            **UserOwnedResource.FIELD_SCHEMA_EXTRAS["created_by"],
-            "type": "string",
-            "format": "uuid",
-        },
     }
 
     integration_type: IntegrationType

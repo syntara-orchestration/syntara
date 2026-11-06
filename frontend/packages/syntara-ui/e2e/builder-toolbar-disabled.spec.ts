@@ -1,44 +1,24 @@
 /**
- * E2E Tests: Builder toolbar buttons disabled while node editor is open
+ * E2E Tests: Builder toolbar buttons disabled while step editor is open
  *
  * Critical paths covered:
- * - Save, Run, and Publish buttons are disabled when a node editor panel is open
- * - Buttons re-enable after closing the node editor
+ * - Save, Run, and Publish buttons are disabled when a step editor panel is open
+ * - Buttons re-enable after closing the step editor
  * - Tooltips show the correct "finish editing" message when disabled
  */
 
-import { type Page, test, expect } from './fixtures'
+import { test, expect } from './fixtures'
 import {
   buildUniqueName,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   createBasicWorkflowViaApi,
   openWorkflowInBuilder,
   deleteWorkflow,
+  openStepForEditing,
 } from './helpers/workflows'
 
-/** Reset layout and fit view so all nodes are in the viewport (required in CI). */
-async function layoutCanvas(app: Page) {
-  const layoutButton = app.getByRole('button', { name: 'Reset layout', exact: true })
-  if ((await layoutButton.count()) > 0) {
-    await layoutButton.click()
-    await app.waitForSelector('[role="group"][aria-roledescription="node"]', { state: 'visible', timeout: 5_000 })
-  }
-  const fitViewButton = app.getByRole('button', { name: 'Fit view' })
-  if ((await fitViewButton.count()) > 0) {
-    await fitViewButton.click()
-  }
-}
-
-/** Click a React Flow node by its visible text label to open its editor. */
-async function clickNode(app: Page, nodeText: string) {
-  await layoutCanvas(app)
-  const node = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeText })
-  await expect(node).toBeVisible({ timeout: 5_000 })
-  await node.click()
-}
-
 test.describe('builder toolbar disabled while editing', () => {
-  test('Save, Run, and Publish are disabled when a node editor is open', async ({ app }) => {
+  test('Save, Run, and Publish are disabled when a step editor is open', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-toolbar-disabled')
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Toolbar test action')
 
@@ -49,13 +29,12 @@ test.describe('builder toolbar disabled while editing', () => {
       await app.getByPlaceholder('Workflow name').fill(`${workflowName}-dirty`)
 
       // Verify Save is initially enabled (aria-disabled=false or absent)
-      const saveBtn = app.getByRole('button', { name: 'Save', exact: true })
+      const saveBtn = app.getByRole('button', { name: 'Save workflow' })
       await expect(saveBtn).not.toHaveAttribute('aria-disabled', 'true')
 
-      // Click a node to open the editor panel
-      await clickNode(app, 'Toolbar test action')
+      await openStepForEditing(app, 'Toolbar test action')
 
-      // Wait for the node editor to fully open (cancel button appears inside the panel)
+      // Wait for the step editor to fully open (cancel button appears inside the panel)
       const cancelBtn = app.getByRole('button', { name: 'Cancel without saving' })
       await expect(cancelBtn).toBeVisible({ timeout: 10_000 })
 
@@ -70,8 +49,8 @@ test.describe('builder toolbar disabled while editing', () => {
       const publishBtn = app.getByRole('button', { name: /Publish workflow/i })
       await expect(publishBtn).toHaveAttribute('aria-disabled', 'true')
 
-      // Close the node editor
-      await closeNodeEditorPanel(app)
+      // Close the step editor
+      await closeStepEditorPanel(app)
 
       // Buttons should re-enable
       await expect(saveBtn).not.toHaveAttribute('aria-disabled', 'true', { timeout: 5_000 })
@@ -87,17 +66,18 @@ test.describe('builder toolbar disabled while editing', () => {
     try {
       await openWorkflowInBuilder(app, workflowName, id)
 
-      // Click a node to open the editor
-      await clickNode(app, 'Tooltip test action')
+      await openStepForEditing(app, 'Tooltip test action')
       const cancelBtn = app.getByRole('button', { name: 'Cancel without saving' })
       await expect(cancelBtn).toBeVisible({ timeout: 10_000 })
 
-      // Hover Save to trigger tooltip
-      const saveBtn = app.getByRole('button', { name: 'Save', exact: true })
-      await saveBtn.hover()
+      const saveBtn = app.getByRole('button', { name: 'Save workflow' })
+      await expect(saveBtn).toHaveAttribute('aria-disabled', 'true')
 
-      // Tooltip should contain "finish editing" message
-      await expect(app.getByRole('tooltip')).toContainText('Finish editing the current step before saving')
+      // PF tooltips can lag behind hover under CI load — retry hover until visible.
+      await expect(async () => {
+        await saveBtn.hover()
+        await expect(app.getByRole('tooltip')).toContainText('Finish editing the current step before saving')
+      }).toPass({ timeout: 15_000, intervals: [500, 1_000, 2_000] })
     } finally {
       await deleteWorkflow(app, workflowName)
     }

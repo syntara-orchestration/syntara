@@ -10,10 +10,10 @@ These existing documents define core standards and should be consulted first:
 
 | Document | Scope |
 |----------|-------|
-| [Decision Records](../../decision-records.md) | Technology choices and rationale (Temporal, FastAPI, SQLModel, Redis, structlog, etc.) |
+| [Decision Records](https://github.com/syntara-orchestration/syntara/blob/devel/backend/docs/decision-records.md) | Technology choices and rationale (Temporal, FastAPI, SQLModel, Redis, structlog, etc.) |
 | [Error Handling Strategy](../error-handling-strategy.md) | RFC 9457 compliance, exception patterns, security |
-| [AGENTS.md](../../AGENTS.md) | AI agent instructions, technology choices, development workflow |
-| [CONTRIBUTING.md](../../CONTRIBUTING.md) | Human contributor guide, PR process |
+| [AGENTS.md](https://github.com/syntara-orchestration/syntara/blob/devel/backend/AGENTS.md) | AI agent instructions, technology choices, development workflow |
+| [Backend contributor guide](https://github.com/syntara-orchestration/syntara/blob/devel/docs/backend-contributing.md) | Human contributor guide, PR process |
 
 ### Standards in This Directory
 
@@ -45,7 +45,7 @@ These existing documents define core standards and should be consulted first:
 |------|-----------------|
 | `pyproject.toml` | Ruff rules (ALL), mypy strict mode, pytest config, coverage thresholds, Vulture config |
 | `.pre-commit-config.yaml` | Formatting, type checking, conventional commits, YAML, requirements sync |
-| `.github/workflows/ci.yml` | CI gates: pre-commit, dead code check, cycle detection, tests (3.12 + 3.13), migration checks, coverage, E2E |
+| `.github/workflows/ci.yml` | CI gates: pre-commit, dead code check, cycle detection, tests (3.12 + 3.13 + 3.14), migration checks, coverage, E2E |
 | `sonar-project.properties` | SonarCloud code quality scanning |
 | `renovate.json` | Automated dependency updates (weekly, in-range-only) |
 

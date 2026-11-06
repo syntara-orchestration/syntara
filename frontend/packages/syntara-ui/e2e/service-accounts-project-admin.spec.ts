@@ -59,10 +59,11 @@ test.describe('UI-11: Service Account CRUD Lifecycle', () => {
       const editModal = app.getByRole('dialog')
       await editModal.getByRole('textbox', { name: 'Name', exact: true }).clear()
       await editModal.getByRole('textbox', { name: 'Name', exact: true }).fill(editedName)
-      await editModal.getByRole('button', { name: 'Save' }).click()
+      await editModal.getByRole('button', { name: 'Save service account' }).click()
 
       await expect(app.getByText('Service account updated')).toBeVisible()
-      await expect(app.getByRole('heading', { level: 1, name: editedName })).toBeVisible()
+      await expect(editModal).not.toBeVisible({ timeout: 15_000 })
+      await expect(app.getByTestId('page-header').getByRole('heading', { level: 1, name: editedName })).toBeVisible()
 
       // Delete the service account via kebab menu
       await app.getByRole('button', { name: 'Service account actions' }).click()
@@ -70,7 +71,7 @@ test.describe('UI-11: Service Account CRUD Lifecycle', () => {
 
       const deleteDialog = app.getByRole('dialog')
       await deleteDialog.getByRole('checkbox', { name: /I understand/i }).check()
-      await deleteDialog.getByRole('button', { name: 'Delete' }).click()
+      await deleteDialog.getByRole('button', { name: 'Delete service account' }).click()
 
       // Verify redirect to list
       await expect(app.getByRole('tab', { name: 'Service accounts', exact: true })).toBeVisible()

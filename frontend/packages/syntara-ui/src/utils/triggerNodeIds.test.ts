@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { MenuNodeType } from '../constants'
+import { StepMenuCategory } from '../constants'
 
 import { buildTriggerNodeId, parseTriggerIndex, resolveFlowNodeId, toReactFlowNodeId } from './triggerNodeIds'
 describe('triggerNodeIds', () => {
@@ -23,8 +23,10 @@ describe('triggerNodeIds', () => {
   })
 
   it('resolves flow node id for trigger and activity', () => {
-    expect(resolveFlowNodeId({ nodeId: 'task-1', nodeType: MenuNodeType.ACTIVITY })).toBe('task-1')
-    expect(resolveFlowNodeId({ nodeId: 'any', nodeType: MenuNodeType.TRIGGER, triggerIndex: 3 })).toBe('trigger-3')
+    expect(resolveFlowNodeId({ nodeId: 'task-1', stepCategory: StepMenuCategory.ACTIVITY })).toBe('task-1')
+    expect(resolveFlowNodeId({ nodeId: 'any', stepCategory: StepMenuCategory.TRIGGER, triggerIndex: 3 })).toBe(
+      'trigger-3'
+    )
   })
 
   it('maps real trigger ids to React Flow display ids', () => {

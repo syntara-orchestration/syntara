@@ -57,7 +57,7 @@ class TestEmitActivityTelemetry:
 
         registry.send_event.assert_called_once()
         event = registry.send_event.call_args[0][0]
-        assert event.workflow_execution_id == str(EXECUTION_ID)
+        assert event.workflow_execution_id == EXECUTION_ID
         assert event.node_type == "script"
         assert event.status == "completed"
         assert event.duration_ms is None

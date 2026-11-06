@@ -1,5 +1,5 @@
 import { FormGroup, TextInput } from '@patternfly/react-core'
-import type { Meta, StoryObj } from '@storybook/react-vite'
+import type { Meta, StoryObj } from '@storybook/tanstack-react'
 
 import { FieldHelpPopover } from './FieldHelpPopover'
 

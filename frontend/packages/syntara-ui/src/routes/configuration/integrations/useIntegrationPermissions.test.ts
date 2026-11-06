@@ -46,7 +46,7 @@ describe('useIntegrationPermissions', () => {
   })
 
   it('returns all true when API grants all permissions', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useIntegrationPermissions(), { wrapper: createWrapper() })
 
@@ -59,7 +59,7 @@ describe('useIntegrationPermissions', () => {
   })
 
   it('calls can_i with correct action and resource_type', async () => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     renderHook(() => useIntegrationPermissions(), { wrapper: createWrapper() })
 

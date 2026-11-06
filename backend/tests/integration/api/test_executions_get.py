@@ -9,6 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.core.models import User
 from syntara.workflows.models import Workflow
 from syntara.workflows.models.execution import ExecutionStatus
+from tests.helpers.user_reference import assert_user_reference
 from tests.integration.helpers.workflow import ExecutionsFactory
 
 # ============================================================================
@@ -106,7 +107,7 @@ async def test_list_executions_filter_by_created_by(
     data = response.json()
     assert len(data["resources"]) == 2
     for item in data["resources"]:
-        assert item["created_by"] == str(test_user.id)
+        assert_user_reference(item["created_by"], test_user)
 
 
 @pytest.mark.asyncio

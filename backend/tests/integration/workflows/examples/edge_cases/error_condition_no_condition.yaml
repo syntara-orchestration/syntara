@@ -19,6 +19,6 @@ nodes:
       language: bash
       code: echo "Then branch"
 edges:
-  - source: invalid_condition
-    target: then_task
+  - from: invalid_condition
+    to: then_task
     port: then

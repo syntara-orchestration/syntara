@@ -3,20 +3,22 @@ schema_version: "2.0.0"
 name: expression-resolution-test
 description: Test expression resolution with multiple placeholders and nested paths
 
-inputs:
-  firstName:
-    type: string
-    default: John
-  lastName:
-    type: string
-    default: Doe
-  timeout:
-    type: number
-    default: 30
-
 triggers:
   - id: trigger_manual
     type: manual_trigger
+    parameters:
+      input_schema:
+        type: object
+        properties:
+          firstName:
+            type: string
+            default: John
+          lastName:
+            type: string
+            default: Doe
+          timeout:
+            type: integer
+            default: 30
 
 nodes:
   - id: test_multiple_placeholders
@@ -24,38 +26,32 @@ nodes:
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_GREETING: "Hello, ${trigger.firstName} ${trigger.lastName}!"
       code: |
         echo "Greeting: $INPUT_GREETING"
-    inputs:
-      greeting: Hello, ${trigger.firstName} ${trigger.lastName}!
-    outputs:
-      result: $.stdout
 
-  - id: test_trigger_field_reference
+  - id: test_variable_reference
     name: Test Trigger Field Reference
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_TIMEOUT_VALUE: ${trigger.timeout}
       code: |
         echo "Timeout: $INPUT_TIMEOUT_VALUE seconds"
-    inputs:
-      timeout_value: ${trigger.timeout}
-    outputs:
-      result: $.stdout
 
   - id: test_activity_output_reference
     name: Test Activity Output Reference
     type: script
     parameters:
       language: bash
+      environment:
+        INPUT_PREVIOUS_RESULT: ${test_multiple_placeholders.stdout}
       code: |
         echo "Previous output was: $INPUT_PREVIOUS_RESULT"
-    inputs:
-      previous_result: ${test_multiple_placeholders.output.result}
-    outputs:
-      final: $.stdout
 edges:
-  - source: test_multiple_placeholders
-    target: test_trigger_field_reference
-  - source: test_trigger_field_reference
-    target: test_activity_output_reference
+  - from: test_multiple_placeholders
+    to: test_variable_reference
+  - from: test_variable_reference
+    to: test_activity_output_reference

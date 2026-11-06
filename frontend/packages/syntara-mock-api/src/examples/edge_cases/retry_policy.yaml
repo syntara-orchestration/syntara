@@ -15,8 +15,6 @@ nodes:
       language: bash
       code: |
         echo "Task executed successfully"
-    outputs:
-      result: $.stdout
     retry_policy:
       maxAttempts: 3
       initialInterval: 1

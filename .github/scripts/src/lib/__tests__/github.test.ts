@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { http, HttpResponse, graphql } from 'msw'
+import { http, HttpResponse } from 'msw/http'
+import { graphql } from 'msw/graphql'
 import { server } from '../../__tests__/setup.js'
 import { GitHubClient } from '../github.js'
 
@@ -126,7 +127,7 @@ describe('GitHubClient', () => {
       }
 
       server.use(
-        graphql.operation(() => {
+        graphql.link('https://api.github.com/graphql').operation(() => {
           return HttpResponse.json(mockResponse as any)
         })
       )
@@ -141,7 +142,7 @@ describe('GitHubClient', () => {
 
     it('returns empty array when queue is null', async () => {
       server.use(
-        graphql.operation(() => {
+        graphql.link('https://api.github.com/graphql').operation(() => {
           return HttpResponse.json({
             data: { repository: { mergeQueue: null } },
           } as any)

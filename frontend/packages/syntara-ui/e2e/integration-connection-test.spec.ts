@@ -87,7 +87,7 @@ test.describe('Integration Wizard @pr-check', () => {
 
         // Save the integration — capture the API response to get the ID
         const responsePromise = app.waitForResponse('**/api/v1/integrations')
-        await app.getByRole('button', { name: 'Save' }).click()
+        await app.getByRole('button', { name: 'Save integration' }).click()
         const response = await responsePromise
         expect(response.status()).toBe(201)
 

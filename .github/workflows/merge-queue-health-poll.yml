@@ -8,7 +8,7 @@ on:
 
 jobs:
   queue-health-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       actions: read
@@ -36,7 +36,7 @@ jobs:
       - name: Check queue health and notify
         id: health
         if: env.SLACK_CI_MONITORING_WEBHOOK_URL != ''
-        run: npm run check-queue-health
+        run: npm run notify:queue-health
         working-directory: .github/scripts
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -54,7 +54,7 @@ jobs:
 
       - name: Send unhealthy alert
         if: steps.health.outputs.should_alert_unhealthy == 'true'
-        run: npm run send-unhealthy-alert
+        run: npm run notify:unhealthy-alert
         working-directory: .github/scripts
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -68,7 +68,7 @@ jobs:
 
       - name: Send recovery alert
         if: steps.health.outputs.should_alert_recovery == 'true'
-        run: npm run send-recovery-alert
+        run: npm run notify:recovery-alert
         working-directory: .github/scripts
         env:
           GITHUB_TOKEN: ${{ github.token }}

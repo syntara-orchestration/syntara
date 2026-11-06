@@ -46,6 +46,16 @@ function crumbApprovals(): AppBreadcrumbItem {
   return { label: LABEL_APPROVALS, href: AppRoute.Approvals.Root }
 }
 
+function projectDetailTabLabel(tab: string): string {
+  if (tab === 'details') return 'Details'
+  if (tab === 'workflows') return 'Workflows'
+  if (tab === 'role-assignments') return 'Assignments'
+  return tab
+}
+
+/** `useUrlTab` default; URL with no trailing segment is the same as this tab — omit a redundant last crumb. */
+const DEFAULT_ENTITY_TAB = 'details'
+
 export function breadcrumbsAccessManagementHub(): AppBreadcrumbItem[] {
   return [crumbAccessManagement()]
 }
@@ -70,8 +80,16 @@ export function breadcrumbsGroupDetail(groupName: string): AppBreadcrumbItem[] {
   return [crumbAccessManagement(), crumbGroupsList(), { label: groupName }]
 }
 
-export function breadcrumbsProjectDetail(projectName: string): AppBreadcrumbItem[] {
-  return [crumbAccessManagement(), crumbProjectsList(), { label: projectName }]
+export function breadcrumbsProjectDetail(
+  projectName: string,
+  projectBasePath: string,
+  tab: string
+): AppBreadcrumbItem[] {
+  const prefix = [crumbAccessManagement(), crumbProjectsList()]
+  if (tab === DEFAULT_ENTITY_TAB) {
+    return [...prefix, { label: projectName }]
+  }
+  return [...prefix, { label: projectName, href: projectBasePath }, { label: projectDetailTabLabel(tab) }]
 }
 
 export function breadcrumbsIdentityProviderAdd(): AppBreadcrumbItem[] {

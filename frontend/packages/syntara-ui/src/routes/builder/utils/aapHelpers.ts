@@ -1,7 +1,7 @@
 import { createAAPJobTemplateActivity, createAAPWorkflowTemplateActivity } from '../../../stores/useWorkflowStore'
 import type { AAPJobTemplateConfig, AAPWorkflowTemplateConfig } from '../../../stores/workflowFactories'
-import type { AAPJobTemplateFormData } from '../node-forms/aapJobTemplateSchema'
-import type { AAPWorkflowTemplateFormData } from '../node-forms/aapWorkflowTemplateSchema'
+import type { AAPJobTemplateFormData } from '../step-forms/aapJobTemplateSchema'
+import type { AAPWorkflowTemplateFormData } from '../step-forms/aapWorkflowTemplateSchema'
 
 /**
  * Check whether any of the given values contain a ${...} expression placeholder.
@@ -9,6 +9,89 @@ import type { AAPWorkflowTemplateFormData } from '../node-forms/aapWorkflowTempl
  */
 export function hasExpressionValue(...values: (string | undefined)[]): boolean {
   return values.some((v) => v?.includes('${'))
+}
+
+type JobTemplateInputVariablesConfig = {
+  use_input_variables?: unknown
+  useInputVariables?: unknown
+  organization_name?: unknown
+  organization?: unknown
+  job_template_name?: unknown
+  jobTemplateName?: unknown
+  inventory_name?: unknown
+  inventoryName?: unknown
+  limit?: unknown
+  tags?: unknown
+  skip_tags?: unknown
+  skipTags?: unknown
+}
+
+function getConfigString(snakeCase: unknown, camelCase?: unknown): string | undefined {
+  const value = snakeCase ?? camelCase
+  return typeof value === 'string' ? value : undefined
+}
+
+/** Restore a job template's expression-mode state from its saved config or fields. */
+export function resolveJobTemplateUseInputVariables(config: JobTemplateInputVariablesConfig): boolean {
+  return (
+    config.use_input_variables === true ||
+    config.useInputVariables === true ||
+    // extra_vars accepts dragged expressions while the template stays selected by ID.
+    hasExpressionValue(
+      getConfigString(config.organization_name, config.organization),
+      getConfigString(config.job_template_name, config.jobTemplateName),
+      getConfigString(config.inventory_name, config.inventoryName),
+      getConfigString(config.limit),
+      getConfigString(config.tags),
+      getConfigString(config.skip_tags, config.skipTags)
+    )
+  )
+}
+
+/** True when the job template form is in input-variables (expression) mode. */
+export function isJobTemplateInputVariablesMode(
+  data: Pick<AAPJobTemplateFormData, 'use_input_variables' | 'organization_name' | 'job_template_name'>
+): boolean {
+  return Boolean(data.use_input_variables) || hasExpressionValue(data.organization_name, data.job_template_name)
+}
+
+/** True when the workflow template form is in input-variables (expression) mode. */
+export function isWorkflowTemplateInputVariablesMode(
+  data: Pick<AAPWorkflowTemplateFormData, 'use_input_variables' | 'organization_name' | 'workflow_job_template_name'>
+): boolean {
+  return (
+    Boolean(data.use_input_variables) || hasExpressionValue(data.organization_name, data.workflow_job_template_name)
+  )
+}
+
+/** Restore workflow expression-mode toggle state from stored activity config. */
+export function resolveWorkflowUseInputVariables(
+  config: Record<string, unknown>,
+  fields: {
+    organizationName: string
+    workflowTemplateName: string
+    inventoryName: string
+    limit: string
+    scmBranch: string
+    tags: string
+    skipTags: string
+    extraVars: string
+  }
+): boolean {
+  return (
+    config.use_input_variables === true ||
+    config.useInputVariables === true ||
+    hasExpressionValue(
+      fields.organizationName,
+      fields.workflowTemplateName,
+      fields.inventoryName,
+      fields.limit,
+      fields.scmBranch,
+      fields.tags,
+      fields.skipTags,
+      fields.extraVars
+    )
+  )
 }
 
 /**
@@ -22,8 +105,8 @@ export function buildExpressionModeActivity(
 ): ReturnType<typeof createAAPJobTemplateActivity> {
   // job_template_id is set to 0 as a placeholder — expression-mode nodes resolve
   // the template by name at runtime, so the ID is removed from config below.
-  const config = buildAAPConfig(data)
-  const activity = createAAPJobTemplateActivity(nodeId, name, 0, config)
+  const config = { ...buildAAPConfig(data), useInputVariables: true }
+  const activity = createAAPJobTemplateActivity({ id: nodeId, name, jobTemplateId: 0, config })
   if (activity.parameters) {
     activity.parameters.job_template_name = data.job_template_name
     activity.parameters.organization_name = data.organization_name
@@ -158,6 +241,10 @@ function setDiffModeField(config: AAPJobTemplateConfig, data: AAPJobTemplateForm
   if (data.diff_mode !== undefined) config.diffMode = data.diff_mode
 }
 
+function setUseInputVariablesField(config: AAPJobTemplateConfig, data: AAPJobTemplateFormData): void {
+  if (data.use_input_variables) config.useInputVariables = true
+}
+
 function setInstanceGroupFields(config: AAPJobTemplateConfig, data: AAPJobTemplateFormData): void {
   // Instance group ID (takes precedence over name)
   if (data.instance_group_id !== undefined && data.instance_group_id !== null) {
@@ -185,6 +272,7 @@ export function buildAAPConfig(data: AAPJobTemplateFormData): AAPJobTemplateConf
   setLabelsField(config, data)
   setDiffModeField(config, data)
   setInstanceGroupFields(config, data)
+  setUseInputVariablesField(config, data)
   collectStringFields(config, data)
   collectNumberFields(config, data)
 
@@ -214,8 +302,9 @@ export function buildWorkflowExpressionModeActivity(
   name: string,
   data: AAPWorkflowTemplateFormData
 ): ReturnType<typeof createAAPWorkflowTemplateActivity> {
-  const config = buildAAPWorkflowTemplateConfig(data)
-  const activity = createAAPWorkflowTemplateActivity(nodeId, name, 0, config)
+  const baseConfig = buildAAPWorkflowTemplateConfig(data)
+  const config = baseConfig ? { ...baseConfig, use_input_variables: true } : { use_input_variables: true }
+  const activity = createAAPWorkflowTemplateActivity({ id: nodeId, name, workflowTemplateId: 0, config })
   if (activity.parameters) {
     activity.parameters.workflow_job_template_name = data.workflow_job_template_name
     activity.parameters.organization_name = data.organization_name

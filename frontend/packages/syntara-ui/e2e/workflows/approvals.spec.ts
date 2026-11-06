@@ -8,9 +8,9 @@
  */
 import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
-import { applyApprovalNameFilter } from '../helpers/approvals'
+import { applyApprovalNameFilter, dismissConnectionBanner, navigateToApprovalAndOpen } from '../helpers/approvals'
 import { APP_TITLE } from '../helpers/appTitle'
-import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
+import { addApprovalStepWithBranch } from '../helpers/v2-steps'
 import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
 import { buildUniqueName, openWorkflowInBuilder } from '../helpers/workflows'
 import {
@@ -38,11 +38,11 @@ async function createPendingApproval(
   const approvalName = buildUniqueName(namePrefix)
 
   // Create the complete workflow via API: trigger → approval → approved-branch script
-  const { id: workflowId, versionNumber } = await createWorkflowViaApi(
+  const { id: workflowId, versionNumber } = await createWorkflowViaApi({
     app,
-    workflowName,
-    [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    [
+    name: workflowName,
+    triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    nodes: [
       { id: 'approval_1', type: 'approval', name: approvalName, parameters: {} },
       {
         id: 'script_1',
@@ -51,11 +51,11 @@ async function createPendingApproval(
         parameters: { language: 'python', code: 'print("approved")' },
       },
     ],
-    [
+    edges: [
       { from: 'trigger_1', to: 'approval_1' },
       { from: 'approval_1', to: 'script_1', from_port: 'approved' },
-    ]
-  )
+    ],
+  })
 
   // Publish the workflow so it can be run
   await publishWorkflowViaApi(app, workflowId, versionNumber)
@@ -96,11 +96,11 @@ async function createPendingApprovalLight(
   const approvalName = buildUniqueName(namePrefix)
   const hasTemporal = !!process.env['SYNTARA_E2E_HAS_TEMPORAL_WORKER']
 
-  const { id: workflowId, versionNumber } = await createWorkflowViaApi(
+  const { id: workflowId, versionNumber } = await createWorkflowViaApi({
     app,
-    workflowName,
-    [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    [
+    name: workflowName,
+    triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    nodes: [
       { id: 'approval_1', type: 'approval', name: approvalName, parameters: {} },
       {
         id: 'script_1',
@@ -109,11 +109,11 @@ async function createPendingApprovalLight(
         parameters: { language: 'python', code: 'print("approved")' },
       },
     ],
-    [
+    edges: [
       { from: 'trigger_1', to: 'approval_1' },
       { from: 'approval_1', to: 'script_1', from_port: 'approved' },
-    ]
-  )
+    ],
+  })
 
   await publishWorkflowViaApi(app, workflowId, versionNumber)
 
@@ -371,125 +371,60 @@ test.describe('Approval Workflow Operations', () => {
   })
 
   test('user changes decision from approve to reject (undo)', async ({ app }) => {
-    // Create a pending approval to test undo behavior
+    test.slow()
     const approval = await createPendingApproval(app)
 
     try {
-      // Navigate to approvals page
-      await app.goto(toAppUrl('/approvals'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await navigateToApprovalAndOpen(app, approval.approvalName)
+      await dismissConnectionBanner(app)
 
-      const table = app.getByRole('grid', { name: 'Approvals table' })
-      await table.waitFor({ state: 'visible', timeout: 15_000 })
-
-      // Filter to show only our test approval
-      await app.getByPlaceholder('Filter by name').fill(approval.approvalName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Wait for filter chip to confirm filter was applied and table to refresh
-      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
-        timeout: 15_000,
-      })
-
-      // Step 1: Click on the pending approval to open side panel
-      const approvalLink = table.getByRole('link', { name: approval.approvalName })
-      await approvalLink.waitFor({ state: 'visible', timeout: 10_000 })
-      await approvalLink.click()
-
-      // Step 2: Verify navigation to execution detail with side panel
-      await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=/, { timeout: 15_000 })
-      await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
-
-      // Step 3: Click "Approve" button
       const approveButton = app.getByRole('button', { name: 'Approve', exact: true })
-      await expect(approveButton).toBeVisible({ timeout: 15_000 })
-      await approveButton.click()
-
-      // Step 4: Verify approval notes field appears
-      const approvalNotesInput = app.getByPlaceholder(/explain.*reason.*approving|optional.*note/i)
-      await expect(approvalNotesInput).toBeVisible({ timeout: 10_000 })
-
-      // Step 5: Click "Reject" to undo the approve decision
       const rejectButton = app.getByRole('button', { name: 'Reject', exact: true })
+      await expect(approveButton).not.toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
+
+      await approveButton.click()
+      await expect(app.getByPlaceholder(/Explain the reason for approving/i)).toBeVisible({ timeout: 10_000 })
+      // Pending approve hides the action buttons; undo clears the draft before choosing reject.
+      await expect(rejectButton).not.toBeVisible()
+
+      await app.getByRole('button', { name: 'Undo decision' }).click()
+      await expect(approveButton).toBeVisible({ timeout: 10_000 })
       await expect(rejectButton).toBeVisible({ timeout: 10_000 })
+      await expect(rejectButton).not.toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
+
       await rejectButton.click()
-
-      // Step 6: Verify rejection notes field appears (approval notes replaced)
-      const rejectionNotesInput = app.getByPlaceholder(/explain.*reason.*rejecting|optional.*note/i)
-      await expect(rejectionNotesInput).toBeVisible({ timeout: 10_000 })
-
-      // Step 7: Verify approval notes field is no longer visible
-      await expect(approvalNotesInput).not.toBeVisible()
-
-      // Step 8: Verify "Submit decision" button is available for rejection
-      const submitButton = app.getByRole('button', { name: 'Submit decision' })
-      await expect(submitButton).toBeVisible({ timeout: 10_000 })
-
-      // NOTE: This test verifies undo behavior (switching between approve/reject)
-      // without actually submitting to avoid mutating approval state
+      await expect(app.getByPlaceholder(/Explain the reason for rejecting/i)).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByRole('button', { name: 'Submit decision' })).toBeVisible({ timeout: 10_000 })
     } finally {
-      // Cleanup: delete created workflow
       await apiRequest(app, 'delete', `/workflows/${approval.workflowId}`).catch(() => {})
     }
   })
 
   test('user clears decision with explicit undo button', async ({ app }) => {
-    // Create a pending approval to test undo/clear behavior
+    test.slow()
     const approval = await createPendingApproval(app)
 
     try {
-      // Navigate to approvals page
-      await app.goto(toAppUrl('/approvals'))
-      await expect(app.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
+      await navigateToApprovalAndOpen(app, approval.approvalName)
+      await dismissConnectionBanner(app)
 
-      const table = app.getByRole('grid', { name: 'Approvals table' })
-      await table.waitFor({ state: 'visible', timeout: 15_000 })
-
-      // Filter to show only our test approval
-      await app.getByPlaceholder('Filter by name').fill(approval.approvalName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-
-      // Click on the pending approval
-      const approvalLink = table.getByRole('link', { name: approval.approvalName })
-      await approvalLink.waitFor({ state: 'visible', timeout: 10_000 })
-      await approvalLink.click()
-      await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
-
-      // Step 1: Click "Approve"
       const approveButton = app.getByRole('button', { name: 'Approve', exact: true })
+      await expect(approveButton).not.toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
       await approveButton.click()
-      await expect(app.getByPlaceholder(/explain.*reason.*approving/i)).toBeVisible()
+      await expect(app.getByPlaceholder(/Explain the reason for approving/i)).toBeVisible({ timeout: 10_000 })
 
-      // Step 2: Look for "Undo decision" or "Clear" button
-      const undoButton = app.getByRole('button', { name: /undo.*decision|clear.*selection/i })
-      const hasUndoButton = await undoButton.isVisible().catch(() => false)
+      await app.getByRole('button', { name: 'Undo decision' }).click()
 
-      if (hasUndoButton) {
-        await undoButton.click()
-
-        // Step 3: Verify both approve and reject buttons are visible again
-        await expect(app.getByRole('button', { name: 'Approve', exact: true })).toBeVisible()
-        await expect(app.getByRole('button', { name: 'Reject', exact: true })).toBeVisible()
-
-        // Step 4: Verify notes field is cleared
-        const notesField = app.getByPlaceholder(/explain.*reason/i)
-        await expect(notesField).not.toBeVisible()
-      } else {
-        // If no explicit undo button exists, verify switching between approve/reject acts as undo
-        const rejectButton = app.getByRole('button', { name: 'Reject', exact: true })
-        await expect(rejectButton).toBeVisible()
-
-        // Clicking reject after approve is the undo mechanism
-        await rejectButton.click()
-        await expect(app.getByPlaceholder(/explain.*reason.*rejecting/i)).toBeVisible()
-      }
+      await expect(approveButton).toBeVisible({ timeout: 10_000 })
+      await expect(app.getByRole('button', { name: 'Reject', exact: true })).toBeVisible()
+      await expect(app.getByPlaceholder(/Explain the reason for approving/i)).not.toBeVisible()
     } finally {
-      // Cleanup: delete created workflow
       await apiRequest(app, 'delete', `/workflows/${approval.workflowId}`).catch(() => {})
     }
   })
 
   test('user selects all filtered approvals using the header checkbox', async ({ app }) => {
+    test.slow()
     // Create 2 pending approvals with a shared prefix for filtering
     const batchId = `batch-${Date.now()}`
     const approval1 = await createPendingApproval(app, batchId)
@@ -503,25 +438,17 @@ test.describe('Approval Workflow Operations', () => {
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
 
-      // Filter to show only our test approvals using shared batch ID
-      await app.getByPlaceholder('Filter by name').fill(batchId)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
+      await applyApprovalNameFilter(app, table, batchId)
 
-      // Wait for filter chip to confirm filter was applied and both rows to appear
-      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
-        timeout: 15_000,
-      })
       const rows = table.getByRole('row')
-      await expect(rows.filter({ hasText: approval1.approvalName })).toBeVisible({
-        timeout: 15_000,
-      })
-      await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible({
-        timeout: 15_000,
-      })
+      const row1 = rows.filter({ hasText: approval1.approvalName })
+      const row2 = rows.filter({ hasText: approval2.approvalName })
+      await expect(row1).toBeVisible({ timeout: 15_000 })
+      await expect(row2).toBeVisible({ timeout: 15_000 })
 
       // Click header row checkbox to select all. Bulk actions live in the page header
       // (Compass toolbar has no accessible name) — same pattern as sibling batch tests.
-      // Under Konflux cluster load the checkbox click can fail to register; retry the whole sequence.
+      // Under merge_group / cluster load the checkbox click can fail to register; retry the whole sequence.
       const selectAllCheckbox = table.getByRole('checkbox', { name: /select all/i })
       await expect(selectAllCheckbox).toBeEnabled()
       const pageHeader = app.getByTestId('page-header')
@@ -529,8 +456,11 @@ test.describe('Approval Workflow Operations', () => {
 
       await expect(async () => {
         await selectAllCheckbox.check()
+        await expect(selectAllCheckbox).toBeChecked()
+        await expect(row1.getByRole('checkbox')).toBeChecked()
+        await expect(row2.getByRole('checkbox')).toBeChecked()
         await expect(selectedText).toBeVisible()
-      }).toPass({ timeout: 15_000, intervals: [500] })
+      }).toPass({ timeout: 45_000, intervals: [500, 1_000, 2_000] })
 
       // Uncheck header checkbox to deselect all
       await selectAllCheckbox.uncheck()
@@ -549,19 +479,25 @@ test.describe('Approval Workflow Operations', () => {
   })
 
   test('UI-29: self-contained approve flow via approvals queue', async ({ app }) => {
-    // Create a workflow with an approval node so we control the approval name
-    const workflowName = buildUniqueName('e2e-approve')
+    // Create a workflow with an approval node so we control the approval name.
+    // Avoid 'approve' in the workflow name — getByRole({ name: 'Approve' }) is a
+    // substring match and collides with the workflow link button on execution detail.
+    const workflowName = buildUniqueName('e2e-ui29')
     const approvalNodeName = buildUniqueName('gate')
-    const { id: workflowId } = await createWorkflowViaApi(app, workflowName, [
-      { id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} },
-    ])
+    const { id: workflowId } = await createWorkflowViaApi({
+      app,
+      name: workflowName,
+      triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    })
     await openWorkflowInBuilder(app, workflowName, workflowId)
 
     try {
       // Add approval node with a unique name so we can find it in the approvals list
-      await addApprovalNodeWithBranch(app, approvalNodeName)
-      await app.getByRole('button', { name: 'Save', exact: true }).click()
+      await addApprovalStepWithBranch(app, approvalNodeName)
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await runWorkflowFromBuilder(app)
+      const executionId = app.url().match(/\/executions\/([^/?]+)/)?.[1]
+      expect(executionId, 'Could not parse execution ID after run').toBeTruthy()
 
       // Wait for execution to pause at the approval node (requires Temporal)
       const reachedApproval = await waitForExecutionPaused(app)
@@ -586,14 +522,21 @@ test.describe('Approval Workflow Operations', () => {
       await expect(app).toHaveURL(/\/executions\/[^?]+\?approval=/)
       await expect(app.getByRole('heading', { name: 'Review Approval' })).toBeVisible({ timeout: 15_000 })
 
-      // Approve with notes
-      await app.getByRole('button', { name: 'Approve' }).click()
+      // Approve with notes (exact: true — workflow link names must not substring-match)
+      await app.getByRole('button', { name: 'Approve', exact: true }).click()
       await app.getByPlaceholder(/Explain the reason for approving/i).fill('Approved in E2E test')
       await app.getByRole('button', { name: 'Submit decision' }).click()
 
-      // Verify approval was submitted and execution resumes
+      // Verify approval was submitted, then poll API for terminal state (UI live updates can lag)
       await expect(app.getByText('Approval submitted')).toBeVisible({ timeout: 15_000 })
-      await expect(app.getByText('Completed')).toBeVisible({ timeout: 30_000 })
+      await pollExecutionStatus(app, executionId!, ['completed', 'completed_with_errors', 'failed', 'cancelled'], {
+        timeout: 60_000,
+      })
+      await app.reload()
+      await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 15_000 })
+      await expect(app.getByTestId('execution-status-badge').getByText('Completed')).toBeVisible({
+        timeout: 30_000,
+      })
     } finally {
       if (workflowId) {
         await apiRequest(app, 'delete', `/workflows/${workflowId}`).catch(() => {})

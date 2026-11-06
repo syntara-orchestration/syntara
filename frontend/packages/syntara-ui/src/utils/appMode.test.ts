@@ -8,7 +8,7 @@ afterEach(() => {
 
 describe('resolveAppMode', () => {
   it('returns community when VITE_EXTENDED is unset', () => {
-    vi.stubEnv('VITE_EXTENDED', undefined as unknown as string)
+    vi.stubEnv('VITE_EXTENDED', undefined)
 
     expect(resolveAppMode()).toBe('community')
   })
@@ -51,7 +51,7 @@ describe('isCommunityMode / isExtendedMode', () => {
   })
 
   it('defaults to resolveAppMode() when mode is omitted', () => {
-    vi.stubEnv('VITE_EXTENDED', undefined as unknown as string)
+    vi.stubEnv('VITE_EXTENDED', undefined)
 
     expect(isCommunityMode()).toBe(true)
     expect(isExtendedMode()).toBe(false)

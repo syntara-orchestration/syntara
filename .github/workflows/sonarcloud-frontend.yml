@@ -23,7 +23,7 @@ permissions: read-all
 jobs:
   changes:
     name: Detect Changes
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: >-
       github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.event == 'pull_request'
@@ -54,7 +54,7 @@ jobs:
     name: SonarCloud Analysis
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # SonarCloud quality gate failures are informational, not blocking.
     # Without this, a failed gate marks the entire PR pipeline as failed.
     continue-on-error: true

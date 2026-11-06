@@ -21,10 +21,10 @@
  */
 
 import { test, expect, toAppUrl } from './fixtures'
-import { addScheduleTrigger } from './helpers/v2-nodes'
+import { addScheduleTrigger, openScheduleTriggerForEditing } from './helpers/v2-steps'
 import {
   buildUniqueName,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   deleteWorkflow,
   openWorkflowInBuilder,
   selectProjectIfRequired,
@@ -46,7 +46,7 @@ test.describe('Schedule Trigger — UI-19', () => {
     test('Schedule trigger button is visible in trigger selection', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
 
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({
+      await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({
         timeout: 15_000,
       })
       await expect(app.getByRole('button', { name: 'Schedule trigger' })).toBeVisible()
@@ -55,7 +55,7 @@ test.describe('Schedule Trigger — UI-19', () => {
     test('Clicking Schedule trigger opens the schedule configuration form', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
 
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({
+      await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({
         timeout: 15_000,
       })
       await app.getByRole('button', { name: 'Schedule trigger' }).click()
@@ -73,7 +73,7 @@ test.describe('Schedule Trigger — UI-19', () => {
   test.describe('Schedule type modes', () => {
     test('Visual schedule builder renders required fields', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({
+      await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({
         timeout: 15_000,
       })
       await app.getByRole('button', { name: 'Schedule trigger' }).click()
@@ -91,7 +91,7 @@ test.describe('Schedule Trigger — UI-19', () => {
 
     test('Custom cron expression mode hides the schedule builder fields', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({
+      await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({
         timeout: 15_000,
       })
       await app.getByRole('button', { name: 'Schedule trigger' }).click()
@@ -111,7 +111,7 @@ test.describe('Schedule Trigger — UI-19', () => {
 
     test('Frequency options include Daily, Weekly, Monthly, Yearly', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({
+      await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({
         timeout: 15_000,
       })
       await app.getByRole('button', { name: 'Schedule trigger' }).click()
@@ -128,7 +128,7 @@ test.describe('Schedule Trigger — UI-19', () => {
 
     test('Custom cron expression mode is available', async ({ app }) => {
       await app.goto(toAppUrl('/workflow-builder/new'))
-      await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({
+      await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({
         timeout: 15_000,
       })
       await app.getByRole('button', { name: 'Schedule trigger' }).click()
@@ -165,11 +165,11 @@ test.describe('Schedule Trigger — UI-19', () => {
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Scheduled action')
         await fillCodeEditor(app, { value: 'print("running")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
-        await closeNodeEditorPanel(app)
+        await closeStepEditorPanel(app)
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         // Schedule trigger node is visible on the canvas
@@ -197,11 +197,11 @@ test.describe('Schedule Trigger — UI-19', () => {
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Report action')
         await fillCodeEditor(app, { value: 'print("report")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
-        await closeNodeEditorPanel(app)
+        await closeStepEditorPanel(app)
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await expect(app.getByText('Weekly Report')).toBeVisible({ timeout: 10_000 })
@@ -225,11 +225,11 @@ test.describe('Schedule Trigger — UI-19', () => {
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Continuous action')
         await fillCodeEditor(app, { value: 'print("running")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
-        await closeNodeEditorPanel(app)
+        await closeStepEditorPanel(app)
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         await expect(app.getByText('Continuous Trigger')).toBeVisible({ timeout: 10_000 })
@@ -262,22 +262,18 @@ test.describe('Schedule Trigger — UI-19', () => {
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Action')
         await fillCodeEditor(app, { value: 'print("ok")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
-        await closeNodeEditorPanel(app)
+        await closeStepEditorPanel(app)
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         // Reload and reopen the trigger node
         await openWorkflowInBuilder(app, wfName)
 
-        const triggerNode = app.getByText('Persisted Schedule')
-        await expect(triggerNode).toBeVisible({ timeout: 15_000 })
-        await triggerNode.click()
+        await openScheduleTriggerForEditing(app, 'Persisted Schedule')
 
-        // Editor opens with saved schedule expression
-        await expect(app.getByLabel('Schedule expression', { exact: true })).toBeVisible({ timeout: 10_000 })
         await expect(app.getByLabel('Schedule expression', { exact: true })).toContainText('Visual schedule builder')
 
         // Frequency shows 'Monthly' since that cadence was saved
@@ -307,20 +303,17 @@ test.describe('Schedule Trigger — UI-19', () => {
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Action')
         await fillCodeEditor(app, { value: 'print("ok")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
-        await closeNodeEditorPanel(app)
+        await closeStepEditorPanel(app)
 
         await selectProjectIfRequired(app)
         await app.getByPlaceholder('Workflow name').fill(wfName)
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
         // Reopen trigger and switch to continuous
         await openWorkflowInBuilder(app, wfName)
-        const triggerNode = app.getByText('Switchable Schedule')
-        await expect(triggerNode).toBeVisible({ timeout: 15_000 })
-        await triggerNode.click()
+        await openScheduleTriggerForEditing(app, 'Switchable Schedule')
 
-        await expect(app.getByLabel('Schedule expression', { exact: true })).toBeVisible({ timeout: 10_000 })
         await app.getByLabel('Schedule expression', { exact: true }).click()
         await app.getByRole('option', { name: 'Custom cron expression', exact: true }).click()
         const cronInput = app.getByLabel('Cron expression', { exact: true })
@@ -331,7 +324,7 @@ test.describe('Schedule Trigger — UI-19', () => {
           (req) => req.url().includes('/workflows') && req.method() === 'PATCH'
         )
         await app.getByRole('button', { name: 'Update', exact: true }).click()
-        await app.getByRole('button', { name: 'Save', exact: true }).click()
+        await app.getByRole('button', { name: 'Save workflow' }).click()
         await patchRequestPromise
 
         // Verify the trigger node still shows on canvas after save

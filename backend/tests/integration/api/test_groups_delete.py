@@ -107,9 +107,7 @@ class TestGroupsDeleteContract:
         group_name: str,
     ) -> None:
         """Test that deleting a builtin group returns 403 Forbidden."""
-        result = await test_db_session.exec(
-            select(Group).where(Group.name == group_name, Group.deleted_at.is_(None))  # type: ignore[union-attr]
-        )
+        result = await test_db_session.exec(select(Group).where(Group.name == group_name))
         group = result.one()
 
         response = await admin_client.delete(f"{GROUPS_URL}/{group.id}")

@@ -37,7 +37,7 @@ async def loop(
 
     Returns:
     - output: Mapped output containing iteration metadata
-    - control: next_port ("iterate" or "complete") and loop state
+    - control: next_port ("iterate" or "complete") and iteration indexes
 
     """
     loop_type = input_config.get("type", LoopType.FOR_EACH)
@@ -51,11 +51,9 @@ async def loop(
 
         # Check if we have more items to process
         if current_index < len(items):
-            current_item = items[current_index]
             next_port = "iterate"
             next_index = current_index + 1
         else:
-            current_item = None
             next_port = "complete"
             next_index = current_index
 
@@ -69,8 +67,6 @@ async def loop(
             "control": {
                 "next_port": next_port,
                 "next_index": next_index,
-                "items": items,
-                "current_item": current_item,
                 "current_index": current_index,
             },
         }

@@ -1,7 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useParams } from '@tanstack/react-router'
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  RouterProvider,
+  useParams,
+} from '@tanstack/react-router'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createContext, use } from 'react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -10,15 +19,19 @@ import { credentialsClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 import { accessFetchClient } from '../../access/accessClient'
 
-import CredentialDetail from './CredentialDetail'
+import CredentialDetail, {
+  CredentialDetailsTabRoute,
+  CredentialIntegrationsTabRoute,
+  CredentialWorkflowsTabRoute,
+} from './CredentialDetail'
 import { useCredentialPermissions } from './useCredentialPermissions'
 
 const { mockNavigate } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
 }))
 
-const wouterMock = vi.hoisted(() => ({
-  credentialId: '1' as string | undefined,
+const routeStateMock = vi.hoisted((): { credentialId: string | undefined } => ({
+  credentialId: '1',
 }))
 
 const mockCredential = {
@@ -29,6 +42,7 @@ const mockCredential = {
   inputs: { token: '$encrypted$', username: 'octocat' },
   enabled: true,
   labels: {},
+  project_id: 'proj-1',
   created_at: '2026-03-01T00:00:00Z',
   updated_at: '2026-03-18T00:00:00Z',
 }
@@ -54,11 +68,14 @@ type MockCredentialRecord = Omit<typeof mockCredential, 'description'> & { descr
 vi.mock('./useCredentialPermissions', () => ({
   useCredentialPermissions: vi.fn(() => ({
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
     isLoading: false,
+    isReadChecking: false,
     tooltips: {
       create: 'You need credential:create permission to create a credential.',
+      read: 'You need credential:read permission to view this credential.',
       update: 'You need credential:update permission to edit this credential.',
       enable: 'You need credential:update permission to enable or disable this credential.',
       delete: 'You need credential:delete permission to delete this credential.',
@@ -95,7 +112,7 @@ vi.mock('@tanstack/react-router', async () => {
     useParams: vi.fn(() => ({ credentialId: '1' })),
     useRouterState: (opts?: { select?: (s: { location: { pathname: string; searchStr: string } }) => unknown }) => {
       const state = {
-        location: { pathname: `/configuration/credentials/${wouterMock.credentialId ?? ''}`, searchStr: '' },
+        location: { pathname: `/configuration/credentials/${routeStateMock.credentialId ?? ''}`, searchStr: '' },
       }
       return opts?.select ? opts.select(state) : state
     },
@@ -171,9 +188,64 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 })
 
+const credentialDetailTestPageContext = createContext<ReactNode>(null)
+
+function CredentialDetailTestPage() {
+  return use(credentialDetailTestPageContext)
+}
+
+function createCredentialDetailTestRouter() {
+  const rootRoute = createRootRoute({ component: Outlet })
+  const credentialRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/configuration/credentials/$credentialId',
+    component: CredentialDetailTestPage,
+  })
+  const detailsIndexRoute = createRoute({
+    getParentRoute: () => credentialRoute,
+    path: '/',
+    component: CredentialDetailsTabRoute,
+  })
+  const detailsRoute = createRoute({
+    getParentRoute: () => credentialRoute,
+    path: 'details',
+    component: CredentialDetailsTabRoute,
+  })
+  const workflowsRoute = createRoute({
+    getParentRoute: () => credentialRoute,
+    path: 'workflows',
+    component: CredentialWorkflowsTabRoute,
+  })
+  const integrationsRoute = createRoute({
+    getParentRoute: () => credentialRoute,
+    path: 'integrations',
+    component: CredentialIntegrationsTabRoute,
+  })
+
+  return createRouter({
+    routeTree: rootRoute.addChildren([
+      credentialRoute.addChildren([detailsIndexRoute, detailsRoute, workflowsRoute, integrationsRoute]),
+    ]),
+    history: createMemoryHistory({
+      initialEntries: [`/configuration/credentials/${routeStateMock.credentialId ?? '1'}`],
+    }),
+  })
+}
+
+let credentialDetailTestRouter: ReturnType<typeof createCredentialDetailTestRouter>
+
+async function loadCredentialDetailTestRouter() {
+  credentialDetailTestRouter = createCredentialDetailTestRouter()
+  await credentialDetailTestRouter.load()
+}
+
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>
-    <AlertProvider>{children}</AlertProvider>
+    <AlertProvider>
+      <credentialDetailTestPageContext.Provider value={children}>
+        <RouterProvider router={credentialDetailTestRouter} />
+      </credentialDetailTestPageContext.Provider>
+    </AlertProvider>
   </QueryClientProvider>
 )
 
@@ -224,18 +296,19 @@ function mockQuery(
 describe('CredentialDetail', () => {
   let mockMutate: ReturnType<typeof vi.fn>
 
-  beforeEach(() => {
-    wouterMock.credentialId = '1'
+  beforeEach(async () => {
+    routeStateMock.credentialId = '1'
     disableCredentialHookMock.reset()
     vi.clearAllMocks()
     queryClient.clear()
     mockMutate = vi.fn()
     vi.mocked(useParams).mockReturnValue({ credentialId: '1' })
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery())
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(credentialsClient.useMutation).mockReturnValue({ mutate: mockMutate, isPending: false } as any)
+    await loadCredentialDetailTestRouter()
   })
 
   it('has no accessibility violations', async () => {
@@ -562,7 +635,7 @@ describe('CredentialDetail', () => {
 
     const dialog = screen.getByRole('dialog')
     await user.click(within(dialog).getByRole('checkbox'))
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete credential' }))
 
     expect(mockMutate).toHaveBeenCalled()
     expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/configuration/credentials' }))
@@ -587,14 +660,14 @@ describe('CredentialDetail', () => {
 
     const dialog = screen.getByRole('dialog')
     await user.click(within(dialog).getByRole('checkbox'))
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete credential' }))
 
     expect(mockMutate).toHaveBeenCalled()
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 
   it('renders invalid credential shell when route has no credential id', () => {
-    wouterMock.credentialId = undefined
+    routeStateMock.credentialId = undefined
     vi.mocked(useParams).mockReturnValueOnce({ credentialId: undefined as unknown as string })
 
     render(<CredentialDetail />, { wrapper })
@@ -657,7 +730,7 @@ describe('CredentialDetail', () => {
     render(<CredentialDetail />, { wrapper })
 
     expect(screen.getByText('Disable credential?')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable credential' }))
 
     expect(mockMutate).toHaveBeenCalledWith(
       { params: { path: { credential_id: '1' } }, body: { enabled: false } },
@@ -675,7 +748,7 @@ describe('CredentialDetail', () => {
     const user = userEvent.setup()
     render(<CredentialDetail />, { wrapper })
 
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable credential' }))
     expect(mockMutate).toHaveBeenCalled()
   })
 
@@ -691,7 +764,7 @@ describe('CredentialDetail', () => {
     const user = userEvent.setup()
     render(<CredentialDetail />, { wrapper })
 
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable credential' }))
     expect(mockMutate).toHaveBeenCalled()
   })
 
@@ -798,7 +871,7 @@ describe('CredentialDetail', () => {
 
   it('renders em-dash for workflow count when null', () => {
     const credWithNullCount = { ...mockCredential, workflow_count: null }
-    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithNullCount as never))
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithNullCount))
 
     render(<CredentialDetail />, { wrapper })
 
@@ -810,7 +883,7 @@ describe('CredentialDetail', () => {
 
   it('renders workflow count as badge on Workflows tab when greater than zero', async () => {
     const credWithCount = { ...mockCredential, workflow_count: 5 }
-    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithCount as never))
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithCount))
 
     render(<CredentialDetail />, { wrapper })
 
@@ -832,7 +905,7 @@ describe('CredentialDetail', () => {
 
   it('renders em-dash for integration count when null', () => {
     const credWithNullIntegrationCount = { ...mockCredential, integration_count: null }
-    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithNullIntegrationCount as never))
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithNullIntegrationCount))
 
     render(<CredentialDetail />, { wrapper })
 
@@ -842,7 +915,7 @@ describe('CredentialDetail', () => {
 
   it('renders integration count as badge on Integrations tab when greater than zero', async () => {
     const credWithIntegrationCount = { ...mockCredential, integration_count: 7 }
-    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithIntegrationCount as never))
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery(credWithIntegrationCount))
 
     render(<CredentialDetail />, { wrapper })
 
@@ -854,7 +927,7 @@ describe('CredentialDetail', () => {
 
   describe('Permission-based tab gating', () => {
     it('hides Workflows tab when workflow:read is denied', async () => {
-      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } } as never)
+      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false } })
       render(<CredentialDetail />, { wrapper })
 
       await act(async () => {
@@ -866,7 +939,7 @@ describe('CredentialDetail', () => {
     })
 
     it('shows Workflows tab when workflow:read is granted', async () => {
-      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+      vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
       render(<CredentialDetail />, { wrapper })
 
       expect(await screen.findByRole('tab', { name: /Workflows/ })).toBeInTheDocument()
@@ -876,11 +949,14 @@ describe('CredentialDetail', () => {
   it('disables Edit button when user lacks credential:update permission', () => {
     vi.mocked(useCredentialPermissions).mockReturnValue({
       canCreate: true,
+      canRead: true,
       canUpdate: false,
       canDelete: true,
       isLoading: false,
+      isReadChecking: false,
       tooltips: {
         create: 'create tooltip',
+        read: 'read tooltip',
         update: 'You need credential:update permission to edit this credential.',
         enable: 'enable tooltip',
         delete: 'delete tooltip',
@@ -896,11 +972,14 @@ describe('CredentialDetail', () => {
   it('disables Enable/Disable toggle when user lacks credential:update permission', () => {
     vi.mocked(useCredentialPermissions).mockReturnValue({
       canCreate: true,
+      canRead: true,
       canUpdate: false,
       canDelete: true,
       isLoading: false,
+      isReadChecking: false,
       tooltips: {
         create: 'create tooltip',
+        read: 'read tooltip',
         update: 'You need credential:update permission to edit this credential.',
         enable: 'enable tooltip',
         delete: 'delete tooltip',
@@ -916,11 +995,14 @@ describe('CredentialDetail', () => {
   it('disables Delete kebab action when user lacks credential:delete permission', async () => {
     vi.mocked(useCredentialPermissions).mockReturnValue({
       canCreate: true,
+      canRead: true,
       canUpdate: true,
       canDelete: false,
       isLoading: false,
+      isReadChecking: false,
       tooltips: {
         create: 'create tooltip',
+        read: 'read tooltip',
         update: 'update tooltip',
         enable: 'enable tooltip',
         delete: 'You need credential:delete permission to delete this credential.',
@@ -935,5 +1017,29 @@ describe('CredentialDetail', () => {
 
     const deleteItem = await screen.findByRole('menuitem', { name: /Delete credential/ })
     expect(deleteItem).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('passes resourceProject and enabled to useCredentialPermissions after credential loads', () => {
+    vi.mocked(credentialsClient.useQuery).mockImplementation(mockQuery())
+
+    render(<CredentialDetail />, { wrapper })
+
+    expect(useCredentialPermissions).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceProject: 'proj-1', enabled: true })
+    )
+  })
+
+  it('passes enabled: false to useCredentialPermissions while credential is loading', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(credentialsClient.useQuery).mockImplementation((_method: string, path: string): any => {
+      if (path === '/credentials/{credential_id}') {
+        return { data: undefined, isPending: true, error: null, refetch: vi.fn() }
+      }
+      return { data: null, isPending: false, error: null, refetch: vi.fn() }
+    })
+
+    render(<CredentialDetail />, { wrapper })
+
+    expect(useCredentialPermissions).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }))
   })
 })

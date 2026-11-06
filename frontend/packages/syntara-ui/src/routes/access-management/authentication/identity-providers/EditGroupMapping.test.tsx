@@ -141,7 +141,7 @@ describe('EditGroupMapping', () => {
       error: null,
       isFetching: false,
       refetch: vi.fn().mockResolvedValue({ data: { resources: mockMappedGroups } }),
-    } as never)
+    })
 
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
       data: mockProvider,
@@ -150,12 +150,12 @@ describe('EditGroupMapping', () => {
       error: null,
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
-    } as never)
+    })
   })
 
   it('renders Add group mapping title when there are no server mappings', async () => {
@@ -179,7 +179,7 @@ describe('EditGroupMapping', () => {
       error: null,
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     render(<EditGroupMapping />, { wrapper })
     await waitFor(() => {
@@ -213,7 +213,7 @@ describe('EditGroupMapping', () => {
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
 
     mockSearchRef.current = '?new=1'
     const user = userEvent.setup()
@@ -234,7 +234,7 @@ describe('EditGroupMapping', () => {
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
 
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
       data: {
@@ -250,7 +250,7 @@ describe('EditGroupMapping', () => {
       error: null,
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const user = userEvent.setup()
     render(<EditGroupMapping />, { wrapper })
@@ -267,8 +267,7 @@ describe('EditGroupMapping', () => {
     })
 
     const patchArgs = mockMutate.mock.calls[0]?.[0] as
-      | { body?: { configuration?: { group_mapping_entries?: unknown[] } } }
-      | undefined
+      { body?: { configuration?: { group_mapping_entries?: unknown[] } } } | undefined
     expect(patchArgs?.body?.configuration?.group_mapping_entries).toEqual([])
   })
 
@@ -277,7 +276,7 @@ describe('EditGroupMapping', () => {
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
 
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
       data: {
@@ -292,7 +291,7 @@ describe('EditGroupMapping', () => {
       error: null,
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const user = userEvent.setup()
     render(<EditGroupMapping />, { wrapper })
@@ -311,7 +310,7 @@ describe('EditGroupMapping', () => {
     vi.mocked(identityProvidersClient.useMutation).mockReturnValue({
       mutate: mockMutate,
       isPending: false,
-    } as never)
+    })
 
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue({
       data: {
@@ -326,7 +325,7 @@ describe('EditGroupMapping', () => {
       error: null,
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const user = userEvent.setup()
     render(<EditGroupMapping />, { wrapper })
@@ -380,7 +379,7 @@ describe('EditGroupMapping', () => {
       error: { response: { status: 404 } },
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     render(<EditGroupMapping />, { wrapper })
     await waitFor(() => {
@@ -396,7 +395,7 @@ describe('EditGroupMapping', () => {
       error: { response: { status: 404 } },
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     const user = userEvent.setup()
     render(<EditGroupMapping />, { wrapper })
@@ -418,7 +417,7 @@ describe('EditGroupMapping', () => {
       error: new Error('Server error'),
       isPending: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     render(<EditGroupMapping />, { wrapper })
     expect(screen.getAllByText('Error loading identity provider').length).toBeGreaterThan(0)
@@ -545,7 +544,7 @@ describe('EditGroupMapping', () => {
         error: { response: { status: 404 } },
         isPending: false,
         refetch: vi.fn(),
-      } as never)
+      })
 
       const { container } = render(<EditGroupMapping />, { wrapper })
       await waitFor(() => {

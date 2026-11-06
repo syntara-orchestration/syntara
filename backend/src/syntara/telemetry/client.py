@@ -7,7 +7,7 @@ the WorkerRegistry pattern used in temporal_worker.py.
 from __future__ import annotations
 
 import hashlib
-import uuid
+import hmac
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
@@ -20,6 +20,8 @@ from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.models.installation import Installation
 
 if TYPE_CHECKING:
+    import uuid
+
     from sqlalchemy.ext.asyncio import async_sessionmaker
     from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -70,6 +72,28 @@ def derive_anonymous_id(installation_id: uuid.UUID, db_host: str, db_name: str) 
     """
     raw = f"{installation_id}:{db_host}:{db_name}"
     return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def hash_user_id(installation_salt: str, user_id: uuid.UUID | str) -> str:
+    """Derive an anonymized, stable identifier for a user.
+
+    Uses HMAC-SHA256 keyed by the per-installation salt so the same user maps
+    to a stable digest within an installation but cannot be correlated across
+    installations or reversed to the raw UUID.
+
+    Args:
+        installation_salt: Per-installation salt (installation UUID).
+        user_id: The user's UUID (or its string form).
+
+    Returns:
+        A 64-character lowercase hex string.
+
+    """
+    return hmac.new(
+        installation_salt.encode(),
+        str(user_id).encode(),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 class TelemetryClientRegistry:
@@ -177,15 +201,16 @@ class TelemetryClientRegistry:
             properties: dict[str, object] = dict(raw_props) if isinstance(raw_props, dict) else {}
             properties["entitlement_id"] = self._entitlement_id
 
-            # Inject request_id from ContextVar if the event doesn't have one
+            # Inject request_id from ContextVar if the event doesn't have one.
+            # Events serialize UUIDs to str at their emission boundary
+            # (BaseTelemetryEvent.to_segment_event), so any request_id already
+            # present in properties is a string.
             if not properties.get("request_id"):
                 from syntara.audit.emitter import request_id_context_var  # noqa: PLC0415
 
                 ctx_request_id = request_id_context_var.get()
                 if ctx_request_id is not None:
                     properties["request_id"] = str(ctx_request_id)
-            elif isinstance(properties.get("request_id"), uuid.UUID):
-                properties["request_id"] = str(properties["request_id"])
 
             raw_context = segment_event.get("context", {})
             context: dict[str, object] = dict(raw_context) if isinstance(raw_context, dict) else {}

@@ -1,7 +1,6 @@
 import { Content, ContentVariants, EmptyState, EmptyStateBody, StackItem, Title } from '@patternfly/react-core'
 import { PlusCircleIcon, RhUiKeyIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import { useCallback, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { flexCenteredBothAxes } from '../../../app/flexCenteredBothAxes'
@@ -13,6 +12,7 @@ import { SynLink } from '../../../components/SynLink'
 import { DateCell } from '../../../components/table/DateCell'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
 import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
+import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useTableSort } from '../../../hooks/useTableSort'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
@@ -179,13 +179,8 @@ export function SelectIdentityStep({
   identitiesSort: ReturnType<typeof useTableSort>
   onSelect: (id: string | null) => void
 }>) {
-  const [page, setPage] = useState(1)
-  const [perPage, setPerPage] = useState(20)
-  const handlePerPageChange = useCallback((n: number) => {
-    setPerPage(n)
-    setPage(1)
-  }, [])
-  const paginatedIdentities = identities.slice((page - 1) * perPage, page * perPage)
+  const { paginate, getFooterProps, resetPage } = useClientPagination()
+  const paginatedIdentities = paginate(identities)
 
   const hasActiveFilters = identitiesFilter.filters.length > 0
   const showSelectionUi = identities.length > 0 || hasActiveFilters
@@ -209,11 +204,11 @@ export function SelectIdentityStep({
               filters={identitiesFilter.filters}
               onFilterChange={(f) => {
                 identitiesFilter.setAllFilters(f)
-                setPage(1)
+                resetPage()
               }}
               clearAllFilters={() => {
                 identitiesFilter.clearAllFilters()
-                setPage(1)
+                resetPage()
               }}
               showClearAll
               isCompact
@@ -237,15 +232,7 @@ export function SelectIdentityStep({
         <SynScrollableTableContainer
           caption="Select an identity"
           useFixedLayout={false}
-          footer={{
-            page,
-            perPage,
-            total: identities.length,
-            hasNext: page * perPage < identities.length,
-            onPrev: () => setPage((p) => Math.max(1, p - 1)),
-            onNext: () => setPage((p) => p + 1),
-            onPerPageChange: handlePerPageChange,
-          }}
+          footer={getFooterProps(identities.length)}
         >
           <Thead>
             <Tr>

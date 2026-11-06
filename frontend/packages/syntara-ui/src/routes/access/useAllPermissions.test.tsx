@@ -42,7 +42,7 @@ describe('useAllPermissions', () => {
     vi.mocked(accessFetchClient.POST).mockResolvedValue({
       data: { resources: mockPermissions, next: null },
       error: null,
-    } as never)
+    })
 
     const { result } = renderHook(() => useAllPermissions(), { wrapper })
 
@@ -59,8 +59,8 @@ describe('useAllPermissions', () => {
     const page2 = [{ policy_name: 'policy-b', effect: 'deny', actions: ['delete'], scope: 'project', project: 'prod' }]
 
     vi.mocked(accessFetchClient.POST)
-      .mockResolvedValueOnce({ data: { resources: page1, next: 'cursor-1' }, error: null } as never)
-      .mockResolvedValueOnce({ data: { resources: page2, next: null }, error: null } as never)
+      .mockResolvedValueOnce({ data: { resources: page1, next: 'cursor-1' }, error: null })
+      .mockResolvedValueOnce({ data: { resources: page2, next: null }, error: null })
 
     const { result } = renderHook(() => useAllPermissions(), { wrapper })
 
@@ -76,7 +76,7 @@ describe('useAllPermissions', () => {
     vi.mocked(accessFetchClient.POST).mockResolvedValue({
       data: undefined,
       error: { detail: 'Forbidden' },
-    } as never)
+    })
 
     const { result } = renderHook(() => useAllPermissions(), { wrapper })
 
@@ -100,7 +100,7 @@ describe('useAllPermissions', () => {
     vi.mocked(accessFetchClient.POST).mockResolvedValue({
       data: { resources: [], next: null },
       error: null,
-    } as never)
+    })
 
     renderHook(() => useAllPermissions(), { wrapper })
 

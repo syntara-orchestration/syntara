@@ -88,7 +88,7 @@ The `WorkflowValidator` class in `syntara.workflows.validators.workflow_definiti
 | Orphaned nodes | `orphaned_node` | Breadth-first search (BFS) starting from all trigger nodes, fanning out level by level following edges. Any node never reached is "orphaned" — it exists on the canvas but has no path from a trigger, so it would never execute. |
 | Converge config | `converge_configuration` | Validates converge nodes have ≥2 incoming branches and that `n_required` does not exceed the branch count |
 | Approval configuration | `approval_configuration` | Validates approval nodes: warns when `fallback_decision` is set to `approve` without `continue_on_failure` enabled, since the fallback would have no effect. Severity: warning. |
-| Template expressions | `invalid_reference` | Validates `${...}` expressions reference valid scopes (`trigger`, `workflow_context`), existing node IDs, or `loop` (only inside loop bodies). Unknown names (including `input` / `inputs` / `variables` when they are not node ids) fail the same way as a missing node. Rejects `${loop.*}` used outside loop bodies. |
+| Template expressions | `invalid_reference` | Validates `${...}` expressions reference valid scopes (`trigger`, `workflow_context`), existing node IDs, or `loop` (only inside loop bodies). Unknown names (including leftover `input` / `inputs` / `variables` when they are not node ids) fail the same way as a missing node. Rejects `${loop.*}` used outside loop bodies. |
 
 Checks are ordered so that fatal structural issues (bad schema version, missing fields) short-circuit via early return before graph analysis runs. The remaining checks (schema violations, edge references, cycles, orphaned nodes, converge config, approval config, template expressions) accumulate findings without short-circuiting, and graph checks only run if the definition contains at least one node.
 
@@ -104,7 +104,7 @@ The frontend enforces these validation behaviors across several call sites:
 | Condition connections | `validateConditionConnections.ts` | `validateWorkflow()` | Condition/switch nodes must have the Then (true) branch connected |
 | Converge inputs | `validateConvergeInputs.ts` | `validateWorkflow()` | Converge nodes must not receive inputs from both branches (Then and Else) of the same condition node — that creates ambiguous execution flow |
 | Loop nodes | `validateLoopNodes.ts` | `validateWorkflow()` | Loop nodes must have at least one outgoing edge from the loop body handle |
-| Variable references | `validateVariableReferences.ts` | `validateWorkflow()` | `${step.field}` references must point to existing upstream nodes |
+| Variable references | `validateVariableReferences.ts` | `validateWorkflow()` | `${step.field}` references must point to existing upstream nodes. Leftover `${workflow.*}` is rejected; `input` / `inputs` / `variables` follow the same missing-node rule as the backend |
 | Minimum workflow | `validateMinimumWorkflow.ts` | `useWorkflowVerification`, `useBuilderToolbarHandlers` | Workflow must have at least one trigger, one action node, and one edge connecting them |
 
 Note: `validateBranchConnections.ts` is a shared helper used internally by `validateApprovalConnections` and `validateConditionConnections` — it is not a standalone rule in the `ERROR_RULES` array.
@@ -139,9 +139,9 @@ For request/response schemas and field definitions, see the OpenAPI spec for `PO
 ## Related Documentation
 
 - [Workflow Definition Guide](workflow-definition-guide.md) — V2 schema structure, node types, edge format
-- [Workflow Management](workflow-management.md) — CRUD operations, credential scope validation, overlapping validation coverage
+- [Workflow Management](../workflow-management.md) — CRUD operations, credential scope validation, overlapping validation coverage
 - [Converge Node](converge-node.md) — converge node strategies and validation rules
 - [Node Settings](node-settings.md) — retry policies and per-node configuration
 - [Switch Node](switch-node.md) — condition node branching
 - [Error Handling Strategy](../error-handling-strategy.md) — RFC 9457 compliance, `DetailedValidationProblemDetail` pipeline
-- [Zustand Architecture](../../frontend/docs/zustand-architecture.md) — `validationErrorCount` store patterns and state management
+- [Zustand Architecture](../../frontend/zustand-architecture.md) — `validationErrorCount` store patterns and state management

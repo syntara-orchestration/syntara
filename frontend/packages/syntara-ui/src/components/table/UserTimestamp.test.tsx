@@ -4,7 +4,7 @@ import { axe } from 'vitest-axe'
 
 import { UserTimestamp } from './UserTimestamp'
 
-const userRef = { id: '550e8400-e29b-41d4-a716-446655440001', name: 'alice' }
+const userRef = { id: '550e8400-e29b-41d4-a716-446655440001', name: 'alice', type: 'user' as const }
 const timestamp = '2026-07-01T12:00:00Z'
 const expectedHref = `/system-administration/access-management/users/${userRef.id}`
 
@@ -67,6 +67,55 @@ describe('UserTimestamp', () => {
       render(<UserTimestamp user="charlie" timestamp={timestamp} inline />)
       expect(screen.getByText('charlie')).toBeInTheDocument()
       expect(screen.queryByRole('link', { name: 'charlie' })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('principal types', () => {
+    const userDetailHref = (id: string) => `/system-administration/access-management/users/${id}`
+
+    it('links a user principal to the user detail page', () => {
+      const user = { id: '550e8400-e29b-41d4-a716-446655440010', name: 'alice', type: 'user' as const }
+      render(<UserTimestamp user={user} timestamp={timestamp} />)
+      expect(screen.getByRole('link', { name: 'alice' })).toHaveAttribute('href', userDetailHref(user.id))
+    })
+
+    it('does not link a service account principal (it has no user page)', () => {
+      const sa = { id: '550e8400-e29b-41d4-a716-446655440011', name: 'ci-runner', type: 'service_account' as const }
+      render(<UserTimestamp user={sa} timestamp={timestamp} />)
+      expect(screen.getByText('ci-runner')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'ci-runner' })).not.toBeInTheDocument()
+    })
+
+    it('does not link an internal service principal', () => {
+      const svc = { id: '550e8400-e29b-41d4-a716-446655440012', name: 'worker.ao.svc', type: 'service' as const }
+      render(<UserTimestamp user={svc} timestamp={timestamp} inline />)
+      expect(screen.getByText('worker.ao.svc')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'worker.ao.svc' })).not.toBeInTheDocument()
+    })
+
+    it('does not link a legacy system principal', () => {
+      const sys = { id: 'dead0000-0000-4000-8000-000000000001', name: 'System', type: 'system' as const }
+      render(<UserTimestamp user={sys} timestamp={timestamp} inline />)
+      expect(screen.getByText('System')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'System' })).not.toBeInTheDocument()
+    })
+
+    it('does not link a deleted service account', () => {
+      const gone = {
+        id: '550e8400-e29b-41d4-a716-446655440014',
+        name: 'Deleted service account',
+        type: 'deleted_service_account' as const,
+      }
+      render(<UserTimestamp user={gone} timestamp={timestamp} />)
+      expect(screen.getByText('Deleted service account')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Deleted service account' })).not.toBeInTheDocument()
+    })
+
+    it('does not link a deleted user', () => {
+      const gone = { id: '550e8400-e29b-41d4-a716-446655440013', name: 'Deleted user', type: 'deleted_user' as const }
+      render(<UserTimestamp user={gone} timestamp={timestamp} />)
+      expect(screen.getByText('Deleted user')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Deleted user' })).not.toBeInTheDocument()
     })
   })
 

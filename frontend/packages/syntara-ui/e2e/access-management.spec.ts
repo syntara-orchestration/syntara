@@ -26,12 +26,24 @@ import {
   type SeededPolicy,
   type SeededUser,
 } from './seeds/iam'
-import { ensureProject, getAuthToken } from './utils/api'
+import { createSeedBucket } from './seeds/seed-bucket'
+import {
+  createGroupViaApi,
+  createProjectViaApi,
+  deleteGroupViaApi,
+  deleteProjectViaApi,
+  ensureProject,
+  getAuthToken,
+} from './utils/api'
 
 const ACCESS_URL = '/system-administration/access-management'
 
-const seededUsers: SeededUser[] = []
-const seededPolicies: SeededPolicy[] = []
+// Buckets, not bare arrays: `fullyParallel: true` lets a worker run this file's
+// `beforeAll`/`afterAll` around more than one group of its tests, and the module
+// holding them is imported only once, so a list that is only ever pushed to hands
+// later tests a resource an earlier `afterAll` already deleted.
+const seededUsers = createSeedBucket<SeededUser>('access-management users')
+const seededPolicies = createSeedBucket<SeededPolicy>('access-management policies')
 
 test.beforeAll(async ({ browser }) => {
   const page = await browser.newPage()
@@ -41,12 +53,12 @@ test.beforeAll(async ({ browser }) => {
     const prefix = buildUniqueName('e2e-am')
 
     for (let i = 1; i <= 2; i++) {
-      seededUsers.push(await createUserViaApi(page, { username: `${prefix}-user-${i}`, token }))
+      seededUsers.add(await createUserViaApi(page, { username: `${prefix}-user-${i}`, token }))
     }
 
     const project = await ensureProject(page)
     if (!project) throw new Error('access-management beforeAll: could not ensure project')
-    seededPolicies.push(await createPolicyViaApi(page, project.id, { name: `${prefix}-policy`, token }))
+    seededPolicies.add(await createPolicyViaApi(page, project.id, { name: `${prefix}-policy`, token }))
   } finally {
     await page.close()
   }
@@ -54,10 +66,12 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(async ({ browser }) => {
   const page = await browser.newPage()
-  for (const policy of seededPolicies) {
+  // Drain, so a later round in this worker starts from an empty bucket and no
+  // resource is deleted twice.
+  for (const policy of seededPolicies.drain()) {
     await deletePolicyViaApi(page, policy.projectId, policy.id)
   }
-  for (const user of seededUsers) {
+  for (const user of seededUsers.drain()) {
     await deleteUserViaApi(page, user.id)
   }
   await page.close()
@@ -67,6 +81,11 @@ test.describe('Access Management — Tab Navigation', () => {
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl(ACCESS_URL))
     await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
+  })
+
+  test('the bare route opens the default Users tab', async ({ app }) => {
+    await expect(app).toHaveURL(toAppUrl(`${ACCESS_URL}/users`))
+    await expect(app.getByRole('tab', { name: /^Users$/i })).toHaveAttribute('aria-selected', 'true')
   })
 
   test('clicking tabs updates the URL', async ({ app }) => {
@@ -298,26 +317,124 @@ test.describe('Access Management — Shareable URLs', () => {
 
 test.describe('Access Management — User Detail Tabs', () => {
   test('detail sub-tabs sync to URL', async ({ app }) => {
-    expect(seededUsers.length, 'Failed to seed users via API').toBeGreaterThan(0)
+    expect(seededUsers.size(), 'Failed to seed users via API').toBeGreaterThan(0)
 
     // Users tab filter placeholder is "Filter by username", not "Filter by name". Go by seeded ID.
-    await app.goto(toAppUrl(`${ACCESS_URL}/users/${seededUsers[0].id}`))
-    await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/${seededUsers[0].id}`))
+    const seededUser = seededUsers.latest()
+    const userDetailUrl = `${ACCESS_URL}/users/${seededUser.id}`
+    await app.goto(toAppUrl(userDetailUrl))
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}$`))
+    const detailsTab = app.getByRole('tab', { name: /Details/i })
+    await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
 
-    // Click Groups sub-tab if available
+    // Click Groups sub-tab and verify its selected state and nested URL.
     const groupsTab = app.getByRole('tab', { name: /Groups/i })
-    const hasGroupsTab = (await groupsTab.count()) > 0
-    if (hasGroupsTab) {
-      await groupsTab.click()
-      await expect(app).toHaveURL(/\/groups$/)
-    }
+    await expect(groupsTab).toBeVisible()
+    await groupsTab.click()
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/groups$`))
+    await expect(groupsTab).toHaveAttribute('aria-selected', 'true')
+    const groupsPanel = app.getByRole('tabpanel', { name: 'Groups' })
+    await expect(groupsPanel).toBeVisible()
 
-    // Click Roles sub-tab if available
-    const rolesTab = app.getByRole('tab', { name: /Roles/i })
-    const hasRolesTab = (await rolesTab.count()) > 0
-    if (hasRolesTab) {
-      await rolesTab.click()
-      await expect(app).toHaveURL(/\/roles$/)
+    // Click Assignments sub-tab. Its visible label differs from its URL segment.
+    const assignmentsTab = app.getByRole('tab', { name: /Assignments/i })
+    await expect(assignmentsTab).toBeVisible()
+    await assignmentsTab.click()
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/roles$`))
+    await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+    const assignmentsPanel = app.getByRole('tabpanel', { name: 'Assignments' })
+    await expect(assignmentsPanel).toBeVisible()
+    await expect(app.getByRole('tabpanel')).toHaveCount(1)
+    expect(await assignmentsTab.getAttribute('aria-controls')).toBe(await assignmentsPanel.getAttribute('id'))
+
+    // Browser history restores the previous nested tab and its selection.
+    await app.goBack()
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/groups$`))
+    await expect(groupsTab).toHaveAttribute('aria-selected', 'true')
+
+    // A direct URL selects the matching child route.
+    await app.goto(toAppUrl(`${userDetailUrl}/roles`))
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/roles$`))
+    await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+
+    // Unknown tab segments stay within the detail layout and route to Details.
+    await app.goto(toAppUrl(`${userDetailUrl}/not-a-tab`))
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/details$`))
+    await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
+    await app.goBack()
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/roles$`))
+    await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+  })
+})
+
+test.describe('Access Management — Nested detail tab routes', () => {
+  test('group detail deep links and browser history select the matching tab', async ({ app }) => {
+    const groupName = buildUniqueName('e2e-nested-group')
+    const groupId = await createGroupViaApi(app, { name: groupName })
+    if (!groupId) throw new Error('Failed to create a group for nested-route coverage')
+
+    const basePath = `${ACCESS_URL}/groups/${groupId}`
+    const membersPath = `${basePath}/members`
+    const assignmentsPath = `${basePath}/roles`
+
+    try {
+      await app.goto(toAppUrl(basePath))
+      await expect(app.getByRole('heading', { level: 1, name: groupName })).toBeVisible()
+      const detailsTab = app.getByRole('tab', { name: /^Details$/i })
+      await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goto(toAppUrl(membersPath))
+      const membersTab = app.getByRole('tab', { name: /^Members\b/i })
+      await expect(membersTab).toHaveAttribute('aria-selected', 'true')
+
+      const assignmentsTab = app.getByRole('tab', { name: /^Assignments\b/i })
+      await assignmentsTab.click()
+      await expect(app).toHaveURL(toAppUrl(assignmentsPath))
+      await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goBack()
+      await expect(app).toHaveURL(toAppUrl(membersPath))
+      await expect(membersTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goForward()
+      await expect(app).toHaveURL(toAppUrl(assignmentsPath))
+      await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+    } finally {
+      await deleteGroupViaApi(app, groupId)
+    }
+  })
+
+  test('project detail deep links and browser history select the matching tab', async ({ app }) => {
+    const projectName = buildUniqueName('e2e-nested-project')
+    const project = await createProjectViaApi(app, projectName)
+    const basePath = `${ACCESS_URL}/projects/${project.id}`
+    const workflowsPath = `${basePath}/workflows`
+    const assignmentsPath = `${basePath}/role-assignments`
+
+    try {
+      await app.goto(toAppUrl(basePath))
+      await expect(app.getByRole('heading', { level: 1, name: projectName })).toBeVisible()
+      const detailsTab = app.getByRole('tab', { name: /^Details$/i })
+      await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goto(toAppUrl(workflowsPath))
+      const workflowsTab = app.getByRole('tab', { name: /^Workflows$/i })
+      await expect(workflowsTab).toHaveAttribute('aria-selected', 'true')
+
+      const assignmentsTab = app.getByRole('tab', { name: /^Assignments$/i })
+      await assignmentsTab.click()
+      await expect(app).toHaveURL(toAppUrl(assignmentsPath))
+      await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goBack()
+      await expect(app).toHaveURL(toAppUrl(workflowsPath))
+      await expect(workflowsTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goForward()
+      await expect(app).toHaveURL(toAppUrl(assignmentsPath))
+      await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+    } finally {
+      await deleteProjectViaApi(app, project.id)
     }
   })
 })
@@ -363,8 +480,8 @@ test.describe('Access Management — Policies Tab Columns', () => {
   })
 
   test('project-scoped policies show a clickable project link', async ({ app }) => {
-    expect(seededPolicies.length, 'Failed to create a project-scoped policy via API').toBeGreaterThan(0)
-    const policy = seededPolicies[0]
+    expect(seededPolicies.size(), 'Failed to create a project-scoped policy via API').toBeGreaterThan(0)
+    const policy = seededPolicies.latest()
 
     const table = app.getByRole('grid', { name: 'Policies' })
     await app.getByPlaceholder('Filter by name').fill(policy.name)
@@ -372,6 +489,6 @@ test.describe('Access Management — Policies Tab Columns', () => {
     await expect(table.getByRole('row').filter({ hasText: policy.name })).toBeVisible({ timeout: 15_000 })
 
     const policyRow = table.getByRole('row').filter({ hasText: policy.name })
-    await expect(policyRow.locator('td[data-label="Project"]').getByRole('button')).toBeVisible()
+    await expect(policyRow.locator('td[data-label="Project"]').getByRole('link')).toBeVisible()
   })
 })

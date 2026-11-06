@@ -38,7 +38,7 @@ _NESTED_QUANTIFIER_RE = re.compile(
 )
 
 
-def _has_dangerous_pattern(pattern: str) -> bool:
+def has_dangerous_pattern(pattern: str) -> bool:
     """Check whether a regex pattern contains nested quantifiers.
 
     This heuristic flags the most common class of ReDoS vulnerability:
@@ -57,6 +57,9 @@ def _has_dangerous_pattern(pattern: str) -> bool:
 
     """
     return bool(_NESTED_QUANTIFIER_RE.search(pattern))
+
+
+_has_dangerous_pattern = has_dangerous_pattern
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +126,7 @@ def _check_regex_pattern(pattern: str, context: str) -> None:
         msg = f"Invalid regex in '{context}': {e}"
         raise ValueError(msg) from e
 
-    if _has_dangerous_pattern(pattern):
+    if has_dangerous_pattern(pattern):
         msg = (
             f"Potentially unsafe regex in '{context}': '{pattern}'. "
             "Nested quantifiers (e.g. '(a+)+') can cause catastrophic "

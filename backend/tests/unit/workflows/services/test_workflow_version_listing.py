@@ -187,9 +187,14 @@ class TestListWorkflowVersionsCursorCallbacks:
     """Tests for the inner callbacks used by list_workflow_versions_cursor."""
 
     @pytest.mark.asyncio
-    async def test_populate_usernames_callback(self, mock_service: WorkflowService) -> None:
+    async def test_populate_context_callback_queries_publish_events(self, mock_service: WorkflowService) -> None:
+        """The post-query callback loads publish context.
+
+        It no longer batches username lookups: created_by is resolved once by
+        BaseService after conversion, so the callback only reads publish events.
+        """
         workflow_id = uuid4()
-        user_id = uuid4()
+        version_id = uuid4()
         mock_workflow = MagicMock()
         mock_workflow.id = workflow_id
         mock_workflow.published_version_id = None
@@ -202,9 +207,9 @@ class TestListWorkflowVersionsCursorCallbacks:
 
         mock_list = AsyncMock(side_effect=capture_list_resources)
 
-        mock_result = MagicMock()
-        mock_result.__iter__ = MagicMock(return_value=iter([(user_id, "testuser")]))
-        mock_exec = AsyncMock(return_value=mock_result)
+        event_rows = MagicMock()
+        event_rows.__iter__ = MagicMock(return_value=iter([]))
+        mock_exec = AsyncMock(return_value=event_rows)
 
         with (
             patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
@@ -214,7 +219,7 @@ class TestListWorkflowVersionsCursorCallbacks:
 
         callback: Callable[..., Any] = captured["post_query_callback"]
         mock_version = MagicMock()
-        mock_version.created_by = user_id
+        mock_version.id = version_id
         with patch.object(mock_service.session, "exec", mock_exec):
             await callback([mock_version])
         mock_exec.assert_called()

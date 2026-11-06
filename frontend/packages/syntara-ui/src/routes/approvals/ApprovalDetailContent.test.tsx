@@ -104,7 +104,7 @@ describe('ApprovalDetailContent', () => {
       mutate: vi.fn(),
       isPending: false,
       isSuccess: false,
-    } as never)
+    })
   })
 
   it('renders the approval summary with workflow name', () => {
@@ -223,7 +223,7 @@ describe('ApprovalDetailContent', () => {
       mutate,
       isPending: false,
       isSuccess: false,
-    } as never)
+    })
 
     const user = userEvent.setup()
     render(<ApprovalDetailContent approval={mockApproval} />, { wrapper })
@@ -250,7 +250,7 @@ describe('ApprovalDetailContent', () => {
       mutate,
       isPending: false,
       isSuccess: false,
-    } as never)
+    })
 
     const user = userEvent.setup()
     render(<ApprovalDetailContent approval={mockApproval} />, { wrapper })
@@ -275,7 +275,7 @@ describe('ApprovalDetailContent', () => {
       mutate,
       isPending: false,
       isSuccess: false,
-    } as never)
+    })
 
     const onDecisionSubmitted = vi.fn()
     const user = userEvent.setup()
@@ -342,7 +342,7 @@ describe('ApprovalDetailContent', () => {
       mutate,
       isPending: false,
       isSuccess: false,
-    } as never)
+    })
 
     const user = userEvent.setup()
     const { rerender } = render(<ApprovalDetailContent approval={mockApproval} />, { wrapper })
@@ -355,7 +355,7 @@ describe('ApprovalDetailContent', () => {
       mutate,
       isPending: true,
       isSuccess: false,
-    } as never)
+    })
 
     rerender(<ApprovalDetailContent approval={mockApproval} />)
 
@@ -369,7 +369,7 @@ describe('ApprovalDetailContent', () => {
       mutate,
       isPending: false,
       isSuccess: false,
-    } as never)
+    })
 
     render(<ApprovalDetailContent approval={mockApproval} />, { wrapper })
 
@@ -385,7 +385,7 @@ describe('ApprovalDetailContent', () => {
       mutate,
       isPending: false,
       isSuccess: false,
-    } as never)
+    })
 
     const approvalNoId = { ...mockApproval, id: undefined as unknown as string }
     const user = userEvent.setup()

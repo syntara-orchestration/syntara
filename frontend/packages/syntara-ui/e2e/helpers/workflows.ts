@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-
 import { type Page, expect, toAppUrl } from '../fixtures'
 import {
   createBasicWorkflowViaApi,
@@ -10,15 +8,18 @@ import {
 } from '../utils/api'
 
 import { clickAddConnectedStep } from './add-connected-step'
+import { canvasStepNode, clickCanvasStepToOpenEditor, expectCanvasStepTitleVisible } from './canvas-interaction'
+import { clickSaveAndWait } from './workflow-save'
 
 export { createBasicWorkflowViaApi, publishWorkflowViaApi }
 export { clickAddConnectedStep }
+export { clickSaveAndWait, isWorkflowSaveResponse } from './workflow-save'
+export { buildUniqueName } from './workflowNames'
+export { expectCanvasStepTitleVisible } from './canvas-interaction'
 
-export const buildUniqueName = (prefix: string) => `${prefix}-${Date.now()}-${randomUUID()}`
-
-export const addNodePanel = (page: Page) =>
+export const addStepPanel = (page: Page) =>
   page.getByRole('region', {
-    name: /add step|select an action node|select a trigger node|select a logic node|select an aap execution node/i,
+    name: /add step|select an action step|select a trigger step|select a logic step|select an aap execution step/i,
   })
 
 /**
@@ -41,7 +42,11 @@ export async function waitForUIReady(page: Page) {
 /**
  * Click the "Reset layout" button to trigger an auto-layout of the canvas.
  * Uses explicit `toBeVisible()` to ride out any layout animations still settling
- * from a previous call (e.g. after addScriptNode).
+ * from a previous call (e.g. after addScriptStep).
+ *
+ * Use this when you only need nodes repositioned after adding steps. Use
+ * {@link layoutCanvas} when tests must also fit the viewport (typical in CI) before
+ * clicking nodes or edge controls.
  */
 export async function triggerLayout(page: Page) {
   const layoutButton = page.getByRole('button', { name: 'Reset layout', exact: true })
@@ -50,11 +55,13 @@ export async function triggerLayout(page: Page) {
   await waitForUIReady(page)
 }
 
-export async function closeNodeEditorPanel(page: Page) {
-  // The node editor cancel button has different aria-labels depending on mode:
+export { clickNode, clickStep, layoutCanvas } from './canvas-interaction'
+
+export async function closeStepEditorPanel(page: Page) {
+  // The step editor cancel button has different aria-labels depending on mode:
   //   edit mode  → "Cancel without saving"
   //   add mode   → "Cancel step creation"
-  //   read-only  → "Close node editor"
+  //   read-only  → "Close step editor"
   // Try each in order.
   const cancelEditButton = page.getByRole('button', { name: 'Cancel without saving' })
   if ((await cancelEditButton.count()) > 0) {
@@ -72,7 +79,7 @@ export async function closeNodeEditorPanel(page: Page) {
   }
   // Scope the "Close" button query to the drawer panel to avoid matching alert close buttons
   const drawer = page.getByRole('dialog').or(page.locator('[class*="drawer"]'))
-  const closeButton = drawer.getByRole('button', { name: 'Close node editor' })
+  const closeButton = drawer.getByRole('button', { name: 'Close step editor' })
   if ((await closeButton.count()) > 0) {
     await expect(closeButton).toBeVisible()
     await closeButton.click()
@@ -81,14 +88,14 @@ export async function closeNodeEditorPanel(page: Page) {
 }
 
 /**
- * Save and close a node form by clicking Create/Update button.
- * Waits for the button to detach (form closed) and optionally verifies the node appears on canvas.
+ * Save and close a step form by clicking Create/Update button.
+ * Waits for the button to detach (form closed) and optionally verifies the step appears on canvas.
  *
  * @param page - Playwright Page instance
  * @param isUpdate - If true, clicks "Update" button; otherwise clicks "Create" button
- * @param nodeName - Optional node name to verify it appears on canvas after saving
+ * @param stepName - Optional step name to verify it appears on canvas after saving
  */
-export async function saveAndCloseNodeForm(page: Page, isUpdate = false, nodeName?: string) {
+export async function saveAndCloseStepForm(page: Page, isUpdate = false, stepName?: string) {
   const buttonName = isUpdate ? 'Update' : 'Create'
   const saveButton = page.getByRole('button', { name: buttonName })
   await expect(saveButton).toBeEnabled()
@@ -98,30 +105,35 @@ export async function saveAndCloseNodeForm(page: Page, isUpdate = false, nodeNam
   await expect(page.getByRole('button', { name: buttonName })).not.toBeAttached({ timeout: 15_000 })
 
   await waitForUIReady(page)
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 
-  // Wait for positive signal (node appears on canvas) if node name provided
-  if (nodeName) {
-    await verifyNodeVisible(page, nodeName)
+  // Wait for positive signal (step appears on canvas) if step name provided
+  if (stepName) {
+    await verifyStepVisible(page, stepName)
   }
 }
 
 /**
- * Open a node for editing by double-clicking it on the canvas.
- * Uses toPass retry pattern to handle React Flow rendering delays.
+ * Open a step for editing via the canvas step header Edit control.
+ *
+ * Retries layout + click while the editor hydrates. Under CI load the click can
+ * land during a React Flow viewport transform and be lost, so callers must not
+ * use a bare `getByText(stepName).click()`.
  *
  * @param page - Playwright Page instance
- * @param nodeName - Name of the node to open
+ * @param stepName - Name of the step to open
  */
-export async function openNodeForEditing(page: Page, nodeName: string) {
-  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })
+export async function openStepForEditing(page: Page, stepName: string) {
+  await triggerLayout(page)
+  const node = canvasStepNode(page, stepName)
   await waitForUIReady(page)
 
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(async () => {
-    await node.dblclick({ force: true })
-    await expect(nameInput).toBeVisible()
-  }).toPass({ timeout: 15_000, intervals: [1_000, 2_000, 3_000] })
+    await expect(node).toBeVisible({ timeout: 5_000 })
+    await clickCanvasStepToOpenEditor(node, stepName)
+    await expect(nameInput).toHaveValue(stepName, { timeout: 5_000 })
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
 
 export async function fillCodeEditor(
@@ -234,6 +246,11 @@ export async function selectFirstProject(page: Page) {
   await expect(page.getByPlaceholder('Select a project')).not.toBeVisible()
 }
 
+/** Escape a literal string for embedding in a RegExp. */
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 /**
  * Select a project in the builder toolbar.
  * Required for new workflows on the real backend (Save is disabled without a project).
@@ -263,7 +280,11 @@ export async function selectProjectIfRequired(page: Page, projectName?: string) 
   await page.getByRole('option').first().waitFor({ state: 'visible', timeout: 10_000 })
 
   if (projectName) {
-    const option = page.getByRole('option', { name: projectName })
+    // Anchor at the start of the option's accessible name. Each option reads
+    // "<name> <description>", so a plain substring match for `default` also
+    // matches the built-in project's "Default project for ..." description and
+    // resolves to two elements.
+    const option = page.getByRole('option', { name: new RegExp(`^${escapeForRegExp(projectName)}(\\s|$)`) })
     await option.waitFor({ state: 'visible', timeout: 15_000 })
     await option.click()
   } else {
@@ -288,6 +309,26 @@ async function trySelectRealProject(page: Page): Promise<boolean> {
         const toggle = page.getByPlaceholder(/All projects|Select a project/)
         if ((await toggle.count()) > 0) await toggle.click()
         await options.first().waitFor({ state: 'visible', timeout: 3_000 })
+      }
+
+      // Prefer `default` — the project `ensureProject` guarantees, and the only
+      // one no spec deletes. Taking whatever sorts first instead means picking a
+      // project another worker created and is about to clean up: the builder
+      // holds its id, the delete lands, and the save then fails with
+      // `404 {"detail":"Project <id> not found"}`. That was invisible before
+      // saves were gated on the response, because the weak URL guard passed
+      // regardless.
+      //
+      // Matched on the *accessible* name, not `textContent`. The option renders
+      // name and description as adjacent nodes with no separator, so
+      // `textContent` reads `defaultDefault project` and no anchored match on it
+      // can work; the accessible name joins them with a space. Anchoring matters
+      // either way — a bare `default` also matches the built-in project's
+      // "Default project for built-in workflows" description.
+      const preferred = page.getByRole('option', { name: /^default(\s|$)/ })
+      if ((await preferred.count()) === 1) {
+        await preferred.click()
+        return
       }
 
       const allOptions = await options.all()
@@ -330,6 +371,18 @@ async function createProjectViaDropdown(page: Page) {
   await expect(dialog).not.toBeVisible({ timeout: 15_000 })
 }
 
+/**
+ * Every step of the UI cleanup fallback is bounded by this.
+ *
+ * `playwright.config.ts` deliberately sets no `actionTimeout`, so an action with
+ * no explicit timeout of its own waits out the entire test timeout. That is
+ * survivable inside a test body, where the wait is for something the test needs;
+ * it is not survivable here, because this helper runs from a `finally` and a
+ * stalled cleanup turns a test whose assertions all passed into a bare
+ * "Test timeout of 120000ms exceeded" with no failing assertion to explain it.
+ */
+export const CLEANUP_ACTION_TIMEOUT = 10_000
+
 /** Delete a workflow by unique name. Prefers API delete; falls back to UI kebab flow. */
 export async function deleteWorkflow(page: Page, workflowName: string) {
   if (page.isClosed()) return
@@ -341,27 +394,38 @@ export async function deleteWorkflow(page: Page, workflowName: string) {
     }
 
     await page.goto(toAppUrl('/workflows'))
-    await page.getByPlaceholder('Filter by name').fill(workflowName)
-    await page.getByRole('button', { name: 'Apply filter' }).click()
+
+    // Reaching here means the API lookup found nothing, which is the common case
+    // rather than the exotic one: the workflow was renamed during the test, or an
+    // earlier cleanup call already deleted it. The list is then often empty, and
+    // an empty project renders the "No workflows yet" empty state — which has no
+    // filter toolbar at all. Waiting for the filter to appear is therefore the
+    // step that must be bounded, not just the interactions that follow it.
+    const nameFilter = page.getByPlaceholder('Filter by name')
+    await nameFilter.waitFor({ state: 'visible', timeout: CLEANUP_ACTION_TIMEOUT })
+    await nameFilter.fill(workflowName, { timeout: CLEANUP_ACTION_TIMEOUT })
+    await page.getByRole('button', { name: 'Apply filter' }).click({ timeout: CLEANUP_ACTION_TIMEOUT })
 
     const table = page.getByRole('grid', { name: 'Workflows table' })
     const row = table.getByRole('row', { name: new RegExp(workflowName) })
     const isVisible = await expect(row.first())
-      .toBeVisible()
+      .toBeVisible({ timeout: CLEANUP_ACTION_TIMEOUT })
       .then(() => true)
       .catch(() => false)
     if (isVisible) {
       await row
         .getByRole('button', { name: /Actions|Kebab toggle/i })
         .first()
-        .click({ force: true })
-      await page.getByRole('menuitem', { name: 'Delete workflow' }).click()
-      await page.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-      await page.getByRole('button', { name: 'Delete' }).click()
+        .click({ force: true, timeout: CLEANUP_ACTION_TIMEOUT })
+      await page.getByRole('menuitem', { name: 'Delete workflow' }).click({ timeout: CLEANUP_ACTION_TIMEOUT })
+      await page
+        .getByRole('checkbox', { name: /I understand this workflow/i })
+        .check({ timeout: CLEANUP_ACTION_TIMEOUT })
+      await page.getByRole('button', { name: 'Delete workflow' }).click({ timeout: CLEANUP_ACTION_TIMEOUT })
 
       // Wait for deletion to complete - delete dialog should close
       const deleteDialog = page.getByRole('dialog', { name: /Delete workflow/i })
-      await expect(deleteDialog).not.toBeVisible({ timeout: 10000 })
+      await expect(deleteDialog).not.toBeVisible({ timeout: CLEANUP_ACTION_TIMEOUT })
     }
   } catch {
     // Best-effort cleanup — don't fail the test
@@ -406,7 +470,7 @@ export async function deleteProject(page: Page, projectName: string) {
     const deleteDialog = page.getByRole('dialog', { name: /Delete project/i })
     await expect(deleteDialog).toBeVisible()
     await deleteDialog.getByRole('checkbox', { name: /I understand/i }).check()
-    await deleteDialog.getByRole('button', { name: 'Delete' }).click()
+    await deleteDialog.getByRole('button', { name: 'Delete project' }).click()
 
     // Wait for dialog to close
     await expect(deleteDialog)
@@ -455,30 +519,30 @@ export async function createBasicWorkflow(page: Page, workflowName: string, acti
   await ensureProject(page)
 
   await page.goto(toAppUrl('/workflow-builder/new'))
-  await expect(page.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
   // Add manual trigger
   await page.getByRole('button', { name: 'Manual trigger' }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
   await page.getByRole('button', { name: 'Create', exact: true }).click()
 
-  // Add a connected action node
+  // Add a connected action step
   const panel = await clickAddConnectedStep(page)
   await panel.getByRole('button', { name: 'Action', exact: true }).click()
   await panel.getByRole('button', { name: 'Script', exact: true }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(actionName)
   await fillCodeEditor(page, { value: 'print("hello")' })
   await page.getByRole('button', { name: 'Create', exact: true }).click()
-  await closeNodeEditorPanel(page)
+  await closeStepEditorPanel(page)
 
   // Select project (required on real backend), then name and save
   await selectProjectIfRequired(page)
 
   await page.getByPlaceholder('Workflow name').fill(workflowName)
-  await page.getByRole('button', { name: 'Save' }).click()
 
-  // Must navigate away from /new — .+ alone would match "new" and give a false pass
-  await expect(page).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
+  // Gate on the create response, not the URL: the builder routes to
+  // /workflow-builder/<id> before the POST has necessarily landed.
+  await clickSaveAndWait(page)
 }
 
 /**
@@ -488,7 +552,7 @@ export async function createBasicWorkflow(page: Page, workflowName: string, acti
 export async function startWorkflowWithTrigger(page: Page) {
   await ensureProject(page)
   await page.goto(toAppUrl('/workflow-builder/new'))
-  await expect(page.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
   await selectProjectIfRequired(page)
 
@@ -496,17 +560,22 @@ export async function startWorkflowWithTrigger(page: Page) {
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
   await page.getByRole('button', { name: 'Create', exact: true }).click()
   // Wait for the editor panel to finish closing before returning — the panel auto-closes
-  // after trigger creation, but callers that immediately call openAddNodePanel would race
+  // after trigger creation, but callers that immediately call openAddStepPanel would race
   // against the closing animation and not find the edge "Add connected step" buttons.
   await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 10_000 })
 }
 
-/** Save the workflow with the given name. Waits for URL to confirm persistence. */
-export async function saveWorkflow(page: Page, workflowName: string, { timeout = 15_000 } = {}) {
+/**
+ * Name and save the workflow, returning once the server has the change.
+ *
+ * The old `toHaveURL(/workflow-builder\/(?!new)/)` gate only ever meant anything
+ * on create; on an already-saved workflow the URL never changes, so it resolved
+ * without waiting for the PATCH at all. See `clickSaveAndWait`.
+ */
+export async function saveWorkflow(page: Page, workflowName: string, { timeout = 30_000 } = {}) {
   await selectProjectIfRequired(page)
   await page.getByPlaceholder('Workflow name').fill(workflowName)
-  await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page).toHaveURL(/workflow-builder\/(?!new)/, { timeout })
+  await clickSaveAndWait(page, { timeout })
 }
 
 /**
@@ -519,7 +588,7 @@ export async function createWorkflowWithTrigger(page: Page, workflowName: string
   await ensureProject(page)
 
   await page.goto(toAppUrl('/workflow-builder/new'))
-  await expect(page.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Manual trigger' }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
@@ -529,10 +598,9 @@ export async function createWorkflowWithTrigger(page: Page, workflowName: string
   const nameInput = page.getByPlaceholder('Workflow name')
   await nameInput.clear()
   await nameInput.fill(workflowName)
-  await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
+  await clickSaveAndWait(page)
 
-  await expect(page.getByText('Manual trigger')).toBeVisible()
+  await expectCanvasStepTitleVisible(page, 'Manual trigger')
   await expect(page.getByRole('button', { name: 'Reset layout', exact: true })).toBeVisible()
 
   // Wait for canvas to be fully ready
@@ -540,9 +608,9 @@ export async function createWorkflowWithTrigger(page: Page, workflowName: string
 }
 
 /**
- * Add a Script action node to the workflow canvas.
+ * Add a Script action step to the workflow canvas.
  */
-export async function addScriptNode(page: Page, name: string, code: string) {
+export async function addScriptStep(page: Page, name: string, code: string) {
   const panel = await clickAddConnectedStep(page)
 
   const actionBtn = panel.getByRole('button', { name: 'Action', exact: true })
@@ -551,7 +619,7 @@ export async function addScriptNode(page: Page, name: string, code: string) {
   await actionBtn.click()
 
   // Wait for panel to transition and show action types
-  const actionHeading = panel.getByRole('heading', { name: /select an action node/i })
+  const actionHeading = panel.getByRole('heading', { name: /select an action step/i })
   await expect(actionHeading).toBeVisible({ timeout: 10000 })
 
   // Wait for panel re-render to complete before clicking Script
@@ -585,7 +653,7 @@ export async function addScriptNode(page: Page, name: string, code: string) {
   await expect(saveButton).toBeEnabled({ timeout: 20000 })
   await saveButton.click()
 
-  // Wait for the Script form to close — AddNodePanel unmounts immediately when Script
+  // Wait for the Script form to close — AddStepPanel unmounts immediately when Script
   // is selected so panel.toHaveCount(0) passes instantly and is not a useful gate.
   // Waiting for the Create button to leave the DOM is the real signal that the form unmounted.
   await expect(page.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 15000 })
@@ -593,19 +661,19 @@ export async function addScriptNode(page: Page, name: string, code: string) {
   // Wait for UI to stabilize
   await waitForUIReady(page)
 
-  // Wait for node to appear on canvas using accessible ARIA attributes
+  // Wait for step to appear on canvas using accessible ARIA attributes
   await expect(page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: name })).toBeVisible({
     timeout: 10000,
   })
 }
 
 /**
- * Add a Script action node WITHOUT auto-connecting it (uses "Add step" instead of "Add connected step").
+ * Add a Script action step WITHOUT auto-connecting it (uses "Add step" instead of "Add connected step").
  * Useful for testing manual edge creation.
  */
-export async function addScriptNodeUnconnected(page: Page, name: string, code: string) {
+export async function addScriptStepUnconnected(page: Page, name: string, code: string) {
   // Wait for any existing panel to close and network to settle
-  const panel = addNodePanel(page)
+  const panel = addStepPanel(page)
   await expect(panel).toHaveCount(0, { timeout: 10000 })
   await waitForUIReady(page)
 
@@ -644,30 +712,30 @@ export async function addScriptNodeUnconnected(page: Page, name: string, code: s
   // Wait for UI to stabilize
   await waitForUIReady(page)
 
-  // Wait for canvas to render the new node using accessible ARIA attributes
+  // Wait for canvas to render the new step using accessible ARIA attributes
   await expect(page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: name })).toBeVisible({
     timeout: 10000,
   })
 }
 
 /**
- * Verify that a node with the given name is visible on the canvas.
+ * Verify that a step with the given name is visible on the canvas.
  */
-export async function verifyNodeVisible(page: Page, nodeName: string) {
+export async function verifyStepVisible(page: Page, stepName: string) {
   // ReactFlow nodes have role="group" with aria-roledescription="node"
-  await expect(page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })).toBeVisible({
+  await expect(page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })).toBeVisible({
     timeout: 10000,
   })
 }
 
 /**
- * Navigate to the workflow builder and add an API action node form
+ * Navigate to the workflow builder and add an API action step form
  * where the credential selector is visible and enabled.
  */
 export async function navigateToApiActionForm(page: Page) {
   await ensureProject(page)
   await page.goto(toAppUrl('/workflow-builder/new'))
-  await expect(page.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
   await selectProjectIfRequired(page)
 
@@ -688,12 +756,12 @@ export async function navigateToApiActionForm(page: Page) {
 }
 
 /**
- * Run a single node of workflow via the kebab menu "Run step" action.
+ * Run a single step of a workflow via the kebab menu "Run step" action.
  * Pass mockData (JSON string) to use mock data, or omit to run all previous steps.
  * Retries kebab → Run step when React Flow remounts the menu mid-click.
  */
-export async function runSingleWorkflowNode(page: Page, nodeName: string, mockData?: string) {
-  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeName })
+export async function runSingleWorkflowStep(page: Page, stepName: string, mockData?: string) {
+  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
   await expect(node).toBeVisible()
   await waitForUIReady(page)
   await node.hover()

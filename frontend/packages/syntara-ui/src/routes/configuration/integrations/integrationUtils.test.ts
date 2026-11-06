@@ -21,7 +21,7 @@ const integrationDefaults: IntegrationRead = {
   enabled_tool_count: 3,
   total_model_count: 0,
   enabled_model_count: 0,
-  created_by: 'user-1',
+  created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
 }
 
 function buildIntegration(overrides: Partial<IntegrationRead> = {}): IntegrationRead {
@@ -76,7 +76,7 @@ describe('integrationUtils', () => {
     })
 
     it('returns empty string when configuration is undefined', () => {
-      expect(getProviderHint(buildIntegration({ configuration: undefined } as never))).toBe('')
+      expect(getProviderHint(buildIntegration({ configuration: undefined }))).toBe('')
     })
   })
 
@@ -98,7 +98,7 @@ describe('integrationUtils', () => {
     })
 
     it('returns empty string when configuration is undefined', () => {
-      expect(getBaseUrl(buildIntegration({ configuration: undefined } as never))).toBe('')
+      expect(getBaseUrl(buildIntegration({ configuration: undefined }))).toBe('')
     })
 
     it('resolves default URL for well-known provider when base_url is null', () => {

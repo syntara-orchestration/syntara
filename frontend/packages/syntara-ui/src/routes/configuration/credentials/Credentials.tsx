@@ -1,12 +1,11 @@
 import { Button, StackItem } from '@patternfly/react-core'
-import { RhUiEditIcon, RhUiTrashIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon } from '@patternfly/react-icons'
 import { Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 
 import { credentialsClient } from '../../../client'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { FilterBar } from '../../../components/filters/FilterBar'
-import { IconLabel } from '../../../components/IconLabel'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
@@ -30,7 +29,7 @@ import { useDocLink } from '../../../utils/docs/useDocLink'
 import type { Credential, CredentialType } from './credentialConstants'
 import { CredentialEmptyState } from './CredentialEmptyState'
 import { getCredentialNameFilterDefinition } from './credentialFilters'
-import { FlatCredentialsTableBody, GroupedCredentialsTableBody, type CredentialRowAction } from './CredentialsTableBody'
+import { FlatCredentialsTableBody, GroupedCredentialsTableBody } from './CredentialsTableBody'
 import { DeleteCredentialDialog } from './DeleteCredentialDialog'
 import { DisableCredentialDialog } from './DisableCredentialDialog'
 import { CredentialFormModal } from './form/CredentialFormModal'
@@ -45,43 +44,6 @@ const SORT_FIELDS: Record<number, string> = {
   4: 'updated_at',
 }
 
-function buildCredentialRowActions(
-  credential: Credential,
-  permissions: ReturnType<typeof useCredentialPermissions>,
-  isBuiltinProject: boolean,
-  callbacks: {
-    onEdit: (credential: Credential) => void
-    onDelete: (credential: Credential) => void
-  }
-): CredentialRowAction[] {
-  const updatePermissionTooltip = permissions.canUpdate ? undefined : { content: permissions.tooltips.update }
-  const noUpdate = isBuiltinProject
-    ? { content: builtinProjectTooltip('edit this credential') }
-    : updatePermissionTooltip
-  const deletePermissionTooltip = permissions.canDelete ? undefined : { content: permissions.tooltips.delete }
-  const noDelete = isBuiltinProject
-    ? { content: builtinProjectTooltip('delete this credential') }
-    : deletePermissionTooltip
-  return [
-    {
-      key: 'edit',
-      title: <IconLabel icon={<RhUiEditIcon />}>Edit credential</IconLabel>,
-      isAriaDisabled: isBuiltinProject || !permissions.canUpdate,
-      tooltipProps: noUpdate,
-      onClick: () => callbacks.onEdit(credential),
-    },
-    { key: 'sep-delete', isSeparator: true },
-    {
-      key: 'delete',
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete credential</IconLabel>,
-      isDanger: true,
-      isAriaDisabled: isBuiltinProject || !permissions.canDelete,
-      tooltipProps: noDelete,
-      onClick: () => callbacks.onDelete(credential),
-    },
-  ]
-}
-
 type CredentialPageToolbarProps = {
   permissions: ReturnType<typeof useCredentialPermissions>
   isBuiltinProject: boolean
@@ -93,7 +55,7 @@ function CredentialPageToolbar({ permissions, isBuiltinProject, onCreateClick }:
   const tooltip = isBuiltinProject ? builtinProjectTooltip('create a credential') : permissions.tooltips.create
   return (
     <DisabledWithTooltip isDisabled={!canCreate} content={tooltip}>
-      <Button variant="primary" isAriaDisabled={!canCreate} onClick={onCreateClick}>
+      <Button variant="primary" icon={<RhUiAddIcon />} isAriaDisabled={!canCreate} onClick={onCreateClick}>
         Create credential
       </Button>
     </DisabledWithTooltip>
@@ -107,7 +69,7 @@ export default function Credentials() {
   const { selectedProject, isAllProjects, projects, ProjectSelector } = useProjectSelector()
   const projectsForGrouping = useProjectsForGrouping(projects, isAllProjects)
   const projectsById = useMemo(() => new Map(projectsForGrouping.map((p) => [p.id, p])), [projectsForGrouping])
-  const permissions = useCredentialPermissions()
+  const permissions = useCredentialPermissions({ resourceProject: selectedProject?.id })
   const isBuiltinSelected = !!selectedProject?.is_builtin
 
   const {
@@ -156,7 +118,13 @@ export default function Credentials() {
   const query = credentialsClient.useQuery('get', '/credentials', { params: { query: finalQueryParams } })
   const serverCredentials = useMemo(() => query.data?.resources ?? [], [query.data?.resources])
 
-  useCursorReset(serverCredentials.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: serverCredentials.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: query.isFetching,
+    resetPagination,
+  })
 
   // Fetch credential types for type name lookup
   const typesQuery = credentialsClient.useQuery('get', '/credential_types')
@@ -308,20 +276,10 @@ export default function Credentials() {
     onSettled: closeDeleteDialog,
   })
 
-  const permissionToggleTooltip = permissions.canUpdate ? undefined : permissions.tooltips.enable
-  const getToggleDisabledTooltip = (credential: Credential): string | undefined => {
-    const isBuiltinProject = !!selectedProject?.is_builtin || !!projectsById.get(credential.project_id)?.is_builtin
-    if (isBuiltinProject) return builtinProjectTooltip('enable or disable this credential')
-    return permissionToggleTooltip
-  }
-
-  const getRowActions = (credential: Credential) => {
-    const isBuiltinProject = !!selectedProject?.is_builtin || !!projectsById.get(credential.project_id)?.is_builtin
-    return buildCredentialRowActions(credential, permissions, isBuiltinProject, {
-      onEdit: setCredentialToEdit,
-      onDelete: openDeleteDialog,
-    })
-  }
+  const getIsBuiltinProject = useCallback(
+    (credential: Credential) => !!selectedProject?.is_builtin || !!projectsById.get(credential.project_id)?.is_builtin,
+    [selectedProject?.is_builtin, projectsById]
+  )
 
   // Query state handling (loading/error)
   const queryState = useQueryState(query, {
@@ -401,14 +359,20 @@ export default function Credentials() {
                         }}
                         aria-label="Row expansion"
                       />
-                      <Th sort={getSortParams(0)}>Name</Th>
-                      <Th>Type</Th>
-                      <Th>Workflows</Th>
-                      <Th>Integrations</Th>
-                      <Th sort={getSortParams(3)}>Created</Th>
-                      <Th sort={getSortParams(4)}>Last modified</Th>
-                      <Th>State</Th>
-                      <Th screenReaderText="Actions" />
+                      <Th width={15} sort={getSortParams(0)}>
+                        Name
+                      </Th>
+                      <Th width={15}>Type</Th>
+                      <Th width={10}>Workflows</Th>
+                      <Th width={10}>Integrations</Th>
+                      <Th width={20} sort={getSortParams(3)}>
+                        Created
+                      </Th>
+                      <Th width={20} sort={getSortParams(4)}>
+                        Last modified
+                      </Th>
+                      <Th width={10}>State</Th>
+                      <Th width={10} screenReaderText="Actions" />
                     </Tr>
                   </Thead>
                   {isAllProjects && groupedCredentials ? (
@@ -419,9 +383,10 @@ export default function Credentials() {
                       typeMap={typeMap}
                       expandedRows={expandedRows}
                       onToggleRow={handleToggleRow}
-                      getRowActions={getRowActions}
+                      onEdit={setCredentialToEdit}
+                      onDelete={openDeleteDialog}
                       onToggleEnabled={handleToggleEnabled}
-                      getToggleDisabledTooltip={getToggleDisabledTooltip}
+                      getIsBuiltinProject={getIsBuiltinProject}
                     />
                   ) : (
                     <FlatCredentialsTableBody
@@ -429,9 +394,10 @@ export default function Credentials() {
                       typeMap={typeMap}
                       expandedRows={expandedRows}
                       onToggleRow={handleToggleRow}
-                      getRowActions={getRowActions}
+                      onEdit={setCredentialToEdit}
+                      onDelete={openDeleteDialog}
                       onToggleEnabled={handleToggleEnabled}
-                      getToggleDisabledTooltip={getToggleDisabledTooltip}
+                      getIsBuiltinProject={getIsBuiltinProject}
                     />
                   )}
                 </SynScrollableTableContainer>

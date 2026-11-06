@@ -19,7 +19,7 @@
  */
 
 import { test, expect, toAppUrl } from '../fixtures'
-import { addManualTrigger, addScriptNode } from '../helpers/v2-nodes'
+import { addManualTrigger, addScriptStep } from '../helpers/v2-steps'
 import { buildUniqueName, deleteWorkflow, selectProjectIfRequired } from '../helpers/workflows'
 import { ensureProject } from '../utils/api'
 
@@ -32,11 +32,11 @@ test.describe('Manual Trigger', () => {
 
     try {
       await addManualTrigger(app, 'Start workflow')
-      await addScriptNode(app, 'Process data', 'print("processing")')
+      await addScriptStep(app, 'Process data', 'print("processing")')
 
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save', exact: true }).click()
+      await app.getByRole('button', { name: 'Save workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/(?!new)[a-f0-9-]+/, { timeout: 15_000 })
 
       await app.goto(toAppUrl('/workflows'))
@@ -48,7 +48,7 @@ test.describe('Manual Trigger', () => {
       await app.getByRole('link', { name: workflowName, exact: true }).click()
 
       // Wait for builder to load
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: 15_000 })
+      await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
 
       // Click Layout to position nodes within the viewport so both are visible
       const layoutButton = app.getByRole('button', { name: 'Reset layout', exact: true })
@@ -68,10 +68,13 @@ test.describe('Manual Trigger', () => {
       await expect(triggerNode).toBeVisible({ timeout: 15_000 })
       await expect(scriptNode).toBeVisible({ timeout: 15_000 })
 
-      // Verify the edge connection exists between the nodes
-      const edges = app.locator('[role="group"][aria-roledescription="edge"]')
-      const edgeCount = await edges.count()
-      expect(edgeCount).toBeGreaterThanOrEqual(1) // At least one edge: trigger -> script
+      // Verify the edge connection exists between the nodes (SVG path; see builder.spec.ts).
+      await expect(async () => {
+        const pathData = await app.evaluate(
+          () => document.querySelector('svg g.react-flow__edge path')?.getAttribute('d') ?? null
+        )
+        expect(pathData).toMatch(/^M/)
+      }).toPass({ timeout: 15_000 })
 
       // Test the full end-to-end journey: now run the workflow from the canvas
       const runButton = app.getByRole('button', { name: 'Run' })
@@ -101,7 +104,7 @@ test.describe('Manual Trigger', () => {
     await ensureProject(app)
     await app.goto(toAppUrl('/workflow-builder/new'))
 
-    await expect(app.getByRole('heading', { name: /select a trigger node/i })).toBeVisible({ timeout: 10_000 })
+    await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Manual trigger' }).click()
 
     const nameInput = app.getByRole('textbox', { name: 'Name', exact: true })

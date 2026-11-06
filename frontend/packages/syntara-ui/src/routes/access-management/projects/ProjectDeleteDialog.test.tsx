@@ -36,7 +36,7 @@ describe('ProjectDeleteDialog', () => {
     render(<ProjectDeleteDialog isOpen projectName="My Project" onClose={onClose} onConfirm={onConfirm} />)
 
     const dialog = screen.getByRole('dialog')
-    const deleteButton = within(dialog).getByRole('button', { name: 'Delete' })
+    const deleteButton = within(dialog).getByRole('button', { name: 'Delete project' })
 
     expect(deleteButton).toBeDisabled()
 

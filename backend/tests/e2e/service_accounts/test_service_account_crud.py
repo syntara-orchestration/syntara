@@ -20,6 +20,7 @@ from syntara_api_client.models.service_account_credential_create import ServiceA
 from syntara_api_client.models.service_account_credential_type import ServiceAccountCredentialType
 from syntara_api_client.models.service_account_status import ServiceAccountStatus
 from syntara_api_client.models.service_account_update import ServiceAccountUpdate
+from syntara_api_client.models.user_reference import UserReference
 
 from tests.e2e.service_accounts import create_sa
 
@@ -51,7 +52,8 @@ class TestCreateServiceAccount:
             assert sa.created_at is not None
             assert sa.updated_at is not None
             assert isinstance(sa.id, UUID)
-            assert isinstance(sa.created_by, UUID)
+            assert isinstance(sa.created_by, UserReference)
+            assert sa.created_by.id is not None
         finally:
             syntara_api.service_accounts.delete(service_account_id=sa.id)
 

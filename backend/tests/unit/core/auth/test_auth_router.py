@@ -1237,7 +1237,7 @@ class TestVerifyIdpTestPermission:
     @pytest.mark.asyncio
     @patch("syntara.auth.router.get_authz_evaluator")
     @patch("syntara.auth.router.authorize", new_callable=AsyncMock)
-    @patch("syntara.auth.router._find_non_deleted_user", new_callable=AsyncMock)
+    @patch("syntara.auth.router._find_user_by_id", new_callable=AsyncMock)
     @patch("syntara.auth.router.create_session_store")
     @patch("syntara.auth.router._get_token_service")
     @patch("syntara.auth.router.get_refresh_token_from_cookie")

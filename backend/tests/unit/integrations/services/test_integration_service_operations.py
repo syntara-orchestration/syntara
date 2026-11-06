@@ -712,6 +712,45 @@ class TestRefreshIntegrationResources:
     @patch(f"{SERVICE_MODULE}.AuditEventDispatcher")
     @patch(f"{SERVICE_MODULE}.get_runtime_settings")
     @patch(f"{SERVICE_MODULE}.create_health_check_adapter")
+    async def test_refresh_exempt_only_sync_does_not_bump_updated_at(
+        self,
+        mock_adapter_factory: MagicMock,
+        mock_settings: MagicMock,
+        mock_audit: MagicMock,
+        test_db_session: AsyncSession,
+        integration_service: IntegrationService,
+    ) -> None:
+        """Provider sync that only touches exempt fields must not bump tool updated_at."""
+        created = await integration_service.create_integration(_mcp_create())
+
+        mock_adapter = AsyncMock()
+        mock_adapter.discover = AsyncMock(
+            return_value=DiscoverResult(
+                success=True,
+                checked_at=datetime.now(UTC),
+                discovered_tools=[DiscoveredTool(name="tool_a", description="Stable")],
+            )
+        )
+        mock_adapter_factory.return_value = mock_adapter
+        mock_settings.return_value = _mock_runtime_settings()
+
+        await integration_service.refresh_resources(created.id)
+
+        tool = (
+            await test_db_session.exec(select(Tool).where(Tool.integration_id == created.id, Tool.name == "tool_a"))
+        ).one()
+        original_updated_at = tool.updated_at
+
+        result = await integration_service.refresh_resources(created.id)
+
+        assert result.updated_count == 1
+        await test_db_session.refresh(tool)
+        assert tool.updated_at == original_updated_at
+
+    @pytest.mark.asyncio
+    @patch(f"{SERVICE_MODULE}.AuditEventDispatcher")
+    @patch(f"{SERVICE_MODULE}.get_runtime_settings")
+    @patch(f"{SERVICE_MODULE}.create_health_check_adapter")
     async def test_refresh_marks_missing_tools_without_disabling(
         self,
         mock_adapter_factory: MagicMock,

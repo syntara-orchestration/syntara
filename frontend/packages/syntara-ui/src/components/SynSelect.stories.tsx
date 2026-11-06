@@ -1,5 +1,5 @@
 import { MenuToggle, type MenuToggleElement, SelectList, SelectOption } from '@patternfly/react-core'
-import type { Meta, StoryObj } from '@storybook/react-vite'
+import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { type Ref, useState } from 'react'
 
 import { SynSelect } from './SynSelect'

@@ -73,11 +73,14 @@ describe('ProjectPolicySelect', () => {
     } = {}
   ) {
     const { policies = mockPolicies, isLoading = false, isFetching = false } = overrides
-    vi.mocked(accessClient.useQuery).mockReturnValue({
-      data: { resources: policies },
-      isLoading,
-      isFetching,
-    } as never)
+    vi.mocked(accessClient.useQuery).mockImplementation((_method, _path, _params, options) => {
+      const enabled = options?.enabled !== false
+      return {
+        data: enabled ? { resources: policies } : undefined,
+        isLoading: enabled ? isLoading : false,
+        isFetching: enabled ? isFetching : false,
+      }
+    })
   }
 
   beforeEach(() => {
@@ -135,6 +138,16 @@ describe('ProjectPolicySelect', () => {
   it('does not render clear all button when no policies are selected', () => {
     renderSelect()
     expect(screen.queryByRole('button', { name: 'Clear all selected policies' })).not.toBeInTheDocument()
+  })
+
+  it('enables the project policies query when the dropdown opens', async () => {
+    const user = userEvent.setup()
+    renderSelect()
+
+    await openDropdown(user)
+
+    const lastCall = vi.mocked(accessClient.useQuery).mock.calls.at(-1)
+    expect(lastCall?.[3]).toEqual(expect.objectContaining({ enabled: true }))
   })
 
   it('opens the dropdown and shows policy options when toggle is clicked', async () => {

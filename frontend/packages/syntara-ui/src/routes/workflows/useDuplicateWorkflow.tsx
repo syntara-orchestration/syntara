@@ -97,7 +97,7 @@ export function useDuplicateWorkflow({ showAlert, showError, setLocation, onSucc
             name: duplicateName,
             description: workflow.description ?? '',
             workflow_definition: transformedDefinition as unknown as WorkflowDefinitionSchema,
-            labels: (workflow.labels as Record<string, string> | undefined) ?? {},
+            labels: workflow.labels ?? {},
             project_id: workflow.project_id,
           },
         })

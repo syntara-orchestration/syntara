@@ -1,10 +1,8 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import { Button, EmptyState, EmptyStateActions, EmptyStateBody, EmptyStateFooter } from '@patternfly/react-core'
 import { RhUiArrowLeftIcon, RhUiSearchIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { type IdentityProvidersAPI } from '@syntara/contracts'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useState, useCallback } from 'react'
-import { useForm } from 'react-hook-form'
 
 import { AppRoute } from '../../../../app/AppRoute'
 import {
@@ -20,7 +18,7 @@ import { SynPanel } from '../../../../components/layout/SynPanel'
 import { useQueryState } from '../../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
-import { useFormMutationErrorHandler } from '../../../../hooks/useFormMutationErrorHandler'
+import { useSynForm } from '../../../../hooks/useSynForm'
 import { useAlerts } from '../../../../providers/alerts'
 import { getErrorMessage, getErrorStatus, isConflictError } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
@@ -308,8 +306,13 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
   const formValues = providerData ? toFormValues(providerData) : undefined
 
   const schema = isEdit ? identityProviderEditSchema : identityProviderAddSchema
+  const form = useSynForm({
+    schema,
+    defaultValues: formValues ?? identityProviderDefaults,
+    values: isEdit && formValues ? formValues : undefined,
+    mode: 'onBlur',
+  })
   const {
-    control,
     handleSubmit,
     setError,
     getValues,
@@ -317,13 +320,8 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
     trigger,
     formState: { isDirty },
     reset,
-  } = useForm<IdentityProviderFormData>({
-    resolver: zodResolver(schema, undefined, { mode: 'sync' }),
-    mode: 'onBlur',
-    defaultValues: formValues ?? identityProviderDefaults,
-    values: isEdit && formValues ? formValues : undefined,
-  })
-  const handleError = useFormMutationErrorHandler<IdentityProviderFormData>(setError)
+    handleError,
+  } = form
 
   const { dismiss } = useDirtyFormGuard({
     isDirty,
@@ -463,9 +461,7 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
         {/* hasNoPadding: PF Wizard applies its own lg padding on __main-body; Panel padding would double it. */}
         <SynPanel isFullHeight isScrollable hasNoPadding>
           <IdentityProviderFormFields
-            control={control}
-            setValue={setValue}
-            trigger={trigger}
+            form={form}
             isEdit={isEdit}
             testResult={discoveredClaims}
             onTestConnection={onTestConnection}

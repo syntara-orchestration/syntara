@@ -5,6 +5,7 @@ import {
   type UnhealthyAlertEnvironment,
 } from './types.js'
 
+/** Formats Zod validation issues into a single readable message. */
 function formatValidationErrors(errors: { path: PropertyKey[]; message: string }[]): string {
   return errors.map((err) => `${err.path.join('.')}: ${err.message}`).join(', ')
 }
@@ -27,7 +28,7 @@ export function getEnvironment(): Environment {
   const result = EnvironmentSchema.safeParse(rawEnv)
 
   if (!result.success) {
-    throw new Error(`Environment validation failed: ${formatValidationErrors(result.error.errors)}`)
+    throw new Error(`Environment validation failed: ${formatValidationErrors(result.error.issues)}`)
   }
 
   return result.data
@@ -44,7 +45,7 @@ export function getUnhealthyAlertEnvironment(): Environment & UnhealthyAlertEnvi
   })
 
   if (!result.success) {
-    throw new Error(`Environment validation failed: ${formatValidationErrors(result.error.errors)}`)
+    throw new Error(`Environment validation failed: ${formatValidationErrors(result.error.issues)}`)
   }
 
   return { ...environment, ...result.data }

@@ -3,16 +3,17 @@ import { APP_TITLE } from './helpers/appTitle'
 import {
   buildUniqueName,
   clickAddConnectedStep,
-  closeNodeEditorPanel,
+  clickSaveAndWait,
+  closeStepEditorPanel,
   createBasicWorkflowViaApi,
   fillCodeEditor,
   selectProjectIfRequired,
 } from './helpers/workflows'
 
-test('user creates and saves a multi-node workflow', async ({ app }) => {
+test('user creates and saves a multi-step workflow', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-multi-node')
   await app.goto(toAppUrl('/workflow-builder/new'))
-  await expect(app.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible()
+  await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
   await expect(app).toHaveTitle(`New Workflow | Workflows | ${APP_TITLE}`)
 
   try {
@@ -21,16 +22,16 @@ test('user creates and saves a multi-node workflow', async ({ app }) => {
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
     await app.getByRole('button', { name: 'Create' }).click()
 
-    // Act - Add connected action node
+    // Act - Add connected action step
     const firstPanel = await clickAddConnectedStep(app)
     await firstPanel.getByRole('button', { name: 'Action', exact: true }).click()
     await firstPanel.getByRole('button', { name: 'Script', exact: true }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Send email')
     await fillCodeEditor(app, { value: 'print("hello from Playwright")' })
     await app.getByRole('button', { name: 'Create' }).click()
-    await closeNodeEditorPanel(app)
+    await closeStepEditorPanel(app)
 
-    // Act - Add another connected action node
+    // Act - Add another connected action step
     const secondPanel = await clickAddConnectedStep(app)
     await secondPanel.getByRole('button', { name: 'Action', exact: true }).click()
     await secondPanel.getByRole('button', { name: 'Script', exact: true }).click()
@@ -41,10 +42,11 @@ test('user creates and saves a multi-node workflow', async ({ app }) => {
     // Act - Save workflow (select project first to avoid name reset)
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
-    await app.getByRole('button', { name: 'Save' }).click()
+    // Gate on the create response: `toHaveURL(/workflow-builder\/.+/)` also matched
+    // the literal `new`, so the goto below used to abort the POST it raced.
+    await clickSaveAndWait(app)
 
     // Assert - Workflow is persisted in workflows list
-    await expect(app).toHaveURL(/workflow-builder\/.+/)
     await app.goto(toAppUrl('/workflows'))
     await app.getByPlaceholder('Filter by name').fill(workflowName)
     await app.getByRole('button', { name: 'Apply filter' }).click()
@@ -58,7 +60,7 @@ test('user creates and saves a multi-node workflow', async ({ app }) => {
       await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
       await app.getByRole('menuitem', { name: 'Delete workflow' }).click()
       await app.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-      await app.getByRole('button', { name: 'Delete' }).click()
+      await app.getByRole('button', { name: 'Delete workflow' }).click()
     }
   }
 })
@@ -77,7 +79,9 @@ test('user edits an existing workflow and changes persist', async ({ app }) => {
     await app.getByRole('link', { name: workflowName, exact: true }).click()
 
     await app.getByPlaceholder('Workflow name').fill(updatedName)
-    await app.getByRole('button', { name: 'Save' }).click()
+    // A rename never changes the URL, so the PATCH response is the only signal
+    // that the change reached the server before the goto tears the page down.
+    await clickSaveAndWait(app)
 
     // Assert - Updated name persists
     await app.goto(toAppUrl('/workflows'))
@@ -94,7 +98,7 @@ test('user edits an existing workflow and changes persist', async ({ app }) => {
         await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
         await app.getByRole('menuitem', { name: 'Delete workflow' }).click()
         await app.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-        await app.getByRole('button', { name: 'Delete' }).click()
+        await app.getByRole('button', { name: 'Delete workflow' }).click()
       }
     }
   }

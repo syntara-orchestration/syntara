@@ -17,12 +17,19 @@ import {
   humanizeValidationMessage,
   mergeHumanizedMessages,
   parseValidationMessage,
+  type ParsedValidationMessage,
 } from './utils/validation/parseValidationMessage'
 
 type ErrorGroup = {
   displayKey: string
   nodeId: string | null
   messages: string[]
+}
+
+function resolveGroupDisplayKey(error: ValidationError, parsed: ParsedValidationMessage): string {
+  if (error.nodeName) return error.nodeName
+  if (error.nodeId && parsed.displayKey === 'Workflow') return error.nodeId
+  return parsed.displayKey
 }
 
 function groupErrors(errors: ValidationError[]): ErrorGroup[] {
@@ -36,7 +43,7 @@ function groupErrors(errors: ValidationError[]): ErrorGroup[] {
       existing.messages.push(...humanized)
     } else {
       groups.set(groupKey, {
-        displayKey: error.nodeName ?? parsed.displayKey,
+        displayKey: resolveGroupDisplayKey(error, parsed),
         nodeId: error.nodeId,
         messages: [...humanized],
       })
@@ -64,7 +71,7 @@ type ValidationBannerProps = Readonly<{
   errors: ValidationError[]
   dismissed: boolean
   dispatch: (action: BuilderAction) => void
-  onNavigateToNode?: (nodeId: string) => void
+  onNavigateToStep?: (nodeId: string) => void
   /** Advisory save vs explicit verify. Defaults to verify. */
   source?: ValidationSource
 }>
@@ -73,7 +80,7 @@ export function ValidationBanner({
   errors,
   dismissed,
   dispatch,
-  onNavigateToNode,
+  onNavigateToStep,
   source = 'verify',
 }: ValidationBannerProps) {
   const groups = useMemo(() => groupErrors(errors), [errors])
@@ -98,8 +105,8 @@ export function ValidationBanner({
           {groups.map((group) => (
             <DescriptionListGroup key={`${group.nodeId ?? 'global'}-${group.displayKey}`}>
               <DescriptionListTerm>
-                {group.nodeId && group.displayKey !== 'Workflow' && onNavigateToNode ? (
-                  <Button variant="link" isInline onClick={() => onNavigateToNode(group.nodeId ?? '')}>
+                {group.nodeId && group.displayKey !== 'Workflow' && onNavigateToStep ? (
+                  <Button variant="link" isInline onClick={() => onNavigateToStep(group.nodeId ?? '')}>
                     {group.displayKey}
                   </Button>
                 ) : (

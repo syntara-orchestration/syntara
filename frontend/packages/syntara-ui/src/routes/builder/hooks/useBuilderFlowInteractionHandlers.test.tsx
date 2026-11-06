@@ -2,8 +2,6 @@ import { act, renderHook } from '@testing-library/react'
 import type { Edge, Node, ReactFlowInstance } from '@xyflow/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
-import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
-
 import { useBuilderFlowInteractionHandlers } from './useBuilderFlowInteractionHandlers'
 
 const moveActivityBefore = vi.fn()
@@ -17,8 +15,8 @@ vi.mock('../../../stores/useWorkflowStore', () => ({
 
 const calculateEdgeConnection = vi.hoisted(() => vi.fn(() => ({ activityReorderTarget: null as string | null })))
 const applyEdgeConnection = vi.hoisted(() =>
-  vi.fn((_r: unknown, _p: unknown, _t: unknown, _rf: unknown, onComplete?: () => void) => {
-    onComplete?.()
+  vi.fn((options?: { onComplete?: () => void }) => {
+    options?.onComplete?.()
   })
 )
 
@@ -77,12 +75,25 @@ describe('useBuilderFlowInteractionHandlers', () => {
       data: { __isGeneric: true },
     } as unknown as Node
     act(() => {
-      result.current.handleNodeClick({} as React.MouseEvent, node as unknown as Node<NodeType['data']>)
+      result.current.handleNodeClick({} as React.MouseEvent, node)
     })
     expect(dispatch).toHaveBeenCalledWith({
       type: 'NODE_CLICK',
       payload: { node, isGeneric: true },
     })
+  })
+
+  it('handleNodeClick does not dispatch NODE_CLICK for non-generic nodes', () => {
+    const { result, dispatch } = renderWith()
+    const node = {
+      id: 'n1',
+      position: { x: 0, y: 0 },
+      data: { __isGeneric: false },
+    } as unknown as Node
+    act(() => {
+      result.current.handleNodeClick({} as React.MouseEvent, node)
+    })
+    expect(dispatch).not.toHaveBeenCalled()
   })
 
   it('handleClearDesiredPosition dispatches CLEAR_NEW_NODE_DESIRED_POSITION', () => {
@@ -102,7 +113,7 @@ describe('useBuilderFlowInteractionHandlers', () => {
       targetHandle: 'custom',
     })
     act(() => {
-      result.current.handleAddNodeFromEdge('s', 't', 'edge-1')
+      result.current.handleAddNodeFromEdge({ sourceNodeId: 's', targetNodeId: 't', edgeId: 'edge-1' })
     })
     expect(dispatch).toHaveBeenCalledWith({
       type: 'OPEN_ADD_NODE_FROM_EDGE',
@@ -120,7 +131,7 @@ describe('useBuilderFlowInteractionHandlers', () => {
   it('handleAddNodeFromEdge leaves targetHandle undefined when edgeId is omitted', () => {
     const { result, dispatch } = renderWith()
     act(() => {
-      result.current.handleAddNodeFromEdge('s', 't')
+      result.current.handleAddNodeFromEdge({ sourceNodeId: 's', targetNodeId: 't' })
     })
     expect(dispatch).toHaveBeenCalledWith({
       type: 'OPEN_ADD_NODE_FROM_EDGE',
@@ -139,7 +150,7 @@ describe('useBuilderFlowInteractionHandlers', () => {
     const { result, dispatch, reactFlowInstance } = renderWith()
     vi.mocked(reactFlowInstance.getEdge).mockReturnValue(undefined)
     act(() => {
-      result.current.handleAddNodeFromEdge('s', 't', 'edge-missing')
+      result.current.handleAddNodeFromEdge({ sourceNodeId: 's', targetNodeId: 't', edgeId: 'edge-missing' })
     })
     expect(dispatch).toHaveBeenCalledWith({
       type: 'OPEN_ADD_NODE_FROM_EDGE',
@@ -181,21 +192,21 @@ describe('useBuilderFlowInteractionHandlers', () => {
     expect(dispatch).toHaveBeenCalledWith({ type: 'CLEAR_SELECTED_IF_DELETED', payload: ['a', 'b'] })
   })
 
-  it('handleViewNodeDetails does nothing when node is missing', () => {
+  it('handleViewStepDetails does nothing when node is missing', () => {
     const { result, dispatch, reactFlowInstance } = renderWith()
     vi.mocked(reactFlowInstance.getNode).mockReturnValue(undefined)
     act(() => {
-      result.current.nodeActionsValue.onViewDetails('missing')
+      result.current.stepActionsValue.onViewDetails('missing')
     })
     expect(dispatch).not.toHaveBeenCalled()
   })
 
-  it('handleViewNodeDetails dispatches when node exists', () => {
+  it('handleViewStepDetails dispatches when node exists', () => {
     const { result, dispatch, reactFlowInstance } = renderWith()
     const node = { id: 'n1', position: { x: 0, y: 0 }, data: {} } as unknown as Node
     vi.mocked(reactFlowInstance.getNode).mockReturnValue(node)
     act(() => {
-      result.current.nodeActionsValue.onViewDetails('n1')
+      result.current.stepActionsValue.onViewDetails('n1')
     })
     expect(dispatch).toHaveBeenCalledWith({
       type: 'NODE_CLICK',
@@ -203,10 +214,10 @@ describe('useBuilderFlowInteractionHandlers', () => {
     })
   })
 
-  it('handleReplaceNode opens add panel with replacement id', () => {
+  it('handleReplaceStep opens add panel with replacement id', () => {
     const { result, dispatch } = renderWith()
     act(() => {
-      result.current.nodeActionsValue.onReplace('rep-1')
+      result.current.stepActionsValue.onReplace('rep-1')
     })
     expect(dispatch).toHaveBeenCalledWith({
       type: 'OPEN_ADD_NODE_PANEL',
@@ -214,7 +225,7 @@ describe('useBuilderFlowInteractionHandlers', () => {
     })
   })
 
-  it('handleDuplicateNode closes editor, sets desired position when node exists, and duplicates', () => {
+  it('handleDuplicateStep closes editor, sets desired position when node exists, and duplicates', () => {
     const { result, dispatch, duplicateActivity, reactFlowInstance } = renderWith()
     const dupNode = {
       id: 'dup',
@@ -225,7 +236,7 @@ describe('useBuilderFlowInteractionHandlers', () => {
     vi.mocked(reactFlowInstance.getNode).mockReturnValue(dupNode)
     vi.mocked(reactFlowInstance.getNodes).mockReturnValue([dupNode])
     act(() => {
-      result.current.nodeActionsValue.onDuplicate('dup')
+      result.current.stepActionsValue.onDuplicate('dup')
     })
     expect(dispatch).toHaveBeenCalledWith({ type: 'CLOSE_NODE_EDITOR' })
     // y: vertical center of the duplicated node — node.position.y (0) + measured.height (40) / 2 = 20 (matches findDuplicatePosition centering)
@@ -236,11 +247,11 @@ describe('useBuilderFlowInteractionHandlers', () => {
     expect(duplicateActivity).toHaveBeenCalledWith('dup')
   })
 
-  it('handleDuplicateNode still calls duplicateActivity when getNode returns undefined', () => {
+  it('handleDuplicateStep still calls duplicateActivity when getNode returns undefined', () => {
     const { result, duplicateActivity, reactFlowInstance } = renderWith()
     vi.mocked(reactFlowInstance.getNode).mockReturnValue(undefined)
     act(() => {
-      result.current.nodeActionsValue.onDuplicate('id-only')
+      result.current.stepActionsValue.onDuplicate('id-only')
     })
     expect(duplicateActivity).toHaveBeenCalledWith('id-only')
   })

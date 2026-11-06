@@ -10,7 +10,7 @@ describe('createFilterChangeHandler', () => {
     const clearAllFilters = vi.fn()
     const setAllFilters = vi.fn()
 
-    const handler = createFilterChangeHandler('page-2-cursor', resetCursor, clearAllFilters, setAllFilters)
+    const handler = createFilterChangeHandler({ cursor: 'page-2-cursor', resetCursor, clearAllFilters, setAllFilters })
 
     const newFilters: FilterConfig[] = [{ key: 'name', operator: 'contains', value: 'test' }]
     handler(newFilters)
@@ -25,7 +25,7 @@ describe('createFilterChangeHandler', () => {
     const clearAllFilters = vi.fn()
     const setAllFilters = vi.fn()
 
-    const handler = createFilterChangeHandler(null, resetCursor, clearAllFilters, setAllFilters)
+    const handler = createFilterChangeHandler({ cursor: null, resetCursor, clearAllFilters, setAllFilters })
 
     const newFilters: FilterConfig[] = [{ key: 'name', operator: 'contains', value: 'test' }]
     handler(newFilters)
@@ -39,7 +39,7 @@ describe('createFilterChangeHandler', () => {
     const clearAllFilters = vi.fn()
     const setAllFilters = vi.fn()
 
-    const handler = createFilterChangeHandler('page-2-cursor', resetCursor, clearAllFilters, setAllFilters)
+    const handler = createFilterChangeHandler({ cursor: 'page-2-cursor', resetCursor, clearAllFilters, setAllFilters })
 
     handler([])
 
@@ -53,7 +53,7 @@ describe('createFilterChangeHandler', () => {
     const clearAllFilters = vi.fn()
     const setAllFilters = vi.fn()
 
-    const handler = createFilterChangeHandler(null, resetCursor, clearAllFilters, setAllFilters)
+    const handler = createFilterChangeHandler({ cursor: null, resetCursor, clearAllFilters, setAllFilters })
 
     const newFilters: FilterConfig[] = [
       { key: 'name', operator: 'contains', value: 'test' },
@@ -78,7 +78,13 @@ describe('createFilterChangeHandler', () => {
       })
     )
 
-    const handler = createFilterChangeHandler(null, resetCursor, clearAllFilters, setAllFilters, transformFilters)
+    const handler = createFilterChangeHandler({
+      cursor: null,
+      resetCursor,
+      clearAllFilters,
+      setAllFilters,
+      transformFilters,
+    })
 
     const newFilters: FilterConfig[] = [{ key: 'is_enabled', operator: 'eq', value: 'true' }]
     handler(newFilters)
@@ -92,7 +98,7 @@ describe('createFilterChangeHandler', () => {
     const clearAllFilters = vi.fn()
     const setAllFilters = vi.fn()
 
-    const handler = createFilterChangeHandler(null, resetCursor, clearAllFilters, setAllFilters)
+    const handler = createFilterChangeHandler({ cursor: null, resetCursor, clearAllFilters, setAllFilters })
 
     const newFilters: FilterConfig[] = [{ key: 'is_enabled', operator: 'eq', value: 'true' }]
     handler(newFilters)
@@ -112,7 +118,13 @@ describe('createFilterChangeHandler', () => {
         return filter
       })
 
-    const handler = createFilterChangeHandler(null, resetCursor, clearAllFilters, setAllFilters, transformFilters)
+    const handler = createFilterChangeHandler({
+      cursor: null,
+      resetCursor,
+      clearAllFilters,
+      setAllFilters,
+      transformFilters,
+    })
 
     const newFilters: FilterConfig[] = [
       { key: 'name', operator: 'contains', value: 'test' },
@@ -131,7 +143,7 @@ describe('createFilterChangeHandler', () => {
     const clearAllFilters = vi.fn()
     const setAllFilters = vi.fn()
 
-    const handler = createFilterChangeHandler('cursor', resetCursor, clearAllFilters, setAllFilters)
+    const handler = createFilterChangeHandler({ cursor: 'cursor', resetCursor, clearAllFilters, setAllFilters })
 
     handler([])
 
@@ -146,7 +158,7 @@ describe('createFilterChangeHandler', () => {
     const clearAllFilters = vi.fn()
     const setAllFilters = vi.fn()
 
-    const handler = createFilterChangeHandler('cursor', resetCursor, clearAllFilters, setAllFilters)
+    const handler = createFilterChangeHandler({ cursor: 'cursor', resetCursor, clearAllFilters, setAllFilters })
 
     const newFilters: FilterConfig[] = [{ key: 'name', operator: 'contains', value: 'test' }]
     handler(newFilters)

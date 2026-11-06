@@ -52,7 +52,7 @@ describe('useLoopBackNodeTypes', () => {
       if (typeof updater === 'function') {
         currentNodes = updater(currentNodes)
       }
-    }) as unknown as Dispatch<SetStateAction<NodeType[]>>
+    })
   })
 
   it('does nothing when not initialized', () => {

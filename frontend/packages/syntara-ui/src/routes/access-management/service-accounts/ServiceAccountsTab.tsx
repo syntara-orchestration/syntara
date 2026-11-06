@@ -1,4 +1,4 @@
-import { Button, Content, Switch, Tooltip, Truncate } from '@patternfly/react-core'
+import { Button, Content, Switch, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiEditFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import { useCallback, useMemo } from 'react'
@@ -6,7 +6,6 @@ import { useCallback, useMemo } from 'react'
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
-import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoData'
 import type { KebabAction } from '../../../components/SynKebabMenu'
@@ -102,23 +101,10 @@ function ServiceAccountRow({
         </SynLink>
       </Td>
       <Td dataLabel="Owning project">
-        {sa.project_name && !sa.is_project_deleted ? (
+        {sa.project_name ? (
           <SynLink to={getProjectDetailPath(sa.project_id)}>{sa.project_name}</SynLink>
         ) : (
-          <>
-            {sa.project_name ?? sa.project_id}
-            {sa.is_project_deleted && (
-              <>
-                {' '}
-                <Tooltip content="The owning project for this service account has been deleted">
-                  {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-                  <span tabIndex={0}>
-                    <SynLabel color="grey">Deleted</SynLabel>
-                  </span>
-                </Tooltip>
-              </>
-            )}
-          </>
+          sa.project_id
         )}
       </Td>
       <Td dataLabel="Created">
@@ -199,7 +185,13 @@ export function ServiceAccountsTab() {
   const serviceAccounts = query.data?.resources ?? []
   const refetch = useCallback(() => detachPromise(query.refetch()), [query])
 
-  useCursorReset(serviceAccounts.length, hasActiveFilters, cursor, query.isFetching, resetPagination)
+  useCursorReset({
+    itemCount: serviceAccounts.length,
+    hasActiveFilters,
+    cursor,
+    isFetching: query.isFetching,
+    resetPagination,
+  })
 
   const createDialog = useDialogState()
   const deleteDialog = useDialogState<ServiceAccountRead>()
@@ -308,12 +300,18 @@ export function ServiceAccountsTab() {
             <SynListPanelTable caption="Service accounts" footer={getFooterProps(query.data)}>
               <Thead>
                 <Tr>
-                  <Th sort={getSortParams(0)}>Name</Th>
-                  <Th>Owning project</Th>
-                  <Th sort={getSortParams(1)}>Created</Th>
-                  <Th sort={getSortParams(2)}>Last authenticated</Th>
-                  <Th>State</Th>
-                  <Th screenReaderText="Actions" />
+                  <Th width={20} sort={getSortParams(0)}>
+                    Name
+                  </Th>
+                  <Th width={20}>Owning project</Th>
+                  <Th width={20} sort={getSortParams(1)}>
+                    Created
+                  </Th>
+                  <Th width={20} sort={getSortParams(2)}>
+                    Last authenticated
+                  </Th>
+                  <Th width={10}>State</Th>
+                  <Th width={10} screenReaderText="Actions" />
                 </Tr>
               </Thead>
               <ServiceAccountTableBody
@@ -348,7 +346,7 @@ export function ServiceAccountsTab() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(deleteDialog.item)}
         title="Delete service account?"
-        confirmLabel="Delete"
+        confirmLabel="Delete service account"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{
@@ -364,7 +362,7 @@ export function ServiceAccountsTab() {
         onClose={disableDialog.close}
         onConfirm={handleDisable}
         title="Disable service account?"
-        confirmLabel="Disable"
+        confirmLabel="Disable service account"
         confirmVariant="primary"
       >
         You are about to disable the service account <strong>{disableDialog.item?.name}</strong>. You can re-enable the

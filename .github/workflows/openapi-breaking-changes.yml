@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: ${{ !contains(fromJSON('["labeled","unlabeled"]'), github.event.action) || github.event.label.name == 'breaking-change-approved' }}
     permissions:
       contents: read
@@ -74,6 +74,10 @@ jobs:
         if: steps.detect.outputs.changed == 'true'
         run: ./scripts/openapi/install-oasdiff.sh
         working-directory: backend
+
+      - name: Install Python dependencies for check-breaking-changes
+        if: steps.detect.outputs.changed == 'true'
+        run: pip install pyyaml
 
       - name: Check for breaking changes
         if: steps.detect.outputs.changed == 'true'

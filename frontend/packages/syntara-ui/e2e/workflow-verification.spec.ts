@@ -17,19 +17,19 @@ import { test, expect } from './fixtures'
 import { WCAG_TAGS } from './fixtures/accessibility'
 import { triggerVerifyWorkflow, VALIDATE_ROUTE } from './helpers/workflow-verify'
 import {
+  addScriptStep,
+  addScriptStepUnconnected,
   buildUniqueName,
+  clickSaveAndWait,
   createBasicWorkflowViaApi,
-  openWorkflowInBuilder,
   createWorkflowWithTrigger,
-  addScriptNode,
-  addScriptNodeUnconnected,
   deleteWorkflow,
+  openWorkflowInBuilder,
 } from './helpers/workflows'
 import { deleteWorkflowViaApi } from './utils/api'
 
 const VERIFY_BANNER_TIMEOUT = 20_000
 const ERROR_BADGE_TIMEOUT = 5_000
-const SAVE_URL_TIMEOUT = 15_000
 
 function getWorkflowIdFromUrl(app: Page): string {
   const id = app.url().match(/workflow-builder\/([^/?]+)/)?.[1]
@@ -185,7 +185,7 @@ test.describe('Validation error panel', () => {
     }
   })
 
-  test('clicking node name in error panel opens node editor', async ({ app }) => {
+  test('clicking step name in error panel opens step editor', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-error-goto')
     const stepName = 'Goto step'
 
@@ -206,13 +206,13 @@ test.describe('Validation error panel', () => {
 
       await expect(app.getByText(/Verification failed/)).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
 
-      await app.getByRole('button', { name: /alert details/i }).click()
+      await app.getByRole('button', { name: /Danger alert details/i }).click()
 
-      const nodeLink = app.getByRole('button', { name: stepName })
+      const nodeLink = app.getByRole('button', { name: stepName, exact: true })
       await expect(nodeLink).toBeVisible({ timeout: VERIFY_BANNER_TIMEOUT })
       await nodeLink.click()
 
-      await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible({
+      await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(stepName, {
         timeout: VERIFY_BANNER_TIMEOUT,
       })
     } finally {
@@ -222,8 +222,8 @@ test.describe('Validation error panel', () => {
   })
 })
 
-test.describe('Error indicators on canvas nodes', () => {
-  test('validation error badge appears on nodes with errors', async ({ app }) => {
+test.describe('Error indicators on canvas steps', () => {
+  test('validation error badge appears on steps with errors', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-error-badge')
 
     try {
@@ -331,7 +331,7 @@ test.describe('Save with warnings', () => {
 })
 
 test.describe('Variable reference validation', () => {
-  test('reference to nonexistent node shows validation error', async ({ app }) => {
+  test('reference to nonexistent step shows validation error', async ({ app }) => {
     test.setTimeout(90_000)
     const workflowName = buildUniqueName('e2e-varref-invalid')
 
@@ -339,10 +339,9 @@ test.describe('Variable reference validation', () => {
     const workflowId = getWorkflowIdFromUrl(app)
 
     try {
-      await addScriptNode(app, 'Ref step', 'echo ${nonexistent_node.result}')
+      await addScriptStep(app, 'Ref step', 'echo ${nonexistent_node.result}')
 
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
+      await clickSaveAndWait(app)
 
       await triggerVerifyWorkflow(app)
 
@@ -355,7 +354,7 @@ test.describe('Variable reference validation', () => {
     }
   })
 
-  test.skip('reference to existing node that is not upstream shows validation error', async ({ app }) => {
+  test.skip('reference to existing step that is not upstream shows validation error', async ({ app }) => {
     test.setTimeout(90_000)
     const workflowName = buildUniqueName('e2e-varref-upstream')
 
@@ -363,17 +362,16 @@ test.describe('Variable reference validation', () => {
     const workflowId = getWorkflowIdFromUrl(app)
 
     try {
-      await addScriptNode(app, 'Upstream step', 'echo hello')
+      await addScriptStep(app, 'Upstream step', 'echo hello')
 
       const upstreamNode = app
         .locator('[role="group"][aria-roledescription="node"]')
         .filter({ hasText: 'Upstream step' })
       const upstreamNodeId = await upstreamNode.getAttribute('data-id')
 
-      await addScriptNodeUnconnected(app, 'Isolated step', `echo \${${upstreamNodeId}.result}`)
+      await addScriptStepUnconnected(app, 'Isolated step', `echo \${${upstreamNodeId}.result}`)
 
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
+      await clickSaveAndWait(app)
 
       await triggerVerifyWorkflow(app)
 
@@ -394,10 +392,9 @@ test.describe('Variable reference validation', () => {
     const workflowId = getWorkflowIdFromUrl(app)
 
     try {
-      await addScriptNode(app, 'Field ref step', 'echo ${trigger.missing_field}')
+      await addScriptStep(app, 'Field ref step', 'echo ${trigger.missing_field}')
 
-      await app.getByRole('button', { name: 'Save' }).click()
-      await expect(app).toHaveURL(/workflow-builder\/.+/, { timeout: SAVE_URL_TIMEOUT })
+      await clickSaveAndWait(app)
 
       await mockValidateEndpoint(app, {
         valid: false,

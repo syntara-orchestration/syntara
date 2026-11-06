@@ -36,14 +36,14 @@ Usage:
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from typing import Any
 
 import structlog
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import MaxConnectionsError, ResponseError
 
-from syntara.core.cache.base import BaseRedisClient, redis_operation_with_backoff
+from syntara.core.cache.base import BaseRedisClient, redis_error_handler, redis_operation_with_backoff
 from syntara.core.exceptions import SafeValueError
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -64,6 +64,46 @@ class StreamClient(BaseRedisClient):
     """
 
     _client_name = "stream"
+
+    async def key_exists(self, key: str) -> bool:
+        """Check whether a Redis key exists.
+
+        Args:
+            key: The Redis key to check
+
+        Returns:
+            True if the key exists, False otherwise
+
+        Raises:
+            RedisConnectionError: If connection to cache fails
+
+        """
+        client = self._ensure_connected()
+        return bool(await client.exists(key))
+
+    async def set_key(self, key: str, value: str, ttl: int) -> None:
+        """Set a Redis key with a TTL.
+
+        Uses the same retry-with-backoff wrapper as ``publish`` because
+        SETEX is idempotent and ``MaxConnectionsError`` (pool exhaustion)
+        is the most common transient failure.
+
+        Args:
+            key: The Redis key to set
+            value: The value to store
+            ttl: Time-to-live in seconds
+
+        Raises:
+            RedisConnectionError: If connection to cache fails
+
+        """
+        client = self._ensure_connected()
+
+        async def _setex() -> None:
+            async with redis_error_handler("set_key", key=key):
+                await client.setex(key, ttl, value)
+
+        await redis_operation_with_backoff(_setex, "set_key", key=key)
 
     async def publish(self, stream_id: str, data: dict[str, Any]) -> str:
         """Publish arbitrary event data to a cache stream.
@@ -292,6 +332,7 @@ class StreamClient(BaseRedisClient):
         should_stop: Callable[[dict[str, Any]], bool] | None,
         block_ms: int,
         count: int,
+        on_idle: Callable[[], Awaitable[None]] | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Read events from stream in a loop.
 
@@ -301,6 +342,10 @@ class StreamClient(BaseRedisClient):
             should_stop: Optional callback to determine when to stop
             block_ms: Milliseconds to block waiting for new events
             count: Maximum number of events to read per batch
+            on_idle: Optional async callback invoked when XREAD returns no
+                events (i.e. the block timeout expired with nothing new).
+                Useful for external checks such as cancellation detection.
+                May raise to abort the stream.
 
         Yields:
             Deserialized event data dictionaries
@@ -318,8 +363,10 @@ class StreamClient(BaseRedisClient):
                 # Read batch of events from stream
                 result = await client.xread({stream_id: current_id}, count=count, block=block_ms)
 
-                # If no events returned, continue waiting
+                # If no events returned, run idle callback and continue waiting
                 if not result:
+                    if on_idle is not None:
+                        await on_idle()
                     await asyncio.sleep(0)
                     continue
 
@@ -357,6 +404,7 @@ class StreamClient(BaseRedisClient):
         should_stop: Callable[[dict[str, Any]], bool] | None = None,
         block_ms: int = 1000,
         count: int = 100,
+        on_idle: Callable[[], Awaitable[None]] | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Read events from a stream as an async generator.
 
@@ -365,6 +413,7 @@ class StreamClient(BaseRedisClient):
         - Manual: caller can break from loop at any time
         - Conditional: provide should_stop function for automatic termination
         - External: use asyncio.Event or other signaling mechanisms
+        - Idle check: provide on_idle callback for checks between empty reads
 
         Position can be specified in two mutually exclusive ways:
         - start_id: Explicit stream position (honored first)
@@ -384,6 +433,8 @@ class StreamClient(BaseRedisClient):
                         Called with each event dict, stops when returns True.
             block_ms: Milliseconds to block waiting for new events (default 1000)
             count: Maximum number of events to read per batch (default 100)
+            on_idle: Optional async callback invoked each time XREAD returns no
+                events. May raise to abort the stream.
 
         Yields:
             Dict[str, Any]: Deserialized event data dictionaries
@@ -431,7 +482,7 @@ class StreamClient(BaseRedisClient):
         current_id = await self._determine_start_position(stream_id, start_id, replay)
 
         # Read and yield events from stream
-        async for event in self._read_event_stream(stream_id, current_id, should_stop, block_ms, count):
+        async for event in self._read_event_stream(stream_id, current_id, should_stop, block_ms, count, on_idle):
             yield event
 
     async def info(self, stream_id: str) -> dict[str, Any]:

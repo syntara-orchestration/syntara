@@ -1,7 +1,7 @@
 import { Button, Content } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiImportIcon } from '@patternfly/react-icons'
 import { ActionsColumn, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
-import type { Decorator, Meta, StoryObj } from '@storybook/react-vite'
+import type { Decorator, Meta, StoryObj } from '@storybook/tanstack-react'
 
 import { useTableSort } from '../../../hooks/useTableSort'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
@@ -39,7 +39,8 @@ const SAMPLE_ROWS: SampleRow[] = Array.from({ length: 8 }, (_, i) => ({
 
 const ROW_ACTIONS = [
   { title: 'Edit resource', onClick: () => {} },
-  { title: 'Delete resource', onClick: () => {} },
+  { isSeparator: true },
+  { title: 'Delete resource', onClick: () => {}, isDanger: true },
 ]
 
 function SampleTable({ rows, isFetching }: Readonly<{ rows: SampleRow[]; isFetching?: boolean }>) {
@@ -439,6 +440,13 @@ export const WithContentBetween: Story = {
 /** Two tabs each with their own `SynListPanelView`; active tab driven by URL. Click tabs to switch content. */
 export const TabbedList: Story = {
   render: () => <TabbedListStory />,
+  parameters: {
+    tanstack: {
+      router: {
+        path: '/group/resources/members',
+      },
+    },
+  },
 }
 
 /** Read-only list — filters + table, no create action. Mirrors the Executions page pattern. */

@@ -283,13 +283,19 @@ export async function addGroupMemberApi(page: Page, groupId: string, userId: str
   if (!resp.ok()) throw new Error(`Failed to add member: ${resp.status()}`)
 }
 
-export async function assignProjectRoleApi(
-  page: Page,
-  projectId: string,
-  userId: string,
-  roleName: string,
+export async function assignProjectRoleApi({
+  page,
+  projectId,
+  userId,
+  roleName,
+  token,
+}: {
+  page: Page
+  projectId: string
+  userId: string
+  roleName: string
   token?: string
-): Promise<{ id: string }> {
+}): Promise<{ id: string }> {
   const t = token ?? (await getAuthToken(page))
   if (!t) throw new Error('No token')
   const resp = await apiRequest(page, 'post', `/projects/${projectId}/role_assignments`, {

@@ -11,7 +11,12 @@ import { AlertProvider } from '../../../../providers/alerts'
 import { routerTestState } from '../../../../test/setup'
 import { accessFetchClient } from '../../../access/accessClient'
 
-import { IdentityProviderDetail } from './IdentityProviderDetail'
+import {
+  IdentityProviderDetail,
+  IdentityProviderDetailsTabRoute,
+  IdentityProviderGroupMappingTabRoute,
+  IdentityProviderUnknownTabRoute,
+} from './IdentityProviderDetail'
 import { IdpTypeKey } from './idpTypePresets'
 
 type MutationCallbacks = {
@@ -30,6 +35,29 @@ vi.mock('./GroupMappingTab', () => ({
     </div>
   ),
 }))
+
+function IdentityProviderDetailTestOutlet() {
+  const tab = routerTestState.pathname.split('/').at(-1)
+  if (tab === 'group-mapping') return <IdentityProviderGroupMappingTabRoute />
+  if (tab === 'invalid-tab') return <IdentityProviderUnknownTabRoute />
+  return <IdentityProviderDetailsTabRoute />
+}
+
+vi.mock('@tanstack/react-router', async () => {
+  const actual = await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router')
+  const { MockLink } = await import('../../../../test/setup')
+  return {
+    ...actual,
+    Link: MockLink,
+    Outlet: IdentityProviderDetailTestOutlet,
+    useParams: vi.fn(() => ({ providerId: VALID_PROVIDER_ID })),
+    useNavigate: () => routerTestState.navigate,
+    useRouterState: (opts?: { select?: (s: { location: { pathname: string; searchStr: string } }) => unknown }) => {
+      const state = { location: { pathname: routerTestState.pathname, searchStr: routerTestState.searchStr } }
+      return opts?.select ? opts.select(state) : state
+    },
+  }
+})
 
 vi.mock('../../../../client', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../client')>()
@@ -108,9 +136,9 @@ function mockQueryReturn(overrides: Record<string, unknown> = {}): ReturnType<ty
 describe('IdentityProviderDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(identityProvidersClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
-    vi.mocked(adminClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } } as never)
+    vi.mocked(identityProvidersClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
+    vi.mocked(adminClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
     vi.mocked(useParams).mockReturnValue({ providerId: VALID_PROVIDER_ID })
     mockIdpPermissions.canCreate = true
     mockIdpPermissions.canUpdate = true
@@ -503,7 +531,7 @@ describe('IdentityProviderDetail', () => {
 
   it('opens disable dialog when toggling an enabled provider', async () => {
     const user = userEvent.setup()
-    vi.mocked(identityProvidersClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false } as never)
+    vi.mocked(identityProvidersClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
@@ -517,17 +545,17 @@ describe('IdentityProviderDetail', () => {
   it('calls patchProvider to disable after confirming dialog', async () => {
     const user = userEvent.setup()
     const mockPatch = vi.fn()
-    vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
+    vi.mocked(identityProvidersClient.useMutation).mockImplementation((method: string) => {
       if (method === 'patch') return { mutate: mockPatch, isPending: false }
       return { mutate: vi.fn(), isPending: false }
-    }) as unknown as typeof identityProvidersClient.useMutation)
+    })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
     const toggle = screen.getByRole('switch', { name: /enabled/i })
     await user.click(toggle)
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
 
     expect(mockPatch).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -547,17 +575,17 @@ describe('IdentityProviderDetail', () => {
     const mockPatch = vi.fn((_params: unknown, callbacks: MutationCallbacks) => {
       callbacks.onSuccess?.()
     })
-    vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
+    vi.mocked(identityProvidersClient.useMutation).mockImplementation((method: string) => {
       if (method === 'patch') return { mutate: mockPatch, isPending: false }
       return { mutate: vi.fn(), isPending: false }
-    }) as unknown as typeof identityProvidersClient.useMutation)
+    })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn({ refetch: mockRefetch }))
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
     const toggle = screen.getByRole('switch', { name: /enabled/i })
     await user.click(toggle)
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
 
     expect(mockRefetch).toHaveBeenCalled()
   })
@@ -567,17 +595,17 @@ describe('IdentityProviderDetail', () => {
     const mockPatch = vi.fn((_params: unknown, callbacks: MutationCallbacks) => {
       callbacks.onError?.(new Error('Toggle failed'))
     })
-    vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
+    vi.mocked(identityProvidersClient.useMutation).mockImplementation((method: string) => {
       if (method === 'patch') return { mutate: mockPatch, isPending: false }
       return { mutate: vi.fn(), isPending: false }
-    }) as unknown as typeof identityProvidersClient.useMutation)
+    })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
     const toggle = screen.getByRole('switch', { name: /enabled/i })
     await user.click(toggle)
-    await user.click(screen.getByRole('button', { name: 'Disable' }))
+    await user.click(screen.getByRole('button', { name: 'Disable identity provider' }))
 
     await waitFor(() => {
       expect(screen.getByText(/failed to disable identity provider/i)).toBeInTheDocument()
@@ -587,10 +615,10 @@ describe('IdentityProviderDetail', () => {
   it('does not call patchProvider when provider has no id', async () => {
     const user = userEvent.setup()
     const mockPatch = vi.fn()
-    vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
+    vi.mocked(identityProvidersClient.useMutation).mockImplementation((method: string) => {
       if (method === 'patch') return { mutate: mockPatch, isPending: false }
       return { mutate: vi.fn(), isPending: false }
-    }) as unknown as typeof identityProvidersClient.useMutation)
+    })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(
       mockQueryReturn({ data: { ...mockProvider, id: undefined } })
     )
@@ -666,7 +694,7 @@ describe('IdentityProviderDetail', () => {
   it('calls revoke mutation when confirming revocation', async () => {
     const user = userEvent.setup()
     const mockRevoke = vi.fn()
-    vi.mocked(adminClient.useMutation).mockReturnValue({ mutate: mockRevoke, isPending: false } as never)
+    vi.mocked(adminClient.useMutation).mockReturnValue({ mutate: mockRevoke, isPending: false })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
@@ -682,10 +710,10 @@ describe('IdentityProviderDetail', () => {
   it('calls delete mutation when confirming deletion', async () => {
     const user = userEvent.setup()
     const mockDelete = vi.fn()
-    vi.mocked(identityProvidersClient.useMutation).mockImplementation(((method: string) => {
+    vi.mocked(identityProvidersClient.useMutation).mockImplementation((method: string) => {
       if (method === 'delete') return { mutate: mockDelete, isPending: false }
       return { mutate: vi.fn(), isPending: false }
-    }) as unknown as typeof identityProvidersClient.useMutation)
+    })
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
@@ -699,7 +727,7 @@ describe('IdentityProviderDetail', () => {
     await user.click(screen.getByRole('checkbox'))
 
     // Confirm deletion
-    const confirmButton = screen.getByRole('button', { name: /^delete$/i })
+    const confirmButton = screen.getByRole('button', { name: /^delete identity provider$/i })
     await user.click(confirmButton)
 
     expect(mockDelete).toHaveBeenCalled()

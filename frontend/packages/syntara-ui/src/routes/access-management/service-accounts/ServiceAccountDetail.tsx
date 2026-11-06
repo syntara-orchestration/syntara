@@ -1,7 +1,7 @@
-import { Button, DescriptionList, Switch, Tab, TabTitleText, Tooltip } from '@patternfly/react-core'
+import { Button, DescriptionList, Switch, Tab, TabTitleText } from '@patternfly/react-core'
 import { RhUiCheckCircleIcon, RhUiEditIcon, RhUiMinusCircleIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { useNavigate, useParams } from '@tanstack/react-router'
-import { useCallback } from 'react'
+import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
+import { createContext, use, useCallback, useMemo } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import {
@@ -24,7 +24,6 @@ import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
-import { useUrlTab } from '../../../hooks/useUrlTab'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { accessClient } from '../../access/accessClient'
@@ -44,23 +43,10 @@ function DetailsTab({ serviceAccount }: Readonly<{ serviceAccount: ServiceAccoun
     <DescriptionList isHorizontal>
       <SynDetail label="Name">{serviceAccount.name}</SynDetail>
       <SynDetail label="Owning project">
-        {serviceAccount.project_name && !serviceAccount.is_project_deleted ? (
+        {serviceAccount.project_name ? (
           <SynLink to={getProjectDetailPath(serviceAccount.project_id)}>{serviceAccount.project_name}</SynLink>
         ) : (
-          <>
-            {serviceAccount.project_name ?? serviceAccount.project_id}
-            {serviceAccount.is_project_deleted && (
-              <>
-                {' '}
-                <Tooltip content="The owning project for this service account has been deleted">
-                  {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex */}
-                  <span tabIndex={0}>
-                    <SynLabel color="grey">Deleted</SynLabel>
-                  </span>
-                </Tooltip>
-              </>
-            )}
-          </>
+          serviceAccount.project_id
         )}
       </SynDetail>
       <SynDetail label="Description">{serviceAccount.description}</SynDetail>
@@ -145,14 +131,73 @@ function ServiceAccountToolbar({
 
 type ServiceAccountTab = 'details' | 'credentials' | 'assignments'
 
-const VALID_TABS = ['details', 'credentials', 'assignments']
+const VALID_TABS: ServiceAccountTab[] = ['details', 'credentials', 'assignments']
 const noop = () => {}
+
+type ServiceAccountDetailRouteContextValue = {
+  serviceAccount: ServiceAccountRead
+}
+
+const ServiceAccountDetailRouteContext = createContext<ServiceAccountDetailRouteContextValue | null>(null)
+
+function useServiceAccountDetailRouteContext() {
+  const context = use(ServiceAccountDetailRouteContext)
+  if (!context) throw new Error('Service account detail tab routes must be rendered inside ServiceAccountDetail')
+  return context
+}
+
+export function ServiceAccountDetailDetailsTabRoute() {
+  const { serviceAccount } = useServiceAccountDetailRouteContext()
+
+  return (
+    <SynListPanelView
+      tabKey="details"
+      tabLabel="Details"
+      isPending={false}
+      error={null}
+      isEmpty={false}
+      hasActiveFilters={false}
+      onRetry={noop}
+      onClearAllFilters={noop}
+      body={<DetailsTab serviceAccount={serviceAccount} />}
+    />
+  )
+}
+
+export function ServiceAccountDetailCredentialsTabRoute() {
+  const { serviceAccount } = useServiceAccountDetailRouteContext()
+
+  return (
+    <CredentialsTab
+      serviceAccountId={serviceAccount.id}
+      serviceAccountName={serviceAccount.name}
+      resourceProject={serviceAccount.project_id ?? serviceAccount.project_name ?? undefined}
+    />
+  )
+}
+
+export function ServiceAccountDetailAssignmentsTabRoute() {
+  const { serviceAccount } = useServiceAccountDetailRouteContext()
+
+  return (
+    <RoleAssignmentsPanel
+      principalType={RolePrincipalType.SERVICE_ACCOUNT}
+      principalId={serviceAccount.id}
+      hiddenColumns={['scope']}
+      tabKey="assignments"
+      tabLabel="Assignments"
+    />
+  )
+}
+
+export function ServiceAccountDetailUnknownTabRoute() {
+  return null
+}
 
 export function ServiceAccountDetail() {
   const { serviceAccountId }: { serviceAccountId: string } = useParams({ strict: false })
   const navigate = useNavigate()
   const basePath = AppRoute.AccessManagement.ServiceAccountDetail.replace(':serviceAccountId', serviceAccountId ?? '')
-  const [activeTab] = useUrlTab<ServiceAccountTab>(basePath)
   const docLink = useDocLink('serviceAccounts')
   const editDialog = useDialogState()
   const deleteDialog = useDialogState()
@@ -188,6 +233,11 @@ export function ServiceAccountDetail() {
   })
 
   const handleMutationError = useMutationErrorHandler()
+
+  const serviceAccountDetailRouteContextValue = useMemo<ServiceAccountDetailRouteContextValue | null>(() => {
+    if (!serviceAccount) return null
+    return { serviceAccount }
+  }, [serviceAccount])
 
   const { mutate: enableServiceAccount } = accessClient.useMutation(
     'post',
@@ -253,7 +303,7 @@ export function ServiceAccountDetail() {
     )
   }
 
-  if (!serviceAccount) return null
+  if (!serviceAccount || !serviceAccountDetailRouteContextValue) return null
 
   const crumbs = breadcrumbsServiceAccountDetail(serviceAccount.name)
   const isEnabled = serviceAccount.status === 'active'
@@ -287,33 +337,9 @@ export function ServiceAccountDetail() {
             <Tab eventKey="credentials" title={<TabTitleText>Credentials</TabTitleText>} />
             <Tab eventKey="assignments" title={<TabTitleText>Assignments</TabTitleText>} />
           </SynListPanelTabs>
-          {activeTab === 'details' && (
-            <SynListPanelView
-              tabKey="details"
-              tabLabel="Details"
-              isPending={false}
-              error={null}
-              isEmpty={false}
-              hasActiveFilters={false}
-              onRetry={noop}
-              onClearAllFilters={noop}
-              body={<DetailsTab serviceAccount={serviceAccount} />}
-            />
-          )}
-          {activeTab === 'credentials' && (
-            <CredentialsTab
-              serviceAccountId={serviceAccount.id}
-              serviceAccountName={serviceAccount.name}
-              resourceProject={serviceAccount.project_id ?? serviceAccount.project_name ?? undefined}
-            />
-          )}
-          {activeTab === 'assignments' && (
-            <RoleAssignmentsPanel
-              principalType={RolePrincipalType.SERVICE_ACCOUNT}
-              principalId={serviceAccount.id}
-              hiddenColumns={['scope']}
-            />
-          )}
+          <ServiceAccountDetailRouteContext.Provider value={serviceAccountDetailRouteContextValue}>
+            <Outlet />
+          </ServiceAccountDetailRouteContext.Provider>
         </SynListPanel>
       </SynPageBody>
 
@@ -331,7 +357,7 @@ export function ServiceAccountDetail() {
         onClose={deleteDialog.close}
         onConfirm={() => handleDelete(undefined)}
         title="Delete service account?"
-        confirmLabel="Delete"
+        confirmLabel="Delete service account"
         confirmVariant="danger"
         titleIconVariant="warning"
         destructiveAcknowledgement={{
@@ -347,7 +373,7 @@ export function ServiceAccountDetail() {
         onClose={disableDialog.close}
         onConfirm={handleDisable}
         title="Disable service account?"
-        confirmLabel="Disable"
+        confirmLabel="Disable service account"
         confirmVariant="primary"
       >
         You are about to disable the service account <strong>{serviceAccount.name}</strong>. You can re-enable the

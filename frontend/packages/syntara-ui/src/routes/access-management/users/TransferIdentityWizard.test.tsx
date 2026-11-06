@@ -184,10 +184,18 @@ function setupMocks({
   vi.mocked(usersClient.useMutation).mockReturnValue({
     mutate: mockMutate,
     isPending: false,
-  } as never)
+  })
 }
 
 describe('TransferIdentityWizard', () => {
+  async function goToStep2() {
+    const user = userEvent.setup()
+    render(<TransferIdentityWizard />, { wrapper })
+    await user.click(screen.getByText('bob@example.com'))
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+    return user
+  }
+
   beforeEach(() => {
     useDocLinkMock.mockClear()
     queryClient.clear()
@@ -322,14 +330,6 @@ describe('TransferIdentityWizard', () => {
   })
 
   describe('Step 2 - Select an identity', () => {
-    async function goToStep2() {
-      const user = userEvent.setup()
-      render(<TransferIdentityWizard />, { wrapper })
-      await user.click(screen.getByText('bob@example.com'))
-      await user.click(screen.getByRole('button', { name: 'Next' }))
-      return user
-    }
-
     it('shows identity table with Provider, Subject, Linked columns', async () => {
       await goToStep2()
 
@@ -434,16 +434,25 @@ describe('TransferIdentityWizard', () => {
   })
 
   describe('Navigation', () => {
-    it('navigates back to identities tab when Cancel is clicked', async () => {
+    it('navigates back to identities tab when Cancel is clicked on step 1', async () => {
       const user = userEvent.setup()
       render(<TransferIdentityWizard />, { wrapper })
 
-      await user.click(screen.getByRole('link', { name: 'Cancel' }))
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
-      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute(
-        'href',
-        '/system-administration/access-management/users/target-user/identities'
-      )
+      expect(routerTestState.navigate).toHaveBeenCalledWith({
+        to: '/system-administration/access-management/users/target-user/identities',
+      })
+    })
+
+    it('navigates back to identities tab when Cancel is clicked on step 2', async () => {
+      const user = await goToStep2()
+
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      expect(routerTestState.navigate).toHaveBeenCalledWith({
+        to: '/system-administration/access-management/users/target-user/identities',
+      })
     })
 
     it('navigates to user detail when username link is clicked', async () => {

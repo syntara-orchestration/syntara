@@ -1,5 +1,5 @@
 import { Button, Content, StackItem } from '@patternfly/react-core'
-import type { Meta, StoryObj } from '@storybook/react-vite'
+import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { fn } from 'storybook/test'
 
 import { SynErrorState } from '../states/SynErrorState'

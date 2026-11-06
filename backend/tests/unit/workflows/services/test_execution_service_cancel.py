@@ -1,11 +1,12 @@
 """Unit tests for ExecutionService.cancel_execution method."""
 
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid4
 
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.agent_orchestrator.services.invocation_service import InvocationService
 from syntara.core.models import User
 from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,
@@ -59,7 +60,12 @@ class TestCancelExecution:
             temporal_service=mock_temporal,
         )
 
-        await service.cancel_execution(execution.id)
+        with patch(
+            "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            await service.cancel_execution(execution.id)
 
         mock_temporal.cancel_workflow.assert_awaited_once_with(temporal_workflow_id=execution.temporal_workflow_id)
 
@@ -149,3 +155,71 @@ class TestCancelExecution:
 
         with pytest.raises(RPCError):
             await service.cancel_execution(execution.id)
+
+    @pytest.mark.asyncio
+    async def test_cancel_execution_injects_a_wired_invocation_service(self) -> None:
+        """Invocation cancellation is delegated to a service built here.
+
+        ExecutionService cancels its own workflow and hands the rest to
+        cancel_invocations_for_execution; it no longer reaches into the builtin
+        agent execution itself. It owns temporal_service, so it is the one that
+        constructs the InvocationService with it rather than passing the
+        dependency through a bridge module that never uses it.
+        """
+        execution = _make_execution(ExecutionStatus.RUNNING)
+        mock_session = _mock_session_returning(execution)
+        mock_user = Mock(spec=User)
+        mock_temporal = Mock(spec=TemporalExecutionService)
+        mock_temporal.cancel_workflow = AsyncMock()
+
+        service = ExecutionService(
+            session=mock_session,
+            user=mock_user,
+            temporal_service=mock_temporal,
+        )
+
+        with patch(
+            "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
+            new_callable=AsyncMock,
+            return_value=[],
+        ) as mock_cancel:
+            await service.cancel_execution(execution.id)
+
+        mock_cancel.assert_awaited_once()
+        assert mock_cancel.await_args is not None
+        session_arg, execution_id_arg, invocation_service = mock_cancel.await_args.args
+        assert session_arg is mock_session
+        assert execution_id_arg == execution.id
+        # The injected service must carry the Temporal dependency: it owns the
+        # cancel of the builtin workflow running each invocation, and without it
+        # that half of the cancel is silently skipped.
+        assert isinstance(invocation_service, InvocationService)
+        assert invocation_service.temporal_service is mock_temporal
+        assert invocation_service.user is mock_user
+        # Only the user's own execution is cancelled from here; the per-invocation
+        # Temporal cancel now happens inside InvocationService.
+        mock_temporal.cancel_workflow.assert_awaited_once_with(temporal_workflow_id=execution.temporal_workflow_id)
+
+    @pytest.mark.asyncio
+    async def test_cancel_execution_invocation_failure_does_not_block(self) -> None:
+        """Test that invocation cancel failure does not prevent execution cancel."""
+        execution = _make_execution(ExecutionStatus.RUNNING)
+        mock_session = _mock_session_returning(execution)
+        mock_user = Mock(spec=User)
+        mock_temporal = Mock(spec=TemporalExecutionService)
+        mock_temporal.cancel_workflow = AsyncMock()
+
+        service = ExecutionService(
+            session=mock_session,
+            user=mock_user,
+            temporal_service=mock_temporal,
+        )
+
+        with patch(
+            "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
+            new_callable=AsyncMock,
+            side_effect=Exception("DB unavailable"),
+        ):
+            await service.cancel_execution(execution.id)
+
+        mock_temporal.cancel_workflow.assert_awaited_once()

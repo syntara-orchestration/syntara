@@ -356,3 +356,80 @@ class TestWorkflowSignalClientSendFailureSignal:
 
         with pytest.raises(ValueError, match="not a valid signal endpoint"):
             await WorkflowSignalClient.send_failure_signal("https://evil.com/steal", invocation_id, error)
+
+
+class TestWorkflowSignalClientSendCancellationSignal:
+    """Tests for WorkflowSignalClient.send_cancellation_signal."""
+
+    @pytest.mark.asyncio
+    async def test_skips_when_no_callback_url(self) -> None:
+        """Test that send_cancellation_signal skips when callback_url is None."""
+        await WorkflowSignalClient.send_cancellation_signal(None, UUID(_EXEC_UUID), "test reason")
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_sends_reason_in_signal_data(self) -> None:
+        """Test that the cancel reason is available at signal_data['reason']."""
+        import json
+
+        invocation_id = UUID(_EXEC_UUID)
+        reason = "User requested cancellation"
+
+        route = respx.post(_SIGNAL_URL).mock(return_value=httpx.Response(200))
+
+        await WorkflowSignalClient.send_cancellation_signal(_SIGNAL_URL, invocation_id, reason)
+
+        assert route.called
+        payload = json.loads(route.calls[0].request.content.decode("utf-8"))
+        signal_data = payload["signal_data"]
+
+        assert signal_data["status"] == "cancelled"
+        assert signal_data["reason"] == reason
+        assert signal_data["error"]["message"] == reason
+        assert signal_data["error"]["error_type"] == "InvocationCancelledError"
+        assert signal_data["agent_type"] == "GenericAgent"
+        assert "timestamp" in signal_data
+        assert signal_data["id"] == str(invocation_id)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_uses_default_reason(self) -> None:
+        """Test that the default reason is 'User cancelled'."""
+        import json
+
+        invocation_id = UUID(_EXEC_UUID)
+
+        route = respx.post(_SIGNAL_URL).mock(return_value=httpx.Response(200))
+
+        await WorkflowSignalClient.send_cancellation_signal(_SIGNAL_URL, invocation_id)
+
+        payload = json.loads(route.calls[0].request.content.decode("utf-8"))
+        assert payload["signal_data"]["reason"] == "User cancelled"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_swallows_http_error(self) -> None:
+        """Test that send_cancellation_signal swallows HTTP errors."""
+        invocation_id = UUID(_EXEC_UUID)
+
+        respx.post(_SIGNAL_URL).mock(return_value=httpx.Response(500))
+
+        await WorkflowSignalClient.send_cancellation_signal(_SIGNAL_URL, invocation_id)
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_swallows_connection_error(self) -> None:
+        """Test that send_cancellation_signal swallows connection errors."""
+        invocation_id = UUID(_EXEC_UUID)
+
+        respx.post(_SIGNAL_URL).mock(side_effect=httpx.ConnectError("Connection failed"))
+
+        await WorkflowSignalClient.send_cancellation_signal(_SIGNAL_URL, invocation_id)
+
+    @pytest.mark.asyncio
+    async def test_send_cancellation_signal_raises_on_invalid_url(self) -> None:
+        """Cancellation signal must NOT swallow SSRF validation errors."""
+        invocation_id = UUID(_EXEC_UUID)
+
+        with pytest.raises(ValueError, match="not a valid signal endpoint"):
+            await WorkflowSignalClient.send_cancellation_signal("https://evil.com/steal", invocation_id)

@@ -599,6 +599,327 @@ class TestContinueOnFailure:
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+class TestLoopConvergeInteraction:
+    """Verify converge waits for a loop predecessor to finish all iterations."""
+
+    async def test_loop_and_parallel_branch_converge_all(self, temporal_env: WorkflowEnvironment) -> None:
+        """Converge ALL waits for a for_each loop to complete all iterations before firing.
+
+        Graph:
+            trigger -> loop_node --(iterate)--> body --> loop_node
+                    |                --(complete)--> join (converge ALL) -> final
+                    -> branch_b -------------------------^
+        """
+        result = await _run_workflow(
+            temporal_env,
+            "v2-loop-converge-all",
+            {
+                "schema_version": "2.0.0",
+                "triggers": [_manual_trigger()],
+                "nodes": [
+                    {
+                        "id": "loop_node",
+                        "type": "loop",
+                        "parameters": {"type": "for_each", "items": ["x", "y", "z"]},
+                    },
+                    {
+                        "id": "body",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo iteration"},
+                    },
+                    {
+                        "id": "branch_b",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo parallel"},
+                    },
+                    {
+                        "id": "join",
+                        "type": "converge",
+                        "parameters": {},
+                    },
+                    {
+                        "id": "final",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo done"},
+                    },
+                ],
+                "edges": [
+                    {"from": "trigger", "to": "loop_node"},
+                    {"from": "trigger", "to": "branch_b"},
+                    {"from": "loop_node", "to": "body", "from_port": "iterate"},
+                    {"from": "body", "to": "loop_node", "to_port": "iterate"},
+                    {"from": "loop_node", "to": "join", "from_port": "complete"},
+                    {"from": "branch_b", "to": "join"},
+                    {"from": "join", "to": "final"},
+                ],
+            },
+        )
+
+        assert result["status"] == "completed"
+        completed = result["completed_activities"]
+        assert "loop_node" in completed
+        assert "body" in completed
+        assert "branch_b" in completed
+        assert "join" in completed
+        assert "final" in completed
+
+        loop_output = result["activity_outputs"].get("loop_node", {})
+        assert loop_output.get("iteration_count") == 3
+
+    async def test_loop_converge_any(self, temporal_env: WorkflowEnvironment) -> None:
+        """Converge ANY with n_required=2 waits for both a loop and a parallel branch.
+
+        The loop must fully complete (not just finish one iteration) before it
+        counts as a satisfied predecessor.
+
+        Graph:
+            trigger -> loop_node --(iterate)--> body --> loop_node
+                    |                --(complete)--> join (converge ANY n=2) -> final
+                    -> branch_b -------------------------^
+        """
+        result = await _run_workflow(
+            temporal_env,
+            "v2-loop-converge-any",
+            {
+                "schema_version": "2.0.0",
+                "triggers": [_manual_trigger()],
+                "nodes": [
+                    {
+                        "id": "loop_node",
+                        "type": "loop",
+                        "parameters": {"type": "for_each", "items": ["a", "b"]},
+                    },
+                    {
+                        "id": "body",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo step"},
+                    },
+                    {
+                        "id": "branch_b",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo fast"},
+                    },
+                    {
+                        "id": "join",
+                        "type": "converge",
+                        "parameters": {"strategy": "any", "n_required": 2},
+                    },
+                    {
+                        "id": "final",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo done"},
+                    },
+                ],
+                "edges": [
+                    {"from": "trigger", "to": "loop_node"},
+                    {"from": "trigger", "to": "branch_b"},
+                    {"from": "loop_node", "to": "body", "from_port": "iterate"},
+                    {"from": "body", "to": "loop_node", "to_port": "iterate"},
+                    {"from": "loop_node", "to": "join", "from_port": "complete"},
+                    {"from": "branch_b", "to": "join"},
+                    {"from": "join", "to": "final"},
+                ],
+            },
+        )
+
+        assert result["status"] == "completed"
+        completed = result["completed_activities"]
+        assert "loop_node" in completed
+        assert "branch_b" in completed
+        assert "join" in completed
+        assert "final" in completed
+
+    async def test_converge_any_fires_without_waiting_for_loop(self, temporal_env: WorkflowEnvironment) -> None:
+        """Converge ANY n_required=1 fires as soon as the fast branch completes.
+
+        The loop is still iterating when the fast branch finishes, but the
+        converge should not wait for it — n_required=1 is already satisfied.
+        The workflow must still complete cleanly (loop finishes in the background).
+
+        Graph:
+            trigger -> loop_node --(iterate)--> body --> loop_node
+                    |                --(complete)--> join (converge ANY n=1) -> final
+                    -> fast_branch ----------------------^
+        """
+        result = await _run_workflow(
+            temporal_env,
+            "v2-loop-converge-any-n1",
+            {
+                "schema_version": "2.0.0",
+                "triggers": [_manual_trigger()],
+                "nodes": [
+                    {
+                        "id": "loop_node",
+                        "type": "loop",
+                        "parameters": {"type": "for_each", "items": ["a", "b", "c"]},
+                    },
+                    {
+                        "id": "body",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo step"},
+                    },
+                    {
+                        "id": "fast_branch",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo fast"},
+                    },
+                    {
+                        "id": "join",
+                        "type": "converge",
+                        "parameters": {"strategy": "any", "n_required": 1},
+                    },
+                    {
+                        "id": "final",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo done"},
+                    },
+                ],
+                "edges": [
+                    {"from": "trigger", "to": "loop_node"},
+                    {"from": "trigger", "to": "fast_branch"},
+                    {"from": "loop_node", "to": "body", "from_port": "iterate"},
+                    {"from": "body", "to": "loop_node", "to_port": "iterate"},
+                    {"from": "loop_node", "to": "join", "from_port": "complete"},
+                    {"from": "fast_branch", "to": "join"},
+                    {"from": "join", "to": "final"},
+                ],
+            },
+        )
+
+        assert result["status"] == "completed"
+        completed = result["completed_activities"]
+        assert "fast_branch" in completed
+        assert "join" in completed
+        assert "final" in completed
+
+    async def test_empty_for_each_loop_converges(self, temporal_env: WorkflowEnvironment) -> None:
+        """A for_each loop over an empty list completes immediately and satisfies converge.
+
+        With items=[], the loop activity returns next_port="complete" on its
+        first (and only) invocation. The converge must treat this as a finished
+        predecessor, not as still-iterating.
+
+        Graph:
+            trigger -> loop_node (items=[]) --(complete)--> join (converge ALL) -> final
+                    -> branch_b --------------------------------^
+        """
+        result = await _run_workflow(
+            temporal_env,
+            "v2-empty-loop-converge",
+            {
+                "schema_version": "2.0.0",
+                "triggers": [_manual_trigger()],
+                "nodes": [
+                    {
+                        "id": "loop_node",
+                        "type": "loop",
+                        "parameters": {"type": "for_each", "items": []},
+                    },
+                    {
+                        "id": "body",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo never"},
+                    },
+                    {
+                        "id": "branch_b",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo fast"},
+                    },
+                    {
+                        "id": "join",
+                        "type": "converge",
+                        "parameters": {},
+                    },
+                    {
+                        "id": "final",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo done"},
+                    },
+                ],
+                "edges": [
+                    {"from": "trigger", "to": "loop_node"},
+                    {"from": "trigger", "to": "branch_b"},
+                    {"from": "loop_node", "to": "body", "from_port": "iterate"},
+                    {"from": "body", "to": "loop_node", "to_port": "iterate"},
+                    {"from": "loop_node", "to": "join", "from_port": "complete"},
+                    {"from": "branch_b", "to": "join"},
+                    {"from": "join", "to": "final"},
+                ],
+            },
+        )
+
+        assert result["status"] == "completed"
+        completed = result["completed_activities"]
+        assert "loop_node" in completed
+        assert "branch_b" in completed
+        assert "join" in completed
+        assert "final" in completed
+        assert "body" not in completed
+
+        loop_output = result["activity_outputs"].get("loop_node", {})
+        assert loop_output.get("iteration_count") == 0
+
+    async def test_loop_body_failure_blocks_converge(self, temporal_env: WorkflowEnvironment) -> None:
+        """When a loop body fails (no CoF), the loop fails and converge ALL does not fire.
+
+        Graph:
+            trigger -> loop_node --(iterate)--> failing_body --> loop_node
+                    |                --(complete)--> join (converge ALL) -> final
+                    -> branch_b --------------------------------^
+        """
+        result = await _run_workflow(
+            temporal_env,
+            "v2-loop-fail-converge",
+            {
+                "schema_version": "2.0.0",
+                "triggers": [_manual_trigger()],
+                "nodes": [
+                    {
+                        "id": "loop_node",
+                        "type": "loop",
+                        "parameters": {"type": "for_each", "items": ["a", "b"]},
+                    },
+                    {
+                        "id": "failing_body",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "exit 1"},
+                    },
+                    {
+                        "id": "branch_b",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo ok"},
+                    },
+                    {
+                        "id": "join",
+                        "type": "converge",
+                        "parameters": {},
+                    },
+                    {
+                        "id": "final",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo done"},
+                    },
+                ],
+                "edges": [
+                    {"from": "trigger", "to": "loop_node"},
+                    {"from": "trigger", "to": "branch_b"},
+                    {"from": "loop_node", "to": "failing_body", "from_port": "iterate"},
+                    {"from": "failing_body", "to": "loop_node", "to_port": "iterate"},
+                    {"from": "loop_node", "to": "join", "from_port": "complete"},
+                    {"from": "branch_b", "to": "join"},
+                    {"from": "join", "to": "final"},
+                ],
+            },
+        )
+
+        assert result["status"] == "failed"
+        assert "failing_body" in result.get("failed_activities", {})
+        assert "loop_node" in result.get("failed_activities", {})
+        assert "final" not in result.get("completed_activities", [])
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
 class TestMixedPatterns:
     """Verify combined execution patterns work together through Temporal."""
 

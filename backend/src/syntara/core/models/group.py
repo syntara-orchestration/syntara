@@ -7,17 +7,18 @@ Groups are included in JWT tokens as the ``groups`` claim.
 """
 
 from enum import StrEnum
-from typing import ClassVar
+from typing import Any, ClassVar
 from uuid import UUID, uuid4
 
+import sqlalchemy as sa
 from sqlalchemy import Column, ForeignKey, String, Table
-from sqlmodel import Field, Index, SQLModel, text
+from sqlmodel import Field, SQLModel
 
 from syntara.core.constants import FieldLimits
 from syntara.core.models.base import BaseResource
 from syntara.core.models.base.query_params import BaseListParams
-from syntara.core.models.base.soft_deletable import SoftDeletableResource
 from syntara.core.models.pagination import ResourcesResponse
+from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 
 
 class GroupSource(StrEnum):
@@ -45,7 +46,7 @@ user_idp_groups = Table(
 )
 
 
-class Group(SoftDeletableResource, table=True):
+class Group(BaseResource, table=True):
     """Group model for organizing users.
 
     Groups provide a way to organize users for access control and are
@@ -56,8 +57,6 @@ class Group(SoftDeletableResource, table=True):
         created_at: Timestamp of group creation (from BaseResource)
         updated_at: Timestamp of last update (from BaseResource)
         labels: Optional key-value metadata (from BaseResource)
-        deleted_at: Soft delete timestamp (from SoftDeletableResource)
-        deleted_by: UUID of user who performed soft delete (from SoftDeletableResource)
         name: Unique group name (e.g., "engineering", "admins")
         description: Optional description of the group's purpose
         created_by: UUID of user who created this group
@@ -110,6 +109,7 @@ class Group(SoftDeletableResource, table=True):
     created_by: UUID | None = Field(
         default=None,
         foreign_key="users.id",
+        ondelete="SET NULL",
         description="User who created this group",
     )
 
@@ -126,13 +126,11 @@ class Group(SoftDeletableResource, table=True):
         index=True,
     )
 
-    # Partial unique index for name (only for non-deleted groups)
+    # Unique constraint for name
     __table_args__ = (
-        Index(
-            "ix_groups_name_unique",
+        sa.UniqueConstraint(
             "name",
-            unique=True,
-            postgresql_where=text("deleted_at IS NULL"),
+            name="uq_groups_name",
         ),
     )
 
@@ -169,7 +167,7 @@ class GroupUpdate(SQLModel):
     )
 
 
-class GroupRead(BaseResource):
+class GroupRead(UserReferenceFieldsMixin, BaseResource):
     """Schema for group response (GET /groups/{id}).
 
     Includes all fields from the database table model.
@@ -178,9 +176,15 @@ class GroupRead(BaseResource):
     name: str
     description: str | None = None
     is_builtin: bool = False
-    created_by: UUID | None = None
+    created_by: UserReference | UUID | str | None = Field(default=None, description="User who created the group")
     source: str = GroupSource.LOCAL
     member_count: int = 0
+
+    USER_REFERENCE_FIELDS: ClassVar[tuple[str, ...]] = ("created_by",)
+
+    FIELD_SCHEMA_EXTRAS: ClassVar[dict[str, dict[str, Any]]] = {
+        **BaseResource.FIELD_SCHEMA_EXTRAS,
+    }
 
 
 class MembershipSource(SQLModel):

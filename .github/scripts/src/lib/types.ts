@@ -75,7 +75,7 @@ export const EnvironmentSchema = z.object({
 
 const requiredFiniteNumber = (name: string) =>
   z
-    .string({ required_error: `${name} is required` })
+    .string({ error: `${name} is required` })
     .trim()
     .min(1, `${name} is required`)
     .transform(Number)
@@ -86,7 +86,7 @@ export const UnhealthyAlertEnvironmentSchema = z.object({
   queueDepth: requiredFiniteNumber('QUEUE_DEPTH'),
   minutesSinceMerge: requiredFiniteNumber('MINUTES_SINCE_MERGE'),
   timeoutMinutes: requiredFiniteNumber('TIMEOUT_MINUTES'),
-  queueUrl: z.string({ required_error: 'QUEUE_URL is required' }).url('QUEUE_URL must be a valid URL'),
+  queueUrl: z.string({ error: 'QUEUE_URL is required' }).url('QUEUE_URL must be a valid URL'),
 })
 
 export type WorkflowRun = z.infer<typeof WorkflowRunSchema>

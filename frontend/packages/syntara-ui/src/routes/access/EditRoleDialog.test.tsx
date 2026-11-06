@@ -72,7 +72,7 @@ describe('EditRoleDialog', () => {
       isFetching: false,
       isLoading: false,
       refetch: vi.fn(),
-    } as never)
+    })
 
     vi.mocked(accessClient.useMutation).mockReturnValue({
       mutate: mockMutate,
@@ -91,7 +91,7 @@ describe('EditRoleDialog', () => {
       variables: undefined,
       status: 'idle',
       isPaused: false,
-    } as never)
+    })
   })
 
   function renderDialog(role: RoleRead = mockRole) {
@@ -125,12 +125,17 @@ describe('EditRoleDialog', () => {
 
     it('pre-fills name input with role name', () => {
       renderDialog()
-      expect(screen.getByRole('textbox', { name: /role name/i })).toHaveValue('my-custom-role')
+      expect(screen.getByLabelText(/^Name/)).toHaveValue('my-custom-role')
+    })
+
+    it('marks the name input as required', () => {
+      renderDialog()
+      expect(screen.getByLabelText(/^Name/)).toBeRequired()
     })
 
     it('pre-fills description input with role description', () => {
       renderDialog()
-      expect(screen.getByRole('textbox', { name: /role description/i })).toHaveValue('A custom role for testing')
+      expect(screen.getByLabelText(/^Description/)).toHaveValue('A custom role for testing')
     })
 
     it('pre-fills policies with role policies', () => {
@@ -140,7 +145,7 @@ describe('EditRoleDialog', () => {
 
     it('renders Save button', () => {
       renderDialog()
-      expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save role' })).toBeInTheDocument()
     })
 
     it('renders Cancel button', () => {
@@ -157,7 +162,7 @@ describe('EditRoleDialog', () => {
   describe('Form pre-population', () => {
     it('handles role with null description', () => {
       renderDialog({ ...mockRole, description: null })
-      expect(screen.getByRole('textbox', { name: /role description/i })).toHaveValue('')
+      expect(screen.getByLabelText(/^Description/)).toHaveValue('')
     })
 
     it('handles role with multiple policies', () => {
@@ -172,9 +177,9 @@ describe('EditRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      const nameInput = screen.getByRole('textbox', { name: /role name/i })
+      const nameInput = screen.getByLabelText(/^Name/)
       await user.clear(nameInput)
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save role' }))
 
       await waitFor(() => {
         expect(screen.getByText('Name is required')).toBeInTheDocument()
@@ -189,11 +194,11 @@ describe('EditRoleDialog', () => {
       renderDialog()
 
       // Modify the description
-      const descInput = screen.getByRole('textbox', { name: /role description/i })
+      const descInput = screen.getByLabelText(/^Description/)
       await user.clear(descInput)
       await user.type(descInput, 'Updated description')
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save role' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()
@@ -214,7 +219,7 @@ describe('EditRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save role' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()
@@ -235,7 +240,7 @@ describe('EditRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save role' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()
@@ -254,10 +259,10 @@ describe('EditRoleDialog', () => {
       const user = userEvent.setup()
       renderDialog()
 
-      const descInput = screen.getByRole('textbox', { name: /role description/i })
+      const descInput = screen.getByLabelText(/^Description/)
       await user.clear(descInput)
 
-      await user.click(screen.getByRole('button', { name: 'Save' }))
+      await user.click(screen.getByRole('button', { name: 'Save role' }))
 
       await waitFor(() => {
         expect(mockMutate).toHaveBeenCalled()

@@ -37,26 +37,13 @@ vi.mock('./useItemSelection', () => ({
     mockUseItemSelection(...args) as ReturnType<typeof import('./useItemSelection').useItemSelection>,
 }))
 
+const mockUseIntegrationModelsState = vi.fn()
+
 vi.mock('./useIntegrationModelsState', () => ({
-  useIntegrationModelsState: () => ({
-    models: [],
-    isLoading: false,
-    error: null,
-    refetchModels: vi.fn().mockResolvedValue(undefined),
-    enabledModelIds: new Set<string>(),
-    enabledCount: 0,
-    allSelected: false,
-    isDirty: false,
-    isSaving: false,
-    handleSave: vi.fn(),
-    handleSelectAll: vi.fn(),
-    defaultModelId: null,
-    handleSelectWithDefaultClear: vi.fn(),
-    handleSetDefault: vi.fn(),
-    handleRemoveDefault: vi.fn(),
-    resetSelectionToServer: vi.fn(),
-    resetDefault: vi.fn(),
-  }),
+  useIntegrationModelsState: (...args: unknown[]) =>
+    mockUseIntegrationModelsState(...args) as ReturnType<
+      typeof import('./useIntegrationModelsState').useIntegrationModelsState
+    >,
 }))
 
 const mockNavigate = vi.fn()
@@ -170,7 +157,7 @@ const mockIntegration: IntegrationRead = {
   total_tool_count: 2,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
-  created_by: 'user-1',
+  created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
   labels: {},
 }
 
@@ -193,7 +180,7 @@ describe('IntegrationDetail', () => {
       isError: overrides?.isError ?? false,
       error: overrides?.isError ? new Error('Load failed') : null,
       refetch: mockRefetch,
-    } as never)
+    })
 
     vi.mocked(credentialsClient.useQuery).mockReturnValue({
       data: integration.management_credential_id
@@ -206,7 +193,7 @@ describe('IntegrationDetail', () => {
       isPending: false,
       isError: false,
       error: null,
-    } as never)
+    })
 
     const baseMutationResult = {
       isPending: false,
@@ -257,6 +244,25 @@ describe('IntegrationDetail', () => {
       handleSelectAll: vi.fn(),
       handleSelectItem: vi.fn(),
       resetToServer: vi.fn(),
+    })
+    mockUseIntegrationModelsState.mockReturnValue({
+      models: [],
+      isLoading: false,
+      error: null,
+      refetchModels: vi.fn().mockResolvedValue(undefined),
+      enabledModelIds: new Set<string>(),
+      enabledCount: 0,
+      allSelected: false,
+      isDirty: false,
+      isSaving: false,
+      handleSave: vi.fn(),
+      handleSelectAll: vi.fn(),
+      defaultModelId: null,
+      handleSelectWithDefaultClear: vi.fn(),
+      handleSetDefault: vi.fn(),
+      handleRemoveDefault: vi.fn(),
+      resetSelectionToServer: vi.fn(),
+      resetDefault: vi.fn(),
     })
   })
 
@@ -556,7 +562,7 @@ describe('IntegrationDetail', () => {
 
       await waitFor(() => {
         const dialog = screen.getByRole('dialog')
-        expect(within(dialog).getByText(/delete integration/i)).toBeInTheDocument()
+        expect(within(dialog).getByRole('heading', { name: /delete integration/i })).toBeInTheDocument()
         expect(within(dialog).getByRole('checkbox')).toBeInTheDocument()
         expect(within(dialog).getByText(/permanently deleted/i)).toBeInTheDocument()
       })
@@ -614,22 +620,22 @@ describe('IntegrationDetail', () => {
         isError: true,
         error: retryableError,
         refetch: mockRefetch,
-      } as never)
+      })
       vi.mocked(credentialsClient.useQuery).mockReturnValue({
         data: undefined,
         isPending: false,
         isError: false,
         error: null,
-      } as never)
+      })
       vi.mocked(integrationsClient.useMutation).mockReturnValue({
         mutate: mockMutate,
         isPending: false,
-      } as never)
+      })
       vi.mocked(integrationsClient.useMutation).mockReturnValue({
         mutateAsync: vi.fn().mockResolvedValue({}),
         mutate: vi.fn(),
         isPending: false,
-      } as never)
+      })
       mockRefetch.mockResolvedValue({ data: mockIntegration })
       const user = userEvent.setup()
       render(<IntegrationDetail />, { wrapper })
@@ -646,26 +652,38 @@ describe('IntegrationDetail', () => {
       render(<IntegrationDetail />, { wrapper })
 
       expect(mockRegisterDirtyCheck).toHaveBeenCalledOnce()
-      const opts = mockRegisterDirtyCheck.mock.lastCall?.[0] as unknown as Record<string, unknown> | undefined
+      const opts = mockRegisterDirtyCheck.mock.lastCall?.[0]
       expect(opts).toBeDefined()
       expect(typeof opts!.check).toBe('function')
       expect(typeof opts!.saveAndExit).toBe('function')
       expect(typeof opts!.exitWithoutSaving).toBe('function')
       expect(opts!.title).toBe('Save resource changes?')
       expect(opts!.body).toBe('You have unsaved changes to enabled resources. Would you like to save before leaving?')
-      expect(opts!.saveLabel).toBe('Save changes')
+      expect(opts!.saveLabel).toBe('Save resources')
     })
 
     it('shows save button disabled on resources tab when no changes are made', () => {
       mockActiveTab = 'resources'
+      mockUseAllIntegrationTools.mockReturnValue({
+        tools: [{ id: 't1', name: 'tool-1', description: 'A tool', status: 'available' }],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
       render(<IntegrationDetail />, { wrapper })
 
-      const saveButton = screen.getByRole('button', { name: 'Save changes' })
+      const saveButton = screen.getByRole('button', { name: 'Save tools' })
       expect(saveButton).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('shows save button enabled on resources tab when changes are made', () => {
       mockActiveTab = 'resources'
+      mockUseAllIntegrationTools.mockReturnValue({
+        tools: [{ id: 't1', name: 'tool-1', description: 'A tool', status: 'available' }],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
       mockUseItemSelection.mockReturnValue({
         enabledIds: new Set(['t1']),
         enabledCount: 1,
@@ -677,7 +695,7 @@ describe('IntegrationDetail', () => {
       })
       render(<IntegrationDetail />, { wrapper })
 
-      const saveButton = screen.getByRole('button', { name: 'Save changes' })
+      const saveButton = screen.getByRole('button', { name: 'Save tools' })
       expect(saveButton).not.toHaveAttribute('aria-disabled', 'true')
     })
 
@@ -685,7 +703,7 @@ describe('IntegrationDetail', () => {
       mockActiveTab = 'details'
       render(<IntegrationDetail />, { wrapper })
 
-      expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save tools' })).not.toBeInTheDocument()
     })
   })
 
@@ -748,7 +766,7 @@ describe('IntegrationDetail', () => {
       const user = userEvent.setup()
       render(<IntegrationDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+      await user.click(screen.getByRole('button', { name: 'Save tools' }))
 
       await waitFor(() => {
         expect(mockMutateAsync).toHaveBeenCalledWith({
@@ -766,7 +784,7 @@ describe('IntegrationDetail', () => {
       const user = userEvent.setup()
       render(<IntegrationDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+      await user.click(screen.getByRole('button', { name: 'Save tools' }))
 
       await waitFor(() => {
         expect(screen.getByText('Changes saved')).toBeInTheDocument()
@@ -778,7 +796,7 @@ describe('IntegrationDetail', () => {
       const user = userEvent.setup()
       render(<IntegrationDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+      await user.click(screen.getByRole('button', { name: 'Save tools' }))
 
       await waitFor(() => {
         expect(screen.getByText('Save failed')).toBeInTheDocument()
@@ -1152,7 +1170,7 @@ describe('IntegrationDetail', () => {
     })
 
     it('shows invalid integration error when integrationId is empty', () => {
-      vi.mocked(useParams).mockReturnValue({ integrationId: '' } as never)
+      vi.mocked(useParams).mockReturnValue({ integrationId: '' })
       render(<IntegrationDetail />, { wrapper })
 
       expect(screen.getByText('Invalid integration')).toBeInTheDocument()
@@ -1299,19 +1317,59 @@ describe('IntegrationDetail', () => {
       enabled_tool_count: 0,
     }
 
-    it('shows Save model changes button on LLM resources tab', () => {
+    it('shows Save model changes button on LLM resources tab when models exist', () => {
+      setupDefaultMocks({ integration: llmIntegration })
+      mockUseIntegrationModelsState.mockReturnValue({
+        models: [{ id: 'm1', name: 'model-1' }],
+        isLoading: false,
+        error: null,
+        refetchModels: vi.fn().mockResolvedValue(undefined),
+        enabledModelIds: new Set<string>(['m1']),
+        enabledCount: 1,
+        allSelected: false,
+        isDirty: false,
+        isSaving: false,
+        handleSave: vi.fn(),
+        handleSelectAll: vi.fn(),
+        defaultModelId: null,
+        handleSelectWithDefaultClear: vi.fn(),
+        handleSetDefault: vi.fn(),
+        handleRemoveDefault: vi.fn(),
+        resetSelectionToServer: vi.fn(),
+        resetDefault: vi.fn(),
+      })
+      mockActiveTab = 'resources'
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.getByRole('button', { name: 'Save models' })).toBeInTheDocument()
+    })
+
+    it('hides Save models footer on LLM resources tab when no models discovered', () => {
       setupDefaultMocks({ integration: llmIntegration })
       mockActiveTab = 'resources'
       render(<IntegrationDetail />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Save model changes' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Save models' })).not.toBeInTheDocument()
     })
 
-    it('shows Save changes button on MCP server resources tab', () => {
+    it('shows Save tools button on MCP server resources tab when tools exist', () => {
+      mockUseAllIntegrationTools.mockReturnValue({
+        tools: [{ id: 't1', name: 'tool-1', description: 'A tool', status: 'available' }],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
       mockActiveTab = 'resources'
       render(<IntegrationDetail />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save tools' })).toBeInTheDocument()
+    })
+
+    it('hides Save tools footer on MCP resources tab when no tools discovered', () => {
+      mockActiveTab = 'resources'
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.queryByRole('button', { name: 'Save tools' })).not.toBeInTheDocument()
     })
   })
 })

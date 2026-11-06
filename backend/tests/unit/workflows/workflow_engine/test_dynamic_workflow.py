@@ -63,6 +63,8 @@ def _make_workflow(
     wf._detached_nodes = set()
     wf._cof_failed_nodes = set()
     wf._converge_branch_nodes = {}
+    wf._has_unhandled_failure = False
+    wf._cancelled_node = None
     init_workflow_runtime(wf)
     wf.pre_resolved_outputs = {}
     wf.stop_after_nodes = set()
@@ -1491,6 +1493,36 @@ class TestBuildResultStatus:
         wf.resolver.set_namespace("node_c", {"status": "failed", "error": "timeout"})
         result = wf._build_result("exec-1", include_node_results=False)
         assert result["status"] == "completed_with_errors"
+
+    def test_cancelled_when_node_cancelled(self) -> None:
+        """Cancelled invocation produces workflow status 'cancelled', not 'failed'."""
+        wf = _make_workflow()
+        wf._cancelled_node = "node_a"
+        wf.resolver.set_namespace("trigger", {})
+        wf.resolver.set_namespace("node_a", {"status": "cancelled"})
+        result = wf._build_result("exec-1", include_node_results=False)
+        assert result["status"] == "cancelled"
+        assert "node_a" not in result["failed_activities"]
+
+
+class TestHandleNodeFailureCancellation:
+    """_handle_node_failure maps InvocationCancelledError to cancelled, not failed."""
+
+    def test_cancelled_node_not_in_failed_nodes(self) -> None:
+        """InvocationCancelledError sets _cancelled_node but not failed_nodes."""
+        from temporalio.exceptions import ApplicationError
+
+        graph = _build_linear_graph()
+        wf = _make_workflow()
+        wf.resolver.set_namespace("trigger", {})
+
+        error = ApplicationError("cancelled", type="InvocationCancelledError", non_retryable=True)
+        wf._handle_node_failure("node_a", error, graph)
+
+        assert "node_a" not in wf.failed_nodes
+        assert wf._cancelled_node == "node_a"
+        assert wf._has_unhandled_failure is False
+        assert wf.resolver.get_namespace("node_a")["status"] == "cancelled"
 
 
 # ---------------------------------------------------------------------------

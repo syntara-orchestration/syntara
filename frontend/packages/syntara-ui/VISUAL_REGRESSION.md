@@ -76,7 +76,7 @@ flowchart TD
 
 ## Scoped `/update-screenshots` Runs
 
-`/update-screenshots` doesn't always re-render all ~140 pages. `scripts/scope-visual-regression.ts` looks at exactly which files your PR changed and decides how much of the suite actually needs to run.
+`/update-screenshots` doesn't always re-render all ~140 pages. `scripts/visual-regression/scope-visual-regression.ts` looks at exactly which files your PR changed and decides how much of the suite actually needs to run.
 
 `update-visual-baselines.yml` (the workflow behind `/update-screenshots`) checks out `refs/pull/<N>/merge` — GitHub's own precomputed merge of your branch into its base — rather than your raw branch, so baselines are generated from the identical code `ci-frontend.yml` actually renders. That merge commit has two parents (the base branch tip, and your PR's real head), so diffing them gives exactly your PR's changed files, independent of how many commits are on the branch or whether it's been rebased.
 
@@ -97,7 +97,7 @@ The PR comment posted by `/update-screenshots` always states which of these happ
 
 **The weekly cron is the backstop for this heuristic.** It never scopes — it always regenerates and diffs every single page against `devel`, unconditionally. So even if a rule in `scope-visual-regression.ts` is wrong or incomplete and a scoped `/update-screenshots` run misses a page that needed updating, that staleness is caught and surfaced to `uxd-team` on the very next Monday at the latest. No scoping bug in the manual path can cause permanent, undetected drift.
 
-If you add a new top-level route folder under `src/routes/`, consider whether it should get its own entry in the `SCOPE_RULES` table at the top of `scripts/scope-visual-regression.ts` — if you don't, PRs touching that folder will simply always trigger a full run, which is correct-but-slower, never incorrect.
+If you add a new top-level route folder under `src/routes/`, consider whether it should get its own entry in the `SCOPE_RULES` table at the top of `scripts/visual-regression/scope-visual-regression.ts` — if you don't, PRs touching that folder will simply always trigger a full run, which is correct-but-slower, never incorrect.
 
 ## Weekly Baseline Refresh
 
@@ -105,7 +105,7 @@ If you add a new top-level route folder under `src/routes/`, consider whether it
 
 1. Checks out `devel` HEAD and regenerates every screenshot with `--update-snapshots`.
 2. Diffs the regenerated PNGs against what's checked in, then runs
-   `scripts/filter-noisy-baseline-diffs.ts` so only meaningful visual changes
+   `scripts/visual-regression/filter-noisy-baseline-diffs.ts` so only meaningful visual changes
    are kept (AA / 1-pixel noise is restored, and overlay screenshots whose
    **dialog card** is unchanged are restored even when the dimmed list behind
    them moved). The filter decodes with `pngjs`
@@ -114,6 +114,7 @@ If you add a new top-level route folder under `src/routes/`, consider whether it
    git bytes — decides which images belong in the weekly PR.
 3. If nothing meaningful changed, it writes a "no drift" job summary and stops — no PR, no noise.
 4. If something changed, it opens a PR (branch `visual-regression/weekly-refresh`, base `devel`) containing only the changed/new PNGs, requests review from `uxd-team`, and lists the added/modified counts in the PR body.
+5. When the PR is created or updated, it posts a concise review link to Slack if `SLACK_VISUAL_REGRESSION_WEBHOOK_URL` is configured.
 
 **Reviewing the weekly PR:** open the **Files changed** tab. GitHub renders a native diff view for each changed PNG (2-up, swipe, or onion skin). For anything that looks like an unintended regression, file a follow-up issue and either drop that file from the PR (its previous baseline stays authoritative until the fix lands) or leave it if the fix is expected before next Monday.
 
@@ -168,7 +169,7 @@ Pages that render a ReactFlow canvas (workflow builder, execution visualizer) us
 
 - Set `perceptual: true` on any entry that renders `.react-flow` — this signals the test runner to mask the ReactFlow canvas with a solid rectangle (`#e8e8e8`) before comparison.
 - Masking replaces the canvas area entirely, so node positions, edge routing, and `fitView()` floating-point output no longer affect the diff. The surrounding UI chrome (toolbar, side panels, breadcrumbs) is still pixel-compared and will catch real regressions.
-- Set `maskCanvas: false` for step/trigger form entries that open `NodeEditorOverlay`. That overlay is `position: absolute; inset: 0` over the same box as `.react-flow`, so a canvas mask would paint solid grey over the form and `--update-snapshots` would commit empty baselines.
+- Set `maskCanvas: false` for step/trigger form entries that open `StepEditorOverlay`. That overlay is `position: absolute; inset: 0` over the same box as `.react-flow`, so a canvas mask would paint solid grey over the form and `--update-snapshots` would commit empty baselines.
 - The `CanvasPageEntry` type enforces `perceptual: true` for dedicated arrays (`builderInteractivePages`, etc.). A runtime check throws if any `workflows/` entry is missing it.
 - `stabilizeReactFlowViewport` still runs before the screenshot — it ensures the canvas has finished rendering (and the surrounding UI has settled) before we capture, even though the canvas itself is usually masked.
 - No `maxDiffPixelRatio` overrides are needed on canvas entries: since the canvas is masked (or covered by the node editor overlay), the only pixel differences are in the non-canvas chrome, which should be fully deterministic.

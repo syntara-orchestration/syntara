@@ -8,6 +8,8 @@ import type { FlowPosition } from '../types'
 import { LOOP_BODY_SPACING } from '../utils/layoutConstants'
 import type { EdgeType } from '../utils/workflowToGraph'
 
+import { useLoopGroupPositionSync } from './useLoopGroupPositionSync'
+
 type UseNodePositioningParams = {
   nodes: NodeType[]
   edges: EdgeType[]
@@ -75,17 +77,25 @@ function positionLoopNode(options: PositionLoopNodeOptions): NodeType {
   return node
 }
 
-function positionLoopBodyNode(
-  node: NodeType,
-  newlyAddedNodeIdsRef: RefObject<Set<string>>,
-  loopBodyNodeMap: Map<string, string>,
-  loopPositions: Map<string, { x: number; y: number; width: number; height: number }>,
+type PositionLoopBodyNodeOptions = {
+  node: NodeType
+  newlyAddedNodeIdsRef: RefObject<Set<string>>
+  loopBodyNodeMap: Map<string, string>
+  loopPositions: Map<string, { x: number; y: number; width: number; height: number }>
   positionedNodes: Map<string, NodeType>
-): NodeType {
+}
+
+function positionLoopBodyNode({
+  node,
+  newlyAddedNodeIdsRef,
+  loopBodyNodeMap,
+  loopPositions,
+  positionedNodes,
+}: PositionLoopBodyNodeOptions): NodeType {
   if (!newlyAddedNodeIdsRef.current.has(node.id) || !node.measured || !loopBodyNodeMap.has(node.id)) {
     return node
   }
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: loopBodyNodeMap.has(node.id) is checked in the early-return guard above (line 85)
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- safe: loopBodyNodeMap.has(node.id) is checked in the early-return guard above
   const loopNodeId = loopBodyNodeMap.get(node.id)!
   const loopPos = loopPositions.get(loopNodeId)
   if (!loopPos) return node
@@ -156,7 +166,13 @@ function positionLoopBranch(ctx: LoopPositioningContext) {
         overridePosition,
       })
       if (loopPositioned !== node) return loopPositioned
-      return positionLoopBodyNode(node, newlyAddedNodeIdsRef, loopBodyNodeMap, loopPositions, positionedNodes)
+      return positionLoopBodyNode({
+        node,
+        newlyAddedNodeIdsRef,
+        loopBodyNodeMap,
+        loopPositions,
+        positionedNodes,
+      })
     })
 
     const nodesChanged = updatedNodes.some((node, index) => node !== currentNodes[index])
@@ -281,6 +297,7 @@ export function useNodePositioning({
   desiredPosition,
   onClearDesiredPosition,
 }: UseNodePositioningParams) {
+  useLoopGroupPositionSync({ nodes, edges, isInitialized, updateNodePositions })
   const loopPositionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {

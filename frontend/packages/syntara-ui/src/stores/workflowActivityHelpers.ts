@@ -48,7 +48,7 @@ export function updateActivityInList(
   activityId: string,
   updates: Partial<Activity>
 ): Activity[] {
-  return mapActivityInList(activities, activityId, (activity) => ({ ...activity, ...updates }) as Activity)
+  return mapActivityInList(activities, activityId, (activity) => ({ ...activity, ...updates }))
 }
 
 /**
@@ -57,7 +57,7 @@ export function updateActivityInList(
  * position-dependent consumers (edges, converge nodes) continue to work.
  */
 export function replaceActivityInList(activities: Activity[], activityId: string, newActivity: Activity): Activity[] {
-  return mapActivityInList(activities, activityId, () => ({ ...newActivity, id: activityId }) as Activity)
+  return mapActivityInList(activities, activityId, () => ({ ...newActivity, id: activityId }))
 }
 
 /**
@@ -74,7 +74,7 @@ export function getValidSourceHandles(activityType: Activity['type']): Set<strin
       return new Set([EdgeHandleEnum.APPROVED, EdgeHandleEnum.REJECTED])
     case ActivityTypeEnum.SWITCH:
       // Returns only the static DEFAULT handle. Dynamic case_N handles are
-      // managed by SwitchNodeDetails.handleSubmit during edit-mode updates.
+      // managed by SwitchStepDetails.handleSubmit during edit-mode updates.
       return new Set([EdgeHandleEnum.DEFAULT])
     default:
       // All other v2 node types (script, http_request, agentic, aap_job_template, converge)

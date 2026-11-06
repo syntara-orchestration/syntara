@@ -5,7 +5,7 @@ Provides a template method pattern for implementing WebSocket streaming handlers
 
 import asyncio
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -16,6 +16,8 @@ from starlette.websockets import WebSocket
 
 if TYPE_CHECKING:
     from uuid import UUID
+
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from syntara.core.cache.stream import StreamClient
 from syntara.core.constants import FieldLimits
@@ -113,6 +115,41 @@ class BaseWebSocketStreamingHandler(ABC):
         """
 
     # ============ Optional Hooks (Can Override) ============
+
+    async def check_before_streaming(self, session_state: dict[str, Any]) -> None:  # noqa: B027
+        """Run a pre-stream check after the stream exists but before reading.
+
+        Override to raise when the resource is already in a terminal state
+        that the replay may not surface (e.g. cancelled invocation whose
+        stream contains a ``completion`` event from the accepted race).
+
+        The default implementation is a no-op.
+
+        Args:
+            session_state: Session state dict from create_session_state
+
+        """
+
+    def get_on_idle(
+        self,
+        session_state: dict[str, Any],  # noqa: ARG002
+        client: StreamClient,  # noqa: ARG002
+    ) -> Callable[[], Awaitable[None]] | None:
+        """Return an async callback invoked when XREAD returns no events.
+
+        Override to perform periodic checks (e.g. cancellation detection)
+        during idle periods of the event stream.  The callback may raise
+        to abort streaming.
+
+        Args:
+            session_state: Session state dict from create_session_state
+            client: The StreamClient used for the event stream
+
+        Returns:
+            Async callable or None (default)
+
+        """
+        return None
 
     async def wait_for_stream_ready(
         self, stream_id: str, session_state: dict[str, Any]
@@ -277,19 +314,28 @@ class BaseWebSocketStreamingHandler(ABC):
             lifecycle_manager.activate_connection(lifecycle_conn_id)
 
             # Step 2: Check if stream exists
-            async with StreamClient() as client:
-                info = await client.info(stream_id)
+            stream_exists = False
+            try:
+                async with StreamClient() as client:
+                    info = await client.info(stream_id)
+                    stream_exists = info["exists"]
+            except (RedisConnectionError, OSError):
+                logger.debug("Redis unavailable for stream existence check, entering wait", stream_id=stream_id)
 
-                if not info["exists"]:
-                    # Stream doesn't exist - wait for it to be ready
-                    await self.wait_for_stream_ready(stream_id, session_state)
+            if not stream_exists:
+                await self.wait_for_stream_ready(stream_id, session_state)
 
             # Step 3: Determine streaming replay parameters
             start_id, replay = self.get_replay_parameters(replay_count, last_event_id, session_state)
 
-            # Step 4: Stream events to client
+            # Step 4: Pre-stream status check (e.g. already-cancelled invocation
+            # whose stream still exists but the cancel key has expired)
+            await self.check_before_streaming(session_state)
+
+            # Step 5: Stream events to client
             stop_condition = self.get_stop_condition(session_state)
             async with StreamClient() as client:
+                on_idle = self.get_on_idle(session_state, client)
                 logger.info("Starting event stream", connection_id=conn_id)
                 async for event in client.events(
                     stream_id=stream_id,
@@ -298,6 +344,7 @@ class BaseWebSocketStreamingHandler(ABC):
                     should_stop=stop_condition,
                     block_ms=1000,
                     count=10,
+                    on_idle=on_idle,
                 ):
                     # Send event to WebSocket client
                     await websocket.send_json(event)
@@ -412,6 +459,7 @@ class BaseWebSocketStreamingHandler(ABC):
         resource_status: str,
         resource_type: str = "resource",
         max_wait_seconds: int = 30,
+        on_poll: Callable[[StreamClient], Any] | None = None,
     ) -> None:
         """Wait for stream to be created in cache.
 
@@ -423,6 +471,9 @@ class BaseWebSocketStreamingHandler(ABC):
             resource_status: Current status of the resource
             resource_type: Type of resource (e.g., "invocation", "execution")
             max_wait_seconds: Maximum time to wait for stream creation
+            on_poll: Optional async callback invoked each iteration with the
+                StreamClient.  May raise to abort the wait early (e.g. when
+                a cancellation key is detected).
 
         Raises:
             WaitForStreamTimeoutError: If timeout waiting for stream creation
@@ -442,10 +493,18 @@ class BaseWebSocketStreamingHandler(ABC):
                 await asyncio.sleep(wait_interval)
                 total_waited += wait_interval
 
-                info = await client.info(stream_id)
-                if info["exists"]:
-                    logger.info("Stream created after wait", stream_id=stream_id, wait_time=total_waited)
-                    return
+                try:
+                    info = await client.info(stream_id)
+                    if info["exists"]:
+                        logger.info("Stream created after wait", stream_id=stream_id, wait_time=total_waited)
+                        return
+                except (RedisConnectionError, OSError):
+                    if on_poll is None:
+                        raise
+                    logger.debug("Stream info check failed, falling back to on_poll", stream_id=stream_id)
+
+                if on_poll is not None:
+                    await on_poll(client)
 
             # Timeout waiting for stream
             logger.error("Timeout waiting for stream to be created", stream_id=stream_id)

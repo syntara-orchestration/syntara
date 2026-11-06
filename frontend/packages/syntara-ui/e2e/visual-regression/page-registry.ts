@@ -2,7 +2,7 @@
  * Page registry for visual regression testing.
  *
  * Every implemented route in the app should have an entry here.
- * The baseline enforcement script (`scripts/check-visual-baselines.ts`)
+ * The baseline enforcement script (`scripts/visual-regression/check-visual-baselines.ts`)
  * validates that this registry stays in sync with `AppRoute.tsx`.
  *
  * Entries are organized by section (matching the route directory structure)
@@ -55,7 +55,7 @@ export type PageEntry = {
   perceptual?: boolean
   /**
    * When `perceptual` is true, mask `.react-flow` (default). Set to `false` when the
-   * screenshot subject is `NodeEditorOverlay` (step/trigger forms): that overlay is
+   * screenshot subject is `StepEditorOverlay` (step/trigger forms): that overlay is
    * `position:absolute; inset:0` over the same box as `.react-flow`, so a canvas mask
    * paints solid grey over the form and `--update-snapshots` commits empty baselines.
    */
@@ -71,7 +71,7 @@ export type PageEntry = {
  * `.react-flow` with a solid rectangle — node/edge layout and `fitView()` are
  * not pixel-deterministic. Use for any page that renders a ReactFlow canvas
  * (builder, execution visualizer, etc.). Set `maskCanvas: false` when the
- * subject is `NodeEditorOverlay` (see `PageEntry.maskCanvas`).
+ * subject is `StepEditorOverlay` (see `PageEntry.maskCanvas`).
  */
 export type CanvasPageEntry = PageEntry & {
   perceptual: true
@@ -259,7 +259,7 @@ export const pages: PageEntry[] = [
     setup: async (page) => {
       const kebab = page.getByRole('button', { name: /Actions|Kebab toggle/i }).first()
       await kebab.click()
-      await page.getByRole('menuitem', { name: 'Delete' }).click()
+      await page.getByRole('menuitem', { name: 'Delete user' }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('button', { name: /Delete/i })).toBeVisible()
@@ -349,7 +349,7 @@ export const pages: PageEntry[] = [
         .filter({ hasText: 'platform-admins' })
         .getByRole('button', { name: /Actions|Kebab toggle/i })
         .click()
-      await page.getByRole('menuitem', { name: 'Delete' }).click()
+      await page.getByRole('menuitem', { name: 'Delete group' }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('button', { name: /Delete/i })).toBeVisible()
@@ -621,7 +621,7 @@ export const pages: PageEntry[] = [
     setup: async (page) => {
       const kebab = page.getByRole('button', { name: /Actions|Kebab toggle/i }).first()
       await kebab.click()
-      await page.getByRole('menuitem', { name: 'Delete' }).click()
+      await page.getByRole('menuitem', { name: 'Delete identity provider' }).click()
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByRole('button', { name: /Delete/i })).toBeVisible()
@@ -898,18 +898,6 @@ export const pages: PageEntry[] = [
   ...credentialEditPages,
 
   // ══════════════════════════════════════════════════════════════════════════
-  // SUPPORT
-  // ══════════════════════════════════════════════════════════════════════════
-  {
-    section: 'support',
-    name: 'glossary',
-    path: AppRoute.Support.Glossary,
-    waitFor: async (page) => {
-      await expect(page.getByRole('heading', { name: 'Glossary' })).toBeVisible()
-    },
-  },
-
-  // ══════════════════════════════════════════════════════════════════════════
   // INTERACTIVE STATES — status variants, detail tabs, settings tabs,
   // authentication (entries defined in page-entries-interactive.ts)
   // ══════════════════════════════════════════════════════════════════════════
@@ -1106,15 +1094,11 @@ export const loginPages: PageEntry[] = [
 // ---------------------------------------------------------------------------
 
 /** Routes in AppRoute.tsx that have no implementation (placeholder/unimplemented) */
-export const excludedUnimplemented: string[] = [
-  AppRoute.Dashboard,
-  AppRoute.Configuration.Overview,
-  AppRoute.Support.Documentation,
-  AppRoute.Support.FAQ,
-]
+export const excludedUnimplemented: string[] = [AppRoute.Dashboard, AppRoute.Configuration.Overview]
 
 /** Routes excluded because they need dynamic setup or have no seeded mock data */
 export const excludedDynamic: string[] = [
+  AppRoute.FeatureFlagDemo, // Temporary direct-link demo route; no baseline required.
   AppRoute.WorkflowBuilder.New,
   AppRoute.SystemAdministration.Root,
   AppRoute.SystemAdministration.Authentication.EditIdentityProvider, // covered by oidcProviderWizardPages
