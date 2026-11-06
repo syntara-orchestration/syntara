@@ -60,23 +60,25 @@ def test_every_grantable_kind_is_valid(kind: str, condition: str) -> None:
     assert validate_node_kind_statements(statements) is None
 
 
-@pytest.mark.parametrize("action", ["step_type:write", "step_type:*"])
 @pytest.mark.parametrize(
-    "labels",
-    [
-        {"kind": "scritp"},
-        {"kind": "*"},
-        {"kind": []},
-        {"kind": None},
-        {"kind": NodeType.INTERNAL_ACTIVITY.value},
-    ],
+    "kind",
+    ["scritp", "future_step_type", NodeType.INTERNAL_ACTIVITY.value],
 )
-def test_unknown_or_malformed_kind_rejected(action: str, labels: dict[str, Any]) -> None:
-    """Unknown values (including system-only types) cannot create silent no-ops."""
-    error = validate_node_kind_statements([{"actions": [action], "conditions": {"resource_labels": labels}}])
+@pytest.mark.parametrize("condition", ["resource_labels", "resource_labels_not"])
+def test_unknown_and_system_kinds_are_valid(kind: str, condition: str) -> None:
+    """Policies can target kinds that are new or system-only."""
+    error = validate_node_kind_statements([{"actions": ["step_type:write"], "conditions": {condition: {"kind": kind}}}])
+    assert error is None
+
+
+@pytest.mark.parametrize("kind", [[], None, "", "   "])
+def test_malformed_kind_rejected(kind: object) -> None:
+    """A kind selector must still be a non-empty string."""
+    error = validate_node_kind_statements(
+        [{"actions": ["step_type:write"], "conditions": {"resource_labels": {"kind": kind}}}]
+    )
     assert error is not None
-    assert "Unknown step type" in error
-    assert str(labels["kind"]) in error
+    assert "non-empty string" in error
 
 
 @pytest.mark.parametrize("conditions", [None, {}, {"resource_labels": {}}, {"resource_labels_not": {}}])

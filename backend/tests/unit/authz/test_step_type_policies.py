@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.dependencies import PermissionChecker
-from syntara.authz.exceptions import DenyEffectNotAllowedError, InvalidResourceActionError
+from syntara.authz.exceptions import DenyEffectNotAllowedError
 from syntara.authz.models.policy import Policy
 from syntara.authz.policy_router import get_policy_service, router
 from syntara.authz.resource_actions import get_resource_actions
@@ -57,9 +57,9 @@ def test_resource_actions_endpoint_lists_only_write(policy_client: tuple[TestCli
 @pytest.mark.parametrize(
     ("conditions", "message"),
     [
-        ({"resource_labels": {"kind": "scritp"}}, "Unknown step type 'scritp'"),
-        ({"resource_labels_not": {"kind": "scritp"}}, "Unknown step type 'scritp'"),
-        ({"resource_labels": {"kind": []}}, "Unknown step type"),
+        ({"resource_labels": {"kind": []}}, "non-empty string"),
+        ({"resource_labels": {"kind": ""}}, "non-empty string"),
+        ({"resource_labels": {"kind": "   "}}, "non-empty string"),
         ({"resource_labels": {"kind": "script", "language": "bash"}}, "Unsupported step type labels: language"),
         ({"resource_labels_not": {"model": "unapproved"}}, "Unsupported step type labels: model"),
         ({"resource_labels": ["script"]}, "must be an object"),
@@ -72,7 +72,7 @@ def test_invalid_step_type_returns_422(
     conditions: dict[str, Any],
     message: str,
 ) -> None:
-    """Create and both update routes reject invalid labels without committing."""
+    """Create and update routes reject malformed labels without committing."""
     client, _, session = policy_client
     path = "/policies" if method == "POST" else f"/policies/{uuid4()}"
     response = client.request(
@@ -94,7 +94,16 @@ def test_invalid_step_type_returns_422(
 @pytest.mark.parametrize("method", ["POST", "PATCH", "PUT"])
 @pytest.mark.parametrize("effect", ["allow", "deny"])
 @pytest.mark.parametrize("scope", ["any", "project"])
-@pytest.mark.parametrize("conditions", [None, {"resource_labels": {"kind": "manual_trigger"}}])
+@pytest.mark.parametrize(
+    "conditions",
+    [
+        None,
+        {"resource_labels": {"kind": "manual_trigger"}},
+        {"resource_labels": {"kind": "future_step_type"}},
+        {"resource_labels_not": {"kind": "future_step_type"}},
+        {"resource_labels": {"kind": "internal_activity"}},
+    ],
+)
 def test_valid_step_policy_accepted(
     policy_client: tuple[TestClient, PolicyService, AsyncMock],
     method: str,
@@ -102,7 +111,7 @@ def test_valid_step_policy_accepted(
     scope: str,
     conditions: dict[str, Any] | None,
 ) -> None:
-    """A project-scoped kind or an unrestricted statement can be persisted."""
+    """Registered, future, and system kinds can be persisted for either effect."""
     client, _, session = policy_client
     statement = {"effect": effect, "scope": scope, "actions": ["step_type:write"], "conditions": conditions}
     response = client.request(
@@ -116,24 +125,23 @@ def test_valid_step_policy_accepted(
 
 
 @pytest.mark.asyncio
-async def test_direct_service_call_rejects_invalid_kind(
+async def test_direct_service_call_accepts_unknown_kind(
     policy_client: tuple[TestClient, PolicyService, AsyncMock],
 ) -> None:
-    """Validation does not depend on the HTTP request schema."""
+    """Direct service callers can target future kinds too."""
     _, service, session = policy_client
-    with pytest.raises(InvalidResourceActionError, match="Unknown step type 'scritp'"):
-        await service.create_policy(
-            "invalid-step",
-            [
-                {
-                    "effect": "allow",
-                    "scope": "any",
-                    "actions": ["step_type:write"],
-                    "conditions": {"resource_labels": {"kind": "scritp"}},
-                }
-            ],
-        )
-    session.commit.assert_not_called()
+    await service.create_policy(
+        "future-step-deny",
+        [
+            {
+                "effect": "deny",
+                "scope": "any",
+                "actions": ["step_type:write"],
+                "conditions": {"resource_labels": {"kind": "future_step_type"}},
+            }
+        ],
+    )
+    session.commit.assert_awaited_once()
 
 
 @pytest.mark.parametrize("method", ["POST", "PATCH", "PUT"])

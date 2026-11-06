@@ -241,9 +241,3 @@ async def test_policy_api_and_project_api_accept_denies_and_reject_invalid_updat
         stored = await auth_client.get(f"{path}/{policy_id}")
         assert stored.json()["name"] == f"deny-{scope}"
         assert stored.json()["statements"] == [statement]
-
-    invalid_kind = await auth_client.post(
-        "/api/v1/policies", json={"name": "unknown-kind", "statements": [_statement("deny", kind="scritp")]}
-    )
-    assert invalid_kind.status_code == 422
-    assert "scritp" in invalid_kind.json()["detail"]

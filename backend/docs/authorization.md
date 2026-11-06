@@ -352,10 +352,10 @@ Existing allow statements retain their wildcard and scope behavior.
 }
 ```
 
-The `kind` selector uses the grantable authoring types registered in
-`workflows/node_kinds.py`, including triggers and control-flow steps. Unknown
-kinds, system-only `internal_activity`, and unsupported step labels are
-rejected. Omitting the kind selector covers every grantable kind.
+Step-type `kind` selectors in both allow and deny policies accept any
+non-empty string, including kinds that are not registered yet. This lets policies be prepared before a
+new step type ships; they match when a resource emits that exact kind. Only
+the `kind` label is supported. Omitting the selector covers every step kind.
 
 A globally assigned `any` deny applies in every project. Project role
 assignments narrow a statement to that project, even if its original scope
