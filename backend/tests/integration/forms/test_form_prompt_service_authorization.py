@@ -55,7 +55,7 @@ _SUBMIT_PERMISSION_CASES = [
     ("auditor", "same", 403),
     ("project-admin", "same", 200),
     ("project-admin", "other", 403),
-    ("project-user", "same", 200),
+    ("project-user", "same", 403),
     ("project-user", "other", 403),
     ("project-auditor", "same", 403),
     ("user", "same", 403),
@@ -252,7 +252,7 @@ class TestFormPromptServiceAuthorizationAPI:
             assert response.json()["code"] == "AUTHORIZATION_DENIED"
             client.send_form_signal.assert_not_awaited()
 
-    @pytest.mark.parametrize("role_name", ["admin", "project-admin", "project-user"])
+    @pytest.mark.parametrize("role_name", ["admin", "project-admin"])
     @pytest.mark.parametrize("responder_mode", ["user", "group", "neither", "group_nonmember", "empty"])
     async def test_submit_responder_membership_for_roles_with_submit_permission(
         self,
@@ -283,7 +283,7 @@ class TestFormPromptServiceAuthorizationAPI:
             assert response.json()["status"] == "submitted"
             client.send_form_signal.assert_awaited_once()
 
-    @pytest.mark.parametrize("role_name", ["auditor", "project-auditor"])
+    @pytest.mark.parametrize("role_name", ["auditor", "project-auditor", "project-user"])
     @pytest.mark.parametrize("responder_mode", ["user", "group"])
     async def test_submit_responder_membership_does_not_grant_submit_permission(
         self,
