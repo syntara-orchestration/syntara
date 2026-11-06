@@ -96,6 +96,15 @@ class ExecutionNotFoundError(WorkflowError):
         super().__init__(f"Execution {execution_id} not found")
 
 
+@fastapi_exception(handler="syntara.workflows.error_handlers.form_prompt_submission_required_handler")
+class FormPromptSubmissionRequiredError(WorkflowError):
+    """Raised when a Form Prompt callback has no valid persisted submission."""
+
+    def __init__(self) -> None:
+        """Initialize with a generic message that does not disclose prompt state."""
+        super().__init__("A persisted Form Prompt submission is required to complete this activity")
+
+
 @fastapi_exception(handler="syntara.workflows.error_handlers.execution_terminal_state_handler")
 class ExecutionInTerminalStateError(WorkflowError):
     """Raised when attempting to modify an execution in a terminal state."""

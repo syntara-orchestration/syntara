@@ -201,6 +201,11 @@ Only submitted responses arrive by signal. Timeout and cancellation use their ow
 paths. Downstream steps reference submitted values with
 `${<step_id>.response_data.<value_name>}`.
 
+The generic activity signal endpoint is only the transport for resuming a Form Prompt; it is
+not a submission path. The callback is accepted only when the matching prompt row is already
+`submitted`, and the workflow output is rebuilt from that row. Caller-supplied response data
+is ignored, and `failed` or `cancelled` callback statuses are rejected for Form Prompts.
+
 ## Timeout and Cleanup
 
 Temporal's activity timeout handles unanswered prompts. The workflow marks the prompt

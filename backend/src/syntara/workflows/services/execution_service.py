@@ -31,6 +31,11 @@ from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
+from syntara.forms.services.form_prompt_signal import (
+    RejectedFormPromptSignal,
+    VerifiedFormPromptSignal,
+    resolve_verified_form_prompt_signal,
+)
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
@@ -40,6 +45,7 @@ from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,
     ExecutionNotFoundError,
     ExecutionNotRetryableError,
+    FormPromptSubmissionRequiredError,
     TemporalUnavailableError,
     TriggerValidationError,
     WorkflowConcurrencyLimitError,
@@ -1079,15 +1085,17 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         """Handle an external callback for an async-completion activity.
 
         Routes the callback to either complete or fail the Temporal activity
-        based on the signal_data status field.
+        based on the signal_data status field. Form Prompt callbacks are reconciled 
+        against their persisted submission.
 
         Args:
             execution_id: Execution ID
             activity_id: Activity ID from workflow definition
-            signal_data: Callback payload (must contain "status" field)
+            signal_data: Callback payload, interpreted by activity type
 
         Raises:
             ExecutionNotFoundError: If execution not found
+            FormPromptSubmissionRequiredError: If a Form Prompt has no valid persisted submission
             TemporalUnavailableError: If Temporal service unavailable
 
         """
@@ -1106,6 +1114,30 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         )
 
         status = signal_data.get("status")
+        form_prompt_resolution = await resolve_verified_form_prompt_signal(
+            self.session,
+            execution_id,
+            activity_id,
+        )
+        rejection_reason: str | None = None
+        if isinstance(form_prompt_resolution, RejectedFormPromptSignal):
+            rejection_reason = form_prompt_resolution.reason
+        elif isinstance(form_prompt_resolution, VerifiedFormPromptSignal):
+            if status in ("failed", "cancelled"):
+                rejection_reason = "Form Prompt callbacks cannot fail or cancel the activity"
+            else:
+                signal_data = form_prompt_resolution.payload
+
+        if rejection_reason is not None:
+            logger.warning(
+                "Rejected Form Prompt activity signal",
+                execution_id=execution_id,
+                activity_id=activity_id,
+                acting_user_id=self.user.id,
+                reason=rejection_reason,
+            )
+            raise FormPromptSubmissionRequiredError
+
         if status == "failed":
             error_msg, error_type, has_error_detail = resolve_signal_failure_message(signal_data.get("error"))
             error_msg = error_msg[:MAX_CALLBACK_ERROR_MSG_LENGTH]

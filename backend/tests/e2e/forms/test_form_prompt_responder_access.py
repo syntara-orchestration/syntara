@@ -34,10 +34,13 @@ from orchestrator_test_sdk.factories import (
     add_to_group,
 )
 from syntara_api_client.models.activity_data_output_data_type_0 import ActivityDataOutputDataType0
+from syntara_api_client.models.activity_signal_payload import ActivitySignalPayload
+from syntara_api_client.models.activity_signal_payload_signal_data import ActivitySignalPayloadSignalData
 
 from ._helpers import (
     assert_consumer_completed,
     assert_forbidden,
+    assert_problem_response,
     assert_prompt_not_consumed,
     assert_responders_configured,
     get_form_prompt,
@@ -551,3 +554,52 @@ class TestEmptyResponderLists:
         response = submit_form_prompt(responder_env["user_a_api"], prompt_id, _RESPONSE)
         assert response.status_code == HTTPStatus.OK
         assert_consumer_completed(syntara_api, exec_id)
+
+
+class TestGenericActivitySignalCannotSubmitFormPrompt:
+    """A generic execution signal cannot bypass responder restrictions."""
+
+    def test_project_user_cannot_forge_form_prompt_submission(
+        self,
+        syntara_api: SyntaraApiRegistry,
+        workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+        responder_env: dict[str, Any],
+        form_execution_cleanup: Callable[[UUID], None],
+    ) -> None:
+        """A project user with execution:run cannot submit an allowlisted prompt by signaling it."""
+        exec_id, prompt_id = _start(
+            syntara_api,
+            workflow_factory,
+            responder_env,
+            form_execution_cleanup,
+            prefix="generic-signal-non-responder",
+            responder_users=[responder_env["user_a_name"]],
+        )
+
+        activities_response = responder_env["user_e_api"].executions.list_activities(execution_id=exec_id)
+        assert activities_response.status_code == HTTPStatus.OK, activities_response.content
+        activities = activities_response.assert_and_get().resources
+        form_activity = next(activity for activity in activities if activity.node_type.value == "form_prompt")
+
+        signal_response = responder_env["user_e_api"].executions.signal_activity(
+            execution_id=exec_id,
+            activity_id=form_activity.temporal_activity_id,
+            body=ActivitySignalPayload(
+                signal_data=ActivitySignalPayloadSignalData.from_dict(
+                    {
+                        "outcome": "submitted",
+                        "response_data": {"reason": "forged by project user"},
+                        "responded_by": responder_env["user_e_name"],
+                        "responded_at": "2026-01-01T00:00:00+00:00",
+                        "prompt_id": str(prompt_id),
+                    }
+                )
+            ),
+        )
+
+        assert_problem_response(
+            signal_response,
+            expected_status=HTTPStatus.CONFLICT,
+            expected_code="FORM_PROMPT_SUBMISSION_REQUIRED",
+        )
+        assert_prompt_not_consumed(syntara_api, exec_id, prompt_id)

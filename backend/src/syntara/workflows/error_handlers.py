@@ -23,6 +23,7 @@ if TYPE_CHECKING:
         ExecutionInTerminalStateError,
         ExecutionNotFoundError,
         ExecutionNotRetryableError,
+        FormPromptSubmissionRequiredError,
         PayloadTooLargeError,
         ScheduledTriggerNotFoundError,
         ScheduledTriggerSyncError,
@@ -156,6 +157,23 @@ def execution_not_retryable_handler(request: Request, exc: "ExecutionNotRetryabl
         title="Execution Not Retryable",
         detail=str(exc),
         code="EXECUTION_NOT_RETRYABLE",
+        retryable=False,
+        instance=str(request.url),
+    )
+
+
+def form_prompt_submission_required_handler(
+    request: Request,
+    exc: "FormPromptSubmissionRequiredError",
+) -> JSONResponse:
+    """Handle Form Prompt callback rejections without disclosing prompt state."""
+    logger.warning("Form Prompt activity signal rejected", exc_info=exc)
+    return create_problem_details_response(
+        status_code=status.HTTP_409_CONFLICT,
+        problem_type=PROBLEM_TYPES["resource_conflict"],
+        title="Signal Conflict",
+        detail="The signal conflicts with the current activity state",
+        code="FORM_PROMPT_SUBMISSION_REQUIRED",
         retryable=False,
         instance=str(request.url),
     )

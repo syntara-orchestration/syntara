@@ -1729,6 +1729,9 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
     def _make_service(self) -> tuple[ExecutionService, AsyncMock]:
         """Create an ExecutionService with mocked temporal_service."""
         mock_session = AsyncMock(spec=AsyncSession)
+        query_result = Mock()
+        query_result.all.return_value = []
+        mock_session.exec.return_value = query_result
         mock_user = Mock(spec=User)
         mock_user.id = uuid4()
         mock_temporal = AsyncMock()
@@ -1784,6 +1787,57 @@ class TestHandleActivityCallback(TestExecutionServiceBase):
 
         mock_temporal.complete_async_activity.assert_called_once()
         mock_temporal.fail_async_activity.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_form_prompt_completes_from_verified_database_payload(self) -> None:
+        from syntara.forms.services.form_prompt_signal import VerifiedFormPromptSignal
+
+        service, mock_temporal = self._make_service()
+        service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
+        verified_payload = {
+            "outcome": "submitted",
+            "response_data": {"reason": "persisted"},
+            "responded_by": "responder",
+            "responded_at": "2026-11-06T12:00:00+00:00",
+            "prompt_id": str(uuid4()),
+        }
+
+        with patch(
+            "syntara.forms.services.form_prompt_signal.resolve_verified_form_prompt_signal",
+            new_callable=AsyncMock,
+            return_value=VerifiedFormPromptSignal(payload=verified_payload),
+        ):
+            await service.handle_activity_callback(
+                uuid4(),
+                "form-activity",
+                {"outcome": "submitted", "response_data": {"reason": "forged"}},
+            )
+
+        mock_temporal.complete_async_activity.assert_awaited_once()
+        assert mock_temporal.complete_async_activity.await_args.kwargs["result"] == {"output": verified_payload}
+        mock_temporal.fail_async_activity.assert_not_awaited()
+
+    @pytest.mark.parametrize("signal_status", ["failed", "cancelled"])
+    @pytest.mark.asyncio
+    async def test_form_prompt_rejects_failure_and_cancellation_signals(self, signal_status: str) -> None:
+        from syntara.forms.services.form_prompt_signal import VerifiedFormPromptSignal
+        from syntara.workflows.exceptions import FormPromptSubmissionRequiredError
+
+        service, mock_temporal = self._make_service()
+        service.get_execution = AsyncMock(return_value=self._mock_execution())  # type: ignore[method-assign]
+
+        with (
+            patch(
+                "syntara.forms.services.form_prompt_signal.resolve_verified_form_prompt_signal",
+                new_callable=AsyncMock,
+                return_value=VerifiedFormPromptSignal(payload={"outcome": "submitted"}),
+            ),
+            pytest.raises(FormPromptSubmissionRequiredError),
+        ):
+            await service.handle_activity_callback(uuid4(), "form-activity", {"status": signal_status})
+
+        mock_temporal.complete_async_activity.assert_not_awaited()
+        mock_temporal.fail_async_activity.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_fails_activity_on_failed_status(self) -> None:

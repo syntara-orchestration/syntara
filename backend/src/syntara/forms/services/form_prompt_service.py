@@ -54,6 +54,7 @@ from syntara.forms.models.api_models import (
 )
 from syntara.forms.models.form_prompt import FormPrompt, FormPromptListRead, FormPromptListResponse, FormPromptRead
 from syntara.forms.models.form_prompt_responders import FormPromptResponderGroup, FormPromptResponderUser
+from syntara.forms.services.form_prompt_signal import build_form_prompt_signal_payload
 from syntara.forms.validators.submission import validate_form_submission, validate_prompt_submission_state
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
@@ -701,13 +702,10 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
                 await client.send_form_signal(
                     execution_id=prompt.execution_id,
                     form_prompt_id=prompt.prompt_node_id,
-                    form_response={
-                        "outcome": "submitted",
-                        "response_data": cleaned_data,
-                        "responded_by": self.user.username,
-                        "responded_at": responded_at.isoformat(),
-                        "prompt_id": str(prompt_id),
-                    },
+                    form_response=build_form_prompt_signal_payload(
+                        prompt,
+                        responded_by_username=self.user.username,
+                    ),
                     temporal_activity_id=prompt.temporal_activity_id,
                 )
         except Exception as e:  # noqa: BLE001
