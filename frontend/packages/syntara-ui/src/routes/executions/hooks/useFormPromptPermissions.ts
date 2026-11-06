@@ -13,18 +13,32 @@ export function useFormPromptPermissions(projectId?: string | null) {
   const canReadProjectQuery = useCanI('read', 'form_prompt', projectId ? { resourceProject: projectId } : undefined)
   const { permissions, isLoading: isLoadingAllPermissions } = useAllPermissions()
 
-  const { canReadAnyProject, canSubmitAnyProject } = useMemo(() => {
-    const readEntries = permissions.filter((p) => p.effect === 'allow' && p.actions.includes('form_prompt:read'))
-    const submitEntries = permissions.filter((p) => p.effect === 'allow' && p.actions.includes('form_prompt:submit'))
-    return {
-      canReadAnyProject: readEntries.some(isSystemScope) || projectScopedNames(readEntries).size > 0,
-      canSubmitAnyProject: submitEntries.some(isSystemScope) || projectScopedNames(submitEntries).size > 0,
-    }
-  }, [permissions])
+  const { canReadAnyProject, canSubmitAnyProject, canReadSystemFromAllPerms, canSubmitSystemFromAllPerms } =
+    useMemo(() => {
+      const readEntries = permissions.filter((p) => p.effect === 'allow' && p.actions.includes('form_prompt:read'))
+      const submitEntries = permissions.filter((p) => p.effect === 'allow' && p.actions.includes('form_prompt:submit'))
+      const readSystem = readEntries.some(isSystemScope)
+      const submitSystem = submitEntries.some(isSystemScope)
+      return {
+        canReadAnyProject: readSystem || projectScopedNames(readEntries).size > 0,
+        canSubmitAnyProject: submitSystem || projectScopedNames(submitEntries).size > 0,
+        canReadSystemFromAllPerms: readSystem,
+        canSubmitSystemFromAllPerms: submitSystem,
+      }
+    }, [permissions])
+
+  const hasKnownProject = Boolean(projectId)
 
   return useMemo(() => {
-    const canSubmit = canSubmitGlobalQuery.allowed || canSubmitProjectQuery.allowed || canSubmitAnyProject
-    const canRead = canReadGlobalQuery.allowed || canReadProjectQuery.allowed || canReadAnyProject
+    // When we know which project the prompt belongs to, project-scoped grants from another
+    // project must not widen access; rely on project-scoped `can_i` + system-wide grants only.
+    const canSubmit = hasKnownProject
+      ? canSubmitGlobalQuery.allowed || canSubmitProjectQuery.allowed || canSubmitSystemFromAllPerms
+      : canSubmitGlobalQuery.allowed || canSubmitProjectQuery.allowed || canSubmitAnyProject
+
+    const canRead = hasKnownProject
+      ? canReadGlobalQuery.allowed || canReadProjectQuery.allowed || canReadSystemFromAllPerms
+      : canReadGlobalQuery.allowed || canReadProjectQuery.allowed || canReadAnyProject
 
     return {
       canRead,
@@ -59,6 +73,9 @@ export function useFormPromptPermissions(projectId?: string | null) {
     canSubmitProjectQuery.isError,
     canReadAnyProject,
     canSubmitAnyProject,
+    canReadSystemFromAllPerms,
+    canSubmitSystemFromAllPerms,
+    hasKnownProject,
     isLoadingAllPermissions,
   ])
 }
