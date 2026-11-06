@@ -148,9 +148,7 @@ class ActivitySyncMonitorMixin:
         """Sync cancelled step nodes, falling back to the completion payload on query failure."""
         cancelled_node_map = await self._sync_cancelled_step_nodes(metadata, handle)
         if cancelled_node_map is None:
-            await self._sync_cancelled_step_fallback(
-                metadata, self._extract_cancelled_activities_from_event(event)
-            )
+            await self._sync_cancelled_step_fallback(metadata, self._extract_cancelled_activities_from_event(event))
 
     async def _process_history_event(
         self,
