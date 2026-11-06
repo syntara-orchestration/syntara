@@ -277,7 +277,7 @@ describe('useExecutionData', () => {
           ],
         },
       },
-    } as unknown as Partial<Execution>)
+    })
 
     vi.mocked(executionsClient.useQuery).mockReturnValue({
       data: mockExecution,
