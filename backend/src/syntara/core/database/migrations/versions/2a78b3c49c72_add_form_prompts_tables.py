@@ -80,6 +80,12 @@ def upgrade() -> None:
     )
     op.create_index(op.f("ix_form_prompts_created_at"), "form_prompts", ["created_at"], unique=False)
     op.create_index(op.f("ix_form_prompts_execution_id"), "form_prompts", ["execution_id"], unique=False)
+    op.create_index(
+        "ix_form_prompts_execution_temporal_activity",
+        "form_prompts",
+        ["execution_id", "temporal_activity_id"],
+        unique=False,
+    )
     op.create_index(op.f("ix_form_prompts_id"), "form_prompts", ["id"], unique=False)
     op.create_index("ix_form_prompts_labels", "form_prompts", ["labels"], unique=False, postgresql_using="gin")
     op.create_index(op.f("ix_form_prompts_name"), "form_prompts", ["name"], unique=False)
@@ -118,6 +124,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_form_prompts_name"), table_name="form_prompts")
     op.drop_index("ix_form_prompts_labels", table_name="form_prompts", postgresql_using="gin")
     op.drop_index(op.f("ix_form_prompts_id"), table_name="form_prompts")
+    op.drop_index("ix_form_prompts_execution_temporal_activity", table_name="form_prompts")
     op.drop_index(op.f("ix_form_prompts_execution_id"), table_name="form_prompts")
     op.drop_index(op.f("ix_form_prompts_created_at"), table_name="form_prompts")
     op.drop_table("form_prompts")
