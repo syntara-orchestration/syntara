@@ -139,6 +139,7 @@ __all__ = (
     "ExecutionReadExecutionMetadataType0",
     "ExecutionReadInputData",
     "ExecutionReadLabels",
+    "ExecutionReadWorkflowDefinitionType0",
     "ExecutionStatus",
     "FileDetailResponse",
     "FilesMetadataResponse",
