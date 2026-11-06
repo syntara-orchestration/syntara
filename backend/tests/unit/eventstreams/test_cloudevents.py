@@ -208,14 +208,12 @@ def test_unsupported_versions_have_a_distinct_failure(version: bytes) -> None:
 @pytest.mark.parametrize(
     "content_type",
     [
-        b"application/cloudevents+json",
-        b"Application/CloudEvents+JSON; charset=UTF-8",
         b"application/cloudevents+avro",
         b"application/cloudevents-batch+json",
     ],
 )
 @pytest.mark.parametrize("binary_headers", [False, True])
-def test_structured_mode_is_rejected_before_json_or_binary_fallback(
+def test_unsupported_structured_formats_are_rejected_before_json_or_binary_fallback(
     content_type: bytes, *, binary_headers: bool
 ) -> None:
     headers = [*(_headers() if binary_headers else []), ("content-type", content_type)]

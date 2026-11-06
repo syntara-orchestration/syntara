@@ -16,6 +16,7 @@ from sqlmodel import SQLModel
 
 from syntara.core.constants import EventStreamLimits
 from syntara.eventstreams.adapters.kafka_cloudevents import decode_kafka_cloudevents
+from syntara.eventstreams.core.cloudevents import CloudEventAttributes
 from syntara.eventstreams.core.envelope import (
     OriginalEvent,
     OriginalEventHeader,
@@ -24,6 +25,7 @@ from syntara.eventstreams.core.envelope import (
     WorkflowEventEnvelope,
 )
 from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCode
+from syntara.eventstreams.core.structured_cloudevents import decode_structured_cloudevents
 from syntara.workflows.json_schema_validation import NO_REF_REGISTRY, validate_json_schema_definition
 
 _MEDIA_TYPE_ATOM = r"[!#$%&'*+\-.^_`|~0-9A-Za-z]+"
@@ -84,16 +86,25 @@ def _validate_content_type(headers: tuple[RawEventHeader, ...]) -> str | None:
         text = values[0].decode("ascii").strip(" \t")
     except UnicodeDecodeError:
         raise _ContentError(EventFailureCode.malformed_content_type) from None
-    match = _MEDIA_TYPE.fullmatch(text)
+    _validate_json_content_type(text, kafka_binding=True)
+    return text
+
+
+def _validate_json_content_type(text: str, *, kafka_binding: bool = False) -> None:
+    """Reuse media-type syntax/charset checks for transport and structured data."""
+    match = _MEDIA_TYPE.fullmatch(text.strip(" \t"))
     if match is None:
         raise _ContentError(EventFailureCode.malformed_content_type)
     media_type = f"{match['type']}/{match['subtype']}".lower()
-    if media_type.startswith("application/cloudevents"):
+    if (
+        kafka_binding
+        and media_type.startswith("application/cloudevents")
+        and media_type != "application/cloudevents+json"
+    ):
         raise _ContentError(EventFailureCode.unsupported_cloudevents_mode)
     if media_type != "application/json" and not match["subtype"].lower().endswith("+json"):
         raise _ContentError(EventFailureCode.unsupported_content_type)
     _validate_content_type_parameters(match["parameters"])
-    return text
 
 
 def _validate_content_type_parameters(parameters: str) -> None:
@@ -108,6 +119,28 @@ def _validate_content_type_parameters(parameters: str) -> None:
             value = re.sub(r"\\(.)", r"\1", value[1:-1])
         if name == "charset" and value.lower() not in {"utf-8", "utf8"}:
             raise _ContentError(EventFailureCode.unsupported_content_type)
+
+
+def _validate_structured_data_type(attributes: CloudEventAttributes) -> None:
+    if attributes.datacontenttype is None:
+        return
+    try:
+        _validate_json_content_type(attributes.datacontenttype)
+    except _ContentError as exc:
+        code = (
+            EventFailureCode.malformed_cloudevents
+            if exc.code == EventFailureCode.malformed_content_type
+            else EventFailureCode.unsupported_cloudevents_data
+        )
+        raise _ContentError(code) from None
+
+
+def _structured_payload(value: JsonValue) -> tuple[JsonValue, CloudEventAttributes]:
+    decoded = decode_structured_cloudevents(value)
+    if isinstance(decoded, EventDecodeFailure):
+        raise _ContentError(decoded.code)
+    _validate_structured_data_type(decoded[1])
+    return decoded
 
 
 def _base64(value: bytes | None) -> str | None:
@@ -256,7 +289,11 @@ class JsonEventDecoder:
         if minimum_encoded_bytes > self._max_envelope_bytes:
             return EventDecodeFailure(code=EventFailureCode.envelope_too_large)
         datacontenttype = _validate_content_type(event.headers)
-        cloudevents = decode_kafka_cloudevents(event.headers, datacontenttype=datacontenttype)
+        structured = (
+            datacontenttype is not None
+            and datacontenttype.split(";", 1)[0].strip(" \t").lower() == "application/cloudevents+json"
+        )
+        cloudevents = None if structured else decode_kafka_cloudevents(event.headers, datacontenttype=datacontenttype)
         if isinstance(cloudevents, EventDecodeFailure):
             raise _ContentError(cloudevents.code)
         # Confluent framing: a zero magic byte followed by a four-byte schema ID.
@@ -273,6 +310,8 @@ class JsonEventDecoder:
         )
         # Escaped lone surrogates are JSON-decodable but cannot be strict UTF-8.
         json.dumps(payload, ensure_ascii=False, allow_nan=False).encode("utf-8")
+        if structured:
+            payload, cloudevents = _structured_payload(payload)
         envelope = WorkflowEventEnvelope(
             payload=payload,
             cloudevents=cloudevents,
