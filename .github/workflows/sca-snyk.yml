@@ -51,8 +51,8 @@ jobs:
             echo "has_snyk_token=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
           filters: |
@@ -78,12 +78,12 @@ jobs:
     steps:
       # Checkout code to scan
       - name: Checkout code to scan
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: scan
 
       - name: Set up Python for scan
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v5
         with:
           python-version: '3.12'
 
@@ -115,7 +115,7 @@ jobs:
       - name: Checkout base branch
         # Only scan base branch for pull requests and merge queue (not for push/schedule)
         if: github.event.pull_request != null || github.event.merge_group != null
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.base.ref || github.event.merge_group.base_ref }}
           path: base
@@ -208,7 +208,7 @@ jobs:
             --json-file-output=snyk-python.json
 
       - name: Upload Snyk results to GitHub Security
-        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         if: always() && hashFiles('scan/backend/snyk-python.sarif') != ''
         # continue-on-error: GitHub Advanced Security (required for SARIF upload)
         # is only available for public repos or paid Enterprise plan.
@@ -220,7 +220,7 @@ jobs:
           category: snyk-sca-python
 
       - name: Upload Snyk JSON report as artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always() && (hashFiles('snyk-scan-backend.json') != '' || hashFiles('snyk-base-backend.json') != '' || hashFiles('scan/backend/snyk-python.json') != '')
         with:
           name: snyk-python-report
@@ -241,12 +241,12 @@ jobs:
     steps:
       # Checkout code to scan
       - name: Checkout code to scan
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: scan
 
       - name: Set up Node.js
-        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4
         with:
           node-version: '20'
 
@@ -272,7 +272,7 @@ jobs:
       - name: Checkout base branch
         # Only scan base branch for pull requests and merge queue (not for push/schedule)
         if: github.event.pull_request != null || github.event.merge_group != null
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.base.ref || github.event.merge_group.base_ref }}
           path: base
@@ -360,7 +360,7 @@ jobs:
             --json-file-output=snyk-npm.json
 
       - name: Upload Snyk results to GitHub Security
-        uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        uses: github/codeql-action/upload-sarif@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         if: always() && hashFiles('scan/frontend/snyk-npm.sarif') != ''
         # continue-on-error: GitHub Advanced Security (required for SARIF upload)
         # is only available for public repos or paid Enterprise plan.
@@ -372,7 +372,7 @@ jobs:
           category: snyk-sca-npm
 
       - name: Upload Snyk JSON report as artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always() && (hashFiles('snyk-scan-frontend.json') != '' || hashFiles('snyk-base-frontend.json') != '' || hashFiles('scan/frontend/snyk-npm.json') != '')
         with:
           name: snyk-npm-report
