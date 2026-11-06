@@ -65,8 +65,11 @@ export function AAPIntegrationSelector({
   })
 
   const integrations: (IntegrationRead & { id: string })[] = useMemo(
-    () => (integrationsData?.resources ?? []).filter((i): i is IntegrationRead & { id: string } => !!i.id),
-    [integrationsData?.resources]
+    () =>
+      (integrationsData?.resources ?? []).filter(
+        (i): i is IntegrationRead & { id: string } => !!i.id && (!!projectId || i.scope !== 'project')
+      ),
+    [integrationsData?.resources, projectId]
   )
 
   const staleFiredForRef = useRef<string | null>(null)
