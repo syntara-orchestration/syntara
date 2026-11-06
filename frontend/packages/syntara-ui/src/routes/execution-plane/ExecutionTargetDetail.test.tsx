@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useParams } from '@tanstack/react-router'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -14,11 +14,17 @@ import { expectPageTitle } from '../../test/pageTitle'
 import ExecutionTargetDetail from './ExecutionTargetDetail'
 
 const mockDeleteMutate = vi.fn()
+const mockPatchMutateAsync = vi.fn()
 
 vi.mock('../../client', () => ({
   executionPlaneClient: {
     useQuery: vi.fn(),
-    useMutation: vi.fn(() => ({ mutate: mockDeleteMutate, isPending: false })),
+    useMutation: vi.fn((method: string) => {
+      if (method === 'patch') {
+        return { mutateAsync: mockPatchMutateAsync, isPending: false }
+      }
+      return { mutate: mockDeleteMutate, isPending: false }
+    }),
   },
   authMiddleware: { onRequest: vi.fn(({ request }: { request: unknown }) => request) },
   interfaceTagMiddleware: { onRequest: vi.fn() },
@@ -126,7 +132,8 @@ describe('ExecutionTargetDetail', () => {
     )
     expect(screen.getByText('Execution namespace')).toBeInTheDocument()
     expect(screen.getByText('syntara-workers')).toBeInTheDocument()
-    expect(screen.getByText('Enabled')).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Toggle Prod OpenShift West' })).toBeChecked()
+    expect(screen.getAllByText('Enabled').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('Active')).toBeInTheDocument()
     expect(screen.getByText('workload=automation')).toBeInTheDocument()
     expect(screen.queryByText('region=us-west')).not.toBeInTheDocument()
@@ -168,7 +175,8 @@ describe('ExecutionTargetDetail', () => {
     render(<ExecutionTargetDetail />, { wrapper })
 
     expect(await screen.findByRole('heading', { level: 1, name: 'RHEL Edge Lab' })).toBeInTheDocument()
-    expect(screen.getByText('Disabled')).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Toggle RHEL Edge Lab' })).not.toBeChecked()
+    expect(screen.getAllByText('Disabled').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1)
   })
 
@@ -290,6 +298,84 @@ describe('ExecutionTargetDetail', () => {
     )
     await user.click(screen.getByRole('button', { name: 'Actions for Prod OpenShift West' }))
     expect(screen.getByRole('menuitem', { name: /Delete execution target/i })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  describe('State Toggle', () => {
+    it('renders an enabled switch in the toolbar', async () => {
+      render(<ExecutionTargetDetail />, { wrapper })
+
+      expect(await screen.findByRole('switch', { name: 'Toggle Prod OpenShift West' })).toBeChecked()
+    })
+
+    it('opens disable confirmation when toggling an enabled target off', async () => {
+      const user = userEvent.setup()
+      render(<ExecutionTargetDetail />, { wrapper })
+
+      await user.click(await screen.findByRole('switch', { name: 'Toggle Prod OpenShift West' }))
+
+      expect(await screen.findByRole('heading', { name: /disable execution target/i })).toBeInTheDocument()
+      expect(mockPatchMutateAsync).not.toHaveBeenCalled()
+    })
+
+    it('calls patch mutation to enable without confirmation', async () => {
+      mockPatchMutateAsync.mockResolvedValue({})
+      const refetch = vi.fn().mockResolvedValue(undefined)
+      mockFacadeQuery({
+        data: { ...mockTarget, enabled: false },
+        refetch,
+      })
+      const user = userEvent.setup()
+      render(<ExecutionTargetDetail />, { wrapper })
+
+      await user.click(await screen.findByRole('switch', { name: 'Toggle Prod OpenShift West' }))
+
+      await waitFor(() => {
+        expect(mockPatchMutateAsync).toHaveBeenCalledWith({
+          params: { path: { target_id: 'et-001' } },
+          body: { enabled: true },
+        })
+      })
+      await waitFor(() => {
+        expect(refetch).toHaveBeenCalled()
+      })
+      expect(screen.queryByRole('heading', { name: /disable execution target/i })).not.toBeInTheDocument()
+    })
+
+    it('calls patch with enabled: false after confirming disable', async () => {
+      mockPatchMutateAsync.mockResolvedValue({})
+      const refetch = vi.fn().mockResolvedValue(undefined)
+      mockFacadeQuery({ refetch })
+      const user = userEvent.setup()
+      render(<ExecutionTargetDetail />, { wrapper })
+
+      await user.click(await screen.findByRole('switch', { name: 'Toggle Prod OpenShift West' }))
+      expect(await screen.findByRole('heading', { name: /disable execution target/i })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Disable' }))
+
+      await waitFor(() => {
+        expect(mockPatchMutateAsync).toHaveBeenCalledWith({
+          params: { path: { target_id: 'et-001' } },
+          body: { enabled: false },
+        })
+      })
+      await waitFor(() => {
+        expect(refetch).toHaveBeenCalled()
+      })
+    })
+
+    it('aria-disables the toolbar switch when canUpdate is false', async () => {
+      vi.mocked(useCanI).mockImplementation((action) => ({
+        allowed: action === 'create' || action === 'delete',
+        isChecking: false,
+        isError: false,
+      }))
+      render(<ExecutionTargetDetail />, { wrapper })
+
+      const toggle = await screen.findByRole('switch', { name: 'Toggle Prod OpenShift West' })
+      // Keep focusable (no native disabled) so the permission tooltip still receives hover/focus.
+      expect(toggle).not.toBeDisabled()
+      expect(toggle).toHaveAttribute('aria-disabled', 'true')
+    })
   })
 
   it('has no accessibility violations on the details view', async () => {

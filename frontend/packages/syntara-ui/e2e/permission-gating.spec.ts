@@ -21,7 +21,11 @@
 import { loginAsUser } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
 import { clickMainNavEntry, expectDockedNavGroupChildLinks, mainNavGroup, mainNavigation } from './helpers/docked-nav'
-import { isExecutionPlaneListReachable } from './helpers/execution-plane'
+import {
+  createExecutionTargetViaApi,
+  deleteExecutionTargetViaApi,
+  isExecutionPlaneListReachable,
+} from './helpers/execution-plane'
 import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
@@ -1030,6 +1034,36 @@ test.describe('Permission gating — Execution target actions', () => {
       'aria-disabled',
       'true'
     )
+  })
+
+  test('auditor: enable/disable toggle is aria-disabled with tooltip', async ({ app, auditorApp }) => {
+    test.skip(
+      !(await isExecutionPlaneListReachable(app)),
+      'Execution Plane API is not available in this environment (compose CI does not start execution-plane-api)'
+    )
+
+    const name = buildUniqueName('e2e-et-perm-toggle')
+    const created = await createExecutionTargetViaApi(app, { name })
+
+    try {
+      await auditorApp.goto(toAppUrl('/execution-plane'))
+      await expect(auditorApp.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+
+      await auditorApp.getByPlaceholder('Filter by name').fill(name)
+      await auditorApp.getByRole('button', { name: 'Apply filter' }).click()
+
+      const row = auditorApp.getByRole('row', { name: new RegExp(name) })
+      await expect(row).toBeVisible({ timeout: 15_000 })
+
+      const toggle = row.getByRole('switch', { name: `Toggle ${name}` })
+      // Keep focusable (no native disabled) so the permission tooltip still receives hover/focus.
+      await expect(toggle).not.toBeDisabled()
+      await expect(toggle).toHaveAttribute('aria-disabled', 'true')
+      await toggle.hover()
+      await expect(auditorApp.getByRole('tooltip').filter({ hasText: 'execution_target:update' })).toBeVisible()
+    } finally {
+      await deleteExecutionTargetViaApi(app, created.id)
+    }
   })
 
   test('viewer: direct URL to Execution Plane list shows access denied', async ({ viewerApp }) => {
