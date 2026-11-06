@@ -89,7 +89,7 @@ describe('RetryFromFailureSidePanel', () => {
     ).toBeInTheDocument()
   })
 
-  it('defaults the retry scope to all eligible failure points', async () => {
+  it('defaults the retry scope to all affected branches', async () => {
     const user = userEvent.setup()
     vi.mocked(useRetryFromFailurePreview).mockReturnValue({
       preview: {
@@ -142,7 +142,7 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
   })
 
-  it('previews an exact selected subset and retries only the checked failure points', async () => {
+  it('previews an exact selected subset and retries only the checked branches', async () => {
     const user = userEvent.setup()
     const onRetryPreviewPointIdsChange = vi.fn()
     const allPoints = ['step-1', 'step-2']
@@ -176,7 +176,7 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByText('4 steps will be retried')).toBeInTheDocument()
     expect(screen.getByText('3 completed results retained')).toBeInTheDocument()
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Retry plan updated. 1 selected failure point. 4 steps to retry. Retry starts at First Step. 3 completed results retained.'
+      'Retry plan updated. 1 selected branch. 4 steps to retry. Retry starts at First Step. 3 completed results retained.'
     )
     const retryStartsAt = screen.getByTestId('retry-starts-at')
     expect(retryStartsAt).toHaveTextContent('First Step')
@@ -187,14 +187,14 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByText('5 steps will be retried')).toBeInTheDocument()
     expect(screen.getByText('2 completed results retained')).toBeInTheDocument()
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Retry plan updated. 2 selected failure points. 5 steps to retry. Retry starts at First Step, Second Step. 2 completed results retained.'
+      'Retry plan updated. 2 selected branches. 5 steps to retry. Retry starts at First Step, Second Step. 2 completed results retained.'
     )
 
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
     expect(mockHandleRetry).toHaveBeenCalledWith(['step-1', 'step-2'], {})
   })
 
-  it('requires a selected failure point before showing a subset plan', async () => {
+  it('requires a selected branch before showing a subset plan', async () => {
     const user = userEvent.setup()
     vi.mocked(useRetryFromFailurePreview).mockReturnValue({
       preview: {
@@ -211,7 +211,7 @@ describe('RetryFromFailureSidePanel', () => {
 
     await user.click(screen.getByRole('radio', { name: 'Choose branches' }))
 
-    expect(screen.getByRole('heading', { name: 'Info alert: Choose at least one failure point' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Info alert: Choose at least one branch' })).toBeInTheDocument()
     expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
   })
 
@@ -352,6 +352,7 @@ describe('RetryFromFailureSidePanel', () => {
     })
     const { container } = renderPanel()
 
+    expect(screen.getByRole('heading', { name: 'Warning alert: Output sanitized' })).toBeInTheDocument()
     expect(screen.getByTestId('retry-sanitized-output-alert')).toHaveTextContent(
       'Output from Second Step was sanitized and cannot be reused. The retry will begin at Second Step to regenerate the missing input for step-failed.'
     )
