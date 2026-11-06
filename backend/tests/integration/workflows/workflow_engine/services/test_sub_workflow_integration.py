@@ -446,8 +446,10 @@ class TestSubWorkflowLifecycle:
             "completed_activities",
             "completed_nodes",
             "failed_activities",
+            "cancelled_activities",
         }
         assert result["failed_activities"] == {}
+        assert result["cancelled_activities"] == {}
 
     async def test_sub_workflow_output_validates_against_m1_model(self, temporal_env: object) -> None:
         """Runtime output validates against the SubWorkflowOutput model."""
