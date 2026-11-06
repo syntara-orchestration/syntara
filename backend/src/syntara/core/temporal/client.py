@@ -182,7 +182,13 @@ async def get_shared_client() -> Client | None:
         async with asyncio.timeout(CONNECT_TIMEOUT_SECONDS):
             return await asyncio.shield(connect_task)
     except TimeoutError:
-        logger.warning("Temporal connect timed out")
+        settings = get_settings()
+        logger.warning(
+            "Temporal connect timed out",
+            timeout_seconds=CONNECT_TIMEOUT_SECONDS,
+            temporal_address=settings.temporal_address,
+            temporal_namespace=settings.temporal_namespace,
+        )
         return None
 
 
