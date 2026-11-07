@@ -233,7 +233,7 @@ make services-run
 
 **Run Temporal worker separately** (for development without containers):
 ```bash
-uv run python -m syntara.workflows.worker
+uv run python -m syntara.workflow_runtime.workers.worker
 # Or use: make worker-run
 ```
 

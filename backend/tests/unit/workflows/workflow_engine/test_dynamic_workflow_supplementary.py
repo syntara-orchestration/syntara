@@ -22,22 +22,22 @@ import pytest
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.constants import INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS
-from syntara.workflows.workflow_engine.dynamic_workflow import (
-    ALLOWED_TRIGGER_TYPES,
-    OrchestratorWorkflow,
-)
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.models import (
     ActivityName,
     DoWhileLoopState,
     ForEachLoopState,
     NodeSettingsNoRetry,
     NodeType,
 )
-from syntara.workflows.workflow_engine.node_settings_resolver import get_default_timeout
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.constants import INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import (
+    ALLOWED_TRIGGER_TYPES,
+    OrchestratorWorkflow,
+)
+from syntara.workflow_runtime.engines.temporal.node_settings_resolver import get_default_timeout
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 
@@ -45,7 +45,7 @@ from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 def _mock_temporal_workflow() -> Generator[MagicMock]:
     """Mock the Temporal workflow module to avoid 'Not in workflow event loop' errors."""
     mock_logger = MagicMock()
-    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+    with patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as mock_wf:
         mock_wf.logger = mock_logger
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
         mock_wf.execute_activity = AsyncMock(return_value={"output": {}})
@@ -95,11 +95,14 @@ def _build_diamond_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
-def _build_chain_graph() -> WorkflowGraph:
+def _build_chain_graph(node_a_outputs: dict[str, str] | None = None) -> WorkflowGraph:
     """Build: trigger -> A -> B -> C (three-node chain)."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+    backend.add_node(
+        "node_a",
+        {"id": "node_a", "type": "script", "parameters": {}, "outputs": node_a_outputs},
+    )
     backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
     backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
@@ -218,11 +221,11 @@ class TestExecuteExecutorNodeHeartbeatTimeout:
         node = ActivityNode("n1", node_type, {})
         with (
             patch(
-                "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+                "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
                 new=AsyncMock(return_value={"output": {}}),
             ) as mock_exec,
             patch(
-                "syntara.workflows.workflow_engine.dynamic_workflow.resolve_retry_policy",
+                "syntara.workflow_runtime.engines.temporal.dynamic_workflow.resolve_retry_policy",
                 return_value=None,
             ),
         ):
@@ -459,7 +462,7 @@ class TestUnselectedTriggerSkipping:
 
         wf = _make_workflow()
         with patch(
-            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
             new_callable=AsyncMock,
             return_value={"output": {"env": "prod"}},
         ):
@@ -1064,7 +1067,7 @@ class TestLoopMaxIterationsEnforcement:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.dynamic_workflow.safe_eval_with_namespace",
+                "syntara.workflow_runtime.engines.temporal.dynamic_workflow.safe_eval_with_namespace",
                 return_value=True,
             ),
             pytest.raises(ApplicationError) as exc_info,
@@ -1093,7 +1096,7 @@ class TestLoopMaxIterationsEnforcement:
         wf.loop_iteration_results["loop_1"] = {}
 
         with patch(
-            "syntara.workflows.workflow_engine.dynamic_workflow.safe_eval_with_namespace",
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.safe_eval_with_namespace",
             return_value=False,
         ):
             result = await wf._execute_loop_node("loop_1", node, node.parameters)
@@ -1288,6 +1291,26 @@ class TestExtractFailureOutput:
 
         assert isinstance(result, dict)
         assert "response_code" not in result
+
+    def test_invalid_mapping_does_not_break_workflow_failure_handling(self) -> None:
+        """Failure fallback must not evaluate an already-invalid output mapping."""
+        wf = _make_workflow()
+        graph = _build_chain_graph()
+        graph = _build_chain_graph({"value": "${result.stdout_json.value}"})
+
+        result = wf._extract_failure_output("node_a", None, graph)
+
+        assert result["stdout_json"] is None
+
+    def test_valid_mapping_is_preserved_in_workflow_failure_handling(self) -> None:
+        """Failure fallback must retain aliases used by downstream recovery steps."""
+        wf = _make_workflow()
+        graph = _build_chain_graph()
+        graph = _build_chain_graph({"value": "${result.stdout}"})
+
+        result = wf._extract_failure_output("node_a", None, graph)
+
+        assert result == {"value": None}
 
 
 class TestEvaluatePredecessor:

@@ -25,8 +25,8 @@ from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
+    from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
     from syntara.workflows.services.execution_service import ExecutionService
-    from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
 from syntara.agent_orchestrator.models import (
     Invocation,
@@ -588,7 +588,7 @@ class InvocationService(BaseService):
 
         Best-effort: Redis failures are logged but do not prevent cancellation.
         """
-        from syntara.workflows.workflow_engine.constants import AGENT_EXECUTION_TIMEOUT_SECONDS  # noqa: PLC0415
+        from syntara.workflow_runtime.engines.temporal.constants import AGENT_EXECUTION_TIMEOUT_SECONDS  # noqa: PLC0415
 
         cancel_key_ttl_seconds = AGENT_EXECUTION_TIMEOUT_SECONDS
         try:

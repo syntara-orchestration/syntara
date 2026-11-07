@@ -34,16 +34,16 @@ from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.config.base import get_settings
 from syntara.core.tls.temporal import build_temporal_tls_config
-from syntara.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
-from syntara.workflows.utils.schedule_parser import (
+from syntara.workflow_core.models import NodeType, ScheduledTriggerConfig
+from syntara.workflow_runtime.authentication import build_auth_header
+from syntara.workflow_runtime.schedules import (
     SCHEDULE_ID_PREFIX,
     build_schedule_execution_workflow_id,
     build_schedule_id,
     config_to_temporal_schedule,
 )
+from syntara.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
 from syntara.workflows.validators import collect_scheduled_trigger_config_findings
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
-from syntara.workflows.workflow_engine.workflow_auth import build_auth_header
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -380,7 +380,7 @@ class ScheduledTriggerService:
             workflow_definition: The full workflow definition dict.
             is_builtin: When True, routes to ``settings.background_task_queue``
                 instead of ``settings.task_queue`` — same branch
-                ``TemporalExecutionService`` uses for manually-triggered
+                ``WorkflowExecutionService`` uses for manually-triggered
                 builtin executions.
 
         Returns:

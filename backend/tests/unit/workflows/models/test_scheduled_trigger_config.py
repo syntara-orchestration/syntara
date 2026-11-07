@@ -13,7 +13,7 @@ Covers:
 import pytest
 from pydantic import ValidationError
 
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_core.models import (
     MissedSchedulePolicy,
     ScheduledTriggerConfig,
     ScheduleType,
@@ -94,7 +94,7 @@ class TestMissedSchedulePolicy:
         """Every policy string must round-trip through the StrEnum."""
         import importlib
 
-        import syntara.workflows.workflow_engine.models.workflow_definition as mod
+        import syntara.workflow_core.models as mod
 
         importlib.reload(mod)
         reloaded = mod.MissedSchedulePolicy(value)
@@ -202,6 +202,15 @@ class TestCronExpressionValidation:
                 cron="every day at 9am",
             )
 
+    @pytest.mark.parametrize("cron", ["\u0660 \u0669 * * *", "\uff10 \uff19 * * *"])
+    async def test_rejects_non_ascii_cron_digits(self, cron: str) -> None:
+        """Cron fields must use ASCII digits accepted by Temporal."""
+        with pytest.raises((ValidationError, ValueError)):
+            ScheduledTriggerConfig(
+                schedule_type=ScheduleType.CRON,
+                cron=cron,
+            )
+
     async def test_rejects_cron_with_special_chars(self) -> None:
         """Cron with special characters should be rejected."""
         with pytest.raises((ValidationError, ValueError)):
@@ -290,7 +299,7 @@ class TestTimezoneValidation:
 
     async def test_valid_timezones_is_nonempty(self) -> None:
         """Regression: available timezone set must never be empty (AAP-86297)."""
-        from syntara.workflows.workflow_engine.models.workflow_definition import (
+        from syntara.workflow_core.models import (
             _get_valid_timezones,
         )
 
@@ -304,7 +313,7 @@ class TestTimezoneValidation:
         """Runtime guard should raise if timezone data is missing (AAP-86297)."""
         from unittest.mock import patch
 
-        import syntara.workflows.workflow_engine.models.workflow_definition as wd
+        import syntara.workflow_core.models as wd
 
         original = wd._VALID_TIMEZONES
         try:

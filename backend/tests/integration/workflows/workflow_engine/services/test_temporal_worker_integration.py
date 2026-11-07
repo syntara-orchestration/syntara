@@ -18,13 +18,15 @@ from orchestrator_test_sdk.e2e import async_poll_for
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from syntara.workflows.worker import main
-from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
-from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
-from syntara.workflows.workflow_engine.services.temporal_worker import TemporalWorkerService
+from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
+from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
+    fetch_workflow_runtime_settings,
+)
+from syntara.workflow_runtime.engines.temporal.activities.script_activity import execute_script_activity
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflow_runtime.engines.temporal.services.temporal_worker import TemporalWorkerService
+from syntara.workflow_runtime.workers.worker import main
 
 
 class MockWorkerService(TemporalWorkerService):
@@ -392,8 +394,8 @@ class TestWorkerSignalHandling:
             shutdown_completed = True
 
         with (
-            patch("syntara.workflows.worker.start_worker", side_effect=mock_start_worker),
-            patch("syntara.workflows.worker_lifecycle.stop_worker", side_effect=mock_stop_worker),
+            patch("syntara.workflow_runtime.workers.worker.start_worker", side_effect=mock_start_worker),
+            patch("syntara.workflow_runtime.workers.worker_lifecycle.stop_worker", side_effect=mock_stop_worker),
         ):
             # Run main() in a background task
             main_task = asyncio.create_task(main())
