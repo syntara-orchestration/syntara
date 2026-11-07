@@ -124,7 +124,7 @@ export function ApprovalReadOnlyView({
 
         <StackItem isFilled className={styles.scrollContent}>
           <Title headingLevel="h3">Approval context</Title>
-          <SynCodeBlock jsonObject={approval} enableCopy />
+          <SynCodeBlock jsonObject={approval} language="json" enableCopy />
         </StackItem>
 
         {(approverUsernames.length > 0 || approverGroups.length > 0) && (

@@ -27,12 +27,12 @@ describe('InputJsonView', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders pretty-printed JSON from data prop', () => {
+  it('renders pretty-printed JSON from data prop', async () => {
     const data = { name: 'test', value: 42 }
     render(<InputJsonView data={data} />)
 
-    expect(screen.getByText(/"name": "test"/)).toBeInTheDocument()
-    expect(screen.getByText(/"value": 42/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent('"name": "test"'))
+    await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent('"value": 42'))
   })
 
   it('copies JSON to clipboard when copy button is clicked', async () => {
@@ -64,6 +64,7 @@ describe('InputJsonView', () => {
     const data = { name: 'test', value: 42 }
     const { container } = render(<InputJsonView data={data} />)
 
+    await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent('"name": "test"'))
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })

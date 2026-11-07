@@ -85,7 +85,7 @@ export function WorkflowSidepanel(props: WorkflowSidepanelProps) {
               <DescriptionListGroup>
                 <DescriptionListTerm>Workflow definition</DescriptionListTerm>
                 <DescriptionListDescription>
-                  <SynCodeBlock jsonObject={props.workflow.version.workflow_definition} noMaxHeight />
+                  <SynCodeBlock jsonObject={props.workflow.version.workflow_definition} language="json" noMaxHeight />
                 </DescriptionListDescription>
               </DescriptionListGroup>
             )}

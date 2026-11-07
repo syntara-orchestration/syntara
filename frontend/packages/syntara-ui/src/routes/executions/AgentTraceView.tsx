@@ -80,7 +80,7 @@ function StructuredStepBody({ data }: Readonly<{ data: Record<string, unknown> }
           JSON
         </Content>
         {/* PatternFly CodeBlock (via SynCodeBlock): read-only display + copy, aligned with schema JSON. */}
-        <SynCodeBlock enableCopy jsonObject={data} />
+        <SynCodeBlock enableCopy jsonObject={data} language="json" />
       </StackItem>
     </Stack>
   )
@@ -191,7 +191,7 @@ function ToolCallCard({ group }: Readonly<{ group: ToolCallGroup }>) {
           isExpanded={isExpanded}
           onToggle={(_e, expanded) => setIsExpanded(expanded)}
         >
-          <SynCodeBlock enableCopy copyContent={inputJson}>
+          <SynCodeBlock enableCopy copyContent={inputJson} language="json">
             {inputJson}
           </SynCodeBlock>
         </ExpandableSection>

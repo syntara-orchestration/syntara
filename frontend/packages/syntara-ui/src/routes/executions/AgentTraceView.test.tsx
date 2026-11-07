@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -96,7 +96,7 @@ describe('AgentTraceView', () => {
     expect(screen.getByText('Analysis complete. 3 hosts require critical patches.')).toBeInTheDocument()
   })
 
-  it('renders structured response-schema final answer as key/value fields', () => {
+  it('renders structured response-schema final answer as key/value fields', async () => {
     const trace = extractAgentTrace({
       agent_trace: {
         model: 'test-model',
@@ -130,7 +130,7 @@ describe('AgentTraceView', () => {
     expect(screen.getByRole('list')).toBeInTheDocument()
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
     expect(screen.getByText('JSON')).toBeInTheDocument()
-    expect(screen.getByText(/"incident_id": "INC-4520"/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent('"incident_id": "INC-4520"'))
     expect(screen.getByRole('button', { name: 'Copy to clipboard' })).toBeInTheDocument()
   })
 
@@ -186,6 +186,7 @@ describe('AgentTraceView', () => {
     })
 
     const { container } = render(<AgentTraceView agentTrace={trace} />)
+    await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent('"incident_id": "INC-4520"'))
     const results = await axe(container)
     expect(results).toHaveNoViolations()
   })
@@ -222,7 +223,7 @@ describe('AgentTraceView', () => {
     const toggleButton = screen.getByRole('button', { name: /show input/i })
     await user.click(toggleButton)
 
-    expect(screen.getByText(/"query": "index=prod level=ERROR"/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent('"query": "index=prod level=ERROR"'))
   })
 
   it('toggles tool input section open and closed', async () => {

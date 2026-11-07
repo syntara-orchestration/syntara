@@ -22,7 +22,7 @@ import {
   RhUiWarningFillIcon,
 } from '@patternfly/react-icons'
 import { ActivityTypeEnum } from '@syntara/contracts'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { SynLabel } from '../../components/labels/SynLabel'
@@ -33,7 +33,6 @@ import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
 import { capitalize } from '../../utils/capitalize'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
-import { highlightTextLines } from '../../utils/highlightText'
 import { ActivityStatusLabel } from '../builder/ExecutionStatus'
 import { InputSchemaView } from '../builder/panels/views/InputSchemaView'
 import { InputTableView } from '../builder/panels/views/InputTableView'
@@ -68,33 +67,46 @@ function NoDataState({ label }: Readonly<{ label: string }>) {
 type DataPaneProps = {
   title: string
   stepId: string
+  executionId: string
   data: Record<string, unknown> | null
   view: PanelView
   onViewChange: (view: PanelView) => void
   isErrorState?: boolean
 }
 
-function DataPane({ title, stepId, data, view, onViewChange, isErrorState = false }: Readonly<DataPaneProps>) {
+function DataPane({
+  title,
+  stepId,
+  executionId,
+  data,
+  view,
+  onViewChange,
+  isErrorState = false,
+}: Readonly<DataPaneProps>) {
   const [searchTerm, setSearchTerm] = useState('')
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-
   const jsonText = useMemo(() => (data ? JSON.stringify(data, null, 2) : ''), [data])
 
-  const highlightedJson = useMemo(() => {
-    if (!jsonText) return undefined
-    return highlightTextLines(jsonText, searchTerm)
-  }, [jsonText, searchTerm])
+  const scrollContainerRef = useCallback(
+    (container: HTMLDivElement | null) => {
+      if (!container) return
 
-  useEffect(() => {
-    if (searchTerm && scrollContainerRef.current) {
-      requestAnimationFrame(() => {
-        const firstMark = scrollContainerRef.current?.querySelector('mark')
+      const scrollToFirstMark = () => {
+        const firstMark = container.querySelector('mark:not([role="presentation"])')
         if (firstMark && typeof firstMark.scrollIntoView === 'function') {
           firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' })
         }
+      }
+      const observer = new MutationObserver(() => {
+        if (searchTerm) requestAnimationFrame(scrollToFirstMark)
       })
-    }
-  }, [searchTerm, view, highlightedJson])
+
+      observer.observe(container, { childList: true, characterData: true, subtree: true })
+      if (searchTerm) requestAnimationFrame(scrollToFirstMark)
+
+      return () => observer.disconnect()
+    },
+    [searchTerm]
+  )
 
   function renderContent() {
     if (!data) {
@@ -108,8 +120,16 @@ function DataPane({ title, stepId, data, view, onViewChange, isErrorState = fals
       case 'json':
         return (
           <div style={isErrorState ? { color: 'var(--pf-t--global--color--status--danger--default)' } : undefined}>
-            <SynCodeBlock enableCopy enableExpand expandTitle={`${title} JSON`} noMaxHeight copyContent={jsonText}>
-              {highlightedJson ?? jsonText}
+            <SynCodeBlock
+              enableCopy
+              enableExpand
+              expandTitle={`${title} JSON`}
+              noMaxHeight
+              language="json"
+              highlightKey={`${executionId}:${stepId}`}
+              searchTerm={searchTerm}
+            >
+              {jsonText}
             </SynCodeBlock>
           </div>
         )
@@ -303,6 +323,7 @@ function StepDetailsHeader({
 
 type StepContentAreaProps = Readonly<{
   stepId: string
+  executionId: string
   inputData: Record<string, unknown> | null
   outputData: Record<string, unknown> | null
   isLoading: boolean
@@ -315,6 +336,7 @@ type StepContentAreaProps = Readonly<{
 
 function StepContentArea({
   stepId,
+  executionId,
   inputData,
   outputData,
   isLoading,
@@ -345,12 +367,20 @@ function StepContentArea({
       className={styles.dataPaneContainer}
     >
       <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
-        <DataPane title="Parameters" stepId={stepId} data={inputData} view={inputView} onViewChange={setInputView} />
+        <DataPane
+          title="Parameters"
+          stepId={stepId}
+          executionId={executionId}
+          data={inputData}
+          view={inputView}
+          onViewChange={setInputView}
+        />
       </FlexItem>
       <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
         <DataPane
           title="Output"
           stepId={stepId}
+          executionId={executionId}
           data={outputData}
           view={outputView}
           onViewChange={setOutputView}
@@ -424,6 +454,7 @@ export function StepExecutionDetailsPanel({
       <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
         <StepContentArea
           stepId={stepId}
+          executionId={executionId}
           inputData={inputData}
           outputData={outputData}
           isLoading={isLoading}

@@ -8,3 +8,28 @@
   word-break: break-word;
   overflow-wrap: break-word;
 }
+
+.syntaxToken {
+  background-color: transparent;
+  color: var(--shiki-light, inherit);
+  font-style: var(--shiki-light-font-style, normal);
+  font-weight: var(--shiki-light-font-weight, normal);
+  text-decoration: var(--shiki-light-text-decoration, none);
+}
+
+:global(html.pf-v6-theme-dark) .syntaxToken {
+  color: var(--shiki-dark, inherit);
+  font-style: var(--shiki-dark-font-style, normal);
+  font-weight: var(--shiki-dark-font-weight, normal);
+  text-decoration: var(--shiki-dark-text-decoration, none);
+}
+
+.searchMark {
+  background-color: var(--pf-t--global--color--nonstatus--orange--default);
+  color: var(--pf-t--global--text--color--nonstatus--on-orange--default);
+  padding: 0;
+}
+
+:global(html.pf-v6-theme-dark) .searchMark {
+  color: var(--pf-t--global--text--color--nonstatus--on-orange--default);
+}
