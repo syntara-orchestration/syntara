@@ -7,6 +7,7 @@ import json as _json
 from typing import TYPE_CHECKING, Any, NamedTuple
 from uuid import UUID
 
+import jsonschema
 import structlog
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool
@@ -22,7 +23,7 @@ from syntara.agent_orchestrator.audit.llm_interaction import (
     LLMInteractionStatus,
     LLMInteractionType,
 )
-from syntara.agent_orchestrator.exceptions import EmptyLLMResponseError
+from syntara.agent_orchestrator.exceptions import EmptyLLMResponseError, StructuredOutputValidationError
 from syntara.agent_orchestrator.models import GenericAgentResponse
 from syntara.agent_orchestrator.models.agent_state import AgentState
 from syntara.agent_orchestrator.utils.keyword_association import annotate_tools_with_relevance
@@ -287,6 +288,7 @@ class GenericAgent(BaseAgent):
 
         """
         ctx = self._extract_context(state)
+        structured_output_invalid = False
 
         try:
             # include_raw=True so we can read provider usage from the AIMessage
@@ -313,6 +315,29 @@ class GenericAgent(BaseAgent):
                 model=getattr(self.llm, "model_name", None),
             )
             parsed_output, raw_message = self._unpack_structured_response(structured_response)
+
+            if raw_message is not None and raw_message.tool_calls:
+                tool_call_output = self._tool_call_output_matching_schema(raw_message, response_schema)
+                if tool_call_output is not None:
+                    parsed_output = tool_call_output
+                elif not self._matches_response_schema(parsed_output, response_schema):
+                    AuditEventDispatcher.dispatch(
+                        LLMInteractionEvent(
+                            session_id=ctx.session_id,
+                            invocation_id=ctx.invocation_id,
+                            execution_id=ctx.execution_id,
+                            request_id=ctx.request_id,
+                            interaction_type=LLMInteractionType.STRUCTURED_OUTPUT,
+                            model_name=getattr(self.llm, "model_name", "unknown"),
+                            status=LLMInteractionStatus.ERROR,
+                            tools_available=0,
+                            response_schema_provided=True,
+                            error_type="StructuredOutputValidationError",
+                            activity_id=ctx.activity_id,
+                            activity_name=ctx.activity_name,
+                        )
+                    )
+                    structured_output_invalid = True
         except Exception as e:  # noqa: BLE001
             # Emit ERROR event before fallback
             AuditEventDispatcher.dispatch(
@@ -333,6 +358,9 @@ class GenericAgent(BaseAgent):
             )
             logger.warning("Structured output failed, falling back to standard execution", exc_info=True)
             return await self._execute_standard(state)
+
+        if structured_output_invalid:
+            raise StructuredOutputValidationError(invocation_id=str(ctx.invocation_id))
 
         # include_raw=True returns parse failures as {parsed: None, raw: ...} instead of
         # raising — treat like the exception path: count billed tokens, then degrade to
@@ -505,6 +533,25 @@ class GenericAgent(BaseAgent):
             raw = response.get("raw")
             return response.get("parsed"), raw if isinstance(raw, AIMessage) else None
         return response, None
+
+    @staticmethod
+    def _matches_response_schema(output: object, response_schema: dict[str, Any]) -> bool:
+        """Check whether structured output satisfies the configured schema."""
+        validator = jsonschema.Draft7Validator(response_schema)
+        return not any(True for _ in validator.iter_errors(output))
+
+    @staticmethod
+    def _tool_call_output_matching_schema(raw_message: AIMessage, response_schema: dict[str, Any]) -> object | None:
+        """Return the sole tool-call arguments when they match the response schema."""
+        tool_calls = raw_message.tool_calls or []
+        if len(tool_calls) != 1:
+            return None
+
+        candidate = tool_calls[0].get("args")
+        if candidate is None:
+            return None
+
+        return candidate if GenericAgent._matches_response_schema(candidate, response_schema) else None
 
     @staticmethod
     def _build_token_usage_entry(result_message: AIMessage) -> dict[str, Any] | None:
