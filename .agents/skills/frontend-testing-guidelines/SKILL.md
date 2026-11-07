@@ -16,6 +16,12 @@ Write tests that verify **what** your code does, not **how** it does it. Tests s
 
 ---
 
+## Test Integrity: No Tautological Tests
+
+Tests must exercise production behavior and compare results with independent expected values, such as literals, fixtures, or requirements. Do not derive expectations from the code under test, copy its logic, or use runtime tests to validate types. Remove tests that could pass when the behavior regresses.
+
+---
+
 ## Coverage Requirements
 
 **CI (blocks merge):** merged Vitest coverage must meet **85% statements**. That is
@@ -637,14 +643,14 @@ Example: a test spies on `document.querySelector` to check a dialog opens. A ref
 
 ## Browser Tab Title Tests
 
-Use `expectPageTitle` from `src/test/pageTitle.ts` — takes the same segments array as `toPageTitle`:
+Use `expectPageTitle` from `src/test/pageTitle.ts` with the complete expected title:
 
 ```typescript
 import { expectPageTitle } from '../../test/pageTitle'
 
 it('sets the browser tab title', () => {
   render(<Workflows />, { wrapper })
-  expectPageTitle(['Workflows'])
+  expectPageTitle('Workflows | Syntara')
 })
 ```
 
@@ -653,9 +659,11 @@ At least one unit test per page component should call `expectPageTitle`. For pag
 ```typescript
 it('shows a fallback title while loading', () => {
   render(<BuilderEdit />) // isLoading = true in mock
-  expectPageTitle(['Loading workflow', 'Workflows'])
+  expectPageTitle('Loading workflow | Workflows | Syntara')
 })
 ```
+
+Use the full expected title; do not call the production `toPageTitle` helper to build it.
 
 **E2E:** Existing feature specs assert page titles when they navigate to a page. Add `expect(app).toHaveTitle(...)` to the relevant feature spec when adding a page or route.
 
