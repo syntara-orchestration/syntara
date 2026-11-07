@@ -57,7 +57,7 @@ flowchart TD
 
 ---
 
-## Quick Start — Copy This Prompt
+## Quick Start: Copy This Prompt
 
 Paste this into your AI agent and replace the placeholders:
 

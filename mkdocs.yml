@@ -169,6 +169,7 @@ nav:
       - 'Data Flow: From OpenAPI to Canvas Steps': frontend/data-flow.md
       - Execution Visualizer - Protocol & Data Spec: frontend/execution-visualizer-protocol.md
       - Features:
+          - Feature Flags: frontend/features/feature-flags.md
           - Approval Node — Builder Integration: frontend/features/approval-builder-integration.md
           - Approval UI Architecture: frontend/features/approval-ui-architecture.md
           - Approval-Execution Integration: frontend/features/approval-execution-integration.md
