@@ -2,12 +2,10 @@ import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patte
 import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useCallback } from 'react'
 
-import { useSynForm } from '../../../../hooks/useSynForm'
 import { detachPromise } from '../../../../utils/detachPromise'
 import type { Credential } from '../credentialConstants'
 
 import { CredentialFormModalFields } from './CredentialFormModalFields'
-import { credentialFormSchema } from './credentialFormSchema'
 import { useCredentialFormModal } from './useCredentialFormModal'
 
 const CREDENTIAL_FORM_ID = 'credential-form-modal'
@@ -40,28 +38,15 @@ export function CredentialFormModal({
   const isEditMode = Boolean(credentialToEdit)
   const title = isEditMode && credentialToEdit ? `Edit ${credentialToEdit.name}` : 'Create credential'
 
-  const form = useSynForm({
-    schema: credentialFormSchema,
-    defaultValues: {
-      name: '',
-      description: '',
-      project_id: '',
-      credential_type_id: '',
-      inputs: {},
-    },
-    onClose,
-  })
-  const { handleClose } = form
-
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} variant="medium">
+    <Modal isOpen={isOpen} onClose={onClose} variant="medium">
       <ModalHeader title={title} />
       {isOpen && (
         <CredentialFormModalContent
-          form={form}
           isOpen={isOpen}
           credentialToEdit={credentialToEdit}
           isEditMode={isEditMode}
+          onClose={onClose}
           preSelectedTypeId={preSelectedTypeId}
           onCreated={onCreated}
           defaultProjectId={defaultProjectId}
@@ -74,10 +59,10 @@ export function CredentialFormModal({
 }
 
 type CredentialFormModalContentProps = {
-  form: ReturnType<typeof useSynForm<import('./credentialFormSchema').CredentialFormData>>
   isOpen: boolean
   credentialToEdit?: Credential | null
   isEditMode: boolean
+  onClose: () => void
   preSelectedTypeId?: string
   onCreated?: (credentialId: string) => void
   defaultProjectId?: string
@@ -86,10 +71,10 @@ type CredentialFormModalContentProps = {
 }
 
 function CredentialFormModalContent({
-  form,
   isOpen,
   credentialToEdit,
   isEditMode,
+  onClose,
   preSelectedTypeId,
   onCreated,
   defaultProjectId,
@@ -97,10 +82,10 @@ function CredentialFormModalContent({
   onSuccess,
 }: Readonly<CredentialFormModalContentProps>) {
   const modalState = useCredentialFormModal({
-    form,
     isOpen,
     credentialToEdit,
     isEditMode,
+    onClose,
     preSelectedTypeId,
     defaultProjectId,
     compatibleTypeNames,
@@ -108,7 +93,7 @@ function CredentialFormModalContent({
     onSuccess,
   })
 
-  const { handleSubmit, handleClose, onSubmit, isSubmitting } = modalState
+  const { form, handleSubmit, handleClose, onSubmit, isSubmitting } = modalState
 
   // Explicit click submit (not form= association) so create works inside the builder
   // action-node-form without the outer form swallowing the footer submit.

@@ -199,22 +199,26 @@ export function ExpressionBuilderCore(props: ExpressionBuilderCoreProps) {
     prevValueRef.current = value
   }, [value])
 
-  // Emit changes to parent — value, expression tree, and mode
-  const prevModeRef = useRef(state.mode)
-  useEffect(() => {
-    const newValue = state.mode === 'visual' ? serializeExpression(state.expression) : state.rawValue
-    const modeChanged = state.mode !== prevModeRef.current
-    prevModeRef.current = state.mode
+  // Report edits at the user event that produced them. External value changes are
+  // handled by the synchronization effect above and should not be echoed back.
+  const dispatchUserAction = useCallback(
+    (action: BuilderAction) => {
+      const nextState = builderReducer(state, action)
+      dispatch(action)
 
-    if (newValue !== value && newValue !== lastEmittedRef.current) {
-      lastEmittedRef.current = newValue
-      const tree = state.mode === 'visual' ? state.expression : { root: null }
-      onChange(newValue, tree, state.mode)
-    } else if (modeChanged) {
-      const tree = state.mode === 'visual' ? state.expression : { root: null }
-      onChange(value, tree, state.mode)
-    }
-  }, [state.expression, state.rawValue, state.mode, onChange, value])
+      const newValue = nextState.mode === 'visual' ? serializeExpression(nextState.expression) : nextState.rawValue
+      const modeChanged = nextState.mode !== state.mode
+      const tree = nextState.mode === 'visual' ? nextState.expression : { root: null }
+
+      if (newValue !== value && newValue !== lastEmittedRef.current) {
+        lastEmittedRef.current = newValue
+        onChange(newValue, tree, nextState.mode)
+      } else if (modeChanged) {
+        onChange(value, tree, nextState.mode)
+      }
+    },
+    [dispatch, onChange, state, value]
+  )
 
   const [isModeOpen, setIsModeOpen] = useState(false)
 
@@ -222,11 +226,11 @@ export function ExpressionBuilderCore(props: ExpressionBuilderCoreProps) {
     (_event: React.MouseEvent | undefined, value: string | number | undefined) => {
       const selected = String(value)
       if ((selected === 'visual' && state.mode === 'raw') || (selected === 'raw' && state.mode === 'visual')) {
-        dispatch({ type: 'TOGGLE_MODE' })
+        dispatchUserAction({ type: 'TOGGLE_MODE' })
       }
       setIsModeOpen(false)
     },
-    [state.mode]
+    [dispatchUserAction, state.mode]
   )
 
   const modeToggleRef = useCallback(
@@ -245,7 +249,7 @@ export function ExpressionBuilderCore(props: ExpressionBuilderCoreProps) {
   )
 
   const handleRawChange = (rawValue: string) => {
-    dispatch({ type: 'SET_RAW_VALUE', payload: rawValue })
+    dispatchUserAction({ type: 'SET_RAW_VALUE', payload: rawValue })
   }
 
   const rootNode = prepareRootNode(state.expression)
@@ -285,7 +289,7 @@ export function ExpressionBuilderCore(props: ExpressionBuilderCoreProps) {
           {state.mode === 'visual' ? (
             <VisualExpressionEditor
               group={rootNode}
-              onUpdateRoot={(root) => dispatch({ type: 'UPDATE_ROOT', payload: root })}
+              onUpdateRoot={(root) => dispatchUserAction({ type: 'UPDATE_ROOT', payload: root })}
               error={error}
             />
           ) : (

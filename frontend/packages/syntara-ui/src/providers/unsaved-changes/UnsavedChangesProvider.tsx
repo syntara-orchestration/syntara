@@ -1,6 +1,6 @@
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
 import { useBlocker, useNavigate, useRouterState } from '@tanstack/react-router'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { useBlurOnOpen } from '../../hooks/useBlurOnOpen'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
@@ -13,62 +13,41 @@ type UnsavedChangesProviderProps = {
   children: ReactNode
 }
 
-function TanStackNavigationBlocker({
-  onBlock,
-  dirtyChecksRef,
-}: {
-  onBlock: (proceed: () => void, reset: () => void) => void
-  dirtyChecksRef: React.RefObject<Map<number, DirtyCheckOptions>>
-}) {
-  const blocker = useBlocker({
-    shouldBlockFn: ({ current, next }) => {
-      const builderDirty =
-        useWorkflowStore.getState().isDirty &&
-        current.pathname.startsWith('/workflow-builder') &&
-        !next.pathname.startsWith('/workflow-builder')
-      const genericDirty = Array.from(dirtyChecksRef.current.values()).some((e) => e.check())
-      return builderDirty || genericDirty
-    },
-    enableBeforeUnload: () => {
-      const builderDirty =
-        useWorkflowStore.getState().isDirty && globalThis.location.pathname.startsWith('/workflow-builder')
-      const genericDirty = Array.from(dirtyChecksRef.current.values()).some((e) => e.check())
-      return builderDirty || genericDirty
-    },
-    withResolver: true,
-  })
-
-  useEffect(() => {
-    if (blocker.status === 'blocked' && blocker.proceed && blocker.reset) {
-      onBlock(blocker.proceed, blocker.reset)
-    }
-  }, [blocker.status, blocker.proceed, blocker.reset, onBlock])
-
-  return null
-}
-
 let dirtyCheckIdCounter = 0
 
 export function UnsavedChangesProvider({ children }: Readonly<UnsavedChangesProviderProps>) {
   const location = useRouterState({ select: (s) => s.location.pathname })
   const tsNavigate = useNavigate()
 
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  useBlurOnOpen(isModalOpen)
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveHandler, setSaveHandler] = useState<(() => Promise<boolean>) | null>(null)
 
-  const proceedNavRef = useRef<(() => void) | null>(null)
-  const resetNavRef = useRef<(() => void) | null>(null)
   const pendingTargetRef = useRef<string | null>(null)
 
   const dirtyChecksRef = useRef(new Map<number, DirtyCheckOptions>())
 
-  const handleTanStackBlock = useCallback((proceed: () => void, reset: () => void) => {
-    proceedNavRef.current = proceed
-    resetNavRef.current = reset
-    setIsModalOpen(true)
-  }, [])
+  const blocker = useBlocker({
+    shouldBlockFn: ({ current, next }) => {
+      const builderDirty =
+        useWorkflowStore.getState().isDirty &&
+        current.pathname.startsWith('/workflow-builder') &&
+        !next.pathname.startsWith('/workflow-builder')
+      const genericDirty = Array.from(dirtyChecksRef.current.values()).some((entry) => entry.check())
+      return builderDirty || genericDirty
+    },
+    enableBeforeUnload: () => {
+      const builderDirty =
+        useWorkflowStore.getState().isDirty && globalThis.location.pathname.startsWith('/workflow-builder')
+      const genericDirty = Array.from(dirtyChecksRef.current.values()).some((entry) => entry.check())
+      return builderDirty || genericDirty
+    },
+    withResolver: true,
+  })
+
+  const { status: blockerStatus, proceed: proceedBlocker, reset: resetBlocker } = blocker
+  const isModalOpen = isManualModalOpen || blockerStatus === 'blocked'
+  useBlurOnOpen(isModalOpen)
 
   const isBuilderDirty = useCallback(() => {
     const isOnBuilder = location.startsWith('/workflow-builder')
@@ -95,7 +74,7 @@ export function UnsavedChangesProvider({ children }: Readonly<UnsavedChangesProv
       }
 
       pendingTargetRef.current = targetPath
-      setIsModalOpen(true)
+      setIsManualModalOpen(true)
     },
     [hasUnsavedChanges, tsNavigate]
   )
@@ -117,27 +96,23 @@ export function UnsavedChangesProvider({ children }: Readonly<UnsavedChangesProv
   }, [])
 
   const proceedNavigation = useCallback(() => {
-    setIsModalOpen(false)
-    if (proceedNavRef.current) {
-      proceedNavRef.current()
-      proceedNavRef.current = null
-      resetNavRef.current = null
+    setIsManualModalOpen(false)
+    if (blockerStatus === 'blocked' && proceedBlocker) {
+      proceedBlocker()
     } else if (pendingTargetRef.current) {
       detachPromise(tsNavigate({ to: pendingTargetRef.current }))
       pendingTargetRef.current = null
     }
-  }, [tsNavigate])
+  }, [blockerStatus, proceedBlocker, tsNavigate])
 
   const cancelNavigation = useCallback(() => {
-    setIsModalOpen(false)
-    if (resetNavRef.current) {
-      resetNavRef.current()
-      proceedNavRef.current = null
-      resetNavRef.current = null
+    setIsManualModalOpen(false)
+    if (blockerStatus === 'blocked' && resetBlocker) {
+      resetBlocker()
     } else {
       pendingTargetRef.current = null
     }
-  }, [])
+  }, [blockerStatus, resetBlocker])
 
   const handleSave = useCallback(async () => {
     const activeDirtyCheck = getActiveDirtyCheck()
@@ -191,7 +166,6 @@ export function UnsavedChangesProvider({ children }: Readonly<UnsavedChangesProv
 
   return (
     <UnsavedChangesContext.Provider value={contextValue}>
-      <TanStackNavigationBlocker onBlock={handleTanStackBlock} dirtyChecksRef={dirtyChecksRef} />
       {children}
 
       <Modal
