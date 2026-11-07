@@ -12,6 +12,8 @@
     "format:check": "prettier --check .",
     "notify:dequeue-burst": "tsx src/dequeue-burst-alert.ts",
     "notify:queue-health": "tsx src/queue-health-poll.ts",
+    "notify:recovery-alert": "tsx src/send-recovery-alert.ts",
+    "notify:unhealthy-alert": "tsx src/send-unhealthy-alert.ts",
     "notify:visual-regression-pr": "tsx src/visual-regression-pr-notification.ts",
     "test": "vitest run",
     "test:watch": "vitest",
