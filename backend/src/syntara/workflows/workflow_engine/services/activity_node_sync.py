@@ -26,6 +26,7 @@ class ActivityNodeSyncMixin:
 
     session_factory: Any
     _publish_activity_patches: Any
+    _loop_body_activity_ids_by_version: dict[UUID, set[str]]
 
     async def _fetch_activity_definitions_map(self, workflow_version_id: UUID) -> dict[str, dict[str, Any]]:
         """Fetch activity definitions from V2 workflow version.
@@ -58,7 +59,44 @@ class ActivityNodeSyncMixin:
                     if "id" in node:
                         activity_definitions_map[node["id"]] = node
 
+                self._loop_body_activity_ids_by_version[workflow_version_id] = self._extract_loop_body_activity_ids(
+                    workflow_def
+                )
+
             return activity_definitions_map
+
+    @staticmethod
+    def _extract_loop_body_activity_ids(definition: dict[str, Any]) -> set[str]:
+        """Return node IDs reachable from loop iterate edges before feedback."""
+        loop_ids = {
+            node.get("id")
+            for node in [*definition.get("nodes", []), *definition.get("triggers", [])]
+            if node.get("type") == NodeType.LOOP and node.get("id")
+        }
+        edges = definition.get("edges", [])
+        body_ids: set[str] = set()
+
+        for loop_id in loop_ids:
+            queue = [
+                edge["to"]
+                for edge in edges
+                if edge.get("from") == loop_id and edge.get("from_port") == "iterate" and edge.get("to") != loop_id
+            ]
+            visited: set[str] = set()
+            while queue:
+                node_id = queue.pop(0)
+                if node_id in visited or node_id == loop_id:
+                    continue
+                visited.add(node_id)
+                body_ids.add(node_id)
+                next_edges = (
+                    [edge for edge in edges if edge.get("from") == node_id and edge.get("from_port") == "iterate"]
+                    if node_id in loop_ids
+                    else [edge for edge in edges if edge.get("from") == node_id]
+                )
+                queue.extend(edge["to"] for edge in next_edges if edge.get("to") != loop_id)
+
+        return body_ids
 
     async def _sync_skipped_nodes(
         self,

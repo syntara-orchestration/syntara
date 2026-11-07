@@ -34,7 +34,22 @@ class ActivitySyncEventProcessorMixin:
         else:
             base_activity_id = attrs.activity_id
             has_iter_suffix = False
-        is_loop_iteration = has_iter_suffix or base_activity_id in metadata.terminal_activity_ids
+        is_loop_iteration = (
+            has_iter_suffix
+            or base_activity_id in metadata.terminal_activity_ids
+            or base_activity_id in metadata.loop_body_activity_ids
+        )
+        # Most loop-body activities reuse the canvas ID, so only later
+        # schedules can be identified as iterations through terminal activity
+        # tracking. Assign the next logical iteration number before querying
+        # workflow I/O; otherwise every repeated schedule queries the current
+        # (latest) namespace.
+        if is_loop_iteration and iteration_number is None:
+            iteration_number = (
+                metadata.iteration_counters.get(base_activity_id, 0) + 1
+                if base_activity_id in metadata.terminal_activity_ids
+                else 0
+            )
         # Loop *control* nodes use `{loop_id}_iter_{n}` (or
         # `{loop_id}_iter_{outer}_iter_{inner}` when nested). Body nodes inside
         # a loop (e.g. approval) reuse that suffix for uniqueness; they must
