@@ -32,6 +32,7 @@ import { useWorkflowsPageToolbar } from './useWorkflowsPageToolbar'
 import { useWorkflowsQuery } from './useWorkflowsQuery'
 import { WorkflowDialogs } from './WorkflowDialogs'
 import { transformIsEnabledFilter, workflowFilterDefinitions } from './workflowFilterDefinitions'
+import { WorkflowNavigationWebMcpTools } from './WorkflowNavigationWebMcpTools'
 import type { WorkflowRowActionCallbacks } from './workflowRowActions'
 import { WorkflowsListView } from './WorkflowsListView'
 import { workflowDefaultSort, workflowTableColumns } from './workflowTableColumns'
@@ -141,6 +142,7 @@ export default function Workflows() {
     resourceProject: selectedProjectId ?? undefined,
     createOnly: true,
   })
+  const canCreateWorkflow = permissions.canCreate && !selectedProject?.is_builtin
   const { projectPermissions, projectEditDialog, projectDeleteDialog, projectActionCallbacks } =
     useWorkflowProjectControls(projects, selectedProjectId)
   // All-projects view hides built-in workflows in the UI. Filter them out in the
@@ -245,6 +247,7 @@ export default function Workflows() {
   const isInitialWorkflowsLoad = workflowsQuery.isLoading
   return (
     <>
+      <WorkflowNavigationWebMcpTools canCreate={canCreateWorkflow} />
       <SynPage>
         <SynPageTitle segments={['Workflows']} />
         <SynPageHeader
@@ -255,14 +258,14 @@ export default function Workflows() {
             !hasQueryError && showToolbar ? (
               <WorkflowsPageToolbar
                 headerProjectActions={headerProjectActions}
-                canCreate={permissions.canCreate && !selectedProject?.is_builtin}
+                canCreate={canCreateWorkflow}
                 createTooltip={
                   selectedProject?.is_builtin ? builtinProjectTooltip('create a workflow') : permissions.tooltips.create
                 }
                 showWorkflowActions={showWorkflowActions}
                 showImportWorkflow={showImportWorkflow}
                 onImportClick={() => setImportDialogOpen(true)}
-                onCreateClick={() => detachPromise(navigate({ to: '/workflow-builder/new' }))}
+                onCreateClick={() => setLocation('/workflow-builder/new')}
               />
             ) : undefined
           }
@@ -280,11 +283,7 @@ export default function Workflows() {
               filterFieldDefinitions={workflowFilterDefinitions}
               onFilterChange={handleFilterChange}
               onClearAllFilters={handleClearAllFilters}
-              onCreateWorkflow={
-                permissions.canCreate && !selectedProject?.is_builtin
-                  ? () => detachPromise(navigate({ to: '/workflow-builder/new' }))
-                  : undefined
-              }
+              onCreateWorkflow={canCreateWorkflow ? () => setLocation('/workflow-builder/new') : undefined}
               footer={getFooterProps(workflowsQuery.data)}
               getSortParams={getSortParams}
               isAllProjects={isAllProjects}

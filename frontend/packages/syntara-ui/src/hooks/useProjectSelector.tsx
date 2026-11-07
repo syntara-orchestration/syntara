@@ -112,6 +112,8 @@ type UseProjectSelectorResult = {
   stableProjectId: string | undefined
   isAllProjects: boolean
   projects: ProjectRead[]
+  /** Select a project through the same persisted state and validation callback as the dropdown. */
+  selectProject: (project: ProjectRead) => boolean
   ProjectSelector: ReactNode
   /** Refetch the projects list (e.g., after creating, editing, or deleting a project) */
   refetchProjects: () => Promise<unknown>
@@ -299,6 +301,20 @@ export function useProjectSelector(options?: UseProjectSelectorOptions): UseProj
     ]
   )
 
+  const selectProject = useCallback(
+    (project: ProjectRead): boolean => {
+      if (!project.id) return false
+      userExplicitlySelected = true
+      setSelectedProjectId(project.id, project.name)
+      setIsOpen(false)
+      if (debouncedFilter) updateFilter('')
+      else clearTypeaheadOnly()
+      onUserProjectSelect?.(project)
+      return true
+    },
+    [setSelectedProjectId, debouncedFilter, updateFilter, clearTypeaheadOnly, onUserProjectSelect]
+  )
+
   const favoriteProjectIdSet = useMemo(() => new Set(favoriteProjectIds), [favoriteProjectIds])
 
   const handleFavoriteAction = useCallback(
@@ -349,6 +365,7 @@ export function useProjectSelector(options?: UseProjectSelectorOptions): UseProj
     stableProjectId,
     isAllProjects,
     projects,
+    selectProject,
     ProjectSelector,
     refetchProjects: projectsQuery.refetch,
   }
