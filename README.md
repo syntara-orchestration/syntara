@@ -21,6 +21,10 @@ See [backend/README.md](backend/README.md) and [frontend/README.md](frontend/REA
 - **Node.js 22+** and npm (frontend)
 - **Podman** or Docker (container-based development)
 - **Make** (orchestration)
+- **libmagic** - System library for file type detection (backend)
+  - macOS: `brew install libmagic`
+  - Ubuntu/Debian: `apt-get install libmagic1`
+  - Fedora/RHEL: `dnf install file-libs`
 
 ## Quick Start
 
