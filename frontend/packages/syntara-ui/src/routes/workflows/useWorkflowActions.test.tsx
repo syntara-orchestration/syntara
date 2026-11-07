@@ -477,5 +477,32 @@ describe('useWorkflowActions', () => {
       expect(JSON.stringify(mockShowError.mock.calls)).not.toContain('raw backend boom')
       expect(mockOnNavigate).not.toHaveBeenCalled()
     })
+
+    it('shows the default friendly alert when POST succeeds but returns no execution id', async () => {
+      vi.mocked(executionsFetchClient.POST).mockResolvedValue({
+        data: {},
+        error: undefined,
+      })
+
+      const { result } = renderHook(
+        () =>
+          useWorkflowActions({
+            showSuccess: mockShowSuccess,
+            showError: mockShowError,
+            onNavigate: mockOnNavigate,
+            onRefetch: mockOnRefetch,
+          }),
+        { wrapper: createWrapper() }
+      )
+
+      await result.current.handleRunWorkflow(mockWorkflow({ name: 'My Workflow' }), {}, 'trigger-1')
+
+      expect(mockShowError).toHaveBeenCalledWith({
+        title: WORKFLOW_START_DEFAULT_TITLE,
+        description:
+          'Could not start workflow "My Workflow". Try again, or contact your administrator if this continues.',
+      })
+      expect(mockOnNavigate).not.toHaveBeenCalled()
+    })
   })
 })

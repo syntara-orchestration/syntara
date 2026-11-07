@@ -1,5 +1,6 @@
 import { getErrorCode, isServiceUnavailableError } from '../../utils/apiErrors'
 
+/** User-facing run toasts: sentence case. `ERROR_TITLES` in `apiErrors` uses Title Case for generic code labels. */
 export const WORKFLOW_START_NOT_PUBLISHED_TITLE = 'Workflow not published'
 export const WORKFLOW_START_NOT_PUBLISHED_DESCRIPTION = 'Publish this workflow before running it.'
 
