@@ -78,7 +78,24 @@ describe('useFormPromptPermissions', () => {
     expect(result.current.tooltips.submit).toContain('form_prompt:submit')
   })
 
-  it('grants submit when a named project has form_prompt:submit in all permissions', () => {
+  it('does not grant read from another project when the prompt project is known', () => {
+    mockUseCanI.mockImplementation(() => ({
+      allowed: false,
+      isChecking: false,
+      isError: false,
+    }))
+    mockUseAllPermissions.mockReturnValue({
+      permissions: [{ effect: 'allow', actions: ['form_prompt:read'], scope: 'project', project: 'project-a' }],
+      isLoading: false,
+      error: null,
+    })
+
+    const { result } = renderHook(() => useFormPromptPermissions('project-b'))
+
+    expect(result.current.canRead).toBe(false)
+  })
+
+  it('grants submit when a named project has form_prompt:submit in all permissions and no prompt project is known', () => {
     mockUseCanI.mockImplementation(() => ({
       allowed: false,
       isChecking: false,
@@ -91,6 +108,57 @@ describe('useFormPromptPermissions', () => {
     })
 
     const { result } = renderHook(() => useFormPromptPermissions())
+    expect(result.current.canSubmit).toBe(true)
+  })
+
+  it('does not grant submit from another project when the prompt project is known', () => {
+    mockUseCanI.mockImplementation(() => ({
+      allowed: false,
+      isChecking: false,
+      isError: false,
+    }))
+    mockUseAllPermissions.mockReturnValue({
+      permissions: [{ effect: 'allow', actions: ['form_prompt:submit'], scope: 'project', project: 'project-a' }],
+      isLoading: false,
+      error: null,
+    })
+
+    const { result } = renderHook(() => useFormPromptPermissions('project-b'))
+
+    expect(result.current.canSubmit).toBe(false)
+  })
+
+  it('grants submit for a known project when all-permissions includes a system-scoped grant', () => {
+    mockUseCanI.mockImplementation(() => ({
+      allowed: false,
+      isChecking: false,
+      isError: false,
+    }))
+    mockUseAllPermissions.mockReturnValue({
+      permissions: [{ effect: 'allow', actions: ['form_prompt:submit'], scope: 'system', project: '' }],
+      isLoading: false,
+      error: null,
+    })
+
+    const { result } = renderHook(() => useFormPromptPermissions('project-b'))
+
+    expect(result.current.canSubmit).toBe(true)
+  })
+
+  it('grants submit for a known project when project-scoped can_i allows it', () => {
+    mockUseCanI.mockImplementation((action: string, _resourceType: string, opts?: { resourceProject?: string }) => ({
+      allowed: action === 'submit' && opts?.resourceProject === 'project-b',
+      isChecking: false,
+      isError: false,
+    }))
+    mockUseAllPermissions.mockReturnValue({
+      permissions: [],
+      isLoading: false,
+      error: null,
+    })
+
+    const { result } = renderHook(() => useFormPromptPermissions('project-b'))
+
     expect(result.current.canSubmit).toBe(true)
   })
 
