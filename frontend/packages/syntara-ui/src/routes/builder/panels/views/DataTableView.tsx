@@ -39,7 +39,7 @@ export function DataTableView({ data, ariaLabel, renderCell, renderHeader }: Rea
 
   return (
     <SynPanelContentStack>
-      <SynScrollableTableContainer caption={ariaLabel} useFixedLayout={false} variant="compact">
+      <SynScrollableTableContainer caption={ariaLabel} useFixedLayout={false}>
         <Thead>
           <Tr>
             {columns.map((col) => (
