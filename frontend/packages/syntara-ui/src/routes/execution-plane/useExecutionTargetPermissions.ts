@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 
-import { permissionTooltip } from '../../hooks/permissionUtils'
-import { useCanI } from '../../hooks/useCanI'
+import { permissionTooltip, useResourceCrudPermissions } from '../../hooks/permissionUtils'
 
 export type ExecutionTargetPermissions = {
   canCreate: boolean
@@ -11,6 +10,7 @@ export type ExecutionTargetPermissions = {
   tooltips: {
     create: string
     update: string
+    enable: string
     delete: string
   }
 }
@@ -23,22 +23,22 @@ export type ExecutionTargetPermissions = {
  */
 export function useExecutionTargetPermissions(): ExecutionTargetPermissions {
   const resourceType = 'execution_target' as const
-  const { allowed: canCreate, isChecking: isCheckingCreate } = useCanI('create', resourceType)
-  const { allowed: canUpdate, isChecking: isCheckingUpdate } = useCanI('update', resourceType)
-  const { allowed: canDelete, isChecking: isCheckingDelete } = useCanI('delete', resourceType)
+  const { canCreate, canUpdate, canDelete, isLoading } = useResourceCrudPermissions(resourceType)
+  const updatePermission = `${resourceType}:update`
 
   return useMemo(
     () => ({
       canCreate,
       canUpdate,
       canDelete,
-      isLoading: isCheckingCreate || isCheckingUpdate || isCheckingDelete,
+      isLoading,
       tooltips: {
         create: permissionTooltip('configure an execution target', `${resourceType}:create`),
-        update: permissionTooltip('edit this execution target', `${resourceType}:update`),
+        update: permissionTooltip('edit this execution target', updatePermission),
+        enable: permissionTooltip('enable or disable this execution target', updatePermission),
         delete: permissionTooltip('delete this execution target', `${resourceType}:delete`),
       },
     }),
-    [canCreate, canUpdate, canDelete, isCheckingCreate, isCheckingUpdate, isCheckingDelete]
+    [canCreate, canUpdate, canDelete, isLoading, updatePermission]
   )
 }

@@ -10,7 +10,7 @@ import { ExecutionTargetDialogs } from './ExecutionTargetDialogs'
 
 type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
 
-function createDeleteDialog(item: ExecutionTarget | null = null, isOpen = false): DialogState<ExecutionTarget> {
+function createDialog(item: ExecutionTarget | null = null, isOpen = false): DialogState<ExecutionTarget> {
   return {
     isOpen,
     item,
@@ -40,10 +40,27 @@ const target: ExecutionTarget = {
   last_ran_at: null,
 }
 
+function renderDialogs(
+  overrides: Partial<{
+    deleteDialog: DialogState<ExecutionTarget>
+    onDelete: () => void
+    disableDialog: DialogState<ExecutionTarget>
+    onDisable: () => void
+  }> = {}
+) {
+  const props = {
+    deleteDialog: createDialog(),
+    onDelete: vi.fn(),
+    disableDialog: createDialog(),
+    onDisable: vi.fn(),
+    ...overrides,
+  }
+  return { ...render(<ExecutionTargetDialogs {...props} />), props }
+}
+
 describe('ExecutionTargetDialogs', () => {
   it('renders the delete confirmation with the target name when open', () => {
-    const deleteDialog = createDeleteDialog(target, true)
-    render(<ExecutionTargetDialogs deleteDialog={deleteDialog} onDelete={vi.fn()} />)
+    renderDialogs({ deleteDialog: createDialog(target, true) })
 
     expect(screen.getByText('Delete execution target?')).toBeInTheDocument()
     const dialog = screen.getByRole('dialog')
@@ -52,8 +69,7 @@ describe('ExecutionTargetDialogs', () => {
   })
 
   it('has no accessibility violations with the delete confirmation dialog open', async () => {
-    const deleteDialog = createDeleteDialog(target, true)
-    const { container } = render(<ExecutionTargetDialogs deleteDialog={deleteDialog} onDelete={vi.fn()} />)
+    const { container } = renderDialogs({ deleteDialog: createDialog(target, true) })
 
     expect(await screen.findByText('Delete execution target?')).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
@@ -62,8 +78,7 @@ describe('ExecutionTargetDialogs', () => {
   it('calls onDelete after acknowledgement and confirm', async () => {
     const user = userEvent.setup()
     const onDelete = vi.fn()
-    const deleteDialog = createDeleteDialog(target, true)
-    render(<ExecutionTargetDialogs deleteDialog={deleteDialog} onDelete={onDelete} />)
+    renderDialogs({ deleteDialog: createDialog(target, true), onDelete })
 
     const dialog = screen.getByRole('dialog')
     await user.click(within(dialog).getByRole('checkbox', { name: /permanently deleted/i }))
@@ -74,10 +89,50 @@ describe('ExecutionTargetDialogs', () => {
 
   it('calls deleteDialog.close when Cancel is clicked', async () => {
     const user = userEvent.setup()
-    const deleteDialog = createDeleteDialog(target, true)
-    render(<ExecutionTargetDialogs deleteDialog={deleteDialog} onDelete={vi.fn()} />)
+    const deleteDialog = createDialog(target, true)
+    renderDialogs({ deleteDialog })
 
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }))
     expect(deleteDialog.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders the disable confirmation with the target name and impact bullets when open', () => {
+    renderDialogs({ disableDialog: createDialog(target, true) })
+
+    expect(screen.getByText('Disable execution target?')).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/Staging OpenShift/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/This will immediately:/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/continue to completion/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/require affinity to this target will fail/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/shift to other available capacity/i)).toBeInTheDocument()
+    expect(within(dialog).getByText(/re-enable this execution target at any time/i)).toBeInTheDocument()
+    expect(within(dialog).queryByText(/Resources that will be affected/i)).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  it('has no accessibility violations with the disable confirmation dialog open', async () => {
+    const { container } = renderDialogs({ disableDialog: createDialog(target, true) })
+
+    expect(await screen.findByText('Disable execution target?')).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('calls onDisable when Disable is confirmed', async () => {
+    const user = userEvent.setup()
+    const onDisable = vi.fn()
+    renderDialogs({ disableDialog: createDialog(target, true), onDisable })
+
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Disable' }))
+    expect(onDisable).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls disableDialog.close when Cancel is clicked on the disable dialog', async () => {
+    const user = userEvent.setup()
+    const disableDialog = createDialog(target, true)
+    renderDialogs({ disableDialog })
+
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }))
+    expect(disableDialog.close).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,15 +1,14 @@
-import { Button, Content, StackItem, Truncate } from '@patternfly/react-core'
+import { Button, Content, StackItem, Switch, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ThProps } from '@patternfly/react-table'
 import type { ExecutionPlaneAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { executionPlaneClient } from '../../client'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
-import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import {
@@ -36,6 +35,7 @@ import { ExecutionTargetStatusLabel } from './ExecutionTargetStatusLabel'
 import { getNodeSelectors } from './getNodeSelectors'
 import { NodeSelectorsCell } from './NodeSelectorsCell'
 import { useExecutionTargetActions } from './useExecutionTargetActions'
+import { useExecutionTargetEnabledToggle } from './useExecutionTargetEnabledToggle'
 import { useExecutionTargetPermissions } from './useExecutionTargetPermissions'
 
 type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
@@ -44,15 +44,22 @@ function ExecutionPlaneTableContent({
   rows,
   getSortParams,
   deleteDialog,
+  handleToggleEnabled,
+  isPatchPending,
   permissions,
   onEdit,
 }: Readonly<{
   rows: ExecutionTarget[]
   getSortParams: (columnField: string) => ThProps['sort']
   deleteDialog: { open: (item: ExecutionTarget) => void }
+  handleToggleEnabled: (target: ExecutionTarget) => void
+  isPatchPending: boolean
   permissions: ReturnType<typeof useExecutionTargetPermissions>
   onEdit: (target: ExecutionTarget) => void
 }>) {
+  const permissionBlocked = permissions.isLoading || !permissions.canUpdate
+  const toggleBlocked = permissionBlocked || isPatchPending
+
   return (
     <>
       <Thead>
@@ -91,9 +98,16 @@ function ExecutionPlaneTableContent({
               <NodeSelectorsCell selectors={getNodeSelectors(target.placement)} />
             </Td>
             <Td dataLabel="State">
-              <SynLabel variant="outline" status={target.enabled ? 'success' : 'custom'}>
-                {target.enabled ? 'Enabled' : 'Disabled'}
-              </SynLabel>
+              <DisabledWithTooltip isDisabled={permissionBlocked} content={permissions.tooltips.enable}>
+                <Switch
+                  id={`toggle-${target.id}`}
+                  label={target.enabled ? 'Enabled' : 'Disabled'}
+                  isChecked={target.enabled}
+                  onChange={toggleBlocked ? () => undefined : () => handleToggleEnabled(target)}
+                  aria-disabled={toggleBlocked || undefined}
+                  aria-label={`Toggle ${target.name}`}
+                />
+              </DisabledWithTooltip>
             </Td>
             <Td isActionCell>
               <SynKebabMenu
@@ -144,11 +158,19 @@ export default function ExecutionPlane() {
     }
   )
 
+  const onMutationSuccess = useCallback(() => query.refetch(), [query])
+
   const { deleteDialog, handleDelete } = useExecutionTargetActions({
-    onSuccess: () => detachPromise(query.refetch()),
+    onSuccess: () => detachPromise(onMutationSuccess()),
   })
 
   const results = query.data?.resources ?? []
+
+  const { targets, disableDialog, handleToggleEnabled, handleDisable, isPatchPending } =
+    useExecutionTargetEnabledToggle({
+      targets: results,
+      onSuccess: onMutationSuccess,
+    })
 
   useCursorReset({
     itemCount: results.length,
@@ -214,9 +236,11 @@ export default function ExecutionPlane() {
             body={
               <SynListPanelTable caption="Execution targets" footer={getFooterProps(query.data)} useFixedLayout={false}>
                 <ExecutionPlaneTableContent
-                  rows={results}
+                  rows={targets}
                   getSortParams={getSortParams}
                   deleteDialog={deleteDialog}
+                  handleToggleEnabled={handleToggleEnabled}
+                  isPatchPending={isPatchPending}
                   permissions={permissions}
                   onEdit={handleEdit}
                 />
@@ -226,7 +250,12 @@ export default function ExecutionPlane() {
         </SynListPanel>
       </SynPageBody>
 
-      <ExecutionTargetDialogs deleteDialog={deleteDialog} onDelete={handleDelete} />
+      <ExecutionTargetDialogs
+        deleteDialog={deleteDialog}
+        onDelete={handleDelete}
+        disableDialog={disableDialog}
+        onDisable={handleDisable}
+      />
     </SynPage>
   )
 }

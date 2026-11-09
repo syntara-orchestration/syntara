@@ -1,4 +1,6 @@
-import { appBaseUrl, type Page } from '../fixtures'
+import { type Response } from '@playwright/test'
+
+import { expect, appBaseUrl, type Page } from '../fixtures'
 import { getAuthToken } from '../utils/api'
 
 /**
@@ -82,4 +84,54 @@ export async function deleteExecutionTargetViaApi(app: Page, targetId: string): 
 
   const url = new URL(`/api/execution_plane/v1/execution_targets/${targetId}`, appBaseUrl).toString()
   await app.request.delete(url, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
+}
+
+/** PATCH enable/disable for setup between UI assertions. */
+export async function patchExecutionTargetEnabledViaApi(app: Page, targetId: string, enabled: boolean): Promise<void> {
+  const token = await getAuthToken(app)
+  if (!token) {
+    throw new Error('Missing auth token; cannot patch execution target via API')
+  }
+
+  const url = new URL(`/api/execution_plane/v1/execution_targets/${targetId}`, appBaseUrl).toString()
+  const response = await app.request.patch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { enabled },
+  })
+
+  if (!response.ok()) {
+    throw new Error(
+      `Failed to patch execution target enabled=${String(enabled)}: ${String(response.status())} ${await response.text()}`
+    )
+  }
+}
+
+/** The PATCH that the Enabled switch issues. */
+export function isExecutionTargetPatchResponse(response: Response): boolean {
+  return (
+    response.request().method() === 'PATCH' &&
+    /\/api\/execution_plane\/v1\/execution_targets\/[^/]+$/.test(new URL(response.url()).pathname)
+  )
+}
+
+/** Per-attempt budget for the enable/disable PATCH to come back. */
+export const EXECUTION_TARGET_PATCH_TIMEOUT = 20_000
+
+/**
+ * Confirm the disable dialog and wait for a successful PATCH.
+ * Armed before the confirm click so optimistic UI alone cannot race past the server write.
+ */
+export async function confirmDisableExecutionTarget(app: Page): Promise<void> {
+  const dialog = app.getByRole('dialog')
+  await expect(dialog.getByText('Disable execution target?')).toBeVisible()
+  await expect(dialog.getByText(/This will immediately:/i)).toBeVisible()
+
+  const patchDone = app.waitForResponse(isExecutionTargetPatchResponse, {
+    timeout: EXECUTION_TARGET_PATCH_TIMEOUT,
+  })
+  await dialog.getByRole('button', { name: 'Disable' }).click()
+
+  const response = await patchDone
+  expect(response.ok(), `PATCH execution target returned ${String(response.status())}`).toBe(true)
+  await expect(dialog).not.toBeVisible()
 }
