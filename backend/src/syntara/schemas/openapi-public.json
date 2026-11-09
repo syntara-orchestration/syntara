@@ -50557,309 +50557,50 @@
         }
       },
       "WorkflowReadWithVersion": {
-        "type": "object",
         "title": "WorkflowReadWithVersion",
         "description": "Schema for workflow response with current version details.\n\nUsed when retrieving a single workflow to include the active workflow definition.",
-        "required": [
-          "name",
-          "id",
-          "current_version",
-          "is_enabled",
-          "project_id",
-          "created_at",
-          "updated_at",
-          "version"
-        ],
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name",
-            "description": "Workflow name"
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/WorkflowRead"
           },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description",
-            "description": "Workflow description"
-          },
-          "labels": {
-            "additionalProperties": {
-              "type": "string"
-            },
+          {
             "type": "object",
-            "title": "Labels",
-            "description": "Workflow labels"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "current_version": {
-            "type": "integer",
-            "title": "Current Version"
-          },
-          "is_builtin": {
-            "type": "boolean",
-            "default": false,
-            "title": "Is Builtin"
-          },
-          "is_enabled": {
-            "type": "boolean",
-            "title": "Is Enabled"
-          },
-          "has_validation_issues": {
-            "type": "boolean",
-            "default": false,
-            "title": "Has Validation Issues"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserReference"
-              },
-              {
-                "type": "null"
-              }
+            "required": [
+              "version"
             ],
-            "description": "User who created the workflow",
-            "readOnly": true,
-            "title": "Created By"
-          },
-          "updated_by": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserReference"
-              },
-              {
-                "type": "null"
+            "properties": {
+              "version": {
+                "$ref": "#/components/schemas/WorkflowVersionRead",
+                "description": "Current active version details"
               }
-            ],
-            "description": "User who last modified the workflow",
-            "readOnly": true,
-            "title": "Updated By"
-          },
-          "project_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Project Id"
-          },
-          "published_version_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Published Version Id"
-          },
-          "published_version_number": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Published Version Number"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "validation_result": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ValidationResult"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator."
-          },
-          "version": {
-            "$ref": "#/components/schemas/WorkflowVersionRead",
-            "description": "Current active version details"
+            }
           }
-        }
+        ]
       },
       "WorkflowDetailRead": {
-        "type": "object",
         "title": "WorkflowDetailRead",
         "description": "Workflow detail response with metadata for its published version.",
-        "required": [
-          "name",
-          "id",
-          "current_version",
-          "is_enabled",
-          "project_id",
-          "created_at",
-          "updated_at",
-          "version"
-        ],
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name",
-            "description": "Workflow name"
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/WorkflowReadWithVersion"
           },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description",
-            "description": "Workflow description"
-          },
-          "labels": {
-            "additionalProperties": {
-              "type": "string"
-            },
+          {
             "type": "object",
-            "title": "Labels",
-            "description": "Workflow labels"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "current_version": {
-            "type": "integer",
-            "title": "Current Version"
-          },
-          "is_builtin": {
-            "type": "boolean",
-            "default": false,
-            "title": "Is Builtin"
-          },
-          "is_enabled": {
-            "type": "boolean",
-            "title": "Is Enabled"
-          },
-          "has_validation_issues": {
-            "type": "boolean",
-            "default": false,
-            "title": "Has Validation Issues"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserReference"
-              },
-              {
-                "type": "null"
+            "properties": {
+              "published_step_metadata": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PublishedWorkflowStepMetadataRead"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Step IDs, types, and output schemas from the exact published version, when one exists."
               }
-            ],
-            "description": "User who created the workflow",
-            "readOnly": true,
-            "title": "Created By"
-          },
-          "updated_by": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserReference"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "User who last modified the workflow",
-            "readOnly": true,
-            "title": "Updated By"
-          },
-          "project_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Project Id"
-          },
-          "published_version_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Published Version Id"
-          },
-          "published_version_number": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Published Version Number"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "validation_result": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ValidationResult"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator."
-          },
-          "version": {
-            "$ref": "#/components/schemas/WorkflowVersionRead",
-            "description": "Current active version details"
-          },
-          "published_step_metadata": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PublishedWorkflowStepMetadataRead"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Step IDs, types, and output schemas from the exact published version, when one exists."
+            }
           }
-        }
+        ]
       },
       "PublishedWorkflowStepMetadataRead": {
         "type": "object",
@@ -50991,157 +50732,24 @@
         }
       },
       "PublishWorkflowVersionResponse": {
-        "type": "object",
         "title": "PublishWorkflowVersionResponse",
         "description": "Publish endpoint response — extends WorkflowReadWithVersion with a warning field.",
-        "required": [
-          "name",
-          "id",
-          "current_version",
-          "is_enabled",
-          "project_id",
-          "created_at",
-          "updated_at",
-          "version"
-        ],
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name",
-            "description": "Workflow name"
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/WorkflowReadWithVersion"
           },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description",
-            "description": "Workflow description"
-          },
-          "labels": {
-            "additionalProperties": {
-              "type": "string"
-            },
+          {
             "type": "object",
-            "title": "Labels",
-            "description": "Workflow labels"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "current_version": {
-            "type": "integer",
-            "title": "Current Version"
-          },
-          "is_builtin": {
-            "type": "boolean",
-            "default": false,
-            "title": "Is Builtin"
-          },
-          "is_enabled": {
-            "type": "boolean",
-            "title": "Is Enabled"
-          },
-          "has_validation_issues": {
-            "type": "boolean",
-            "default": false,
-            "title": "Has Validation Issues"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserReference"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "User who created the workflow",
-            "readOnly": true,
-            "title": "Created By"
-          },
-          "updated_by": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserReference"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "User who last modified the workflow",
-            "readOnly": true,
-            "title": "Updated By"
-          },
-          "project_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Project Id"
-          },
-          "published_version_id": {
-            "anyOf": [
-              {
+            "properties": {
+              "warning": {
                 "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
+                "default": "",
+                "title": "Warning",
+                "description": "Non-fatal warning from the publish operation"
               }
-            ],
-            "title": "Published Version Id"
-          },
-          "published_version_number": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Published Version Number"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "validation_result": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ValidationResult"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator."
-          },
-          "version": {
-            "$ref": "#/components/schemas/WorkflowVersionRead",
-            "description": "Current active version details"
-          },
-          "warning": {
-            "type": "string",
-            "default": "",
-            "title": "Warning",
-            "description": "Non-fatal warning from the publish operation"
+            }
           }
-        }
+        ]
       },
       "WorkflowVersionRead": {
         "type": "object",
