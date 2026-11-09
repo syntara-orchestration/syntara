@@ -186,15 +186,22 @@ export function RetryFromFailureSidePanel({
       aria-label="Retry run from failure review"
       data-testid="retry-from-failure-panel"
     >
-      <SynPanel hasNoPadding isFullHeight isScrollable footer={
-        <RetryFooter
-          onRetry={() => retry.handleRetry(scopeMode === 'all' ? undefined : requestedRetryPointIds, submitInputParameterOverrides)}
-          onCancel={onClose}
-          isRetryDisabled={isRetryDisabled}
-          isRetryPending={retry.isPending}
-          stepCount={activePreview?.total_step_count}
-        />
-      }>
+      <SynPanel
+        hasNoPadding
+        isFullHeight
+        isScrollable
+        footer={
+          <RetryFooter
+            onRetry={() =>
+              retry.handleRetry(scopeMode === 'all' ? undefined : requestedRetryPointIds, submitInputParameterOverrides)
+            }
+            onCancel={onClose}
+            isRetryDisabled={isRetryDisabled}
+            isRetryPending={retry.isPending}
+            stepCount={activePreview?.total_step_count}
+          />
+        }
+      >
         <div className={styles.panelInner}>
           <Stack className={styles.panelStack}>
             <StackItem className={styles.headerPadding}>

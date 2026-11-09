@@ -159,6 +159,11 @@ export function BuilderFlowCanvas({
       }),
     [nodes, retryPreviewCanvasStates]
   )
+  const zoom = useStore((state: ReactFlowState) => state.transform[2])
+  const retryLabelOffsets = useMemo(
+    () => getRetryPreviewLabelOffsets(nodes, retryPreviewCanvasStates, zoom),
+    [nodes, retryPreviewCanvasStates, zoom]
+  )
 
   return (
     <div
@@ -205,11 +210,47 @@ export function BuilderFlowCanvas({
       >
         <SemanticZoomNodeInternalsUpdater />
         <EdgeMarkers />
-        <RetryPreviewNodeToolbars
-          nodes={nodes}
-          retryPreviewNodeIds={retryPreviewNodeIds}
-          states={retryPreviewCanvasStates}
-        />
+        {retryPreviewNodeIds.map((nodeId) => (
+          <NodeToolbar
+            key={nodeId}
+            nodeId={nodeId}
+            isVisible
+            position={Position.Top}
+            align="center"
+            offset={retryLabelOffsets.get(nodeId) ?? RETRY_LABEL_BASE_OFFSET}
+            data-testid={`retry-origin-${nodeId}`}
+          >
+            <span
+              className={canvasStyles.retryPreviewLabel}
+              data-testid={`retry-origin-label-${nodeId}`}
+              aria-hidden="true"
+            >
+              <SynLabel color="blue">Retry origin</SynLabel>
+            </span>
+          </NodeToolbar>
+        ))}
+        {[...retryPreviewCanvasStates].map(([nodeId, state]) => {
+          if (state === 'origin') return null
+          return (
+            <NodeToolbar
+              key={`retry-state-${nodeId}`}
+              nodeId={nodeId}
+              isVisible
+              position={Position.Top}
+              align="center"
+              offset={retryLabelOffsets.get(nodeId) ?? RETRY_LABEL_BASE_OFFSET}
+              data-testid={`retry-state-${nodeId}`}
+            >
+              <span
+                className={canvasStyles.retryPreviewLabel}
+                data-testid={`retry-state-label-${nodeId}`}
+                aria-hidden="true"
+              >
+                <RetryStateLabel state={state} />
+              </span>
+            </NodeToolbar>
+          )
+        })}
         {!isReadOnly && <Background variant={BackgroundVariant.Dots} gap={20} size={1} />}
         <CanvasControls onLayout={onLayout} hideLayout={isReadOnly} />
         {!isReadOnly && <UndoRedoControls />}
@@ -348,63 +389,4 @@ function getRetryPreviewLabelOffsets(
   }
 
   return offsets
-}
-
-function RetryPreviewNodeToolbars({
-  nodes,
-  retryPreviewNodeIds,
-  states,
-}: Readonly<{
-  nodes: readonly NodeType[]
-  retryPreviewNodeIds: readonly string[]
-  states: ReadonlyMap<string, RetryPreviewCanvasState>
-}>) {
-  const zoom = useStore((state: ReactFlowState) => state.transform[2])
-  const labelOffsets = useMemo(() => getRetryPreviewLabelOffsets(nodes, states, zoom), [nodes, states, zoom])
-
-  return (
-    <>
-      {retryPreviewNodeIds.map((nodeId) => (
-        <NodeToolbar
-          key={nodeId}
-          nodeId={nodeId}
-          isVisible
-          position={Position.Top}
-          align="center"
-          offset={labelOffsets.get(nodeId) ?? RETRY_LABEL_BASE_OFFSET}
-          data-testid={`retry-origin-${nodeId}`}
-        >
-          <span
-            className={canvasStyles.retryPreviewLabel}
-            data-testid={`retry-origin-label-${nodeId}`}
-            aria-hidden="true"
-          >
-            <SynLabel color="blue">Retry origin</SynLabel>
-          </span>
-        </NodeToolbar>
-      ))}
-      {[...states].map(([nodeId, state]) => {
-        if (state === 'origin') return null
-        return (
-          <NodeToolbar
-            key={`retry-state-${nodeId}`}
-            nodeId={nodeId}
-            isVisible
-            position={Position.Top}
-            align="center"
-            offset={labelOffsets.get(nodeId) ?? RETRY_LABEL_BASE_OFFSET}
-            data-testid={`retry-state-${nodeId}`}
-          >
-            <span
-              className={canvasStyles.retryPreviewLabel}
-              data-testid={`retry-state-label-${nodeId}`}
-              aria-hidden="true"
-            >
-              <RetryStateLabel state={state} />
-            </span>
-          </NodeToolbar>
-        )
-      })}
-    </>
-  )
 }
