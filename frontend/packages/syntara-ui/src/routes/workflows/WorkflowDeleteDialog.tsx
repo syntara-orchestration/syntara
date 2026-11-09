@@ -4,7 +4,7 @@ import { useId } from 'react'
 import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 
 const DELETE_WORKFLOW_ACK_LABEL =
-  'I understand this workflow will be deleted and any in-progress runs will stop immediately.'
+  'I understand this workflow will be deleted and any in-progress runs will stop immediately. I also understand its run history will be permanently deleted.'
 
 export type WorkflowDeleteDialogProps = Readonly<{
   isOpen: boolean
@@ -48,8 +48,8 @@ export function WorkflowDeleteDialog({
       }}
     >
       <Content component="p">
-        The workflow <strong>{workflowName}</strong> will be deleted and any in-progress runs will stop immediately.
-        This action cannot be undone.
+        The workflow <strong>{workflowName}</strong> will be deleted and any in-progress runs will stop immediately. Its
+        run history will also be permanently deleted. This action cannot be undone.
       </Content>
     </SynConfirmationDialog>
   )

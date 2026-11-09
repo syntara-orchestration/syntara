@@ -17,7 +17,7 @@ import {
   ToolbarContent,
   ToolbarItem,
 } from '@patternfly/react-core'
-import { RhUiConnectedIcon, WrenchIcon } from '@patternfly/react-icons'
+import { RhUiBuildIcon, RhUiConnectedIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { useMemo, useState } from 'react'
@@ -82,7 +82,7 @@ function EnableToolsStep({
 
   if (!testResult) {
     return (
-      <EmptyState headingLevel="h3" icon={WrenchIcon} titleText="No tools discovered yet" isFullHeight>
+      <EmptyState headingLevel="h3" icon={RhUiBuildIcon} titleText="No tools discovered yet" isFullHeight>
         <EmptyStateBody>
           Test the connection in the previous step to discover available tools, or test it from here.
         </EmptyStateBody>

@@ -10,7 +10,13 @@ import { routerTestState } from '../../../test/setup'
 import { accessClient, accessFetchClient } from '../../access/accessClient'
 import { useProjectPermissions } from '../useProjectPermissions'
 
-import { ProjectDetail } from './ProjectDetail'
+import {
+  ProjectDetail,
+  ProjectDetailAssignmentsTabRoute,
+  ProjectDetailDetailsTabRoute,
+  ProjectDetailUnknownTabRoute,
+  ProjectDetailWorkflowsTabRoute,
+} from './ProjectDetail'
 
 vi.mock('../../access/accessClient', () => ({
   accessClient: {
@@ -37,8 +43,10 @@ vi.mock('@tanstack/react-router', async () => {
   return {
     ...actual,
     Link: MockLink,
+    Outlet: ProjectDetailTestOutlet,
     useParams: () => mockUseParams(),
     useNavigate: () => routerTestState.navigate,
+    useRouterState: () => mockPathname,
   }
 })
 
@@ -47,7 +55,22 @@ vi.mock('../../../hooks/routing/useLocation', () => ({
 }))
 
 const mockGoToTab = vi.fn()
-const mockDetailTab = vi.fn(() => ['details', mockGoToTab])
+let mockActiveTab = 'details'
+let mockPathname = '/system-administration/access-management/projects/proj-1/details'
+const mockDetailTab = vi.fn(() => [mockActiveTab, mockGoToTab] as const)
+
+function setMockActiveTab(tab: string) {
+  mockActiveTab = tab
+  mockPathname = `/system-administration/access-management/projects/proj-1/${tab}`
+}
+
+function ProjectDetailTestOutlet() {
+  if (mockActiveTab === 'workflows') return <ProjectDetailWorkflowsTabRoute />
+  if (mockActiveTab === 'role-assignments') return <ProjectDetailAssignmentsTabRoute />
+  if (mockActiveTab === 'unknown') return <ProjectDetailUnknownTabRoute />
+  return <ProjectDetailDetailsTabRoute />
+}
+
 vi.mock('../../../hooks/useUrlTab', () => ({
   useUrlTab: () => mockDetailTab(),
 }))
@@ -124,7 +147,7 @@ describe('ProjectDetail', () => {
     vi.clearAllMocks()
     queryClient.clear()
     mockRefetch.mockResolvedValue({})
-    mockDetailTab.mockReturnValue(['details', mockGoToTab])
+    setMockActiveTab('details')
     mockUseParams.mockReturnValue({ projectId: 'proj-1' })
     vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
     vi.mocked(useProjectPermissions).mockReturnValue({
@@ -363,14 +386,14 @@ describe('ProjectDetail', () => {
   })
 
   it('renders the Role Assignments tab content', async () => {
-    mockDetailTab.mockReturnValue(['role-assignments', mockGoToTab])
+    setMockActiveTab('role-assignments')
     render(<ProjectDetail />, { wrapper })
 
     expect(await screen.findByText('Mock Role Assignments Tab')).toBeInTheDocument()
   })
 
   it('renders the Workflows tab content', async () => {
-    mockDetailTab.mockReturnValue(['workflows', mockGoToTab])
+    setMockActiveTab('workflows')
     render(<ProjectDetail />, { wrapper })
 
     expect(await screen.findByText('Mock Workflows Tab')).toBeInTheDocument()
@@ -378,7 +401,7 @@ describe('ProjectDetail', () => {
 
   it('renders the Workflows tab content while permissions are still loading', async () => {
     vi.mocked(accessFetchClient.POST).mockImplementation(() => new Promise(() => {}))
-    mockDetailTab.mockReturnValue(['workflows', mockGoToTab])
+    setMockActiveTab('workflows')
     render(<ProjectDetail />, { wrapper })
 
     expect(await screen.findByText('Mock Workflows Tab')).toBeInTheDocument()

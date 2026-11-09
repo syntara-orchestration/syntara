@@ -90,19 +90,19 @@ Nice to have (but we'll explain the basics):
 
 ## Technology Stack
 
-| Layer               | Technology                              | Notes                                         |
-| ------------------- | --------------------------------------- | --------------------------------------------- |
-| **UI Components**   | PatternFly 6                            | Enterprise UI component framework             |
-| **Styling**         | PatternFly 6                            | Enterprise UI component framework             |
-| **Forms**           | react-hook-form                         | Performant form handling                      |
-| **Icons**           | PatternFly Icons (prefer RhUi-prefixed) | PatternFly icon library, prefer RhUi icons    |
-| **Workflow Canvas** | React Flow (`@xyflow/react`)            | Step-based workflow editor (React Flow graph) |
-| **State (Server)**  | TanStack Query                          | Caching, fetching, synchronizing API data     |
-| **State (Client)**  | Zustand                                 | Lightweight store for workflow editing        |
-| **WebSocket**       | Pure Zustand store                      | Real-time communication with backend          |
-| **Routing**         | TanStack Router                         | Route tree, route matching, and URL state     |
-| **Build**           | Vite                                    | Fast dev server and bundler                   |
-| **Testing**         | Vitest + Testing Library                | Unit and component testing                    |
+| Layer               | Technology                   | Notes                                         |
+| ------------------- | ---------------------------- | --------------------------------------------- |
+| **UI Components**   | PatternFly 6                 | Enterprise UI component framework             |
+| **Styling**         | PatternFly 6                 | Enterprise UI component framework             |
+| **Forms**           | react-hook-form              | Performant form handling                      |
+| **Icons**           | PatternFly `RhUi` icons      | Use `RhUi` icons by default                   |
+| **Workflow Canvas** | React Flow (`@xyflow/react`) | Step-based workflow editor (React Flow graph) |
+| **State (Server)**  | TanStack Query               | Caching, fetching, synchronizing API data     |
+| **State (Client)**  | Zustand                      | Lightweight store for workflow editing        |
+| **WebSocket**       | Pure Zustand store           | Real-time communication with backend          |
+| **Routing**         | TanStack Router              | Route tree, route matching, and URL state     |
+| **Build**           | Vite                         | Fast dev server and bundler                   |
+| **Testing**         | Vitest + Testing Library     | Unit and component testing                    |
 
 ---
 
@@ -644,7 +644,7 @@ The builder edits nodes + edges directly in the Zustand store. On save, `buildWo
 | `utils/buildNestedStructure.ts`                   | Legacy wrapper (identity function in v2 — returns activities as-is)                                                      |
 | `utils/validation/`                               | Validation rules                                                                                                         |
 
-Floating canvas surfaces (controls, step legend, steps on the canvas, undo/redo) use [`SynPanel`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/components/layout/SynPanel.tsx) so they stay readable under the glass theme: compact overlays use `variant="raised"`; large flat panels (for example the step editor shell) use `opaqueFloatingFill` instead of raised chrome.
+Floating canvas surfaces (controls, step legend, steps on the canvas, undo/redo) use [`SynPanel`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/components/layout/SynPanel.tsx) so they stay readable when glass contrast is on: compact overlays use `variant="raised"`; large flat panels (for example the step editor shell) use `opaqueFloatingFill` instead of raised chrome.
 
 ### Builder internals (advanced): registry, edges, and graph semantics
 

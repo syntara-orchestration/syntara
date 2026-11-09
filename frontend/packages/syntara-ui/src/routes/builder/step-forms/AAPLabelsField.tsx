@@ -45,7 +45,7 @@ type LabelToggleRenderProps = {
   readonly selectedLabels: readonly string[]
   readonly placeholderText: string
   readonly onToggle: () => void
-  readonly ariaDescribedBy: string
+  readonly ariaDescribedBy: string | undefined
 }
 
 function LabelToggleRender({
@@ -119,8 +119,6 @@ export function AAPLabelsField({
   const [filterValue, setFilterValue] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
-  const helperTextId = `${fieldId}-helper`
-
   useEffect(() => {
     if (!onSearchChange) return
     debounceRef.current = setTimeout(() => {
@@ -138,7 +136,7 @@ export function AAPLabelsField({
         fieldId={fieldId}
         hint={helperText}
       >
-        {({ field }) => {
+        {({ field, describedBy }) => {
           const labelNames: readonly string[] = availableLabels.map((l) => l.name)
           const selectedLabels: readonly string[] = Array.isArray(field.value) ? field.value : []
 
@@ -188,7 +186,7 @@ export function AAPLabelsField({
                 selectedLabels,
                 placeholderText,
                 onToggle: handleToggle,
-                ariaDescribedBy: helperTextId,
+                ariaDescribedBy: describedBy,
               })}
             >
               <SearchInput
