@@ -381,74 +381,7 @@ export interface components {
      *
      *     Used when retrieving a single workflow to include the active workflow definition.
      */
-    WorkflowReadWithVersion: {
-      /**
-       * Name
-       * @description Workflow name
-       */
-      name: string
-      /**
-       * Description
-       * @description Workflow description
-       */
-      description?: string | null
-      /**
-       * Labels
-       * @description Workflow labels
-       */
-      labels?: {
-        [key: string]: string
-      }
-      /**
-       * Id
-       * Format: uuid
-       */
-      id: string
-      /** Current Version */
-      current_version: number
-      /**
-       * Is Builtin
-       * @default false
-       */
-      is_builtin?: boolean
-      /** Is Enabled */
-      is_enabled: boolean
-      /**
-       * Has Validation Issues
-       * @default false
-       */
-      has_validation_issues?: boolean
-      /**
-       * Created By
-       * @description User who created the workflow
-       */
-      readonly created_by?: components['schemas']['UserReference'] | null
-      /**
-       * Updated By
-       * @description User who last modified the workflow
-       */
-      readonly updated_by?: components['schemas']['UserReference'] | null
-      /**
-       * Project Id
-       * Format: uuid
-       */
-      project_id: string
-      /** Published Version Id */
-      published_version_id?: string | null
-      /** Published Version Number */
-      published_version_number?: number | null
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string
-      /**
-       * Updated At
-       * Format: date-time
-       */
-      updated_at: string
-      /** @description Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator. */
-      validation_result?: components['schemas']['ValidationResult'] | null
+    WorkflowReadWithVersion: components['schemas']['WorkflowRead'] & {
       /** @description Current active version details */
       version: components['schemas']['WorkflowVersionRead']
     }
@@ -456,76 +389,7 @@ export interface components {
      * WorkflowDetailRead
      * @description Workflow detail response with metadata for its published version.
      */
-    WorkflowDetailRead: {
-      /**
-       * Name
-       * @description Workflow name
-       */
-      name: string
-      /**
-       * Description
-       * @description Workflow description
-       */
-      description?: string | null
-      /**
-       * Labels
-       * @description Workflow labels
-       */
-      labels?: {
-        [key: string]: string
-      }
-      /**
-       * Id
-       * Format: uuid
-       */
-      id: string
-      /** Current Version */
-      current_version: number
-      /**
-       * Is Builtin
-       * @default false
-       */
-      is_builtin?: boolean
-      /** Is Enabled */
-      is_enabled: boolean
-      /**
-       * Has Validation Issues
-       * @default false
-       */
-      has_validation_issues?: boolean
-      /**
-       * Created By
-       * @description User who created the workflow
-       */
-      readonly created_by?: components['schemas']['UserReference'] | null
-      /**
-       * Updated By
-       * @description User who last modified the workflow
-       */
-      readonly updated_by?: components['schemas']['UserReference'] | null
-      /**
-       * Project Id
-       * Format: uuid
-       */
-      project_id: string
-      /** Published Version Id */
-      published_version_id?: string | null
-      /** Published Version Number */
-      published_version_number?: number | null
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string
-      /**
-       * Updated At
-       * Format: date-time
-       */
-      updated_at: string
-      /** @description Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator. */
-      validation_result?: components['schemas']['ValidationResult'] | null
-      /** @description Current active version details */
-      version: components['schemas']['WorkflowVersionRead']
+    WorkflowDetailRead: components['schemas']['WorkflowReadWithVersion'] & {
       /** @description Step IDs, types, and output schemas from the exact published version, when one exists. */
       published_step_metadata?: components['schemas']['PublishedWorkflowStepMetadataRead'] | null
     }
@@ -601,76 +465,7 @@ export interface components {
      * PublishWorkflowVersionResponse
      * @description Publish endpoint response — extends WorkflowReadWithVersion with a warning field.
      */
-    PublishWorkflowVersionResponse: {
-      /**
-       * Name
-       * @description Workflow name
-       */
-      name: string
-      /**
-       * Description
-       * @description Workflow description
-       */
-      description?: string | null
-      /**
-       * Labels
-       * @description Workflow labels
-       */
-      labels?: {
-        [key: string]: string
-      }
-      /**
-       * Id
-       * Format: uuid
-       */
-      id: string
-      /** Current Version */
-      current_version: number
-      /**
-       * Is Builtin
-       * @default false
-       */
-      is_builtin?: boolean
-      /** Is Enabled */
-      is_enabled: boolean
-      /**
-       * Has Validation Issues
-       * @default false
-       */
-      has_validation_issues?: boolean
-      /**
-       * Created By
-       * @description User who created the workflow
-       */
-      readonly created_by?: components['schemas']['UserReference'] | null
-      /**
-       * Updated By
-       * @description User who last modified the workflow
-       */
-      readonly updated_by?: components['schemas']['UserReference'] | null
-      /**
-       * Project Id
-       * Format: uuid
-       */
-      project_id: string
-      /** Published Version Id */
-      published_version_id?: string | null
-      /** Published Version Number */
-      published_version_number?: number | null
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string
-      /**
-       * Updated At
-       * Format: date-time
-       */
-      updated_at: string
-      /** @description Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator. */
-      validation_result?: components['schemas']['ValidationResult'] | null
-      /** @description Current active version details */
-      version: components['schemas']['WorkflowVersionRead']
+    PublishWorkflowVersionResponse: components['schemas']['WorkflowReadWithVersion'] & {
       /**
        * Warning
        * @description Non-fatal warning from the publish operation
