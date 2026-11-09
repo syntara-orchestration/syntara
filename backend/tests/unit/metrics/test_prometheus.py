@@ -55,6 +55,10 @@ class TestMetricDefinitions:
         assert prom.opa_request_duration_seconds is not None
         assert prom.cache_pool_retry_backoff_duration_seconds is not None
 
+    def test_retry_duration_uses_slow_buckets(self, prom: OrchestratorPrometheusMetrics) -> None:
+        """Retry durations cover full workflow runtimes."""
+        assert tuple(prom.workflow_retry_duration_seconds._upper_bounds[:-1]) == LATENCY_BUCKETS_SLOW
+
     def test_gauges_defined(self, prom: OrchestratorPrometheusMetrics) -> None:
         """All required gauges are present."""
         assert prom.cache_utilization_ratio is not None
