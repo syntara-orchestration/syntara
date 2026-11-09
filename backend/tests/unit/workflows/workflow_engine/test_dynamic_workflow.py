@@ -17,7 +17,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine import dynamic_workflow as dynamic_workflow_module
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
@@ -909,12 +908,14 @@ class TestConvergeAnyStrategy:
         wf = _make_workflow()
         wf.execution_id = "11111111-2222-3333-4444-555555555555"
         wf._active_ep_nodes = {"node_a", "node_b"}
-        dynamic_workflow_module.workflow.execute_activity = AsyncMock(return_value={})
+        with patch(
+            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+            new=AsyncMock(return_value={}),
+        ) as mock_execute_activity:
+            await wf._cancel_execution_plane_work_nodes(["node_a", "other"], reason="Workflow cancelled")
 
-        await wf._cancel_execution_plane_work_nodes(["node_a", "other"], reason="Workflow cancelled")
-
-        assert dynamic_workflow_module.workflow.execute_activity.await_args is not None
-        assert dynamic_workflow_module.workflow.execute_activity.await_args.kwargs["args"] == [
+        assert mock_execute_activity.await_args is not None
+        assert mock_execute_activity.await_args.kwargs["args"] == [
             "11111111-2222-3333-4444-555555555555",
             ["node_a"],
             "Workflow cancelled",
