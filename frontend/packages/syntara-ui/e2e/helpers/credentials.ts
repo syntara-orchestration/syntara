@@ -1,5 +1,6 @@
 import { type Locator, type Response } from '@playwright/test'
 
+import { regExpPrefixMatch } from '../../src/utils/escapeRegExp'
 import { expect, type Page, toAppUrl } from '../fixtures'
 import {
   apiRequest,
@@ -11,13 +12,9 @@ import {
 
 import { buildUniqueName, selectFirstProject } from './workflows'
 
-function escapeForRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
 /** PatternFly SelectOption descriptions are included in the option accessible name. */
 export function credentialTypeOptionName(typeName: string): RegExp {
-  return new RegExp(`^${escapeForRegExp(typeName)}`)
+  return regExpPrefixMatch(typeName)
 }
 
 /**

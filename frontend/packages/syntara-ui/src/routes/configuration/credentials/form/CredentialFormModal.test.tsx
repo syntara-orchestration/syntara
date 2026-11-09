@@ -7,6 +7,7 @@ import { axe } from 'vitest-axe'
 
 import { credentialsClient } from '../../../../client'
 import { AlertProvider } from '../../../../providers/alerts'
+import { regExpPrefixMatch } from '../../../../utils/escapeRegExp'
 import { useSelectableProjects } from '../../../access/useAllProjects'
 
 import { CredentialFormModal } from './CredentialFormModal'
@@ -98,7 +99,7 @@ const mockProjects = [
 
 /** PatternFly SelectOption descriptions are included in the option accessible name. */
 function credentialTypeOption(name: string) {
-  return { name: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }
+  return { name: regExpPrefixMatch(name) }
 }
 
 let typesQueryState: CredentialTypesQueryMock
