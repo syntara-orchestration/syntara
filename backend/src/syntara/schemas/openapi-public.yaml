@@ -30800,20 +30800,13 @@ components:
           $ref: '#/components/schemas/IntegrationScope'
           default: global
         configuration:
-          oneOf:
+          anyOf:
             - $ref: '#/components/schemas/MCPServerConfigurationInput'
             - $ref: '#/components/schemas/LLMProviderConfiguration'
             - $ref: '#/components/schemas/AAPConfiguration'
             - $ref: '#/components/schemas/OpenShiftConfiguration'
           title: Configuration
           description: Integration-specific configuration
-          discriminator:
-            propertyName: integration_type
-            mapping:
-              ansible_automation_platform: '#/components/schemas/AAPConfiguration'
-              llm_provider: '#/components/schemas/LLMProviderConfiguration'
-              mcp_server: '#/components/schemas/MCPServerConfigurationInput'
-              openshift: '#/components/schemas/OpenShiftConfiguration'
         last_validated_at:
           anyOf:
             - type: string

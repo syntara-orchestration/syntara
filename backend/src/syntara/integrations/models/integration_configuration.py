@@ -172,4 +172,5 @@ IntegrationConfiguration = Annotated[
 # fields (discovered_tools) are stored as separate Tool records.
 IntegrationConfigurationInputTypes = IntegrationConfigurationTypes
 IntegrationConfigurationInput = IntegrationConfiguration
+IntegrationConfigurationOutputTypes = IntegrationConfigurationTypes
 MCPServerConfiguration = MCPServerConfigurationInput

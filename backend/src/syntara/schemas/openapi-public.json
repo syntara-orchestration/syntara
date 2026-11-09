@@ -44919,7 +44919,7 @@
             "default": "global"
           },
           "configuration": {
-            "oneOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/MCPServerConfigurationInput"
               },
@@ -44934,16 +44934,7 @@
               }
             ],
             "title": "Configuration",
-            "description": "Integration-specific configuration",
-            "discriminator": {
-              "propertyName": "integration_type",
-              "mapping": {
-                "ansible_automation_platform": "#/components/schemas/AAPConfiguration",
-                "llm_provider": "#/components/schemas/LLMProviderConfiguration",
-                "mcp_server": "#/components/schemas/MCPServerConfigurationInput",
-                "openshift": "#/components/schemas/OpenShiftConfiguration"
-              }
-            }
+            "description": "Integration-specific configuration"
           },
           "last_validated_at": {
             "anyOf": [

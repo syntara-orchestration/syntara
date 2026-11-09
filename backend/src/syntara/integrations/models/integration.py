@@ -24,6 +24,7 @@ from syntara.core.utils.sqlmodel import DiscriminatedJSONB, postgres_enum_column
 from syntara.integrations.models.integration_configuration import (
     IntegrationConfiguration,
     IntegrationConfigurationInputTypes,
+    IntegrationConfigurationOutputTypes,
     IntegrationConfigurationTypes,
 )
 
@@ -409,9 +410,7 @@ class IntegrationRead(UserReferenceFieldsMixin, NamedResource, UserOwnedResource
     enabled: bool = True
     validation_status: IntegrationStatus = IntegrationStatus.UNKNOWN
     scope: IntegrationScope = IntegrationScope.GLOBAL
-    configuration: IntegrationConfigurationTypes = Field(
-        description=_CONFIGURATION_DESCRIPTION, discriminator="integration_type"
-    )
+    configuration: IntegrationConfigurationOutputTypes = Field(description=_CONFIGURATION_DESCRIPTION)
     management_credential_id: UUID | None = None
     last_validated_at: datetime | None = None
     validation_error: str | None = None
