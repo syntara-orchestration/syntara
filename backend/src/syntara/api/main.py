@@ -97,7 +97,6 @@ from syntara.telemetry.periodic_collector import PeriodicCollector
 from syntara.workflows.error_handlers import (
     temporal_rpc_error_handler,
 )
-from syntara.workflows.openapi import compose_workflow_response_schemas
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -444,7 +443,6 @@ def _custom_openapi() -> dict[str, Any]:
 
     if app.state.openapi_product_schema is None:
         app.state.openapi_product_schema = _translate_product_name(base_schema, product_name)
-        compose_workflow_response_schemas(app.state.openapi_product_schema)
 
     app.state.openapi_product_name = product_name
     app.openapi_schema = app.state.openapi_product_schema

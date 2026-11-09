@@ -12,9 +12,9 @@ from dateutil.parser import isoparse
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.publish_workflow_version_response_labels import PublishWorkflowVersionResponseLabels
     from ..models.user_reference import UserReference
     from ..models.validation_result import ValidationResult
-    from ..models.workflow_read_labels import WorkflowReadLabels
     from ..models.workflow_version_read import WorkflowVersionRead
 
 
@@ -35,7 +35,7 @@ class PublishWorkflowVersionResponse:
         updated_at (datetime.datetime):
         version (WorkflowVersionRead): Schema for workflow version response (GET /workflows/{id}/versions/{version}).
         description (None | str | Unset): Workflow description
-        labels (WorkflowReadLabels | Unset): Workflow labels
+        labels (PublishWorkflowVersionResponseLabels | Unset): Workflow labels
         is_builtin (bool | Unset):  Default: False.
         has_validation_issues (bool | Unset):  Default: False.
         created_by (None | Unset | UserReference): User who created the workflow
@@ -56,7 +56,7 @@ class PublishWorkflowVersionResponse:
     updated_at: datetime.datetime
     version: WorkflowVersionRead
     description: None | str | Unset = UNSET
-    labels: WorkflowReadLabels | Unset = UNSET
+    labels: PublishWorkflowVersionResponseLabels | Unset = UNSET
     is_builtin: bool | Unset = False
     has_validation_issues: bool | Unset = False
     created_by: None | Unset | UserReference = UNSET
@@ -180,9 +180,9 @@ class PublishWorkflowVersionResponse:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.publish_workflow_version_response_labels import PublishWorkflowVersionResponseLabels
         from ..models.user_reference import UserReference
         from ..models.validation_result import ValidationResult
-        from ..models.workflow_read_labels import WorkflowReadLabels
         from ..models.workflow_version_read import WorkflowVersionRead
 
         d = dict(src_dict)
@@ -212,11 +212,11 @@ class PublishWorkflowVersionResponse:
         description = _parse_description(d.pop("description", UNSET))
 
         _labels = d.pop("labels", UNSET)
-        labels: WorkflowReadLabels | Unset
+        labels: PublishWorkflowVersionResponseLabels | Unset
         if isinstance(_labels, Unset):
             labels = UNSET
         else:
-            labels = WorkflowReadLabels.from_dict(_labels)
+            labels = PublishWorkflowVersionResponseLabels.from_dict(_labels)
 
         is_builtin = d.pop("is_builtin", UNSET)
 
