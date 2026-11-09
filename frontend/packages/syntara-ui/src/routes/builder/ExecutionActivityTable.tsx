@@ -109,7 +109,7 @@ function ActivityRow({
   const displayName = name ?? id
   const jobUrl = isAAPNodeType(type) ? extractAAPJobUrl(state?.outputData) : null
   const columnCount = hasAAPColumn ? 6 : 5
-  const replayed = isReplayedStep(state?.startedAt, replayBaselineAt)
+  const replayed = isReplayedStep(state?.startedAt, replayBaselineAt, state?.status)
 
   return (
     <Fragment>

@@ -225,7 +225,7 @@ export class ExecutionStateEnricher {
           started_at: activityState.startedAt ?? undefined,
           completed_at: activityState.completedAt ?? undefined,
           error_details: activityState.errorDetails ?? undefined,
-          replayed: isReplayedStep(activityState.startedAt, replayBaselineAt),
+          replayed: isReplayedStep(activityState.startedAt, replayBaselineAt, activityState.status),
         },
       }
 

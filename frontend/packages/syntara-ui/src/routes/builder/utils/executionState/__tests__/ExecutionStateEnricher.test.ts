@@ -135,6 +135,37 @@ describe('ExecutionStateEnricher', () => {
       expect(result.__executionState?.replayed).toBe(true)
     })
 
+    it('does not flag a retained failure as replayed', () => {
+      const activity: Activity = {
+        id: 'task-1',
+        name: 'Task 1',
+        type: 'script',
+        parameters: { language: 'python', code: '' },
+      }
+      const activityStates = new Map<string, ActivityState>([
+        [
+          'task-1',
+          {
+            activityId: 'task-1',
+            status: 'failed',
+            startedAt: '2024-01-01T00:00:00Z',
+            completedAt: '2024-01-01T00:01:00Z',
+          },
+        ],
+      ])
+
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'failed',
+        activityStates: activityStates,
+        edges: [],
+        options: { replayBaselineAt: '2024-01-02T00:00:00Z' },
+      })
+
+      expect(result.__executionState?.replayed).toBe(false)
+      expect(result.__executionState?.status).toBe('failed')
+    })
+
     it('does not flag a step that started inside the retry window', () => {
       const activity: Activity = {
         id: 'task-1',
