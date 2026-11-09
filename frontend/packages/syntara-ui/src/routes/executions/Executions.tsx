@@ -10,15 +10,20 @@ import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
+import { SynEmptyStateAccessDenied } from '../../components/states/SynEmptyStateAccessDenied'
 import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
-import { useQueryState } from '../../components/states/useQueryState'
+import { SynEmptyStateServiceUnavailable } from '../../components/states/SynEmptyStateServiceUnavailable'
+import { SynErrorState } from '../../components/states/SynErrorState'
+import { SynLoadingState } from '../../components/states/SynLoadingState'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
+import { useApiErrorAlert } from '../../hooks/useApiErrorAlert'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useProjectsForGrouping } from '../../hooks/useProjectsForGrouping'
 import type { FilterFieldDefinition } from '../../types/filters'
+import { getErrorStatus, isForbiddenError, isRetryableError, isServiceUnavailableError } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
 
@@ -29,6 +34,7 @@ import {
   getExecutionVersionFilterFromExecutions,
   transformExecutionStatusFilter,
 } from './executionFilters'
+import { getExecutionsListLoadErrorMessage } from './executionsListLoadErrors'
 import { FlatExecutionsTableBody, GroupedExecutionsTableBody } from './ExecutionsTableBody'
 import { executionDefaultSort, executionTableColumns } from './executionTableColumns'
 
@@ -145,10 +151,36 @@ export default function Executions() {
     })
   }
 
-  const queryState = useQueryState(executionsQuery, {
-    title: 'Error loading executions',
-    onRetry: () => detachPromise(executionsQuery.refetch()),
-  })
+  const listError = executionsQuery.error
+  useApiErrorAlert(listError, { title: 'Unable to load workflow runs', suppress503: true })
+
+  const queryState = (() => {
+    if (listError) {
+      const message = getExecutionsListLoadErrorMessage(listError)
+      if (isServiceUnavailableError(listError)) {
+        return <SynEmptyStateServiceUnavailable description={message} showAdminHint={false} />
+      }
+      if (isForbiddenError(listError)) {
+        return <SynEmptyStateAccessDenied description={message} />
+      }
+      return (
+        <SynErrorState
+          title="Unable to load workflow runs"
+          message={{
+            status: getErrorStatus(listError),
+            detail: message,
+            retryable: isRetryableError(listError),
+          }}
+          onRetry={() => detachPromise(executionsQuery.refetch())}
+        />
+      )
+    }
+    if (executionsQuery.isPending) {
+      return <SynLoadingState />
+    }
+    return null
+  })()
+
   if (queryState) {
     return (
       <SynPage>
