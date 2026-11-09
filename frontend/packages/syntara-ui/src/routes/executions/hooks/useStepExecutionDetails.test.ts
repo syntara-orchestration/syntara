@@ -188,7 +188,6 @@ describe('useStepExecutionDetails', () => {
 
       expect(result.current.isLoading).toBe(true)
       expect(result.current.inputData).toBeNull()
-      expect(mockUseQuery.mock.calls[0]?.[3].select?.(mockActivityResponse)).toBeUndefined()
       await waitFor(() => expect(mockPreloadShiki).toHaveBeenCalledOnce())
 
       await act(async () => {
@@ -199,7 +198,6 @@ describe('useStepExecutionDetails', () => {
       await waitFor(() => expect(result.current.isLoading).toBe(false))
       expect(result.current.inputData).toEqual({ host: '10.0.0.1', port: 8080 })
       expect(result.current.outputData).toEqual({ status: 'ok', result: 42 })
-      expect(mockUseQuery.mock.calls.at(-1)?.[3].select?.(mockActivityResponse)).toEqual(mockActivityResponse)
     })
 
     it('releases activity data if Shiki preload fails', async () => {

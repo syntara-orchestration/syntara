@@ -1,5 +1,4 @@
-import type { ExecutionsAPI } from '@syntara/contracts'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { executionsClient } from '../../../client'
 import { getLoadedShikiService, loadShikiService } from '../../../components/details/shiki-service-loader'
@@ -37,13 +36,8 @@ export function useStepExecutionDetails(
   const activityName =
     effectiveIteration != null && effectiveIteration > 0 ? `${baseId}#iter-${effectiveIteration}` : baseId
 
-  // Preload outside the query; this selector exposes cached data once Shiki is ready.
+  // Keep fetched data available while delaying its display until JSON highlighting is ready.
   const [isShikiSettled, setIsShikiSettled] = useState(() => getLoadedShikiService()?.isShikiReady('json') ?? false)
-  const selectActivityResponse = useCallback(
-    (response: ExecutionsAPI.components['schemas']['ActivityExecutionListResponse']) =>
-      isShikiSettled ? response : undefined,
-    [isShikiSettled]
-  )
 
   useEffect(() => {
     if (isShikiSettled || !executionId || !stepId) return
@@ -62,6 +56,7 @@ export function useStepExecutionDetails(
       isCurrent = false
     }
   }, [executionId, isShikiSettled, stepId])
+
   const queryResult = executionsClient.useQuery(
     'get',
     '/executions/{execution_id}/activities',
@@ -71,7 +66,7 @@ export function useStepExecutionDetails(
         query: { activity_name: activityName, limit: 1 },
       },
     },
-    { enabled: !!executionId && !!stepId, select: selectActivityResponse }
+    { enabled: !!executionId && !!stepId }
   )
 
   const { data, isLoading, isSuccess, error, refetch } = queryResult
@@ -85,7 +80,7 @@ export function useStepExecutionDetails(
   }, [activityStatus, refetch])
 
   return useMemo(() => {
-    if (!data) {
+    if (!data || !isShikiSettled) {
       return {
         inputData: null,
         outputData: null,

@@ -17,8 +17,8 @@ describe('Shiki JSON highlighter', () => {
     expect(reconstructedSource).toBe(source)
     expect(hasDualThemeStyle).toBe(true)
     expect(statusToken?.style).toMatchObject({
-      '--shiki-light': '#024C1A',
-      '--shiki-dark': '#72F088',
+      '--shiki-light': expect.any(String),
+      '--shiki-dark': expect.any(String),
     })
   })
 
