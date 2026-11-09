@@ -10,6 +10,7 @@ import copy
 import json
 from datetime import timedelta
 from typing import Any, ClassVar, cast
+from uuid import UUID, uuid5
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
@@ -18,7 +19,11 @@ from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 
 with workflow.unsafe.imports_passed_through():
     from syntara.core.exceptions import SafeValueError
+    from syntara.execution_plane.utils import execution_plane_supported_node_types
     from syntara.workflows.workflow_engine.activities.credential_resolution_activity import resolve_workflow_credentials
+    from syntara.workflows.workflow_engine.activities.ep.ep_cancellation_activity import (
+        cancel_execution_plane_work_activity,
+    )
     from syntara.workflows.workflow_engine.activities.integration_resolution_activity import (
         resolve_workflow_integration,
     )
@@ -67,6 +72,11 @@ ALLOWED_TRIGGER_TYPES: set[str] = {
 
 # Marker value for pre-resolved node inputs in test executions
 PRE_RESOLVED_MARKER = "__pre_resolved"
+
+# Snapshot process-wide configuration at worker import time. Calling
+# get_settings() from workflow code would perform configuration I/O during a
+# deterministic workflow replay.
+_EXECUTION_PLANE_SUPPORTED_NODE_TYPES = execution_plane_supported_node_types()
 
 
 def _parse_items(items: Any) -> Any:  # noqa: ANN401
@@ -155,6 +165,10 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         except asyncio.CancelledError:
             workflow.logger.info("Workflow cancelled, cleaning up pending approvals and agentic invocations")
+            await self._cancel_execution_plane_work_nodes(
+                list(self._active_ep_nodes),
+                reason="Workflow cancelled",
+            )
             await self._cancel_approval_requests()
             await self._cancel_agentic_invocations()
             raise
@@ -191,6 +205,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self._timeout_tasks: dict[str, asyncio.Task[Any]] = {}
         self._timed_out_converge_nodes: set[str] = set()
         self._detached_nodes: set[str] = set()
+        self._active_ep_nodes: set[str] = set()
         self._converge_branch_nodes: dict[str, set[str]] = {}
         self._cof_failed_nodes: set[str] = set()
         self._secret_values: set[str] = set()
@@ -275,8 +290,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         """Wait for all pending tasks to complete, scheduling successors as they finish."""
         while pending_tasks or self._timed_out_converge_nodes:
             # Cancel pending tasks for nodes that were skipped (by timeout or "any" converge)
-            self._cancel_skipped_pending_tasks(pending_tasks)
-            self._remove_detached_tasks(pending_tasks)
+            await self._cancel_skipped_pending_tasks(pending_tasks)
+            await self._remove_detached_tasks(pending_tasks)
 
             # Schedule successors of converge nodes that failed with continue_on_failure
             for node_id in list(self._timed_out_converge_nodes):
@@ -311,6 +326,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             return
 
         del pending_tasks[completed_node_id]
+        self._active_ep_nodes.discard(completed_node_id)
 
         try:
             output = await task
@@ -328,7 +344,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self.resolver.set_namespace(completed_node_id, {**output, "status": "completed"})
         workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
         await self._schedule_successors(completed_node_id=completed_node_id, graph=graph, pending_tasks=pending_tasks)
-        self._cancel_skipped_pending_tasks(pending_tasks)
+        await self._cancel_skipped_pending_tasks(pending_tasks)
 
     @staticmethod
     def _find_node_for_task(
@@ -565,11 +581,17 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             port = "approved" if fallback == "approve" else "rejected"
             self.node_control_data[node_id] = {"next_port": port}
         await self._schedule_successors(node_id, graph, pending_tasks)
-        self._cancel_skipped_pending_tasks(pending_tasks)
+        await self._cancel_skipped_pending_tasks(pending_tasks)
 
-    def _cancel_skipped_pending_tasks(self, pending_tasks: dict[str, asyncio.Task[Any]]) -> None:
+    async def _cancel_skipped_pending_tasks(
+        self,
+        pending_tasks: dict[str, asyncio.Task[Any]],
+        *,
+        reason: str = "Workflow step skipped",
+    ) -> None:
         """Cancel pending tasks for nodes that were marked as skipped."""
         skipped_pending = [nid for nid in pending_tasks if nid in self.skipped_nodes]
+        await self._cancel_execution_plane_work_nodes(skipped_pending, reason=reason)
         for nid in skipped_pending:
             pending_tasks[nid].cancel()
             del pending_tasks[nid]
@@ -583,16 +605,51 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             if pred_id in pending_tasks and not self.resolver.has_namespace(pred_id):
                 self._detached_nodes.add(pred_id)
 
-    def _remove_detached_tasks(self, pending_tasks: dict[str, asyncio.Task[Any]]) -> None:
+    async def _remove_detached_tasks(
+        self,
+        pending_tasks: dict[str, asyncio.Task[Any]],
+        *,
+        reason: str = "Workflow step detached",
+    ) -> None:
         """Remove detached in-flight tasks from the main loop without cancelling them.
 
         When a converge node fires (ANY) or fails, in-flight predecessors keep
         running in Temporal but no longer block the workflow from completing.
         """
         detached = [nid for nid in pending_tasks if nid in self._detached_nodes]
+        await self._cancel_execution_plane_work_nodes(detached, reason=reason)
         for nid in detached:
             del pending_tasks[nid]
             workflow.logger.info(f"Detached in-flight node {nid} from main loop (converge fired)")
+
+    async def _cancel_execution_plane_work_nodes(self, node_ids: list[str], *, reason: str) -> None:
+        """Best-effort cancel Execution Plane work for active EP-capable nodes."""
+        active_node_ids = [node_id for node_id in node_ids if node_id in self._active_ep_nodes]
+        if not active_node_ids:
+            return
+
+        try:
+            cleanup_activity_id = uuid5(
+                UUID(self.execution_id),
+                f"cancel-execution-plane:{','.join(sorted(active_node_ids))}",
+            )
+            await asyncio.shield(
+                workflow.execute_activity(
+                    cancel_execution_plane_work_activity,
+                    args=[self.execution_id, active_node_ids, reason],
+                    activity_id=f"__internal__cancel_ep_{cleanup_activity_id}",
+                    start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
+            )
+        except Exception:  # noqa: BLE001
+            workflow.logger.warning(
+                "Failed to cancel Execution Plane work (best-effort)",
+                extra={"node_ids": active_node_ids, "reason": reason},
+            )
+        finally:
+            for node_id in active_node_ids:
+                self._active_ep_nodes.discard(node_id)
 
     def _cleanup_timeout_tasks(self) -> None:
         """Cancel any remaining converge timeout background tasks."""
@@ -694,6 +751,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             workflow.logger.info(f"Scheduling node: {successor.id} (type: {successor.type})")
             task = asyncio.create_task(self._execute_node(node=successor, graph=graph))
             pending_tasks[successor.id] = task
+            if successor.type in _EXECUTION_PLANE_SUPPORTED_NODE_TYPES:
+                self._active_ep_nodes.add(successor.id)
             self._handle_converge_timeout(successor.id, graph, pending_tasks)
 
         # Check if a loop body just completed and needs re-iteration

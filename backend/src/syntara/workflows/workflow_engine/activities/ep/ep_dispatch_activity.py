@@ -20,6 +20,7 @@ from syntara.execution_plane.client import (
     ExecutionPlaneRejectedError,
     ExecutionPlaneUnavailableError,
 )
+from syntara.execution_plane.utils import execution_plane_container_image, execution_plane_work_item_id
 from syntara.workflows.workflow_engine.activities.common import HEARTBEAT_STOP_MONITOR
 from syntara.workflows.workflow_engine.constants import ENGINE_TIMEOUT_SECONDS_KEY
 from syntara.workflows.workflow_engine.models.workflow_definition import (
@@ -116,11 +117,11 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
         msg = "Temporal activity context is missing workflow or run identity"
         raise ApplicationError(msg, type="ContextError", non_retryable=True)
 
-    work_item_id = uuid.uuid5(execution_id, info.activity_id)
+    work_item_id = execution_plane_work_item_id(execution_id, info.activity_id)
     selectors = _build_work_execute_selectors(execution_target_id)
 
-    image = settings.node_container_images.get(_NODE_TYPE)
-    if not image:
+    image = execution_plane_container_image(_NODE_TYPE)
+    if image is None:
         msg = f"No Execution Plane container image configured for node type '{_NODE_TYPE}'"
         raise ApplicationError(msg, type="ConfigError", non_retryable=True)
     try:

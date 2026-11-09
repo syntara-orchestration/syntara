@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from execution_plane_client.commands.control import Completion
+from execution_plane_client.commands.control import Completion, CompletionStatus
 from execution_plane_client.protocol import ResourceReference
 from fastapi import FastAPI, Request, Response
 
@@ -40,7 +40,7 @@ def callback() -> tuple[FastAPI, AsyncMock, MagicMock]:
 def completion():
     work_id = uuid4()
     return Completion(
-        status="succeeded",
+        status=CompletionStatus.COMPLETED,
         result={"output": {"stdout": "ok"}},
         resource=ResourceReference(kind="work_item", resource_id=work_id),
     ).to_message(
@@ -56,7 +56,15 @@ def test_router_only_exposes_the_command_ingress():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("outcome", ["succeeded", "failed", "cancelled", "outcome_unknown"])
+@pytest.mark.parametrize(
+    "outcome",
+    [
+        CompletionStatus.COMPLETED,
+        CompletionStatus.FAILED,
+        CompletionStatus.CANCELLED,
+        CompletionStatus.RECONCILIATION_REQUIRED,
+    ],
+)
 async def test_completion_command_resolves_temporal_activity_and_acknowledges(callback, outcome, monkeypatch):
     app, temporal, _ = callback
     message = completion()
@@ -72,13 +80,18 @@ async def test_completion_command_resolves_temporal_activity_and_acknowledges(ca
     assert response.json()["resource"]["kind"] == "work_item"
     assert response.json()["resource"]["resource_id"] == str(message.command.parent_command_id)
     validate.assert_called_once()
-    if outcome == "succeeded":
+    if outcome is CompletionStatus.COMPLETED:
         temporal.complete_async_activity.assert_awaited_once_with(
             temporal_workflow_id="workflow-id", activity_id="activity-id", result={"output": {"stdout": "ok"}}
         )
+    elif outcome is CompletionStatus.CANCELLED:
+        temporal.report_cancellation_async_activity.assert_awaited_once_with(
+            temporal_workflow_id="workflow-id", activity_id="activity-id"
+        )
+        temporal.fail_async_activity.assert_not_awaited()
     else:
         assert temporal.fail_async_activity.await_args.kwargs["error"].non_retryable
-        if outcome == "outcome_unknown":
+        if outcome is CompletionStatus.RECONCILIATION_REQUIRED:
             assert (
                 temporal.fail_async_activity.await_args.kwargs["error"].type == "ExecutionPlaneReconciliationRequired"
             )
@@ -130,12 +143,13 @@ async def test_completion_rejects_invalid_correlation_or_command(callback, inval
 
 
 @pytest.mark.asyncio
-async def test_completion_missing_activity_remains_retryable(callback):
+async def test_completion_missing_activity_is_idempotent_noop(callback):
     app, _, rows = callback
     rows.first.return_value = None
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=completion().model_dump(mode="json"))
-    assert response.status_code == 404
+    assert response.status_code == 200, response.text
+    assert response.json()["received"] is True
 
 
 @pytest.mark.asyncio

@@ -20,6 +20,7 @@ from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 
@@ -61,6 +62,7 @@ def _make_workflow(
     wf._timeout_tasks = {}
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
+    wf._active_ep_nodes = set()
     wf._cof_failed_nodes = set()
     wf._converge_branch_nodes = {}
     wf._has_unhandled_failure = False
@@ -223,6 +225,27 @@ class TestLinearExecution:
         _run_schedule_successors(wf, "trigger", graph, pending)
 
         assert "node_a" in pending
+
+    def test_schedule_successors_tracks_execution_plane_capable_nodes(self) -> None:
+        """Only node types with configured EP images are tracked for cancellation."""
+        wf = _make_workflow()
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "http_request", "parameters": {}})
+        backend.add_edge("trigger", "node_a", None)
+        backend.add_edge("trigger", "node_b", None)
+        graph = WorkflowGraph(backend)
+        wf.resolver.set_namespace("trigger", {})
+        pending: dict[str, asyncio.Task[Any]] = {}
+
+        with patch(
+            "syntara.workflows.workflow_engine.dynamic_workflow._EXECUTION_PLANE_SUPPORTED_NODE_TYPES",
+            frozenset({NodeType.HTTP_REQUEST}),
+        ):
+            _run_schedule_successors(wf, "trigger", graph, pending)
+
+        assert wf._active_ep_nodes == {"node_b"}
 
     def test_schedule_successors_chains_to_next_node(self) -> None:
         """After node_a completes, node_b should be scheduled."""
@@ -853,16 +876,73 @@ class TestConvergeAnyStrategy:
         wf = _make_workflow(skipped_nodes={"node_a"})
         mock_task = MagicMock()
         pending: dict[str, asyncio.Task[Any]] = {"node_a": mock_task, "node_b": MagicMock()}
-        wf._cancel_skipped_pending_tasks(pending)
+        result = asyncio.run(wf._cancel_skipped_pending_tasks(pending))
+
+        assert result is None
         mock_task.cancel.assert_called_once()
         assert "node_a" not in pending
         assert "node_b" in pending
 
+    @pytest.mark.asyncio
+    async def test_cancel_skipped_pending_tasks_cancels_execution_plane_work(self) -> None:
+        wf = _make_workflow(skipped_nodes={"node_a"})
+        wf._active_ep_nodes = {"node_a"}
+        mock_task = MagicMock()
+        pending: dict[str, asyncio.Task[Any]] = {"node_a": mock_task}
+
+        with patch.object(
+            wf,
+            "_cancel_execution_plane_work_nodes",
+            new_callable=AsyncMock,
+        ) as mock_cancel_work:
+            await wf._cancel_skipped_pending_tasks(pending, reason="branch skipped")
+
+        mock_cancel_work.assert_awaited_once_with(["node_a"], reason="branch skipped")
+        mock_task.cancel.assert_called_once()
+        assert "node_a" not in pending
+
     def test_cancel_skipped_pending_tasks_noop_when_none_skipped(self) -> None:
         wf = _make_workflow()
         pending: dict[str, asyncio.Task[Any]] = {"node_a": MagicMock()}
-        wf._cancel_skipped_pending_tasks(pending)
+        asyncio.run(wf._cancel_skipped_pending_tasks(pending))
         assert "node_a" in pending
+
+    @pytest.mark.asyncio
+    async def test_remove_detached_tasks_cancels_execution_plane_work(self) -> None:
+        wf = _make_workflow()
+        wf._detached_nodes = {"node_b"}
+        wf._active_ep_nodes = {"node_b"}
+        pending: dict[str, asyncio.Task[Any]] = {"node_b": MagicMock()}
+
+        with patch.object(
+            wf,
+            "_cancel_execution_plane_work_nodes",
+            new_callable=AsyncMock,
+        ) as mock_cancel_work:
+            await wf._remove_detached_tasks(pending, reason="converge detached")
+
+        mock_cancel_work.assert_awaited_once_with(["node_b"], reason="converge detached")
+        assert "node_b" not in pending
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("_mock_temporal_workflow")
+    async def test_cancel_execution_plane_work_nodes_executes_activity_and_clears_active(self) -> None:
+        wf = _make_workflow()
+        wf.execution_id = "11111111-2222-3333-4444-555555555555"
+        wf._active_ep_nodes = {"node_a", "node_b"}
+        with patch(
+            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+            new=AsyncMock(return_value={}),
+        ) as mock_execute_activity:
+            await wf._cancel_execution_plane_work_nodes(["node_a", "other"], reason="Workflow cancelled")
+
+        assert mock_execute_activity.await_args is not None
+        assert mock_execute_activity.await_args.kwargs["args"] == [
+            "11111111-2222-3333-4444-555555555555",
+            ["node_a"],
+            "Workflow cancelled",
+        ]
+        assert wf._active_ep_nodes == {"node_b"}
 
     def test_skip_incomplete_predecessors_marks_and_propagates(self) -> None:
         graph = _build_fanin_graph()

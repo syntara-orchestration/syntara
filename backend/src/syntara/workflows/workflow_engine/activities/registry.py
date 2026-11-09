@@ -26,6 +26,9 @@ from syntara.workflows.workflow_engine.activities.condition import condition
 from syntara.workflows.workflow_engine.activities.converge import converge
 from syntara.workflows.workflow_engine.activities.credential_resolution_activity import resolve_workflow_credentials
 from syntara.workflows.workflow_engine.activities.eda_trigger import eda_trigger
+from syntara.workflows.workflow_engine.activities.ep.ep_cancellation_activity import (
+    cancel_execution_plane_work_activity,
+)
 from syntara.workflows.workflow_engine.activities.ep.ep_dispatch_activity import execute_script_activity
 from syntara.workflows.workflow_engine.activities.http_request_activity import execute_http_request_activity
 from syntara.workflows.workflow_engine.activities.integration_resolution_activity import resolve_workflow_integration
@@ -66,6 +69,7 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     manual_trigger,
     scheduled_trigger,
     execute_script_activity,
+    cancel_execution_plane_work_activity,
     wait,
     complete_wait,
     webhook_trigger,
