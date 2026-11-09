@@ -494,6 +494,8 @@ async def test_resolve_effective_policies_service_account_direct_role(seeded_db:
 
     policies = await resolve_effective_policies(seeded_db, sa.id)
     names = {p["name"] for p in policies}
-    assert "sa:direct:any" in names
+    assert "sa:direct:any@sa-resolver-proj" in names
+    statement = next(p for p in policies if p["name"] == "sa:direct:any@sa-resolver-proj")
+    assert statement["policy_name"] == "sa:direct:any"
     proj_policies = [p for p in policies if p.get("project") == "sa-resolver-proj"]
     assert len(proj_policies) >= 1

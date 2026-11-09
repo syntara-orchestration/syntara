@@ -6,11 +6,37 @@ from typing import Any
 
 import pytest
 
-from syntara.workflows.node_kinds import NODE_KINDS, node_labels, validate_node_kind_statements
+from syntara.workflows.node_kinds import (
+    NODE_KIND_DISPLAY_LABELS,
+    NODE_KINDS,
+    node_kind_display_label,
+    node_labels,
+    validate_node_kind_statements,
+)
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 _SYSTEM_ONLY_NODE_TYPES = frozenset({NodeType.INTERNAL_ACTIVITY.value})
 _GRANTABLE_NODE_TYPES = sorted(NODE_KINDS)
+
+
+def test_display_labels_cover_every_grantable_kind() -> None:
+    """Adding a grantable step type requires an explicit display label."""
+    assert set(NODE_KIND_DISPLAY_LABELS) == NODE_KINDS
+
+
+@pytest.mark.parametrize(
+    ("kind", "label"),
+    [
+        ("manual_trigger", "Manual trigger"),
+        ("eda_trigger", "Event-Driven Ansible trigger"),
+        ("agentic", "Task Agent"),
+        ("http_request", "REST API"),
+        ("future_step_type", "Future Step Type"),
+    ],
+)
+def test_node_kind_display_label(kind: str, label: str) -> None:
+    """Use builder terminology, with readable labels for unrecognized kinds."""
+    assert node_kind_display_label(kind) == label
 
 
 def test_registry_and_schema_catalog_cover_all_node_types() -> None:
@@ -34,23 +60,25 @@ def test_every_grantable_kind_is_valid(kind: str, condition: str) -> None:
     assert validate_node_kind_statements(statements) is None
 
 
-@pytest.mark.parametrize("action", ["step_type:write", "step_type:*"])
 @pytest.mark.parametrize(
-    "labels",
-    [
-        {"kind": "scritp"},
-        {"kind": "*"},
-        {"kind": []},
-        {"kind": None},
-        {"kind": NodeType.INTERNAL_ACTIVITY.value},
-    ],
+    "kind",
+    ["scritp", "future_step_type", NodeType.INTERNAL_ACTIVITY.value],
 )
-def test_unknown_or_malformed_kind_rejected(action: str, labels: dict[str, Any]) -> None:
-    """Unknown values (including system-only types) cannot create silent no-ops."""
-    error = validate_node_kind_statements([{"actions": [action], "conditions": {"resource_labels": labels}}])
+@pytest.mark.parametrize("condition", ["resource_labels", "resource_labels_not"])
+def test_unknown_and_system_kinds_are_valid(kind: str, condition: str) -> None:
+    """Policies can target kinds that are new or system-only."""
+    error = validate_node_kind_statements([{"actions": ["step_type:write"], "conditions": {condition: {"kind": kind}}}])
+    assert error is None
+
+
+@pytest.mark.parametrize("kind", [[], None, "", "   "])
+def test_malformed_kind_rejected(kind: object) -> None:
+    """A kind selector must still be a non-empty string."""
+    error = validate_node_kind_statements(
+        [{"actions": ["step_type:write"], "conditions": {"resource_labels": {"kind": kind}}}]
+    )
     assert error is not None
-    assert "Unknown step type" in error
-    assert str(labels["kind"]) in error
+    assert "non-empty string" in error
 
 
 @pytest.mark.parametrize("conditions", [None, {}, {"resource_labels": {}}, {"resource_labels_not": {}}])
