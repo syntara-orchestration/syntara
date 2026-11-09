@@ -10,6 +10,7 @@ class MetricsCategoryType(str, Enum):
     ERROR = "error"
     EXECUTION_SERVICE = "execution_service"
     LLM = "llm"
+    RETRY = "retry"
     SYSTEM_OVERHEAD = "system_overhead"
     SYSTEM_WIDE = "system_wide"
     TEMPORAL_WORKER = "temporal_worker"

@@ -106,6 +106,11 @@ class MetricType(StrEnum):
     AUTHZ_DURATION = "authz_duration_ms"
     OPA_REQUEST_DURATION = "opa_request_duration_ms"
 
+    # Retry Telemetry Metrics
+    WORKFLOW_RETRY_REQUESTS = "workflow_retry_requests_total"
+    WORKFLOW_RETRY_COMPLETIONS = "workflow_retry_completions_total"
+    WORKFLOW_RETRY_DURATION = "workflow_retry_duration_seconds"
+
 
 class MetricsCategoryType(StrEnum):
     """Metric category names used to group :class:`MetricType` members."""
@@ -125,6 +130,7 @@ class MetricsCategoryType(StrEnum):
     TOOL = "tool"
     SYSTEM_WIDE = "system_wide"
     AUTHORIZATION = "authorization"
+    RETRY = "retry"
 
 
 METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
@@ -203,6 +209,11 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
     MetricsCategoryType.AUTHORIZATION: [
         MetricType.AUTHZ_DURATION,
         MetricType.OPA_REQUEST_DURATION,
+    ],
+    MetricsCategoryType.RETRY: [
+        MetricType.WORKFLOW_RETRY_REQUESTS,
+        MetricType.WORKFLOW_RETRY_COMPLETIONS,
+        MetricType.WORKFLOW_RETRY_DURATION,
     ],
 }
 

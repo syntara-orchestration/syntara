@@ -423,6 +423,13 @@ class MetricsRecorder:
         }:
             MetricsRecorder._dispatch_scheduled_trigger(metric_type, value, labels, p)
 
+        elif metric_type in {
+            MetricType.WORKFLOW_RETRY_REQUESTS,
+            MetricType.WORKFLOW_RETRY_COMPLETIONS,
+            MetricType.WORKFLOW_RETRY_DURATION,
+        }:
+            MetricsRecorder._dispatch_retry(metric_type, value, labels, p)
+
         else:
             MetricsRecorder._dispatch_component(metric_type, value, labels, p)
 
@@ -577,6 +584,40 @@ class MetricsRecorder:
             p.opa_request_duration_seconds.labels(
                 resource_type=resource_type,
                 action=action,
+            ).observe(value / 1000)
+
+    @staticmethod
+    def _dispatch_retry(
+        metric_type: MetricType,
+        value: float,
+        labels: dict[str, str],
+        p: OrchestratorPrometheusMetrics,
+    ) -> None:
+        """Handle retry telemetry metrics (requests, completions, duration).
+
+        Retry metrics do not include a component label and use milliseconds for duration.
+        """
+        retry_kind = labels.get("retry_kind", "unknown")
+
+        if metric_type == MetricType.WORKFLOW_RETRY_REQUESTS:
+            outcome = labels.get("outcome", "unknown")
+            p.workflow_retry_requests_total.labels(
+                retry_kind=retry_kind,
+                outcome=outcome,
+            ).inc()
+
+        elif metric_type == MetricType.WORKFLOW_RETRY_COMPLETIONS:
+            status = labels.get("status", "unknown")
+            p.workflow_retry_completions_total.labels(
+                retry_kind=retry_kind,
+                status=status,
+            ).inc()
+
+        elif metric_type == MetricType.WORKFLOW_RETRY_DURATION:
+            status = labels.get("status", "unknown")
+            p.workflow_retry_duration_seconds.labels(
+                retry_kind=retry_kind,
+                status=status,
             ).observe(value / 1000)
 
     @staticmethod
