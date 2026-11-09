@@ -1,4 +1,4 @@
-import { EdgeHandleEnum, type Activity } from '@syntara/contracts'
+import { ActivityTypeEnum, EdgeHandleEnum, type Activity } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import type { EdgeConnection } from '../../../types/edge'
@@ -307,6 +307,25 @@ describe('validateVariableReferences', () => {
       }
 
       expect(validateVariableReferences(activities, [], context)).toEqual([])
+    })
+  })
+
+  describe('loop scope (parity with backend template_expressions validator)', () => {
+    it('accepts ${loop.item.<field>} on a node inside the loop body', () => {
+      const activities: Activity[] = [
+        makeActivity({ id: 'each_host', type: ActivityTypeEnum.LOOP, parameters: {} }),
+        makeActivity({
+          id: 'check_host',
+          name: 'Check host',
+          type: 'script',
+          parameters: { code: 'echo ${loop.item.host}' },
+        }),
+      ]
+      const edges: EdgeConnection[] = [
+        { id: 'e1', source: 'each_host', target: 'check_host', sourceHandle: EdgeHandleEnum.LOOP },
+      ]
+
+      expect(validateVariableReferences(activities, edges)).toEqual([])
     })
   })
 
