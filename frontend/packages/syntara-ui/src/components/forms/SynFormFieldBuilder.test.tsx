@@ -363,6 +363,20 @@ describe('SynFormFieldBuilder', () => {
       expect(defaultInput).toHaveValue(12.5)
     })
 
+    it('increments number initial answer from empty', async () => {
+      const user = userEvent.setup()
+      const definition = parseFormDefinition({
+        fields: [{ type: FormFieldTypeEnum.NUMBER, value_name: 'qty', label: 'Qty', default: null }],
+      })
+      renderBuilder(<SynFormFieldBuilder value={definition} onChange={vi.fn()} />)
+
+      const defaultInput = screen.getByRole('spinbutton', { name: 'Initial answer' })
+      expect(defaultInput).toHaveValue(null)
+
+      await user.click(screen.getByRole('button', { name: 'Plus' }))
+      expect(defaultInput).toHaveValue(1)
+    })
+
     it('accepts text default value', async () => {
       const user = userEvent.setup()
       renderBuilder(<SynFormFieldBuilder value={createEmptyFormDefinition()} onChange={vi.fn()} />)
