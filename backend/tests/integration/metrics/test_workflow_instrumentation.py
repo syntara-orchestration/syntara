@@ -6,7 +6,7 @@ expected metrics records when encountering terminal executions.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
@@ -465,3 +465,78 @@ class TestWorkflowCompletionRate:
             component="execution_service",
         )._value.get()
         assert gauge_value == pytest.approx(1.0)
+
+
+# =============================================================================
+# Retry metrics
+# =============================================================================
+
+
+class TestRetryMetrics:
+    """Tests for retry-specific metrics."""
+
+    def setup_method(self) -> None:
+        reset_emission_trackers()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("metadata", "expected_kind", "execution_status", "expected_status"),
+        [
+            (None, "standard", ExecutionStatus.FAILED, "failed"),
+            ({"eligible_point_ids": ["node-1", "node-2"]}, "from_failure", ExecutionStatus.COMPLETED, "completed"),
+        ],
+    )
+    async def test_retry_completion_metrics(
+        self,
+        recorder: MetricsRecorder,
+        executions_factory: ExecutionsFactory,
+        test_db_session: AsyncSession,
+        metadata: dict[str, list[str]] | None,
+        expected_kind: str,
+        execution_status: ExecutionStatus,
+        expected_status: str,
+    ) -> None:
+        """Retry completion metrics use inferred kind, bounded status, and seconds."""
+        # Create original execution
+        original_execs = await executions_factory.create_executions(count=1, status=ExecutionStatus.FAILED)
+        original_exec = original_execs[0]
+
+        retry_execs = await executions_factory.create_executions(count=1, status=execution_status)
+        retry_exec = retry_execs[0]
+        retry_exec.retried_from_execution_id = original_exec.id
+        retry_exec.execution_metadata = metadata
+        retry_exec.created_at = datetime.now(UTC) - timedelta(seconds=2)
+        retry_exec.completed_at = datetime.now(UTC)
+        test_db_session.add(retry_exec)
+        await test_db_session.commit()
+        await test_db_session.refresh(retry_exec)
+
+        # Emit metrics
+        service = _make_service(test_db_session)
+        with patch(PATCH_TARGET, return_value=recorder):
+            await service._emit_completion_metrics(retry_exec)
+
+        # Verify retry completion metric with status=failed
+        retry_completions = list(recorder.query(metric_types={MetricType.WORKFLOW_RETRY_COMPLETIONS}))
+        assert len(retry_completions) == 1
+        assert retry_completions[0].labels["retry_kind"] == expected_kind
+        assert retry_completions[0].labels["status"] == expected_status
+
+        retry_durations = list(recorder.query(metric_types={MetricType.WORKFLOW_RETRY_DURATION}))
+        assert len(retry_durations) == 1
+        assert retry_durations[0].labels["retry_kind"] == expected_kind
+        assert retry_durations[0].labels["status"] == expected_status
+
+        completion_sample = recorder.prometheus.workflow_retry_completions_total.labels(
+            retry_kind=expected_kind,
+            status=expected_status,
+        )
+        assert completion_sample._value.get() == pytest.approx(1.0)
+
+        duration_sample = recorder.prometheus.workflow_retry_duration_seconds.labels(
+            retry_kind=expected_kind,
+            status=expected_status,
+        )
+        duration_samples = {sample.name: sample.value for sample in duration_sample._child_samples()}
+        assert duration_samples["_count"] == pytest.approx(1.0)
+        assert duration_samples["_sum"] == pytest.approx(2.0, abs=0.1)

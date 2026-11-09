@@ -240,6 +240,9 @@ export interface components {
       | 'auth_failure'
       | 'authz_duration_ms'
       | 'opa_request_duration_ms'
+      | 'workflow_retry_requests_total'
+      | 'workflow_retry_completions_total'
+      | 'workflow_retry_duration_seconds'
     /**
      * MetricsCategoryType
      * @description Metric category names used to group :class:`MetricType` members.
@@ -260,6 +263,7 @@ export interface components {
       | 'tool'
       | 'system_wide'
       | 'authorization'
+      | 'retry'
     /**
      * MetricsRecordPage
      * @description Paginated list of raw metric records.
