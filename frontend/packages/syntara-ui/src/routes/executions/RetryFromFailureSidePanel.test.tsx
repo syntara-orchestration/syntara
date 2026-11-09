@@ -128,7 +128,7 @@ describe('RetryFromFailureSidePanel', () => {
   it('submits saved input overrides with the retry request', async () => {
     const user = userEvent.setup()
     const overrides = { 'step-2': { endpoint: 'https://retry.example' } }
-    renderPanel({ inputParameterOverrides: overrides })
+    renderPanel({ failedActivityIds: ['step-2'], inputParameterOverrides: overrides })
 
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
 
@@ -350,7 +350,12 @@ describe('RetryFromFailureSidePanel', () => {
         isError: false,
       }
     })
-    const { container } = renderPanel()
+    const onRetryInputOverridePointIdsChange = vi.fn()
+    const { container } = renderPanel({
+      failedActivityIds: ['step-failed'],
+      workflowEdges: [{ source: 'step-2', target: 'step-failed' }],
+      onRetryInputOverridePointIdsChange,
+    })
 
     expect(screen.getByRole('heading', { name: 'Warning alert: Output sanitized' })).toBeInTheDocument()
     expect(screen.getByTestId('retry-sanitized-output-alert')).toHaveTextContent(
@@ -361,13 +366,40 @@ describe('RetryFromFailureSidePanel', () => {
       'Sanitized for safety and regenerated during retry'
     )
 
+    expect(onRetryInputOverridePointIdsChange).toHaveBeenCalledWith(['step-failed'])
+
     await user.click(screen.getByRole('radio', { name: 'Choose branches' }))
     await user.click(screen.getByRole('checkbox', { name: 'Second Step' }))
 
     expect(screen.getByTestId('retry-starts-at')).toHaveTextContent('Second Step')
+    await waitFor(() => expect(onRetryInputOverridePointIdsChange).toHaveBeenCalledWith(['step-failed']))
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
     expect(mockHandleRetry).toHaveBeenCalledWith(['step-2'], {})
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('submits overrides for the failed step when retry starts at a sanitized replacement', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useRetryFromFailurePreview).mockReturnValue({
+      preview: {
+        eligible: true,
+        eligible_point_ids: ['step-2'],
+        auto_included_node_ids: ['step-2'],
+        sanitized_replacements: { 'step-failed': ['step-2'] },
+        total_step_count: 3,
+      },
+      isLoading: false,
+      isError: false,
+    })
+    renderPanel({
+      failedActivityIds: ['step-failed'],
+      workflowEdges: [{ source: 'step-2', target: 'step-failed' }],
+      inputParameterOverrides: { 'step-failed': { code: 'echo retry' }, 'step-2': { url: 'https://ignored.example' } },
+    })
+
+    await user.click(screen.getByTestId('retry-from-failure-confirm'))
+
+    expect(mockHandleRetry).toHaveBeenCalledWith(undefined, { 'step-failed': { code: 'echo retry' } })
   })
 
   it('describes sanitized replacement starts and warns when a failed branch is left unselected', async () => {

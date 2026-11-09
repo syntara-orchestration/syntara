@@ -7,6 +7,7 @@ import { FlowNodeType } from '../../constants'
 import { type ButtonEdgePlaceholderNode, type NodeType } from '../workflows/canvas/nodes/NodeType'
 
 import { BuilderFlowCanvas } from './BuilderFlowCanvas'
+import { RETRY_LABEL_BASE_OFFSET, RETRY_LABEL_HEIGHT, RETRY_LABEL_LANE_GAP } from './retryPreviewLabelLayout'
 import type { EdgeType } from './utils/workflowToGraph'
 
 let latestReactFlowProps: Record<string, unknown> | null = null
@@ -31,21 +32,23 @@ vi.mock('@xyflow/react', async () => {
       children,
       'data-testid': testId,
       position,
+      align,
       offset,
     }: {
       children?: ReactNode
       'data-testid'?: string
       position?: string
+      align?: string
       offset?: number
     }) => (
-      <div data-testid={testId} data-position={position} data-offset={offset}>
+      <div data-testid={testId} data-position={position} data-align={align} data-offset={offset}>
         {children}
       </div>
     ),
     Background: () => null,
     BackgroundVariant: { Dots: 'dots' },
     ConnectionLineType: { SmoothStep: 'smoothstep' },
-    Position: { Top: 'top', Bottom: 'bottom' },
+    Position: { Top: 'top', Bottom: 'bottom', Left: 'left', Right: 'right' },
     useStore: (
       selector: (state: typeof flowStore.state) => unknown,
       equalityFn?: (previous: unknown, next: unknown) => boolean
@@ -190,8 +193,16 @@ describe('BuilderFlowCanvas', () => {
       screen.getByTestId('retry-state-retained'),
       screen.getByTestId('retry-state-unselected-failure'),
     ]
-    expect(retryLabels.every((label) => label.getAttribute('data-position') === 'top')).toBe(true)
-    expect(retryLabels[0]?.getAttribute('data-offset')).not.toBe(retryLabels[1]?.getAttribute('data-offset'))
+    expect(
+      retryLabels.every((label) => ['top', 'left', 'right'].includes(label.getAttribute('data-position') ?? ''))
+    ).toBe(true)
+    expect(
+      retryLabels.every(
+        (label) =>
+          Number(label.getAttribute('data-offset')) <=
+          RETRY_LABEL_BASE_OFFSET + RETRY_LABEL_HEIGHT + RETRY_LABEL_LANE_GAP
+      )
+    ).toBe(true)
     const renderedNodes = (
       latestReactFlowProps as {
         nodes: Array<{ id: string; data: Record<string, unknown>; ariaLabel?: string }>

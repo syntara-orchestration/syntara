@@ -2,6 +2,7 @@ import { ExecutionStatusEnum } from '@syntara/contracts'
 import type { ExecutionsAPI } from '@syntara/contracts'
 
 import { getActivityTypeLabel } from '../builder/panels/utils/getUpstreamStepDisplayName'
+import { getRetryPreviewReachableNodeIds, type RetryPreviewGraphEdge } from '../builder/retryPreviewCanvasState'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
 type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
@@ -50,6 +51,32 @@ export function selectedRetryPointId(
 /** Sanitized nodes that replace failed start points, independent of the current selection. */
 export function sanitizedReplacementIds(preview: RetryFromFailurePreview | undefined): string[] {
   return [...new Set(Object.values(preview?.sanitized_replacements ?? {}).flat())]
+}
+
+/**
+ * Failed steps the user may edit for this retry: they will re-execute, and they
+ * are not the auto-replayed sanitized replacement that only regenerates output.
+ */
+export function getRetryInputOverridePointIds(
+  preview: RetryFromFailurePreview | undefined,
+  failedActivityIds: readonly string[],
+  edges: readonly RetryPreviewGraphEdge[]
+): string[] {
+  if (!preview?.eligible) return []
+  const startIds = eligibleRetryPointIds(preview)
+  if (startIds.length === 0) return []
+
+  const reachable = getRetryPreviewReachableNodeIds(startIds, edges)
+  const nonEditable = new Set(unavailableOutputIds(preview).map((id) => parseCompositeKey(id).baseId))
+  const seen = new Set<string>()
+  const targets: string[] = []
+  for (const activityId of failedActivityIds) {
+    const baseId = parseCompositeKey(activityId).baseId
+    if (seen.has(baseId) || nonEditable.has(baseId) || !reachable.has(baseId)) continue
+    seen.add(baseId)
+    targets.push(baseId)
+  }
+  return targets
 }
 
 /** Sanitized start points on the current retry path that cannot reuse stored output. */

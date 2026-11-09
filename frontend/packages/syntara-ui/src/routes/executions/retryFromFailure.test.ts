@@ -3,6 +3,7 @@ import { ExecutionStatusEnum } from '@syntara/contracts'
 import {
   canConfirmRetryFromFailure,
   eligibleRetryPointIds,
+  getRetryInputOverridePointIds,
   getRetryPlanPoints,
   getSanitizedOutputWarning,
   getUnavailableRetryPlanPoints,
@@ -141,6 +142,56 @@ describe('selectedRetryPointId', () => {
         preview({ eligible_point_ids: ['failed-node', 'sanitized-node'], auto_included_node_ids: ['sanitized-node'] })
       )
     ).toBe('sanitized-node')
+  })
+})
+
+describe('getRetryInputOverridePointIds', () => {
+  const edges = [
+    { source: 'fetch-inventory', target: 'process-inventory' },
+    { source: 'call-api', target: 'publish-results' },
+  ]
+
+  it('lets the failed step stay editable when retry starts at a sanitized replacement', () => {
+    expect(
+      getRetryInputOverridePointIds(
+        preview({
+          eligible_point_ids: ['fetch-inventory'],
+          auto_included_node_ids: ['fetch-inventory'],
+          sanitized_replacements: { 'process-inventory': ['fetch-inventory'] },
+        }),
+        ['process-inventory', 'call-api'],
+        edges
+      )
+    ).toEqual(['process-inventory'])
+  })
+
+  it('keeps a selected failed branch editable and leaves unselected failures out', () => {
+    expect(
+      getRetryInputOverridePointIds(
+        preview({
+          eligible_point_ids: ['call-api'],
+          sanitized_replacements: { 'process-inventory': ['fetch-inventory'] },
+        }),
+        ['process-inventory', 'call-api'],
+        edges
+      )
+    ).toEqual(['call-api'])
+  })
+
+  it('still targets a failed start point when no output was sanitized', () => {
+    expect(getRetryInputOverridePointIds(preview({ eligible_point_ids: ['call-api'] }), ['call-api'], edges)).toEqual([
+      'call-api',
+    ])
+  })
+
+  it('returns no editor targets when the preview is ineligible', () => {
+    expect(
+      getRetryInputOverridePointIds(
+        preview({ eligible: false, eligible_point_ids: ['fetch-inventory'] }),
+        ['process-inventory'],
+        edges
+      )
+    ).toEqual([])
   })
 })
 

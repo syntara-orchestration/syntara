@@ -13,10 +13,10 @@ import { useRetryFromFailurePreview } from './hooks/useRetryFromFailurePreview'
 import {
   canConfirmRetryFromFailure,
   eligibleRetryPointIds,
+  getRetryInputOverridePointIds,
   getRetryPlanPoints,
   getSanitizedOutputWarning,
   getUnavailableRetryPlanPoints,
-  sanitizedReplacementIds,
   type RetryFromFailurePreview,
 } from './retryFromFailure'
 import styles from './RetryFromFailureSidePanel.module.css'
@@ -122,11 +122,8 @@ export function RetryFromFailureSidePanel({
     isLoading: activeIsLoading,
     activePreview,
   })
-  const sanitizedOverrideIds = new Set(sanitizedReplacementIds(defaultPreviewQuery.preview))
-  const retryInputOverridePointIds = (
-    scopeMode === 'all' ? eligibleRetryPointIds(defaultPreviewQuery.preview) : requestedRetryPointIds
-  ).filter((pointId) => !sanitizedOverrideIds.has(pointId))
-  const retryInputOverridePointIdsKey = activePreview?.eligible ? retryInputOverridePointIds.join('\u0000') : ''
+  const retryInputOverridePointIds = getRetryInputOverridePointIds(activePreview, failedActivityIds, workflowEdges)
+  const retryInputOverridePointIdsKey = retryInputOverridePointIds.join('\u0000')
   const notifyRetryPreviewPointIdsChange = useEffectEvent((pointIds: string[]) => {
     onRetryPreviewPointIdsChange?.(pointIds)
   })
@@ -155,11 +152,9 @@ export function RetryFromFailureSidePanel({
     (scopeMode === 'selected' && requestedRetryPointIds.length === 0) ||
     hasUnsavedInputOverrides ||
     retry.isPending
-  const submitInputParameterOverrides = Object.fromEntries(
-    retryInputOverridePointIds.flatMap((pointId) => {
-      const overrides = inputParameterOverrides[pointId]
-      return overrides && Object.keys(overrides).length > 0 ? [[pointId, overrides] as const] : []
-    })
+  const submitInputParameterOverrides = pickRetryInputParameterOverrides(
+    retryInputOverridePointIds,
+    inputParameterOverrides
   )
 
   return (
@@ -280,6 +275,18 @@ function useRetryScopeSelection() {
     chooseRetryPoints,
     updateRetryPoint,
   }
+}
+
+function pickRetryInputParameterOverrides(
+  pointIds: readonly string[],
+  overrides: Readonly<Record<string, Record<string, unknown>>>
+): Record<string, Record<string, unknown>> {
+  return Object.fromEntries(
+    pointIds.flatMap((pointId) => {
+      const value = overrides[pointId]
+      return value && Object.keys(value).length > 0 ? [[pointId, value] as const] : []
+    })
+  )
 }
 
 function getPanelNotRetriedFailureCount({

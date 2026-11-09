@@ -6,7 +6,7 @@ export type RetryPreviewCanvasNode = Readonly<{ id: string; type?: string; statu
 export type RetryPreviewCanvasState = 'origin' | 'will-retry' | 'retained' | 'not-retried'
 
 /** Find the workflow nodes that are downstream of the selected retry start points. */
-function getRetryPreviewReachableNodeIds(
+export function getRetryPreviewReachableNodeIds(
   retryPointIds: readonly string[],
   edges: readonly RetryPreviewGraphEdge[]
 ): Set<string> {
