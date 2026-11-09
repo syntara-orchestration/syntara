@@ -40,6 +40,7 @@ export function SynDynamicForm({
   isReadOnly = false,
   disabledFieldTooltip,
   hideSubmitButton = false,
+  showSubmitWhenReadOnly = false,
   id,
   'data-testid': dataTestId,
   textAreaControlClassName,
@@ -101,7 +102,7 @@ export function SynDynamicForm({
     }
   }
 
-  const showSubmit = !hideSubmitButton && !isReadOnly
+  const showSubmit = !hideSubmitButton && (!isReadOnly || showSubmitWhenReadOnly)
 
   return (
     <Form id={id} data-testid={dataTestId} onSubmit={handleSubmit((values) => detachPromise(onFormSubmit(values)))}>

@@ -15,6 +15,25 @@ function renderPreview(ui: ReactElement) {
 }
 
 describe('FormPromptPreviewModal', () => {
+  it('shows a disabled submit button and applies CSS overrides in the preview', () => {
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'note', label: 'Note' }],
+    })
+
+    renderPreview(
+      <FormPromptPreviewModal
+        isOpen
+        formDefinition={definition}
+        onClose={vi.fn()}
+        submitLabel="Send request"
+        cssOverrideSource=".form-step-response-form label { font-weight: 700; }"
+      />
+    )
+
+    expect(screen.getByRole('button', { name: 'Send request' })).toBeDisabled()
+    expect(screen.getByText('Note')).toHaveStyle({ fontWeight: '700' })
+  })
+
   it('shows preview notice when dynamic options cannot be resolved', () => {
     const definition = parseFormDefinition({
       fields: [

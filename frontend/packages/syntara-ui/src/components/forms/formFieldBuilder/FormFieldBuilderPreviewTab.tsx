@@ -9,13 +9,26 @@ import {
   FORM_PROMPT_PREVIEW_DYNAMIC_OPTIONS_ALERT_BODY,
   FORM_PROMPT_PREVIEW_DYNAMIC_OPTIONS_ALERT_TITLE,
 } from '../../../forms/formPromptDynamicOptions'
-import { SynDynamicForm } from '../SynDynamicForm'
+import { SynFormDefinitionPreview } from '../SynFormDefinitionPreview'
 
-export function FormFieldBuilderPreviewTab() {
+type FormFieldBuilderPreviewTabProps = Readonly<{
+  submitLabel?: string | null
+  cssOverrideSource?: string | null
+  description?: string | null
+}>
+
+const FORM_BUILDER_PREVIEW_FALLBACK_DESCRIPTION = 'Preview of the configured form.'
+
+export function FormFieldBuilderPreviewTab({
+  submitLabel,
+  cssOverrideSource,
+  description,
+}: FormFieldBuilderPreviewTabProps) {
   const { control } = useFormContext<FormDefinition>()
   const fields = useWatch({ control, name: 'fields' })
 
   const parsed = useMemo(() => safeParseFormDefinition({ fields }), [fields])
+  const previewDescription = description?.trim() || FORM_BUILDER_PREVIEW_FALLBACK_DESCRIPTION
 
   if (!parsed.success) {
     return (
@@ -44,12 +57,11 @@ export function FormFieldBuilderPreviewTab() {
         </StackItem>
       ) : null}
       <StackItem>
-        <SynDynamicForm
+        <SynFormDefinitionPreview
           definition={parsed.data}
-          hideSubmitButton
-          isReadOnly
-          onSubmit={() => undefined}
-          description="Preview of the configured form."
+          description={previewDescription}
+          submitLabel={submitLabel}
+          cssOverrideSource={cssOverrideSource}
         />
       </StackItem>
     </Stack>
