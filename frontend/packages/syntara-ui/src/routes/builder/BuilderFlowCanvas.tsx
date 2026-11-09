@@ -168,6 +168,7 @@ export function BuilderFlowCanvas({
         maxZoom={1}
         nodesDraggable={!isReadOnly}
         nodesConnectable={!isReadOnly}
+        edgesFocusable={false}
       >
         <SemanticZoomNodeInternalsUpdater />
         <EdgeMarkers />

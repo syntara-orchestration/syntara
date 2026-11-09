@@ -8,6 +8,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import { approvalsClient, executionsClient, workflowClient } from '../../client'
 import { AlertProvider } from '../../providers/alerts'
+import { FeatureFlagsProvider } from '../../providers/feature-flags-provider'
 import { routerTestState } from '../../test/setup'
 
 // Mock dependencies
@@ -64,9 +65,11 @@ const queryClient = new QueryClient({
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>
-    <AlertProvider>
-      <ReactFlowProvider>{children}</ReactFlowProvider>
-    </AlertProvider>
+    <FeatureFlagsProvider>
+      <AlertProvider>
+        <ReactFlowProvider>{children}</ReactFlowProvider>
+      </AlertProvider>
+    </FeatureFlagsProvider>
   </QueryClientProvider>
 )
 
@@ -212,7 +215,7 @@ describe('BuilderContent - Delete Workflow', () => {
       expect(screen.getByText('Delete workflow?')).toBeInTheDocument()
       expect(
         screen.getByText(
-          /will be deleted and any in-progress runs will stop immediately\. This action cannot be undone\./
+          /will be deleted and any in-progress runs will stop immediately\. Its run history will also be permanently deleted\. This action cannot be undone\./
         )
       ).toBeInTheDocument()
     })
@@ -246,7 +249,7 @@ describe('BuilderContent - Delete Workflow', () => {
     await screen.findByText('Delete workflow?')
     await user.click(
       screen.getByRole('checkbox', {
-        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately\. I also understand its run history will be permanently deleted/,
       })
     )
     await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
@@ -292,7 +295,7 @@ describe('BuilderContent - Delete Workflow', () => {
     await screen.findByText('Delete workflow?')
     await user.click(
       screen.getByRole('checkbox', {
-        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately\. I also understand its run history will be permanently deleted/,
       })
     )
     await user.click(screen.getByRole('button', { name: 'Delete workflow' }))

@@ -4,7 +4,7 @@ import {
   COLOR_SCHEME_STORAGE_KEY,
   applyDocumentColorScheme,
   ensureDocumentColorScheme,
-  readStoredColorScheme,
+  readStoredColorSchemePreference,
   resolveColorScheme,
 } from './colorScheme'
 
@@ -38,9 +38,20 @@ describe('colorScheme', () => {
     vi.unstubAllGlobals()
   })
 
-  it('readStoredColorScheme returns null for unknown values', () => {
+  it('readStoredColorSchemePreference returns null for unknown values', () => {
+    localStorage.setItem(COLOR_SCHEME_STORAGE_KEY, 'sepia')
+    expect(readStoredColorSchemePreference()).toBeNull()
+  })
+
+  it('readStoredColorSchemePreference accepts system', () => {
     localStorage.setItem(COLOR_SCHEME_STORAGE_KEY, 'system')
-    expect(readStoredColorScheme()).toBeNull()
+    expect(readStoredColorSchemePreference()).toBe('system')
+  })
+
+  it('resolveColorScheme follows media when the stored preference is system', () => {
+    vi.stubGlobal('matchMedia', mockMatchMedia(true, false))
+    localStorage.setItem(COLOR_SCHEME_STORAGE_KEY, 'system')
+    expect(resolveColorScheme()).toBe('light')
   })
 
   it('resolveColorScheme returns stored light', () => {

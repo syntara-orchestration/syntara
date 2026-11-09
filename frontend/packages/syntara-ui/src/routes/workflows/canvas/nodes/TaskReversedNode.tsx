@@ -53,6 +53,7 @@ export function TaskReversedStepComponent(props: NodeProps<TaskReversedNode>) {
       topBarColor={iconColor}
       semanticZoomSummary={getTaskSemanticLabels(props.data)}
       semanticZoomIcon={getTaskCanvasIcon(props.data, iconColor, 'semanticZoom')}
+      semanticZoomPreviewIcon={getTaskCanvasIcon(props.data, iconColor, 'header')}
       semanticZoomMenuActions={menuActions}
     >
       <TaskActivityDetails data={props.data} menuActions={menuActions} iconColor={iconColor} />

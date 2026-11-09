@@ -162,7 +162,7 @@ export default tseslint.config(
       'no-restricted-properties': ['error', CRYPTO_RANDOM_UUID_RESTRICTION],
     },
   },
-  // Icon migration: flag non-RhUi icons at warn level (existing legacy imports being phased out incrementally).
+  // Require RhUi icons in production TypeScript files when equivalents exist.
   // Bridge hook deprecation uses @typescript-eslint/no-restricted-imports (a separate
   // rule name) to avoid flat-config shadowing — two blocks setting the same rule on the same files
   // would cause the last one to win and silently drop the other.
@@ -171,14 +171,14 @@ export default tseslint.config(
     ignores: [...TEST_FILES, ...E2E_FILES],
     rules: {
       'no-restricted-imports': [
-        'warn',
+        'error',
         {
           patterns: [
             {
               group: ['@patternfly/react-icons'],
-              importNamePattern: '^(?!RhUi)',
-              message:
-                'Use RhUi* icons from @patternfly/react-icons (e.g. RhUiAddIcon, RhUiTrashIcon, RhUiEditIcon). Non-RhUi icons are being phased out.',
+              // Provider identity and empty-state icon choices follow product UX guidance.
+              importNamePattern: '^(?!(?:RhUi|AnsibleTowerIcon$|GlobeIcon$|PlusCircleIcon$|SearchIcon$))',
+              message: 'Use RhUi* icons from @patternfly/react-icons, except approved provider and empty-state icons.',
             },
           ],
         },
@@ -192,7 +192,7 @@ export default tseslint.config(
     ignores: ['**/hooks/routing/*.{ts,tsx}', '**/hooks/routing/*.test.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
-        'warn',
+        'error',
         {
           ...SHARED_RESTRICTED_IMPORT_OPTIONS,
         },
@@ -366,7 +366,7 @@ export default tseslint.config(
       'reactYouMightNotNeedAnEffect/no-chain-state-updates': 'warn',
       'reactYouMightNotNeedAnEffect/no-event-handler': 'warn',
       'reactYouMightNotNeedAnEffect/no-adjust-state-on-prop-change': 'warn',
-      'reactYouMightNotNeedAnEffect/no-reset-all-state-on-prop-change': 'warn',
+      'reactYouMightNotNeedAnEffect/no-reset-all-state-on-prop-change': 'error',
       'reactYouMightNotNeedAnEffect/no-pass-live-state-to-parent': 'warn',
       'reactYouMightNotNeedAnEffect/no-pass-data-to-parent': 'warn',
       'reactYouMightNotNeedAnEffect/no-initialize-state': 'warn',
@@ -500,7 +500,7 @@ export default tseslint.config(
       'testing-library/no-debugging-utils': 'error',
       // Prefer userEvent over fireEvent for realistic user interaction simulation
       'testing-library/prefer-user-event': 'error',
-      'testing-library/no-container': 'warn',
+      'testing-library/no-container': 'error',
       'testing-library/no-node-access': 'error',
     },
   },

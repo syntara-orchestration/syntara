@@ -65,6 +65,8 @@ Treat accessibility as part of every UI change, not an optional follow-up:
 **CRITICAL: Always follow TypeScript best practices and do not introduce new ESLint warnings.**
 
 - **TypeScript first**: Prefer strict, explicit typing and type-safe patterns. Avoid `any`, avoid unsafe casts unless absolutely necessary, and use existing shared types or contract types whenever possible.
+- **Feature flags**: Use `useFeatureFlag` with a registered `FeatureFlag` in React components; use `context.featureFlags` (`FeatureFlagConfig`) in route guards. `isFeatureFlagEnabled` is an internal storage reader used to build the provider snapshot.
+  In component tests, set `localStorage` before rendering `FeatureFlagsProvider` instead of mocking `useFeatureFlag`. Do not cast arbitrary strings to bypass the type check. See [`docs/features/feature-flags.md`](docs/features/feature-flags.md) for registration and local override guidance.
 - **Respect existing lint rules**: New or modified code should not add fresh ESLint warnings or errors, even in areas where older warnings still exist.
 - **Leave files no worse than you found them**: If you touch a file, avoid increasing its warning count. When practical, reduce nearby warnings as part of the change.
 - **Refactor instead of suppressing**: Prefer clearer control flow, smaller functions, extracted helpers, and stronger types over disabling rules.
@@ -111,7 +113,7 @@ The items below cover patterns ESLint **cannot** catch:
 14. **No unnecessary `useEffect`** -- never use `useEffect` to compute derived state, chain state updates, or handle user events; use event handlers, `useMemo`, or inline calculations instead ([React docs](https://react.dev/learn/you-might-not-need-an-effect), [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §23)
 15. **Cascading form field resets belong in `onChange`** -- when one field change should reset another, put the `setValue()` calls in the field's `onChange` handler, not in a `useEffect` watching the field value
 16. **E2E tests must be self-contained** -- every E2E test must create ALL resources it needs and delete ALL created resources in a `try-finally` block; `test.skip()` is only acceptable for data that is impossible to create programmatically (e.g., human-approved records, external integrations) — if the test can create the data via API, it must (see [`.agents/skills/frontend-playwright-e2e/SKILL.md`](../.agents/skills/frontend-playwright-e2e/SKILL.md))
-17. **Use `RhUi*` icons for action buttons** -- never use PatternFly icons like `PlusCircleIcon` directly; use `RhUiAddIcon`, `RhUiDuplicate`, etc. from `@patternfly/react-icons`
+17. **Use `RhUi*` icons by default** -- import `RhUi`-prefixed icons from `@patternfly/react-icons`; the ESLint config defines allowed exceptions
 18. **CSS module classes over inline style objects** -- prefer `.module.css` classes over `style={{ ... }}` props; CSS modules are more DOM-efficient, cacheable, and keep styles co-located
 19. **No mutable counters in `.map()`** -- do not use `let` counters inside `.map()` or `.forEach()`; pre-compute indices immutably or use the callback's index parameter
 20. **Never use `eslint-disable`** -- do not add `eslint-disable` or `eslint-disable-next-line` to new or modified code. Every rule catches a real problem; fix the code so the rule passes. Pre-existing suppressions are tech debt being cleaned up. See [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §28
