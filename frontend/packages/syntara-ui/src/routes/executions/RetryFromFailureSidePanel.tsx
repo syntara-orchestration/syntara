@@ -62,9 +62,14 @@ export function RetryFromFailureSidePanel({
   const navigate = useNavigate()
   const scopeId = useId()
   const panelRef = useRef<HTMLElement | null>(null)
-  const [scopeMode, setScopeMode] = useState<RetryScopeMode>('all')
-  const [checkedRetryPointIds, setCheckedRetryPointIds] = useState<string[]>([])
-  const [shouldAnnounceRetryPlan, setShouldAnnounceRetryPlan] = useState(false)
+  const {
+    scopeMode,
+    checkedRetryPointIds,
+    shouldAnnounceRetryPlan,
+    setAllRetryPoints,
+    chooseRetryPoints,
+    updateRetryPoint,
+  } = useRetryScopeSelection()
 
   const defaultPreviewQuery = useRetryFromFailurePreview({ executionId, enabled: true })
   const defaultPoints = getRetryPlanPoints(defaultPreviewQuery.preview, activityNameMap, activityTypeMap)
@@ -157,27 +162,6 @@ export function RetryFromFailureSidePanel({
     })
   )
 
-  const setAllRetryPoints = () => {
-    setShouldAnnounceRetryPlan(true)
-    setScopeMode('all')
-    setCheckedRetryPointIds([])
-  }
-
-  const chooseRetryPoints = () => {
-    setShouldAnnounceRetryPlan(true)
-    setScopeMode('selected')
-    setCheckedRetryPointIds([])
-  }
-
-  const updateRetryPoint = (pointId: string, isChecked: boolean) => {
-    setShouldAnnounceRetryPlan(true)
-    setScopeMode('selected')
-    setCheckedRetryPointIds((currentIds) => {
-      if (isChecked) return [...new Set([...currentIds, pointId])]
-      return currentIds.filter((id) => id !== pointId)
-    })
-  }
-
   return (
     <aside
       ref={panelRef}
@@ -260,6 +244,42 @@ export function RetryFromFailureSidePanel({
       </SynPanel>
     </aside>
   )
+}
+
+function useRetryScopeSelection() {
+  const [scopeMode, setScopeMode] = useState<RetryScopeMode>('all')
+  const [checkedRetryPointIds, setCheckedRetryPointIds] = useState<string[]>([])
+  const [shouldAnnounceRetryPlan, setShouldAnnounceRetryPlan] = useState(false)
+
+  const setAllRetryPoints = () => {
+    setShouldAnnounceRetryPlan(true)
+    setScopeMode('all')
+    setCheckedRetryPointIds([])
+  }
+
+  const chooseRetryPoints = () => {
+    setShouldAnnounceRetryPlan(true)
+    setScopeMode('selected')
+    setCheckedRetryPointIds([])
+  }
+
+  const updateRetryPoint = (pointId: string, isChecked: boolean) => {
+    setShouldAnnounceRetryPlan(true)
+    setScopeMode('selected')
+    setCheckedRetryPointIds((currentIds) => {
+      if (isChecked) return [...new Set([...currentIds, pointId])]
+      return currentIds.filter((id) => id !== pointId)
+    })
+  }
+
+  return {
+    scopeMode,
+    checkedRetryPointIds,
+    shouldAnnounceRetryPlan,
+    setAllRetryPoints,
+    chooseRetryPoints,
+    updateRetryPoint,
+  }
 }
 
 function getPanelNotRetriedFailureCount({
