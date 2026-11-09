@@ -329,6 +329,9 @@ class Execution(UserOwnedResource, table=True):
         - If retried_from_execution_id is set AND execution_metadata has 'eligible_point_ids' → 'from_failure'
         - If retried_from_execution_id is set AND execution_metadata lacks 'eligible_point_ids' → 'standard'
 
+        Older retry executions do not have ``eligible_point_ids`` and are
+        intentionally classified as standard retries for compatibility.
+
         Returns:
             Retry kind value ('standard', 'from_failure') or None if not a retry
 

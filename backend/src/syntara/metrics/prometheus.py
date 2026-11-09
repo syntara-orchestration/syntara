@@ -408,5 +408,6 @@ class OrchestratorPrometheusMetrics:
             "orchestrator_workflow_retry_duration_seconds",
             "Duration of retry executions from creation to completion",
             ["retry_kind", "status"],
+            buckets=LATENCY_BUCKETS_SLOW,
             registry=self.registry,
         )

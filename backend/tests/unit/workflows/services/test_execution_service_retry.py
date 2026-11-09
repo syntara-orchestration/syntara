@@ -2,7 +2,7 @@
 
 from typing import cast
 from unittest.mock import AsyncMock, Mock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -313,6 +313,7 @@ class TestRetryExecution:
                 new_callable=AsyncMock,
                 return_value="Author",
             ),
+            patch.object(service, "_record_retry_request") as mock_record,
             pytest.raises(Exception, match="DB commit failed"),
         ):
             await service.retry_execution(execution.id)
@@ -320,6 +321,73 @@ class TestRetryExecution:
         mock_temporal.cancel_workflow.assert_awaited_once_with(
             temporal_workflow_id=temporal_result.temporal_workflow_id
         )
+        mock_record.assert_called_once_with("standard", "error")
+
+
+class TestRetryKindInference:
+    """Test runtime retry-kind inference for current and legacy executions."""
+
+    @pytest.mark.parametrize(
+        ("parent_id", "metadata", "expected"),
+        [
+            (None, None, None),
+            (uuid4(), None, "standard"),
+            (uuid4(), {}, "standard"),
+            (uuid4(), {"eligible_point_ids": []}, "from_failure"),
+            (uuid4(), {"eligible_point_ids": ["node-1"]}, "from_failure"),
+        ],
+    )
+    def test_inferred_retry_kind(
+        self,
+        parent_id: UUID | None,
+        metadata: dict[str, object] | None,
+        expected: str | None,
+    ) -> None:
+        """Legacy parented executions remain standard retries."""
+        execution = Execution.model_construct(
+            retried_from_execution_id=parent_id,
+            execution_metadata=metadata,
+        )
+
+        assert execution.inferred_retry_kind == expected
+
+
+class TestRetryInfrastructureMetrics:
+    """Test infrastructure failures use the error retry outcome."""
+
+    @pytest.mark.asyncio
+    async def test_retry_from_failure_records_error_for_start_failure(self) -> None:
+        """Retry-from-failure does not classify infrastructure errors as rejection."""
+        source = _make_execution(ExecutionStatus.FAILED)
+        version = _make_version(source.workflow_version_id)
+
+        def result_for(value: object) -> Mock:
+            result = Mock()
+            result.one_or_none.return_value = value
+            return result
+
+        mock_session = Mock(spec=AsyncSession)
+        mock_session.exec = AsyncMock(
+            side_effect=[result_for(source), result_for(source.workflow), result_for(version)]
+        )
+        mock_user = Mock(spec=User)
+        service = ExecutionService(session=mock_session, user=mock_user, temporal_service=None)
+        validation = Mock(eligible=True, eligible_point_ids=["node-1"])
+
+        with (
+            patch(
+                "syntara.workflows.services.execution_service.validate_retry_from_failure",
+                new_callable=AsyncMock,
+                return_value=validation,
+            ),
+            patch.object(service, "_start_temporal_and_create_execution", new_callable=AsyncMock) as start_mock,
+            patch.object(service, "_record_retry_request") as record_mock,
+            pytest.raises(RuntimeError, match="start failed"),
+        ):
+            start_mock.side_effect = RuntimeError("start failed")
+            await service.retry_from_failure(source.id, ["node-1"])
+
+        record_mock.assert_called_once_with("from_failure", "error")
 
 
 class TestFailedStepTypes:

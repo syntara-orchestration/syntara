@@ -1195,7 +1195,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         Args:
             retry_kind: Type of retry (standard, from_failure)
-            outcome: Request outcome (accepted, rejected)
+            outcome: Request outcome (accepted, rejected, or error)
 
         """
         try:
@@ -1338,8 +1338,8 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                 retried_from_execution_id=original.id,
             )
         except Exception:
-            # Record rejected on any failure (Temporal, concurrency, persistence)
-            self._record_retry_request(RetryKind.STANDARD.value, "rejected")
+            # Infrastructure failures are distinct from ineligible requests.
+            self._record_retry_request(RetryKind.STANDARD.value, "error")
             raise
 
         self._record_retry_request(RetryKind.STANDARD.value, "accepted")
@@ -1528,8 +1528,8 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                 input_parameter_overrides=validated_overrides,
             )
         except Exception:
-            # Record rejected on any failure (Temporal, concurrency, persistence)
-            self._record_retry_request(RetryKind.FROM_FAILURE.value, "rejected")
+            # Infrastructure failures are distinct from ineligible requests.
+            self._record_retry_request(RetryKind.FROM_FAILURE.value, "error")
             raise
 
         self._record_retry_request(RetryKind.FROM_FAILURE.value, "accepted")
