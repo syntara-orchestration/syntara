@@ -237,7 +237,6 @@ export default tseslint.config(
       globals: globals.browser,
       parserOptions: {
         project: ['./tsconfig.app.json', './tsconfig.node.json', './tsconfig.e2e.json', './tsconfig.storybook.json'],
-        tsconfigRootDir: __dirname,
       },
     },
     settings: {
