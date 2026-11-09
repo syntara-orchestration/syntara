@@ -7,9 +7,9 @@ import pytest
 
 from syntara.execution_plane.cancellation import (
     cancel_execution_plane_work_items,
-    execution_plane_work_item_id,
 )
 from syntara.execution_plane.client import ExecutionPlaneRejectedError
+from syntara.execution_plane.utils import execution_plane_work_item_id
 
 
 class _FakeExecutionPlaneClient:

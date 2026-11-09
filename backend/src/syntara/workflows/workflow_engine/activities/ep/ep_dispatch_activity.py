@@ -13,7 +13,6 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
-from syntara.execution_plane.cancellation import execution_plane_work_item_id
 from syntara.execution_plane.client import (
     EP_AUDIENCE,
     EP_CLIENT_ID,
@@ -21,6 +20,7 @@ from syntara.execution_plane.client import (
     ExecutionPlaneRejectedError,
     ExecutionPlaneUnavailableError,
 )
+from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.workflows.workflow_engine.activities.common import HEARTBEAT_STOP_MONITOR
 from syntara.workflows.workflow_engine.constants import ENGINE_TIMEOUT_SECONDS_KEY
 from syntara.workflows.workflow_engine.models.workflow_definition import (

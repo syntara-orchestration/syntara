@@ -20,7 +20,7 @@ from temporalio.client import Client, WorkflowHandle, WorkflowHistoryEventFilter
 from temporalio.exceptions import TemporalError
 
 from syntara.audit.dispatcher import AuditEventDispatcher
-from syntara.execution_plane.cancellation import execution_plane_work_item_id
+from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.workflows.audit.execution_started import WorkflowStartEvent
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus

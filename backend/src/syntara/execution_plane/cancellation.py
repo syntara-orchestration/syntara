@@ -4,17 +4,18 @@ from __future__ import annotations
 
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Protocol, Self
-from uuid import UUID, uuid5
 
 import structlog
 from sqlmodel import col, select
 
 from syntara.execution_plane.client import ExecutionPlaneHttpClient, ExecutionPlaneRejectedError
+from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from uuid import UUID
 
     from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -40,11 +41,6 @@ class WorkItemCancellationClient(Protocol):
 
     async def cancel_work_item(self, *, work_item_id: UUID) -> object:
         """Request cancellation for one work item."""
-
-
-def execution_plane_work_item_id(execution_id: UUID, activity_id: str) -> UUID:
-    """Build the stable work-item identity shared by dispatch and cancellation."""
-    return uuid5(execution_id, activity_id)
 
 
 async def cancel_execution_plane_work_items(
