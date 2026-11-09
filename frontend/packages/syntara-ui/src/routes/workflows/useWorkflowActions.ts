@@ -7,6 +7,7 @@ import { getErrorMessage } from '../../utils/apiErrors'
 
 import { resolveWorkflowRunTrigger } from './resolveWorkflowRunTrigger'
 import { getWorkflowRunTriggerDetailsErrorMessage } from './workflowRunTriggerDetailsError'
+import { getWorkflowStartErrorAlert } from './workflowStartErrors'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -70,10 +71,7 @@ export function useWorkflowActions({
         },
       })
       if (error || !data?.id) {
-        showError({
-          title: 'Failed to run workflow',
-          description: `Failed to start workflow "${workflow.name}": ${getErrorMessage(error)}`,
-        })
+        showError(getWorkflowStartErrorAlert(error, workflow.name))
       } else {
         onNavigate(`/executions/${data.id}`)
       }
