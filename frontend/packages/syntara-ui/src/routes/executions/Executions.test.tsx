@@ -291,12 +291,33 @@ describe('Executions Component', () => {
     expect(screen.getByTestId('loading-state')).toBeInTheDocument()
   })
 
-  it('shows error state', () => {
+  it('shows actionable default error when the list API fails', () => {
     mockExecutionsQuery([], false, { message: 'Failed to load' })
 
     render(<Executions />, { wrapper: TestWrapper })
 
-    expect(screen.getByText('Error loading executions')).toBeInTheDocument()
+    expect(screen.getByText('Unable to load workflow runs')).toBeInTheDocument()
+    expect(screen.getByText('Unable to load workflow runs. Try again.')).toBeInTheDocument()
+  })
+
+  it('shows a permission message when the list API returns 403', () => {
+    mockExecutionsQuery([], false, { status: 403, detail: 'Forbidden' })
+
+    render(<Executions />, { wrapper: TestWrapper })
+
+    expect(screen.getByText('Access denied')).toBeInTheDocument()
+    expect(screen.getByText('You do not have permission to view executions in this project.')).toBeInTheDocument()
+  })
+
+  it('shows a service unavailable message when the list API returns 503', () => {
+    mockExecutionsQuery([], false, { status: 503, detail: 'Service down' })
+
+    render(<Executions />, { wrapper: TestWrapper })
+
+    expect(screen.getByText('Service Unavailable')).toBeInTheDocument()
+    expect(
+      screen.getByText('The workflow service is temporarily unavailable. Try again in a few minutes.')
+    ).toBeInTheDocument()
   })
 
   it('displays workflow names instead of IDs', () => {
