@@ -1,5 +1,6 @@
 import { Truncate } from '@patternfly/react-core'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import { LinkCell } from '../../components/table/LinkCell'
 
 type ExecutionRunIdCellProps = {
@@ -10,7 +11,7 @@ type ExecutionRunIdCellProps = {
 export function ExecutionRunIdCell({ executionId }: Readonly<ExecutionRunIdCellProps>) {
   /* v8 ignore start -- phantom branches from React Compiler on trivial link cell JSX */
   return (
-    <LinkCell href={`/executions/${executionId}`}>
+    <LinkCell options={{ to: routeRefs.executionDetailRoute.fullPath, params: { executionId } }}>
       <code>
         <Truncate content={executionId} />
       </code>

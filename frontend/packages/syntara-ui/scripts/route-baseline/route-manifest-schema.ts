@@ -28,11 +28,10 @@ export const routeKindSchema = z.enum(['page', 'redirect', 'fallback', 'app'])
  * Where a path template was discovered when building the manifest.
  *
  * - `router` — `createRoute` in `src/app/routes`
- * - `appRoute` — declared in the `AppRoute` catalog
  * - `navigation` — linked from `navigationItems`
  * - `app` — handled in `App.tsx` before the router mounts
  */
-export const routeSourceSchema = z.enum(['router', 'appRoute', 'navigation', 'app'])
+export const routeSourceSchema = z.enum(['router', 'navigation', 'app'])
 
 /**
  * Raw `createRoute({ ... })` fields extracted from source text before normalization.
@@ -60,8 +59,8 @@ export const normalizedRouteSchema = z.object({
   redirectTo: z.string().min(1).optional(),
   /**
    * Sources that declare this template.
-   * The manifest is built from router definitions; AppRoute and navigation
-   * annotations are added for review and consistency checks.
+   * The manifest is built from router definitions; navigation annotations are
+   * added for review and consistency checks.
    */
   sources: z.array(routeSourceSchema).min(1),
 })

@@ -21,17 +21,17 @@ const executionDetailSearch = z
   })
   .catch({})
 
-export const executionsRoutes = [
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/executions',
-    validateSearch: executionsSearch,
-    component: makeRouteComponent(<Executions />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/executions/$executionId',
-    validateSearch: executionDetailSearch,
-    component: makeRouteComponent(<ExecutionDetail />),
-  }),
-]
+export const executionsListRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/executions',
+  validateSearch: executionsSearch,
+  component: makeRouteComponent(<Executions />),
+})
+export const executionDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/executions/$executionId',
+  validateSearch: executionDetailSearch,
+  component: makeRouteComponent(<ExecutionDetail />),
+})
+
+export const executionsRoutes = [executionsListRoute, executionDetailRoute]

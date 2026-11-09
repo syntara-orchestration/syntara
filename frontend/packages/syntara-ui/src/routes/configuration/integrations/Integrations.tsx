@@ -6,7 +6,7 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { integrationsClient } from '../../../client'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
@@ -114,7 +114,10 @@ function IntegrationsTableContent({
           <Tr key={integration.id}>
             <Td dataLabel="Name">
               <LinkCell
-                href={AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integration.id ?? '')}
+                options={{
+                  to: routeRefs.integrationDetailRoute.fullPath,
+                  params: { integrationId: integration.id ?? '' },
+                }}
               >
                 <Truncate content={integration.name ?? ''} />
               </LinkCell>
@@ -244,7 +247,7 @@ export default function Integrations() {
                 onClick={
                   permissions.canCreate
                     ? () => {
-                        detachPromise(navigate({ to: AppRoute.Configuration.Integrations.Configure }))
+                        detachPromise(navigate({ to: routeRefs.configureIntegrationRoute.fullPath }))
                       }
                     : undefined
                 }

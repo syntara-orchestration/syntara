@@ -2,6 +2,7 @@ import type { ExecutionsAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useExecutionWebSocket } from '../../workflows/hooks/useExecutionWebSocket'
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
@@ -31,7 +32,7 @@ export function useExecutionStreaming(executionId: string | undefined, execution
             queryKey: ['get', '/executions/{execution_id}'],
           }),
           queryClient.invalidateQueries({
-            queryKey: ['get', '/executions'],
+            queryKey: ['get', routeRefs.executionsListRoute.fullPath],
           }),
         ])
       )

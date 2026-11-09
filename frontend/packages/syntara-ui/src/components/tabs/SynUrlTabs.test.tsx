@@ -1,7 +1,7 @@
 import { Tab } from '@patternfly/react-core'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, beforeEach } from 'vitest'
+import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { routerTestState } from '../../test/setup'
@@ -16,7 +16,7 @@ describe('SynUrlTabs', () => {
 
   it('has no accessibility violations', async () => {
     const { container } = render(
-      <SynUrlTabs basePath="/base" defaultTab="tab-a" aria-label="Test tabs">
+      <SynUrlTabs onTabChange={() => {}} basePath="/base" defaultTab="tab-a" aria-label="Test tabs">
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
@@ -30,7 +30,7 @@ describe('SynUrlTabs', () => {
 
   it('sets active tab from URL path segment', () => {
     render(
-      <SynUrlTabs basePath="/base" aria-label="Test tabs">
+      <SynUrlTabs onTabChange={() => {}} basePath="/base" aria-label="Test tabs">
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
@@ -46,8 +46,9 @@ describe('SynUrlTabs', () => {
 
   it('navigates to the correct URL when a tab is clicked', async () => {
     const user = userEvent.setup()
+    const onTabChange = vi.fn()
     render(
-      <SynUrlTabs basePath="/base" aria-label="Test tabs">
+      <SynUrlTabs onTabChange={onTabChange} basePath="/base" aria-label="Test tabs">
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
@@ -59,13 +60,13 @@ describe('SynUrlTabs', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Tab B' }))
 
-    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/base/tab-b' })
+    expect(onTabChange).toHaveBeenCalledWith('tab-b')
   })
 
   it('uses defaultTab when URL has no tab segment', () => {
     routerTestState.pathname = '/base'
     render(
-      <SynUrlTabs basePath="/base" defaultTab="tab-b" aria-label="Test tabs">
+      <SynUrlTabs onTabChange={() => {}} basePath="/base" defaultTab="tab-b" aria-label="Test tabs">
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
@@ -80,8 +81,15 @@ describe('SynUrlTabs', () => {
 
   it('redirects to defaultTab when URL tab is not in validTabs', async () => {
     routerTestState.pathname = '/base/invalid'
+    const onTabChange = vi.fn()
     render(
-      <SynUrlTabs basePath="/base" defaultTab="tab-a" validTabs={['tab-a', 'tab-b']} aria-label="Test tabs">
+      <SynUrlTabs
+        onTabChange={onTabChange}
+        basePath="/base"
+        defaultTab="tab-a"
+        validTabs={['tab-a', 'tab-b']}
+        aria-label="Test tabs"
+      >
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
@@ -92,12 +100,19 @@ describe('SynUrlTabs', () => {
     )
 
     await act(() => new Promise((r) => requestAnimationFrame(r)))
-    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/base/tab-a', replace: true })
+    expect(onTabChange).toHaveBeenCalledWith('tab-a', { replace: true })
   })
 
   it('does not redirect when URL tab is valid', () => {
+    const onTabChange = vi.fn()
     render(
-      <SynUrlTabs basePath="/base" defaultTab="tab-a" validTabs={['tab-a', 'tab-b']} aria-label="Test tabs">
+      <SynUrlTabs
+        onTabChange={onTabChange}
+        basePath="/base"
+        defaultTab="tab-a"
+        validTabs={['tab-a', 'tab-b']}
+        aria-label="Test tabs"
+      >
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
@@ -107,12 +122,13 @@ describe('SynUrlTabs', () => {
       </SynUrlTabs>
     )
 
-    expect(routerTestState.navigate).not.toHaveBeenCalled()
+    expect(onTabChange).not.toHaveBeenCalled()
   })
 
   it('uses the provided human-readable label for a nested route panel', () => {
     render(
       <SynUrlTabs
+        onTabChange={() => {}}
         basePath="/base"
         tabPanelLabels={{ 'tab-a': 'Tab A' }}
         renderPanel={(activeTab) => <div>Route content for {activeTab}</div>}
@@ -129,6 +145,7 @@ describe('SynUrlTabs', () => {
   it('only applies the detail panel layout when requested', () => {
     const renderTabs = (routePanelLayout?: 'detail') => (
       <SynUrlTabs
+        onTabChange={() => {}}
         basePath="/base"
         routePanelLayout={routePanelLayout}
         renderPanel={() => <div>Route content</div>}
@@ -148,8 +165,9 @@ describe('SynUrlTabs', () => {
 
   it('redirects to first validTab when no defaultTab is provided', async () => {
     routerTestState.pathname = '/base'
+    const onTabChange = vi.fn()
     render(
-      <SynUrlTabs basePath="/base" validTabs={['first', 'second']} aria-label="Test tabs">
+      <SynUrlTabs onTabChange={onTabChange} basePath="/base" validTabs={['first', 'second']} aria-label="Test tabs">
         <Tab eventKey="first" title="First">
           Content
         </Tab>
@@ -160,12 +178,12 @@ describe('SynUrlTabs', () => {
     )
 
     await act(() => new Promise((r) => requestAnimationFrame(r)))
-    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/base/first', replace: true })
+    expect(onTabChange).toHaveBeenCalledWith('first', { replace: true })
   })
 
   it('passes through additional Tabs props', () => {
     render(
-      <SynUrlTabs basePath="/base" defaultTab="tab-a" aria-label="Custom label" isBox>
+      <SynUrlTabs onTabChange={() => {}} basePath="/base" defaultTab="tab-a" aria-label="Custom label" isBox>
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>
@@ -177,7 +195,7 @@ describe('SynUrlTabs', () => {
 
   it('blurs focused tab on popstate (browser back/forward)', () => {
     render(
-      <SynUrlTabs basePath="/base" aria-label="Test tabs">
+      <SynUrlTabs onTabChange={() => {}} basePath="/base" aria-label="Test tabs">
         <Tab eventKey="tab-a" title="Tab A">
           Content A
         </Tab>

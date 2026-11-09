@@ -6,6 +6,7 @@ import { useFieldArray, type Control } from 'react-hook-form'
 
 import { breadcrumbsIdentityProviderGroupMappingForm } from '../../../../app/breadcrumbBuilders'
 import type { AppBreadcrumbItem } from '../../../../app/breadcrumbs/appBreadcrumbItem'
+import * as routeRefs from '../../../../app/routes/routeReferences'
 import { identityProvidersClient } from '../../../../client'
 import { useQueryState } from '../../../../components/states/useQueryState'
 import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
@@ -31,7 +32,6 @@ import {
   processDiscoveredGroups,
   type OIDCConfigurationResponse,
 } from './groupMappingUtils'
-import { identityProviderDetailBasePath, identityProviderGroupMappingTabPath } from './identityProviderPaths'
 import { IDP_TYPE_PRESETS } from './idpTypePresets'
 import { useTestSignIn } from './useTestSignIn'
 
@@ -94,9 +94,6 @@ export function useGroupMappingFormMetadata(
   const defaultExpression = idpType ? (IDP_TYPE_PRESETS[idpType]?.groupMappingExpression ?? null) : null
   const pageTitle = groupMappingFormPageTitle(hasServerMappingEntries(groupMappingConfig), isAddFlow)
 
-  const groupMappingTabPath = providerId ? identityProviderGroupMappingTabPath(providerId) : ''
-  const detailBasePath = providerId ? identityProviderDetailBasePath(providerId) : ''
-
   const refetchProvider = providerQuery.refetch
   const queryState = useQueryState(providerQuery, {
     title: 'Error loading identity provider',
@@ -104,21 +101,8 @@ export function useGroupMappingFormMetadata(
   })
 
   const breadcrumbs = useMemo(() => {
-    if (!providerData?.name || !providerId) {
-      return breadcrumbsIdentityProviderGroupMappingForm(
-        'Identity provider',
-        detailBasePath,
-        groupMappingTabPath,
-        pageTitle
-      )
-    }
-    return breadcrumbsIdentityProviderGroupMappingForm(
-      providerData.name,
-      detailBasePath,
-      groupMappingTabPath,
-      pageTitle
-    )
-  }, [providerData, providerId, detailBasePath, groupMappingTabPath, pageTitle])
+    return breadcrumbsIdentityProviderGroupMappingForm(providerData?.name ?? 'Identity provider', providerId, pageTitle)
+  }, [providerData?.name, providerId, pageTitle])
 
   return {
     pageTitle,
@@ -221,7 +205,12 @@ export function useGroupMappingEditForm({
   })
 
   const navigateToTab = useCallback(() => {
-    detachPromise(navigate({ to: identityProviderGroupMappingTabPath(providerId) }))
+    detachPromise(
+      navigate({
+        to: routeRefs.identityProviderGroupMappingRoute.fullPath,
+        params: { providerId },
+      })
+    )
   }, [navigate, providerId])
 
   const handleSave = form.handleSubmit((values) => {

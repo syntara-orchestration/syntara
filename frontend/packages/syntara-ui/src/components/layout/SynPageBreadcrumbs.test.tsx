@@ -1,7 +1,10 @@
+import '../../app/tanstackRouter'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
+
+import { breadcrumbTestRoutes } from '../../test/breadcrumbTestRoutes'
 
 import { SynPageBreadcrumbs } from './SynPageBreadcrumbs'
 
@@ -42,18 +45,26 @@ describe('SynPageBreadcrumbs', () => {
   })
 
   it('renders links and current page', () => {
-    render(<SynPageBreadcrumbs items={[{ label: 'Parent', href: '/parent' }, { label: 'Current' }]} />)
+    render(
+      <SynPageBreadcrumbs
+        items={[{ label: 'Parent', destination: breadcrumbTestRoutes.workflows }, { label: 'Current' }]}
+      />
+    )
 
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument()
     const parentLink = screen.getByRole('link', { name: 'Parent' })
-    expect(parentLink).toHaveAttribute('href', '/parent')
+    expect(parentLink).toHaveAttribute('href', '/workflows')
     expect(screen.getByText('Current')).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {
     const { container } = render(
       <SynPageBreadcrumbs
-        items={[{ label: 'One', href: '/one' }, { label: 'Two', href: '/two' }, { label: 'Three' }]}
+        items={[
+          { label: 'One', destination: breadcrumbTestRoutes.workflows },
+          { label: 'Two', destination: breadcrumbTestRoutes.approvals },
+          { label: 'Three' },
+        ]}
       />
     )
 
@@ -66,9 +77,9 @@ describe('SynPageBreadcrumbs', () => {
     render(
       <SynPageBreadcrumbs
         items={[
-          { label: 'First', href: '/first' },
-          { label: 'Mid A', href: '/a' },
-          { label: 'Mid B', href: '/b' },
+          { label: 'First', destination: breadcrumbTestRoutes.workflows },
+          { label: 'Mid A', destination: breadcrumbTestRoutes.workflows },
+          { label: 'Mid B', destination: breadcrumbTestRoutes.approvals },
           { label: 'Last' },
         ]}
       />
@@ -87,9 +98,9 @@ describe('SynPageBreadcrumbs', () => {
     render(
       <SynPageBreadcrumbs
         items={[
-          { label: 'First', href: '/first' },
-          { label: 'Mid A', href: '/a' },
-          { label: 'Mid B', href: '/b' },
+          { label: 'First', destination: breadcrumbTestRoutes.workflows },
+          { label: 'Mid A', destination: breadcrumbTestRoutes.workflows },
+          { label: 'Mid B', destination: breadcrumbTestRoutes.approvals },
           { label: 'Last' },
         ]}
       />
@@ -103,9 +114,9 @@ describe('SynPageBreadcrumbs', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
 
     const itemA = screen.getByRole('menuitem', { name: 'Mid A' })
-    expect(itemA).toHaveAttribute('href', '/a')
+    expect(itemA).toHaveAttribute('href', '/workflows')
     const itemB = screen.getByRole('menuitem', { name: 'Mid B' })
-    expect(itemB).toHaveAttribute('href', '/b')
+    expect(itemB).toHaveAttribute('href', '/approvals')
 
     await user.click(toggle)
 
@@ -128,7 +139,10 @@ describe('SynPageBreadcrumbs', () => {
     render(
       <div style={{ width: 160 }}>
         <SynPageBreadcrumbs
-          items={[{ label: 'Access management', href: '/access-management' }, { label: longLabel }]}
+          items={[
+            { label: 'Access management', destination: breadcrumbTestRoutes.accessManagement },
+            { label: longLabel },
+          ]}
         />
       </div>
     )
@@ -173,9 +187,9 @@ describe('SynPageBreadcrumbs', () => {
       <div style={{ width: 480 }}>
         <SynPageBreadcrumbs
           items={[
-            { label: 'Access management', href: '/access-management' },
-            { label: 'Projects', href: '/access-management/projects' },
-            { label: longProject, href: '/access-management/projects/1' },
+            { label: 'Access management', destination: breadcrumbTestRoutes.accessManagement },
+            { label: 'Projects', destination: breadcrumbTestRoutes.projects },
+            { label: longProject, destination: breadcrumbTestRoutes.project() },
             { label: 'Workflows' },
           ]}
         />
@@ -192,7 +206,13 @@ describe('SynPageBreadcrumbs', () => {
 
   it('renders a non-link middle segment in the full trail (wide viewport)', () => {
     render(
-      <SynPageBreadcrumbs items={[{ label: 'Home', href: '/home' }, { label: 'Unlinked step' }, { label: 'Done' }]} />
+      <SynPageBreadcrumbs
+        items={[
+          { label: 'Home', destination: breadcrumbTestRoutes.workflows },
+          { label: 'Unlinked step' },
+          { label: 'Done' },
+        ]}
+      />
     )
 
     expect(screen.getByText('Unlinked step')).toBeInTheDocument()
@@ -206,8 +226,8 @@ describe('SynPageBreadcrumbs', () => {
       <SynPageBreadcrumbs
         items={[
           { label: 'Section' },
-          { label: 'Mid A', href: '/a' },
-          { label: 'Mid B', href: '/b' },
+          { label: 'Mid A', destination: breadcrumbTestRoutes.workflows },
+          { label: 'Mid B', destination: breadcrumbTestRoutes.approvals },
           { label: 'Last' },
         ]}
       />
@@ -225,9 +245,9 @@ describe('SynPageBreadcrumbs', () => {
     render(
       <SynPageBreadcrumbs
         items={[
-          { label: 'First', href: '/first' },
+          { label: 'First', destination: breadcrumbTestRoutes.workflows },
           { label: 'Mid no href' },
-          { label: 'Mid B', href: '/b' },
+          { label: 'Mid B', destination: breadcrumbTestRoutes.approvals },
           { label: 'Last' },
         ]}
       />
@@ -248,9 +268,9 @@ describe('SynPageBreadcrumbs', () => {
     render(
       <SynPageBreadcrumbs
         items={[
-          { label: 'First', href: '/first' },
-          { label: 'Mid A', href: '/a' },
-          { label: 'Mid B', href: '/b' },
+          { label: 'First', destination: breadcrumbTestRoutes.workflows },
+          { label: 'Mid A', destination: breadcrumbTestRoutes.workflows },
+          { label: 'Mid B', destination: breadcrumbTestRoutes.approvals },
           { label: 'Last' },
         ]}
       />

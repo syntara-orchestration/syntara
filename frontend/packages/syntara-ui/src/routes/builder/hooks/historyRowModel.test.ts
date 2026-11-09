@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
+
 import {
   buildExecutionHistoryRowModel,
-  executionDetailHref,
+  executionDetailOptions,
   getClearFiltersHandler,
   resolveVersionStatusForBadge,
   shouldShowSecondaryVersionDatetime,
-  workflowVersionHref,
+  workflowVersionOptions,
 } from './historyRowModel'
 
 describe('buildExecutionHistoryRowModel', () => {
@@ -32,7 +34,11 @@ describe('buildExecutionHistoryRowModel', () => {
     expect(model.showRetryKebab).toBe(true)
     expect(model.elapsedLabel).toMatch(/^Elapsed time:/)
     expect(model.runIdLabel).toBe('Run ID: 12345678')
-    expect(model.versionHref).toBe('/workflow-builder/wf-1?version=3')
+    expect(model.versionOptions).toEqual({
+      to: routeRefs.builderEditRoute.fullPath,
+      params: { workflowId: 'wf-1' },
+      search: { version: '3' },
+    })
     expect(model.versionLabel).toBe('release')
     expect(model.retriedFromLabel).toBe('Retried from: abcdef01')
     expect(model.status).toBe('failed')
@@ -60,7 +66,7 @@ describe('buildExecutionHistoryRowModel', () => {
     expect(model.showRetryKebab).toBe(false)
     expect(model.elapsedLabel).toBe('Elapsed time: -')
     expect(model.runIdLabel).toBeNull()
-    expect(model.versionHref).toBeNull()
+    expect(model.versionOptions).toBeNull()
     expect(model.versionLabel).toBeNull()
     expect(model.retriedFromLabel).toBeNull()
     expect(model.showTestRun).toBe(false)
@@ -77,7 +83,11 @@ describe('buildExecutionHistoryRowModel', () => {
       undefined
     )
 
-    expect(model.versionHref).toBe('/workflow-builder/wf-1?version=3')
+    expect(model.versionOptions).toEqual({
+      to: routeRefs.builderEditRoute.fullPath,
+      params: { workflowId: 'wf-1' },
+      search: { version: '3' },
+    })
     expect(model.versionLabel).toBeTruthy()
   })
 
@@ -90,7 +100,7 @@ describe('buildExecutionHistoryRowModel', () => {
       undefined
     )
 
-    expect(model.versionHref).toBeNull()
+    expect(model.versionOptions).toBeNull()
     expect(model.versionLabel).toBeNull()
   })
 
@@ -128,12 +138,19 @@ describe('resolveVersionStatusForBadge', () => {
 })
 
 describe('history row URL helpers', () => {
-  it('builds a workflow-builder URL for a given workflow version', () => {
-    expect(workflowVersionHref('wf-42', 7)).toBe('/workflow-builder/wf-42?version=7')
+  it('builds typed workflow-builder options for a given workflow version', () => {
+    expect(workflowVersionOptions('wf-42', 7)).toEqual({
+      to: routeRefs.builderEditRoute.fullPath,
+      params: { workflowId: 'wf-42' },
+      search: { version: '7' },
+    })
   })
 
-  it('builds an executions URL for a given execution id', () => {
-    expect(executionDetailHref('exec-abc')).toBe('/executions/exec-abc')
+  it('builds typed execution options for a given execution id', () => {
+    expect(executionDetailOptions('exec-abc')).toEqual({
+      to: routeRefs.executionDetailRoute.fullPath,
+      params: { executionId: 'exec-abc' },
+    })
   })
 })
 

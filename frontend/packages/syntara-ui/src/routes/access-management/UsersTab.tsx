@@ -5,7 +5,8 @@ import type { User } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo, type ReactNode } from 'react'
 
-import { AppRoute } from '../../app/AppRoute'
+import type { AppRouteNavigationOptions } from '../../app/routeNavigationOptions'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { IconLabel } from '../../components/IconLabel'
@@ -26,7 +27,7 @@ import { detachPromise } from '../../utils/detachPromise'
 import { getUserIdFromToken } from '../../utils/jwtUtils'
 import { accessClient } from '../access/accessClient'
 
-import { getUserDetailPath } from './accessManagementPaths'
+import { getUserDetailOptions } from './accessManagementPaths'
 import { AUTH_SOURCE_LOCAL } from './adminConstants'
 import { BuiltInAdminCard } from './BuiltInAdminCard'
 import { useAdminToggle } from './useAdminToggle'
@@ -104,7 +105,7 @@ function getRowActions({
   onDelete: (user: User) => void
   onRevoke: (user: User) => void
   permissions: ReturnType<typeof useUserPermissions>
-  onNavigate: (path: string) => void
+  onNavigate: (destination: AppRouteNavigationOptions) => void
 }): KebabAction[] {
   return [
     {
@@ -113,7 +114,7 @@ function getRowActions({
       isAriaDisabled: !permissions.canUpdate,
       tooltipProps: permissions.canUpdate ? undefined : { content: permissions.tooltips.update },
       onClick: permissions.canUpdate
-        ? () => onNavigate(AppRoute.AccessManagement.EditUser.replace(':userId', user.id))
+        ? () => onNavigate({ to: routeRefs.editUserRoute.fullPath, params: { userId: user.id } })
         : undefined,
     },
     {
@@ -227,12 +228,12 @@ function UserTableRow({
   onToggleEnabled: (user: User) => void
   onDelete: (user: User) => void
   onRevoke: (user: User) => void
-  onNavigate: (path: string) => void
+  onNavigate: (destination: AppRouteNavigationOptions) => void
 }>) {
   return (
     <Tr>
       <Td dataLabel="Username">
-        <SynLink to={getUserDetailPath(user.id)}>
+        <SynLink options={getUserDetailOptions(user.id)}>
           <Truncate content={user.username} />
         </SynLink>
       </Td>
@@ -314,9 +315,9 @@ export function UsersTab() {
   })
 
   const handleCreateUser = permissions.canCreate
-    ? () => detachPromise(navigate({ to: AppRoute.AccessManagement.CreateUser }))
+    ? () => detachPromise(navigate({ to: routeRefs.createUserRoute.fullPath }))
     : undefined
-  const handleRowNavigate = (path: string) => detachPromise(navigate({ to: path }))
+  const handleRowNavigate = (destination: AppRouteNavigationOptions) => detachPromise(navigate(destination))
 
   const adminToggle = useAdminToggle(builtinUser, () => detachPromise(refetch()))
 

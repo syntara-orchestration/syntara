@@ -5,7 +5,7 @@ import type React from 'react'
 import '@xyflow/react/dist/style.css'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { AppRoute } from '../../app/AppRoute'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { executionsClient } from '../../client'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
@@ -43,7 +43,6 @@ import { useExecutionStepClick } from './hooks/useExecutionStepClick'
 import { useExecutionStreaming, useSyncActivityStore } from './hooks/useExecutionStreaming'
 import { useExecutionWorkflow } from './hooks/useExecutionWorkflow'
 import { useForkWorkflow } from './hooks/useForkWorkflow'
-
 /** Returns true when the page should render a fallback (missing ID, loading, or error) instead of the main content. */
 function shouldShowFallbackState(
   executionId: string | undefined,
@@ -247,7 +246,7 @@ function ExecutionDetailContent({
             onClose={() => {
               detachPromise(
                 navigate({
-                  to: '/executions/$executionId',
+                  to: routeRefs.executionDetailRoute.fullPath,
                   params: { executionId },
                   search: (prev: Record<string, unknown>) => ({ ...prev, history: 'closed' }),
                 })
@@ -256,7 +255,7 @@ function ExecutionDetailContent({
             onExecutionSelect={(selectedId) => {
               detachPromise(
                 navigate({
-                  to: '/executions/$executionId',
+                  to: routeRefs.executionDetailRoute.fullPath,
                   params: { executionId: selectedId },
                   search: (prev: Record<string, unknown>) => ({ ...prev }),
                 })
@@ -337,7 +336,7 @@ export default function ExecutionDetail() {
     if (willOpen) approval.close()
     detachPromise(
       navigate({
-        to: '/executions/$executionId',
+        to: routeRefs.executionDetailRoute.fullPath,
         params: { executionId },
         search: (prev: Record<string, unknown>) => ({ ...prev, history: willOpen ? 'open' : 'closed' }),
       })
@@ -358,7 +357,9 @@ export default function ExecutionDetail() {
   return (
     <SynPage>
       <SynPageTitle segments={[executionDetailPageHeading(execution, executionId), 'Workflow Runs']} />
-      <SynReactFlowViewportGuard onReturn={() => detachPromise(navigate({ to: AppRoute.Executions.Root }))}>
+      <SynReactFlowViewportGuard
+        onReturn={() => detachPromise(navigate({ to: routeRefs.executionsListRoute.fullPath }))}
+      >
         <SynPageHeader
           title={executionDetailPageHeading(execution, executionId)}
           docLink={executionsDocLink}
@@ -379,7 +380,7 @@ export default function ExecutionDetail() {
               onBackToEditor={() => {
                 if (execution?.workflow_id) {
                   detachPromise(
-                    navigate({ to: '/workflow-builder/$workflowId', params: { workflowId: execution.workflow_id } })
+                    navigate({ to: routeRefs.builderEditRoute.fullPath, params: { workflowId: execution.workflow_id } })
                   )
                 }
               }}
@@ -402,7 +403,7 @@ export default function ExecutionDetail() {
                   activityNameMap={activityNameMap}
                   onClose={approval.close}
                   onDecisionSubmitted={approval.dismiss}
-                  onNavigate={(path) => detachPromise(navigate({ to: path }))}
+                  onNavigate={(destination) => detachPromise(navigate(destination))}
                   currentIndex={currentIndex}
                   totalCount={approvals.length}
                   hasPrev={approvalNavigation.hasPrev}
@@ -440,7 +441,7 @@ export default function ExecutionDetail() {
           if (execution?.workflow_id && executionId)
             detachPromise(
               navigate({
-                to: '/workflow-builder/$workflowId',
+                to: routeRefs.builderEditRoute.fullPath,
                 params: { workflowId: execution.workflow_id },
                 search: { fromExecution: executionId },
               })
@@ -452,7 +453,7 @@ export default function ExecutionDetail() {
           copyToEditorDialog.close()
           detachPromise(
             navigate({
-              to: '/workflow-builder/$workflowId',
+              to: routeRefs.builderEditRoute.fullPath,
               params: { workflowId: id },
               search: { linkExecution: executionId },
             })

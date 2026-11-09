@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import { executionsClient } from '../../client'
 import { useAlerts } from '../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../utils/apiErrors'
@@ -10,7 +11,7 @@ function invalidateExecutionQueries(queryClient: ReturnType<typeof useQueryClien
     Promise.all([
       queryClient.invalidateQueries({ queryKey: ['get', '/executions/{execution_id}'] }),
       queryClient.invalidateQueries({ queryKey: ['get', '/executions/{execution_id}/activities'] }),
-      queryClient.invalidateQueries({ queryKey: ['get', '/executions'] }),
+      queryClient.invalidateQueries({ queryKey: ['get', routeRefs.executionsListRoute.fullPath] }),
     ])
   )
 }

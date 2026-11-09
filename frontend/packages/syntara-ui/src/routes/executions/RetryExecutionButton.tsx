@@ -1,7 +1,7 @@
 import { Button } from '@patternfly/react-core'
 import { useNavigate } from '@tanstack/react-router'
 
-import { AppRoute } from '../../app/AppRoute'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { permissionTooltip } from '../../hooks/permissionUtils'
 import { useCanI } from '../../hooks/useCanI'
@@ -43,7 +43,7 @@ export function RetryExecutionButton({
 
   const retry = useRetryExecution(executionId, (newExecutionId) => {
     retryDialog.close()
-    detachPromise(navigate({ to: AppRoute.Executions.Execution.replace(':executionId', newExecutionId) }))
+    detachPromise(navigate({ to: routeRefs.executionDetailRoute.fullPath, params: { executionId: newExecutionId } }))
   })
   /* v8 ignore stop */
 

@@ -25,7 +25,7 @@ export type BuilderDialogPropsParams = {
   setPendingImport: Dispatch<SetStateAction<PendingImportData | null>>
   selectedProject: { id: string } | null
   createWorkflow: UseBuilderSaveWorkflowParams['createWorkflow']
-  setLocation: (path: string) => void
+  setLocation: UseBuilderSaveWorkflowParams['setLocation']
   pinnedMockDataForDialog: Record<string, Record<string, unknown>> | undefined
 }
 

@@ -2,7 +2,7 @@ import { Button } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useNavigate } from '@tanstack/react-router'
 
-import { AppRoute } from '../../../app/AppRoute'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { detachPromise } from '../../../utils/detachPromise'
 
@@ -20,7 +20,7 @@ export function AddProviderButton({ permissions }: Readonly<{ permissions: Ident
         isAriaDisabled={!permissions.canCreate}
         onClick={
           permissions.canCreate
-            ? () => detachPromise(navigate({ to: AppRoute.SystemAdministration.Authentication.AddIdentityProvider }))
+            ? () => detachPromise(navigate({ to: routeRefs.addIdentityProviderRoute.fullPath }))
             : undefined
         }
       >

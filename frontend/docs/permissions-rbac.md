@@ -111,10 +111,13 @@ Navigation items are filtered based on permissions via `useFilteredNavigationIte
 
 Set on `TNavigationItem` in `navigationItems.tsx`. The nav item is visible if the user has ANY of the listed permissions.
 
+In navigation examples, `routeRefs` is imported from `src/app/routes/routeReferences.ts`. Route references keep path parameters tied to the route definition.
+
 ```tsx
 {
   label: 'Settings',
-  path: AppRoute.Settings,
+  destination: { to: routeRefs.settingsRoute.fullPath },
+  matchPath: routeRefs.settingsRoute.fullPath,
   requiredPermissions: [{ action: 'read', resourceType: 'setting' }],
 }
 ```
@@ -126,7 +129,8 @@ Set on `TNavigationItem` for create/edit routes. Wraps the route component in `P
 ```tsx
 {
   label: 'Create User',
-  path: AppRoute.AccessManagement.CreateUser,
+  destination: { to: routeRefs.createUserRoute.fullPath },
+  matchPath: routeRefs.createUserRoute.fullPath,
   routePermission: { action: 'create', resourceType: 'user' },
 }
 ```

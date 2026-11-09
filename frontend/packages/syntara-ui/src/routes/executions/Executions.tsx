@@ -4,6 +4,7 @@ import type { Execution } from '@syntara/contracts'
 import { useSearch } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import { executionsClient } from '../../client'
 import { FilterBar } from '../../components/filters/FilterBar'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
@@ -78,7 +79,7 @@ export default function Executions() {
     transformFilters: transformExecutionStatusFilter,
   })
 
-  const executionsQuery = executionsClient.useQuery('get', '/executions', {
+  const executionsQuery = executionsClient.useQuery('get', routeRefs.executionsListRoute.fullPath, {
     params: {
       query: queryParams,
     },

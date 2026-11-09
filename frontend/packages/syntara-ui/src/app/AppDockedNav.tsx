@@ -26,7 +26,7 @@ import {
 import type { MenuToggleElement } from '@patternfly/react-core'
 import { RhUiProfileFillIcon, RhUiQuestionMarkCircleIcon } from '@patternfly/react-icons'
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- MastheadLogo needs a plain anchor; SynLink adds PF Button styling
-import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
+import { Link, useNavigate, useRouter, useRouterState } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
 
 import { authClient } from '../client'
@@ -38,8 +38,9 @@ import { getErrorMessage } from '../utils/apiErrors'
 import { detachPromise } from '../utils/detachPromise'
 import { useDocLink } from '../utils/docs/useDocLink'
 
-import { AppRoute } from './AppRoute'
 import type { TNavigationItem } from './navigationItems'
+import type { AppRouteNavigationOptions } from './routeNavigationOptions'
+import * as routeRefs from './routes/routeReferences'
 import { ThemeMenu } from './ThemeMenu'
 import { useDockState } from './useDockState'
 import { useFilteredNavigationItems } from './useFilteredNavigationItems'
@@ -49,11 +50,15 @@ function MastheadHomeLink(props: React.ComponentProps<typeof Link>) {
   return <Link {...props} to="/" />
 }
 
-function findFirstEnabledPath(item: TNavigationItem): string {
-  if (item.children?.length) {
-    return item.children[0].path
-  }
-  return item.path
+function navigationItemId(item: TNavigationItem): string {
+  return item.id ?? item.matchPath ?? item.destination?.to ?? item.label
+}
+
+function findFirstEnabledDestination(item: TNavigationItem): AppRouteNavigationOptions {
+  const childDestination = item.children?.find((child) => !child.hidden && child.destination)?.destination
+  const destination = childDestination ?? item.destination
+  if (!destination) throw new Error(`Navigation item has no route destination: ${item.label}`)
+  return destination
 }
 
 /** Items with multiple children render as expandable groups instead of direct links. */
@@ -64,7 +69,7 @@ function hasDropdownChildren(item: TNavigationItem): boolean {
 function createNavItemRefs(items: TNavigationItem[]) {
   const refs: Record<string, React.RefObject<HTMLAnchorElement | null>> = {}
   items.forEach((item) => {
-    refs[item.path] = { current: null }
+    refs[navigationItemId(item)] = { current: null }
   })
   return refs
 }
@@ -73,7 +78,7 @@ function createExpandableRefs(items: TNavigationItem[]) {
   const refs: Record<string, React.RefObject<HTMLButtonElement | null>> = {}
   items.forEach((item) => {
     if (hasDropdownChildren(item)) {
-      refs[item.path] = { current: null }
+      refs[navigationItemId(item)] = { current: null }
     }
   })
   return refs
@@ -82,18 +87,18 @@ function createExpandableRefs(items: TNavigationItem[]) {
 function navigateToNavItem(
   itemId: string | number,
   visibleItems: TNavigationItem[],
-  requestNavigation: (path: string) => void
+  requestNavigation: (destination: AppRouteNavigationOptions) => void
 ) {
-  const item = visibleItems.find((navItem) => navItem.path === itemId)
-  if (item) requestNavigation(findFirstEnabledPath(item))
+  const item = visibleItems.find((navItem) => navigationItemId(navItem) === itemId)
+  if (item) requestNavigation(findFirstEnabledDestination(item))
 }
 
 function openExternalDoc(url: string) {
   globalThis.open(url, '_blank', 'noopener,noreferrer')
 }
 
-function getNavGroupId(itemPath: string): string {
-  return `nav-expandable-${itemPath.replaceAll('/', '-')}`
+function getNavGroupId(itemId: string): string {
+  return `nav-expandable-${itemId.replaceAll('/', '-')}`
 }
 
 function NavExpandableItem({
@@ -105,6 +110,7 @@ function NavExpandableItem({
   location,
   onExpand,
   requestNavigation,
+  router,
 }: Readonly<{
   item: TNavigationItem
   isActive: boolean
@@ -113,10 +119,15 @@ function NavExpandableItem({
   buttonRef?: React.RefObject<HTMLButtonElement | null>
   location: string
   onExpand: (event: React.MouseEvent<HTMLButtonElement>, isExpanded: boolean) => void
-  requestNavigation: (path: string) => void
+  requestNavigation: (destination: AppRouteNavigationOptions) => void
+  router: ReturnType<typeof useRouter>
 }>) {
-  const enabledChildren = item.children ?? []
-  const groupId = getNavGroupId(item.path)
+  const enabledChildren =
+    item.children?.flatMap((child) =>
+      !child.hidden && child.destination ? [{ item: child, destination: child.destination }] : []
+    ) ?? []
+  const itemId = navigationItemId(item)
+  const groupId = getNavGroupId(itemId)
 
   /* v8 ignore start -- phantom branches from compiled JSX props and map callback */
   return (
@@ -127,7 +138,7 @@ function NavExpandableItem({
       hasExpandableIcon={!isMobile}
       isExpanded={isExpanded}
       isActive={isActive}
-      id={`nav-${item.path.replaceAll('/', '-')}`}
+      id={`nav-${itemId.replaceAll('/', '-')}`}
       buttonProps={{
         'aria-label': item.label,
         ...(buttonRef ? { ref: buttonRef } : {}),
@@ -135,17 +146,17 @@ function NavExpandableItem({
       aria-label={item.label}
       onExpand={onExpand}
     >
-      {enabledChildren.map((child) => (
+      {enabledChildren.map(({ item: child, destination }) => (
         <NavItem
-          key={child.path}
+          key={navigationItemId(child)}
           preventDefault
-          id={`nav-${child.path.replaceAll('/', '-')}`}
+          id={`nav-${navigationItemId(child).replaceAll('/', '-')}`}
           groupId={groupId}
-          itemId={child.path}
-          href={child.path}
-          isActive={location.startsWith(child.path)}
+          itemId={navigationItemId(child)}
+          href={router.buildLocation(destination).href}
+          isActive={location.startsWith(child.matchPath ?? destination.to)}
           icon={child.icon}
-          onClick={() => requestNavigation(child.path)}
+          onClick={() => requestNavigation(destination)}
         >
           {child.label}
         </NavItem>
@@ -212,7 +223,7 @@ function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
           <DropdownItem
             key="profile"
             onClick={() => {
-              detachPromise(navigate({ to: AppRoute.MyProfile.Root }))
+              detachPromise(navigate({ to: routeRefs.myProfileRootRoute.fullPath }))
               setIsOpen(false)
             }}
           >
@@ -233,7 +244,9 @@ function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
 
 export function AppDockedNav() {
   const location = useRouterState({ select: (s) => s.location.pathname })
+  const router = useRouter()
   const { requestNavigation } = useUnsavedChanges()
+  const requestRouteNavigation = (destination: AppRouteNavigationOptions) => requestNavigation(destination)
   const { colorScheme } = useColorScheme()
   const brand = useBrand()
   const docsHomeUrl = useDocLink('home')
@@ -285,7 +298,7 @@ export function AppDockedNav() {
               <ToolbarItem>
                 <Nav
                   onSelect={(_event, selectedItem) => {
-                    navigateToNavItem(selectedItem.itemId, visibleItems, requestNavigation)
+                    navigateToNavItem(selectedItem.itemId, visibleItems, requestRouteNavigation)
                     onNavSelect()
                   }}
                   variant="docked"
@@ -293,39 +306,43 @@ export function AppDockedNav() {
                 >
                   <NavList>
                     {visibleItems.flatMap((item) => {
-                      const itemTopLevel = '/' + item.path.split('/')[1]
+                      const itemId = navigationItemId(item)
+                      const itemPath = item.matchPrefix ?? item.matchPath ?? item.destination?.to ?? ''
+                      const itemTopLevel = '/' + itemPath.split('/')[1]
                       const isActive = itemTopLevel === activeTopLevel
                       const separator = item.separatorBefore ? (
-                        <Divider key={`divider-${item.path}`} component="li" />
+                        <Divider key={`divider-${itemId}`} component="li" />
                       ) : null
                       if (hasDropdownChildren(item)) {
                         return [
                           separator,
                           <NavExpandableItem
-                            key={item.path}
+                            key={itemId}
                             item={item}
                             isActive={isActive}
-                            isExpanded={isNavGroupExpanded(getNavGroupId(item.path))}
+                            isExpanded={isNavGroupExpanded(getNavGroupId(itemId))}
                             isMobile={isMobile}
-                            buttonRef={expandableRefs[item.path]}
+                            buttonRef={expandableRefs[itemId]}
                             location={location}
-                            onExpand={(event, expanded) => onExpandNavGroup(event, getNavGroupId(item.path), expanded)}
-                            requestNavigation={requestNavigation}
+                            onExpand={(event, expanded) => onExpandNavGroup(event, getNavGroupId(itemId), expanded)}
+                            requestNavigation={requestRouteNavigation}
+                            router={router}
                           />,
                         ]
                       }
+                      const destination = findFirstEnabledDestination(item)
                       return [
                         separator,
                         <NavItem
-                          key={item.path}
+                          key={itemId}
                           preventDefault
-                          id={`nav-${item.path.replaceAll('/', '-')}`}
-                          itemId={item.path}
-                          href={findFirstEnabledPath(item)}
+                          id={`nav-${itemId.replaceAll('/', '-')}`}
+                          itemId={itemId}
+                          href={router.buildLocation(destination).href}
                           isActive={isActive}
                           icon={item.icon}
                           aria-label={item.label}
-                          anchorRef={navItemRefs[item.path]}
+                          anchorRef={navItemRefs[itemId]}
                         >
                           {item.label}
                         </NavItem>,
@@ -336,10 +353,10 @@ export function AppDockedNav() {
                 {showTooltips &&
                   visibleItems.map((item) => (
                     <Tooltip
-                      key={`tooltip-${item.path}`}
+                      key={`tooltip-${navigationItemId(item)}`}
                       aria="none"
                       aria-live="off"
-                      triggerRef={expandableRefs[item.path] ?? navItemRefs[item.path]}
+                      triggerRef={expandableRefs[navigationItemId(item)] ?? navItemRefs[navigationItemId(item)]}
                       content={item.label}
                       position="right"
                     />

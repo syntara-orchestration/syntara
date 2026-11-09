@@ -4,13 +4,13 @@ import { type IdentityProvidersAPI } from '@syntara/contracts'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useState, useCallback } from 'react'
 
-import { AppRoute } from '../../../../app/AppRoute'
 import {
   breadcrumbsIdentityProviderAdd,
   breadcrumbsIdentityProviderEdit,
   breadcrumbsIdentityProviderFormLoading,
 } from '../../../../app/breadcrumbBuilders'
 import type { AppBreadcrumbItem } from '../../../../app/breadcrumbs/appBreadcrumbItem'
+import * as routeRefs from '../../../../app/routes/routeReferences'
 import { identityProvidersClient, OIDC_REDIRECT_URI } from '../../../../client'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
@@ -212,11 +212,8 @@ function identityProviderFormBreadcrumbTrail(
   if (!isEdit) {
     return breadcrumbsIdentityProviderAdd()
   }
-  const idpDetailPath = providerId
-    ? AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(':providerId', providerId)
-    : ''
-  if (providerName && idpDetailPath) {
-    return breadcrumbsIdentityProviderEdit(providerName, idpDetailPath)
+  if (providerName && providerId) {
+    return breadcrumbsIdentityProviderEdit(providerName, providerId)
   }
   return breadcrumbsIdentityProviderFormLoading(pageTitle)
 }
@@ -331,7 +328,7 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
   })
 
   const navigateBack = useCallback(
-    () => detachPromise(navigate({ to: AppRoute.SystemAdministration.Authentication.Root })),
+    () => detachPromise(navigate({ to: routeRefs.authenticationRootRoute.fullPath })),
     [navigate]
   )
 

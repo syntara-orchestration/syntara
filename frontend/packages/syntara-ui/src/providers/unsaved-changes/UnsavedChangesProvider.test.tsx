@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import { useUnsavedChanges } from '../../app/useUnsavedChanges'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { resetAll } from '../../stores/workflowStoreActions'
@@ -20,17 +21,22 @@ vi.mock('../../stores/workflowStoreActions', () => ({
 
 // Test helper component
 function TestConsumer({
-  targetPath = '/workflows',
+  target = { to: routeRefs.workflowsRoute.fullPath },
   saveHandler,
 }: {
-  targetPath?: string
+  target?:
+    | { to: typeof routeRefs.workflowsRoute.fullPath }
+    | {
+        to: typeof routeRefs.builderEditRoute.fullPath
+        params: { workflowId: string }
+      }
   saveHandler?: () => Promise<boolean>
 }) {
   const { requestNavigation, registerSaveHandler } = useUnsavedChanges()
 
   return (
     <div>
-      <button onClick={() => requestNavigation(targetPath)}>Navigate Away</button>
+      <button onClick={() => requestNavigation(target)}>Navigate Away</button>
       {saveHandler && <button onClick={() => registerSaveHandler(saveHandler)}>Register Handler</button>}
     </div>
   )
@@ -169,14 +175,17 @@ describe('UnsavedChangesProvider', () => {
       const user = userEvent.setup()
       render(
         <UnsavedChangesProvider>
-          <TestConsumer targetPath="/workflow-builder/456" />
+          <TestConsumer target={{ to: routeRefs.builderEditRoute.fullPath, params: { workflowId: '456' } }} />
         </UnsavedChangesProvider>
       )
 
       await user.click(screen.getByText('Navigate Away'))
 
       expect(screen.queryByText('Save changes before exiting the workflow builder?')).not.toBeInTheDocument()
-      expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/workflow-builder/456' })
+      expect(routerTestState.navigate).toHaveBeenCalledWith({
+        to: routeRefs.builderEditRoute.fullPath,
+        params: { workflowId: '456' },
+      })
     })
 
     it('navigates without modal when no unsaved changes', async () => {
@@ -237,7 +246,7 @@ describe('UnsavedChangesProvider', () => {
           <div>
             <button onClick={() => registerSaveHandler(saveHandler)}>Register</button>
             <button onClick={unregisterSaveHandler}>Unregister</button>
-            <button onClick={() => requestNavigation('/workflows')}>Navigate Away</button>
+            <button onClick={() => requestNavigation({ to: routeRefs.workflowsRoute.fullPath })}>Navigate Away</button>
           </div>
         )
       }
@@ -288,7 +297,7 @@ describe('UnsavedChangesProvider', () => {
           >
             Register Dirty
           </button>
-          <button onClick={() => requestNavigation('/workflows')}>Navigate Away</button>
+          <button onClick={() => requestNavigation({ to: routeRefs.workflowsRoute.fullPath })}>Navigate Away</button>
         </div>
       )
     }
@@ -474,7 +483,7 @@ describe('UnsavedChangesProvider (TanStack router path)', () => {
 
     function TestNav() {
       const { requestNavigation } = useTanStackUnsavedChanges()
-      return <button onClick={() => requestNavigation('/workflows')}>Navigate Away</button>
+      return <button onClick={() => requestNavigation({ to: routeRefs.workflowsRoute.fullPath })}>Navigate Away</button>
     }
 
     render(

@@ -1,6 +1,7 @@
 import { Button, HelperText, HelperTextItem, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
 import { useCallback, useMemo, useState } from 'react'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { executionsClient } from '../../../client'
 import { useBlurOnOpen } from '../../../hooks/useBlurOnOpen'
 import { useAlerts } from '../../../providers/alerts'
@@ -122,7 +123,7 @@ export function RunWorkflowModal({
 
   const latestExecQuery = executionsClient.useQuery(
     'get',
-    '/executions',
+    routeRefs.executionsListRoute.fullPath,
     {
       params: {
         query: {

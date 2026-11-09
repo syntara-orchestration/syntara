@@ -1,5 +1,7 @@
 import { useCallback } from 'react'
 
+import type { AppRouteNavigationOptions } from '../../../app/routeNavigationOptions'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import type { AlertConfig, AlertMessage } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import type { BuilderAction } from '../builderReducer'
@@ -13,7 +15,7 @@ export type UseBuilderImportHandlersParams = {
   markDirty: () => void
   selectedProject: { id: string } | null
   createWorkflow: UseBuilderSaveWorkflowParams['createWorkflow']
-  setLocation: (to: string) => void
+  setLocation: (destination: AppRouteNavigationOptions) => void
   showAlert: (config: AlertConfig) => void
   showSuccess: (options: AlertMessage) => void
   showError: (options: AlertMessage) => void
@@ -88,7 +90,7 @@ export function useBuilderImportHandlers(
             showSuccess({ title: 'Workflow imported', description: `Created "${importName}"` })
           }
           if (data.id) {
-            setLocation(`/workflow-builder/${data.id}`)
+            setLocation({ to: routeRefs.builderEditRoute.fullPath, params: { workflowId: data.id } })
           }
         },
         onError: (error) => {

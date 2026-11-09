@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 
+import type { AppRouteNavigationOptions } from '../../../app/routeNavigationOptions'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { executionsFetchClient, workflowFetchClient } from '../../../client'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
@@ -18,7 +20,7 @@ type UseBuilderConflictParams = {
   currentWorkflow: WorkflowDefinition | null
   currentVersion: number | undefined
   isNew: boolean
-  setLocation: (to: string) => void
+  setLocation: (destination: AppRouteNavigationOptions) => void
   showError: (options: { title: string; description: string }) => void
   markClean: () => void
 }
@@ -160,19 +162,26 @@ export function useBuilderConflict(params: UseBuilderConflictParams) {
         }
         if (action === 'run') {
           const firstTrigger = currentWorkflow.triggers?.[0] as { id?: string } | undefined
-          const { data: runData, error: runError } = await executionsFetchClient.POST('/executions', {
-            body: {
-              workflow_id: created.id,
-              input_data: {},
-              trigger_node_id: firstTrigger?.id ?? '',
-            },
-          })
+          const { data: runData, error: runError } = await executionsFetchClient.POST(
+            routeRefs.executionsListRoute.fullPath,
+            {
+              body: {
+                workflow_id: created.id,
+                input_data: {},
+                trigger_node_id: firstTrigger?.id ?? '',
+              },
+            }
+          )
           conflictDialog.close()
           if (runError || !runData?.id) {
             showError({ title: 'Run failed', description: 'Workflow duplicated but failed to run' })
-            setLocation(`/workflow-builder/${created.id}`)
+            setLocation({ to: routeRefs.builderEditRoute.fullPath, params: { workflowId: created.id } })
           } else {
-            setLocation(`/executions/${runData.id}?history=closed`)
+            setLocation({
+              to: routeRefs.executionDetailRoute.fullPath,
+              params: { executionId: runData.id },
+              search: { history: 'closed' },
+            })
           }
           return
         }
@@ -184,7 +193,7 @@ export function useBuilderConflict(params: UseBuilderConflictParams) {
           })
         }
         conflictDialog.close()
-        setLocation(`/workflow-builder/${created.id}`)
+        setLocation({ to: routeRefs.builderEditRoute.fullPath, params: { workflowId: created.id } })
       } finally {
         setIsConflictLoading(false)
       }

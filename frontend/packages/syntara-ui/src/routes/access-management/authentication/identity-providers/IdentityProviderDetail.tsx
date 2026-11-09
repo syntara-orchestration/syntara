@@ -16,35 +16,28 @@ import {
   Tab,
   TabTitleText,
 } from '@patternfly/react-core'
-import {
-  RhUiArrowLeftIcon,
-  RhUiBanIcon,
-  RhUiEditIcon,
-  RhUiSearchIcon,
-  RhUiSyncIcon,
-  RhUiTrashIcon,
-} from '@patternfly/react-icons'
+import { RhUiArrowLeftIcon, RhUiEditIcon, RhUiSearchIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { type IdentityProvidersAPI } from '@syntara/contracts'
 import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
 import { createContext, use, useMemo, useState, type ReactNode } from 'react'
 
-import { AppRoute } from '../../../../app/AppRoute'
 import {
   breadcrumbsIdentityProviderDetail,
   breadcrumbsIdentityProviderDetailEarlyShell,
 } from '../../../../app/breadcrumbBuilders'
+import * as routeRefs from '../../../../app/routes/routeReferences'
+import { tanstackRouter } from '../../../../app/tanstackRouter'
 import { adminClient, identityProvidersClient } from '../../../../client'
 import { SynConfirmationDialog } from '../../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../../components/DisabledWithTooltip'
-import { IconLabel } from '../../../../components/IconLabel'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
 import { SynListPanel, SynListPanelTabs, SynListPanelView } from '../../../../components/panels/list/SynListPanel'
 import { ProviderIcon } from '../../../../components/ProviderIcon'
 import { useQueryState } from '../../../../components/states/useQueryState'
-import type { KebabAction } from '../../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../../components/SynKebabMenu'
+import type { KebabAction } from '../../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { DateCell } from '../../../../components/table/DateCell'
 import { useDeleteAction } from '../../../../hooks/useDeleteAction'
@@ -62,7 +55,13 @@ import { useIdentityProviderToggle } from '../useIdentityProviderToggle'
 import { GroupMappingTab } from './GroupMappingTab'
 import { buildGroupMappingConfig, type GroupMappingConfig } from './groupMappingUtils'
 import { IdentityProviderDeleteDialog } from './IdentityProviderDeleteDialog'
-import { identityProviderGroupMappingEditPath } from './identityProviderPaths'
+import { buildIdentityProviderKebabActions } from './identityProviderDetailActions'
+import {
+  GROUP_MAPPING_TAB,
+  identityProviderEditOptions,
+  identityProviderTabOptions,
+  type IdentityProviderDetailTab,
+} from './identityProviderPaths'
 import { IdpTypeKey, IDP_TYPE_PRESETS } from './idpTypePresets'
 
 type ProviderData = IdentityProvidersAPI.components['schemas']['IdentityProviderRead']
@@ -156,8 +155,6 @@ function ProviderDetailsContent({ provider }: Readonly<{ provider: ProviderData 
   )
 }
 
-const GROUP_MAPPING_TAB = 'group-mapping' as const
-
 type IdentityProviderDetailRouteContextValue = {
   provider: ProviderData
   providerId: string
@@ -235,15 +232,18 @@ function IdentityProviderDetailEarlyLayout({ children }: Readonly<{ children: Re
 function IdentityProviderDetailTabStrip({
   basePath,
   mappingCount,
+  onTabChange,
 }: Readonly<{
   basePath: string
   mappingCount: number
+  onTabChange: (tab: IdentityProviderDetailTab, options?: { replace?: boolean }) => void
 }>) {
   return (
     <SynListPanelTabs
       basePath={basePath}
       defaultTab="details"
       validTabs={['details', GROUP_MAPPING_TAB]}
+      onTabChange={onTabChange}
       aria-label="Identity provider details"
     >
       <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
@@ -294,39 +294,6 @@ function IdentityProviderDetailToolbar({
   )
 }
 
-function buildKebabActions(
-  idpPermissions: ReturnType<typeof useIdentityProviderPermissions>,
-  onEditMapping: () => void,
-  onRevoke: () => void,
-  onDelete: () => void
-): KebabAction[] {
-  return [
-    {
-      key: 'edit-mapping',
-      title: <IconLabel icon={<RhUiEditIcon />}>Edit group mapping</IconLabel>,
-      isAriaDisabled: !idpPermissions.canUpdate,
-      tooltipProps: idpPermissions.canUpdate ? undefined : { content: idpPermissions.tooltips.update },
-      onClick: idpPermissions.canUpdate ? onEditMapping : undefined,
-    },
-    {
-      key: 'revoke',
-      title: <IconLabel icon={<RhUiBanIcon />}>Revoke tokens</IconLabel>,
-      isAriaDisabled: !idpPermissions.canRevoke,
-      tooltipProps: idpPermissions.canRevoke ? undefined : { content: idpPermissions.tooltips.revoke },
-      onClick: idpPermissions.canRevoke ? onRevoke : undefined,
-    },
-    { key: 'separator', isSeparator: true },
-    {
-      key: 'delete',
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete provider</IconLabel>,
-      isDanger: true,
-      isAriaDisabled: !idpPermissions.canDelete,
-      tooltipProps: idpPermissions.canDelete ? undefined : { content: idpPermissions.tooltips.delete },
-      onClick: idpPermissions.canDelete ? onDelete : undefined,
-    },
-  ]
-}
-
 export function IdentityProviderDetail() {
   const navigate = useNavigate()
   const identityProvidersDocLink = useDocLink('identityProviders')
@@ -338,10 +305,10 @@ export function IdentityProviderDetail() {
   const { showSuccess } = useAlerts()
   const handleMutationError = useMutationErrorHandler()
   const canUpdate = idpPermissions.canUpdate
-  const idpDetailBasePath = AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
-    ':providerId',
-    providerId ?? ''
-  )
+  const idpDetailBasePath = tanstackRouter.buildLocation({
+    to: routeRefs.identityProviderDetailRoute.fullPath,
+    params: { providerId: providerId ?? '' },
+  }).href
 
   const providerQuery = identityProvidersClient.useQuery(
     'get',
@@ -355,13 +322,10 @@ export function IdentityProviderDetail() {
     '/identity_providers/{provider_id}'
   )
 
-  const navigateBack = () => detachPromise(navigate({ to: AppRoute.SystemAdministration.Authentication.Root }))
-  const navigateEdit = () =>
-    detachPromise(
-      navigate({
-        to: AppRoute.SystemAdministration.Authentication.EditIdentityProvider.replace(':providerId', providerId ?? ''),
-      })
-    )
+  const navigateBack = () => detachPromise(navigate({ to: routeRefs.authenticationRootRoute.fullPath }))
+  const navigateEdit = () => detachPromise(navigate(identityProviderEditOptions(providerId ?? '')))
+  const onTabChange = (tab: IdentityProviderDetailTab, options?: { replace?: boolean }) =>
+    detachPromise(navigate({ ...identityProviderTabOptions(providerId ?? '', tab), ...options }))
 
   const providerData = providerQuery.data
   const config = providerData?.configuration
@@ -424,10 +388,14 @@ export function IdentityProviderDetail() {
     )
   }
 
-  const kebabActions = buildKebabActions(
+  const kebabActions = buildIdentityProviderKebabActions(
     idpPermissions,
     () => {
-      if (providerId) detachPromise(navigate({ to: identityProviderGroupMappingEditPath(providerId) }))
+      if (providerId) {
+        detachPromise(
+          navigate({ to: routeRefs.editIdentityProviderGroupMappingRoute.fullPath, params: { providerId } })
+        )
+      }
     },
     () => {
       if (providerData) revokeDialog.open(providerData)
@@ -504,7 +472,11 @@ export function IdentityProviderDetail() {
       />
       <SynPageBody>
         <SynListPanel>
-          <IdentityProviderDetailTabStrip basePath={idpDetailBasePath} mappingCount={mappingCount} />
+          <IdentityProviderDetailTabStrip
+            basePath={idpDetailBasePath}
+            mappingCount={mappingCount}
+            onTabChange={onTabChange}
+          />
           <IdentityProviderDetailRouteContext.Provider value={detailRouteContextValue}>
             <Outlet />
           </IdentityProviderDetailRouteContext.Provider>

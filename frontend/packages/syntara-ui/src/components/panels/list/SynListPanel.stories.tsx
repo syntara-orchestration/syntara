@@ -443,7 +443,7 @@ export const TabbedList: Story = {
   parameters: {
     tanstack: {
       router: {
-        path: '/group/resources/members',
+        path: '/workflows',
       },
     },
   },

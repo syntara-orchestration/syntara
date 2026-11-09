@@ -19,6 +19,7 @@ import type { ExecutionsAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo, useState, type ReactNode } from 'react'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import { FilterBar } from '../../components/filters/FilterBar'
 import { IconLabel } from '../../components/IconLabel'
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
@@ -50,7 +51,7 @@ import type { ExecutionMetadata } from '../workflows/stores/useExecutionStore'
 import { StatusLabel } from './ExecutionStatus'
 import { formatHistoryDateTime, getDateGroupLabel } from './historyDateUtils'
 import { HistoryListItemLink } from './HistoryListItemLink'
-import { executionDetailHref, getClearFiltersHandler, workflowVersionHref } from './hooks/historyRowModel'
+import { executionDetailOptions, getClearFiltersHandler, workflowVersionOptions } from './hooks/historyRowModel'
 import styles from './WorkflowHistoryCard.module.css'
 
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
@@ -96,7 +97,7 @@ function HistoryRowRetryAction({ execution }: Readonly<{ execution: Execution }>
   } = useIsCurrentVersion(execution.workflow_id, execution.workflow_version_id, retryDialogOpen)
   const retryHook = useRetryExecution(execution.id, (newId) => {
     setRetryDialogOpen(false)
-    detachPromise(navigate({ to: `/executions/${newId}` }))
+    detachPromise(navigate({ to: routeRefs.executionDetailRoute.fullPath, params: { executionId: newId } }))
   })
   /* v8 ignore stop */
 
@@ -136,11 +137,11 @@ export function ExecutionHistoryRow({ execution, onSelect, isSelected }: Executi
   const truncatedId = execution.id ? execution.id.slice(0, TRUNCATED_ID_LENGTH) : null
   const isTestRun = (execution as { execution_metadata?: ExecutionMetadata }).execution_metadata?.mode === 'test'
   const retryable = isExecutionRetryable(execution.status, execution.mode)
-  const executionHref = executionDetailHref(execution.id)
+  const executionOptions = executionDetailOptions(execution.id)
   const runIdLabel = truncatedId ? `Run ID: ${truncatedId}` : null
-  const versionHref =
+  const versionOptions =
     execution.workflow_version != null && execution.workflow_id
-      ? workflowVersionHref(execution.workflow_id, execution.workflow_version)
+      ? workflowVersionOptions(execution.workflow_id, execution.workflow_version)
       : null
   const dateLabel = execution.created_at
     ? `Execution from ${formatHistoryDateTime(execution.created_at)}`
@@ -152,7 +153,7 @@ export function ExecutionHistoryRow({ execution, onSelect, isSelected }: Executi
     // eslint-disable-next-line syntara/prefer-pf-list-components -- SimpleListItem renders a <button> wrapper, causing invalid nested interactive elements (https://github.com/patternfly/patternfly-react/issues/11368)
     <li className={`pf-v6-c-simple-list__item ${styles.historyRowItem}`}>
       <HistoryListItemLink
-        to={executionHref}
+        options={executionOptions}
         isSelected={isSelected}
         onSelect={onSelect}
         data-item-id={execution.id}
@@ -176,10 +177,10 @@ export function ExecutionHistoryRow({ execution, onSelect, isSelected }: Executi
               {runIdLabel}
             </Content>
           )}
-          {versionHref && (
+          {versionOptions && (
             <Content component={ContentVariants.small} className={styles.historyRowMeta}>
               {'Version: '}
-              <SynLink to={versionHref} className={styles.historyRowRaised}>
+              <SynLink options={versionOptions} className={styles.historyRowRaised}>
                 {execution.workflow_version_name ? (
                   <Truncate content={execution.workflow_version_name} />
                 ) : (

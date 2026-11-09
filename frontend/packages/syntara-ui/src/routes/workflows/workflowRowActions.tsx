@@ -11,6 +11,7 @@ import {
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import { IconLabel } from '../../components/IconLabel'
 import { builtinProjectTooltip } from '../../hooks/permissionUtils'
 import { detachPromise } from '../../utils/detachPromise'
@@ -65,7 +66,9 @@ export function buildWorkflowRowActions(
       tooltipProps: noUpdate,
       onClick: () => {
         if (!workflow.id) return
-        detachPromise(callbacks.navigate({ to: '/workflow-builder/$workflowId', params: { workflowId: workflow.id } }))
+        detachPromise(
+          callbacks.navigate({ to: routeRefs.builderEditRoute.fullPath, params: { workflowId: workflow.id } })
+        )
       },
     },
     {
@@ -81,7 +84,9 @@ export function buildWorkflowRowActions(
       key: 'history',
       title: <IconLabel icon={<RhUiHistoryIcon />}>View run history</IconLabel>,
       onClick: () => {
-        detachPromise(callbacks.navigate({ to: '/executions', search: { workflow_id: workflow.id } }))
+        detachPromise(
+          callbacks.navigate({ to: routeRefs.executionsListRoute.fullPath, search: { workflow_id: workflow.id } })
+        )
       },
     },
     {

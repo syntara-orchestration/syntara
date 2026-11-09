@@ -1,15 +1,17 @@
+import '../../app/tanstackRouter'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import type { AppBreadcrumbItem } from '../../app/breadcrumbs/appBreadcrumbItem'
+import { breadcrumbTestRoutes } from '../../test/breadcrumbTestRoutes'
 
 import { SynPageBreadcrumbsCollapsedMiddle } from './SynPageBreadcrumbsCollapsedMiddle'
 
 const MIDDLE_ITEMS: readonly AppBreadcrumbItem[] = [
-  { label: 'Mid A', href: '/a' },
-  { label: 'Mid B', href: '/b' },
+  { label: 'Mid A', destination: breadcrumbTestRoutes.workflows },
+  { label: 'Mid B', destination: breadcrumbTestRoutes.approvals },
 ]
 
 describe('SynPageBreadcrumbsCollapsedMiddle', () => {
@@ -41,8 +43,8 @@ describe('SynPageBreadcrumbsCollapsedMiddle', () => {
 
     await user.click(screen.getByRole('button', { name: 'Earlier pages, 2 levels' }))
 
-    expect(screen.getByRole('menuitem', { name: 'Mid A' })).toHaveAttribute('href', '/a')
-    expect(screen.getByRole('menuitem', { name: 'Mid B' })).toHaveAttribute('href', '/b')
+    expect(screen.getByRole('menuitem', { name: 'Mid A' })).toHaveAttribute('href', '/workflows')
+    expect(screen.getByRole('menuitem', { name: 'Mid B' })).toHaveAttribute('href', '/approvals')
   })
 
   it('uses client-side navigation on regular menu item click', async () => {
@@ -100,7 +102,10 @@ describe('SynPageBreadcrumbsCollapsedMiddle', () => {
 
   it('renders items without href as non-link menu entries', async () => {
     const user = userEvent.setup()
-    const items: readonly AppBreadcrumbItem[] = [{ label: 'No link' }, { label: 'Has link', href: '/link' }]
+    const items: readonly AppBreadcrumbItem[] = [
+      { label: 'No link' },
+      { label: 'Has link', destination: breadcrumbTestRoutes.credentials },
+    ]
     render(<SynPageBreadcrumbsCollapsedMiddle middleItems={items} />)
 
     await user.click(screen.getByRole('button', { name: 'Earlier pages, 2 levels' }))
@@ -122,8 +127,8 @@ describe('SynPageBreadcrumbsCollapsedMiddle', () => {
     const user = userEvent.setup()
     const longLabel = `alice-sandbox-${'x'.repeat(80)}`
     const items: readonly AppBreadcrumbItem[] = [
-      { label: 'Projects', href: '/projects' },
-      { label: longLabel, href: '/projects/1' },
+      { label: 'Projects', destination: breadcrumbTestRoutes.projects },
+      { label: longLabel, destination: breadcrumbTestRoutes.project() },
     ]
 
     render(<SynPageBreadcrumbsCollapsedMiddle middleItems={items} />)

@@ -2,8 +2,8 @@
  * Baseline enforcement script for visual regression testing.
  *
  * Catches four failure modes:
- *   1. A new route was added to AppRoute.tsx but not to the page registry
- *   2. A registry path doesn't match any route in AppRoute.tsx (stale/moved route)
+ *   1. A new mounted route was added but not to the page registry
+ *   2. A registry path doesn't match any mounted route (stale/moved route)
  *   3. A route is in the page registry but has no committed baseline screenshot
  *   4. A baseline PNG exists but has no matching entry in the page registry (orphan)
  *
@@ -15,29 +15,25 @@
  *   1 — missing coverage or missing baselines
  */
 
-import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { resolve, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { buildRouteManifest } from '../route-baseline/build-route-manifest'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const pkgRoot = resolve(__dirname, '../..')
 
 // ---------------------------------------------------------------------------
-// 1. Extract all route paths from AppRoute.tsx
+// 1. Collect mounted route templates from the route definitions.
 // ---------------------------------------------------------------------------
-const appRoutePath = resolve(pkgRoot, 'src/app/AppRoute.tsx')
-const appRouteSource = readFileSync(appRoutePath, 'utf-8')
-
-// Match all string literals that look like route paths: '/some/path'
-const routePathRegex = /['"](\/.+?)['"]/g
-const allAppRoutes = new Set<string>()
-
-for (const match of appRouteSource.matchAll(routePathRegex)) {
-  allAppRoutes.add(match[1])
-}
+const { manifest } = buildRouteManifest({ pkgRoot })
+const allRouteTemplates = new Set(
+  manifest.routes.filter((route) => route.kind !== 'fallback').map((route) => route.template)
+)
 
 // ---------------------------------------------------------------------------
-// 2. Import the page registry to get resolved paths (handles AppRoute imports)
+// 2. Import the page registry to get resolved paths and concrete test IDs.
 // ---------------------------------------------------------------------------
 const { pages, loginPages, allExcludedRoutes } = await import(
   resolve(pkgRoot, 'e2e/visual-regression/page-registry.ts')
@@ -47,31 +43,31 @@ const coveredConcretePaths = new Set<string>(pages.map((p: { path: string }) => 
 const excludedRoutes = new Set<string>(allExcludedRoutes as string[])
 
 // ---------------------------------------------------------------------------
-// 3. Normalize parameterized routes for comparison
-//    AppRoute.tsx has :param placeholders; the registry uses concrete mock IDs
+// 3. Match TanStack `$param` templates against concrete registry paths.
 // ---------------------------------------------------------------------------
 
 function matchesTemplate(template: string, concretePath: string): boolean {
+  const pathname = concretePath.split('?')[0] ?? concretePath
   const tParts = template.split('/')
-  const cParts = concretePath.split('/')
+  const cParts = pathname.split('/')
 
   if (tParts.length !== cParts.length) {
     const tail = tParts[tParts.length - 1]
-    const isOptionalTail = tail?.startsWith(':') && tail.endsWith('?') && tParts.length === cParts.length + 1
+    const isOptionalTail = tail?.startsWith('$') && tail.endsWith('?') && tParts.length === cParts.length + 1
     if (!isOptionalTail) return false
   }
 
   return tParts.every((tSeg, i) => {
-    if (i >= cParts.length) return tSeg.startsWith(':') && tSeg.endsWith('?')
-    if (tSeg.startsWith(':')) return true
+    if (i >= cParts.length) return tSeg.startsWith('$') && tSeg.endsWith('?')
+    if (tSeg.startsWith('$')) return true
     return tSeg === cParts[i]
   })
 }
 
-// Build set of AppRoute templates that are covered (by concrete paths or exclusions)
+// Build set of route templates covered by concrete paths or explicit exclusions.
 const uncoveredRoutes: string[] = []
 
-for (const route of allAppRoutes) {
+for (const route of allRouteTemplates) {
   // Check if explicitly excluded
   if (excludedRoutes.has(route)) continue
 
@@ -86,12 +82,12 @@ for (const route of allAppRoutes) {
 }
 
 // ---------------------------------------------------------------------------
-// 3b. Detect stale registry paths (registry → AppRoute reverse check)
+// 3b. Detect stale registry paths (registry → route definitions reverse check)
 // ---------------------------------------------------------------------------
 const staleRegistryPaths: string[] = []
 
 for (const concretePath of coveredConcretePaths) {
-  const matchesAny = [...allAppRoutes].some((template) => matchesTemplate(template, concretePath))
+  const matchesAny = [...allRouteTemplates].some((template) => matchesTemplate(template, concretePath))
   if (!matchesAny) {
     staleRegistryPaths.push(concretePath)
   }
@@ -165,7 +161,7 @@ let hasErrors = false
 if (uncoveredRoutes.length > 0) {
   hasErrors = true
   console.error('\n--- Routes missing from page registry ---')
-  console.error('These routes exist in AppRoute.tsx but have no entry in page-registry.ts:')
+  console.error('These mounted routes have no entry in page-registry.ts:')
   for (const route of uncoveredRoutes.sort()) {
     console.error(`  - ${route}`)
   }
@@ -192,11 +188,11 @@ if (missingBaselines.length > 0) {
 if (staleRegistryPaths.length > 0) {
   hasErrors = true
   console.error('\n--- Stale registry paths ---')
-  console.error("These paths are in page-registry.ts but don't match any route in AppRoute.tsx:")
+  console.error("These paths are in page-registry.ts but don't match any mounted route:")
   for (const p of staleRegistryPaths.sort()) {
     console.error(`  - ${p}`)
   }
-  console.error('\nTo fix: update the path in page-registry.ts to match the current route in AppRoute.tsx.')
+  console.error('\nTo fix: update the path in page-registry.ts to match a route definition.')
   console.error('        This usually means a route was moved but the registry was not updated.\n')
 }
 
@@ -214,7 +210,7 @@ if (hasErrors) {
   process.exit(1)
 } else {
   console.log('All routes covered, all baselines present, no orphans, no stale paths.')
-  console.log(`  Routes in AppRoute.tsx: ${allAppRoutes.size} (${excludedRoutes.size} excluded)`)
+  console.log(`  Route templates: ${allRouteTemplates.size} (${excludedRoutes.size} excluded)`)
   console.log(
     `  Pages in registry: ${registryEntries.length} (${loginPageEntries.length} login + ${registryEntries.length - loginPageEntries.length} routes)`
   )

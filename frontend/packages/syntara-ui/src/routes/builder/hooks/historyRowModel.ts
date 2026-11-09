@@ -1,5 +1,7 @@
 import type { ExecutionsAPI } from '@syntara/contracts'
 
+import type { AppRouteNavigationOptions } from '../../../app/routeNavigationOptions'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { formatDateTime, formatElapsedTime } from '../../../utils/dateUtils'
 import { isExecutionRetryable } from '../../executions/executionRetryable'
 import type { ExecutionMetadata } from '../../workflows/stores/useExecutionStore'
@@ -30,7 +32,7 @@ export type ExecutionHistoryRowModel = {
   showRetryKebab: boolean
   elapsedLabel: string
   runIdLabel: string | null
-  versionHref: string | null
+  versionOptions: AppRouteNavigationOptions | null
   versionLabel: string | null
   retriedFromLabel: string | null
   status: string | null | undefined
@@ -43,7 +45,9 @@ export function buildExecutionHistoryRowModel(
   elapsedMs: number | undefined
 ): ExecutionHistoryRowModel {
   const truncatedId = execution.id ? execution.id.slice(0, TRUNCATED_ID_LENGTH) : null
-  const hasVersion = execution.workflow_version != null && Boolean(execution.workflow_id)
+  const workflowId = execution.workflow_id
+  const workflowVersion = execution.workflow_version
+  const hasVersion = workflowVersion != null && Boolean(workflowId)
   const versionLabel = hasVersion
     ? (execution.workflow_version_name ?? formatDateTime(execution.workflow_version_created_at))
     : null
@@ -53,9 +57,8 @@ export function buildExecutionHistoryRowModel(
     showRetryKebab: isExecutionRetryable(execution.status as ExecutionStatus | null | undefined, execution.mode),
     elapsedLabel: elapsedMs !== undefined ? `Elapsed time: ${formatElapsedTime(elapsedMs)}` : 'Elapsed time: -',
     runIdLabel: truncatedId ? `Run ID: ${truncatedId}` : null,
-    versionHref: hasVersion
-      ? `/workflow-builder/${execution.workflow_id}?version=${String(execution.workflow_version)}`
-      : null,
+    versionOptions:
+      hasVersion && workflowId && workflowVersion != null ? workflowVersionOptions(workflowId, workflowVersion) : null,
     versionLabel,
     retriedFromLabel: execution.retried_from_execution_id
       ? `Retried from: ${execution.retried_from_execution_id.slice(0, TRUNCATED_ID_LENGTH)}`
@@ -80,12 +83,16 @@ export function resolveVersionStatusForBadge(status: string | null | undefined):
   return null
 }
 
-export function workflowVersionHref(workflowId: string, version: number): string {
-  return `/workflow-builder/${workflowId}?version=${String(version)}`
+export function workflowVersionOptions(workflowId: string, version: number): AppRouteNavigationOptions {
+  return {
+    to: routeRefs.builderEditRoute.fullPath,
+    params: { workflowId },
+    search: { version: String(version) },
+  }
 }
 
-export function executionDetailHref(executionId: string): string {
-  return `/executions/${executionId}`
+export function executionDetailOptions(executionId: string): AppRouteNavigationOptions {
+  return { to: routeRefs.executionDetailRoute.fullPath, params: { executionId } }
 }
 
 export function getClearFiltersHandler<T>(

@@ -1,5 +1,5 @@
-import { renderHook, act } from '@testing-library/react'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { renderHook } from '@testing-library/react'
+import { beforeEach, describe, it, expect } from 'vitest'
 
 import { routerTestState } from '../test/setup'
 
@@ -15,54 +15,48 @@ describe('useUrlTab', () => {
     routerTestState.pathname = '/system-administration/access-management/users/123'
     const { result } = renderHook(() => useUrlTab('/system-administration/access-management/users/123'))
 
-    expect(result.current[0]).toBe('details')
+    expect(result.current).toBe('details')
   })
 
   it('should return custom default tab when specified', () => {
     routerTestState.pathname = '/access/can-i'
     const { result } = renderHook(() => useUrlTab('/access/can-i', 'check'))
 
-    expect(result.current[0]).toBe('check')
+    expect(result.current).toBe('check')
   })
 
   it('should parse tab slug from URL path', () => {
     routerTestState.pathname = '/system-administration/access-management/users/123/groups'
     const { result } = renderHook(() => useUrlTab('/system-administration/access-management/users/123'))
 
-    expect(result.current[0]).toBe('groups')
+    expect(result.current).toBe('groups')
   })
 
   it('should parse tab slug with trailing slash', () => {
     routerTestState.pathname = '/system-administration/access-management/users/123/roles/'
     const { result } = renderHook(() => useUrlTab('/system-administration/access-management/users/123'))
 
-    expect(result.current[0]).toBe('roles')
+    expect(result.current).toBe('roles')
   })
 
-  it('should call navigate with correct path when goToTab is called', () => {
-    routerTestState.pathname = '/system-administration/access-management/users/123/details'
+  it('only reads the active tab and leaves navigation to its caller', () => {
+    routerTestState.pathname = '/system-administration/access-management/users/123/groups'
     const { result } = renderHook(() => useUrlTab('/system-administration/access-management/users/123'))
-
-    act(() => {
-      result.current[1]('groups')
-    })
-
-    expect(routerTestState.navigate).toHaveBeenCalledWith({
-      to: '/system-administration/access-management/users/123/groups',
-    })
+    expect(result.current).toBe('groups')
+    expect(routerTestState.navigate).not.toHaveBeenCalled()
   })
 
   it('should return default tab when location does not start with basePath', () => {
     routerTestState.pathname = '/other/path'
     const { result } = renderHook(() => useUrlTab('/system-administration/access-management/users/123'))
 
-    expect(result.current[0]).toBe('details')
+    expect(result.current).toBe('details')
   })
 
   it('should handle exact basePath match with no trailing content', () => {
     routerTestState.pathname = '/access/can-i'
     const { result } = renderHook(() => useUrlTab('/access/can-i', 'check'))
 
-    expect(result.current[0]).toBe('check')
+    expect(result.current).toBe('check')
   })
 })

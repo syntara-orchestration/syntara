@@ -16,6 +16,7 @@ import type { Approval } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
+import type { AppRouteNavigationOptions } from '../../app/routeNavigationOptions'
 import { approvalsClient } from '../../client'
 import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
@@ -62,7 +63,7 @@ type ApprovalDetailContentProps = Readonly<{
   /** Optional map of activity ID to human-readable name for resolving approval node names. */
   activityNameMap?: Map<string, string>
   onDecisionSubmitted?: () => void
-  onWorkflowClick?: (link: string) => void
+  onWorkflowClick?: (destination: AppRouteNavigationOptions) => void
 }>
 
 function getDecideTooltip(
@@ -185,8 +186,8 @@ function ApprovalSummary({
   approvalInitiatedAt: string | null | undefined
   approvalMessage: string | undefined
   workflowName: string
-  workflowLink: string | undefined
-  onWorkflowClick?: (link: string) => void
+  workflowLink: AppRouteNavigationOptions | undefined
+  onWorkflowClick?: (destination: AppRouteNavigationOptions) => void
 }>) {
   return (
     <DescriptionList>

@@ -2,8 +2,8 @@ import { Content, ContentVariants, EmptyState, EmptyStateBody, StackItem, Title 
 import { PlusCircleIcon, RhUiKeyIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { flexCenteredBothAxes } from '../../../app/flexCenteredBothAxes'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { FilterBar } from '../../../components/filters/FilterBar'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
@@ -16,7 +16,7 @@ import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useTableSort } from '../../../hooks/useTableSort'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
-import { getUserDetailPath } from '../accessManagementPaths'
+import { getUserDetailOptions } from '../accessManagementPaths'
 import { AUTH_SOURCE_LOCAL } from '../adminConstants'
 
 import type { UserIdentity, UserSummary } from './identityUtils'
@@ -141,7 +141,7 @@ export function SelectUserStep({
                     }}
                   />
                   <Td dataLabel="Username">
-                    <SynLink to={getUserDetailPath(user.id)} onClick={(e) => e.stopPropagation()}>
+                    <SynLink options={getUserDetailOptions(user.id)} onClick={(e) => e.stopPropagation()}>
                       {user.username}
                     </SynLink>
                   </Td>
@@ -262,10 +262,10 @@ export function SelectIdentityStep({
                   />
                   <Td dataLabel="Provider">
                     <SynLink
-                      to={AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
-                        ':providerId',
-                        identity.identity_provider_id
-                      ).replace('/:tab?', '')}
+                      options={{
+                        to: routeRefs.identityProviderDetailRoute.fullPath,
+                        params: { providerId: identity.identity_provider_id },
+                      }}
                       onClick={(e) => e.stopPropagation()}
                     >
                       {identity.provider_name}

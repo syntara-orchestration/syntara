@@ -4,6 +4,7 @@ import { Tbody, Td, Tr } from '@patternfly/react-table'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useState } from 'react'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import groupedTableStyles from '../../components/groupedTable.module.css'
 import type { KebabAction } from '../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../components/SynKebabMenu'
@@ -47,7 +48,7 @@ function WorkflowRow({
   return (
     <Tr key={workflow.id}>
       <Td dataLabel="Name">
-        <LinkCell href={`/workflow-builder/${workflow.id}`}>
+        <LinkCell options={{ to: routeRefs.builderEditRoute.fullPath, params: { workflowId: workflow.id } }}>
           <Truncate content={workflow.name ?? ''} />
         </LinkCell>
       </Td>

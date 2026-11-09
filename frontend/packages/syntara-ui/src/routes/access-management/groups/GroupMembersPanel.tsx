@@ -24,7 +24,7 @@ import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { accessClient } from '../../access/accessClient'
-import { getUserDetailPath } from '../accessManagementPaths'
+import { getUserDetailOptions } from '../accessManagementPaths'
 import { DisabledBadge } from '../DisabledBadge'
 import { MembershipSourceLabels } from '../MembershipSourceLabels'
 import { getMembershipSources } from '../membershipSourceUtils'
@@ -224,7 +224,7 @@ export function GroupMembersPanel({ groupId, onMembershipChange }: Readonly<Grou
               {paginatedMembers.map((member) => (
                 <Tr key={member.id}>
                   <Td dataLabel="Username">
-                    <LinkCell href={getUserDetailPath(member.id)}>
+                    <LinkCell options={getUserDetailOptions(member.id)}>
                       <Truncate content={member.username} />
                     </LinkCell>
                     {!member.is_enabled && <DisabledBadge />}

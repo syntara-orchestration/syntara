@@ -7,6 +7,7 @@ import { axe } from 'vitest-axe'
 
 import { identityProvidersClient, usersClient } from '../../../../client'
 import { AlertProvider } from '../../../../providers/alerts'
+import { breadcrumbTestRoutes } from '../../../../test/breadcrumbTestRoutes'
 import type { DocKey } from '../../../../utils/docs/types'
 import { useAllGroups } from '../../../access/useAllGroups'
 
@@ -76,7 +77,7 @@ const mockProvider = {
 function buildMetadata(overrides: Partial<UseGroupMappingFormMetadataResult> = {}): UseGroupMappingFormMetadataResult {
   return {
     pageTitle: 'Add group mapping',
-    breadcrumbs: [{ label: 'Identity providers', href: '/system-administration/authentication' }],
+    breadcrumbs: [{ label: 'Identity providers', destination: breadcrumbTestRoutes.identityProviders }],
     isValidId: true,
     isNotFound: false,
     queryState: null,

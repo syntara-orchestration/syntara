@@ -15,11 +15,11 @@ const workflowsSearch = listSearchParams
   })
   .catch({})
 
-export const workflowsRoutes = [
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/workflows',
-    validateSearch: workflowsSearch,
-    component: makeRouteComponent(<Workflows />),
-  }),
-]
+export const workflowsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/workflows',
+  validateSearch: workflowsSearch,
+  component: makeRouteComponent(<Workflows />),
+})
+
+export const workflowsRoutes = [workflowsRoute]

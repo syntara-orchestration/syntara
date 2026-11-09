@@ -17,6 +17,7 @@ import {
 import { RhUiAddIcon } from '@patternfly/react-icons'
 import { type FormEvent, type Ref, useCallback, useMemo, useState } from 'react'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { tanstackRouter } from '../../../app/tanstackRouter'
 import { SynForm } from '../../../components/forms/SynForm'
 import { SynFormField } from '../../../components/forms/SynFormField'
@@ -29,7 +30,6 @@ import { formatExpirationDate } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { accessClient } from '../../access/accessClient'
 import { useSelectableProjects } from '../../access/useAllProjects'
-import { getServiceAccountDetailPath } from '../accessManagementPaths'
 
 import { CredentialExpirationField } from './CredentialExpirationField'
 import { serviceAccountHelp } from './serviceAccountFieldHelp'
@@ -129,7 +129,12 @@ function CredentialsRevealPhase({
   const [savedAck, setSavedAck] = useState(false)
   const handleProceed = useCallback(() => {
     onClose()
-    detachPromise(tanstackRouter.navigate({ to: getServiceAccountDetailPath(credentials.id) + '/assignments' }))
+    detachPromise(
+      tanstackRouter.navigate({
+        to: routeRefs.serviceAccountDetailAssignmentsRoute.fullPath,
+        params: { serviceAccountId: credentials.id },
+      })
+    )
   }, [onClose, credentials.id])
 
   return (
@@ -242,7 +247,10 @@ function useCreateServiceAccountSubmit({
                   onListRefresh()
                   onCancel()
                   detachPromise(
-                    tanstackRouter.navigate({ to: getServiceAccountDetailPath(saResponse.id) + '/credentials' })
+                    tanstackRouter.navigate({
+                      to: routeRefs.serviceAccountDetailCredentialsRoute.fullPath,
+                      params: { serviceAccountId: saResponse.id },
+                    })
                   )
                 },
               }

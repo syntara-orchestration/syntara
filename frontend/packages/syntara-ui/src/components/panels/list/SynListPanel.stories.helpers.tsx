@@ -73,7 +73,12 @@ function TabbedListContent() {
 
   return (
     <SynListPanel>
-      <SynListPanelTabs basePath={TABBED_BASE_PATH} defaultTab="members" aria-label="Group resources">
+      <SynListPanelTabs
+        onTabChange={() => {}}
+        basePath={TABBED_BASE_PATH}
+        defaultTab="members"
+        aria-label="Group resources"
+      >
         <Tab
           eventKey="members"
           title={

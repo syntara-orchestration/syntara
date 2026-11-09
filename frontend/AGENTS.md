@@ -262,9 +262,9 @@ See: [`docs/data-flow.md`](docs/data-flow.md) — "Type-Safe API Clients"
 
 #### How do I add a new route?
 
-1. Add route constant to `packages/syntara-ui/src/app/AppRoute.tsx`
-2. Add navigation item to `packages/syntara-ui/src/app/navigationItems.tsx` with lazy-loaded component
-3. The router auto-discovers it from `navigationItems` — no manual route config needed. If the route owns URL search state, declare it with `validateSearch` and use TanStack Router APIs to read and update it.
+1. Declare the route with `createRoute` in the appropriate module under `packages/syntara-ui/src/app/routes/` and add it to the route tree in `tanstackRouteTree.tsx`.
+2. Export the route object from `routes/routeReferences.ts` when other modules need to link to or navigate to it. Keep path parameters and search state on the route definition; declare search validation with `validateSearch`.
+3. Add a navigation item to `packages/syntara-ui/src/app/navigationItems.tsx` only when the route should appear in the app sidebar. Set its typed `destination` and matching metadata separately, and keep permission visibility on the item.
 4. In the page component, render `<title>{toPageTitle(['Page Name'])}</title>` as the first child of `<SynPage>`; import `toPageTitle` from `src/utils/toPageTitle`
 5. Run `npm run route-baseline:update` and commit the regenerated `manifest.gen.json`
 

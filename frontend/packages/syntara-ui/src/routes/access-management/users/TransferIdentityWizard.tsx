@@ -19,8 +19,8 @@ import {
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsUserDetailEarlyShell } from '../../../app/breadcrumbBuilders'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { usersClient } from '../../../client'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { DocLinkButton, SynPageHeader } from '../../../components/layout/SynPageHeader'
@@ -42,8 +42,8 @@ import styles from './TransferIdentityWizard.module.css'
 import { userDisplayName } from './userDisplayName'
 import { useIdentitiesData, useUsersPagination } from './useTransferIdentityData'
 
-function getNavigateBackPath(userId: string) {
-  return `${AppRoute.AccessManagement.UserDetail.replace(':userId', userId)}/identities`
+function getNavigateBackOptions(userId: string) {
+  return { to: routeRefs.userDetailIdentitiesRoute.fullPath, params: { userId } }
 }
 
 /** Step 1 footer with disabled Back, conditional Next, and a Cancel button. */
@@ -169,7 +169,7 @@ export function TransferIdentityWizard() {
     onRetry: () => detachPromise(userIdentitiesQuery.refetch()),
   })
 
-  const navigateBack = () => detachPromise(navigate({ to: getNavigateBackPath(safeUserId) }))
+  const navigateBack = () => detachPromise(navigate(getNavigateBackOptions(safeUserId)))
 
   const handleSelectUser = (user: UserSummary) => {
     if (selectedUser?.id !== user.id) {

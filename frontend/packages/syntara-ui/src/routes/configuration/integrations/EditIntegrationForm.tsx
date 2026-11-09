@@ -16,8 +16,8 @@ import { useNavigate, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef } from 'react'
 import { useWatch, type UseFormSetValue } from 'react-hook-form'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsIntegrationEdit } from '../../../app/breadcrumbBuilders'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { integrationsClient } from '../../../client'
 import { SynDetail } from '../../../components/details/SynDetail'
 import { SynForm } from '../../../components/forms/SynForm'
@@ -217,6 +217,10 @@ function EditFormFooter({ isSaving, onCancel }: Readonly<{ isSaving: boolean; on
 export function EditIntegrationForm() {
   const { integrationId }: { integrationId: string } = useParams({ strict: false })
   const navigate = useNavigate()
+  const detailOptions = {
+    to: routeRefs.integrationDetailRoute.fullPath,
+    params: { integrationId: integrationId ?? '' },
+  }
   const queryClient = useQueryClient()
   const { showAlert } = useAlerts()
   const docLink = useDocLink('integrations')
@@ -240,8 +244,7 @@ export function EditIntegrationForm() {
 
   const { syncAssignments } = useProjectAssignmentSync()
 
-  const detailPath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId ?? '')
-  const breadcrumbs = breadcrumbsIntegrationEdit(integration?.name ?? 'Integration', detailPath)
+  const breadcrumbs = breadcrumbsIntegrationEdit(integration?.name ?? 'Integration', integrationId ?? '')
 
   const schema = useMemo(() => {
     if (!integration) return editIntegrationSchema
@@ -362,7 +365,7 @@ export function EditIntegrationForm() {
             autoDismiss: true,
           })
           dismiss()
-          detachPromise(navigate({ to: detailPath }))
+          detachPromise(navigate(detailOptions))
         } catch (error: unknown) {
           handleError({ title: 'Failed to update integration', context: `Integration "${values.name}"` })(error)
         }
@@ -398,7 +401,7 @@ export function EditIntegrationForm() {
           isFullHeight
           isScrollable
           panelMainBodyProps={{ className: styles.panelBody }}
-          footer={<EditFormFooter isSaving={isSaving} onCancel={() => detachPromise(navigate({ to: detailPath }))} />}
+          footer={<EditFormFooter isSaving={isSaving} onCancel={() => detachPromise(navigate(detailOptions))} />}
         >
           <Form
             id="edit-integration-form"

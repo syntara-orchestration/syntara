@@ -1,37 +1,6 @@
 import { extractParameters, normalizeTemplate } from './normalize-route'
-import { collectRouteGraph, parseRouteSource } from './route-graph'
-import {
-  absolutePathSchema,
-  plainObjectSchema,
-  type NormalizedRoute,
-  type ParsedCreateRoute,
-} from './route-manifest-schema'
-
-const PATH_LITERAL = /['"](\/[^'"]*)['"]/g
-
-type NavItemLike = { path: string; children?: NavItemLike[] }
-
-/**
- * Walk a nested catalog (such as `AppRoute`) and collect string path values.
- *
- * @param value - Nested object or string path
- * @param out - Mutable set used while recursing
- * @returns The same set for chaining
- */
-export function collectPathsFromObject(value: unknown, out: Set<string> = new Set()): Set<string> {
-  const path = absolutePathSchema.safeParse(value)
-  if (path.success) {
-    out.add(path.data)
-    return out
-  }
-  const object = plainObjectSchema.safeParse(value)
-  if (object.success) {
-    for (const child of Object.values(object.data)) {
-      collectPathsFromObject(child, out)
-    }
-  }
-  return out
-}
+import { collectExportedRoutePaths, collectRouteGraph, parseRouteSource } from './route-graph'
+import { absolutePathSchema, type NormalizedRoute, type ParsedCreateRoute } from './route-manifest-schema'
 
 /**
  * Extract the interior of a `{ ... }` object starting at `openBraceIndex`,
@@ -88,11 +57,7 @@ export function extractBalancedObjectBody(source: string, openBraceIndex: number
  * Options for {@link parseCreateRouteBlocks}.
  */
 export type ParseCreateRouteBlocksOptions = {
-  /**
-   * Nested `AppRoute` catalog used to resolve `redirect({ to: AppRoute... })`.
-   * Required when a createRoute block uses an AppRoute redirect target.
-   */
-  appRouteCatalog?: unknown
+  routeReferencePaths?: Record<string, string>
 }
 
 /**
@@ -101,49 +66,43 @@ export type ParseCreateRouteBlocksOptions = {
  * Uses the TypeScript parser and symbol resolution for parent references.
  * Source analysis avoids executing page components or CSS.
  *
- * Redirect targets may be string literals or `AppRoute.Foo.Bar` references
- * (resolved via {@link resolveAppRouteReference}).
+ * Redirect targets may be string literals or exported route references.
  *
  * @param source - TypeScript/TSX file contents
- * @param options - Optional AppRoute catalog for non-literal redirects
+ * @param options - Optional route references for non-literal redirects
  * @returns Raw path entries with kind and optional redirect target
  */
 export function parseCreateRouteBlocks(
   source: string,
   options: ParseCreateRouteBlocksOptions = {}
 ): ParsedCreateRoute[] {
-  return parseRouteSource(source, (body) => extractRedirectTarget(body, options.appRouteCatalog))
+  return parseRouteSource(source, (body) => extractRedirectTarget(body, options.routeReferencePaths))
 }
 
 /**
  * Read `redirect({ to: ... })` from a createRoute options body.
  *
- * Supports string literals and `AppRoute...` references. Other expression
+ * Supports string literals and route-reference expressions. Other expression
  * shapes throw so redirect metadata is never silently dropped.
  *
  * @param body - Interior of a createRoute options object
- * @param appRouteCatalog - Catalog for resolving AppRoute references
+ * @param routeReferencePaths - Exported route paths for resolving references
  * @returns Absolute redirect path, or `undefined` when no redirect is present
  */
-function extractRedirectTarget(body: string, appRouteCatalog: unknown): string | undefined {
+function extractRedirectTarget(body: string, routeReferencePaths?: Record<string, string>): string | undefined {
   const literalMatch = body.match(/\bredirect\(\{\s*to:\s*['"]([^'"]+)['"]/)
   if (literalMatch?.[1]) return literalMatch[1]
 
-  const appRouteMatch = body.match(/\bredirect\(\{\s*to:\s*(AppRoute(?:\.\w+)+)/)
-  if (appRouteMatch?.[1]) {
-    if (appRouteCatalog === undefined) {
-      throw new Error(`redirect({ to: ${appRouteMatch[1]} }) requires an AppRoute catalog to resolve`)
-    }
-    const resolved = absolutePathSchema.safeParse(resolveAppRouteReference(appRouteCatalog, appRouteMatch[1]))
-    if (!resolved.success) {
-      throw new Error(`Could not resolve redirect target ${appRouteMatch[1]} against AppRoute`)
-    }
+  const routeRef = body.match(/\bredirect\(\{\s*to:\s*routeRefs\.(\w+)\.fullPath/)
+  if (routeRef?.[1]) {
+    const resolved = absolutePathSchema.safeParse(routeReferencePaths?.[routeRef[1]])
+    if (!resolved.success) throw new Error(`Could not resolve routeRefs.${routeRef[1]}.fullPath in redirect`)
     return resolved.data
   }
 
   const otherMatch = body.match(/\bredirect\(\{\s*to:\s*([^,\s}'"]+)/)
   if (otherMatch?.[1]) {
-    throw new Error(`Unsupported redirect({ to: ${otherMatch[1]} }) — use a string literal or AppRoute.Foo.Bar`)
+    throw new Error(`Unsupported redirect({ to: ${otherMatch[1]} }) — use a string literal or route reference`)
   }
 
   return undefined
@@ -157,16 +116,16 @@ function extractRedirectTarget(body: string, appRouteCatalog: unknown): string |
  *
  * @param routesDir - Absolute path to `src/app/routes`
  * @param treeSource - Contents of `tanstackRouteTree.tsx`
- * @param appRouteCatalog - Catalog for resolving `redirect({ to: AppRoute... })`
+ * @param routeReferencePaths - Exported route paths for resolving redirect targets
  * @returns Deduplicated router routes plus unmounted paths relative to routesDir
  */
 export function collectMountedRouterRoutes(
   routesDir: string,
   treeSource: string,
-  appRouteCatalog?: unknown
+  routeReferencePaths?: Record<string, string>
 ): { routes: NormalizedRoute[]; unmountedRouteFiles: string[] } {
   const { routes, unmountedRouteFiles } = collectRouteGraph(routesDir, treeSource, (body) =>
-    extractRedirectTarget(body, appRouteCatalog)
+    extractRedirectTarget(body, routeReferencePaths)
   )
 
   const byTemplate = new Map<string, NormalizedRoute>()
@@ -184,190 +143,66 @@ export function collectMountedRouterRoutes(
   return { routes: [...byTemplate.values()], unmountedRouteFiles }
 }
 
-/**
- * Collect canonical path templates from `AppRoute.tsx` source text.
- *
- * @param appRouteSource - File contents of `AppRoute.tsx`
- * @returns Sorted unique templates
- */
-export function collectAppRoutePaths(appRouteSource: string): string[] {
-  const paths = new Set<string>()
-  for (const match of appRouteSource.matchAll(PATH_LITERAL)) {
-    const path = absolutePathSchema.safeParse(match[1])
-    if (path.success) paths.add(normalizeTemplate(path.data))
-  }
-  return [...paths].sort()
-}
-
-/**
- * Collect path templates from an in-memory navigation tree.
- *
- * @param items - Navigation items with `path` and optional `children`
- * @returns Sorted unique templates
- */
-export function collectNavigationPaths(items: NavItemLike[]): string[] {
-  const paths = new Set<string>()
-
-  const walk = (nodes: NavItemLike[]) => {
-    for (const node of nodes) {
-      paths.add(normalizeTemplate(node.path))
-      if (node.children?.length) walk(node.children)
-    }
-  }
-
-  walk(items)
-  return [...paths].sort()
+/** Resolve exported route objects from the route-reference barrel. */
+export function collectRouteReferencePaths(routesDir: string, treeSource: string, referenceFile: string) {
+  return collectExportedRoutePaths(routesDir, treeSource, referenceFile)
 }
 
 /**
  * Collect navigation paths from `navigationItems.tsx` source without importing JSX.
  *
- * Resolves `path: AppRoute.Foo.Bar` against the live `AppRoute` object and also
- * accepts literal `path: '/...'` strings.
+ * Resolves every `routeRefs.foo.fullPath` use against the route objects exported
+ * from the route-reference barrel. This covers destinations and matching metadata;
+ * group identity strings have no route reference and are skipped.
  *
  * @param navigationSource - File contents of `navigationItems.tsx`
- * @param appRouteCatalog - The `AppRoute` object used to resolve references
+ * @param routeReferencePaths - Exported route paths used to resolve references
  * @returns Sorted unique templates
  */
-export function collectNavigationPathsFromSource(navigationSource: string, appRouteCatalog: unknown): string[] {
+export function collectNavigationPathsFromSource(
+  navigationSource: string,
+  routeReferencePaths: Record<string, string>
+): string[] {
   const paths = new Set<string>()
 
-  for (const match of navigationSource.matchAll(/\bpath:\s*(AppRoute(?:\.\w+)+)/g)) {
-    const expression = match[1]
-    if (!expression) continue
-    const resolved = absolutePathSchema.safeParse(resolveAppRouteReference(appRouteCatalog, expression))
-    if (resolved.success) paths.add(normalizeTemplate(resolved.data))
-  }
-
-  for (const match of navigationSource.matchAll(/\bpath:\s*['"](\/[^'"]+)['"]/g)) {
-    const path = absolutePathSchema.safeParse(match[1])
-    if (path.success) paths.add(normalizeTemplate(path.data))
+  for (const match of navigationSource.matchAll(/\brouteRefs\.(\w+)\.fullPath/g)) {
+    const name = match[1]
+    if (!name) continue
+    const resolved = absolutePathSchema.safeParse(routeReferencePaths[name])
+    if (!resolved.success) {
+      const line = navigationSource.slice(0, match.index).split('\n').length
+      throw new Error(`Could not resolve routeRefs.${name}.fullPath in navigationItems.tsx:${line}`)
+    }
+    paths.add(normalizeTemplate(resolved.data))
   }
 
   return [...paths].sort()
 }
 
 /**
- * Parse `export const AppRoute = { ... }` from source into a nested catalog.
- *
- * Avoids importing `AppRoute.tsx` from Node/tsconfig.node (no JSX).
- *
- * @param source - File contents of `AppRoute.tsx`
- * @returns Nested catalog of path strings
- */
-export function parseAppRouteCatalog(source: string): Record<string, unknown> {
-  const match = /export\s+const\s+AppRoute\s*=\s*\{/.exec(source)
-  if (!match || match.index === undefined) {
-    throw new Error('Could not find export const AppRoute = { in AppRoute source')
-  }
-
-  const openBraceIndex = match.index + match[0].lastIndexOf('{')
-  const body = extractBalancedObjectBody(source, openBraceIndex)
-  if (body === null) {
-    throw new Error('Unbalanced AppRoute object literal')
-  }
-
-  return parseObjectLiteral(body)
-}
-
-/**
- * Resolve a dotted `AppRoute.AccessManagement.Users` expression to its value.
- *
- * @param appRouteCatalog - Root `AppRoute` object
- * @param expression - Full expression including the `AppRoute` prefix
- * @returns The resolved value, or `undefined` when the path does not exist
- */
-export function resolveAppRouteReference(appRouteCatalog: unknown, expression: string): unknown {
-  const parts = expression.split('.')
-  if (parts[0] !== 'AppRoute') return undefined
-  let current: unknown = appRouteCatalog
-  for (const part of parts.slice(1)) {
-    const object = plainObjectSchema.safeParse(current)
-    if (!object.success) return undefined
-    current = object.data[part]
-  }
-  return current
-}
-
-/**
- * Parse a nested object-literal body of string and object properties.
- *
- * @param body - Object interior without outer braces
- * @returns Nested record of string path values
- */
-function parseObjectLiteral(body: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
-  let i = 0
-
-  while (i < body.length) {
-    while (i < body.length && /[\s,]/.test(body[i] ?? '')) i += 1
-    if (i >= body.length) break
-
-    const keyMatch = /^([A-Za-z_]\w*)\s*:/.exec(body.slice(i))
-    if (!keyMatch?.[1]) break
-    const key = keyMatch[1]
-    i += keyMatch[0].length
-
-    while (i < body.length && /\s/.test(body[i] ?? '')) i += 1
-
-    if (body[i] === '{') {
-      const nestedBody = extractBalancedObjectBody(body, i)
-      if (nestedBody === null) {
-        throw new Error(`Unbalanced nested object at key ${key}`)
-      }
-      result[key] = parseObjectLiteral(nestedBody)
-      i += nestedBody.length + 2
-      continue
-    }
-
-    const stringMatch = /^(['"])((?:\\.|(?!\1).)*)\1/.exec(body.slice(i))
-    if (!stringMatch?.[2]) {
-      throw new Error(`Expected string or object value at key ${key}`)
-    }
-    result[key] = stringMatch[2].replace(/\\(['"\\])/g, '$1')
-    i += stringMatch[0].length
-  }
-
-  return result
-}
-
-/**
  * Collect bookmarkable paths handled in `App.tsx` before `RouterProvider`.
  *
- * Parses `location.pathname === AppRoute...` and literal pathname comparisons
- * so changing the escape hatch updates the baseline.
+ * Reads the callback path constant when App routes the callback before RouterProvider.
  *
  * @param appSource - File contents of `App.tsx`
- * @param appRouteCatalog - Live `AppRoute` object for resolving references
+ * @param appLevelPathSource - Source for the app-level callback path constant
  * @returns Normalized app-level route entries
  */
-export function collectAppLevelRoutesFromSource(appSource: string, appRouteCatalog: unknown): NormalizedRoute[] {
+export function collectAppLevelRoutesFromSource(appSource: string, appLevelPathSource: string): NormalizedRoute[] {
   const byTemplate = new Map<string, NormalizedRoute>()
 
-  for (const match of appSource.matchAll(/location\.pathname\s*===\s*(AppRoute(?:\.\w+)+)/g)) {
-    const expression = match[1]
-    if (!expression) continue
-    const resolved = absolutePathSchema.safeParse(resolveAppRouteReference(appRouteCatalog, expression))
-    if (!resolved.success) continue
-    const template = normalizeTemplate(resolved.data)
-    byTemplate.set(template, {
-      template,
-      parameters: extractParameters(template),
-      kind: 'app',
-      sources: ['app', 'appRoute'],
-    })
-  }
-
-  for (const match of appSource.matchAll(/location\.pathname\s*===\s*['"](\/[^'"]+)['"]/g)) {
-    const path = absolutePathSchema.safeParse(match[1])
-    if (!path.success) continue
-    const template = normalizeTemplate(path.data)
-    byTemplate.set(template, {
-      template,
-      parameters: extractParameters(template),
-      kind: 'app',
-      sources: ['app'],
-    })
+  if (appSource.includes('location.pathname === testSignInCallbackPath')) {
+    const match = appLevelPathSource.match(/export\s+const\s+testSignInCallbackPath\s*=\s*['"](\/[^'"]+)['"]/)
+    const path = absolutePathSchema.safeParse(match?.[1])
+    if (path.success) {
+      const template = normalizeTemplate(path.data)
+      byTemplate.set(template, {
+        template,
+        parameters: extractParameters(template),
+        kind: 'app',
+        sources: ['app'],
+      })
+    }
   }
 
   return [...byTemplate.values()]

@@ -122,7 +122,7 @@ export type UseFilteredQueryResult<TData> = {
  * const { data, queryState } = useFilteredQuery({
  *   client: executionsClient,
  *   method: 'get',
- *   path: '/executions',
+ *   path: routeRefs.executionsListRoute.fullPath,
  *   filters: [
  *     { key: 'workflow_id', operator: 'eq', value: workflowId },
  *     { key: 'status', operator: 'in', value: ['running', 'failed'] }

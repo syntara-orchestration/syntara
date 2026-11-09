@@ -15,7 +15,7 @@ export function useUnsavedChanges(): UnsavedChangesContextType {
 
   const fallback = useMemo<UnsavedChangesContextType>(
     () => ({
-      requestNavigation: (path: string) => detachPromise(navigate({ to: path })),
+      requestNavigation: (destination) => detachPromise(navigate(destination)),
       registerSaveHandler: noop,
       unregisterSaveHandler: () => {},
       registerDirtyCheck: noop,

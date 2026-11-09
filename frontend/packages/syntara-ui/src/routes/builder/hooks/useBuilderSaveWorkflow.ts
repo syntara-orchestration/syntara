@@ -2,6 +2,8 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import type { Query, QueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
+import type { AppRouteNavigationOptions } from '../../../app/routeNavigationOptions'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import type { AlertMessage } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
@@ -150,7 +152,7 @@ export type UseBuilderSaveWorkflowParams = {
   selectedProject: { id: string } | null
   workflowsListResources: { name: string }[] | undefined
   queryClient: QueryClient
-  setLocation: (to: string) => void
+  setLocation: (destination: AppRouteNavigationOptions) => void
   showSuccess: (options: AlertMessage) => void
   showWarning: (options: AlertMessage) => void
   showError: (options: AlertMessage) => void
@@ -222,12 +224,12 @@ async function completeSave(
   queryClient: QueryClient,
   markClean: () => void,
   navigateToId: string | undefined,
-  setLocation: (to: string) => void
+  setLocation: (destination: AppRouteNavigationOptions) => void
 ): Promise<void> {
   markClean()
   await queryClient.invalidateQueries({ predicate: isWorkflowQuery })
   if (navigateToId) {
-    setLocation(`/workflow-builder/${navigateToId}`)
+    setLocation({ to: routeRefs.builderEditRoute.fullPath, params: { workflowId: navigateToId } })
   }
 }
 
@@ -242,7 +244,7 @@ async function processSaveResult(
     showWarning: (options: AlertMessage) => void
     markClean: () => void
     queryClient: QueryClient
-    setLocation: (to: string) => void
+    setLocation: (destination: AppRouteNavigationOptions) => void
     onVersionUpdated?: (newVersion: number) => void
     onSaveWithValidationIssues?: () => void
     onValidationFindings?: (errors: ValidationError[]) => void

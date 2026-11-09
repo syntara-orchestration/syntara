@@ -5,9 +5,9 @@ import type { IdentityProvidersAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { resolveLinkError } from '../../../app/authErrorMessages'
 import { flexCenteredBothAxes } from '../../../app/flexCenteredBothAxes'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import type { AuthProvider } from '../../../app/useAuthProviders'
 import { useAuthProviders } from '../../../app/useAuthProviders'
 import { OIDC_AUTHORIZE_PATH, identityProvidersClient, usersClient } from '../../../client'
@@ -86,12 +86,7 @@ function ProviderLink({ name, providerId }: { name: string; providerId: string }
         <ProviderIcon name={name} />
       </FlexItem>
       <FlexItem>
-        <SynLink
-          to={AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
-            ':providerId',
-            providerId
-          ).replace('/:tab?', '')}
-        >
+        <SynLink options={{ to: routeRefs.identityProviderDetailRoute.fullPath, params: { providerId } }}>
           {name}
         </SynLink>
       </FlexItem>
@@ -368,7 +363,7 @@ export function UserIdentitiesPanel({
   const showTable = identities.length > 0 || (!isBuiltinUser && unlinkedProviders.length > 0) || hasActiveFilters
 
   const handleTransferIdentity = identityPermissions.canAttach
-    ? () => detachPromise(navigate({ to: AppRoute.AccessManagement.TransferIdentity.replace(':userId', userId) }))
+    ? () => detachPromise(navigate({ to: routeRefs.transferIdentityRoute.fullPath, params: { userId } }))
     : undefined
 
   const dialogs = (

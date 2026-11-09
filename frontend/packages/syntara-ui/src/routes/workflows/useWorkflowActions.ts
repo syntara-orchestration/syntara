@@ -1,6 +1,8 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback } from 'react'
 
+import type { AppRouteNavigationOptions } from '../../app/routeNavigationOptions'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { executionsFetchClient, workflowClient } from '../../client'
 import type { useAlerts } from '../../providers/alerts'
 import { getErrorMessage } from '../../utils/apiErrors'
@@ -13,7 +15,7 @@ type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 type UseWorkflowActionsOptions = {
   showSuccess: ReturnType<typeof useAlerts>['showSuccess']
   showError: ReturnType<typeof useAlerts>['showError']
-  onNavigate: (path: string) => void
+  onNavigate: (destination: AppRouteNavigationOptions) => void
   onRefetch: () => void
   onDeleteSettled?: () => void
   onPublishSettled?: () => void
@@ -61,7 +63,7 @@ export function useWorkflowActions({
         }
       }
 
-      const { data, error } = await executionsFetchClient.POST('/executions', {
+      const { data, error } = await executionsFetchClient.POST(routeRefs.executionsListRoute.fullPath, {
         body: {
           workflow_id: workflow.id,
           input_data: inputData,
@@ -75,7 +77,7 @@ export function useWorkflowActions({
           description: `Failed to start workflow "${workflow.name}": ${getErrorMessage(error)}`,
         })
       } else {
-        onNavigate(`/executions/${data.id}`)
+        onNavigate({ to: routeRefs.executionDetailRoute.fullPath, params: { executionId: data.id } })
       }
     },
     [onNavigate, showError]

@@ -380,16 +380,16 @@ flowchart LR
   Root -->|"layout"| Shell["RootLayout > AppShell > Outlet"]
 ```
 
-| File                         | Role                                                                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `app/tanstackRouter.ts`      | Creates the module-scoped TanStack Router instance from the assembled route tree.                             |
-| `app/tanstackRouteTree.tsx`  | Combines the root route and route groups declared under `app/routes/`.                                        |
-| `app/routes/__root.ts`       | Defines the root route, root layout, and not-found redirect.                                                  |
-| `app/routes/*.tsx`           | Declares route objects with `createRoute`, screen components, permissions, and search validation.             |
-| `app/makeRouteComponent.tsx` | Wraps screen components in loading/error boundaries and, when requested, a `ProtectedRoute` permission check. |
-| `app/RootLayout.tsx`         | Renders `AppShell` and the matched child route through `Outlet`.                                              |
-| `app/AppRoute.tsx`           | Holds reusable path strings for common destinations.                                                          |
-| `app/navigationItems.tsx`    | Defines navigation labels, hierarchy, and permission-based visibility; it does not register routes.           |
+| File                            | Role                                                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `app/tanstackRouter.ts`         | Creates the module-scoped TanStack Router instance from the assembled route tree.                             |
+| `app/tanstackRouteTree.tsx`     | Combines the root route and route groups declared under `app/routes/`.                                        |
+| `app/routes/__root.ts`          | Defines the root route, root layout, and not-found redirect.                                                  |
+| `app/routes/*.tsx`              | Declares route objects with `createRoute`, screen components, permissions, and search validation.             |
+| `app/makeRouteComponent.tsx`    | Wraps screen components in loading/error boundaries and, when requested, a `ProtectedRoute` permission check. |
+| `app/RootLayout.tsx`            | Renders `AppShell` and the matched child route through `Outlet`.                                              |
+| `app/navigationItems.tsx`       | Defines navigation labels, hierarchy, and permission-based visibility; it does not register routes.           |
+| `app/routes/routeReferences.ts` | Exports mounted route objects for typed links and navigation; route definitions remain the source of paths.   |
 
 **Permission gating on routes:**
 
@@ -400,20 +400,20 @@ Navigation visibility and route access are handled separately:
 
 See [`docs/permissions-rbac.md`](permissions-rbac.md) for the full permission gating architecture.
 
-> **Note**: `AppRoute.Dashboard` is a path constant only. There is no matching route declaration or navigation item for `/dashboard` in the current app.
-
 **Common patterns:**
 
 ```tsx
+import * as routeRefs from './routes/routeReferences'
+
 // Navigate programmatically
 const navigate = useNavigate()
-detachPromise(navigate({ to: AppRoute.Workflows.Root }))
+detachPromise(navigate({ to: routeRefs.workflowsRoute.fullPath }))
 
 // Read route params in a component that is not bound to one route object
 const { executionId }: { executionId: string } = useParams({ strict: false })
 ```
 
-Use `SynLink` for UI links and TanStack Router's `useNavigate` for programmatic navigation. Route modules may validate URL search state with `validateSearch`; components read router state with TanStack Router hooks. Some existing destinations still use reusable strings from `AppRoute.tsx` while route APIs are being migrated.
+Use `SynLink` with validated route options for UI links and TanStack Router's `useNavigate` for programmatic navigation. Route modules may validate URL search state with `validateSearch`; components read router state with TanStack Router hooks. For parameterized routes, pass the route's `fullPath` and a separate `params` object.
 
 **Routing strategy details:**
 
@@ -423,7 +423,7 @@ Use `SynLink` for UI links and TanStack Router's `useNavigate` for programmatic 
 **Page breadcrumbs (location hierarchy):**
 
 - [`SynPageHeader`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/components/layout/SynPageHeader.tsx) accepts a required string `title` (default `h1`), optional `breadcrumbs` (PatternFly `Breadcrumb` above the title when there are at least two items), optional `toolbar` for actions (laid out right-aligned via an internal spacer—callers should not add their own `FlexItem grow`), optional `projectSelector` and other title-row slots (`titleLeading`, `titleAddons`), and `titleSlot` for rare full-width custom title rows (e.g. the workflow builder).
-- Trails are built with helpers in [`breadcrumbBuilders.ts`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/app/breadcrumbBuilders.ts); links use `href` values from [`AppRoute.tsx`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/app/AppRoute.tsx).
+- Trails are built with helpers in [`breadcrumbBuilders.ts`](https://github.com/syntara-orchestration/syntara/blob/devel/frontend/packages/syntara-ui/src/app/breadcrumbBuilders.ts); linked items carry validated TanStack navigation options derived from the route references.
 - **Visibility**: nothing is rendered unless there are **at least two** items. The **last** item omits `href` and represents the current page (including tab-specific labels on detail views).
 - **Default tab**: On entity detail routes where the URL without a trailing segment is the same as the default tab (e.g. `…/projects/:id` and `…/projects/:id/details` both mean “Details”), the trail ends at the **entity name** so the parent link is not redundant with the current page.
 - **Access management hub**: Visiting `/system-administration/access-management` triggers a client-side `replace` navigation to `/system-administration/access-management/users` (the default tab). Breadcrumbs are omitted on that Users hub view because the page title and tab bar already convey the location; other hub tabs still show `Access management > …`.
@@ -1126,7 +1126,7 @@ flowchart TB
 
 1. Add a `createRoute` declaration to the appropriate module under `app/routes/` (or create a route module for a new area).
 2. Add the new route group to `buildTanStackRouteTree()` in `app/tanstackRouteTree.tsx`.
-3. Add a reusable path string to `app/AppRoute.tsx` when callers need it outside the route declaration.
+3. Export the route object from `app/routes/routeReferences.ts` when callers need a typed destination outside its route module.
 4. Add an item to `app/navigationItems.tsx` only when the screen should appear in the app navigation; set `requiredPermissions` for visibility rules.
 
 ### Add a new API call

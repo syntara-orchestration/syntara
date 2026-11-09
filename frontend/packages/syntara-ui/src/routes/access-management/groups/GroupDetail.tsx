@@ -16,8 +16,9 @@ import type { Group } from '@syntara/contracts'
 import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
 import { createContext, use, useMemo, useState } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsGroupDetail, breadcrumbsGroupDetailEarlyShell } from '../../../app/breadcrumbBuilders'
+import * as routeRefs from '../../../app/routes/routeReferences'
+import { tanstackRouter } from '../../../app/tanstackRouter'
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
@@ -116,25 +117,33 @@ function GroupDetailToolbar({
 
 function GroupTabBar({
   basePath,
+  onTabChange,
   showMembers,
   showAssignments,
   memberCount,
   roleAssignmentCount,
 }: Readonly<{
   basePath: string
+  onTabChange: (tab: 'details' | 'members' | 'roles', options?: { replace?: boolean }) => void
   showMembers: boolean
   showAssignments: boolean
   memberCount: number
   roleAssignmentCount: number
 }>) {
   const validTabs = useMemo(() => {
-    const tabs: string[] = ['details']
+    const tabs: ('details' | 'members' | 'roles')[] = ['details']
     if (showMembers) tabs.push('members')
     if (showAssignments) tabs.push('roles')
     return tabs
   }, [showMembers, showAssignments])
   return (
-    <SynListPanelTabs basePath={basePath} defaultTab="details" validTabs={validTabs} aria-label="Group details">
+    <SynListPanelTabs
+      basePath={basePath}
+      defaultTab="details"
+      validTabs={validTabs}
+      onTabChange={onTabChange}
+      aria-label="Group details"
+    >
       <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
       {showMembers && (
         <Tab
@@ -268,7 +277,10 @@ export function GroupDetail() {
   const navigate = useNavigate()
   const groupsDocLink = useDocLink('groups')
   const { groupId }: { groupId: string } = useParams({ strict: false })
-  const basePath = AppRoute.AccessManagement.GroupDetail.replace(':groupId', groupId ?? '')
+  const basePath = tanstackRouter.buildLocation({
+    to: routeRefs.groupDetailRoute.fullPath,
+    params: { groupId: groupId ?? '' },
+  }).href
   const [editModalOpen, setEditModalOpen] = useState(false)
   const deleteDialog = useDialogState<Group>()
 
@@ -281,7 +293,22 @@ export function GroupDetail() {
   const showMembers = !isAuthenticated && (permissionsLoading || canReadMembers)
   const showAssignments = permissionsLoading || canReadAssignments
 
-  const navigateBack = () => detachPromise(navigate({ to: AppRoute.AccessManagement.Groups }))
+  const navigateBack = () => detachPromise(navigate({ to: routeRefs.accessManagementGroupsRoute.fullPath }))
+
+  const onTabChange = (tab: 'details' | 'members' | 'roles', options?: { replace?: boolean }) => {
+    const params = { groupId: groupId ?? '' }
+    switch (tab) {
+      case 'details':
+        detachPromise(navigate({ to: routeRefs.groupDetailDetailsRoute.fullPath, params, ...options }))
+        break
+      case 'members':
+        detachPromise(navigate({ to: routeRefs.groupDetailMembersRoute.fullPath, params, ...options }))
+        break
+      case 'roles':
+        detachPromise(navigate({ to: routeRefs.groupDetailRolesRoute.fullPath, params, ...options }))
+        break
+    }
+  }
 
   const handleDelete = useDeleteAction({
     deleteFn: deleteGroup,
@@ -357,6 +384,7 @@ export function GroupDetail() {
         <SynListPanel>
           <GroupTabBar
             basePath={basePath}
+            onTabChange={onTabChange}
             showMembers={showMembers}
             showAssignments={showAssignments}
             memberCount={memberCount}

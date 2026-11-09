@@ -1,13 +1,36 @@
-import { AppRoute } from '../../../../app/AppRoute'
+import type { AppRouteNavigationOptions } from '../../../../app/routeNavigationOptions'
+import * as routeRefs from '../../../../app/routes/routeReferences'
 
-export function identityProviderDetailBasePath(providerId: string): string {
-  return AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(':providerId', providerId)
+export const GROUP_MAPPING_TAB = 'group-mapping' as const
+export type IdentityProviderDetailTab = 'details' | typeof GROUP_MAPPING_TAB
+
+export function identityProviderDetailOptions(providerId: string): AppRouteNavigationOptions {
+  return { to: routeRefs.identityProviderDetailRoute.fullPath, params: { providerId } }
 }
 
-export function identityProviderGroupMappingTabPath(providerId: string): string {
-  return `${identityProviderDetailBasePath(providerId)}/group-mapping`
+export function identityProviderEditOptions(providerId: string): AppRouteNavigationOptions {
+  return { to: routeRefs.editIdentityProviderRoute.fullPath, params: { providerId } }
 }
 
-export function identityProviderGroupMappingEditPath(providerId: string): string {
-  return `${identityProviderDetailBasePath(providerId)}/group-mapping/edit`
+export function identityProviderTabOptions(
+  providerId: string,
+  tab: IdentityProviderDetailTab
+): AppRouteNavigationOptions {
+  return tab === GROUP_MAPPING_TAB
+    ? { to: routeRefs.identityProviderGroupMappingRoute.fullPath, params: { providerId } }
+    : { to: routeRefs.identityProviderDetailsRoute.fullPath, params: { providerId } }
+}
+
+export function identityProviderGroupMappingTabOptions(providerId: string): AppRouteNavigationOptions {
+  return { to: routeRefs.identityProviderGroupMappingRoute.fullPath, params: { providerId } }
+}
+
+export function identityProviderGroupMappingEditOptions(
+  providerId: string,
+  search?: 'discover' | 'new'
+): AppRouteNavigationOptions {
+  const target = { to: routeRefs.editIdentityProviderGroupMappingRoute.fullPath, params: { providerId } }
+  if (search === 'discover') return { ...target, search: { discover: '1' } }
+  if (search === 'new') return { ...target, search: { new: '1' } }
+  return target
 }

@@ -15,7 +15,7 @@ import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Control, UseFormSetValue } from 'react-hook-form'
 import { Controller, useFormContext, useFormState, useWatch } from 'react-hook-form'
 
-import { AppRoute } from '../../../app/AppRoute'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { SynForm } from '../../../components/forms/SynForm'
 import { SynLink } from '../../../components/SynLink'
 import { useSynForm } from '../../../hooks/useSynForm'
@@ -245,7 +245,7 @@ function AIAgentFormFields({
                   {canCreateIntegration ? (
                     <>
                       An administrator must{' '}
-                      <SynLink to={AppRoute.Configuration.Integrations.Configure}>
+                      <SynLink options={{ to: routeRefs.configureIntegrationRoute.fullPath }}>
                         configure an MCP server integration
                       </SynLink>{' '}
                       before tools can be selected.

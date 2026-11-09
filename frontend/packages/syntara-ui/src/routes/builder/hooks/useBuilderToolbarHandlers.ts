@@ -2,6 +2,8 @@ import { ActivityTypeEnum } from '@syntara/contracts'
 import type { ReactFlowInstance } from '@xyflow/react'
 import { useCallback, type Dispatch } from 'react'
 
+import type { AppRouteNavigationOptions } from '../../../app/routeNavigationOptions'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { workflowFetchClient } from '../../../client'
 import type { AlertMessage } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
@@ -79,7 +81,7 @@ export type UseBuilderToolbarHandlersOptions = {
   deleteWorkflow: DeleteWorkflowMutate
   showSuccess: ShowAlert
   showError: ShowAlert
-  setLocation: (to: string) => void
+  setLocation: (destination: AppRouteNavigationOptions) => void
   handleSaveWorkflow: (options?: { expectedVersionOverride?: number; blockOnWarnings?: boolean }) => Promise<boolean>
   currentWorkflow: WorkflowDefinition | null
   loadedVersion: number | null
@@ -195,7 +197,11 @@ export function useBuilderToolbarHandlers({
           onSuccess: (data) => {
             dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
             if (data.id) {
-              setLocation(`/executions/${data.id}?history=closed`)
+              setLocation({
+                to: routeRefs.executionDetailRoute.fullPath,
+                params: { executionId: data.id },
+                search: { history: 'closed' },
+              })
             }
           },
           onError: (error) => {
@@ -233,7 +239,7 @@ export function useBuilderToolbarHandlers({
         onSuccess: () => {
           showSuccess({ title: 'Workflow deleted', description: `Workflow "${workflowName}" has been deleted.` })
           dispatch({ type: 'SET_DELETE_DIALOG', payload: false })
-          setLocation('/workflows')
+          setLocation({ to: routeRefs.workflowsRoute.fullPath })
         },
         onError: (error) => {
           showError({

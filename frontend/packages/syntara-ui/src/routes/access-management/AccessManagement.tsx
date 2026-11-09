@@ -1,9 +1,9 @@
 import { Tab } from '@patternfly/react-core'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
-import { useLayoutEffect, useMemo } from 'react'
+import { useCallback, useLayoutEffect, useMemo } from 'react'
 
-import { AppRoute } from '../../app/AppRoute'
 import { breadcrumbsAccessManagementHub } from '../../app/breadcrumbBuilders'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
@@ -40,7 +40,7 @@ const allTabDefs: TabDef[] = [
   { key: 'token-revocation', label: 'Token revocation' },
 ]
 
-const basePath = AppRoute.AccessManagement.Root
+const basePath = routeRefs.accessManagementRoute.fullPath
 
 export function AccessManagement() {
   const accessDocLink = useDocLink('accessControl')
@@ -90,14 +90,49 @@ export function AccessManagement() {
   const validTabKeys = useMemo(() => validTabDefs.map((t) => t.key), [validTabDefs])
   const defaultTab = validTabDefs[0]?.key ?? 'users'
 
+  const onTabChange = useCallback(
+    (tab: AccessTab, options?: { replace?: boolean }) => {
+      switch (tab) {
+        case 'users':
+          detachPromise(navigate({ to: routeRefs.accessManagementUsersRoute.fullPath, ...options }))
+          break
+        case 'groups':
+          detachPromise(navigate({ to: routeRefs.accessManagementGroupsRoute.fullPath, ...options }))
+          break
+        case 'projects':
+          detachPromise(navigate({ to: routeRefs.accessManagementProjectsRoute.fullPath, ...options }))
+          break
+        case 'policies':
+          detachPromise(navigate({ to: routeRefs.accessManagementPoliciesRoute.fullPath, ...options }))
+          break
+        case 'roles':
+          detachPromise(navigate({ to: routeRefs.accessManagementRolesRoute.fullPath, ...options }))
+          break
+        case 'service-accounts':
+          detachPromise(navigate({ to: routeRefs.accessManagementServiceAccountsRoute.fullPath, ...options }))
+          break
+        case 'assignments':
+          detachPromise(navigate({ to: routeRefs.accessManagementAssignmentsRoute.fullPath, ...options }))
+          break
+        case 'check-access':
+          detachPromise(navigate({ to: routeRefs.accessManagementCheckAccessRoute.fullPath, ...options }))
+          break
+        case 'token-revocation':
+          detachPromise(navigate({ to: routeRefs.accessManagementTokenRevocationRoute.fullPath, ...options }))
+          break
+      }
+    },
+    [navigate]
+  )
+
   // Redirect from the bare base path to the first allowed tab so the URL always has a tab segment.
   // SynUrlTabs handles restricted-path redirects via its own useEffect.
   useLayoutEffect(() => {
     if (isLoading || !canAccessPage) return
     if (location === basePath) {
-      detachPromise(navigate({ to: `${basePath}/${defaultTab}`, replace: true }))
+      onTabChange(defaultTab, { replace: true })
     }
-  }, [location, navigate, canAccessPage, isLoading, defaultTab])
+  }, [location, canAccessPage, isLoading, defaultTab, onTabChange])
 
   if (!isLoading && !canAccessPage) {
     return (
@@ -121,7 +156,12 @@ export function AccessManagement() {
       <SynPageHeader title="Access Management" docLink={accessDocLink} breadcrumbs={hubBreadcrumbs} />
       <SynPageBody>
         <SynListPanel>
-          <SynListPanelTabs basePath={basePath} defaultTab={defaultTab} validTabs={validTabKeys}>
+          <SynListPanelTabs
+            basePath={basePath}
+            defaultTab={defaultTab}
+            validTabs={validTabKeys}
+            onTabChange={onTabChange}
+          >
             {validTabDefs.map((tab) => (
               <Tab key={tab.key} eventKey={tab.key} title={tab.label} />
             ))}

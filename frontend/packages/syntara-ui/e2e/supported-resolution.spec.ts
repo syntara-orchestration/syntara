@@ -10,12 +10,12 @@
  * - chromium runs on mock API (PR) and real-backend (E2E) CI
  * - Firefox and WebKit run via playwright.config when the mock API webServer is used (PR CI)
  */
-import { AppRoute } from '../src/app/AppRoute'
 import { MIN_SUPPORTED_VIEWPORT, REACT_FLOW_VIEWPORT_EMPTY_STATE } from '../src/constants/viewport'
 
 import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
+import { routePaths } from './routePaths'
 
 const isRealBackend = isSkipWebServerForPlaywrightTests()
 
@@ -28,10 +28,10 @@ const executionsTable = (page: Page) =>
 /** Mock API seed includes exec-1; real-backend CI may have no executions. */
 const MOCK_EXECUTION_ID = 'exec-1'
 
-const executionDetailPath = (executionId: string) => AppRoute.Executions.Execution.replace(':executionId', executionId)
+const executionDetailPath = (executionId: string) => routePaths.Executions.Execution(executionId)
 
 async function openFirstExecutionDetail(page: Page): Promise<string | null> {
-  await page.goto(toAppUrl(AppRoute.Executions.Root))
+  await page.goto(toAppUrl(routePaths.Executions.Root))
   await expect(page.getByRole('heading', { level: 1, name: 'Workflow Runs' })).toBeVisible()
 
   const table = executionsTable(page)
@@ -67,43 +67,43 @@ type SmokePage = {
 
 const SMOKE_PAGES: SmokePage[] = [
   {
-    path: AppRoute.Workflows.Root,
+    path: routePaths.Workflows.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
     },
   },
   {
-    path: AppRoute.Executions.Root,
+    path: routePaths.Executions.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflow Runs' })).toBeVisible()
     },
   },
   {
-    path: AppRoute.Approvals.Root,
+    path: routePaths.Approvals.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
     },
   },
   {
-    path: AppRoute.Configuration.Integrations.Root,
+    path: routePaths.Configuration.Integrations.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
     },
   },
   {
-    path: AppRoute.Configuration.Credentials.Root,
+    path: routePaths.Configuration.Credentials.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
     },
   },
   {
-    path: AppRoute.SystemAdministration.Settings,
+    path: routePaths.SystemAdministration.Settings,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible()
     },
   },
   {
-    path: AppRoute.AccessManagement.Users,
+    path: routePaths.AccessManagement.Users,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
     },
@@ -122,7 +122,7 @@ test.describe('Supported resolution', () => {
   }
 
   test('workflow builder is usable at minimum supported width', async ({ app }) => {
-    await app.goto(toAppUrl(AppRoute.WorkflowBuilder.New))
+    await app.goto(toAppUrl(routePaths.WorkflowBuilder.New))
     await expect(app.getByPlaceholder('Workflow name')).toBeVisible()
     await expect(reactFlowViewportEmptyState(app)).not.toBeVisible()
     await expect(app.locator('.react-flow')).toBeVisible()
@@ -149,7 +149,7 @@ test.describe('Supported resolution', () => {
 test.describe('React Flow viewport guard', () => {
   test('shows full-page empty state on workflow builder below minimum width', async ({ app }) => {
     await app.setViewportSize({ width: MIN_SUPPORTED_VIEWPORT.width - 1, height: 720 })
-    await app.goto(toAppUrl(AppRoute.WorkflowBuilder.New))
+    await app.goto(toAppUrl(routePaths.WorkflowBuilder.New))
     await expect(app.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
     await expect(reactFlowViewportEmptyState(app)).toBeVisible()
     await expect(app.getByRole('button', { name: REACT_FLOW_VIEWPORT_EMPTY_STATE.returnLabel })).toBeVisible()
@@ -160,7 +160,7 @@ test.describe('React Flow viewport guard', () => {
 
   test('workflow builder renders at minimum width regardless of height', async ({ app }) => {
     await app.setViewportSize({ width: 1024, height: 400 })
-    await app.goto(toAppUrl(AppRoute.WorkflowBuilder.New))
+    await app.goto(toAppUrl(routePaths.WorkflowBuilder.New))
     await expect(app.locator('.react-flow')).toBeVisible()
     await expect(reactFlowViewportEmptyState(app)).not.toBeVisible()
   })
@@ -183,7 +183,7 @@ test.describe('React Flow viewport guard', () => {
 
   test('workflows list remains usable below minimum width', async ({ app }) => {
     await app.setViewportSize({ width: MIN_SUPPORTED_VIEWPORT.width - 1, height: 720 })
-    await app.goto(toAppUrl(AppRoute.Workflows.Root))
+    await app.goto(toAppUrl(routePaths.Workflows.Root))
     await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
     await expect(app.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
     await expect(reactFlowViewportEmptyState(app)).not.toBeVisible()
@@ -191,7 +191,7 @@ test.describe('React Flow viewport guard', () => {
 
   test('executions list remains usable below minimum width', async ({ app }) => {
     await app.setViewportSize({ width: MIN_SUPPORTED_VIEWPORT.width - 1, height: 720 })
-    await app.goto(toAppUrl(AppRoute.Executions.Root))
+    await app.goto(toAppUrl(routePaths.Executions.Root))
     await expect(app.getByRole('heading', { level: 1, name: 'Workflow Runs' })).toBeVisible()
     await expect(app.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
     await expect(reactFlowViewportEmptyState(app)).not.toBeVisible()
@@ -199,7 +199,7 @@ test.describe('React Flow viewport guard', () => {
 
   test('Return to Workflows navigates from builder empty state', async ({ app }) => {
     await app.setViewportSize({ width: MIN_SUPPORTED_VIEWPORT.width - 1, height: 720 })
-    await app.goto(toAppUrl(AppRoute.WorkflowBuilder.New))
+    await app.goto(toAppUrl(routePaths.WorkflowBuilder.New))
     await app.getByRole('button', { name: REACT_FLOW_VIEWPORT_EMPTY_STATE.returnLabel }).click()
     await expect(app).toHaveURL(/\/workflows$/)
     await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()

@@ -2,6 +2,8 @@ import { AlertActionLink } from '@patternfly/react-core'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback, useState } from 'react'
 
+import type { AppRouteNavigationOptions } from '../../app/routeNavigationOptions'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { workflowFetchClient } from '../../client'
 import type { useAlerts } from '../../providers/alerts'
 import { getErrorMessage } from '../../utils/apiErrors'
@@ -12,7 +14,7 @@ type WorkflowDefinitionSchema = WorkflowAPI.components['schemas']['WorkflowDefin
 type UseDuplicateWorkflowOptions = {
   showAlert: ReturnType<typeof useAlerts>['showAlert']
   showError: ReturnType<typeof useAlerts>['showError']
-  setLocation: (path: string) => void
+  setLocation: (destination: AppRouteNavigationOptions) => void
   onSuccess: () => void
 }
 
@@ -113,7 +115,11 @@ export function useDuplicateWorkflow({ showAlert, showError, setLocation, onSucc
           title: 'Workflow duplicated',
           description: `Created "${duplicateName}"`,
           actionLinks: createdWorkflow?.id ? (
-            <AlertActionLink onClick={() => setLocation(`/workflow-builder/${createdWorkflow.id}`)}>
+            <AlertActionLink
+              onClick={() =>
+                setLocation({ to: routeRefs.builderEditRoute.fullPath, params: { workflowId: createdWorkflow.id } })
+              }
+            >
               Open workflow
             </AlertActionLink>
           ) : undefined,

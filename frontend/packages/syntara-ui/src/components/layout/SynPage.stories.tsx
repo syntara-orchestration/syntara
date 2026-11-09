@@ -2,6 +2,7 @@ import { Button, Content, StackItem } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { fn } from 'storybook/test'
 
+import { breadcrumbTestRoutes } from '../../test/breadcrumbTestRoutes'
 import { SynErrorState } from '../states/SynErrorState'
 
 import { SynPage, SynPageBody } from './SynPage'
@@ -84,7 +85,7 @@ export const FullDetailPageLayout: Story = {
     <SynPage>
       <SynPageHeader
         title="my-workflow"
-        breadcrumbs={[{ label: 'Workflows', href: '/workflows' }, { label: 'my-workflow' }]}
+        breadcrumbs={[{ label: 'Workflows', destination: breadcrumbTestRoutes.workflows }, { label: 'my-workflow' }]}
       />
       <SynPageBody>
         <SynPanel isFullHeight>
@@ -116,8 +117,8 @@ export const FullFormPageLayout: Story = {
       <SynPageHeader
         title="Create user"
         breadcrumbs={[
-          { label: 'Access management', href: '/access-management' },
-          { label: 'Users', href: '/access-management/users' },
+          { label: 'Access management', destination: breadcrumbTestRoutes.accessManagement },
+          { label: 'Users', destination: breadcrumbTestRoutes.users },
           { label: 'Create user' },
         ]}
         toolbar={

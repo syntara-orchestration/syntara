@@ -1,14 +1,11 @@
 import { Tabs, type TabsProps } from '@patternfly/react-core'
-import { useNavigate } from '@tanstack/react-router'
 import React, { useEffect, useId } from 'react'
 
-import { useUnsavedChanges } from '../../app/useUnsavedChanges'
 import { useUrlTab } from '../../hooks/useUrlTab'
-import { detachPromise } from '../../utils/detachPromise'
 
 import styles from './SynUrlTabs.module.css'
 
-type UrlTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref' | 'children'> & {
+type UrlTabsProps<T extends string> = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref' | 'children'> & {
   /**
    * Tab children (`<Tab>` elements). Typed as `ReactNode` to accept pre-cloned Tab arrays from
    * callers like `SynListPanelTabs`; cast to PF's `TabsChild` when forwarded to `<Tabs>`.
@@ -17,18 +14,15 @@ type UrlTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref' | 'children
   /** Base path used to derive the active tab from the URL (e.g. `/system-administration/settings`). */
   basePath: string
   /** Tab key used when the URL has no tab segment (default: `'details'`). */
-  defaultTab?: string
+  defaultTab?: T
   /**
    * When provided, the component redirects (via `replace`) to `defaultTab`
    * if the current URL tab segment is not in this list.
    * Use for pages whose tabs are loaded dynamically (e.g. from an API).
    */
-  validTabs?: string[]
-  /**
-   * When true, tab switches go through the `requestNavigation` unsaved-changes guard
-   * instead of navigating directly. Use on pages where a tab may have unsaved state.
-   */
-  guardUnsavedChanges?: boolean
+  validTabs?: readonly T[]
+  /** Navigate through the caller's typed route reference for the selected tab. */
+  onTabChange: (tab: T, options?: { replace?: boolean }) => void
   /** Accessible panel names by tab key. Unlisted panels use their tab key as a fallback. */
   tabPanelLabels?: Readonly<Record<string, string>>
   /** Applies the full-height spacing layout used by nested detail tabs. */
@@ -52,20 +46,20 @@ type UrlTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref' | 'children
   renderPanel?: (activeTab: string) => React.ReactNode
 }
 
-export function SynUrlTabs({
+export function SynUrlTabs<T extends string = string>({
   basePath,
-  defaultTab = 'details',
+  defaultTab,
   validTabs,
   children,
-  guardUnsavedChanges,
+  onTabChange,
   tabPanelLabels,
   routePanelLayout,
   renderPanel,
   ...tabsProps
-}: UrlTabsProps) {
+}: UrlTabsProps<T>) {
   const uid = useId()
-  const [activeTab, goToTab] = useUrlTab(basePath, defaultTab)
-  const navigate = useNavigate()
+  const fallbackTab = defaultTab ?? ('details' as T)
+  const activeTab = useUrlTab<T>(basePath, fallbackTab)
 
   // validTabs arrives asynchronously (from an API); redirect when the URL tab is absent from the
   // list is an async-prop side-effect, not a user event — useEffect is correct here.
@@ -76,11 +70,11 @@ export function SynUrlTabs({
     if (!validTabs || validTabs.length === 0) return
     if (validTabs.includes(activeTab)) return
     const id = requestAnimationFrame(() => {
-      const target = validTabs.includes(defaultTab) ? defaultTab : validTabs[0]
-      detachPromise(navigate({ to: `${basePath}/${target}`, replace: true }))
+      const target = validTabs.includes(fallbackTab) ? fallbackTab : validTabs[0]
+      if (target) onTabChange(target, { replace: true })
     })
     return () => cancelAnimationFrame(id)
-  }, [validTabs, activeTab, defaultTab, basePath, navigate])
+  }, [validTabs, activeTab, fallbackTab, onTabChange])
 
   useEffect(() => {
     const blurStaleTab = () => {
@@ -92,14 +86,8 @@ export function SynUrlTabs({
     return () => globalThis.removeEventListener('popstate', blurStaleTab)
   }, [])
 
-  const { requestNavigation } = useUnsavedChanges()
-
   const handleSelect = (_event: React.MouseEvent<HTMLElement, MouseEvent>, key: string | number) => {
-    if (guardUnsavedChanges) {
-      requestNavigation(`${basePath}/${String(key)}`)
-    } else {
-      goToTab(String(key))
-    }
+    onTabChange(String(key) as T)
   }
 
   // Classify each Tab child. Tabs that already have their own panel content (children prop set) let

@@ -1,6 +1,7 @@
 import { Truncate } from '@patternfly/react-core'
 import { cloneElement, isValidElement, useRef, type ReactNode, type RefObject } from 'react'
 
+import type { AppRouteNavigationOptions } from '../../app/routeNavigationOptions'
 import { SynLink } from '../SynLink'
 
 import styles from './LinkCell.module.css'
@@ -24,11 +25,11 @@ function wireTruncateChild(children: ReactNode, linkRef: RefObject<HTMLAnchorEle
 }
 
 /** Renders a table cell value as a client-side router link. */
-export function LinkCell(props: Readonly<{ href: string; children: React.ReactNode }>) {
+export function LinkCell(props: Readonly<{ options: AppRouteNavigationOptions; children: React.ReactNode }>) {
   const linkRef = useRef<HTMLAnchorElement>(null)
 
   return (
-    <SynLink ref={linkRef} to={props.href} className={styles.root}>
+    <SynLink ref={linkRef} options={props.options} className={styles.root}>
       {wireTruncateChild(props.children, linkRef)}
     </SynLink>
   )

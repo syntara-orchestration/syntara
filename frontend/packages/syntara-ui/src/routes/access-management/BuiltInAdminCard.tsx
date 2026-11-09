@@ -4,7 +4,7 @@ import { RhUiCheckCircleIcon, RhUiLockIcon, RhUiUnlockIcon } from '@patternfly/r
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynLink } from '../../components/SynLink'
 
-import { getUserDetailPath } from './accessManagementPaths'
+import { getUserDetailOptions } from './accessManagementPaths'
 import { BUILTIN_ADMIN_TOGGLE_DISABLED_REASON } from './adminConstants'
 
 type BuiltInAdminCardProps = {
@@ -32,7 +32,7 @@ export function BuiltInAdminCard({ userId, isEnabled, canToggle, onToggle }: Rea
         <Flex alignItems={{ default: 'alignItemsCenter' }}>
           <FlexItem>{isEnabled ? <RhUiUnlockIcon aria-hidden="true" /> : <RhUiLockIcon aria-hidden="true" />}</FlexItem>
           <FlexItem>
-            <SynLink to={getUserDetailPath(userId)}>
+            <SynLink options={getUserDetailOptions(userId)}>
               <strong>Built-in Administrator Account</strong>
             </SynLink>
           </FlexItem>

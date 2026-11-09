@@ -35,7 +35,7 @@ import {
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 
-import { AppRoute } from '../../app/AppRoute'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { MultiSelectFilter } from '../../components/filters/MultiSelectFilter'
 import pageMainSlotStyles from '../../components/layout/SynPage.module.css'
 import { SynPanel } from '../../components/layout/SynPanel'
@@ -232,7 +232,7 @@ type VersionRowProps = Readonly<{
 /** Links a version's creator to their user page. Render only when both id and name are known. */
 function VersionCreatedByLink({ userId, name }: Readonly<{ userId: string; name: string }>) {
   return (
-    <SynLink to={AppRoute.AccessManagement.UserDetail.replace(':userId', userId)} className={styles.usernameLink}>
+    <SynLink options={{ to: routeRefs.userDetailRoute.fullPath, params: { userId } }} className={styles.usernameLink}>
       {name}
     </SynLink>
   )

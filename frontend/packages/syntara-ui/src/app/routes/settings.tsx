@@ -5,13 +5,13 @@ import { makeRouteComponent } from '../makeRouteComponent'
 
 import { rootRoute } from './__root'
 
-const settingsRoute = createRoute({
+export const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/system-administration/settings',
   component: makeRouteComponent(<Settings />),
 })
 
-const settingsCategoryRoute = createRoute({
+export const settingsCategoryRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: '/$category',
   component: makeRouteComponent(<SettingsCategoryRoute />),

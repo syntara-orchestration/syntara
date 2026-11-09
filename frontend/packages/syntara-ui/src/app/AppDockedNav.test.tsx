@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { authClient } from '../client'
+import './tanstackRouter'
 import { BrandProvider } from '../providers/brand'
 import { COLOR_SCHEME_STORAGE_KEY } from '../providers/theme/colorScheme'
 import { ColorSchemeProvider } from '../providers/theme/ColorSchemeProvider'
@@ -45,6 +46,14 @@ vi.mock('@tanstack/react-router', async () => {
       </a>
     ),
     useNavigate: () => mockNavigate,
+    useRouter: () => ({
+      buildLocation: ({ to, params }: { to: string; params?: Record<string, string> }) => ({
+        href: Object.entries(params ?? {}).reduce(
+          (path, [key, value]) => path.replaceAll(`$${key}`, encodeURIComponent(value)),
+          to
+        ),
+      }),
+    }),
     useRouterState: vi.fn((opts?: { select?: (s: { location: { pathname: string } }) => unknown }) => {
       const state = { location: { pathname: mockLocation } }
       return opts?.select ? opts.select(state) : state
@@ -298,7 +307,7 @@ describe('AppDockedNav', () => {
     renderDockedNav()
 
     await user.click(screen.getByRole('link', { name: linkName }))
-    expect(mockRequestNavigation).toHaveBeenCalledWith(expectedPath)
+    expect(mockRequestNavigation).toHaveBeenCalledWith({ to: expectedPath })
   })
 
   it('shows System Administration child links when the group is expanded', () => {
@@ -343,7 +352,7 @@ describe('AppDockedNav', () => {
       renderDockedNav()
 
       await user.click(screen.getByText('Integrations'))
-      expect(mockRequestNavigation).toHaveBeenCalledWith('/configuration/integrations')
+      expect(mockRequestNavigation).toHaveBeenCalledWith({ to: '/configuration/integrations' })
     })
 
     it('marks active child item when location matches', () => {
@@ -486,7 +495,7 @@ describe('AppDockedNav', () => {
       renderDockedNav()
 
       await user.click(screen.getByText('Identity Providers'))
-      expect(mockRequestNavigation).toHaveBeenCalledWith('/system-administration/authentication')
+      expect(mockRequestNavigation).toHaveBeenCalledWith({ to: '/system-administration/authentication' })
     })
   })
 

@@ -1,6 +1,7 @@
 import type { ActivityExecution } from '@syntara/contracts'
 import { useMemo } from 'react'
 
+import * as routeRefs from '../../../../app/routes/routeReferences'
 import { executionsClient } from '../../../../client'
 
 import { useUpstreamSteps } from './useUpstreamSteps'
@@ -42,7 +43,7 @@ export function useStepExecutionData(
   // If no explicit executionId, fetch the latest execution for this workflow
   const latestExecQuery = executionsClient.useQuery(
     'get',
-    '/executions',
+    routeRefs.executionsListRoute.fullPath,
     {
       params: {
         query: {

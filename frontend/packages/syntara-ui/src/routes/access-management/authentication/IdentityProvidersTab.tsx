@@ -15,7 +15,8 @@ import type { IdentityProvidersAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useLayoutEffect, useMemo, useState } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
+import type { AppRouteNavigationOptions } from '../../../app/routeNavigationOptions'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { adminClient, identityProvidersClient } from '../../../client'
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
@@ -60,7 +61,7 @@ function getRowActions({
   onDelete: (provider: IdentityProvider) => void
   onRevoke: (provider: IdentityProvider) => void
   permissions: ReturnType<typeof useIdentityProviderPermissions>
-  onNavigate: (path: string) => void
+  onNavigate: (destination: AppRouteNavigationOptions) => void
 }): KebabAction[] {
   const { id } = provider
   const canEdit = permissions.canUpdate && !!id
@@ -74,7 +75,7 @@ function getRowActions({
       isAriaDisabled: !permissions.canUpdate,
       tooltipProps: tooltipWhenDenied(permissions.canUpdate, permissions.tooltips.update),
       onClick: canEdit
-        ? () => onNavigate(AppRoute.SystemAdministration.Authentication.EditIdentityProvider.replace(':providerId', id))
+        ? () => onNavigate({ to: routeRefs.editIdentityProviderRoute.fullPath, params: { providerId: id } })
         : undefined,
     },
     {
@@ -84,7 +85,7 @@ function getRowActions({
       isAriaDisabled: !permissions.canUpdate,
       tooltipProps: tooltipWhenDenied(permissions.canUpdate, permissions.tooltips.editMapping),
       onClick: canEdit
-        ? () => onNavigate(AppRoute.SystemAdministration.Authentication.EditGroupMapping.replace(':providerId', id))
+        ? () => onNavigate({ to: routeRefs.editIdentityProviderGroupMappingRoute.fullPath, params: { providerId: id } })
         : undefined,
     },
     {
@@ -105,10 +106,6 @@ function getRowActions({
       onClick: canDel ? () => onDelete(provider) : undefined,
     },
   ]
-}
-
-function providerDetailPath(providerId: string): string {
-  return AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(':providerId', providerId)
 }
 
 function NoProvidersEmptyState({
@@ -169,7 +166,9 @@ function ProviderRow({
           </FlexItem>
           <FlexItem style={{ minWidth: 0 }}>
             {provider.id ? (
-              <SynLink to={providerDetailPath(provider.id)}>
+              <SynLink
+                options={{ to: routeRefs.identityProviderDetailRoute.fullPath, params: { providerId: provider.id } }}
+              >
                 <Truncate content={provider.name ?? ''} />
               </SynLink>
             ) : (
@@ -203,7 +202,7 @@ function ProviderRow({
             onDelete,
             onRevoke,
             permissions,
-            onNavigate: (path) => detachPromise(navigate({ to: path })),
+            onNavigate: (destination) => detachPromise(navigate(destination)),
           })}
           aria-label={`Actions for ${provider.name}`}
         />

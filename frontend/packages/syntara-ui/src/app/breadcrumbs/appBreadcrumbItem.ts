@@ -1,5 +1,7 @@
-/** One segment of the page breadcrumb trail. The last item must omit `href` (current page). */
+import type { AppRouteNavigationOptions } from '../routeNavigationOptions'
+
+/** One breadcrumb segment. The current page omits `destination`. */
 export type AppBreadcrumbItem = {
   readonly label: string
-  readonly href?: string
+  readonly destination?: AppRouteNavigationOptions
 }

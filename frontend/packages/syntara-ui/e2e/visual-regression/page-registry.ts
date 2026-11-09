@@ -3,7 +3,7 @@
  *
  * Every implemented route in the app should have an entry here.
  * The baseline enforcement script (`scripts/visual-regression/check-visual-baselines.ts`)
- * validates that this registry stays in sync with `AppRoute.tsx`.
+ * validates that this registry stays in sync with the TanStack route tree.
  *
  * Entries are organized by section (matching the route directory structure)
  * and include multiple states per page where relevant:
@@ -14,8 +14,9 @@
  */
 import { type Page, expect } from '@playwright/test'
 
-import { AppRoute } from '../../src/app/AppRoute'
+import * as routeRefs from '../../src/app/routes/routeReferences'
 import { APP_TITLE } from '../helpers/appTitle'
+import { routePaths } from '../routePaths'
 
 import { MOCK_IDENTITY_PROVIDER_ID } from './mock-ids'
 import {
@@ -107,7 +108,7 @@ export const pages: PageEntry[] = [
     section: 'workflows',
     name: 'workflows-list',
     perceptual: true,
-    path: AppRoute.Workflows.Root,
+    path: routePaths.Workflows.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -117,7 +118,7 @@ export const pages: PageEntry[] = [
     section: 'workflows',
     name: 'workflows-list-empty-filter',
     perceptual: true,
-    path: AppRoute.Workflows.Root,
+    path: routePaths.Workflows.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -131,7 +132,7 @@ export const pages: PageEntry[] = [
     section: 'workflows',
     name: 'workflows-delete-dialog',
     perceptual: true,
-    path: AppRoute.Workflows.Root,
+    path: routePaths.Workflows.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -160,7 +161,7 @@ export const pages: PageEntry[] = [
   {
     section: 'workflows',
     name: 'builder-edit',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_WORKFLOW_ID),
     perceptual: true,
     waitFor: waitForCanvasReady,
   },
@@ -172,7 +173,7 @@ export const pages: PageEntry[] = [
   {
     section: 'executions',
     name: 'executions-list',
-    path: AppRoute.Executions.Root,
+    path: routePaths.Executions.Root,
     maxDiffPixelRatio: EXECUTION_STATUS_BADGE_TOLERANCE,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflow Runs' })).toBeVisible()
@@ -184,7 +185,7 @@ export const pages: PageEntry[] = [
   {
     section: 'executions',
     name: 'execution-detail',
-    path: AppRoute.Executions.Execution.replace(':executionId', MOCK_EXECUTION_ID),
+    path: routePaths.Executions.Execution(MOCK_EXECUTION_ID),
     perceptual: true,
     // perceptual: true masks the .react-flow canvas in the screenshot — the
     // animated edge rendering variance is contained in the canvas and is now
@@ -200,7 +201,7 @@ export const pages: PageEntry[] = [
   {
     section: 'approvals',
     name: 'approvals-list',
-    path: AppRoute.Approvals.Root,
+    path: routePaths.Approvals.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -209,7 +210,7 @@ export const pages: PageEntry[] = [
   {
     section: 'approvals',
     name: 'approvals-list-empty-filter',
-    path: AppRoute.Approvals.Root,
+    path: routePaths.Approvals.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -227,7 +228,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'users-list',
-    path: AppRoute.AccessManagement.Users,
+    path: routePaths.AccessManagement.Users,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -237,7 +238,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'users-list-empty-filter',
-    path: AppRoute.AccessManagement.Users,
+    path: routePaths.AccessManagement.Users,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -251,7 +252,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'users-delete-dialog',
-    path: AppRoute.AccessManagement.Users,
+    path: routePaths.AccessManagement.Users,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -268,7 +269,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'user-create',
-    path: AppRoute.AccessManagement.CreateUser,
+    path: routePaths.AccessManagement.CreateUser,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Create user' })).toBeVisible()
     },
@@ -276,7 +277,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'user-detail',
-    path: AppRoute.AccessManagement.UserDetail.replace(':userId', MOCK_USER_ID),
+    path: routePaths.AccessManagement.UserDetail(MOCK_USER_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     },
@@ -284,7 +285,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'user-edit',
-    path: AppRoute.AccessManagement.EditUser.replace(':userId', MOCK_USER_ID),
+    path: routePaths.AccessManagement.EditUser(MOCK_USER_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Edit Demo Admin' })).toBeVisible()
     },
@@ -299,7 +300,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/groups',
     name: 'groups-list',
-    path: AppRoute.AccessManagement.Groups,
+    path: routePaths.AccessManagement.Groups,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -308,7 +309,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/groups',
     name: 'groups-list-empty-filter',
-    path: AppRoute.AccessManagement.Groups,
+    path: routePaths.AccessManagement.Groups,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -322,7 +323,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/groups',
     name: 'groups-create-modal',
-    path: AppRoute.AccessManagement.Groups,
+    path: routePaths.AccessManagement.Groups,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -337,7 +338,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/groups',
     name: 'groups-delete-dialog',
-    path: AppRoute.AccessManagement.Groups,
+    path: routePaths.AccessManagement.Groups,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -358,7 +359,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/groups',
     name: 'group-detail',
-    path: AppRoute.AccessManagement.GroupDetail.replace(':groupId', MOCK_GROUP_ID),
+    path: routePaths.AccessManagement.GroupDetail(MOCK_GROUP_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     },
@@ -370,7 +371,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/projects',
     name: 'projects-list',
-    path: AppRoute.AccessManagement.Projects,
+    path: routePaths.AccessManagement.Projects,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -379,7 +380,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/projects',
     name: 'projects-list-empty-filter',
-    path: AppRoute.AccessManagement.Projects,
+    path: routePaths.AccessManagement.Projects,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -396,7 +397,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/projects',
     name: 'projects-create-modal',
-    path: AppRoute.AccessManagement.Projects,
+    path: routePaths.AccessManagement.Projects,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -411,7 +412,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/projects',
     name: 'project-detail',
-    path: AppRoute.AccessManagement.ProjectDetail.replace(':projectId', MOCK_PROJECT_ID),
+    path: routePaths.AccessManagement.ProjectDetail(MOCK_PROJECT_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     },
@@ -423,7 +424,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/service-accounts',
     name: 'service-accounts-list',
-    path: AppRoute.AccessManagement.ServiceAccounts,
+    path: routePaths.AccessManagement.ServiceAccounts,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -432,7 +433,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/service-accounts',
     name: 'service-accounts-list-empty-filter',
-    path: AppRoute.AccessManagement.ServiceAccounts,
+    path: routePaths.AccessManagement.ServiceAccounts,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -446,7 +447,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/service-accounts',
     name: 'service-accounts-create-modal',
-    path: AppRoute.AccessManagement.ServiceAccounts,
+    path: routePaths.AccessManagement.ServiceAccounts,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -461,7 +462,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/service-accounts',
     name: 'service-accounts-delete-dialog',
-    path: AppRoute.AccessManagement.ServiceAccounts,
+    path: routePaths.AccessManagement.ServiceAccounts,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -478,7 +479,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/service-accounts',
     name: 'service-account-detail',
-    path: AppRoute.AccessManagement.ServiceAccountDetail.replace(':serviceAccountId', MOCK_SERVICE_ACCOUNT_ID),
+    path: routePaths.AccessManagement.ServiceAccountDetail(MOCK_SERVICE_ACCOUNT_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     },
@@ -490,7 +491,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/roles',
     name: 'roles-list',
-    path: AppRoute.AccessManagement.Roles,
+    path: routePaths.AccessManagement.Roles,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -499,7 +500,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/roles',
     name: 'roles-list-empty-filter',
-    path: AppRoute.AccessManagement.Roles,
+    path: routePaths.AccessManagement.Roles,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -513,7 +514,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/roles',
     name: 'roles-add-dialog',
-    path: AppRoute.AccessManagement.Roles,
+    path: routePaths.AccessManagement.Roles,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -532,7 +533,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/policies',
     name: 'policies-list',
-    path: AppRoute.AccessManagement.Policies,
+    path: routePaths.AccessManagement.Policies,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -541,7 +542,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/policies',
     name: 'policies-list-empty-filter',
-    path: AppRoute.AccessManagement.Policies,
+    path: routePaths.AccessManagement.Policies,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -559,7 +560,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/assignments',
     name: 'assignments-list',
-    path: AppRoute.AccessManagement.Assignments,
+    path: routePaths.AccessManagement.Assignments,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -568,7 +569,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/assignments',
     name: 'assignments-list-empty-filter',
-    path: AppRoute.AccessManagement.Assignments,
+    path: routePaths.AccessManagement.Assignments,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -591,7 +592,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/check-access',
     name: 'check-access',
-    path: AppRoute.AccessManagement.CheckAccess,
+    path: routePaths.AccessManagement.CheckAccess,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.getByRole('button', { name: 'More info for Resource type' })).toBeVisible()
@@ -604,7 +605,7 @@ export const pages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'authentication',
-    path: AppRoute.SystemAdministration.Authentication.Root,
+    path: routePaths.SystemAdministration.Authentication.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Identity Providers' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -613,7 +614,7 @@ export const pages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'authentication-delete-dialog',
-    path: AppRoute.SystemAdministration.Authentication.Root,
+    path: routePaths.SystemAdministration.Authentication.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Identity Providers' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -630,7 +631,7 @@ export const pages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'identity-provider-add',
-    path: AppRoute.SystemAdministration.Authentication.AddIdentityProvider,
+    path: routePaths.SystemAdministration.Authentication.AddIdentityProvider,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Add OIDC provider' })).toBeVisible()
     },
@@ -638,7 +639,7 @@ export const pages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'identity-provider-add-claim-mapping',
-    path: AppRoute.SystemAdministration.Authentication.AddIdentityProvider,
+    path: routePaths.SystemAdministration.Authentication.AddIdentityProvider,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Add OIDC provider' })).toBeVisible()
     },
@@ -650,7 +651,7 @@ export const pages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'identity-provider-add-template-dropdown',
-    path: AppRoute.SystemAdministration.Authentication.AddIdentityProvider,
+    path: routePaths.SystemAdministration.Authentication.AddIdentityProvider,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Add OIDC provider' })).toBeVisible()
     },
@@ -662,10 +663,7 @@ export const pages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'identity-provider-group-mapping-edit',
-    path: AppRoute.SystemAdministration.Authentication.EditGroupMapping.replace(
-      ':providerId',
-      MOCK_IDENTITY_PROVIDER_ID
-    ),
+    path: routePaths.SystemAdministration.Authentication.EditGroupMapping(MOCK_IDENTITY_PROVIDER_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Add group mapping' })).toBeVisible()
       await expect(page.getByRole('button', { name: 'Save mapping' })).toBeVisible()
@@ -677,7 +675,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/token-revocation',
     name: 'token-revocation',
-    path: AppRoute.AccessManagement.TokenRevocation,
+    path: routePaths.AccessManagement.TokenRevocation,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.getByRole('tab', { name: 'Token revocation' })).toBeVisible()
@@ -686,7 +684,7 @@ export const pages: PageEntry[] = [
   {
     section: 'access-management/token-revocation',
     name: 'token-revocation-confirm-dialog',
-    path: AppRoute.AccessManagement.TokenRevocation,
+    path: routePaths.AccessManagement.TokenRevocation,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
       await expect(page.getByRole('tab', { name: 'Token revocation' })).toBeVisible()
@@ -705,7 +703,7 @@ export const pages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings',
-    path: AppRoute.SystemAdministration.Settings,
+    path: routePaths.SystemAdministration.Settings,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab').first()).toBeVisible()
@@ -718,7 +716,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integrations-list',
-    path: AppRoute.Configuration.Integrations.Root,
+    path: routePaths.Configuration.Integrations.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -727,7 +725,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integrations-list-empty-filter',
-    path: AppRoute.Configuration.Integrations.Root,
+    path: routePaths.Configuration.Integrations.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -741,7 +739,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integration-configure',
-    path: AppRoute.Configuration.Integrations.Configure,
+    path: routePaths.Configuration.Integrations.Configure,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Configure integration' })).toBeVisible()
     },
@@ -749,7 +747,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integration-detail',
-    path: AppRoute.Configuration.Integrations.Detail.replace(':integrationId', '1'),
+    path: routePaths.Configuration.Integrations.Detail('1'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByText('Server name / ID')).toBeVisible()
@@ -758,7 +756,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integration-detail-credential-disabled',
-    path: AppRoute.Configuration.Integrations.Detail.replace(':integrationId', '3'),
+    path: routePaths.Configuration.Integrations.Detail('3'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByText('Credential disabled')).toBeVisible()
@@ -767,7 +765,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integration-tools',
-    path: AppRoute.Configuration.Integrations.DetailTab.replace(':integrationId', '1').replace(':tab', 'resources'),
+    path: routePaths.Configuration.Integrations.DetailTab('1', 'resources'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByText('get_resource')).toBeVisible()
@@ -777,7 +775,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integration-tools-empty',
-    path: AppRoute.Configuration.Integrations.DetailTab.replace(':integrationId', '4').replace(':tab', 'resources'),
+    path: routePaths.Configuration.Integrations.DetailTab('4', 'resources'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByText('No resources discovered yet')).toBeVisible()
@@ -786,7 +784,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integration-edit',
-    path: AppRoute.Configuration.Integrations.Edit.replace(':integrationId', '1'),
+    path: routePaths.Configuration.Integrations.Edit('1'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Edit integration' })).toBeVisible()
     },
@@ -794,7 +792,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'llm-provider-detail',
-    path: AppRoute.Configuration.Integrations.Detail.replace(':integrationId', '10'),
+    path: routePaths.Configuration.Integrations.Detail('10'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Red Hat AI' })).toBeVisible()
       await expect(page.getByText('LLM Provider', { exact: true })).toBeVisible()
@@ -803,7 +801,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'llm-provider-models',
-    path: AppRoute.Configuration.Integrations.DetailTab.replace(':integrationId', '10').replace(':tab', 'resources'),
+    path: routePaths.Configuration.Integrations.DetailTab('10', 'resources'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByText('granite-3.3-8b-instruct')).toBeVisible()
@@ -813,7 +811,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'llm-provider-edit',
-    path: AppRoute.Configuration.Integrations.Edit.replace(':integrationId', '10'),
+    path: routePaths.Configuration.Integrations.Edit('10'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Edit integration' })).toBeVisible()
     },
@@ -821,7 +819,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'aap-detail',
-    path: AppRoute.Configuration.Integrations.Detail.replace(':integrationId', '12'),
+    path: routePaths.Configuration.Integrations.Detail('12'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Production AAP' })).toBeVisible()
       await expect(page.getByText('Ansible Automation Platform', { exact: true })).toBeVisible()
@@ -830,7 +828,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'aap-edit',
-    path: AppRoute.Configuration.Integrations.Edit.replace(':integrationId', '12'),
+    path: routePaths.Configuration.Integrations.Edit('12'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Edit integration' })).toBeVisible()
       await expect(page.locator('input[value="https://aap.prod.example.com"]')).toBeVisible()
@@ -846,7 +844,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/credentials',
     name: 'credentials-list',
-    path: AppRoute.Configuration.Credentials.Root,
+    path: routePaths.Configuration.Credentials.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -855,7 +853,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/credentials',
     name: 'credentials-list-empty-filter',
-    path: AppRoute.Configuration.Credentials.Root,
+    path: routePaths.Configuration.Credentials.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -870,7 +868,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/credentials',
     name: 'credentials-create-modal',
-    path: AppRoute.Configuration.Credentials.Root,
+    path: routePaths.Configuration.Credentials.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -888,7 +886,7 @@ export const pages: PageEntry[] = [
   {
     section: 'configuration/credentials',
     name: 'credential-detail',
-    path: AppRoute.Configuration.Credentials.Detail.replace(':credentialId', MOCK_CREDENTIAL_ID),
+    path: routePaths.Configuration.Credentials.Detail(MOCK_CREDENTIAL_ID),
     waitFor: async (page) => {
       // Credential detail uses ReactNode title (back button + name), not a heading
       await expect(page.getByText('Production API Auth').first()).toBeVisible()
@@ -913,7 +911,7 @@ export const pages: PageEntry[] = [
   {
     section: 'permission-gating',
     name: 'viewer-workflows-list',
-    path: AppRoute.Workflows.Root,
+    path: routePaths.Workflows.Root,
     role: 'viewer',
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
@@ -923,7 +921,7 @@ export const pages: PageEntry[] = [
   {
     section: 'permission-gating',
     name: 'viewer-credentials-list',
-    path: AppRoute.Configuration.Credentials.Root,
+    path: routePaths.Configuration.Credentials.Root,
     role: 'viewer',
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
@@ -933,7 +931,7 @@ export const pages: PageEntry[] = [
   {
     section: 'permission-gating',
     name: 'auditor-users-list',
-    path: AppRoute.AccessManagement.Users,
+    path: routePaths.AccessManagement.Users,
     role: 'auditor',
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Access Management' })).toBeVisible()
@@ -943,7 +941,7 @@ export const pages: PageEntry[] = [
   {
     section: 'permission-gating',
     name: 'viewer-access-denied',
-    path: AppRoute.AccessManagement.Users,
+    path: routePaths.AccessManagement.Users,
     role: 'viewer',
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: /access denied/i })).toBeVisible()
@@ -952,7 +950,7 @@ export const pages: PageEntry[] = [
   {
     section: 'permission-gating',
     name: 'viewer-builder-read-only',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_WORKFLOW_ID),
     role: 'viewer',
     perceptual: true,
     waitFor: waitForCanvasReady,
@@ -960,7 +958,7 @@ export const pages: PageEntry[] = [
   {
     section: 'permission-gating',
     name: 'auditor-authentication-list',
-    path: AppRoute.SystemAdministration.Authentication.Root,
+    path: routePaths.SystemAdministration.Authentication.Root,
     role: 'auditor',
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Identity Providers' })).toBeVisible()
@@ -970,7 +968,7 @@ export const pages: PageEntry[] = [
   {
     section: 'permission-gating',
     name: 'user-workflows-list',
-    path: AppRoute.Workflows.Root,
+    path: routePaths.Workflows.Root,
     role: 'user',
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
@@ -980,7 +978,7 @@ export const pages: PageEntry[] = [
   {
     section: 'permission-gating',
     name: 'viewer-workflows-kebab-disabled',
-    path: AppRoute.Workflows.Root,
+    path: routePaths.Workflows.Root,
     role: 'viewer',
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
@@ -995,7 +993,7 @@ export const pages: PageEntry[] = [
   {
     section: 'permission-gating',
     name: 'viewer-executions-list',
-    path: AppRoute.Executions.Root,
+    path: routePaths.Executions.Root,
     role: 'viewer',
     maxDiffPixelRatio: EXECUTION_STATUS_BADGE_TOLERANCE,
     waitFor: async (page) => {
@@ -1006,7 +1004,7 @@ export const pages: PageEntry[] = [
   {
     section: 'permission-gating',
     name: 'viewer-approvals-list',
-    path: AppRoute.Approvals.Root,
+    path: routePaths.Approvals.Root,
     role: 'viewer',
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
@@ -1016,7 +1014,7 @@ export const pages: PageEntry[] = [
   {
     section: 'permission-gating',
     name: 'viewer-integrations-list',
-    path: AppRoute.Configuration.Integrations.Root,
+    path: routePaths.Configuration.Integrations.Root,
     role: 'viewer',
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
@@ -1025,7 +1023,7 @@ export const pages: PageEntry[] = [
   {
     section: 'permission-gating',
     name: 'viewer-settings',
-    path: AppRoute.SystemAdministration.Settings,
+    path: routePaths.SystemAdministration.Settings,
     role: 'viewer',
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible()
@@ -1034,7 +1032,7 @@ export const pages: PageEntry[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// Login page entries — pre-auth, not route-based (outside AppRoute.tsx)
+// Login page entries — pre-auth, outside the authenticated route tree
 // ---------------------------------------------------------------------------
 export const loginPages: PageEntry[] = [
   {
@@ -1093,22 +1091,21 @@ export const loginPages: PageEntry[] = [
 // Routes intentionally excluded from visual regression
 // ---------------------------------------------------------------------------
 
-/** Routes in AppRoute.tsx that have no implementation (placeholder/unimplemented) */
-export const excludedUnimplemented: string[] = [AppRoute.Dashboard, AppRoute.Configuration.Overview]
+/** Implemented routes that intentionally have no visual baseline. */
+export const excludedUnimplemented: string[] = [routePaths.Configuration.Overview]
 
 /** Routes excluded because they need dynamic setup or have no seeded mock data */
 export const excludedDynamic: string[] = [
-  AppRoute.FeatureFlagDemo, // Temporary direct-link demo route; no baseline required.
-  AppRoute.WorkflowBuilder.New,
-  AppRoute.SystemAdministration.Root,
-  AppRoute.SystemAdministration.Authentication.EditIdentityProvider, // covered by oidcProviderWizardPages
-  AppRoute.SystemAdministration.Authentication.IdentityProviderDetailTab, // covered by identity-provider-detail interactive entries
-  AppRoute.AccessManagement.Root,
-  AppRoute.Auth.TestSignInCallback,
-  AppRoute.AccessManagement.TransferIdentity, // covered by transferIdentityWizardPages (interactive entries)
-  AppRoute.AccessManagement.ServiceAccountDetailTab, // covered by detailTabPages (interactive entries)
-  AppRoute.MyProfile.Root, // covered via user detail component — My Profile is a wrapper
-  AppRoute.MyProfile.Tab, // tab variant of the above
+  routePaths.FeatureFlagDemo, // Temporary direct-link demo route; no baseline required.
+  routePaths.WorkflowBuilder.New,
+  routeRefs.editIdentityProviderRoute.fullPath, // covered by oidcProviderWizardPages
+  routeRefs.identityProviderUnknownTabRoute.fullPath, // covered by identity-provider-detail interactive entries
+  routePaths.AccessManagement.Root,
+  routePaths.Auth.TestSignInCallback,
+  routeRefs.transferIdentityRoute.fullPath, // covered by transferIdentityWizardPages (interactive entries)
+  routeRefs.serviceAccountDetailUnknownTabRoute.fullPath, // covered by detailTabPages (interactive entries)
+  routePaths.MyProfile.Root, // covered via user detail component — My Profile is a wrapper
+  routeRefs.myProfileTabRoute.fullPath, // tab variant of the above
 ]
 
 /** All excluded route patterns (union of both lists) */

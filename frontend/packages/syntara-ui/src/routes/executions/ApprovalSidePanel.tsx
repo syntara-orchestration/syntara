@@ -1,6 +1,7 @@
 import { Stack, StackItem } from '@patternfly/react-core'
 import type { Approval } from '@syntara/contracts'
 
+import type { AppRouteNavigationOptions } from '../../app/routeNavigationOptions'
 import { ApprovalNavigationHeader } from '../../components/ApprovalNavigationHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SidePanelHeader } from '../../components/SidePanelHeader'
@@ -19,8 +20,8 @@ type ApprovalSidePanelProps = Readonly<{
   onClose: () => void
   /** Called after a decision (approve/reject) is successfully submitted. Used to dismiss the panel and clean up state. */
   onDecisionSubmitted: () => void
-  /** Optional navigation handler for links within the panel (e.g. clicking the workflow name). Receives the target path. */
-  onNavigate?: (path: string) => void
+  /** Optional navigation handler for links within the panel (e.g. clicking the workflow name). */
+  onNavigate?: (destination: AppRouteNavigationOptions) => void
   /** Current approval index (0-based). Only shown when totalCount > 1. */
   currentIndex?: number
   /** Total number of pending approvals. Navigation controls only shown when > 1. */

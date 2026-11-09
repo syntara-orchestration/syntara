@@ -2,7 +2,11 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 
+import * as routeRefs from '../../app/routes/routeReferences'
+
 import { HistoryListItemLink } from './HistoryListItemLink'
+
+const executionDestination = { to: routeRefs.executionDetailRoute.fullPath, params: { executionId: 'execution-1' } }
 
 describe('HistoryListItemLink', () => {
   const onSelect = vi.fn()
@@ -12,20 +16,27 @@ describe('HistoryListItemLink', () => {
   })
 
   it('renders an anchor with the correct href', () => {
-    render(<HistoryListItemLink to="/foo/bar" onSelect={onSelect} aria-label="test link" />)
+    render(<HistoryListItemLink options={executionDestination} onSelect={onSelect} aria-label="test link" />)
 
     const link = screen.getByRole('link', { name: 'test link' })
-    expect(link).toHaveAttribute('href', '/foo/bar')
+    expect(link).toHaveAttribute('href', '/executions/execution-1')
   })
 
   it('applies the PF simple-list item-link class', () => {
-    render(<HistoryListItemLink to="/x" onSelect={onSelect} aria-label="link" />)
+    render(<HistoryListItemLink options={executionDestination} onSelect={onSelect} aria-label="link" />)
 
     expect(screen.getByRole('link')).toHaveClass('pf-v6-c-simple-list__item-link')
   })
 
   it('applies the PF simple-list item-link class with a row overlay className', () => {
-    render(<HistoryListItemLink to="/x" onSelect={onSelect} className="row-overlay" aria-label="link" />)
+    render(
+      <HistoryListItemLink
+        options={executionDestination}
+        onSelect={onSelect}
+        className="row-overlay"
+        aria-label="link"
+      />
+    )
 
     const link = screen.getByRole('link')
     expect(link).toHaveClass('pf-v6-c-simple-list__item-link')
@@ -33,7 +44,9 @@ describe('HistoryListItemLink', () => {
   })
 
   it('appends custom className', () => {
-    render(<HistoryListItemLink to="/x" onSelect={onSelect} className="my-extra" aria-label="link" />)
+    render(
+      <HistoryListItemLink options={executionDestination} onSelect={onSelect} className="my-extra" aria-label="link" />
+    )
 
     const link = screen.getByRole('link')
     expect(link).toHaveClass('pf-v6-c-simple-list__item-link')
@@ -41,7 +54,7 @@ describe('HistoryListItemLink', () => {
   })
 
   it('sets aria-current and pf-m-current when selected', () => {
-    render(<HistoryListItemLink to="/x" onSelect={onSelect} isSelected aria-label="link" />)
+    render(<HistoryListItemLink options={executionDestination} onSelect={onSelect} isSelected aria-label="link" />)
 
     const link = screen.getByRole('link')
     expect(link).toHaveAttribute('aria-current', 'page')
@@ -49,7 +62,7 @@ describe('HistoryListItemLink', () => {
   })
 
   it('omits aria-current and pf-m-current when not selected', () => {
-    render(<HistoryListItemLink to="/x" onSelect={onSelect} aria-label="link" />)
+    render(<HistoryListItemLink options={executionDestination} onSelect={onSelect} aria-label="link" />)
 
     const link = screen.getByRole('link')
     expect(link).not.toHaveAttribute('aria-current')
@@ -57,14 +70,16 @@ describe('HistoryListItemLink', () => {
   })
 
   it('sets data-item-id', () => {
-    render(<HistoryListItemLink to="/x" onSelect={onSelect} data-item-id="abc" aria-label="link" />)
+    render(
+      <HistoryListItemLink options={executionDestination} onSelect={onSelect} data-item-id="abc" aria-label="link" />
+    )
 
     expect(screen.getByRole('link')).toHaveAttribute('data-item-id', 'abc')
   })
 
   it('calls onSelect on unmodified click', async () => {
     const user = userEvent.setup()
-    render(<HistoryListItemLink to="/x" onSelect={onSelect} aria-label="link" />)
+    render(<HistoryListItemLink options={executionDestination} onSelect={onSelect} aria-label="link" />)
 
     await user.click(screen.getByRole('link'))
 
@@ -73,7 +88,7 @@ describe('HistoryListItemLink', () => {
 
   it('does not call onSelect on Ctrl+click', async () => {
     const user = userEvent.setup()
-    render(<HistoryListItemLink to="/x" onSelect={onSelect} aria-label="link" />)
+    render(<HistoryListItemLink options={executionDestination} onSelect={onSelect} aria-label="link" />)
 
     await user.keyboard('{Control>}')
     await user.click(screen.getByRole('link'))
@@ -84,7 +99,7 @@ describe('HistoryListItemLink', () => {
 
   it('does not call onSelect on Meta+click', async () => {
     const user = userEvent.setup()
-    render(<HistoryListItemLink to="/x" onSelect={onSelect} aria-label="link" />)
+    render(<HistoryListItemLink options={executionDestination} onSelect={onSelect} aria-label="link" />)
 
     await user.keyboard('{Meta>}')
     await user.click(screen.getByRole('link'))
@@ -95,7 +110,7 @@ describe('HistoryListItemLink', () => {
 
   it('renders children', () => {
     render(
-      <HistoryListItemLink to="/x" onSelect={onSelect} aria-label="link">
+      <HistoryListItemLink options={executionDestination} onSelect={onSelect} aria-label="link">
         <span>Row content</span>
       </HistoryListItemLink>
     )
@@ -106,7 +121,7 @@ describe('HistoryListItemLink', () => {
   it('has no accessibility violations', async () => {
     const { container } = render(
       <nav>
-        <HistoryListItemLink to="/x" onSelect={onSelect} aria-label="Test link" />
+        <HistoryListItemLink options={executionDestination} onSelect={onSelect} aria-label="Test link" />
       </nav>
     )
 
@@ -116,7 +131,7 @@ describe('HistoryListItemLink', () => {
   it('has no accessibility violations when selected', async () => {
     const { container } = render(
       <nav>
-        <HistoryListItemLink to="/x" onSelect={onSelect} isSelected aria-label="Selected link" />
+        <HistoryListItemLink options={executionDestination} onSelect={onSelect} isSelected aria-label="Selected link" />
       </nav>
     )
 

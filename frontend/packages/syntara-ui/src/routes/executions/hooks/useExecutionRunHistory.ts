@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { executionsClient } from '../../../client'
 import { useCursorPagination } from '../../../hooks/useCursorPagination'
 import { transformExecutionStatusFilter } from '../executionFilters'
@@ -22,7 +23,7 @@ export function useExecutionRunHistory(workflowId: string | undefined) {
 
   const executionsQuery = executionsClient.useQuery(
     'get',
-    '/executions',
+    routeRefs.executionsListRoute.fullPath,
     {
       params: { query: executionsQueryParams },
     },

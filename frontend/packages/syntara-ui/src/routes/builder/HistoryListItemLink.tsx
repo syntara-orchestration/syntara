@@ -1,8 +1,10 @@
 import { Link } from '@tanstack/react-router'
 import type { MouseEvent, ReactNode } from 'react'
 
+import type { AppRouteNavigationOptions } from '../../app/routeNavigationOptions'
+
 type HistoryListItemLinkProps = Readonly<{
-  to: string
+  options: AppRouteNavigationOptions
   isSelected?: boolean
   onSelect: () => void
   children?: ReactNode
@@ -21,7 +23,7 @@ function isModifiedClick(event: MouseEvent<HTMLAnchorElement>): boolean {
  * left-click still runs `onSelect`. SynLink is a PF Button, so it cannot be used here.
  */
 export function HistoryListItemLink({
-  to,
+  options,
   isSelected = false,
   onSelect,
   children,
@@ -34,8 +36,7 @@ export function HistoryListItemLink({
 
   return (
     <Link
-      // TanStack Router expects literal route strings; history hrefs are dynamic
-      to={to}
+      {...options}
       className={`pf-v6-c-simple-list__item-link${selectedClass}${extraClass}`.trim()}
       aria-current={isSelected ? 'page' : undefined}
       aria-label={ariaLabel}

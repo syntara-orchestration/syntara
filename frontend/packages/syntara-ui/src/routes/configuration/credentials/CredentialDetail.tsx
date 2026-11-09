@@ -7,10 +7,11 @@ import {
   RhUiTrashIcon,
 } from '@patternfly/react-icons'
 import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
-import { createContext, use, useMemo, useState } from 'react'
+import { createContext, use, useCallback, useMemo, useState } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsCredentialDetail, breadcrumbsCredentialEarlyShell } from '../../../app/breadcrumbBuilders'
+import * as routeRefs from '../../../app/routes/routeReferences'
+import { tanstackRouter } from '../../../app/tanstackRouter'
 import { credentialsClient } from '../../../client'
 import { SynDetail } from '../../../components/details/SynDetail'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
@@ -36,6 +37,7 @@ import { useDocLink } from '../../../utils/docs/useDocLink'
 import { ENCRYPTED_SENTINEL, type Credential } from './credentialConstants'
 import styles from './CredentialDetail.module.css'
 import { CredentialIntegrationsTab } from './CredentialIntegrationsTab'
+import { credentialTabOptions, type CredentialTab } from './credentialNavigation'
 import { CredentialWorkflowsTab } from './CredentialWorkflowsTab'
 import { DeleteCredentialDialog } from './DeleteCredentialDialog'
 import { DisableCredentialDialog } from './DisableCredentialDialog'
@@ -46,7 +48,6 @@ import { useCredentialPermissions } from './useCredentialPermissions'
 import { useDeleteCredentialState } from './useDeleteCredentialState'
 import { useDisableCredentialState } from './useDisableCredentialState'
 
-type CredentialTab = 'details' | 'workflows' | 'integrations'
 const ALL_CREDENTIAL_TABS: CredentialTab[] = ['details', 'workflows', 'integrations']
 const CREDENTIAL_TAB_PANEL_LABELS: Readonly<Record<CredentialTab, string>> = {
   details: 'Details',
@@ -225,7 +226,15 @@ export default function CredentialDetail() {
   const credentialsDocLink = useDocLink('credentials')
   const { credentialId }: { credentialId: string } = useParams({ strict: false })
   const navigate = useNavigate()
-  const credentialBasePath = AppRoute.Configuration.Credentials.Detail.replace(':credentialId', credentialId ?? '')
+  const credentialBasePath = tanstackRouter.buildLocation({
+    to: routeRefs.credentialDetailRoute.fullPath,
+    params: { credentialId: credentialId ?? '' },
+  }).href
+  const onTabChange = useCallback(
+    (tab: CredentialTab, options?: { replace?: boolean }) =>
+      detachPromise(navigate({ ...credentialTabOptions(credentialId ?? '', tab), ...options })),
+    [navigate, credentialId]
+  )
   const { canReadWorkflows, canReadIntegrations, isLoading: permissionsLoading } = useCredentialDetailPermissions()
 
   const validTabs = useMemo(
@@ -378,7 +387,7 @@ export default function CredentialDetail() {
     entityLabel: 'credential',
     getItemName: (cred) => cred.name,
     onSuccess: () => {
-      detachPromise(navigate({ to: AppRoute.Configuration.Credentials.Root }))
+      detachPromise(navigate({ to: routeRefs.credentialsRoute.fullPath }))
     },
     onSettled: closeDeleteDialog,
   })
@@ -476,6 +485,7 @@ export default function CredentialDetail() {
               basePath={credentialBasePath}
               defaultTab="details"
               validTabs={validTabs}
+              onTabChange={onTabChange}
               aria-label="Credential details"
               renderPanel={() => <Outlet />}
               routePanelLayout="detail"

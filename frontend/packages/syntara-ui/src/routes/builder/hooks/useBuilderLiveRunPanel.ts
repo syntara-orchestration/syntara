@@ -2,6 +2,7 @@ import { type ExecutionStatus, ExecutionStatusEnum } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useExecutionWebSocket } from '../../workflows/hooks/useExecutionWebSocket'
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
@@ -77,7 +78,7 @@ export function useBuilderLiveRunPanel({
       detachPromise(
         Promise.all([
           queryClient.invalidateQueries({ queryKey: ['get', '/executions/{execution_id}'] }),
-          queryClient.invalidateQueries({ queryKey: ['get', '/executions'] }),
+          queryClient.invalidateQueries({ queryKey: ['get', routeRefs.executionsListRoute.fullPath] }),
           queryClient.invalidateQueries({ queryKey: ['get', '/executions/{execution_id}/activities'] }),
         ])
       )

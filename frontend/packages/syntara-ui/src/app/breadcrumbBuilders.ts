@@ -1,5 +1,5 @@
-import { AppRoute } from './AppRoute'
 import type { AppBreadcrumbItem } from './breadcrumbs/appBreadcrumbItem'
+import * as routeRefs from './routes/routeReferences'
 
 const LABEL_ACCESS_MANAGEMENT = 'Access management'
 const LABEL_IDENTITY_PROVIDERS = 'Identity providers'
@@ -7,43 +7,43 @@ const LABEL_CONFIGURATION = 'Configuration'
 const LABEL_APPROVALS = 'Approvals'
 
 function crumbAccessManagement(): AppBreadcrumbItem {
-  return { label: LABEL_ACCESS_MANAGEMENT, href: AppRoute.AccessManagement.Root }
+  return { label: LABEL_ACCESS_MANAGEMENT, destination: { to: routeRefs.accessManagementRoute.fullPath } }
 }
 
 function crumbUsersList(): AppBreadcrumbItem {
-  return { label: 'Users', href: AppRoute.AccessManagement.Users }
+  return { label: 'Users', destination: { to: routeRefs.accessManagementUsersRoute.fullPath } }
 }
 
 function crumbGroupsList(): AppBreadcrumbItem {
-  return { label: 'Groups', href: AppRoute.AccessManagement.Groups }
+  return { label: 'Groups', destination: { to: routeRefs.accessManagementGroupsRoute.fullPath } }
 }
 
 function crumbProjectsList(): AppBreadcrumbItem {
-  return { label: 'Projects', href: AppRoute.AccessManagement.Projects }
+  return { label: 'Projects', destination: { to: routeRefs.accessManagementProjectsRoute.fullPath } }
 }
 
 function crumbIdentityProvidersList(): AppBreadcrumbItem {
-  return { label: LABEL_IDENTITY_PROVIDERS, href: AppRoute.SystemAdministration.Authentication.Root }
+  return { label: LABEL_IDENTITY_PROVIDERS, destination: { to: routeRefs.authenticationRootRoute.fullPath } }
 }
 
 function crumbConfiguration(): AppBreadcrumbItem {
-  return { label: LABEL_CONFIGURATION, href: AppRoute.Configuration.Overview }
+  return { label: LABEL_CONFIGURATION, destination: { to: routeRefs.configurationOverviewRoute.fullPath } }
 }
 
 function crumbIntegrations(): AppBreadcrumbItem {
-  return { label: 'Integrations', href: AppRoute.Configuration.Integrations.Root }
+  return { label: 'Integrations', destination: { to: routeRefs.integrationsRoute.fullPath } }
 }
 
 function crumbCredentials(): AppBreadcrumbItem {
-  return { label: 'Credentials', href: AppRoute.Configuration.Credentials.Root }
+  return { label: 'Credentials', destination: { to: routeRefs.credentialsRoute.fullPath } }
 }
 
 function crumbSettings(): AppBreadcrumbItem {
-  return { label: 'Settings', href: AppRoute.SystemAdministration.Settings }
+  return { label: 'Settings', destination: { to: routeRefs.settingsRoute.fullPath } }
 }
 
 function crumbApprovals(): AppBreadcrumbItem {
-  return { label: LABEL_APPROVALS, href: AppRoute.Approvals.Root }
+  return { label: LABEL_APPROVALS, destination: { to: routeRefs.approvalsRoute.fullPath } }
 }
 
 function projectDetailTabLabel(tab: string): string {
@@ -68,8 +68,13 @@ export function breadcrumbsCreateUser(): AppBreadcrumbItem[] {
   return [crumbAccessManagement(), crumbUsersList(), { label: 'Create user' }]
 }
 
-export function breadcrumbsEditUser(displayName: string, userBasePath: string): AppBreadcrumbItem[] {
-  return [crumbAccessManagement(), crumbUsersList(), { label: displayName, href: userBasePath }, { label: 'Edit user' }]
+export function breadcrumbsEditUser(displayName: string, userId: string): AppBreadcrumbItem[] {
+  return [
+    crumbAccessManagement(),
+    crumbUsersList(),
+    { label: displayName, destination: { to: routeRefs.userDetailRoute.fullPath, params: { userId } } },
+    { label: 'Edit user' },
+  ]
 }
 
 export function breadcrumbsUserDetail(displayName: string): AppBreadcrumbItem[] {
@@ -80,36 +85,48 @@ export function breadcrumbsGroupDetail(groupName: string): AppBreadcrumbItem[] {
   return [crumbAccessManagement(), crumbGroupsList(), { label: groupName }]
 }
 
-export function breadcrumbsProjectDetail(
-  projectName: string,
-  projectBasePath: string,
-  tab: string
-): AppBreadcrumbItem[] {
+export function breadcrumbsProjectDetail(projectName: string, projectId: string, tab: string): AppBreadcrumbItem[] {
   const prefix = [crumbAccessManagement(), crumbProjectsList()]
   if (tab === DEFAULT_ENTITY_TAB) {
     return [...prefix, { label: projectName }]
   }
-  return [...prefix, { label: projectName, href: projectBasePath }, { label: projectDetailTabLabel(tab) }]
+  return [
+    ...prefix,
+    { label: projectName, destination: { to: routeRefs.projectDetailRoute.fullPath, params: { projectId } } },
+    { label: projectDetailTabLabel(tab) },
+  ]
 }
 
 export function breadcrumbsIdentityProviderAdd(): AppBreadcrumbItem[] {
   return [crumbIdentityProvidersList(), { label: 'Add OIDC provider' }]
 }
 
-export function breadcrumbsIdentityProviderEdit(providerName: string, detailBasePath: string): AppBreadcrumbItem[] {
-  return [crumbIdentityProvidersList(), { label: providerName, href: detailBasePath }, { label: 'Edit OIDC provider' }]
+export function breadcrumbsIdentityProviderEdit(providerName: string, providerId: string): AppBreadcrumbItem[] {
+  return [
+    crumbIdentityProvidersList(),
+    {
+      label: providerName,
+      destination: { to: routeRefs.identityProviderDetailRoute.fullPath, params: { providerId } },
+    },
+    { label: 'Edit OIDC provider' },
+  ]
 }
 
 export function breadcrumbsIdentityProviderGroupMappingForm(
   providerName: string,
-  detailBasePath: string,
-  groupMappingTabPath: string,
+  providerId: string | undefined,
   formTitle: string
 ): AppBreadcrumbItem[] {
+  const detailDestination = providerId
+    ? { destination: { to: routeRefs.identityProviderDetailRoute.fullPath, params: { providerId } } }
+    : {}
+  const groupMappingDestination = providerId
+    ? { destination: { to: routeRefs.identityProviderGroupMappingRoute.fullPath, params: { providerId } } }
+    : {}
   return [
     crumbIdentityProvidersList(),
-    { label: providerName, href: detailBasePath },
-    { label: 'Group mapping', href: groupMappingTabPath },
+    { label: providerName, ...detailDestination },
+    { label: 'Group mapping', ...groupMappingDestination },
     { label: formTitle },
   ]
 }
@@ -135,11 +152,14 @@ export function breadcrumbsIntegrationDetailEarlyShell(): AppBreadcrumbItem[] {
   return [crumbConfiguration(), crumbIntegrations(), { label: 'Integration details' }]
 }
 
-export function breadcrumbsIntegrationEdit(integrationName: string, detailBasePath: string): AppBreadcrumbItem[] {
+export function breadcrumbsIntegrationEdit(integrationName: string, integrationId: string): AppBreadcrumbItem[] {
   return [
     crumbConfiguration(),
     crumbIntegrations(),
-    { label: integrationName, href: detailBasePath },
+    {
+      label: integrationName,
+      destination: { to: routeRefs.integrationDetailRoute.fullPath, params: { integrationId } },
+    },
     { label: 'Edit integration' },
   ]
 }
@@ -166,7 +186,7 @@ export function breadcrumbsUserDetailEarlyShell(): AppBreadcrumbItem[] {
 }
 
 function crumbServiceAccountsList(): AppBreadcrumbItem {
-  return { label: 'Service Accounts', href: AppRoute.AccessManagement.ServiceAccounts }
+  return { label: 'Service Accounts', destination: { to: routeRefs.accessManagementServiceAccountsRoute.fullPath } }
 }
 
 export function breadcrumbsServiceAccountDetail(name: string): AppBreadcrumbItem[] {

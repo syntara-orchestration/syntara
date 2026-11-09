@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 
+import { breadcrumbTestRoutes } from '../../test/breadcrumbTestRoutes'
+
 import { SynPageBreadcrumbs } from './SynPageBreadcrumbs'
 
 const meta: Meta<typeof SynPageBreadcrumbs> = {
@@ -26,8 +28,8 @@ export const ThreeItems: Story = {
   },
   args: {
     items: [
-      { label: 'Access management', href: '/access-management' },
-      { label: 'Users', href: '/access-management/users' },
+      { label: 'Access management', destination: breadcrumbTestRoutes.accessManagement },
+      { label: 'Users', destination: breadcrumbTestRoutes.users },
       { label: 'Create user' },
     ],
   },
@@ -38,7 +40,7 @@ export const TwoItems: Story = {
     docs: { description: { story: 'Minimum visible trail — one parent link and the current page label.' } },
   },
   args: {
-    items: [{ label: 'Access management', href: '/access-management' }, { label: 'Users' }],
+    items: [{ label: 'Access management', destination: breadcrumbTestRoutes.accessManagement }, { label: 'Users' }],
   },
 }
 
@@ -49,7 +51,7 @@ export const SingleItemHidden: Story = {
     },
   },
   args: {
-    items: [{ label: 'Access management', href: '/access-management' }],
+    items: [{ label: 'Access management', destination: breadcrumbTestRoutes.accessManagement }],
   },
 }
 
@@ -63,10 +65,10 @@ export const ManyItems: Story = {
   },
   args: {
     items: [
-      { label: 'Settings', href: '/settings' },
-      { label: 'Infrastructure', href: '/settings/infrastructure' },
-      { label: 'Clusters', href: '/settings/infrastructure/clusters' },
-      { label: 'Regions', href: '/settings/infrastructure/clusters/regions' },
+      { label: 'Settings', destination: breadcrumbTestRoutes.settings },
+      { label: 'Infrastructure', destination: breadcrumbTestRoutes.settingsCategory() },
+      { label: 'Clusters', destination: breadcrumbTestRoutes.settingsCategory() },
+      { label: 'Regions', destination: breadcrumbTestRoutes.settingsCategory() },
       { label: 'Add region' },
     ],
   },

@@ -13,8 +13,8 @@ import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useCallback, useState } from 'react'
 import { useWatch, type UseFormTrigger } from 'react-hook-form'
 
-import { AppRoute } from '../../../../app/AppRoute'
 import { breadcrumbsIntegrationConfigure } from '../../../../app/breadcrumbBuilders'
+import * as routeRefs from '../../../../app/routes/routeReferences'
 import { tanstackRouter } from '../../../../app/tanstackRouter'
 import { integrationsClient } from '../../../../client'
 import { SynForm } from '../../../../components/forms/SynForm'
@@ -129,7 +129,7 @@ function WizardNavFooter({
             <Button
               variant="link"
               onClick={() => {
-                detachPromise(tanstackRouter.navigate({ to: AppRoute.Configuration.Integrations.Root }))
+                detachPromise(tanstackRouter.navigate({ to: routeRefs.integrationsRoute.fullPath }))
               }}
             >
               Cancel

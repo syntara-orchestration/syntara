@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { AppRoute } from '../AppRoute'
-
 import { configurationRoutes } from './configuration'
+import * as routeRefs from './routeReferences'
 
 describe('configurationRoutes', () => {
   // The redirect route is always first in the array
@@ -10,7 +9,7 @@ describe('configurationRoutes', () => {
   const redirectRouteOpts = redirectRoute.options as { path?: string; beforeLoad?: () => unknown }
 
   it('has a route registered for /configuration', () => {
-    expect(redirectRouteOpts.path).toBe(AppRoute.Configuration.Overview)
+    expect(redirectRouteOpts.path).toBe(routeRefs.configurationOverviewRoute.fullPath)
   })
 
   it('/configuration beforeLoad returns a redirect to /configuration/integrations with replace', () => {
@@ -19,7 +18,7 @@ describe('configurationRoutes', () => {
     const result = redirectRouteOpts.beforeLoad?.() as { options: { to: string; replace: boolean } }
 
     expect(result?.options).toMatchObject({
-      to: AppRoute.Configuration.Integrations.Root,
+      to: routeRefs.integrationsRoute.fullPath,
       replace: true,
     })
   })

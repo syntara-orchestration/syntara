@@ -182,6 +182,20 @@ class RouteGraph {
     return calls
   }
 
+  exportedRoutePaths(file: string): Record<string, string> {
+    const moduleSymbol = this.checker.getSymbolAtLocation(this.source(file))
+    if (!moduleSymbol) throw new Error(`Could not resolve route reference module ${file}`)
+    const result: Record<string, string> = {}
+    for (const exported of this.checker.getExportsOfModule(moduleSymbol)) {
+      const target = exported.flags & ts.SymbolFlags.Alias ? this.checker.getAliasedSymbol(exported) : exported
+      const declaration = target.valueDeclaration
+      if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer) continue
+      const route = this.route(declaration.initializer)
+      result[exported.name] = this.path(route)
+    }
+    return result
+  }
+
   parseSource(): ParsedCreateRoute[] {
     return this.declarations(this.entryFile).flatMap((call) => this.parsed(call) ?? [])
   }
@@ -246,4 +260,10 @@ export function collectRouteGraph(routesDir: string, treeSource: string, readRed
     .map((file) => relative(routesDir, file))
     .sort()
   return { routes, unmountedRouteFiles }
+}
+
+export function collectExportedRoutePaths(routesDir: string, treeSource: string, referenceFile: string) {
+  const files = routeFiles(resolve(routesDir))
+  const entryFile = resolve(routesDir, '../tanstackRouteTree.tsx')
+  return new RouteGraph(entryFile, treeSource, files, () => undefined).exportedRoutePaths(resolve(referenceFile))
 }

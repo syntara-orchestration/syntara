@@ -10,9 +10,9 @@ import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { AppRoute } from '../app/AppRoute'
 import type { AppRouterContext } from '../app/routes/__root'
 import { guardFeatureFlagDemoRoute } from '../app/routes/feature-flag-demo'
+import * as routeRefs from '../app/routes/routeReferences'
 import { FeatureFlagDemo } from '../routes/feature-flags/feature-flag-demo-page'
 
 import { toFeatureFlagKey } from './feature-flags'
@@ -23,18 +23,18 @@ function createFeatureFlagRouter() {
   const rootRoute = createRootRouteWithContext<AppRouterContext>()({ component: Outlet })
   const fallbackRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: AppRoute.Workflows.Root,
+    path: routeRefs.workflowsRoute.fullPath,
     component: () => <h1>Workflows</h1>,
   })
   const featureRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: AppRoute.FeatureFlagDemo,
+    path: routeRefs.featureFlagDemoRoute.fullPath,
     beforeLoad: guardFeatureFlagDemoRoute,
     component: FeatureFlagDemo,
   })
   const router = createRouter({
     routeTree: rootRoute.addChildren([fallbackRoute, featureRoute]),
-    history: createMemoryHistory({ initialEntries: [AppRoute.FeatureFlagDemo] }),
+    history: createMemoryHistory({ initialEntries: [routeRefs.featureFlagDemoRoute.fullPath] }),
     context: { featureFlags: {} },
     defaultPendingMinMs: 0,
   })

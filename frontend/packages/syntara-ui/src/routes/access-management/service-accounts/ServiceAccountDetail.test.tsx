@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { AppRoute } from '../../../app/AppRoute'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { AlertProvider } from '../../../providers/alerts'
 import { routerTestState } from '../../../test/setup'
 import { accessClient } from '../../access/accessClient'
@@ -394,7 +394,9 @@ describe('ServiceAccountDetail', () => {
     await user.click(ackCheckbox)
     await user.click(screen.getByRole('button', { name: 'Delete service account' }))
     expect(mockDeleteMutate).toHaveBeenCalled()
-    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.AccessManagement.ServiceAccounts })
+    expect(routerTestState.navigate).toHaveBeenCalledWith({
+      to: routeRefs.accessManagementServiceAccountsRoute.fullPath,
+    })
   })
 
   it('renders loading state while query is pending', () => {

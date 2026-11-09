@@ -4,7 +4,7 @@ import { useNavigate, useParams, useRouterState } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
 
-import { AppRoute } from '../../../../app/AppRoute'
+import * as routeRefs from '../../../../app/routes/routeReferences'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
@@ -61,8 +61,7 @@ export function EditGroupMapping() {
     detachPromise(Promise.resolve(openTestSignInRef.current()))
   }, [metadata.openDiscoverOnMount, metadata.isReady, canUpdate])
 
-  const navigateToAuthentication = () =>
-    detachPromise(navigate({ to: AppRoute.SystemAdministration.Authentication.Root }))
+  const navigateToAuthentication = () => detachPromise(navigate({ to: routeRefs.authenticationRootRoute.fullPath }))
 
   if (!metadata.isValidId) {
     return (

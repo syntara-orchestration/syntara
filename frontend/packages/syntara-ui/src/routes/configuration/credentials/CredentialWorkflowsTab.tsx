@@ -3,7 +3,7 @@ import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ExecutionsAPI } from '@syntara/contracts'
 import { useMemo } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { credentialsClient } from '../../../client'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
@@ -35,8 +35,8 @@ function isExecutionStatus(status: string): status is ExecutionStatus {
   return Object.hasOwn(executionStatusDisplayLabels, status)
 }
 
-function workflowHref(workflowId: string): string {
-  return AppRoute.WorkflowBuilder.Edit.replace(':workflowId', workflowId)
+function workflowOptions(workflowId: string) {
+  return { to: routeRefs.builderEditRoute.fullPath, params: { workflowId } } as const
 }
 
 function WorkflowsTable({
@@ -89,7 +89,7 @@ function WorkflowsTable({
                 }
               />
               <Td dataLabel="Workflow name">
-                <LinkCell href={workflowHref(workflow.id)}>
+                <LinkCell options={workflowOptions(workflow.id)}>
                   <Truncate content={workflow.name} />
                 </LinkCell>
               </Td>

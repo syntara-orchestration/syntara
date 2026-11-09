@@ -494,7 +494,7 @@ describe('SynListPanelTabs', () => {
   it('renders tab bar with the correct tabs', async () => {
     withRouter(
       <SynListPanel>
-        <SynListPanelTabs basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
+        <SynListPanelTabs onTabChange={() => {}} basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
           <Tab eventKey="members" title="Members" />
           <Tab eventKey="roles" title="Roles" />
         </SynListPanelTabs>
@@ -509,7 +509,7 @@ describe('SynListPanelTabs', () => {
   it('activates the tab that matches the URL', async () => {
     withRouter(
       <SynListPanel>
-        <SynListPanelTabs basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
+        <SynListPanelTabs onTabChange={() => {}} basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
           <Tab eventKey="members" title="Members" />
           <Tab eventKey="roles" title="Roles" />
         </SynListPanelTabs>
@@ -523,7 +523,7 @@ describe('SynListPanelTabs', () => {
   it('tab aria-controls targets the matching tabpanel id', async () => {
     withRouter(
       <SynListPanel>
-        <SynListPanelTabs basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
+        <SynListPanelTabs onTabChange={() => {}} basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
           <Tab eventKey="members" title="Members" />
           <Tab eventKey="roles" title="Roles" />
         </SynListPanelTabs>
@@ -546,7 +546,7 @@ describe('SynListPanelTabs', () => {
   it('has no accessibility violations', async () => {
     const { container } = withRouter(
       <SynListPanel>
-        <SynListPanelTabs basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
+        <SynListPanelTabs onTabChange={() => {}} basePath="/group/tabs" defaultTab="members" aria-label="Group tabs">
           <Tab eventKey="members" title="Members" />
           <Tab eventKey="roles" title="Roles" />
         </SynListPanelTabs>

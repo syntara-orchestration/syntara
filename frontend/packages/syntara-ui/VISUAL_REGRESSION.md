@@ -128,7 +128,7 @@ The branch name is fixed and reused week to week: if last Monday's PR is still o
 
 ### Flow 1: Adding a New Page
 
-1. Add your route to `AppRoute.tsx`
+1. Declare the route with `createRoute` in `src/app/routes/`, add it to the route tree, and export it from `src/app/routes/routeReferences.ts` if other modules need to reference it.
 2. Add an entry to `e2e/visual-regression/page-registry.ts`:
    ```typescript
    {
@@ -157,7 +157,7 @@ Baseline regeneration uses `--update-snapshots=all` so even sub-threshold diffs
 
 ### Flow 3: Removing a Page
 
-1. Remove the route from `AppRoute.tsx`
+1. Remove the route from its route module and the mounted route tree.
 2. Remove the entry from `page-registry.ts`
 3. Delete the baseline PNG files from `e2e/visual-regression/page-screenshots.spec.ts-snapshots/`
 

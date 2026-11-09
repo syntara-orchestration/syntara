@@ -5,6 +5,8 @@ import { useNavigate } from '@tanstack/react-router'
 import { useReactFlow, useNodesInitialized } from '@xyflow/react'
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 
+import type { AppRouteNavigationOptions } from '../../app/routeNavigationOptions'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { useUnsavedChanges } from '../../app/useUnsavedChanges'
 import { executionsClient, workflowClient } from '../../client'
 import { SynLabel } from '../../components/labels/SynLabel'
@@ -74,15 +76,15 @@ export function BuilderContent(props: BuilderContentProps) {
   const isWorkflowBuilderQolEnabled = useFeatureFlag('workflow_builder_qol')
   const navigate = useNavigate()
   const setLocation = useCallback(
-    (to: string) => {
-      detachPromise(navigate({ to }))
+    (destination: AppRouteNavigationOptions) => {
+      detachPromise(navigate(destination))
     },
     [navigate]
   )
   const [searchParams, setSearchParams] = useSearchParams()
   const { showAlert, showSuccess, showWarning, showError } = useAlerts()
   const [saveAttemptedWithoutProject, setSaveAttemptedWithoutProject] = useState(false)
-  const [pendingDuplicateNavigation, setPendingDuplicateNavigation] = useState<string | null>(null)
+  const [pendingDuplicateNavigation, setPendingDuplicateNavigation] = useState<AppRouteNavigationOptions | null>(null)
   const { selectedProject, stableProjectId, ProjectSelector } = useProjectSelector({
     requireProject: isNew,
     initialProjectId: isNew ? undefined : (workflow?.project_id ?? undefined),
@@ -107,7 +109,12 @@ export function BuilderContent(props: BuilderContentProps) {
   } = useWorkflowStore()
   const { registerSaveHandler, unregisterSaveHandler, requestNavigation } = useUnsavedChanges()
   const handleExecutionNavigate = useCallback(
-    (id: string) => requestNavigation(`/executions/${id}?history=open`),
+    (id: string) =>
+      requestNavigation({
+        to: routeRefs.executionDetailRoute.fullPath,
+        params: { executionId: id },
+        search: { history: 'open' },
+      }),
     [requestNavigation]
   )
 
@@ -209,7 +216,7 @@ export function BuilderContent(props: BuilderContentProps) {
     'patch',
     '/workflows/{workflow_id}'
   )
-  const { mutate: executeWorkflow } = executionsClient.useMutation('post', '/executions')
+  const { mutate: executeWorkflow } = executionsClient.useMutation('post', routeRefs.executionsListRoute.fullPath)
   const { mutate: deleteWorkflow, isPending: isDeleting } = workflowClient.useMutation(
     'delete',
     '/workflows/{workflow_id}'
@@ -416,9 +423,12 @@ export function BuilderContent(props: BuilderContentProps) {
                     // those edits won't trigger the dialog. This is acceptable - the timing
                     // window is too small to be a practical concern.
                     if (useWorkflowStore.getState().isDirty) {
-                      setPendingDuplicateNavigation(`/workflow-builder/${created.id}`)
+                      setPendingDuplicateNavigation({
+                        to: routeRefs.builderEditRoute.fullPath,
+                        params: { workflowId: created.id },
+                      })
                     } else {
-                      setLocation(`/workflow-builder/${created.id}`)
+                      setLocation({ to: routeRefs.builderEditRoute.fullPath, params: { workflowId: created.id } })
                     }
                   }}
                 >
@@ -476,12 +486,12 @@ export function BuilderContent(props: BuilderContentProps) {
   }, [currentWorkflow, workflowName, workflowDescription, executeDuplicateWorkflow, showError])
 
   const handleSaveBeforeDuplicateNavigation = useCallback(async (): Promise<boolean> => {
-    const destinationPath = pendingDuplicateNavigation
+    const destination = pendingDuplicateNavigation
     const saved = await guardedSaveWorkflow()
     if (saved) {
       setPendingDuplicateNavigation(null)
-      if (destinationPath) {
-        setLocation(destinationPath)
+      if (destination) {
+        setLocation(destination)
       }
     }
     return saved

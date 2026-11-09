@@ -7,7 +7,7 @@ import { excludeAuthenticatedGroup } from '../../adminConstants'
 
 import { EmptyMappingState, ReadOnlyView } from './GroupMappingComponents'
 import { toFormEntries, type GroupMappingConfig } from './groupMappingUtils'
-import { identityProviderGroupMappingEditPath } from './identityProviderPaths'
+import { identityProviderGroupMappingEditOptions } from './identityProviderPaths'
 
 type GroupMappingTabProps = {
   providerId: string
@@ -24,16 +24,15 @@ export function GroupMappingTab({ providerId, groupMapping, readOnly = false }: 
   const entries = useMemo(() => toFormEntries(groupMapping), [groupMapping])
   const hasEntries = entries.length > 0
 
-  const navigateToEdit = (search?: string) => {
-    const path = identityProviderGroupMappingEditPath(providerId)
-    detachPromise(navigate({ to: search ? `${path}?${search}` : path }))
+  const navigateToEdit = (search?: 'discover' | 'new') => {
+    detachPromise(navigate(identityProviderGroupMappingEditOptions(providerId, search)))
   }
 
   if (!hasEntries) {
     return (
       <EmptyMappingState
-        onTestSignIn={readOnly ? undefined : () => navigateToEdit('discover=1')}
-        onAddManually={readOnly ? undefined : () => navigateToEdit('new=1')}
+        onTestSignIn={readOnly ? undefined : () => navigateToEdit('discover')}
+        onAddManually={readOnly ? undefined : () => navigateToEdit('new')}
       />
     )
   }

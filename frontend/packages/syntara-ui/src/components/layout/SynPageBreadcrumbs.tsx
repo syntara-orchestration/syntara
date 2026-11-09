@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router'
 import { useSyncExternalStore } from 'react'
 
 import type { AppBreadcrumbItem } from '../../app/breadcrumbs/appBreadcrumbItem'
+import type { AppRouteNavigationOptions } from '../../app/routeNavigationOptions'
 
 import styles from './SynPageBreadcrumbs.module.css'
 import { SynPageBreadcrumbsCollapsedMiddle } from './SynPageBreadcrumbsCollapsedMiddle'
@@ -33,10 +34,9 @@ function BreadcrumbTruncatedLabel({
   )
 }
 
-function renderBreadcrumbLink(href: string, label: string) {
+function renderBreadcrumbLink(destination: AppRouteNavigationOptions, label: string) {
   return ({ className, ariaCurrent }: BreadcrumbItemRenderArgs) => (
-    // TanStack Router expects literal route strings; breadcrumb hrefs are dynamic
-    <Link to={href} className={`${className ?? ''} ${styles.segmentLink}`} aria-current={ariaCurrent}>
+    <Link {...destination} className={`${className ?? ''} ${styles.segmentLink}`} aria-current={ariaCurrent}>
       <BreadcrumbTruncatedLabel label={label} />
     </Link>
   )
@@ -93,8 +93,8 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
     <Breadcrumb aria-label="Breadcrumb" className={styles.breadcrumb}>
       {collapseMiddle ? (
         <>
-          {first.href ? (
-            <BreadcrumbItem render={renderBreadcrumbLink(first.href, first.label)} />
+          {first.destination ? (
+            <BreadcrumbItem render={renderBreadcrumbLink(first.destination, first.label)} />
           ) : (
             <BreadcrumbItem isActive>{first.label}</BreadcrumbItem>
           )}
@@ -106,7 +106,7 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
       ) : (
         items.map((item, index) => {
           const isLast = index === lastIndex
-          const itemKey = item.href ?? `current:${item.label}`
+          const itemKey = item.destination ? JSON.stringify(item.destination) : `current:${item.label}`
           if (isLast) {
             return (
               <BreadcrumbItem key={itemKey} isActive>
@@ -114,8 +114,8 @@ export function SynPageBreadcrumbs(props: SynPageBreadcrumbsProps) {
               </BreadcrumbItem>
             )
           }
-          if (item.href) {
-            return <BreadcrumbItem key={item.href} render={renderBreadcrumbLink(item.href, item.label)} />
+          if (item.destination) {
+            return <BreadcrumbItem key={itemKey} render={renderBreadcrumbLink(item.destination, item.label)} />
           }
           return (
             <BreadcrumbItem key={itemKey} isActive>

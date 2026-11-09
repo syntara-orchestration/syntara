@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { breadcrumbTestRoutes } from '../../test/breadcrumbTestRoutes'
+
 import { SynPageHeader } from './SynPageHeader'
 
 beforeEach(() => {
@@ -70,8 +72,8 @@ describe('SynPageHeader', () => {
       <SynPageHeader
         title="Create user"
         breadcrumbs={[
-          { label: 'Access management', href: '/system-administration/access-management' },
-          { label: 'Users', href: '/system-administration/access-management/users' },
+          { label: 'Access management', destination: breadcrumbTestRoutes.accessManagement },
+          { label: 'Users', destination: breadcrumbTestRoutes.users },
           { label: 'Create user' },
         ]}
       />
@@ -107,8 +109,8 @@ describe('SynPageHeader', () => {
         title={longTitle}
         docLink="https://docs.example.com/integrations"
         breadcrumbs={[
-          { label: 'Configuration', href: '/configuration' },
-          { label: 'Integrations', href: '/configuration/integrations' },
+          { label: 'Configuration', destination: breadcrumbTestRoutes.configuration },
+          { label: 'Integrations', destination: breadcrumbTestRoutes.integrations },
           { label: longTitle },
         ]}
         toolbar={
@@ -133,8 +135,8 @@ describe('SynPageHeader', () => {
       <SynPageHeader
         title="Settings"
         breadcrumbs={[
-          { label: 'Configuration', href: '/configuration/integrations' },
-          { label: 'Settings', href: '/system-administration/settings' },
+          { label: 'Configuration', destination: breadcrumbTestRoutes.integrations },
+          { label: 'Settings', destination: breadcrumbTestRoutes.settings },
           { label: 'System' },
         ]}
       />

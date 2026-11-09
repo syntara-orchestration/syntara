@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { AppRoute } from '../../app/AppRoute'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { IconLabel } from '../../components/IconLabel'
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
 import { ProjectGroupHeaderRow } from '../../components/ProjectGroupHeaderRow'
@@ -29,7 +29,6 @@ import { useIsCurrentVersion } from './hooks/useIsCurrentVersion'
 import { RetryExecutionDialog } from './RetryExecutionDialog'
 import { useCancelExecution } from './useCancelExecution'
 import { useRetryExecution } from './useRetryExecution'
-
 type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
 
 type Execution = {
@@ -77,7 +76,7 @@ function ExecutionRowActions({
   } = useIsCurrentVersion(execution.workflow_id, execution.workflow_version_id, retryDialogOpen)
   const retry = useRetryExecution(execution.id, (newId) => {
     setRetryDialogOpen(false)
-    detachPromise(navigate({ to: AppRoute.Executions.Execution.replace(':executionId', newId) }))
+    detachPromise(navigate({ to: routeRefs.executionDetailRoute.fullPath, params: { executionId: newId } }))
   })
   const cancel = useCancelExecution(execution.id)
   /* v8 ignore stop */
@@ -88,7 +87,7 @@ function ExecutionRowActions({
       detachPromise(
         Promise.all([
           queryClient.invalidateQueries({ queryKey: ['get', '/executions/{execution_id}'] }),
-          queryClient.invalidateQueries({ queryKey: ['get', '/executions'] }),
+          queryClient.invalidateQueries({ queryKey: ['get', routeRefs.executionsListRoute.fullPath] }),
         ])
       )
     },
@@ -167,7 +166,9 @@ function ExecutionRow({ execution }: Readonly<ExecutionRowProps>) {
       {/* v8 ignore stop */}
       <Td dataLabel="Workflow name">
         {execution.workflow_id ? (
-          <LinkCell href={`/workflow-builder/${execution.workflow_id}`}>
+          <LinkCell
+            options={{ to: routeRefs.builderEditRoute.fullPath, params: { workflowId: execution.workflow_id } }}
+          >
             <Truncate content={execution.workflow_name ?? execution.workflow_id} />
           </LinkCell>
         ) : (
@@ -190,7 +191,13 @@ function ExecutionRow({ execution }: Readonly<ExecutionRowProps>) {
       </Td>
       <Td dataLabel="Version">
         {execution.workflow_version != null && execution.workflow_id ? (
-          <LinkCell href={`/workflow-builder/${execution.workflow_id}?version=${String(execution.workflow_version)}`}>
+          <LinkCell
+            options={{
+              to: routeRefs.builderEditRoute.fullPath,
+              params: { workflowId: execution.workflow_id },
+              search: { version: String(execution.workflow_version) },
+            }}
+          >
             {execution.workflow_version_name ? (
               <Truncate content={execution.workflow_version_name} />
             ) : (

@@ -3,11 +3,12 @@ import { RhUiCheckCircleIcon, RhUiEditIcon, RhUiMinusCircleIcon, RhUiTrashIcon }
 import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
 import { createContext, use, useCallback, useMemo } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
 import {
   breadcrumbsServiceAccountDetail,
   breadcrumbsServiceAccountDetailEarlyShell,
 } from '../../../app/breadcrumbBuilders'
+import * as routeRefs from '../../../app/routes/routeReferences'
+import { tanstackRouter } from '../../../app/tanstackRouter'
 import { SynDetail } from '../../../components/details/SynDetail'
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
@@ -27,7 +28,7 @@ import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { accessClient } from '../../access/accessClient'
-import { getProjectDetailPath } from '../accessManagementPaths'
+import { getProjectDetailOptions } from '../accessManagementPaths'
 import { DetailPageShell } from '../DetailPageShell'
 import { RoleAssignmentsPanel } from '../RoleAssignmentsPanel'
 import { RolePrincipalType } from '../RoleAssignmentTypes'
@@ -44,7 +45,7 @@ function DetailsTab({ serviceAccount }: Readonly<{ serviceAccount: ServiceAccoun
       <SynDetail label="Name">{serviceAccount.name}</SynDetail>
       <SynDetail label="Owning project">
         {serviceAccount.project_name ? (
-          <SynLink to={getProjectDetailPath(serviceAccount.project_id)}>{serviceAccount.project_name}</SynLink>
+          <SynLink options={getProjectDetailOptions(serviceAccount.project_id)}>{serviceAccount.project_name}</SynLink>
         ) : (
           serviceAccount.project_id
         )}
@@ -197,7 +198,10 @@ export function ServiceAccountDetailUnknownTabRoute() {
 export function ServiceAccountDetail() {
   const { serviceAccountId }: { serviceAccountId: string } = useParams({ strict: false })
   const navigate = useNavigate()
-  const basePath = AppRoute.AccessManagement.ServiceAccountDetail.replace(':serviceAccountId', serviceAccountId ?? '')
+  const basePath = tanstackRouter.buildLocation({
+    to: routeRefs.serviceAccountDetailRoute.fullPath,
+    params: { serviceAccountId: serviceAccountId ?? '' },
+  }).href
   const docLink = useDocLink('serviceAccounts')
   const editDialog = useDialogState()
   const deleteDialog = useDialogState()
@@ -216,8 +220,26 @@ export function ServiceAccountDetail() {
   })
   const refetchSa = saQuery.refetch
 
+  const onTabChange = useCallback(
+    (tab: ServiceAccountTab, options?: { replace?: boolean }) => {
+      const params = { serviceAccountId: serviceAccountId ?? '' }
+      switch (tab) {
+        case 'details':
+          detachPromise(navigate({ to: routeRefs.serviceAccountDetailDetailsRoute.fullPath, params, ...options }))
+          break
+        case 'credentials':
+          detachPromise(navigate({ to: routeRefs.serviceAccountDetailCredentialsRoute.fullPath, params, ...options }))
+          break
+        case 'assignments':
+          detachPromise(navigate({ to: routeRefs.serviceAccountDetailAssignmentsRoute.fullPath, params, ...options }))
+          break
+      }
+    },
+    [navigate, serviceAccountId]
+  )
+
   const navigateBack = useCallback(
-    () => detachPromise(navigate({ to: AppRoute.AccessManagement.ServiceAccounts })),
+    () => detachPromise(navigate({ to: routeRefs.accessManagementServiceAccountsRoute.fullPath })),
     [navigate]
   )
 
@@ -331,6 +353,7 @@ export function ServiceAccountDetail() {
             basePath={basePath}
             defaultTab="details"
             validTabs={VALID_TABS}
+            onTabChange={onTabChange}
             aria-label="Service account details"
           >
             <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />

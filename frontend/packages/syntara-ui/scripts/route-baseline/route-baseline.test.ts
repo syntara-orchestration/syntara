@@ -4,8 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { SOURCE_PARITY_EXCEPTIONS, buildRouteManifest } from './build-route-manifest'
-import { collectAppRoutePaths } from './collect-routes'
+import { buildRouteManifest } from './build-route-manifest'
 import { getManifestPath, readCommittedManifest, writeManifest } from './manifest-io'
 import { ROUTE_MANIFEST_COMMENT_KEY, ROUTE_MANIFEST_NOTICE, type RouteManifest } from './route-manifest-schema'
 import { checkRouteBaseline, updateRouteBaseline } from './run-route-baseline'
@@ -37,17 +36,6 @@ describe('route baseline tooling', () => {
     }
     return toPkgRoot
   }
-
-  it('keeps SOURCE_PARITY_EXCEPTIONS limited to documented non-manifest gaps', () => {
-    const pkgRoot = makeFixturePackageRoot()
-    const { manifest } = buildRouteManifest({ pkgRoot })
-
-    expect(SOURCE_PARITY_EXCEPTIONS.has('/auth/test-signin-callback')).toBe(false)
-    expect(SOURCE_PARITY_EXCEPTIONS.has('/dashboard')).toBe(true)
-    for (const template of SOURCE_PARITY_EXCEPTIONS) {
-      expect(manifest.routes.some((route) => route.template === template)).toBe(false)
-    }
-  })
 
   it('round-trips a generated manifest through writeManifest and readCommittedManifest', () => {
     const pkgRoot = makeFixturePackageRoot()
@@ -83,16 +71,15 @@ describe('route baseline tooling', () => {
     expect(result.messages.some((line) => line.includes('Next steps:'))).toBe(true)
   })
 
-  it('checkRouteBaseline fails when App.tsx escape hatch path changes', { timeout: updateBaselineTimeout }, () => {
+  it('checkRouteBaseline fails when the app-level callback path changes', { timeout: updateBaselineTimeout }, () => {
     const tempRoot = makeFixturePackageRoot()
     updateRouteBaseline(tempRoot)
 
-    const appPath = join(tempRoot, 'src/app/App.tsx')
-    const appSource = readFileSync(appPath, 'utf-8').replace(
-      'AppRoute.Auth.TestSignInCallback',
-      "'/auth/moved-callback'"
+    const pathFile = join(tempRoot, 'src/app/routes/appLevelPaths.ts')
+    writeFileSync(
+      pathFile,
+      readFileSync(pathFile, 'utf-8').replace('/auth/test-signin-callback', '/auth/moved-callback')
     )
-    writeFileSync(appPath, appSource)
 
     const result = checkRouteBaseline(tempRoot)
     expect(result.ok).toBe(false)
@@ -132,18 +119,16 @@ export const orphanRoutes = [
     expect(result.messages.some((line) => line.includes('Unmounted route modules'))).toBe(true)
   })
 
-  it('updateRouteBaseline refuses to write when parity gaps remain', { timeout: updateBaselineTimeout }, () => {
-    const tempRoot = makeFixturePackageRoot()
-
-    const appRoutePath = join(tempRoot, 'src/app/AppRoute.tsx')
-    writeFileSync(
-      appRoutePath,
-      `${readFileSync(appRoutePath, 'utf-8')}\nexport const ExtraOnlyInAppRoute = '/parity-gap-only'\n`
-    )
-
-    // collectAppRoutePaths scrapes all '/...' literals in AppRoute source.
-    expect(() => updateRouteBaseline(tempRoot)).toThrow(/Refusing to update route baseline/)
-  })
+  it(
+    'updateRouteBaseline refuses to write when a navigation route reference is unresolved',
+    { timeout: updateBaselineTimeout },
+    () => {
+      const tempRoot = makeFixturePackageRoot()
+      const refsPath = join(tempRoot, 'src/app/routes/routeReferences.ts')
+      writeFileSync(refsPath, `export { missingRoute as workflowsRoute } from './workflows'\n`)
+      expect(() => updateRouteBaseline(tempRoot)).toThrow(/Could not resolve routeRefs\.workflowsRoute\.fullPath/)
+    }
+  )
 
   it(
     'updateRouteBaseline writes a manifest that checkRouteBaseline accepts',
@@ -173,13 +158,6 @@ export const orphanRoutes = [
     expect(templates).toStrictEqual([...templates].sort((a, b) => a.localeCompare(b)))
     expect(new Set(templates).size).toBe(templates.length)
   })
-
-  it('collectAppRoutePaths scrapes absolute path literals from AppRoute source', () => {
-    const appRouteSource = FIXTURE_ROUTE_SOURCES['src/app/AppRoute.tsx']
-    expect(appRouteSource).toBeDefined()
-    const paths = collectAppRoutePaths(appRouteSource)
-    expect(paths).toStrictEqual(['/auth/test-signin-callback', '/workflows'])
-  })
 })
 
 /**
@@ -189,10 +167,11 @@ export const orphanRoutes = [
  * CLI, rather than Vitest, verifies the committed manifest against live sources.
  */
 const FIXTURE_ROUTE_SOURCES = {
-  'src/app/App.tsx': `if (globalThis.location.pathname === AppRoute.Auth.TestSignInCallback) return null\n`,
-  'src/app/AppRoute.tsx': `export const AppRoute = {\n  Workflows: { Root: '/workflows' },\n  Auth: { TestSignInCallback: '/auth/test-signin-callback' },\n}\n`,
-  'src/app/navigationItems.tsx': `const items = [{ path: AppRoute.Workflows.Root }]\n`,
+  'src/app/App.tsx': `if (globalThis.location.pathname === testSignInCallbackPath) return null\n`,
+  'src/app/navigationItems.tsx': `const items = [{ path: routeRefs.workflowsRoute.fullPath }]\n`,
   'src/app/tanstackRouteTree.tsx': `import { rootRoute } from './routes/__root'\nimport { workflowsRoutes } from './routes/workflows'\nexport const tree = rootRoute.addChildren([...workflowsRoutes])\n`,
   'src/app/routes/__root.ts': `export const rootRoute = createRootRoute({})\nnavigate({ to: '/workflows', replace: true })\n`,
-  'src/app/routes/workflows.tsx': `import { rootRoute } from './__root'\nexport const workflowsRoutes = [\n  createRoute({ getParentRoute: () => rootRoute, path: '/workflows' }),\n]\n`,
+  'src/app/routes/workflows.tsx': `import { rootRoute } from './__root'\nexport const workflowsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/workflows' })\nexport const workflowsRoutes = [workflowsRoute]\n`,
+  'src/app/routes/routeReferences.ts': `export { workflowsRoute } from './workflows'\n`,
+  'src/app/routes/appLevelPaths.ts': `export const testSignInCallbackPath = '/auth/test-signin-callback'\n`,
 } as const

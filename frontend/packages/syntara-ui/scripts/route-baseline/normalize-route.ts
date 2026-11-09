@@ -5,8 +5,8 @@ import { plainObjectSchema } from './route-manifest-schema'
 /**
  * Convert a path template to TanStack `$param` syntax.
  *
- * Accepts AppRoute-style `:param` and TanStack `$param` forms so AppRoute
- * helpers and router definitions compare as the same URL contract.
+ * Accepts legacy colon-style `:param` and TanStack `$param` forms for stable
+ * compatibility comparisons.
  *
  * @param path - Raw path template from any route source
  * @returns Canonical template using `$param` placeholders

@@ -14,11 +14,15 @@ import {
 
 import type { PermissionRequirement } from '../hooks/permissionUtils'
 
-import { AppRoute } from './AppRoute'
+import type { AppRouteNavigationOptions } from './routeNavigationOptions'
+import * as routeRefs from './routes/routeReferences'
 
 export type TNavigationItem = {
+  id?: string
   label: string
-  path: string
+  destination?: AppRouteNavigationOptions
+  matchPath?: string
+  matchPrefix?: string
   children?: TNavigationItem[]
   hidden?: boolean
   matchPattern?: string
@@ -41,24 +45,28 @@ export type TNavigationItem = {
 export const NAV_ITEMS: TNavigationItem[] = [
   {
     label: 'Workflow Builder',
-    path: AppRoute.WorkflowBuilder.New,
+    destination: { to: routeRefs.builderNewRoute.fullPath },
+    matchPath: routeRefs.builderNewRoute.fullPath,
     // UX requirement: rotate the network icon 270° so it reads as a "builder" shape rather than a network diagram
     icon: <RhUiNetworkIcon style={{ transform: 'rotate(270deg)' }} />,
-    matchPattern: '/workflow-builder/:workflowId',
+    matchPattern: routeRefs.builderEditRoute.fullPath,
   },
   {
     label: 'Workflows',
-    path: AppRoute.Workflows.Root,
+    destination: { to: routeRefs.workflowsRoute.fullPath },
+    matchPath: routeRefs.workflowsRoute.fullPath,
     icon: <RhUiListIcon />,
   },
   {
     label: 'Workflow Runs',
-    path: AppRoute.Executions.Root,
+    destination: { to: routeRefs.executionsListRoute.fullPath },
+    matchPath: routeRefs.executionsListRoute.fullPath,
     icon: <RhUiPlayCircleIcon />,
   },
   {
     label: 'Approvals',
-    path: AppRoute.Approvals.Root,
+    destination: { to: routeRefs.approvalsRoute.fullPath },
+    matchPath: routeRefs.approvalsRoute.fullPath,
     icon: <RhUiLikeIcon />,
     requiredPermissions: [
       { action: 'read', resourceType: 'approval' },
@@ -67,53 +75,59 @@ export const NAV_ITEMS: TNavigationItem[] = [
   },
   {
     label: 'Configuration',
-    path: AppRoute.Configuration.Integrations.Root,
+    destination: { to: routeRefs.integrationsRoute.fullPath },
+    matchPath: routeRefs.integrationsRoute.fullPath,
     icon: <RhUiFolderIcon />,
     children: [
       {
         label: 'Integrations',
-        path: AppRoute.Configuration.Integrations.Root,
+        destination: { to: routeRefs.integrationsRoute.fullPath },
+        matchPath: routeRefs.integrationsRoute.fullPath,
         icon: <RhUiConnectedIcon />,
         requiredPermissions: [{ action: 'read', resourceType: 'integration' }],
         children: [
           {
             label: 'Configure',
-            path: AppRoute.Configuration.Integrations.Configure,
+            destination: { to: routeRefs.configureIntegrationRoute.fullPath },
+            matchPath: routeRefs.configureIntegrationRoute.fullPath,
             routePermission: { action: 'create', resourceType: 'integration' },
           },
           {
             label: 'Edit Integration',
-            path: AppRoute.Configuration.Integrations.Edit,
+            matchPath: routeRefs.editIntegrationRoute.fullPath,
             hidden: true,
             routePermission: { action: 'update', resourceType: 'integration' },
           },
           {
             label: 'Integration Detail',
-            path: AppRoute.Configuration.Integrations.Detail,
+            matchPath: routeRefs.integrationDetailRoute.fullPath,
             hidden: true,
           },
           {
             label: 'Integration Detail Tab',
-            path: AppRoute.Configuration.Integrations.DetailTab,
+            matchPath: routeRefs.integrationDetailTabRoute.fullPath,
             hidden: true,
           },
         ],
       },
       {
         label: 'Credentials',
-        path: AppRoute.Configuration.Credentials.Root,
+        destination: { to: routeRefs.credentialsRoute.fullPath },
+        matchPath: routeRefs.credentialsRoute.fullPath,
         icon: <RhUiKeyIcon />,
       },
     ],
   },
   {
     label: 'System Administration',
-    path: AppRoute.SystemAdministration.Root,
+    id: '/system-administration',
+    matchPrefix: '/system-administration',
     icon: <RhUiLanguageIcon />,
     children: [
       {
         label: 'Access Management',
-        path: AppRoute.AccessManagement.Root,
+        destination: { to: routeRefs.accessManagementRoute.fullPath },
+        matchPath: routeRefs.accessManagementRoute.fullPath,
         icon: <RhUiUsersIcon />,
         // Admin-worthy grants only. Do not include project:read or service_account:read —
         // those are shared with project-user / project-auditor and would over-show the hub.
@@ -127,143 +141,156 @@ export const NAV_ITEMS: TNavigationItem[] = [
         children: [
           {
             label: 'Users',
-            path: AppRoute.AccessManagement.Users,
+            destination: { to: routeRefs.accessManagementUsersRoute.fullPath },
+            matchPath: routeRefs.accessManagementUsersRoute.fullPath,
             requiredPermissions: [{ action: 'read', resourceType: 'user' }],
           },
           {
             label: 'Groups',
-            path: AppRoute.AccessManagement.Groups,
+            destination: { to: routeRefs.accessManagementGroupsRoute.fullPath },
+            matchPath: routeRefs.accessManagementGroupsRoute.fullPath,
             requiredPermissions: [{ action: 'read', resourceType: 'group' }],
           },
           {
             label: 'Service Accounts',
-            path: AppRoute.AccessManagement.ServiceAccounts,
+            destination: { to: routeRefs.accessManagementServiceAccountsRoute.fullPath },
+            matchPath: routeRefs.accessManagementServiceAccountsRoute.fullPath,
             requiredPermissions: [{ action: 'read', resourceType: 'service_account' }],
           },
           {
             label: 'Service Account Detail',
-            path: AppRoute.AccessManagement.ServiceAccountDetail,
+            matchPath: routeRefs.serviceAccountDetailRoute.fullPath,
             hidden: true,
           },
           {
             label: 'Service Account Detail Tab',
-            path: AppRoute.AccessManagement.ServiceAccountDetailTab,
+            matchPath: routeRefs.serviceAccountDetailCredentialsRoute.fullPath,
             hidden: true,
           },
           {
             label: 'Policies',
-            path: AppRoute.AccessManagement.Policies,
+            destination: { to: routeRefs.accessManagementPoliciesRoute.fullPath },
+            matchPath: routeRefs.accessManagementPoliciesRoute.fullPath,
           },
           {
             label: 'Roles',
-            path: AppRoute.AccessManagement.Roles,
+            destination: { to: routeRefs.accessManagementRolesRoute.fullPath },
+            matchPath: routeRefs.accessManagementRolesRoute.fullPath,
           },
           {
             label: 'Projects',
-            path: AppRoute.AccessManagement.Projects,
+            destination: { to: routeRefs.accessManagementProjectsRoute.fullPath },
+            matchPath: routeRefs.accessManagementProjectsRoute.fullPath,
           },
           {
             label: 'Project Detail',
-            path: AppRoute.AccessManagement.ProjectDetail,
+            matchPath: routeRefs.projectDetailRoute.fullPath,
             hidden: true,
           },
           {
             label: 'Project Detail Tab',
-            path: AppRoute.AccessManagement.ProjectDetailTab,
+            matchPath: routeRefs.projectDetailWorkflowsRoute.fullPath,
             hidden: true,
           },
           {
             label: 'Assignments',
-            path: AppRoute.AccessManagement.Assignments,
+            destination: { to: routeRefs.accessManagementAssignmentsRoute.fullPath },
+            matchPath: routeRefs.accessManagementAssignmentsRoute.fullPath,
           },
           {
             label: 'Check access',
-            path: AppRoute.AccessManagement.CheckAccess,
+            destination: { to: routeRefs.accessManagementCheckAccessRoute.fullPath },
+            matchPath: routeRefs.accessManagementCheckAccessRoute.fullPath,
           },
           {
             label: 'Token Revocation',
-            path: AppRoute.AccessManagement.TokenRevocation,
+            destination: { to: routeRefs.accessManagementTokenRevocationRoute.fullPath },
+            matchPath: routeRefs.accessManagementTokenRevocationRoute.fullPath,
           },
           {
             label: 'Group Detail',
-            path: AppRoute.AccessManagement.GroupDetail,
+            matchPath: routeRefs.groupDetailRoute.fullPath,
             hidden: true,
           },
           {
             label: 'Group Detail Tab',
-            path: AppRoute.AccessManagement.GroupDetailTab,
+            matchPath: routeRefs.groupDetailMembersRoute.fullPath,
             hidden: true,
           },
           {
             label: 'Create User',
-            path: AppRoute.AccessManagement.CreateUser,
+            destination: { to: routeRefs.createUserRoute.fullPath },
+            matchPath: routeRefs.createUserRoute.fullPath,
             hidden: true,
             routePermission: { action: 'create', resourceType: 'user' },
           },
           {
             label: 'Edit User',
-            path: AppRoute.AccessManagement.EditUser,
+            matchPath: routeRefs.editUserRoute.fullPath,
             hidden: true,
             routePermission: { action: 'update', resourceType: 'user' },
           },
           {
             label: 'Transfer Identity',
-            path: AppRoute.AccessManagement.TransferIdentity,
+            matchPath: routeRefs.transferIdentityRoute.fullPath,
             hidden: true,
           },
           {
             label: 'User Detail',
-            path: AppRoute.AccessManagement.UserDetail,
+            matchPath: routeRefs.userDetailRoute.fullPath,
             hidden: true,
           },
           {
             label: 'User Detail Tab',
-            path: AppRoute.AccessManagement.UserDetailTab,
+            matchPath: routeRefs.userDetailDetailsRoute.fullPath,
             hidden: true,
           },
         ],
       },
       {
         label: 'Identity Providers',
-        path: AppRoute.SystemAdministration.Authentication.Root,
+        destination: { to: routeRefs.authenticationRootRoute.fullPath },
+        matchPath: routeRefs.authenticationRootRoute.fullPath,
         icon: <RhUiSecuredIcon />,
         requiredPermissions: [{ action: 'read', resourceType: 'identity-provider' }],
         children: [
           {
             label: 'Add Identity Provider',
-            path: AppRoute.SystemAdministration.Authentication.AddIdentityProvider,
+            destination: { to: routeRefs.addIdentityProviderRoute.fullPath },
+            matchPath: routeRefs.addIdentityProviderRoute.fullPath,
             routePermission: { action: 'create', resourceType: 'identity-provider' },
           },
           {
             label: 'Edit Identity Provider',
-            path: AppRoute.SystemAdministration.Authentication.EditIdentityProvider,
+            matchPath: routeRefs.editIdentityProviderRoute.fullPath,
             routePermission: { action: 'update', resourceType: 'identity-provider' },
           },
           {
             label: 'Edit Group Mapping',
-            path: AppRoute.SystemAdministration.Authentication.EditGroupMapping,
+            matchPath: routeRefs.editIdentityProviderGroupMappingRoute.fullPath,
             hidden: true,
           },
           {
             label: 'Identity Provider Details',
-            path: AppRoute.SystemAdministration.Authentication.IdentityProviderDetail,
+            matchPath: routeRefs.identityProviderDetailRoute.fullPath,
           },
           {
             label: 'Identity Provider Details Tab',
-            path: AppRoute.SystemAdministration.Authentication.IdentityProviderDetailTab,
+            matchPath: routeRefs.identityProviderGroupMappingRoute.fullPath,
             hidden: true,
           },
         ],
       },
       {
         label: 'Settings',
-        path: AppRoute.SystemAdministration.Settings,
+        destination: { to: routeRefs.settingsRoute.fullPath },
+        matchPath: routeRefs.settingsRoute.fullPath,
         icon: <RhUiSettingsIcon />,
         requiredPermissions: [{ action: 'read', resourceType: 'setting' }],
         children: [
           {
             label: 'Settings Tab',
-            path: AppRoute.SystemAdministration.SettingsTab,
+            matchPath: routeRefs.settingsCategoryRoute.fullPath,
             hidden: true,
           },
         ],
@@ -273,32 +300,33 @@ export const NAV_ITEMS: TNavigationItem[] = [
   // Hidden routes (not shown in navigation, but path needed for active-state matching)
   {
     label: 'Edit Workflow',
-    path: AppRoute.WorkflowBuilder.Edit,
+    matchPath: routeRefs.builderEditRoute.fullPath,
     hidden: true,
   },
   {
     label: 'Execution Detail',
-    path: AppRoute.Executions.Execution,
+    matchPath: routeRefs.executionDetailRoute.fullPath,
     hidden: true,
   },
   {
     label: 'Credential Detail',
-    path: AppRoute.Configuration.Credentials.Detail,
+    matchPath: routeRefs.credentialDetailRoute.fullPath,
     hidden: true,
   },
   {
     label: 'Credential Detail Tab',
-    path: AppRoute.Configuration.Credentials.DetailTab,
+    matchPath: routeRefs.credentialDetailsRoute.fullPath,
     hidden: true,
   },
   {
     label: 'My Profile',
-    path: AppRoute.MyProfile.Root,
+    destination: { to: routeRefs.myProfileRootRoute.fullPath },
+    matchPath: routeRefs.myProfileRootRoute.fullPath,
     hidden: true,
   },
   {
     label: 'My Profile Tab',
-    path: AppRoute.MyProfile.Tab,
+    matchPath: routeRefs.myProfileTabRoute.fullPath,
     hidden: true,
   },
 ] as const

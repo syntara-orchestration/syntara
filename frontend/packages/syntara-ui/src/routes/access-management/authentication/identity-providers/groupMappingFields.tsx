@@ -27,7 +27,7 @@ import { Controller, useWatch, type Control } from 'react-hook-form'
 import { SynSelect } from '../../../../components/SynSelect'
 import { LinkCell } from '../../../../components/table/LinkCell'
 import { APP_TITLE } from '../../../../utils/appTitle'
-import { getGroupDetailPath } from '../../accessManagementPaths'
+import { getGroupDetailOptions } from '../../accessManagementPaths'
 
 import type { GroupMappingEditFormValues } from './groupMappingEditFormSchema'
 import type { GroupMappingEntry, MappedGroup } from './groupMappingUtils'
@@ -296,7 +296,7 @@ export function MappingRow({
         </Td>
         <Td dataLabel={`${APP_TITLE} Group`}>
           {entry.mappedGroupId !== '' && groupName !== '' ? (
-            <LinkCell href={getGroupDetailPath(entry.mappedGroupId)}>{groupDisplay}</LinkCell>
+            <LinkCell options={getGroupDetailOptions(entry.mappedGroupId)}>{groupDisplay}</LinkCell>
           ) : (
             <Content>{groupDisplay}</Content>
           )}

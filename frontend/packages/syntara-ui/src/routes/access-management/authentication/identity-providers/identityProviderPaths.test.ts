@@ -1,29 +1,35 @@
 import { describe, expect, it } from 'vitest'
 
+import * as routeRefs from '../../../../app/routes/routeReferences'
+
 import {
-  identityProviderDetailBasePath,
-  identityProviderGroupMappingEditPath,
-  identityProviderGroupMappingTabPath,
+  identityProviderDetailOptions,
+  identityProviderGroupMappingEditOptions,
+  identityProviderGroupMappingTabOptions,
 } from './identityProviderPaths'
 
 const PROVIDER_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
 
-describe('identityProviderPaths', () => {
-  it('builds detail base path', () => {
-    expect(identityProviderDetailBasePath(PROVIDER_ID)).toBe(
-      `/system-administration/authentication/identity-providers/${PROVIDER_ID}`
-    )
+describe('identity provider route options', () => {
+  it('builds detail route options', () => {
+    expect(identityProviderDetailOptions(PROVIDER_ID)).toEqual({
+      to: routeRefs.identityProviderDetailRoute.fullPath,
+      params: { providerId: PROVIDER_ID },
+    })
   })
 
-  it('builds group mapping tab path', () => {
-    expect(identityProviderGroupMappingTabPath(PROVIDER_ID)).toBe(
-      `/system-administration/authentication/identity-providers/${PROVIDER_ID}/group-mapping`
-    )
+  it('uses the nested group mapping route', () => {
+    expect(identityProviderGroupMappingTabOptions(PROVIDER_ID)).toEqual({
+      to: routeRefs.identityProviderGroupMappingRoute.fullPath,
+      params: { providerId: PROVIDER_ID },
+    })
   })
 
-  it('builds group mapping edit path', () => {
-    expect(identityProviderGroupMappingEditPath(PROVIDER_ID)).toBe(
-      `/system-administration/authentication/identity-providers/${PROVIDER_ID}/group-mapping/edit`
-    )
+  it('preserves typed query flags on the edit route', () => {
+    expect(identityProviderGroupMappingEditOptions(PROVIDER_ID, 'discover')).toEqual({
+      to: routeRefs.editIdentityProviderGroupMappingRoute.fullPath,
+      params: { providerId: PROVIDER_ID },
+      search: { discover: '1' },
+    })
   })
 })

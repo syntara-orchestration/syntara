@@ -2,6 +2,7 @@ import { Button, Switch } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { useState } from 'react'
 
+import { breadcrumbTestRoutes } from '../../test/breadcrumbTestRoutes'
 import { SynKebabMenu } from '../SynKebabMenu'
 
 import { SynPageHeader } from './SynPageHeader'
@@ -38,7 +39,10 @@ function LongTitleDetailPageHeader() {
   return (
     <SynPageHeader
       title={LONG_DETAIL_TITLE}
-      breadcrumbs={[{ label: 'Integrations', href: '/configuration/integrations' }, { label: LONG_DETAIL_TITLE }]}
+      breadcrumbs={[
+        { label: 'Integrations', destination: breadcrumbTestRoutes.integrations },
+        { label: LONG_DETAIL_TITLE },
+      ]}
       toolbar={
         <>
           <Switch
@@ -60,7 +64,10 @@ function DetailPageToolbarHeader() {
   return (
     <SynPageHeader
       title="my-credential"
-      breadcrumbs={[{ label: 'Credentials', href: '/credentials' }, { label: 'my-credential' }]}
+      breadcrumbs={[
+        { label: 'Credentials', destination: breadcrumbTestRoutes.credentials },
+        { label: 'my-credential' },
+      ]}
       toolbar={
         <>
           <Switch
@@ -218,8 +225,8 @@ export const WithBreadcrumbs: Story = {
   args: {
     title: 'Create user',
     breadcrumbs: [
-      { label: 'Access management', href: '/access-management' },
-      { label: 'Users', href: '/access-management/users' },
+      { label: 'Access management', destination: breadcrumbTestRoutes.accessManagement },
+      { label: 'Users', destination: breadcrumbTestRoutes.users },
       { label: 'Create user' },
     ],
   },
@@ -236,8 +243,8 @@ export const WithBreadcrumbsAndToolbar: Story = {
   args: {
     title: 'Edit workflow',
     breadcrumbs: [
-      { label: 'Automation', href: '/automation' },
-      { label: 'Workflows', href: '/automation/workflows' },
+      { label: 'Automation', destination: breadcrumbTestRoutes.workflows },
+      { label: 'Workflows', destination: breadcrumbTestRoutes.workflows },
       { label: 'Edit workflow' },
     ],
     toolbar: (
@@ -260,6 +267,6 @@ export const SingleBreadcrumbHidden: Story = {
   },
   args: {
     title: 'Users',
-    breadcrumbs: [{ label: 'Access management', href: '/access-management' }],
+    breadcrumbs: [{ label: 'Access management', destination: breadcrumbTestRoutes.accessManagement }],
   },
 }

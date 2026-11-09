@@ -1,7 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPagination'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useWorkflowPermissions } from '../../workflows/useWorkflowPermissions'
@@ -70,7 +70,9 @@ export function ProjectWorkflowsTab({ projectId, isBuiltin = false }: Readonly<P
       filterFieldDefinitions={workflowFilterDefinitions}
       onFilterChange={handleFilterChange}
       onClearAllFilters={handleClearAllFilters}
-      onCreateWorkflow={canCreate ? () => detachPromise(navigate({ to: AppRoute.WorkflowBuilder.New })) : undefined}
+      onCreateWorkflow={
+        canCreate ? () => detachPromise(navigate({ to: routeRefs.builderNewRoute.fullPath })) : undefined
+      }
       footer={getFooterProps(workflowsQuery.data)}
       getSortParams={getSortParams}
       isAllProjects={false}

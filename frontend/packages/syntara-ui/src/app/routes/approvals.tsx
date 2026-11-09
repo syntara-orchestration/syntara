@@ -8,11 +8,11 @@ import { rootRoute } from './__root'
 
 const approvalsSearch = listSearchParams.catch({})
 
-export const approvalsRoutes = [
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/approvals',
-    validateSearch: approvalsSearch,
-    component: makeRouteComponent(<Approvals />),
-  }),
-]
+export const approvalsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/approvals',
+  validateSearch: approvalsSearch,
+  component: makeRouteComponent(<Approvals />),
+})
+
+export const approvalsRoutes = [approvalsRoute]

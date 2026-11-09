@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import type { AppBreadcrumbItem } from '../../app/breadcrumbs/appBreadcrumbItem'
+import { breadcrumbTestRoutes } from '../../test/breadcrumbTestRoutes'
 
 import { DetailPageShell } from './DetailPageShell'
 
@@ -13,8 +14,8 @@ vi.mock('../../components/layout/SynPageHeader', () => ({
       {breadcrumbs && breadcrumbs.length >= 2 && (
         <nav aria-label="Breadcrumb">
           {breadcrumbs.map((b) =>
-            b.href ? (
-              <a key={b.label} href={b.href}>
+            b.destination ? (
+              <a key={b.label} href={b.destination.to}>
                 {b.label}
               </a>
             ) : (
@@ -28,8 +29,8 @@ vi.mock('../../components/layout/SynPageHeader', () => ({
 }))
 
 const testBreadcrumbs: readonly AppBreadcrumbItem[] = [
-  { label: 'Home', href: '/' },
-  { label: 'Users', href: '/users' },
+  { label: 'Home', destination: breadcrumbTestRoutes.workflows },
+  { label: 'Users', destination: breadcrumbTestRoutes.users },
   { label: 'Details' },
 ]
 
@@ -86,8 +87,8 @@ describe('DetailPageShell', () => {
       <DetailPageShell
         title="User Details"
         breadcrumbs={[
-          { label: 'Access management', href: '/access-management' },
-          { label: 'Users', href: '/access-management/users' },
+          { label: 'Access management', destination: breadcrumbTestRoutes.accessManagement },
+          { label: 'Users', destination: breadcrumbTestRoutes.users },
           { label: 'User Details' },
         ]}
       >

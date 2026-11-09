@@ -10,19 +10,20 @@ const builderEditSearch = z
   .object({
     fromExecution: z.string().optional(),
     linkExecution: z.string().optional(),
+    version: z.string().optional(),
   })
   .catch({})
 
-export const builderRoutes = [
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/workflow-builder/new',
-    component: makeRouteComponent(<BuilderNew />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/workflow-builder/$workflowId',
-    validateSearch: builderEditSearch,
-    component: makeRouteComponent(<BuilderEdit />),
-  }),
-]
+export const builderNewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/workflow-builder/new',
+  component: makeRouteComponent(<BuilderNew />),
+})
+export const builderEditRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/workflow-builder/$workflowId',
+  validateSearch: builderEditSearch,
+  component: makeRouteComponent(<BuilderEdit />),
+})
+
+export const builderRoutes = [builderNewRoute, builderEditRoute]

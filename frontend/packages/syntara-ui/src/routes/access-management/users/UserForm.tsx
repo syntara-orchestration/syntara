@@ -3,9 +3,9 @@ import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useNavigate } from '@tanstack/react-router'
 import type { BaseSyntheticEvent, ReactNode } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsCreateUser, breadcrumbsEditUser, breadcrumbsUserFormLoading } from '../../../app/breadcrumbBuilders'
 import type { AppBreadcrumbItem } from '../../../app/breadcrumbs/appBreadcrumbItem'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { SynForm } from '../../../components/forms/SynForm'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
@@ -78,10 +78,9 @@ function userFormBreadcrumbTrail(
   if (!isEdit) {
     return breadcrumbsCreateUser()
   }
-  const userBasePath = userId ? AppRoute.AccessManagement.UserDetail.replace(':userId', userId) : undefined
   const displayName = user ? userDisplayName(user) : undefined
-  if (displayName && userBasePath) {
-    return breadcrumbsEditUser(displayName, userBasePath)
+  if (displayName && userId) {
+    return breadcrumbsEditUser(displayName, userId)
   }
   return breadcrumbsUserFormLoading(pageTitle)
 }
@@ -180,7 +179,7 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
     watch,
   } = form
 
-  const navigateBack = () => detachPromise(navigate({ to: AppRoute.AccessManagement.Users }))
+  const navigateBack = () => detachPromise(navigate({ to: routeRefs.accessManagementUsersRoute.fullPath }))
 
   const { dismiss } = useDirtyFormGuard({
     isDirty,

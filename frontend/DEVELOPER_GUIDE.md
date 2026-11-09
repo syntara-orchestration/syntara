@@ -70,7 +70,7 @@ npm start
 
 ### Key Architectural Patterns
 
-- Routing: route definitions in `src/app/routes/` are assembled by `src/app/tanstackRouteTree.tsx` and mounted through TanStack Router's `RouterProvider`. `src/app/AppRoute.tsx` holds reusable path strings, while `src/app/navigationItems.tsx` defines navigation and its permission visibility.
+- Routing: route definitions in `src/app/routes/` are assembled by `src/app/tanstackRouteTree.tsx` and mounted through TanStack Router's `RouterProvider`. `src/app/routes/routeReferences.ts` exports the mounted route objects for typed links and navigation, while `src/app/navigationItems.tsx` defines navigation and its permission visibility.
 - Lazy-loaded components
 - Type-safe API calls
 - Automatic memoization via React Compiler

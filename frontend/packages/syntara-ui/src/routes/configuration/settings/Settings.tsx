@@ -3,8 +3,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsSettingsPage } from '../../../app/breadcrumbBuilders'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { settingsClient } from '../../../client'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
@@ -30,7 +30,7 @@ import { SettingsCategoryTabContext } from './SettingsCategoryTabContext'
 import { useAllSettings } from './useAllSettings'
 import { useSettingsPermissions } from './useSettingsPermissions'
 
-const basePath = AppRoute.SystemAdministration.Settings
+const basePath = routeRefs.settingsRoute.fullPath
 
 function buildBulkUpdates(
   edits: Map<string, unknown>,
@@ -91,15 +91,21 @@ export default function Settings() {
   const defaultCategory = categories[0]?.slug ?? ''
   const location = useRouterState({ select: (s) => s.location.pathname })
   const navigate = useNavigate()
+  const onTabChange = useCallback(
+    (category: string, options?: { replace?: boolean }) => {
+      detachPromise(navigate({ to: routeRefs.settingsCategoryRoute.fullPath, params: { category }, ...options }))
+    },
+    [navigate]
+  )
 
   // UrlTabs only redirects when the URL contains an *invalid* tab slug.
   // When there is *no* slug at all, useUrlTab silently falls back to defaultTab
   // without updating the URL — so we redirect here to keep the URL bookmarkable.
   useEffect(() => {
     if (defaultCategory && location.startsWith(basePath) && !location.startsWith(`${basePath}/`)) {
-      detachPromise(navigate({ to: `${basePath}/${defaultCategory}`, replace: true }))
+      onTabChange(defaultCategory, { replace: true })
     }
-  }, [defaultCategory, location, navigate])
+  }, [defaultCategory, location, onTabChange])
 
   const settingsByCategory = useMemo(() => {
     const grouped = new Map<string, (typeof allSettings)[number][]>()
@@ -245,6 +251,7 @@ export default function Settings() {
                   basePath={basePath}
                   defaultTab={defaultCategory}
                   validTabs={validTabs}
+                  onTabChange={onTabChange}
                   aria-label="Settings categories"
                   renderPanel={() => <Outlet />}
                 >

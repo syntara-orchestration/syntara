@@ -3,7 +3,7 @@ import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { useMemo } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { integrationsClient } from '../../../client'
 import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
 import { SynListPanelTable, SynListPanelView } from '../../../components/panels/list/SynListPanel'
@@ -28,8 +28,8 @@ type CredentialIntegrationsTabProps = {
 const INTEGRATION_COLUMN_COUNT = 6
 const noop = () => {}
 
-function integrationHref(integrationId: string): string {
-  return AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId)
+function integrationOptions(integrationId: string) {
+  return { to: routeRefs.integrationDetailRoute.fullPath, params: { integrationId } } as const
 }
 
 function integrationScopeLabel(scope: Integration['scope']): string {
@@ -87,7 +87,7 @@ function IntegrationsTable({
                 }
               />
               <Td dataLabel="Integration name">
-                <LinkCell href={integrationHref(integration.id ?? '')}>
+                <LinkCell options={integrationOptions(integration.id ?? '')}>
                   <Truncate content={integration.name} />
                 </LinkCell>
               </Td>

@@ -1,6 +1,6 @@
 import { Badge, BreadcrumbItem, Dropdown, DropdownItem, DropdownList, MenuToggle } from '@patternfly/react-core'
 import type { MenuToggleElement } from '@patternfly/react-core'
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, useRouter } from '@tanstack/react-router'
 import type { MouseEvent, Ref } from 'react'
 import { useMemo, useState } from 'react'
 
@@ -52,6 +52,7 @@ export function SynPageBreadcrumbsCollapsedMiddle(props: SynPageBreadcrumbsColla
   const { middleItems } = props
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
+  const router = useRouter()
 
   const middleCount = middleItems.length
 
@@ -72,12 +73,12 @@ export function SynPageBreadcrumbsCollapsedMiddle(props: SynPageBreadcrumbsColla
         <DropdownList>
           {middleItems.map((item) => (
             <DropdownItem
-              key={item.href ?? item.label}
-              to={item.href}
+              key={item.destination ? JSON.stringify(item.destination) : item.label}
+              to={item.destination ? router.buildLocation(item.destination).href : undefined}
               onClick={(e: MouseEvent) => {
-                if (item.href && !(e.metaKey || e.altKey || e.ctrlKey || e.shiftKey || e.button !== 0)) {
+                if (item.destination && !(e.metaKey || e.altKey || e.ctrlKey || e.shiftKey || e.button !== 0)) {
                   e.preventDefault()
-                  detachPromise(navigate({ to: item.href }))
+                  detachPromise(navigate(item.destination))
                 }
                 setIsOpen(false)
               }}

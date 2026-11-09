@@ -17,9 +17,12 @@ import { RhUiCheckCircleIcon, RhUiEditIcon, RhUiTrashIcon, RhUiWarningIcon } fro
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useNavigate, useParams } from '@tanstack/react-router'
+import { useCallback } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsIntegrationDetail, breadcrumbsIntegrationDetailEarlyShell } from '../../../app/breadcrumbBuilders'
+import * as routeRefs from '../../../app/routes/routeReferences'
+import { tanstackRouter } from '../../../app/tanstackRouter'
+import { useUnsavedChanges } from '../../../app/useUnsavedChanges'
 import { credentialsClient, integrationsClient } from '../../../client'
 import { SynDetail } from '../../../components/details/SynDetail'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
@@ -132,7 +135,7 @@ function IntegrationDetailsTab({
             ) : (
               <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
                 <FlexItem>
-                  <SynLink to={AppRoute.Configuration.Credentials.Detail.replace(':credentialId', credentialId)}>
+                  <SynLink options={{ to: routeRefs.credentialDetailRoute.fullPath, params: { credentialId } }}>
                     {credentialName}
                   </SynLink>
                 </FlexItem>
@@ -299,9 +302,26 @@ type IntegrationDetailTab = 'details' | 'resources' | 'edit'
 export function IntegrationDetail() {
   const { integrationId }: { integrationId: string } = useParams({ strict: false })
   const navigate = useNavigate()
-  const integrationBasePath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId)
-  const editPath = AppRoute.Configuration.Integrations.Edit.replace(':integrationId', integrationId)
-  const [activeTab] = useUrlTab<IntegrationDetailTab>(integrationBasePath)
+  const integrationBasePath = tanstackRouter.buildLocation({
+    to: routeRefs.integrationDetailRoute.fullPath,
+    params: { integrationId: integrationId },
+  }).href
+  const activeTab = useUrlTab<IntegrationDetailTab>(integrationBasePath)
+  const { requestNavigation } = useUnsavedChanges()
+  const onTabChange = useCallback(
+    (tab: IntegrationDetailTab, options?: { replace?: boolean }) => {
+      const target = {
+        to: routeRefs.integrationDetailTabRoute.fullPath,
+        params: { integrationId, tab },
+      }
+      if (options?.replace) {
+        detachPromise(navigate({ ...target, replace: true }))
+      } else {
+        requestNavigation(target)
+      }
+    },
+    [integrationId, navigate, requestNavigation]
+  )
   const docLink = useDocLink('integrations')
   const permissions = useIntegrationPermissions()
 
@@ -411,7 +431,9 @@ export function IntegrationDetail() {
             integration={integration}
             kebabActions={kebabActions}
             onToggleEnabled={() => handleToggleEnabled(integration)}
-            onEdit={() => detachPromise(navigate({ to: editPath }))}
+            onEdit={() =>
+              detachPromise(navigate({ to: routeRefs.editIntegrationRoute.fullPath, params: { integrationId } }))
+            }
             permissions={permissions}
           />
         }
@@ -423,8 +445,8 @@ export function IntegrationDetail() {
             basePath={integrationBasePath}
             defaultTab="details"
             validTabs={hasResourcesTab(integration) ? ['details', 'resources'] : ['details']}
+            onTabChange={onTabChange}
             aria-label="Integration details"
-            guardUnsavedChanges
           >
             <Tab eventKey="details" title="Details">
               <IntegrationDetailsTab

@@ -14,3 +14,11 @@ export const tanstackRouter = createRouter({
   // RouterProvider supplies the current snapshot from FeatureFlagsProvider.
   context: { featureFlags: {} },
 })
+
+declare module '@tanstack/react-router' {
+  // TanStack Router requires interface augmentation for the global router type.
+  // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+  interface Register {
+    router: typeof tanstackRouter
+  }
+}

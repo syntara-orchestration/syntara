@@ -1,9 +1,15 @@
-import { createRootRouteWithContext, useNavigate } from '@tanstack/react-router'
-import { useEffect } from 'react'
+import { createRootRouteWithContext, lazyRouteComponent, useNavigate } from '@tanstack/react-router'
+import { Suspense, createElement, useEffect } from 'react'
 
+import { SynLoadingState } from '../../components/states/SynLoadingState'
 import { detachPromise } from '../../utils/detachPromise'
 import type { FeatureFlagConfig } from '../../utils/feature-flags'
-import { RootLayout } from '../RootLayout'
+
+const LazyRootLayout = lazyRouteComponent(() => import('../RootLayout'), 'RootLayout')
+
+function RootLayoutWithSuspense() {
+  return createElement(Suspense, { fallback: createElement(SynLoadingState) }, createElement(LazyRootLayout))
+}
 
 export type AppRouterContext = {
   featureFlags: FeatureFlagConfig
@@ -19,6 +25,6 @@ function NotFoundRedirect() {
 }
 
 export const rootRoute = createRootRouteWithContext<AppRouterContext>()({
-  component: RootLayout,
+  component: RootLayoutWithSuspense,
   notFoundComponent: NotFoundRedirect,
 })

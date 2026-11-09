@@ -4,6 +4,8 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 
+import type { AppRouteNavigationOptions } from '../../app/routeNavigationOptions'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
@@ -123,7 +125,10 @@ export default function Workflows() {
   const workflowsDocLink = useDocLink('workflows')
   const { showAlert, showSuccess, showError } = useAlerts()
   const navigate = useNavigate()
-  const setLocation = useCallback((to: string) => detachPromise(navigate({ to })), [navigate])
+  const setLocation = useCallback(
+    (destination: AppRouteNavigationOptions) => detachPromise(navigate(destination)),
+    [navigate]
+  )
   const {
     selectedProject,
     selectedProjectId,
@@ -262,7 +267,7 @@ export default function Workflows() {
                 showWorkflowActions={showWorkflowActions}
                 showImportWorkflow={showImportWorkflow}
                 onImportClick={() => setImportDialogOpen(true)}
-                onCreateClick={() => detachPromise(navigate({ to: '/workflow-builder/new' }))}
+                onCreateClick={() => detachPromise(navigate({ to: routeRefs.builderNewRoute.fullPath }))}
               />
             ) : undefined
           }
@@ -282,7 +287,7 @@ export default function Workflows() {
               onClearAllFilters={handleClearAllFilters}
               onCreateWorkflow={
                 permissions.canCreate && !selectedProject?.is_builtin
-                  ? () => detachPromise(navigate({ to: '/workflow-builder/new' }))
+                  ? () => detachPromise(navigate({ to: routeRefs.builderNewRoute.fullPath }))
                   : undefined
               }
               footer={getFooterProps(workflowsQuery.data)}

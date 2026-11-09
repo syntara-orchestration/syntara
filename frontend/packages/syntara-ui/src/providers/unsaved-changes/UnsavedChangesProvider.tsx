@@ -2,6 +2,7 @@ import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/
 import { useBlocker, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
+import type { AppRouteNavigationOptions } from '../../app/routeNavigationOptions'
 import { useBlurOnOpen } from '../../hooks/useBlurOnOpen'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { resetAll } from '../../stores/workflowStoreActions'
@@ -60,7 +61,7 @@ export function UnsavedChangesProvider({ children }: Readonly<UnsavedChangesProv
 
   const proceedNavRef = useRef<(() => void) | null>(null)
   const resetNavRef = useRef<(() => void) | null>(null)
-  const pendingTargetRef = useRef<string | null>(null)
+  const pendingTargetRef = useRef<AppRouteNavigationOptions | null>(null)
 
   const dirtyChecksRef = useRef(new Map<number, DirtyCheckOptions>())
 
@@ -88,13 +89,13 @@ export function UnsavedChangesProvider({ children }: Readonly<UnsavedChangesProv
   }, [isBuilderDirty, getActiveDirtyCheck])
 
   const requestNavigation = useCallback(
-    (targetPath: string) => {
-      if (targetPath.startsWith('/workflow-builder') || !hasUnsavedChanges()) {
-        detachPromise(tsNavigate({ to: targetPath }))
+    (destination: AppRouteNavigationOptions) => {
+      if (destination.to.startsWith('/workflow-builder') || !hasUnsavedChanges()) {
+        detachPromise(tsNavigate(destination))
         return
       }
 
-      pendingTargetRef.current = targetPath
+      pendingTargetRef.current = destination
       setIsModalOpen(true)
     },
     [hasUnsavedChanges, tsNavigate]
@@ -123,7 +124,7 @@ export function UnsavedChangesProvider({ children }: Readonly<UnsavedChangesProv
       proceedNavRef.current = null
       resetNavRef.current = null
     } else if (pendingTargetRef.current) {
-      detachPromise(tsNavigate({ to: pendingTargetRef.current }))
+      detachPromise(tsNavigate(pendingTargetRef.current))
       pendingTargetRef.current = null
     }
   }, [tsNavigate])

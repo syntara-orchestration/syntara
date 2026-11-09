@@ -20,7 +20,7 @@ import { useTableSort } from '../../hooks/useTableSort'
 import type { FilterFieldDefinition } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
 
-import { getGroupDetailPath } from './accessManagementPaths'
+import { getGroupDetailOptions } from './accessManagementPaths'
 import { getGroupDescriptionFilterDefinition, getGroupNameFilterDefinition } from './groupFilters'
 import { GroupFormModal } from './GroupFormModal'
 import { useGroupPermissions } from './useGroupPermissions'
@@ -182,7 +182,7 @@ export function GroupsTab() {
                 {groups.map((group) => (
                   <Tr key={group.id}>
                     <Td dataLabel="Name">
-                      <LinkCell href={getGroupDetailPath(group.id ?? '')}>
+                      <LinkCell options={getGroupDetailOptions(group.id ?? '')}>
                         <Truncate content={group.name} />
                       </LinkCell>
                     </Td>

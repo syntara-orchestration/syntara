@@ -5,15 +5,15 @@ import { makeRouteComponent } from '../makeRouteComponent'
 
 import { rootRoute } from './__root'
 
-export const myProfileRoutes = [
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/my-profile',
-    component: makeRouteComponent(<MyProfile />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/my-profile/$tab',
-    component: makeRouteComponent(<MyProfile />),
-  }),
-]
+export const myProfileRootRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/my-profile',
+  component: makeRouteComponent(<MyProfile />),
+})
+export const myProfileTabRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/my-profile/$tab',
+  component: makeRouteComponent(<MyProfile />),
+})
+
+export const myProfileRoutes = [myProfileRootRoute, myProfileTabRoute]

@@ -3,7 +3,7 @@ import { RhUiLockIcon } from '@patternfly/react-icons'
 
 import { SynLabel } from '../../components/labels/SynLabel'
 import { LinkCell } from '../../components/table/LinkCell'
-import { getProjectDetailPath } from '../access-management/accessManagementPaths'
+import { getProjectDetailOptions } from '../access-management/accessManagementPaths'
 
 import type { PolicyStatement } from './types'
 
@@ -49,7 +49,7 @@ export function ProjectLabel({ projectId, projectNameMap }: Readonly<ProjectLabe
     return <>-</>
   }
 
-  return <LinkCell href={getProjectDetailPath(projectId)}>{projectNameMap.get(projectId) ?? projectId}</LinkCell>
+  return <LinkCell options={getProjectDetailOptions(projectId)}>{projectNameMap.get(projectId) ?? projectId}</LinkCell>
 }
 
 type StatementsCellProps = {

@@ -15,8 +15,9 @@ import { RhUiEditIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { Outlet, useNavigate, useParams, useRouterState } from '@tanstack/react-router'
 import { createContext, use, useMemo, useState } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsProjectDetail, breadcrumbsProjectDetailEarlyShell } from '../../../app/breadcrumbBuilders'
+import * as routeRefs from '../../../app/routes/routeReferences'
+import { tanstackRouter } from '../../../app/tanstackRouter'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
 import { SynLabel } from '../../../components/labels/SynLabel'
@@ -190,7 +191,10 @@ export function ProjectDetail() {
   const navigate = useNavigate()
   const projectsDocLink = useDocLink('projects')
   const { projectId }: { projectId: string } = useParams({ strict: false })
-  const basePath = AppRoute.AccessManagement.ProjectDetail.replace(':projectId', projectId ?? '')
+  const basePath = tanstackRouter.buildLocation({
+    to: routeRefs.projectDetailRoute.fullPath,
+    params: { projectId: projectId ?? '' },
+  }).href
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const { activeTab, activeTabSlug } = useMemo(() => {
     const routePath = pathname.startsWith(basePath) ? pathname.slice(basePath.length) : ''
@@ -221,7 +225,21 @@ export function ProjectDetail() {
     { enabled: !!projectId, retry: false }
   )
 
-  const navigateBack = () => detachPromise(navigate({ to: AppRoute.AccessManagement.Projects }))
+  const navigateBack = () => detachPromise(navigate({ to: routeRefs.accessManagementProjectsRoute.fullPath }))
+  const onTabChange = (tab: ProjectTab, options?: { replace?: boolean }) => {
+    const params = { projectId: projectId ?? '' }
+    switch (tab) {
+      case 'details':
+        detachPromise(navigate({ to: routeRefs.projectDetailDetailsRoute.fullPath, params, ...options }))
+        break
+      case 'workflows':
+        detachPromise(navigate({ to: routeRefs.projectDetailWorkflowsRoute.fullPath, params, ...options }))
+        break
+      case 'role-assignments':
+        detachPromise(navigate({ to: routeRefs.projectDetailRoleAssignmentsRoute.fullPath, params, ...options }))
+        break
+    }
+  }
 
   const handleDelete = useDeleteAction({
     deleteFn: deleteProject,
@@ -274,7 +292,7 @@ export function ProjectDetail() {
 
   if (!projectData || !projectDetailRouteContextValue) return null
 
-  const projectCrumbs = breadcrumbsProjectDetail(projectData.name, basePath, activeTabSlug)
+  const projectCrumbs = breadcrumbsProjectDetail(projectData.name, projectId ?? '', activeTabSlug)
 
   return (
     <SynPage>
@@ -297,6 +315,7 @@ export function ProjectDetail() {
             basePath={basePath}
             defaultTab="details"
             validTabs={urlValidTabs}
+            onTabChange={onTabChange}
             aria-label="Project details"
           >
             <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />

@@ -1,6 +1,6 @@
 import { FormHelperText, HelperText, HelperTextItem } from '@patternfly/react-core'
 
-import { AppRoute } from '../../../app/AppRoute'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { SynLink } from '../../../components/SynLink'
 import { useIntegrationPermissions } from '../../configuration/integrations/useIntegrationPermissions'
 
@@ -18,7 +18,9 @@ export function IntegrationRequiredHelper({ integrationLabel, actionLabel }: Int
         <HelperTextItem>
           An administrator must{' '}
           {canCreate ? (
-            <SynLink to={AppRoute.Configuration.Integrations.Configure}>configure {integrationLabel}</SynLink>
+            <SynLink options={{ to: routeRefs.configureIntegrationRoute.fullPath }}>
+              configure {integrationLabel}
+            </SynLink>
           ) : (
             `configure ${integrationLabel}`
           )}{' '}

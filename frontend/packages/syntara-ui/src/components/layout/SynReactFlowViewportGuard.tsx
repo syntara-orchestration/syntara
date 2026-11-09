@@ -2,8 +2,8 @@ import { Stack, StackItem } from '@patternfly/react-core'
 import { useNavigate } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
 
-import { AppRoute } from '../../app/AppRoute'
 import { panelContentStackStyle } from '../../app/panelContentStackStyle'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { detachPromise } from '../../utils/detachPromise'
 import { SynEmptyStateViewportTooSmall } from '../states/SynEmptyStateViewportTooSmall'
 
@@ -18,7 +18,7 @@ type SynReactFlowViewportGuardProps = {
 /** Hides page content and shows a full-page empty state when the viewport width is below 1024px (nav bar remains visible). Height is not gated. */
 export function SynReactFlowViewportGuard({ children, onReturn }: SynReactFlowViewportGuardProps) {
   const navigate = useNavigate()
-  const handleReturn = onReturn ?? (() => detachPromise(navigate({ to: AppRoute.Workflows.Root })))
+  const handleReturn = onReturn ?? (() => detachPromise(navigate({ to: routeRefs.workflowsRoute.fullPath })))
 
   return (
     <Stack style={panelContentStackStyle}>

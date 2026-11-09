@@ -15,8 +15,9 @@ import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
 import { createContext, use, useMemo } from 'react'
 import type { ReactNode } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsUserDetail } from '../../../app/breadcrumbBuilders'
+import * as routeRefs from '../../../app/routes/routeReferences'
+import { tanstackRouter } from '../../../app/tanstackRouter'
 import { authClient } from '../../../client'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
@@ -34,6 +35,7 @@ import { accessClient } from '../../access/accessClient'
 import { CheckAccessView } from '../../access/CheckAccessView'
 import { MyPermissionsView } from '../../access/MyPermissionsView'
 import { useResourceActions } from '../../access/useResourceActions'
+import { getUserTabOptions, type UserDetailTab } from '../accessManagementPaths'
 import { AUTH_TYPE_LOCAL } from '../adminConstants'
 import { DisabledBadge } from '../DisabledBadge'
 import { RoleAssignmentsPanel } from '../RoleAssignmentsPanel'
@@ -163,10 +165,8 @@ function UserDetailsTab({
                       onClick={() =>
                         detachPromise(
                           navigate({
-                            to: AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
-                              ':providerId',
-                              id
-                            ).replace('/:tab?', ''),
+                            to: routeRefs.identityProviderDetailRoute.fullPath,
+                            params: { providerId: id },
                           })
                         )
                       }
@@ -194,8 +194,7 @@ function UserDetailsTab({
   )
 }
 
-type UserTab = 'details' | 'groups' | 'identities' | 'roles' | 'permissions' | 'check-access'
-const USER_DETAIL_TAB_PANEL_LABELS: Readonly<Record<UserTab, string>> = {
+const USER_DETAIL_TAB_PANEL_LABELS: Readonly<Record<UserDetailTab, string>> = {
   details: 'Details',
   groups: 'Groups',
   identities: 'Identities',
@@ -216,8 +215,8 @@ function computeVisibleTabs({
   canReadAssignments: boolean
   isOwnProfile: boolean
   isLoading: boolean
-}): UserTab[] {
-  const tabs: UserTab[] = ['details']
+}): UserDetailTab[] {
+  const tabs: UserDetailTab[] = ['details']
   if (isLoading || canReadGroups) tabs.push('groups')
   if (isLoading || canReadIdentities) tabs.push('identities')
   if (isLoading || canReadAssignments) tabs.push('roles')
@@ -237,6 +236,7 @@ function UserCheckAccessTab() {
 
 function UserDetailTabBar({
   basePath,
+  onTabChange,
   validTabs,
   groupCount,
   identitiesCount,
@@ -244,7 +244,8 @@ function UserDetailTabBar({
   renderPanel,
 }: Readonly<{
   basePath: string
-  validTabs: UserTab[]
+  onTabChange: (tab: UserDetailTab, options?: { replace?: boolean }) => void
+  validTabs: UserDetailTab[]
   groupCount: number
   identitiesCount: number
   roleAssignmentCount: number
@@ -255,6 +256,7 @@ function UserDetailTabBar({
       basePath={basePath}
       defaultTab="details"
       validTabs={validTabs}
+      onTabChange={onTabChange}
       aria-label="User details"
       renderPanel={renderPanel}
       routePanelLayout="detail"
@@ -312,7 +314,7 @@ function UserDetailTabContent({
   isNestedRoute = false,
 }: Readonly<{
   activeTab: string
-  validTabs: UserTab[]
+  validTabs: UserDetailTab[]
   userData: User
   userId: string
   currentUserId: string | undefined
@@ -349,7 +351,7 @@ function UserDetailTabContent({
 
 type UserDetailTabContextValue = {
   activeTab: string
-  validTabs: UserTab[]
+  validTabs: UserDetailTab[]
   userData: User
   userId: string
   currentUserId: string | undefined
@@ -381,8 +383,8 @@ function useUserDetailRouting(isMyProfile: boolean | undefined) {
 
   const userId = isMyProfile ? meUserId : urlUserId
   const basePath = isMyProfile
-    ? AppRoute.MyProfile.Root
-    : AppRoute.AccessManagement.UserDetail.replace(':userId', userId ?? '')
+    ? routeRefs.myProfileRootRoute.fullPath
+    : tanstackRouter.buildLocation({ to: routeRefs.userDetailRoute.fullPath, params: { userId: userId ?? '' } }).href
 
   return { userId, basePath, meQuery }
 }
@@ -392,7 +394,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
   const usersDocLink = useDocLink('users')
   const docLink = isMyProfile ? undefined : usersDocLink
   const { userId, basePath, meQuery } = useUserDetailRouting(isMyProfile)
-  const [activeTab] = useUrlTab<UserTab>(basePath)
+  const activeTab = useUrlTab<UserDetailTab>(basePath)
 
   const userPermissions = useUserPermissions()
   const deleteDialog = useDialogState<User>()
@@ -421,9 +423,14 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
   )
 
   const navigateBack = () =>
-    detachPromise(navigate({ to: isMyProfile ? AppRoute.Workflows.Root : AppRoute.AccessManagement.Users }))
+    detachPromise(
+      navigate({ to: isMyProfile ? routeRefs.workflowsRoute.fullPath : routeRefs.accessManagementUsersRoute.fullPath })
+    )
   const navigateEdit = () =>
-    detachPromise(navigate({ to: AppRoute.AccessManagement.EditUser.replace(':userId', userId ?? '') }))
+    detachPromise(navigate({ to: routeRefs.editUserRoute.fullPath, params: { userId: userId ?? '' } }))
+
+  const onTabChange = (tab: UserDetailTab, options?: { replace?: boolean }) =>
+    detachPromise(navigate({ ...getUserTabOptions(!!isMyProfile, userId ?? '', tab), ...options }))
 
   const handleDelete = useDeleteAction({
     deleteFn: deleteUser,
@@ -503,6 +510,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
           <SynListPanel>
             <UserDetailTabBar
               basePath={basePath}
+              onTabChange={onTabChange}
               validTabs={validTabs}
               groupCount={groupCount}
               identitiesCount={identitiesData.length}

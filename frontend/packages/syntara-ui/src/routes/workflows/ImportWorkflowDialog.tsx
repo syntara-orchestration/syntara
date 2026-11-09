@@ -12,6 +12,7 @@ import type { V2WorkflowDefinition } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import { workflowFetchClient } from '../../client'
 import { SynFileField } from '../../components/forms/SynFileField'
 import { SynForm } from '../../components/forms/SynForm'
@@ -100,7 +101,7 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
     const title = hasValidationIssues ? 'Workflow imported with warnings' : 'Workflow imported'
     const description = importAlertDescription(wfName, findings)
     const openInEditor = createdId
-      ? () => detachPromise(navigate({ to: '/workflow-builder/$workflowId', params: { workflowId: createdId } }))
+      ? () => detachPromise(navigate({ to: routeRefs.builderEditRoute.fullPath, params: { workflowId: createdId } }))
       : undefined
     const actionLinks = createdId ? <AlertActionLink onClick={openInEditor}>Open workflow</AlertActionLink> : undefined
     showAlert({ variant, autoDismiss: true, title, description, actionLinks })

@@ -7,10 +7,10 @@
  */
 import { expect, type Page } from '@playwright/test'
 
-import { AppRoute } from '../../src/app/AppRoute'
 import { toAppUrl } from '../fixtures'
 import { clickCanvasStepToOpenEditor } from '../helpers/canvas-interaction'
 import { credentialTypeOptionName } from '../helpers/credentials'
+import { routePaths } from '../routePaths'
 
 import { MOCK_IDENTITY_PROVIDER_ID } from './mock-ids'
 import type { CanvasPageEntry, PageEntry } from './page-registry'
@@ -65,7 +65,7 @@ async function enterBuilderVersionViewHeaderState(page: Page, workflowId: string
   const unpublishResp = await page.request.post(`/api/v1/workflows/${workflowId}/unpublish`)
   if (!unpublishResp.ok()) throw new Error(`Unpublish workflow ${workflowId} failed: ${unpublishResp.status()}`)
 
-  const builderPath = AppRoute.WorkflowBuilder.Edit.replace(':workflowId', workflowId)
+  const builderPath = routePaths.WorkflowBuilder.Edit(workflowId)
   await page.goto(toAppUrl(`${builderPath}?version=${currentVersion}`))
 
   await expect(page.getByRole('heading', { level: 1, name: workflow.name ?? 'conditional-demo' })).toBeVisible({
@@ -200,7 +200,7 @@ export const transferIdentityWizardPages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'transfer-identity-wizard-step1',
-    path: AppRoute.AccessManagement.TransferIdentity.replace(':userId', MOCK_USER_ID),
+    path: routePaths.AccessManagement.TransferIdentity(MOCK_USER_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: /Transfer identity to/i })).toBeVisible()
       await expect(page.getByRole('heading', { level: 2, name: 'Select a user' })).toBeVisible()
@@ -209,7 +209,7 @@ export const transferIdentityWizardPages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'transfer-identity-wizard-step1-selected',
-    path: AppRoute.AccessManagement.TransferIdentity.replace(':userId', MOCK_USER_ID),
+    path: routePaths.AccessManagement.TransferIdentity(MOCK_USER_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 2, name: 'Select a user' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -222,7 +222,7 @@ export const transferIdentityWizardPages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'transfer-identity-wizard-step2-empty',
-    path: AppRoute.AccessManagement.TransferIdentity.replace(':userId', MOCK_USER_ID),
+    path: routePaths.AccessManagement.TransferIdentity(MOCK_USER_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 2, name: 'Select a user' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -242,7 +242,7 @@ export const oidcProviderWizardPages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'identity-provider-add-connection-section',
-    path: AppRoute.SystemAdministration.Authentication.AddIdentityProvider,
+    path: routePaths.SystemAdministration.Authentication.AddIdentityProvider,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Add OIDC provider' })).toBeVisible()
     },
@@ -255,7 +255,7 @@ export const oidcProviderWizardPages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'identity-provider-add-options-section',
-    path: AppRoute.SystemAdministration.Authentication.AddIdentityProvider,
+    path: routePaths.SystemAdministration.Authentication.AddIdentityProvider,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Add OIDC provider' })).toBeVisible()
     },
@@ -268,10 +268,7 @@ export const oidcProviderWizardPages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'identity-provider-edit',
-    path: AppRoute.SystemAdministration.Authentication.EditIdentityProvider.replace(
-      ':providerId',
-      MOCK_IDENTITY_PROVIDER_ID
-    ),
+    path: routePaths.SystemAdministration.Authentication.EditIdentityProvider(MOCK_IDENTITY_PROVIDER_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: /Edit OIDC provider/i })).toBeVisible()
     },
@@ -279,10 +276,7 @@ export const oidcProviderWizardPages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'identity-provider-detail-group-mapping-tab',
-    path: AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
-      ':providerId',
-      MOCK_IDENTITY_PROVIDER_ID
-    ),
+    path: routePaths.SystemAdministration.Authentication.IdentityProviderDetail(MOCK_IDENTITY_PROVIDER_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     },
@@ -294,10 +288,7 @@ export const oidcProviderWizardPages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'identity-provider-detail-disable-dialog',
-    path: AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
-      ':providerId',
-      MOCK_IDENTITY_PROVIDER_ID
-    ),
+    path: routePaths.SystemAdministration.Authentication.IdentityProviderDetail(MOCK_IDENTITY_PROVIDER_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     },
@@ -311,10 +302,7 @@ export const oidcProviderWizardPages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'identity-provider-detail-kebab-menu',
-    path: AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
-      ':providerId',
-      MOCK_IDENTITY_PROVIDER_ID
-    ),
+    path: routePaths.SystemAdministration.Authentication.IdentityProviderDetail(MOCK_IDENTITY_PROVIDER_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     },
@@ -326,7 +314,7 @@ export const oidcProviderWizardPages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'identity-provider-add-step1-validation',
-    path: AppRoute.SystemAdministration.Authentication.AddIdentityProvider,
+    path: routePaths.SystemAdministration.Authentication.AddIdentityProvider,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Add OIDC provider' })).toBeVisible()
     },
@@ -345,7 +333,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     section: 'workflows',
     name: 'builder-edit-add-step-panel',
     perceptual: true,
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_WORKFLOW_ID),
     waitFor: async (page) => {
       await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
     },
@@ -363,7 +351,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   {
     section: 'workflows',
     name: 'builder-edit-script-step-form',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_CONDITION_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_CONDITION_WORKFLOW_ID),
     perceptual: true,
     // StepEditorOverlay covers the canvas box — masking .react-flow would erase the form.
     maskCanvas: false,
@@ -377,7 +365,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   {
     section: 'workflows',
     name: 'builder-edit-condition-step-form',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_CONDITION_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_CONDITION_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
     waitFor: async (page) => {
@@ -390,7 +378,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   {
     section: 'workflows',
     name: 'builder-edit-loop-step-form',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_LOOP_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_LOOP_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
     waitFor: async (page) => {
@@ -407,7 +395,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   {
     section: 'workflows',
     name: 'builder-edit-agentic-step-form',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_AGENTIC_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_AGENTIC_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
     waitFor: async (page) => {
@@ -421,7 +409,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   {
     section: 'workflows',
     name: 'builder-edit-http-step-form',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_HTTP_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_HTTP_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
     waitFor: async (page) => {
@@ -435,7 +423,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   {
     section: 'workflows',
     name: 'builder-edit-converge-step-form',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_CONVERGE_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_CONVERGE_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
     waitFor: async (page) => {
@@ -448,7 +436,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   {
     section: 'workflows',
     name: 'builder-edit-approval-step-form',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_APPROVAL_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_APPROVAL_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
     waitFor: async (page) => {
@@ -463,7 +451,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     name: 'builder-new-scheduled-trigger-form',
     perceptual: true,
     maskCanvas: false,
-    path: AppRoute.WorkflowBuilder.New,
+    path: routePaths.WorkflowBuilder.New,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible({
         timeout: 30_000,
@@ -486,7 +474,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     name: 'builder-new-webhook-trigger-form',
     perceptual: true,
     maskCanvas: false,
-    path: AppRoute.WorkflowBuilder.New,
+    path: routePaths.WorkflowBuilder.New,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible({
         timeout: 30_000,
@@ -501,7 +489,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     section: 'workflows',
     name: 'builder-new-verify-errors',
     perceptual: true,
-    path: AppRoute.WorkflowBuilder.New,
+    path: routePaths.WorkflowBuilder.New,
     waitFor: async (page) => {
       await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
     },
@@ -514,7 +502,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   {
     section: 'workflows',
     name: 'builder-edit-verify-step-errors',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_WORKFLOW_ID),
     perceptual: true,
     waitFor: async (page) => {
       await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
@@ -535,7 +523,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
     section: 'workflows',
     name: 'workflows-kebab-menu',
     perceptual: true,
-    path: AppRoute.Workflows.Root,
+    path: routePaths.Workflows.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -550,7 +538,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
     section: 'workflows',
     name: 'workflows-publish-dialog',
     perceptual: true,
-    path: AppRoute.Workflows.Root,
+    path: routePaths.Workflows.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -567,7 +555,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
     section: 'workflows',
     name: 'workflows-unpublish-dialog',
     perceptual: true,
-    path: AppRoute.Workflows.Root,
+    path: routePaths.Workflows.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -624,7 +612,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
     section: 'workflows',
     name: 'workflows-run-dialog',
     perceptual: true,
-    path: AppRoute.Workflows.Root,
+    path: routePaths.Workflows.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -667,7 +655,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
   {
     section: 'workflows',
     name: 'builder-edit-version-history-panel',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_WORKFLOW_ID),
     perceptual: true,
     waitFor: async (page) => {
       // Use 30s to match all other builder entries (ReactFlow + Zustand + lazy-load is slow in CI)
@@ -696,7 +684,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
   {
     section: 'workflows',
     name: 'builder-edit-version-view-header',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_WORKFLOW_ID),
     perceptual: true,
     waitFor: async (page) => {
       await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
@@ -708,7 +696,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
   {
     section: 'workflows',
     name: 'builder-edit-run-history-panel',
-    path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_WORKFLOW_ID),
+    path: routePaths.WorkflowBuilder.Edit(MOCK_WORKFLOW_ID),
     perceptual: true,
     waitFor: async (page) => {
       await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
@@ -726,7 +714,7 @@ export const workflowDialogPages: CanvasPageEntry[] = [
     section: 'workflows',
     name: 'workflows-import-dialog',
     perceptual: true,
-    path: AppRoute.Workflows.Root,
+    path: routePaths.Workflows.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -747,7 +735,7 @@ export const credentialDialogPages: PageEntry[] = [
   {
     section: 'configuration/credentials',
     name: 'credentials-delete-dialog',
-    path: AppRoute.Configuration.Credentials.Root,
+    path: routePaths.Configuration.Credentials.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -764,7 +752,7 @@ export const credentialDialogPages: PageEntry[] = [
   {
     section: 'configuration/credentials',
     name: 'credentials-disable-dialog',
-    path: AppRoute.Configuration.Credentials.Root,
+    path: routePaths.Configuration.Credentials.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -785,7 +773,7 @@ export const integrationWizardPages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integration-configure-aap-step1',
-    path: AppRoute.Configuration.Integrations.Configure,
+    path: routePaths.Configuration.Integrations.Configure,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Configure integration' })).toBeVisible()
     },
@@ -799,7 +787,7 @@ export const integrationWizardPages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integration-configure-security',
-    path: AppRoute.Configuration.Integrations.Configure,
+    path: routePaths.Configuration.Integrations.Configure,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Configure integration' })).toBeVisible()
     },
@@ -811,7 +799,7 @@ export const integrationWizardPages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integration-configure-step2-credential',
-    path: AppRoute.Configuration.Integrations.Configure,
+    path: routePaths.Configuration.Integrations.Configure,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Configure integration' })).toBeVisible()
     },
@@ -826,7 +814,7 @@ export const integrationWizardPages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integration-configure-step3-tools',
-    path: AppRoute.Configuration.Integrations.Configure,
+    path: routePaths.Configuration.Integrations.Configure,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Configure integration' })).toBeVisible()
     },
@@ -858,7 +846,7 @@ export const integrationSecurityPages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integration-edit-security',
-    path: AppRoute.Configuration.Integrations.Edit.replace(':integrationId', '1'),
+    path: routePaths.Configuration.Integrations.Edit('1'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Edit integration' })).toBeVisible()
     },
@@ -870,7 +858,7 @@ export const integrationSecurityPages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'llm-provider-edit-security',
-    path: AppRoute.Configuration.Integrations.Edit.replace(':integrationId', '10'),
+    path: routePaths.Configuration.Integrations.Edit('10'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Edit integration' })).toBeVisible()
     },
@@ -882,7 +870,7 @@ export const integrationSecurityPages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'aap-edit-security',
-    path: AppRoute.Configuration.Integrations.Edit.replace(':integrationId', '12'),
+    path: routePaths.Configuration.Integrations.Edit('12'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Edit integration' })).toBeVisible()
       await expect(page.locator('input[value="https://aap.prod.example.com"]')).toBeVisible()
@@ -901,7 +889,7 @@ export const integrationDialogPages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integrations-delete-dialog',
-    path: AppRoute.Configuration.Integrations.Root,
+    path: routePaths.Configuration.Integrations.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Integrations' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -918,7 +906,7 @@ export const integrationDialogPages: PageEntry[] = [
   {
     section: 'configuration/integrations',
     name: 'integration-resources-unsaved-changes-dialog',
-    path: AppRoute.Configuration.Integrations.DetailTab.replace(':integrationId', '1').replace(':tab', 'resources'),
+    path: routePaths.Configuration.Integrations.DetailTab('1', 'resources'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Enabled resources/i, selected: true })).toBeVisible()
@@ -954,14 +942,14 @@ export const approvalInteractivePages: PageEntry[] = [
   {
     section: 'approvals',
     name: 'approval-side-panel-pending',
-    path: `${AppRoute.Executions.Execution.replace(':executionId', MOCK_APPROVAL_EXECUTION_ID)}?approval=${MOCK_APPROVAL_ID}&history=closed`,
+    path: `${routePaths.Executions.Execution(MOCK_APPROVAL_EXECUTION_ID)}?approval=${MOCK_APPROVAL_ID}&history=closed`,
     perceptual: true,
     waitFor: waitForApprovalPanel,
   },
   {
     section: 'approvals',
     name: 'approval-side-panel-approve-selected',
-    path: `${AppRoute.Executions.Execution.replace(':executionId', MOCK_APPROVAL_EXECUTION_ID)}?approval=${MOCK_APPROVAL_ID}&history=closed`,
+    path: `${routePaths.Executions.Execution(MOCK_APPROVAL_EXECUTION_ID)}?approval=${MOCK_APPROVAL_ID}&history=closed`,
     perceptual: true,
     waitFor: waitForApprovalPanel,
     setup: async (page) => {
@@ -974,7 +962,7 @@ export const approvalInteractivePages: PageEntry[] = [
   {
     section: 'approvals',
     name: 'approval-side-panel-reject-selected',
-    path: `${AppRoute.Executions.Execution.replace(':executionId', MOCK_APPROVAL_EXECUTION_ID)}?approval=${MOCK_APPROVAL_ID}&history=closed`,
+    path: `${routePaths.Executions.Execution(MOCK_APPROVAL_EXECUTION_ID)}?approval=${MOCK_APPROVAL_ID}&history=closed`,
     perceptual: true,
     waitFor: waitForApprovalPanel,
     setup: async (page) => {
@@ -987,7 +975,7 @@ export const approvalInteractivePages: PageEntry[] = [
   {
     section: 'approvals',
     name: 'approval-side-panel-viewer-disabled',
-    path: `${AppRoute.Executions.Execution.replace(':executionId', MOCK_APPROVAL_EXECUTION_ID)}?approval=${MOCK_APPROVAL_ID}&history=closed`,
+    path: `${routePaths.Executions.Execution(MOCK_APPROVAL_EXECUTION_ID)}?approval=${MOCK_APPROVAL_ID}&history=closed`,
     perceptual: true,
     role: 'viewer',
     waitFor: async (page) => {
@@ -1004,7 +992,7 @@ export const settingsTabPages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings-ai-llm-tab',
-    path: AppRoute.SystemAdministration.SettingsTab.replace(':category', 'ai_llm'),
+    path: routePaths.SystemAdministration.SettingsTab('ai_llm'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab', { name: /AI \/ LLM/i, selected: true })).toBeVisible()
@@ -1013,7 +1001,7 @@ export const settingsTabPages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings-system-tab',
-    path: AppRoute.SystemAdministration.SettingsTab.replace(':category', 'system'),
+    path: routePaths.SystemAdministration.SettingsTab('system'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab', { name: /System/i, selected: true })).toBeVisible()
@@ -1022,7 +1010,7 @@ export const settingsTabPages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings-authentication-tab',
-    path: AppRoute.SystemAdministration.SettingsTab.replace(':category', 'authentication'),
+    path: routePaths.SystemAdministration.SettingsTab('authentication'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Authentication/i, selected: true })).toBeVisible()
@@ -1031,7 +1019,7 @@ export const settingsTabPages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings-workflow-execution-tab',
-    path: AppRoute.SystemAdministration.SettingsTab.replace(':category', 'workflow_execution'),
+    path: routePaths.SystemAdministration.SettingsTab('workflow_execution'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Workflow Execution/i, selected: true })).toBeVisible()
@@ -1040,7 +1028,7 @@ export const settingsTabPages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings-context-manager-tab',
-    path: AppRoute.SystemAdministration.SettingsTab.replace(':category', 'context_manager'),
+    path: routePaths.SystemAdministration.SettingsTab('context_manager'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Context Manager/i, selected: true })).toBeVisible()
@@ -1055,7 +1043,7 @@ export const statusVariantPages: PageEntry[] = [
   {
     section: 'executions',
     name: 'execution-detail-failed',
-    path: AppRoute.Executions.Execution.replace(':executionId', MOCK_EXECUTION_FAILED_ID),
+    path: routePaths.Executions.Execution(MOCK_EXECUTION_FAILED_ID),
     maxDiffPixelRatio: 0.02,
     perceptual: true,
     waitFor: async (page) => {
@@ -1067,7 +1055,7 @@ export const statusVariantPages: PageEntry[] = [
   {
     section: 'executions',
     name: 'execution-detail-running',
-    path: AppRoute.Executions.Execution.replace(':executionId', MOCK_EXECUTION_RUNNING_ID),
+    path: routePaths.Executions.Execution(MOCK_EXECUTION_RUNNING_ID),
     perceptual: true,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
@@ -1077,7 +1065,7 @@ export const statusVariantPages: PageEntry[] = [
   {
     section: 'executions',
     name: 'execution-detail-paused',
-    path: AppRoute.Executions.Execution.replace(':executionId', MOCK_EXECUTION_PAUSED_ID),
+    path: routePaths.Executions.Execution(MOCK_EXECUTION_PAUSED_ID),
     perceptual: true,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
@@ -1087,7 +1075,7 @@ export const statusVariantPages: PageEntry[] = [
   {
     section: 'executions',
     name: 'execution-detail-cancelled',
-    path: AppRoute.Executions.Execution.replace(':executionId', MOCK_EXECUTION_CANCELLED_ID),
+    path: routePaths.Executions.Execution(MOCK_EXECUTION_CANCELLED_ID),
     perceptual: true,
     maxDiffPixelRatio: EXECUTION_STATUS_BADGE_TOLERANCE,
     waitFor: async (page) => {
@@ -1098,7 +1086,7 @@ export const statusVariantPages: PageEntry[] = [
   {
     section: 'executions',
     name: 'execution-detail-pending',
-    path: AppRoute.Executions.Execution.replace(':executionId', MOCK_EXECUTION_PENDING_ID),
+    path: routePaths.Executions.Execution(MOCK_EXECUTION_PENDING_ID),
     perceptual: true,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
@@ -1108,7 +1096,7 @@ export const statusVariantPages: PageEntry[] = [
   {
     section: 'approvals',
     name: 'approvals-expanded-row',
-    path: AppRoute.Approvals.Root,
+    path: routePaths.Approvals.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -1125,7 +1113,7 @@ export const statusVariantPages: PageEntry[] = [
   {
     section: 'configuration/credentials',
     name: 'credential-detail-disabled',
-    path: AppRoute.Configuration.Credentials.Detail.replace(':credentialId', MOCK_CREDENTIAL_DISABLED_ID),
+    path: routePaths.Configuration.Credentials.Detail(MOCK_CREDENTIAL_DISABLED_ID),
     waitFor: async (page) => {
       await expect(page.getByText('GitHub API Token').first()).toBeVisible()
       await expect(page.getByText('Disabled')).toBeVisible()
@@ -1140,7 +1128,7 @@ export const userCreateFormPages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'user-create-validation-errors',
-    path: AppRoute.AccessManagement.CreateUser,
+    path: routePaths.AccessManagement.CreateUser,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Create user' })).toBeVisible()
     },
@@ -1159,7 +1147,7 @@ export const credentialEditPages: PageEntry[] = [
   {
     section: 'configuration/credentials',
     name: 'credentials-edit-modal',
-    path: AppRoute.Configuration.Credentials.Root,
+    path: routePaths.Configuration.Credentials.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
       await expect(page.locator('table tbody tr').first()).toBeVisible()
@@ -1176,7 +1164,7 @@ export const credentialEditPages: PageEntry[] = [
   {
     section: 'configuration/credentials',
     name: 'credentials-create-modal-auth-method',
-    path: AppRoute.Configuration.Credentials.Root,
+    path: routePaths.Configuration.Credentials.Root,
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
       // PatternFly's <Table> renders with role="grid" (see isExpandable usage in
@@ -1205,10 +1193,7 @@ export const authenticationInteractivePages: PageEntry[] = [
   {
     section: 'authentication',
     name: 'identity-provider-detail',
-    path: AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
-      ':providerId',
-      MOCK_IDENTITY_PROVIDER_ID
-    ),
+    path: routePaths.SystemAdministration.Authentication.IdentityProviderDetail(MOCK_IDENTITY_PROVIDER_ID),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     },
@@ -1222,7 +1207,7 @@ export const detailTabPages: PageEntry[] = [
   {
     section: 'settings',
     name: 'settings-application-tab',
-    path: AppRoute.SystemAdministration.SettingsTab.replace(':category', 'application'),
+    path: routePaths.SystemAdministration.SettingsTab('application'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Application/i, selected: true })).toBeVisible()
@@ -1231,10 +1216,7 @@ export const detailTabPages: PageEntry[] = [
   {
     section: 'configuration/credentials',
     name: 'credential-detail-workflows-tab',
-    path: AppRoute.Configuration.Credentials.DetailTab.replace(':credentialId', MOCK_CREDENTIAL_ID).replace(
-      ':tab',
-      'workflows'
-    ),
+    path: routePaths.Configuration.Credentials.DetailTab(MOCK_CREDENTIAL_ID, 'workflows'),
     waitFor: async (page) => {
       await expect(page.getByText('Production API Auth').first()).toBeVisible()
       await expect(page.getByRole('tab', { name: /Workflows/i, selected: true })).toBeVisible()
@@ -1243,10 +1225,7 @@ export const detailTabPages: PageEntry[] = [
   {
     section: 'configuration/credentials',
     name: 'credential-detail-integrations-tab',
-    path: AppRoute.Configuration.Credentials.DetailTab.replace(':credentialId', MOCK_CREDENTIAL_ID).replace(
-      ':tab',
-      'integrations'
-    ),
+    path: routePaths.Configuration.Credentials.DetailTab(MOCK_CREDENTIAL_ID, 'integrations'),
     waitFor: async (page) => {
       await expect(page.getByText('Production API Auth').first()).toBeVisible()
       await expect(page.getByRole('tab', { name: /Integrations/i, selected: true })).toBeVisible()
@@ -1255,7 +1234,7 @@ export const detailTabPages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'user-detail-groups-tab',
-    path: AppRoute.AccessManagement.UserDetailTab.replace(':userId', MOCK_USER_ID).replace(':tab', 'groups'),
+    path: routePaths.AccessManagement.UserDetailTab(MOCK_USER_ID, 'groups'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Groups/i, selected: true })).toBeVisible()
@@ -1264,7 +1243,7 @@ export const detailTabPages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'user-detail-roles-tab',
-    path: AppRoute.AccessManagement.UserDetailTab.replace(':userId', MOCK_USER_ID).replace(':tab', 'roles'),
+    path: routePaths.AccessManagement.UserDetailTab(MOCK_USER_ID, 'roles'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Assignments/i, selected: true })).toBeVisible()
@@ -1273,7 +1252,7 @@ export const detailTabPages: PageEntry[] = [
   {
     section: 'access-management/users',
     name: 'user-detail-check-access-tab',
-    path: AppRoute.AccessManagement.UserDetailTab.replace(':userId', MOCK_USER_ID).replace(':tab', 'check-access'),
+    path: routePaths.AccessManagement.UserDetailTab(MOCK_USER_ID, 'check-access'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Check my access/i, selected: true })).toBeVisible()
@@ -1283,7 +1262,7 @@ export const detailTabPages: PageEntry[] = [
   {
     section: 'access-management/groups',
     name: 'group-detail-members-tab',
-    path: AppRoute.AccessManagement.GroupDetailTab.replace(':groupId', MOCK_GROUP_ID).replace(':tab', 'members'),
+    path: routePaths.AccessManagement.GroupDetailTab(MOCK_GROUP_ID, 'members'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Members/i, selected: true })).toBeVisible()
@@ -1292,7 +1271,7 @@ export const detailTabPages: PageEntry[] = [
   {
     section: 'access-management/groups',
     name: 'group-detail-roles-tab',
-    path: AppRoute.AccessManagement.GroupDetailTab.replace(':groupId', MOCK_GROUP_ID).replace(':tab', 'roles'),
+    path: routePaths.AccessManagement.GroupDetailTab(MOCK_GROUP_ID, 'roles'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Assignments/i, selected: true })).toBeVisible()
@@ -1301,10 +1280,7 @@ export const detailTabPages: PageEntry[] = [
   {
     section: 'access-management/projects',
     name: 'project-detail-role-assignments-tab',
-    path: AppRoute.AccessManagement.ProjectDetailTab.replace(':projectId', MOCK_PROJECT_ID).replace(
-      ':tab',
-      'role-assignments'
-    ),
+    path: routePaths.AccessManagement.ProjectDetailTab(MOCK_PROJECT_ID, 'role-assignments'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Assignments/i, selected: true })).toBeVisible()
@@ -1313,10 +1289,7 @@ export const detailTabPages: PageEntry[] = [
   {
     section: 'access-management/service-accounts',
     name: 'service-account-detail-credentials-tab',
-    path: AppRoute.AccessManagement.ServiceAccountDetailTab.replace(
-      ':serviceAccountId',
-      MOCK_SERVICE_ACCOUNT_ID
-    ).replace(':tab', 'credentials'),
+    path: routePaths.AccessManagement.ServiceAccountDetailTab(MOCK_SERVICE_ACCOUNT_ID, 'credentials'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Credentials/i, selected: true })).toBeVisible()
@@ -1325,10 +1298,7 @@ export const detailTabPages: PageEntry[] = [
   {
     section: 'access-management/service-accounts',
     name: 'service-account-detail-assignments-tab',
-    path: AppRoute.AccessManagement.ServiceAccountDetailTab.replace(
-      ':serviceAccountId',
-      MOCK_SERVICE_ACCOUNT_ID
-    ).replace(':tab', 'assignments'),
+    path: routePaths.AccessManagement.ServiceAccountDetailTab(MOCK_SERVICE_ACCOUNT_ID, 'assignments'),
     waitFor: async (page) => {
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(page.getByRole('tab', { name: /Assignments/i, selected: true })).toBeVisible()

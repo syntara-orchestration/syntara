@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { AppRoute } from '../../app/AppRoute'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { adminClient, usersClient } from '../../client'
 import { AlertProvider } from '../../providers/alerts'
 import { routerTestState } from '../../test/setup'
@@ -110,7 +110,7 @@ describe('AccessManagement', () => {
       }
       return Promise.resolve({ data: { allowed: true } } as never)
     })
-    routerTestState.pathname = AppRoute.AccessManagement.Users
+    routerTestState.pathname = routeRefs.accessManagementUsersRoute.fullPath
   })
 
   async function renderAndSettle(ui: React.ReactElement) {
@@ -171,11 +171,14 @@ describe('AccessManagement', () => {
   })
 
   it('replaces bare /system-administration/access-management with the Users tab URL', async () => {
-    routerTestState.pathname = AppRoute.AccessManagement.Root
+    routerTestState.pathname = routeRefs.accessManagementRoute.fullPath
     await renderAndSettle(<AccessManagement />)
 
     await waitFor(() => {
-      expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.AccessManagement.Users, replace: true })
+      expect(routerTestState.navigate).toHaveBeenCalledWith({
+        to: routeRefs.accessManagementUsersRoute.fullPath,
+        replace: true,
+      })
     })
   })
 
@@ -186,7 +189,7 @@ describe('AccessManagement', () => {
   })
 
   it('does not include the tab name in breadcrumbs on non-default hub tabs', async () => {
-    routerTestState.pathname = AppRoute.AccessManagement.Groups
+    routerTestState.pathname = routeRefs.accessManagementGroupsRoute.fullPath
     await renderAndSettle(<AccessManagement />)
 
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
@@ -206,7 +209,7 @@ describe('AccessManagement', () => {
     await user.click(screen.getByRole('tab', { name: 'Groups' }))
 
     // SynListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
-    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.AccessManagement.Groups })
+    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: routeRefs.accessManagementGroupsRoute.fullPath })
   })
 
   it('hides Users tab when user lacks user:read permission', async () => {
@@ -218,7 +221,7 @@ describe('AccessManagement', () => {
       if (body.resource_type === 'user') return Promise.resolve({ data: { allowed: false } } as never)
       return Promise.resolve({ data: { allowed: true } } as never)
     })
-    routerTestState.pathname = AppRoute.AccessManagement.Groups
+    routerTestState.pathname = routeRefs.accessManagementGroupsRoute.fullPath
     await renderAndSettle(<AccessManagement />)
 
     await waitFor(() => {
@@ -289,7 +292,7 @@ describe('AccessManagement', () => {
       }
       return Promise.resolve({ data: { allowed: true } } as never)
     })
-    routerTestState.pathname = AppRoute.AccessManagement.Policies
+    routerTestState.pathname = routeRefs.accessManagementPoliciesRoute.fullPath
     await renderAndSettle(<AccessManagement />)
 
     await waitFor(() => {
@@ -318,7 +321,7 @@ describe('AccessManagement', () => {
       }
       return Promise.resolve({ data: { allowed: false } } as never)
     })
-    routerTestState.pathname = AppRoute.AccessManagement.Assignments
+    routerTestState.pathname = routeRefs.accessManagementAssignmentsRoute.fullPath
     await renderAndSettle(<AccessManagement />)
 
     await waitFor(() => {
@@ -338,13 +341,13 @@ describe('AccessManagement', () => {
       if (body.resource_type === 'user') return Promise.resolve({ data: { allowed: false } } as never)
       return Promise.resolve({ data: { allowed: true } } as never)
     })
-    routerTestState.pathname = AppRoute.AccessManagement.Users
+    routerTestState.pathname = routeRefs.accessManagementUsersRoute.fullPath
     await renderAndSettle(<AccessManagement />)
 
     await waitFor(() => {
       // useUrlTab uses useNavigate for tab redirects
       expect(routerTestState.navigate).toHaveBeenCalledWith(
-        expect.objectContaining({ to: AppRoute.AccessManagement.Groups })
+        expect.objectContaining({ to: routeRefs.accessManagementGroupsRoute.fullPath })
       )
     })
   })
@@ -358,12 +361,15 @@ describe('AccessManagement', () => {
       if (body.resource_type === 'project') return Promise.resolve({ data: { allowed: false } } as never)
       return Promise.resolve({ data: { allowed: true } } as never)
     })
-    routerTestState.pathname = AppRoute.AccessManagement.Projects
+    routerTestState.pathname = routeRefs.accessManagementProjectsRoute.fullPath
     await renderAndSettle(<AccessManagement />)
 
     await waitFor(() => {
       // SynUrlTabs redirects via navigate({ to, replace: true }) when the active tab is hidden
-      expect(routerTestState.navigate).toHaveBeenCalledWith({ to: AppRoute.AccessManagement.Users, replace: true })
+      expect(routerTestState.navigate).toHaveBeenCalledWith({
+        to: routeRefs.accessManagementUsersRoute.fullPath,
+        replace: true,
+      })
     })
   })
 

@@ -1,7 +1,7 @@
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 
-import { AppRoute } from '../../../app/AppRoute'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { integrationsClient } from '../../../client'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useAlerts } from '../../../providers/alerts'
@@ -72,7 +72,7 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
             autoDismiss: true,
           })
           detachPromise(refetch())
-          detachPromise(navigate({ to: AppRoute.Configuration.Integrations.Root }))
+          detachPromise(navigate({ to: routeRefs.integrationsRoute.fullPath }))
         },
         onError: (error: unknown) => {
           showAlert({

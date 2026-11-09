@@ -2,7 +2,7 @@ import { IntegrationTypeEnum, type IntegrationsAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
-import { AppRoute } from '../../../../app/AppRoute'
+import * as routeRefs from '../../../../app/routes/routeReferences'
 import { tanstackRouter } from '../../../../app/tanstackRouter'
 import { integrationsClient } from '../../../../client'
 import type { useFormMutationErrorHandler } from '../../../../hooks/useFormMutationErrorHandler'
@@ -40,7 +40,7 @@ export function useCreateIntegration({ handleError, onBeforeNavigate }: UseCreat
     ) => {
       const context = formData.name ? `Integration "${formData.name}"` : undefined
       const navigateToList = () => {
-        detachPromise(tanstackRouter.navigate({ to: AppRoute.Configuration.Integrations.Root }))
+        detachPromise(tanstackRouter.navigate({ to: routeRefs.integrationsRoute.fullPath }))
       }
 
       detachPromise(

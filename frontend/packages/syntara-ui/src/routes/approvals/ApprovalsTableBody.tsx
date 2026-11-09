@@ -12,6 +12,7 @@ import { RhUiCaretDownIcon, RhUiCaretRightIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Tr, ExpandableRowContent } from '@patternfly/react-table'
 import { Fragment } from 'react'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import groupedTableStyles from '../../components/groupedTable.module.css'
 import { DateCell } from '../../components/table/DateCell'
 import { LinkCell } from '../../components/table/LinkCell'
@@ -156,13 +157,19 @@ function ApprovalRow({
           }
         />
         <Td dataLabel="Approval name">
-          <LinkCell href={`/executions/${approval.execution_id}?approval=${approval.id}&history=closed`}>
+          <LinkCell
+            options={{
+              to: routeRefs.executionDetailRoute.fullPath,
+              params: { executionId: approval.execution_id },
+              search: { approval: approval.id, history: 'closed' },
+            }}
+          >
             {approval.approvalName || approval.id}
           </LinkCell>
         </Td>
         <Td dataLabel="Workflow">
           {approval.workflowId ? (
-            <LinkCell href={buildWorkflowBuilderLink(approval.workflowId, approval.workflowVersion)}>
+            <LinkCell options={buildWorkflowBuilderLink(approval.workflowId, approval.workflowVersion)}>
               {approval.workflowName || approval.workflowId}
             </LinkCell>
           ) : (

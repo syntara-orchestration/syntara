@@ -303,13 +303,15 @@ export function SynListPanelSkeletonTbody({ columnsCount, rowCount = 5 }: SynLis
   )
 }
 
-export type SynListPanelTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref'> & {
+export type SynListPanelTabsProps<T extends string = string> = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref'> & {
   /** Base URL path for tab routing. */
   basePath: string
   /** Tab key used when the URL has no tab segment. */
-  defaultTab?: string
+  defaultTab?: T
   /** Redirects to `defaultTab` when the URL tab is not in this list. */
-  validTabs?: string[]
+  validTabs?: readonly T[]
+  /** Navigate through the caller's typed route reference for the selected tab. */
+  onTabChange: (tab: T, options?: { replace?: boolean }) => void
   /** `<Tab>` elements. */
   children: ReactNode
   /** Render the active nested route in the selected tab panel. */
@@ -321,16 +323,17 @@ export type SynListPanelTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | '
 }
 
 /** URL-driven tabs for use inside `SynListPanel`. */
-export function SynListPanelTabs({
+export function SynListPanelTabs<T extends string = string>({
   basePath,
   defaultTab,
   validTabs,
+  onTabChange,
   children,
   renderPanel,
   tabPanelLabels,
   routePanelLayout,
   ...tabsProps
-}: SynListPanelTabsProps) {
+}: SynListPanelTabsProps<T>) {
   const tabCtx = useSynListPanelTabContext()
 
   // Inject tabContentId into each Tab so PF's aria-controls targets the panel rendered by
@@ -350,6 +353,7 @@ export function SynListPanelTabs({
         basePath={basePath}
         defaultTab={defaultTab}
         validTabs={validTabs}
+        onTabChange={onTabChange}
         renderPanel={renderPanel}
         tabPanelLabels={tabPanelLabels}
         routePanelLayout={routePanelLayout}

@@ -4,11 +4,8 @@ import {
   collectAppLevelRoutesFromSource,
   collectFallbackRouteFromSource,
   collectNavigationPathsFromSource,
-  collectPathsFromObject,
   extractBalancedObjectBody,
-  parseAppRouteCatalog,
   parseCreateRouteBlocks as parseBlocks,
-  resolveAppRouteReference,
 } from './collect-routes'
 
 // Each parser fixture includes a real root declaration; unresolved parents must fail.
@@ -83,20 +80,17 @@ export const routes = [
     ])
   })
 
-  it('resolves redirect({ to: AppRoute... }) against the catalog', () => {
-    const catalog = {
-      Configuration: {
-        Credentials: { Root: '/configuration/credentials' },
-      },
-    }
+  it('resolves route-reference redirects against exported route paths', () => {
     const source = `
 createRoute({
   getParentRoute: () => rootRoute,
   path: '/configuration',
-  beforeLoad: () => redirect({ to: AppRoute.Configuration.Credentials.Root, replace: true }),
+  beforeLoad: () => redirect({ to: routeRefs.credentialsRoute.fullPath, replace: true }),
 })
 `
-    expect(parseCreateRouteBlocks(source, { appRouteCatalog: catalog })).toStrictEqual([
+    expect(
+      parseCreateRouteBlocks(source, { routeReferencePaths: { credentialsRoute: '/configuration/credentials' } })
+    ).toStrictEqual([
       {
         path: '/configuration',
         kind: 'redirect',
@@ -105,16 +99,16 @@ createRoute({
     ])
   })
 
-  it('throws when AppRoute redirect cannot be resolved', () => {
+  it('throws when a route-reference redirect cannot be resolved', () => {
     const source = `
 createRoute({
   getParentRoute: () => rootRoute,
   path: '/configuration',
-  beforeLoad: () => redirect({ to: AppRoute.Missing.Path, replace: true }),
+  beforeLoad: () => redirect({ to: routeRefs.missingRoute.fullPath, replace: true }),
 })
 `
-    expect(() => parseCreateRouteBlocks(source, { appRouteCatalog: {} })).toThrow(
-      /Could not resolve redirect target AppRoute\.Missing\.Path/
+    expect(() => parseCreateRouteBlocks(source, { routeReferencePaths: {} })).toThrow(
+      /Could not resolve routeRefs\.missingRoute/
     )
   })
 
@@ -162,33 +156,26 @@ describe('extractBalancedObjectBody', () => {
 })
 
 describe('collectAppLevelRoutesFromSource', () => {
-  it('resolves AppRoute pathname escape hatches', () => {
-    const catalog = { Auth: { TestSignInCallback: '/auth/test-signin-callback' } }
+  it('resolves the app-level callback path definition', () => {
     const source = `
-      if (globalThis.location.pathname === AppRoute.Auth.TestSignInCallback) {
+      if (globalThis.location.pathname === testSignInCallbackPath) {
         return <TestSignInCallback />
       }
     `
-    expect(collectAppLevelRoutesFromSource(source, catalog)).toStrictEqual([
+    const pathSource = `export const testSignInCallbackPath = '/auth/test-signin-callback'`
+    expect(collectAppLevelRoutesFromSource(source, pathSource)).toStrictEqual([
       {
         template: '/auth/test-signin-callback',
-        parameters: [],
-        kind: 'app',
-        sources: ['app', 'appRoute'],
-      },
-    ])
-  })
-
-  it('accepts literal pathname comparisons', () => {
-    const source = `if (location.pathname === '/custom-app-path') return null`
-    expect(collectAppLevelRoutesFromSource(source, {})).toStrictEqual([
-      {
-        template: '/custom-app-path',
         parameters: [],
         kind: 'app',
         sources: ['app'],
       },
     ])
+  })
+
+  it('ignores path literals outside the app-level path definition', () => {
+    const source = `if (location.pathname === '/custom-app-path') return null`
+    expect(collectAppLevelRoutesFromSource(source, '')).toStrictEqual([])
   })
 })
 
@@ -216,54 +203,19 @@ function NotFoundRedirect() {
   })
 })
 
-describe('collectPathsFromObject', () => {
-  it('flattens nested path catalogs', () => {
-    const paths = collectPathsFromObject({
-      Root: '/workflows',
-      Detail: { path: '/workflows/:id' },
-    })
-    expect([...paths].sort()).toStrictEqual(['/workflows', '/workflows/:id'])
-  })
-})
-
 describe('collectNavigationPathsFromSource', () => {
-  it('resolves AppRoute references and literal paths', () => {
-    const catalog = {
-      Workflows: { Root: '/workflows' },
-      Approvals: { Root: '/approvals' },
-    }
+  it('resolves route references used by navigation items', () => {
+    const paths = { workflowsRoute: '/workflows', approvalsRoute: '/approvals' }
     const source = `
-      { path: AppRoute.Workflows.Root },
-      { path: AppRoute.Approvals.Root },
-      { path: '/custom' },
+      { destination: { to: routeRefs.workflowsRoute.fullPath }, matchPath: routeRefs.workflowsRoute.fullPath },
+      { destination: { to: routeRefs.approvalsRoute.fullPath }, matchPath: routeRefs.approvalsRoute.fullPath },
     `
-    expect(collectNavigationPathsFromSource(source, catalog)).toStrictEqual(['/approvals', '/custom', '/workflows'])
+    expect(collectNavigationPathsFromSource(source, paths)).toStrictEqual(['/approvals', '/workflows'])
   })
-})
 
-describe('resolveAppRouteReference', () => {
-  it('walks dotted AppRoute paths', () => {
-    const catalog = { AccessManagement: { Users: '/system-administration/access-management/users' } }
-    expect(resolveAppRouteReference(catalog, 'AppRoute.AccessManagement.Users')).toBe(
-      '/system-administration/access-management/users'
-    )
-  })
-})
-
-describe('parseAppRouteCatalog', () => {
-  it('parses nested AppRoute object literals from source', () => {
-    const source = `
-export const AppRoute = {
-  Workflows: {
-    Root: '/workflows',
-  },
-  Auth: {
-    TestSignInCallback: '/auth/test-signin-callback',
-  },
-}
-`
-    const catalog = parseAppRouteCatalog(source)
-    expect(resolveAppRouteReference(catalog, 'AppRoute.Workflows.Root')).toBe('/workflows')
-    expect(resolveAppRouteReference(catalog, 'AppRoute.Auth.TestSignInCallback')).toBe('/auth/test-signin-callback')
+  it('reports unresolved route references with their source line', () => {
+    expect(() =>
+      collectNavigationPathsFromSource('{ destination: { to: routeRefs.missingRoute.fullPath } }', {})
+    ).toThrow(/routeRefs\.missingRoute\.fullPath in navigationItems\.tsx:1/)
   })
 })

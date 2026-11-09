@@ -13,7 +13,7 @@ import { RhUiCaretDownIcon, RhUiCaretRightIcon, RhUiEditIcon, RhUiTrashIcon } fr
 import { ExpandableRowContent, Tbody, Td, Tr } from '@patternfly/react-table'
 import { Fragment, useMemo } from 'react'
 
-import { AppRoute } from '../../../app/AppRoute'
+import * as routeRefs from '../../../app/routes/routeReferences'
 import groupedTableStyles from '../../../components/groupedTable.module.css'
 import { IconLabel } from '../../../components/IconLabel'
 import type { KebabAction } from '../../../components/SynKebabMenu'
@@ -118,7 +118,9 @@ function CredentialRow({
           }
         />
         <Td dataLabel="Name">
-          <LinkCell href={AppRoute.Configuration.Credentials.Detail.replace(':credentialId', credential.id ?? '')}>
+          <LinkCell
+            options={{ to: routeRefs.credentialDetailRoute.fullPath, params: { credentialId: credential.id ?? '' } }}
+          >
             <Truncate content={credential.name} />
           </LinkCell>
         </Td>

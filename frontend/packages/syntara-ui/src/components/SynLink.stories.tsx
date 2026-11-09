@@ -1,7 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { createRootRoute, createRoute } from '@tanstack/react-router'
 
+import * as routeRefs from '../app/routes/routeReferences'
+
 import { SynLink } from './SynLink'
+
+const workflowsDestination = { to: routeRefs.workflowsRoute.fullPath }
 
 // Wildcard route allows target paths like /workflows to match without router errors
 const rootRoute = createRootRoute()
@@ -33,7 +37,7 @@ type Story = StoryObj<typeof meta>
 
 export const Default: Story = {
   args: {
-    to: '/workflows',
+    options: workflowsDestination,
     children: 'View workflows',
   },
 }
@@ -41,7 +45,7 @@ export const Default: Story = {
 export const WithCustomClassName: Story = {
   name: 'With custom className',
   args: {
-    to: '/workflows',
+    options: workflowsDestination,
     children: 'Styled link',
     className: 'pf-v6-u-font-weight-bold',
   },

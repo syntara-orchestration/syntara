@@ -20,7 +20,7 @@ import { RhUiCloseIcon } from '@patternfly/react-icons'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
-import { AppRoute } from '../../app/AppRoute'
+import * as routeRefs from '../../app/routes/routeReferences'
 import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { DateCell } from '../../components/table/DateCell'
@@ -47,9 +47,7 @@ function ProjectScopeLink({
     <Button
       variant="link"
       isInline
-      onClick={() =>
-        detachPromise(navigate({ to: AppRoute.AccessManagement.ProjectDetail.replace(':projectId', projectId) }))
-      }
+      onClick={() => detachPromise(navigate({ to: routeRefs.projectDetailRoute.fullPath, params: { projectId } }))}
     >
       Project: {projectName ?? projectId}
     </Button>

@@ -1,3 +1,4 @@
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { executionsClient, workflowClient } from '../../../client'
 import { WORKFLOWS_LIST_PARAMS_FOR_DEFAULT_NAME } from '../utils/workflowListQuery'
 
@@ -12,7 +13,7 @@ export function useBuilderContentQueries(options: {
 
   const executionsQuery = executionsClient.useQuery(
     'get',
-    '/executions',
+    routeRefs.executionsListRoute.fullPath,
     {
       params: { query: executionsQueryParams },
     },
