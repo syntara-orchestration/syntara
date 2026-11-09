@@ -188,6 +188,8 @@ function FormPromptFormFields({
   const { register, control, setValue } = useFormContext<FormPromptFormData>()
   const formDefinition = useWatch({ control, name: 'form_definition' })
   const message = useWatch({ control, name: 'message' })
+  const submitLabel = useWatch({ control, name: 'submit_label' })
+  const cssOverrideSource = useWatch({ control, name: 'css_override' })
   const builderCommitRef = use(FormFieldBuilderCommitRefContext)
   const storeProjectId = useWorkflowStore((state) => state.projectId)
   const effectiveProjectId = projectId ?? storeProjectId
@@ -321,6 +323,9 @@ function FormPromptFormFields({
           }
           registerCommit={registerBuilderCommit}
           isDisabled={isVersionView}
+          previewSubmitLabel={submitLabel}
+          previewCssOverrideSource={cssOverrideSource}
+          previewDescription={message}
         />
       </StackItem>
       <StackItem>
@@ -349,6 +354,8 @@ function FormPromptFormFields({
         onClose={() => setIsPreviewOpen(false)}
         formDefinition={resolvedDefinition}
         message={message}
+        submitLabel={submitLabel}
+        cssOverrideSource={cssOverrideSource}
       />
     </>
   )
