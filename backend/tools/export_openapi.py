@@ -30,6 +30,7 @@ from syntara.metrics.internal_api import (
     metrics_store_reset,
     metrics_store_summary,
 )
+from syntara.workflows.openapi import compose_workflow_response_schemas
 
 
 def _extract_route_permission(route: object) -> dict[str, object] | None:
@@ -237,6 +238,7 @@ def main() -> int:
 
     app = build_spec_app(include_internal=not args.public)
     spec = app.openapi()
+    compose_workflow_response_schemas(spec)
     apply_rfc9457_media_types(spec)
     _inject_permission_metadata(app, spec)
     _consolidate_identical_input_output_schemas(spec)
