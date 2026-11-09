@@ -71,7 +71,7 @@ If Temporal is unreachable during `sync_scheduled_triggers()` or `delete_trigger
 
 ## Execution Conflict Policy
 
-Controls what happens when a schedule fires while a previous execution from the same schedule is still running. Each policy maps to a Temporal `ScheduleOverlapPolicy` and a catchup window (see `build_schedule_policy()` in `schedule_parser.py`).
+Controls what happens when a schedule fires while a previous execution from the same schedule is still running. Each policy maps to a Temporal `ScheduleOverlapPolicy` and a catchup window (see `build_schedule_policy()` in `workflow_runtime/engines/temporal/schedule_parser.py`).
 
 | Policy | Overlap behavior | Catchup behavior | Use Case |
 |--------|-----------------|-------------------|----------|
@@ -85,7 +85,7 @@ Controls what happens when a schedule fires while a previous execution from the 
 
 ## Schedule Types
 
-The trigger supports two schedule types: **cron** (standard 5-field expressions for clock-aligned schedules) and **interval** (ISO 8601 repeating intervals for fixed cadence). See `ScheduledTriggerConfig` in `workflow_definition.py` and `config_to_temporal_schedule()` in `schedule_parser.py` for format details and validation rules.
+The trigger supports two schedule types: **cron** (standard 5-field expressions for clock-aligned schedules) and **interval** (ISO 8601 repeating intervals for fixed cadence). See `ScheduledTriggerConfig` in `workflow_core/models.py` and `config_to_temporal_schedule()` in `workflow_runtime/engines/temporal/schedule_parser.py` for format details and validation rules.
 
 ## Trigger Output
 

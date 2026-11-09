@@ -68,7 +68,7 @@ Webhook payloads are wrapped as `{"payload": <body>}` before being passed to the
 
 ## Configuration
 
-Webhook trigger parameters are defined by the config model `WebhookTriggerConfig` in `workflow_definition.py` and the JSON Schemas at `src/syntara/schemas/workflows/v2/triggers/webhook.schema.json` (and `eda.schema.json`). Key fields are `webhook_path` (unique URL slug) and `input_schema` (optional JSON Schema for payload validation, with `$ref`/ReDoS protections — see [overview](overview.md#validation-happens-before-temporal)).
+Webhook trigger parameters are defined by the config model `WebhookTriggerConfig` in `workflow_core/models.py` and the JSON Schemas at `src/syntara/schemas/workflows/v2/triggers/webhook.schema.json` (and `eda.schema.json`). Key fields are `webhook_path` (unique URL slug) and `input_schema` (optional JSON Schema for payload validation, with `$ref`/ReDoS protections — see [overview](overview.md#validation-happens-before-temporal)).
 
 ## EDA Variant
 

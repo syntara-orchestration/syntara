@@ -36,7 +36,7 @@ from syntara.core.jsonb_limits import validate_jsonb_size
 from syntara.core.models import User
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.core.utils.session_factory import create_session_factory_from_request
-from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflow_runtime.execution import WorkflowExecutionService
 from syntara.workflows.executions_router import get_temporal_execution_service
 
 router = SyntaraRouter(prefix="/invocations", tags=["Invocation"])
@@ -95,7 +95,7 @@ async def get_invocation_service_with_temporal(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     request: Request,
-    temporal_service: Annotated[TemporalExecutionService | None, Depends(get_temporal_execution_service)],
+    temporal_service: Annotated[WorkflowExecutionService | None, Depends(get_temporal_execution_service)],
 ) -> InvocationService:
     """Dependency provider for InvocationService with Temporal workflow support.
 

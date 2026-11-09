@@ -122,9 +122,9 @@ Both node types use the same terminal status set (`AAP_JOB_TERMINAL_STATUSES` in
 
 | File | What it does |
 |------|-------------|
-| `workflow_engine/activities/aap_job_template_activity.py` | Job template activity: config validation, launch, poll, output |
-| `workflow_engine/activities/aap_workflow_job_template_activity.py` | Workflow job template activity (same pattern) |
-| `workflow_engine/activities/aap_common.py` | Shared: `resolve_aap_auth()`, `poll_until_complete()`, `handle_cancellation()`, `build_aap_job_url()` |
+| `workflow_runtime/engines/temporal/activities/aap_job_template_activity.py` | Job template activity: config validation, launch, poll, output |
+| `workflow_runtime/engines/temporal/activities/aap_workflow_job_template_activity.py` | Workflow job template activity (same pattern) |
+| `workflow_runtime/engines/temporal/activities/aap_common.py` | Shared: `resolve_aap_auth()`, `poll_until_complete()`, `handle_cancellation()`, `build_aap_job_url()` |
 | `workflow_core/models.py` | `AAPJobTemplateExecutorParameters`, `AAPWorkflowJobTemplateExecutorParameters`, output models |
 | `schemas/workflows/v2/executors/aap_job_template.schema.json` | JSON Schema for config validation |
 | `schemas/workflows/v2/executors/aap_workflow_job_template.schema.json` | JSON Schema for config validation |

@@ -160,7 +160,7 @@ This is triggered by the `asyncio.CancelledError` exception handler in the workf
 - Approval activity: `backend/src/syntara/workflow_runtime/engines/temporal/activities/approval_activity.py`
 - Signal endpoint: `backend/src/syntara/workflows/executions_router.py`
 - Signal client (approvals → workflow engine): `backend/src/syntara/approvals/clients/workflow_client.py`
-- Approvals client (workflow engine → approvals): `backend/src/syntara/workflows/clients/approvals_client.py`
+- Approvals client (workflow runtime → approvals): `backend/src/syntara/workflow_runtime/clients/approvals_client.py`
 - Timeout resolution: `backend/src/syntara/workflow_runtime/engines/temporal/node_settings_resolver.py`
 - Retry configuration: `backend/src/syntara/core/config/base.py`
 

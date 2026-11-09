@@ -588,7 +588,7 @@ class InvocationService(BaseService):
 
         Best-effort: Redis failures are logged but do not prevent cancellation.
         """
-        from syntara.workflow_runtime.engines.temporal.constants import AGENT_EXECUTION_TIMEOUT_SECONDS  # noqa: PLC0415
+        from syntara.workflow_core.constants import AGENT_EXECUTION_TIMEOUT_SECONDS  # noqa: PLC0415
 
         cancel_key_ttl_seconds = AGENT_EXECUTION_TIMEOUT_SECONDS
         try:

@@ -3,6 +3,15 @@
 from enum import StrEnum
 
 
+class AAPJobTerminalStatus(StrEnum):
+    """AAP job terminal statuses for both regular and workflow jobs."""
+
+    SUCCESSFUL = "successful"
+    FAILED = "failed"
+    ERROR = "error"
+    CANCELED = "canceled"
+
+
 class AAPResourceType(StrEnum):
     """AAP resource types with display names for error messages.
 

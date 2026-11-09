@@ -38,7 +38,7 @@ from syntara.files.file_manager import FileManager, get_file_manager
 from syntara.files.health import FileStorageStatus, check_file_storage_health
 from syntara.files.models.file_metadata import FileMetadata, FileStatus
 from syntara.files.storage import sanitize_filename
-from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflow_runtime.execution import WorkflowExecutionService
 from syntara.workflows.executions_router import get_temporal_execution_service
 from syntara.workflows.services.execution_service import ExecutionService
 
@@ -154,7 +154,7 @@ async def upload_files(
     file_manager: Annotated[FileManager, Depends(get_file_manager)],
     current_user: Annotated[User, Depends(get_current_user)],
     body: Annotated[UploadFilesBody, Form(media_type="multipart/form-data")],
-    temporal_service: Annotated[TemporalExecutionService | None, Depends(get_temporal_execution_service)],
+    temporal_service: Annotated[WorkflowExecutionService | None, Depends(get_temporal_execution_service)],
 ) -> FileUploadResponse:
     """Upload files for later use in agent invocations.
 

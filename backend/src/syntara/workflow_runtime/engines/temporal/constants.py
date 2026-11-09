@@ -28,10 +28,6 @@ MAX_ENV_VAR_LENGTH = _settings.max_env_var_length
 # executor nodes use _get_default_timeout() for type-appropriate defaults.
 DEFAULT_ACTIVITY_TIMEOUT_SECONDS = 30
 
-# Timeout for the Agent Execution builtin workflow node.  Used by
-# seed_builtin.py and as the cancel-key TTL in invocation_service.py.
-AGENT_EXECUTION_TIMEOUT_SECONDS = 3600
-
 # Temporal only delivers activity cancellation through heartbeats, and only to an
 # activity that was scheduled with a heartbeat_timeout -- without one the server
 # drops the beats and a cancelled workflow cannot interrupt a long-running

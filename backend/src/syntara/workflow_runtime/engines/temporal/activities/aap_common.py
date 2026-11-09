@@ -10,7 +10,6 @@ import math
 import re
 import time
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -90,19 +89,6 @@ def build_aap_job_url(base_url: str, job_id: int, job_type: str = "playbook") ->
 
     """
     return f"{base_url.rstrip('/')}/execution/jobs/{job_type}/{job_id}/output"
-
-
-class AAPJobTerminalStatus(StrEnum):
-    """AAP job terminal statuses for both regular jobs and workflow jobs."""
-
-    SUCCESSFUL = "successful"
-    FAILED = "failed"
-    ERROR = "error"
-    CANCELED = "canceled"
-
-
-# Set of terminal statuses for efficient lookup (lowercase)
-AAP_JOB_TERMINAL_STATUSES = {status.lower() for status in AAPJobTerminalStatus}
 
 
 class AAPActivityExecutionError(ActivityExecutionError):

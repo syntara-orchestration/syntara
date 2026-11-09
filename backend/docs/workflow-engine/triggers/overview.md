@@ -90,7 +90,7 @@ For details on the resolver, see `NamespaceResolver` in `src/syntara/workflow_co
 
 A workflow can define multiple trigger nodes. When an execution starts, only the selected trigger runs — `_skip_unselected_triggers()` marks all other trigger nodes as skipped and propagates the skip state downstream through their exclusive branches.
 
-Trigger selection is handled by `resolve_trigger_node()` in `workflow_definition.py`:
+Trigger selection is handled by `resolve_trigger_node()` in `workflow_core/models.py`:
 
 1. If `trigger_node_id` is provided in the request, that specific trigger is selected
 2. If `trigger_node_id` is omitted, the **first manual trigger** in the definition is used as the default
@@ -103,11 +103,11 @@ To add a new trigger type, you need to touch these areas:
 1. **Activity** — Create a new file in `src/syntara/workflow_runtime/engines/temporal/activities/` following the pass-through pattern (receive input, call `apply_output_mapping`, return `{"output": ...}`). Register it with `@activity.defn(name=ActivityName.YOUR_TRIGGER)`.
 
 2. **Registration** — Add the new type to:
-   - `ActivityName` enum in `workflow_definition.py`
-   - `NodeType` enum in `workflow_definition.py`
+   - `ActivityName` enum in `workflow_core/models.py`
+   - `NodeType` enum in `workflow_core/models.py`
    - `ALLOWED_TRIGGER_TYPES` in `dynamic_workflow.py`
 
-3. **Config model** (if the trigger has parameters beyond `input_schema`) — Add a config class in `workflow_definition.py` extending `TemplateAwareBaseModel`.
+3. **Config model** (if the trigger has parameters beyond `input_schema`) — Add a config class in `workflow_core/models.py` extending `TemplateAwareBaseModel`.
 
 4. **JSON Schema** — Add a schema file in `src/syntara/schemas/workflows/v2/triggers/`.
 
