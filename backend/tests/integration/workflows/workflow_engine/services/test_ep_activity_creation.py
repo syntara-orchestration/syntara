@@ -71,22 +71,16 @@ async def test_monitor_and_dispatch_share_identity_in_either_order(
             assert (
                 await reader.exec(select(ActivityExecution).where(ActivityExecution.execution_id == test_execution.id))
             ).all() == []
-        assert (
             await CompletionCommandHandler()._complete_activity(
                 context=AOCommandContext(reader, temporal), work_id=work_id, status="completed", result=result
             )
-            is True
-        )
     if not monitor_first:
         temporal.complete_async_activity.assert_not_awaited()
 
     await monitor._create_all_activities_upfront(test_execution.id, _DEFINITIONS)
     async with test_db_session_factory() as reader:
-        assert (
-            await CompletionCommandHandler()._complete_activity(
-                context=AOCommandContext(reader, temporal), work_id=work_id, status="completed", result=result
-            )
-            is True
+        await CompletionCommandHandler()._complete_activity(
+            context=AOCommandContext(reader, temporal), work_id=work_id, status="completed", result=result
         )
         rows = (
             await reader.exec(select(ActivityExecution).where(ActivityExecution.execution_id == test_execution.id))
