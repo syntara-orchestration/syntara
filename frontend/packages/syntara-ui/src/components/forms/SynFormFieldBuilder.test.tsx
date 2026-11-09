@@ -389,23 +389,25 @@ describe('SynFormFieldBuilder', () => {
       const user = userEvent.setup()
       renderBuilder(<SynFormFieldBuilder value={dropdownFieldDefinition()} onChange={vi.fn()} />)
 
-      await user.click(screen.getByRole('button', { name: 'Initial answer' }))
+      const initialAnswer = screen.getByRole('textbox', { name: 'Initial answer' })
+      await user.click(initialAnswer)
       await user.click(screen.getByRole('option', { name: 'Beta' }))
-      expect(screen.getByRole('button', { name: 'Initial answer' })).toHaveTextContent('Beta')
+      expect(initialAnswer).toHaveValue('Beta')
     })
 
-    it('toggles multi-select default checkboxes', async () => {
+    it('toggles multi-select initial answers with typeahead checkboxes', async () => {
       const user = userEvent.setup()
       renderBuilder(<SynFormFieldBuilder value={multiSelectFieldDefinition()} onChange={vi.fn()} />)
 
-      const one = screen.getByRole('checkbox', { name: 'One' })
-      const two = screen.getByRole('checkbox', { name: 'Two' })
-      await user.click(one)
-      await user.click(two)
-      expect(one).toBeChecked()
-      expect(two).toBeChecked()
-      await user.click(one)
-      expect(one).not.toBeChecked()
+      const initialAnswer = screen.getByRole('textbox', { name: 'Initial answer' })
+      await user.click(initialAnswer)
+      await user.click(screen.getByRole('checkbox', { name: 'One' }))
+      await user.click(screen.getByRole('checkbox', { name: 'Two' }))
+      expect(screen.getByRole('button', { name: 'Close One' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Close Two' })).toBeInTheDocument()
+
+      await user.click(screen.getByRole('checkbox', { name: 'One' }))
+      expect(screen.queryByRole('button', { name: 'Close One' })).not.toBeInTheDocument()
     })
 
     it('requires dynamic expression, label key, and value key before saving', async () => {

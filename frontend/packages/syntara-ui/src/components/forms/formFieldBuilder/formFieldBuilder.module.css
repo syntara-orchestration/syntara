@@ -165,6 +165,10 @@
   color: var(--pf-t--global--text--color--subtle);
 }
 
+.staticDefaultTypeaheadPlaceholder :global(.pf-v6-c-text-input-group__text-input) {
+  color: var(--pf-t--global--text--color--subtle);
+}
+
 .jsonSchemaImportError {
   margin-block: var(--pf-t--global--spacer--sm);
 }
