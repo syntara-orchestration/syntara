@@ -13,6 +13,8 @@ const FORM_FIELD_BUILDER_LABEL_HELP = {
     'Example text shown inside the field before the person filling out the form enters a value. It disappears once they start typing and is never submitted as data.',
   helpText: 'Extra guidance shown below the field to help the person filling out the form understand what to enter.',
   defaultValue: 'The answer or selection prefilled when the form opens. The user can change it before submitting.',
+  dateDefaultValue:
+    'The answer or selection prefilled when the form opens. Initial answer can not be partially completed. The user can change it before submitting.',
   dateShowInForm:
     'Choose which date, time, and timezone inputs appear in the form. At least one input must be selected.',
   optionsSource:
