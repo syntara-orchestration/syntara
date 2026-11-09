@@ -14,7 +14,7 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.user_reference import UserReference
     from ..models.validation_result import ValidationResult
-    from ..models.workflow_read_labels import WorkflowReadLabels
+    from ..models.workflow_read_with_version_labels import WorkflowReadWithVersionLabels
     from ..models.workflow_version_read import WorkflowVersionRead
 
 
@@ -37,7 +37,7 @@ class WorkflowReadWithVersion:
             updated_at (datetime.datetime):
             version (WorkflowVersionRead): Schema for workflow version response (GET /workflows/{id}/versions/{version}).
             description (None | str | Unset): Workflow description
-            labels (WorkflowReadLabels | Unset): Workflow labels
+            labels (WorkflowReadWithVersionLabels | Unset): Workflow labels
             is_builtin (bool | Unset):  Default: False.
             has_validation_issues (bool | Unset):  Default: False.
             created_by (None | Unset | UserReference): User who created the workflow
@@ -57,7 +57,7 @@ class WorkflowReadWithVersion:
     updated_at: datetime.datetime
     version: WorkflowVersionRead
     description: None | str | Unset = UNSET
-    labels: WorkflowReadLabels | Unset = UNSET
+    labels: WorkflowReadWithVersionLabels | Unset = UNSET
     is_builtin: bool | Unset = False
     has_validation_issues: bool | Unset = False
     created_by: None | Unset | UserReference = UNSET
@@ -178,7 +178,7 @@ class WorkflowReadWithVersion:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.user_reference import UserReference
         from ..models.validation_result import ValidationResult
-        from ..models.workflow_read_labels import WorkflowReadLabels
+        from ..models.workflow_read_with_version_labels import WorkflowReadWithVersionLabels
         from ..models.workflow_version_read import WorkflowVersionRead
 
         d = dict(src_dict)
@@ -208,11 +208,11 @@ class WorkflowReadWithVersion:
         description = _parse_description(d.pop("description", UNSET))
 
         _labels = d.pop("labels", UNSET)
-        labels: WorkflowReadLabels | Unset
+        labels: WorkflowReadWithVersionLabels | Unset
         if isinstance(_labels, Unset):
             labels = UNSET
         else:
-            labels = WorkflowReadLabels.from_dict(_labels)
+            labels = WorkflowReadWithVersionLabels.from_dict(_labels)
 
         is_builtin = d.pop("is_builtin", UNSET)
 
