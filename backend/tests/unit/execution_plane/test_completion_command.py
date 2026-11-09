@@ -76,6 +76,11 @@ async def test_completion_command_resolves_temporal_activity_and_acknowledges(ca
         temporal.complete_async_activity.assert_awaited_once_with(
             temporal_workflow_id="workflow-id", activity_id="activity-id", result={"output": {"stdout": "ok"}}
         )
+    elif outcome == "cancelled":
+        temporal.report_cancellation_async_activity.assert_awaited_once_with(
+            temporal_workflow_id="workflow-id", activity_id="activity-id"
+        )
+        temporal.fail_async_activity.assert_not_awaited()
     else:
         assert temporal.fail_async_activity.await_args.kwargs["error"].non_retryable
         if outcome == "outcome_unknown":
@@ -130,12 +135,13 @@ async def test_completion_rejects_invalid_correlation_or_command(callback, inval
 
 
 @pytest.mark.asyncio
-async def test_completion_missing_activity_remains_retryable(callback):
+async def test_completion_missing_activity_is_idempotent_noop(callback):
     app, _, rows = callback
     rows.first.return_value = None
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=completion().model_dump(mode="json"))
-    assert response.status_code == 404
+    assert response.status_code == 200, response.text
+    assert response.json()["received"] is True
 
 
 @pytest.mark.asyncio

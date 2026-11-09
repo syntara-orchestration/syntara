@@ -686,6 +686,26 @@ class TestActivityEventProcessing:
 
         assert self.metadata.pending_activity_updates[1]["status"] == ActivityStatus.CANCELLED
 
+    def test_process_activity_failed_for_cancelled_execution_plane_work(self) -> None:
+        """Execution Plane cancellation is terminal but should not appear as a failure."""
+        self.metadata.pending_activity_updates[1] = {
+            "activity_id": "test-activity",
+            "status": ActivityStatus.RUNNING,
+            "completed_at": None,
+            "error_details": None,
+        }
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
+            event_id=3,
+            scheduled_event_id=1,
+            failure_message="Execution Plane work was cancelled before execution",
+            failure_type="ExecutionPlaneWorkCancelled",
+        )
+
+        self.service._process_activity_failed(event, self.metadata)
+
+        assert self.metadata.pending_activity_updates[1]["status"] == ActivityStatus.CANCELLED
+
     @pytest.mark.parametrize(
         ("event_type", "expected_status", "expected_error", "failure_message"),
         [

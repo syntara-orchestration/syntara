@@ -13,6 +13,7 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
+from syntara.execution_plane.cancellation import execution_plane_work_item_id
 from syntara.execution_plane.client import (
     EP_AUDIENCE,
     EP_CLIENT_ID,
@@ -116,7 +117,7 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
         msg = "Temporal activity context is missing workflow or run identity"
         raise ApplicationError(msg, type="ContextError", non_retryable=True)
 
-    work_item_id = uuid.uuid5(execution_id, info.activity_id)
+    work_item_id = execution_plane_work_item_id(execution_id, info.activity_id)
     selectors = _build_work_execute_selectors(execution_target_id)
 
     image = settings.node_container_images.get(_NODE_TYPE)

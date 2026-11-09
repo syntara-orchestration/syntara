@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflows.workflow_engine import dynamic_workflow as dynamic_workflow_module
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
@@ -61,6 +62,7 @@ def _make_workflow(
     wf._timeout_tasks = {}
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
+    wf._active_ep_nodes = set()
     wf._cof_failed_nodes = set()
     wf._converge_branch_nodes = {}
     wf._has_unhandled_failure = False
@@ -853,16 +855,71 @@ class TestConvergeAnyStrategy:
         wf = _make_workflow(skipped_nodes={"node_a"})
         mock_task = MagicMock()
         pending: dict[str, asyncio.Task[Any]] = {"node_a": mock_task, "node_b": MagicMock()}
-        wf._cancel_skipped_pending_tasks(pending)
+        result = asyncio.run(wf._cancel_skipped_pending_tasks(pending))
+
+        assert result is None
         mock_task.cancel.assert_called_once()
         assert "node_a" not in pending
         assert "node_b" in pending
 
+    @pytest.mark.asyncio
+    async def test_cancel_skipped_pending_tasks_cancels_execution_plane_work(self) -> None:
+        wf = _make_workflow(skipped_nodes={"node_a"})
+        wf._active_ep_nodes = {"node_a"}
+        mock_task = MagicMock()
+        pending: dict[str, asyncio.Task[Any]] = {"node_a": mock_task}
+
+        with patch.object(
+            wf,
+            "_cancel_execution_plane_work_nodes",
+            new_callable=AsyncMock,
+        ) as mock_cancel_work:
+            await wf._cancel_skipped_pending_tasks(pending, reason="branch skipped")
+
+        mock_cancel_work.assert_awaited_once_with(["node_a"], reason="branch skipped")
+        mock_task.cancel.assert_called_once()
+        assert "node_a" not in pending
+
     def test_cancel_skipped_pending_tasks_noop_when_none_skipped(self) -> None:
         wf = _make_workflow()
         pending: dict[str, asyncio.Task[Any]] = {"node_a": MagicMock()}
-        wf._cancel_skipped_pending_tasks(pending)
+        asyncio.run(wf._cancel_skipped_pending_tasks(pending))
         assert "node_a" in pending
+
+    @pytest.mark.asyncio
+    async def test_remove_detached_tasks_cancels_execution_plane_work(self) -> None:
+        wf = _make_workflow()
+        wf._detached_nodes = {"node_b"}
+        wf._active_ep_nodes = {"node_b"}
+        pending: dict[str, asyncio.Task[Any]] = {"node_b": MagicMock()}
+
+        with patch.object(
+            wf,
+            "_cancel_execution_plane_work_nodes",
+            new_callable=AsyncMock,
+        ) as mock_cancel_work:
+            await wf._remove_detached_tasks(pending, reason="converge detached")
+
+        mock_cancel_work.assert_awaited_once_with(["node_b"], reason="converge detached")
+        assert "node_b" not in pending
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("_mock_temporal_workflow")
+    async def test_cancel_execution_plane_work_nodes_executes_activity_and_clears_active(self) -> None:
+        wf = _make_workflow()
+        wf.execution_id = "11111111-2222-3333-4444-555555555555"
+        wf._active_ep_nodes = {"node_a", "node_b"}
+        dynamic_workflow_module.workflow.execute_activity = AsyncMock(return_value={})
+
+        await wf._cancel_execution_plane_work_nodes(["node_a", "other"], reason="Workflow cancelled")
+
+        assert dynamic_workflow_module.workflow.execute_activity.await_args is not None
+        assert dynamic_workflow_module.workflow.execute_activity.await_args.kwargs["args"] == [
+            "11111111-2222-3333-4444-555555555555",
+            ["node_a"],
+            "Workflow cancelled",
+        ]
+        assert wf._active_ep_nodes == {"node_b"}
 
     def test_skip_incomplete_predecessors_marks_and_propagates(self) -> None:
         graph = _build_fanin_graph()

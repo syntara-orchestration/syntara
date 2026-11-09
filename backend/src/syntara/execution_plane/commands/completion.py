@@ -70,7 +70,11 @@ class CompletionCommandHandler:
             )
         ).first()
         if row is None:
-            return False
+            logger.warning(
+                "Ignoring Execution Plane completion without a matching AO activity",
+                work_id=work_id,
+            )
+            return True
         temporal_workflow_id, temporal_activity_id = row
         temporal_service = context.temporal_service
         if temporal_service is None:
@@ -81,6 +85,11 @@ class CompletionCommandHandler:
                 temporal_workflow_id=temporal_workflow_id,
                 activity_id=temporal_activity_id,
                 result=result,
+            )
+        elif status == "cancelled":
+            await temporal_service.report_cancellation_async_activity(
+                temporal_workflow_id=temporal_workflow_id,
+                activity_id=temporal_activity_id,
             )
         else:
             await temporal_service.fail_async_activity(

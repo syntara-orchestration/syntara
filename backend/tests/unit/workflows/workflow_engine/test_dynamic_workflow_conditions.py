@@ -47,6 +47,7 @@ def _make_workflow(
     wf._timeout_tasks = {}
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
+    wf._active_ep_nodes = set()
     wf._converge_branch_nodes = {}
     init_workflow_runtime(wf)
     wf.pre_resolved_outputs = {}

@@ -223,3 +223,65 @@ class TestCancelExecution:
             await service.cancel_execution(execution.id)
 
         mock_temporal.cancel_workflow.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_cancel_execution_cancels_execution_plane_work(self) -> None:
+        """Execution cancellation also requests EP work-item cancellation."""
+        execution = _make_execution(ExecutionStatus.RUNNING)
+        mock_session = _mock_session_returning(execution)
+        mock_user = Mock(spec=User)
+        mock_temporal = Mock(spec=TemporalExecutionService)
+        mock_temporal.cancel_workflow = AsyncMock()
+
+        service = ExecutionService(
+            session=mock_session,
+            user=mock_user,
+            temporal_service=mock_temporal,
+        )
+
+        with (
+            patch(
+                "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "syntara.workflows.services.execution_service.cancel_execution_plane_work_for_execution",
+                new_callable=AsyncMock,
+                return_value=[],
+            ) as mock_cancel_work,
+        ):
+            await service.cancel_execution(execution.id)
+
+        mock_cancel_work.assert_awaited_once_with(mock_session, execution.id)
+
+    @pytest.mark.asyncio
+    async def test_cancel_execution_plane_failure_does_not_block(self) -> None:
+        """EP cancellation is best effort and cannot block workflow cancellation."""
+        execution = _make_execution(ExecutionStatus.RUNNING)
+        mock_session = _mock_session_returning(execution)
+        mock_user = Mock(spec=User)
+        mock_temporal = Mock(spec=TemporalExecutionService)
+        mock_temporal.cancel_workflow = AsyncMock()
+
+        service = ExecutionService(
+            session=mock_session,
+            user=mock_user,
+            temporal_service=mock_temporal,
+        )
+
+        with (
+            patch(
+                "syntara.workflows.services.invocation_cancellation.cancel_invocations_for_execution",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "syntara.workflows.services.execution_service.cancel_execution_plane_work_for_execution",
+                new_callable=AsyncMock,
+                side_effect=Exception("EP unavailable"),
+            ),
+        ):
+            await service.cancel_execution(execution.id)
+
+        mock_temporal.cancel_workflow.assert_awaited_once()

@@ -75,7 +75,7 @@ async def test_monitor_and_dispatch_share_identity_in_either_order(
             await CompletionCommandHandler()._complete_activity(
                 context=AOCommandContext(reader, temporal), work_id=work_id, status="completed", result=result
             )
-            is monitor_first
+            is True
         )
     if not monitor_first:
         temporal.complete_async_activity.assert_not_awaited()

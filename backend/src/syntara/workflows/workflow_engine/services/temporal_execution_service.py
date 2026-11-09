@@ -310,6 +310,47 @@ class TemporalExecutionService:
             )
             raise
 
+    async def report_cancellation_async_activity(
+        self,
+        temporal_workflow_id: str,
+        activity_id: str,
+    ) -> None:
+        """Report cancellation for an async-completion activity.
+
+        Args:
+            temporal_workflow_id: Temporal workflow ID.
+            activity_id: Activity ID from workflow definition.
+
+        """
+        try:
+            handle = self.temporal_client.get_async_activity_handle(
+                workflow_id=temporal_workflow_id,
+                run_id=None,
+                activity_id=activity_id,
+            )
+            await handle.report_cancellation()
+
+            logger.info(
+                "Async activity cancellation reported",
+                activity_id=activity_id,
+                temporal_workflow_id=temporal_workflow_id,
+            )
+
+        except RPCError as e:
+            if "not found" in str(e).lower():
+                logger.warning(
+                    "Async activity already closed; cancellation report is a no-op",
+                    activity_id=activity_id,
+                    temporal_workflow_id=temporal_workflow_id,
+                )
+                return
+            logger.exception(
+                "Failed to report async activity cancellation",
+                activity_id=activity_id,
+                temporal_workflow_id=temporal_workflow_id,
+            )
+            raise
+
 
 async def create_temporal_execution_service(
     temporal_address: str | None = None,
