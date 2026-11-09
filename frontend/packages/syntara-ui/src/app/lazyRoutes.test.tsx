@@ -33,6 +33,9 @@ vi.mock('../routes/execution-plane/ExecutionPlane', () => ({ default: () => <div
 vi.mock('../routes/execution-plane/CreateExecutionTarget', () => ({
   CreateExecutionTarget: () => <div>CreateExecutionTarget</div>,
 }))
+vi.mock('../routes/execution-plane/EditExecutionTarget', () => ({
+  EditExecutionTarget: () => <div>EditExecutionTarget</div>,
+}))
 vi.mock('../routes/execution-plane/ExecutionTargetDetail', () => ({
   default: () => <div>ExecutionTargetDetail</div>,
 }))
@@ -123,6 +126,10 @@ const lazyRouteNames = [
   'SettingsCategoryRoute',
   'FeatureFlagDemo',
   'Approvals',
+  'ExecutionPlane',
+  'CreateExecutionTarget',
+  'EditExecutionTarget',
+  'ExecutionTargetDetail',
   'AccessManagement',
   'AccessManagementCheckAccessRoute',
   'AccessManagementTokenRevocationRoute',

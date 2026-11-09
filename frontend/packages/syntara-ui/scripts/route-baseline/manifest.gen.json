@@ -114,6 +114,12 @@
     },
     {
       "kind": "page",
+      "parameters": ["executionTargetId"],
+      "sources": ["appRoute", "navigation", "router"],
+      "template": "/execution-plane/$executionTargetId/edit"
+    },
+    {
+      "kind": "page",
       "parameters": [],
       "sources": ["appRoute", "navigation", "router"],
       "template": "/execution-plane/create"

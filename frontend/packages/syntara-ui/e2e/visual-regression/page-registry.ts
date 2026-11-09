@@ -265,6 +265,16 @@ export const pages: PageEntry[] = [
       await expect(page.getByText('prod-openshift-west')).toBeVisible()
     },
   },
+  {
+    section: 'execution-plane',
+    name: 'execution-target-edit',
+    path: AppRoute.ExecutionPlane.Edit.replace(':executionTargetId', 'a1000000-0000-4000-8000-000000000001'),
+    waitFor: async (page) => {
+      await expect(page.getByRole('heading', { level: 1, name: 'Edit execution target' })).toBeVisible()
+      await expect(page.getByRole('textbox', { name: 'Execution target name' })).toHaveValue('Prod OpenShift West')
+      await expect(page.getByText('prod-openshift-west')).toBeVisible()
+    },
+  },
 
   // ══════════════════════════════════════════════════════════════════════════
   // ACCESS MANAGEMENT — Users

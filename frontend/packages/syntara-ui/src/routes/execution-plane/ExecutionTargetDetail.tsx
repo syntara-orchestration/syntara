@@ -8,7 +8,7 @@ import {
   StackItem,
   Title,
 } from '@patternfly/react-core'
-import { RhUiArrowLeftIcon, RhUiSearchIcon, RhUiSyncIcon } from '@patternfly/react-icons'
+import { RhUiArrowLeftIcon, RhUiEditIcon, RhUiSearchIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import type { ExecutionPlaneAPI } from '@syntara/contracts'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import type { ReactNode } from 'react'
@@ -21,6 +21,7 @@ import {
 import { executionPlaneClient } from '../../client'
 import { SynDetail } from '../../components/details/SynDetail'
 import { SynDetailList } from '../../components/details/SynDetailList'
+import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
@@ -197,6 +198,8 @@ export default function ExecutionTargetDetail() {
     return null
   }
 
+  const editPath = AppRoute.ExecutionPlane.Edit.replace(':executionTargetId', target.id)
+
   return (
     <SynPage>
       <SynPageTitle segments={[target.name, 'Execution Plane']} />
@@ -205,10 +208,22 @@ export default function ExecutionTargetDetail() {
         title={target.name}
         docLink={docLink}
         toolbar={
-          <SynKebabMenu
-            actions={[buildExecutionTargetDeleteAction(target, deleteDialog, permissions)]}
-            aria-label={`Actions for ${target.name}`}
-          />
+          <>
+            <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
+              <Button
+                variant="primary"
+                icon={<RhUiEditIcon />}
+                isAriaDisabled={!permissions.canUpdate}
+                onClick={permissions.canUpdate ? () => detachPromise(navigate({ to: editPath })) : undefined}
+              >
+                Edit execution target
+              </Button>
+            </DisabledWithTooltip>
+            <SynKebabMenu
+              actions={[buildExecutionTargetDeleteAction(target, deleteDialog, permissions)]}
+              aria-label={`Actions for ${target.name}`}
+            />
+          </>
         }
       />
       <SynPageBody>

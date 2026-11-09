@@ -27,20 +27,23 @@ describe('useExecutionTargetPermissions', () => {
     vi.mocked(useCanI).mockReturnValue({ allowed: false, isChecking: false, isError: false })
   })
 
-  it('defaults to denying create and delete until allowed', () => {
+  it('defaults to denying create, update, and delete until allowed', () => {
     const { result } = renderHook(() => useExecutionTargetPermissions(), { wrapper: createWrapper() })
 
     expect(result.current.canCreate).toBe(false)
+    expect(result.current.canUpdate).toBe(false)
     expect(result.current.canDelete).toBe(false)
     expect(result.current.isLoading).toBe(false)
     expect(result.current.tooltips.create).toMatch(/configure an execution target/i)
+    expect(result.current.tooltips.update).toMatch(/edit this execution target/i)
+    expect(result.current.tooltips.update).toContain('execution_target:update')
     expect(result.current.tooltips.delete).toMatch(/delete this execution target/i)
     expect(result.current.tooltips.delete).toContain('execution_target:delete')
   })
 
-  it('reports loading while either can_i check is in flight', () => {
+  it('reports loading while any can_i check is in flight', () => {
     vi.mocked(useCanI).mockImplementation((action) => {
-      if (action === 'delete') {
+      if (action === 'update') {
         return { allowed: false, isChecking: true, isError: false }
       }
       return { allowed: true, isChecking: false, isError: false }
@@ -50,22 +53,25 @@ describe('useExecutionTargetPermissions', () => {
 
     expect(result.current.isLoading).toBe(true)
     expect(result.current.canCreate).toBe(true)
-    expect(result.current.canDelete).toBe(false)
+    expect(result.current.canUpdate).toBe(false)
+    expect(result.current.canDelete).toBe(true)
   })
 
-  it('allows create and delete when can_i grants both', () => {
+  it('allows create, update, and delete when can_i grants all', () => {
     vi.mocked(useCanI).mockReturnValue({ allowed: true, isChecking: false, isError: false })
 
     const { result } = renderHook(() => useExecutionTargetPermissions(), { wrapper: createWrapper() })
 
     expect(result.current.canCreate).toBe(true)
+    expect(result.current.canUpdate).toBe(true)
     expect(result.current.canDelete).toBe(true)
   })
 
-  it('checks create and delete on execution_target', () => {
+  it('checks create, update, and delete on execution_target', () => {
     renderHook(() => useExecutionTargetPermissions(), { wrapper: createWrapper() })
 
     expect(useCanI).toHaveBeenCalledWith('create', 'execution_target')
+    expect(useCanI).toHaveBeenCalledWith('update', 'execution_target')
     expect(useCanI).toHaveBeenCalledWith('delete', 'execution_target')
   })
 })

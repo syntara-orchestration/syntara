@@ -175,6 +175,10 @@ export function breadcrumbsConfigureExecutionTarget(): AppBreadcrumbItem[] {
   return [crumbExecutionPlane(), { label: 'Configure execution target' }]
 }
 
+export function breadcrumbsEditExecutionTarget(targetName: string, detailPath: string): AppBreadcrumbItem[] {
+  return [crumbExecutionPlane(), { label: targetName, href: detailPath }, { label: 'Edit execution target' }]
+}
+
 export function breadcrumbsUserFormLoading(currentLabel: string): AppBreadcrumbItem[] {
   return [crumbAccessManagement(), crumbUsersList(), { label: currentLabel }]
 }
