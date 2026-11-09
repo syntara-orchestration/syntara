@@ -150,19 +150,22 @@ class ActivityExecutionSyncMixin:
         output_data = initial_output_data
 
         iteration = activity_data.get("iteration")
+        history_activity_id = activity_data.get("_history_activity_id")
+        query_activity_id = history_activity_id or activity_id
+        query_iteration = None if history_activity_id else iteration
         try:
-            if iteration is not None:
-                input_data = await handle.query("get_activity_input", args=[activity_id, iteration]) or {}
-                queried_output = await handle.query("get_activity_output", args=[activity_id, iteration])
+            if query_iteration is not None:
+                input_data = await handle.query("get_activity_input", args=[query_activity_id, query_iteration]) or {}
+                queried_output = await handle.query("get_activity_output", args=[query_activity_id, query_iteration])
             else:
-                input_data = await handle.query("get_activity_input", activity_id) or {}
-                queried_output = await handle.query("get_activity_output", activity_id)
+                input_data = await handle.query("get_activity_input", query_activity_id) or {}
+                queried_output = await handle.query("get_activity_output", query_activity_id)
         except (TemporalError, ValueError):
             logger.warning("Could not query activity data", activity_id=activity_id)
             raise
 
         if queried_output is None and activity_data["status"] == ActivityStatus.COMPLETED:
-            queried_output = await self._fetch_completed_activity_output(handle, activity_id, iteration)
+            queried_output = await self._fetch_completed_activity_output(handle, query_activity_id, query_iteration)
 
         if queried_output is not None:
             output_data = self._merge_output(initial_output_data, queried_output)

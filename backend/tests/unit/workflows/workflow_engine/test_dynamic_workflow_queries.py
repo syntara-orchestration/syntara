@@ -164,6 +164,12 @@ class TestGetActivityInputQuery:
         assert wf.get_activity_input("node_a", 1) == {"value": 2}
         assert wf.get_activity_input("node_a", 2) == {"value": 3}
 
+    def test_returns_nested_loop_value_by_full_temporal_activity_id(self) -> None:
+        wf = _make_workflow()
+        wf.activity_input_history["inner_iter_1_iter_0"] = [{"value": "outer-1-inner-0"}]
+
+        assert wf.get_activity_input("inner_iter_1_iter_0") == {"value": "outer-1-inner-0"}
+
 
 # ---------------------------------------------------------------------------
 # Tests: get_activity_output query
@@ -203,6 +209,12 @@ class TestGetActivityOutputQuery:
         assert wf.get_activity_output("node_a", 0) == {"stdout": "1\\n"}
         assert wf.get_activity_output("node_a", 1) == {"stdout": "2\\n"}
         assert wf.get_activity_output("node_a", 2) == {"stdout": "3\\n"}
+
+    def test_returns_nested_loop_output_by_full_temporal_activity_id(self) -> None:
+        wf = _make_workflow()
+        wf.activity_output_history["inner_iter_1_iter_0"] = [{"stdout": "outer-1-inner-0\\n"}]
+
+        assert wf.get_activity_output("inner_iter_1_iter_0") == {"stdout": "outer-1-inner-0\\n"}
 
 
 # ---------------------------------------------------------------------------

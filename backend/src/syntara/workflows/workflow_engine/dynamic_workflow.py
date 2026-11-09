@@ -337,6 +337,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self.activity_output_history.setdefault(completed_node_id, []).append(
             copy.deepcopy({**output, "status": "completed"})
         )
+        completed_node = graph.get_node(completed_node_id)
+        if completed_node.type == NodeType.APPROVAL:
+            history_activity_id = self._approval_activity_id(completed_node_id)
+            if history_activity_id != completed_node_id:
+                self.activity_output_history.setdefault(history_activity_id, []).append(
+                    copy.deepcopy({**output, "status": "completed"})
+                )
         workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
         await self._schedule_successors(completed_node_id=completed_node_id, graph=graph, pending_tasks=pending_tasks)
         self._cancel_skipped_pending_tasks(pending_tasks)
@@ -385,33 +392,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         namespace_entry = self._extract_failure_output(node_id, app_error, graph)
 
-        if is_cancellation:
-            namespace_entry["status"] = "cancelled"
-            self._cancelled_node = node_id
-            # TODO: cancelled nodes are not in failed_nodes  # noqa: TD002, TD003
-            # or skipped_nodes, so _mark_downstream_as_skipped is a no-op (it
-            # requires predecessors in one of those sets), converge ALL-strategy
-            # treats the cancelled branch as successful, and
-            # _count_successful_predecessors includes it.  Thread cancelled node
-            # IDs through those predicates or add a _cancelled_nodes set checked
-            # alongside failed_nodes.  Additionally, continue_on_failure is not
-            # handled for cancellation: _process_pending_tasks still calls
-            # _handle_continued_failure after _handle_node_failure returns,
-            # scheduling successors while _build_result stamps the run cancelled.
-            workflow.logger.info(f"Node {node_id} cancelled: {error_message}")
-        else:
-            self.failed_nodes[node_id] = error_message
-            namespace_entry["status"] = "failed"
-            workflow.logger.error(f"Node {node_id} failed: {error_message}")
+        self._record_failure_state(node_id, error_message, namespace_entry, is_cancellation=is_cancellation)
         namespace_entry["error"] = error_message
 
         self.resolver.set_namespace(node_id, namespace_entry)
-        if not is_cancellation and not continue_on_failure:
-            if node_id not in self._converge_branch_nodes:
-                self._has_unhandled_failure = True
-            self._mark_downstream_as_skipped(node_id, graph)
-        elif not is_cancellation and continue_on_failure:
-            self._cof_failed_nodes.add(node_id)
+        self._record_failure_history(node_id, namespace_entry, graph)
+        self._route_failure_after_recording(
+            node_id, graph, is_cancellation=is_cancellation, continue_on_failure=continue_on_failure
+        )
 
         if is_cancellation:
             self._mark_downstream_as_skipped(node_id, graph)
@@ -420,6 +408,64 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         self._check_converge_successors(node_id, graph, pending_tasks)
         if not continue_on_failure:
             self._propagate_loop_body_failure(node_id, graph, pending_tasks)
+
+    def _record_failure_state(
+        self,
+        node_id: str,
+        error_message: str,
+        namespace_entry: dict[str, Any],
+        *,
+        is_cancellation: bool,
+    ) -> None:
+        """Set workflow bookkeeping and output status for a failed node."""
+        if is_cancellation:
+            namespace_entry["status"] = "cancelled"
+            self._cancelled_node = node_id
+            workflow.logger.info(f"Node {node_id} cancelled: {error_message}")
+            return
+
+        self.failed_nodes[node_id] = error_message
+        namespace_entry["status"] = "failed"
+        workflow.logger.error(f"Node {node_id} failed: {error_message}")
+
+    def _record_failure_history(
+        self,
+        node_id: str,
+        namespace_entry: dict[str, Any],
+        graph: WorkflowGraph,
+    ) -> None:
+        """Keep failed output available to iteration-specific sync queries."""
+        self.activity_output_history.setdefault(node_id, []).append(copy.deepcopy(namespace_entry))
+        failed_node = graph.get_node(node_id)
+        history_activity_id: str | None = None
+        if failed_node.type == NodeType.LOOP:
+            loop_state = self.loop_state.get(node_id)
+            current_index = loop_state.current_index if loop_state is not None else 0
+            history_activity_id = loop_control_activity_id(
+                node_id, current_index, self.loop_body_map, self.node_control_data
+            )
+        elif failed_node.type == NodeType.APPROVAL:
+            history_activity_id = self._approval_activity_id(node_id)
+        if history_activity_id and history_activity_id != node_id:
+            self.activity_output_history.setdefault(history_activity_id, []).append(copy.deepcopy(namespace_entry))
+
+    def _route_failure_after_recording(
+        self,
+        node_id: str,
+        graph: WorkflowGraph,
+        *,
+        is_cancellation: bool,
+        continue_on_failure: bool,
+    ) -> None:
+        """Apply downstream routing and continue-on-failure bookkeeping."""
+        if is_cancellation:
+            return
+        if continue_on_failure:
+            self._cof_failed_nodes.add(node_id)
+            return
+        if node_id not in self._converge_branch_nodes:
+            self._has_unhandled_failure = True
+        self._mark_downstream_as_skipped(node_id, graph)
 
     def _propagate_loop_body_failure(
         self,
@@ -1360,17 +1406,25 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             msg = f"Loop {node_id} exceeded max_iterations ({max_iter})"
             raise ApplicationError(msg, type="MaxIterationsError", non_retryable=True)
 
+        loop_activity_id = loop_control_activity_id(
+            node_id, state.current_index, self.loop_body_map, self.node_control_data
+        )
+        self.activity_input_history.setdefault(loop_activity_id, []).append(copy.deepcopy(loop_parameters))
+
         loop_result = cast(
             "dict[str, Any]",
             await workflow.execute_activity(
                 ActivityName.LOOP,
                 args=[loop_parameters, node.outputs, self.loop_iteration_results[node_id]],
-                activity_id=loop_control_activity_id(
-                    node_id, state.current_index, self.loop_body_map, self.node_control_data
-                ),
+                activity_id=loop_activity_id,
                 start_to_close_timeout=timedelta(seconds=timeout_seconds),
             ),
         )
+        loop_output = loop_result.get("output", loop_result)
+        if isinstance(loop_output, dict):
+            self.activity_output_history.setdefault(loop_activity_id, []).append(
+                copy.deepcopy({**loop_output, "status": "completed"})
+            )
 
         # Update loop state from control data for next iteration
         control_data = loop_result.get("control", {})
@@ -1506,6 +1560,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         timeout_seconds = resolve_timeout(node, self._runtime_settings)
         self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
         self.activity_input_history.setdefault(node.id, []).append(copy.deepcopy(resolved_parameters))
+        if node.type == NodeType.APPROVAL:
+            history_activity_id = self._approval_activity_id(node.id)
+            if history_activity_id != node.id:
+                self.activity_input_history.setdefault(history_activity_id, []).append(
+                    copy.deepcopy(resolved_parameters)
+                )
 
         result = await self._dispatch_node(node, resolved_parameters, graph, timeout_seconds)
         return self._process_node_result(node, result)
@@ -1743,11 +1803,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         activity_id: str,
         iteration: int | None,
     ) -> dict[str, Any] | None:
-        """Return an iteration-specific value, falling back to current state."""
-        if iteration is not None:
-            values = history.get(activity_id, [])
-            if 0 <= iteration < len(values):
-                return values[iteration]
+        """Return an iteration-specific value, or the latest value for a key."""
+        values = history.get(activity_id, [])
+        if iteration is None:
+            return values[-1] if values else None
+        if 0 <= iteration < len(values):
+            return values[iteration]
         return None
 
     @workflow.query
@@ -1825,12 +1886,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         ``except TemporalError`` and falls back to a sleep + query retry.
         """
         await workflow.wait_condition(
-            lambda: (
-                self._activity_history_value(getattr(self, "activity_output_history", {}), activity_id, iteration)
-                is not None
-                if iteration is not None
-                else self.resolver.has_namespace(activity_id)
-            ),
+            lambda: self._activity_history_value(getattr(self, "activity_output_history", {}), activity_id, iteration)
+            is not None
+            or (iteration is None and self.resolver.has_namespace(activity_id)),
             timeout=timedelta(seconds=30),
         )
         data = self._activity_history_value(getattr(self, "activity_output_history", {}), activity_id, iteration)

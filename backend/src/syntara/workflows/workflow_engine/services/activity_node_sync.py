@@ -88,12 +88,15 @@ class ActivityNodeSyncMixin:
                 if node_id in visited or node_id == loop_id:
                     continue
                 visited.add(node_id)
-                body_ids.add(node_id)
-                next_edges = (
-                    [edge for edge in edges if edge.get("from") == node_id and edge.get("from_port") == "iterate"]
-                    if node_id in loop_ids
-                    else [edge for edge in edges if edge.get("from") == node_id]
-                )
+                is_nested_loop = node_id in loop_ids
+                if not is_nested_loop:
+                    body_ids.add(node_id)
+                next_edges = [edge for edge in edges if edge.get("from") == node_id]
+                if is_nested_loop:
+                    # A nested loop is a boundary inside the outer body, but its
+                    # complete edge continues the outer traversal to the tail.
+                    # Following only iterate edges loses that tail activity.
+                    next_edges = [edge for edge in next_edges if edge.get("from_port") in ("iterate", "complete")]
                 queue.extend(edge["to"] for edge in next_edges if edge.get("to") != loop_id)
 
         return body_ids

@@ -12,6 +12,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import Activit
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     innermost_iteration_index,
+    iteration_indices,
     strip_loop_iteration_suffixes,
 )
 from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
@@ -81,6 +82,7 @@ class ActivitySyncEventProcessorMixin:
             "error_details": None,
             "retry_count": 0,
             "iteration": iteration_number,
+            "_history_activity_id": attrs.activity_id if iteration_indices(attrs.activity_id) else None,
             "scheduled_at": ensure_timezone_aware(event.event_time),
             "configured_timeout_seconds": configured_timeout_seconds,
         }
