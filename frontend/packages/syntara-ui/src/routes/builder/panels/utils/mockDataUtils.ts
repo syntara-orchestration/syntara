@@ -1,20 +1,27 @@
-import { getNodeOutputSchema, type OutputFieldDef } from '@syntara/contracts'
+import { getNodeOutputSchema } from '@syntara/contracts'
+
+import type { PreviewFieldDef } from './effectiveOutputSchema'
 
 /**
  * Build a JSON skeleton string from a node's output schema.
  * Used by both InputPanel and OutputPanel for mock data editor initial values.
  */
-export function buildMockJsonSkeleton(nodeType: string | null, schemaFields: OutputFieldDef[] | null): string {
-  // Use the node type's output schema, or fall back to provided schema fields
+export function buildMockJsonSkeleton(nodeType: string | null, schemaFields: PreviewFieldDef[] | null): string {
+  // Prefer a supplied effective schema so configuration-derived form fields survive.
   const schema = nodeType ? getNodeOutputSchema(nodeType) : null
-  const effectiveSchema = schema ?? schemaFields
+  const effectiveSchema = schemaFields ?? schema
   if (!effectiveSchema) return '{}'
 
-  const skeleton: Record<string, unknown> = {}
-  for (const field of effectiveSchema) {
-    skeleton[field.name] = ''
-  }
+  const skeleton = buildSkeletonFields(effectiveSchema)
   return JSON.stringify(skeleton, null, 2)
+}
+
+function buildSkeletonFields(fields: PreviewFieldDef[]): Record<string, unknown> {
+  const skeleton: Record<string, unknown> = {}
+  for (const field of fields) {
+    skeleton[field.name] = field.children?.length ? buildSkeletonFields(field.children) : ''
+  }
+  return skeleton
 }
 
 type ParseJsonObjectResult = { success: true; data: Record<string, unknown> } | { success: false; error: string }

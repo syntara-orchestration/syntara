@@ -29,9 +29,9 @@ import { InputEmptyState } from './InputEmptyState'
 import { InputNodeContent, InputPanelNodeSection } from './InputNodeContent'
 import { MockDataEditor } from './MockDataEditor'
 import styles from './panels.module.css'
+import { getEffectiveOutputSchema } from './utils/effectiveOutputSchema'
 import { getUpstreamNodeDisplayName } from './utils/getUpstreamNodeDisplayName'
 import { buildMockJsonSkeleton } from './utils/mockDataUtils'
-import { getTriggerInputSchemaFields } from './utils/triggerSchemaUtils'
 import { VariablesAndContextTree } from './VariablesAndContextTree'
 import { ViewToggle, type PanelView } from './ViewToggle'
 
@@ -49,8 +49,8 @@ function computeEffectiveUpstream(params: {
   upstreamNodes: UpstreamNodeInfo[]
   sourceNodeId: string | null | undefined
   sourceAncestors: UpstreamNodeInfo[]
-  activities: { id: string; name?: string; type: string }[] | undefined
-  triggers: { id: string; name?: string; type: string }[] | undefined
+  activities: { id: string; name?: string; type: string; parameters?: Record<string, unknown> }[] | undefined
+  triggers: { id: string; name?: string; type: string; parameters?: Record<string, unknown> }[] | undefined
 }): UpstreamNodeInfo[] {
   const { upstreamNodes, sourceNodeId, sourceAncestors, activities, triggers } = params
   if (upstreamNodes.length > 0) return upstreamNodes
@@ -58,18 +58,32 @@ function computeEffectiveUpstream(params: {
 
   const activity = activities?.find((a) => a.id === sourceNodeId)
   if (activity) {
-    return [{ id: activity.id, name: activity.name ?? activity.id, type: activity.type }, ...sourceAncestors]
+    return [
+      { id: activity.id, name: activity.name ?? activity.id, type: activity.type, parameters: activity.parameters },
+      ...sourceAncestors,
+    ]
   }
 
   const trigger = triggers?.find((t) => t.id === sourceNodeId)
   if (trigger) {
-    return [{ id: trigger.id, name: trigger.name ?? trigger.id, type: trigger.type }, ...sourceAncestors]
+    return [
+      { id: trigger.id, name: trigger.name ?? trigger.id, type: trigger.type, parameters: trigger.parameters },
+      ...sourceAncestors,
+    ]
   }
 
   const triggerIndex = parseTriggerIndex(sourceNodeId)
   if (triggerIndex !== undefined && triggers?.[triggerIndex]) {
     const resolved = triggers[triggerIndex]
-    return [{ id: resolved.id, name: resolved.name ?? resolved.id, type: resolved.type }, ...sourceAncestors]
+    return [
+      {
+        id: resolved.id,
+        name: resolved.name ?? resolved.id,
+        type: resolved.type,
+        parameters: resolved.parameters,
+      },
+      ...sourceAncestors,
+    ]
   }
 
   return []
@@ -111,7 +125,8 @@ function getInputMockSkeleton(
 ): string {
   const node = effectiveUpstream.find((n) => n.id === predecessorId)
   if (!node) return '{}'
-  return buildMockJsonSkeleton(node.type, getTriggerInputSchemaFields(predecessorId, triggers))
+  const schema = getEffectiveOutputSchema(node, triggers)
+  return buildMockJsonSkeleton(node.type, schema)
 }
 
 /** Track which upstream node sections are expanded, syncing when the upstream set changes. */
