@@ -19,7 +19,7 @@ from aiokafka.protocol.metadata import MetadataRequest_v4, MetadataRequest_v5
 
 from syntara.eventstreams.models.responses import EventSubscriptionTestResponse
 from syntara.integrations.adapters.kafka import KafkaAdapter, KafkaAuthenticationConfigurationError
-from syntara.integrations.lib.kafka_connection import create_kafka_connection as create_conn
+from syntara.integrations.lib.kafka_connection import create_pinned_connection as create_conn
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
 PREFLIGHT_TIMEOUT_SECONDS = 10
@@ -113,7 +113,7 @@ async def test_kafka_connection(
     except ssl.SSLError:
         result.connection = "failed"
         result.error_code = "tls_failed"
-    except (OSError, KafkaError):
+    except (OSError, KafkaError, ValueError):
         result.connection = "failed"
         result.error_code = "connection_failed"
     finally:
