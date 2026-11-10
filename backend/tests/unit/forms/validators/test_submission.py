@@ -1,5 +1,6 @@
 """Unit tests for form submission validation and coercion."""
 
+import json
 from datetime import datetime, tzinfo
 from typing import Any, Self, cast, get_args
 
@@ -237,7 +238,18 @@ class TestCoercion:
 
     @pytest.mark.parametrize(
         "raw",
-        ["abc", "nan", "inf", "-inf", True, False, [1], float("nan"), float("inf"), float("-inf")],
+        [
+            "abc",
+            "nan",
+            "inf",
+            "-inf",
+            True,
+            False,
+            [1],
+            float("nan"),
+            pytest.param(json.loads("1e400"), id="json-number-overflows-to-positive-infinity"),
+            float("-inf"),
+        ],
     )
     def test_number_rejected(self, raw: Any) -> None:  # noqa: ANN401
         """Non-numeric strings, bools, nan/inf and lists are rejected."""
