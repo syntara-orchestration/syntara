@@ -12,6 +12,7 @@ from functools import lru_cache
 from typing import Any
 
 import jsonschema
+import structlog
 from pydantic import ValidationError
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
@@ -20,7 +21,7 @@ from syntara.core.constants import JsonbLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.schemas import SCHEMA_DIR
 from syntara.workflow_core.graph_backend import InMemoryGraphBackend
-from syntara.workflow_core.models import NodeType, ScheduledTriggerConfig
+from syntara.workflow_core.models import TEMPLATE_PATTERN, NodeType, ScheduledTriggerConfig
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
@@ -29,9 +30,67 @@ from syntara.workflows.models.validation_finding import (
 )
 from syntara.workflows.validators.template_expressions import check_template_expressions
 
+logger = structlog.stdlib.get_logger(__name__)
+
 _SCHEMA_DIR = SCHEMA_DIR / "workflows" / "v2"
 _BASE_URI = "https://automation.example.com/schemas/workflows/v2/"
 _FEEDBACK_PORTS: frozenset[str] = frozenset({"iterate"})
+
+
+def canonicalize_empty_tool_selections(workflow_definition: dict[str, Any]) -> bool:
+    """Rewrite agentic nodes stuck at SELECTED with no tools to the canonical NONE form.
+
+    A Task Agent node can end up with ``tool_selection_strategy: "SELECTED"`` and a
+    missing or empty ``tool_selections`` list — most commonly because no MCP tools
+    were available to pick when the strategy was set. That shape fails the agentic
+    node's JSON Schema (``tool_selections`` is required and non-empty when strategy
+    is SELECTED) and is rejected again at execution time, even though "no tools
+    selected" is otherwise a valid, supported configuration under NONE.
+
+    This is a purely syntactic pre-pass — no database lookups — so it must run
+    *before* ``WorkflowValidator.collect_findings`` and before a version record is
+    persisted, on every save path. It intentionally does not touch non-empty
+    ``tool_selections`` (that's ``_clean_unavailable_tool_selections``'s job: a
+    DB-driven check for deleted/disabled tool IDs) and leaves template expressions
+    (``${...}``) alone since their resolved value isn't known at save time.
+
+    Mutates ``workflow_definition`` in place, matching the mutation style of
+    ``_clean_unavailable_tool_selections``.
+
+    Returns:
+        True if any node was changed.
+
+    """
+    changed = False
+    nodes = workflow_definition.get("nodes")
+    if not isinstance(nodes, list):
+        return False
+
+    for node in nodes:
+        if not isinstance(node, dict) or node.get("type") != NodeType.AGENTIC:
+            continue
+        params = node.get("parameters")
+        if not isinstance(params, dict):
+            continue
+
+        strategy = params.get("tool_selection_strategy")
+        if strategy != "SELECTED" or (isinstance(strategy, str) and TEMPLATE_PATTERN.search(strategy)):
+            continue
+
+        if params.get("tool_selections"):
+            continue
+
+        params["tool_selection_strategy"] = "NONE"
+        params.pop("tool_selections", None)
+        changed = True
+
+        logger.info(
+            "Canonicalized empty SELECTED tool strategy to NONE",
+            node_id=node.get("id"),
+            reason="empty_tool_selections_canonicalized",
+        )
+
+    return changed
 
 
 def _retrieve_schema(uri: str) -> Resource:

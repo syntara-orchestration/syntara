@@ -66,6 +66,7 @@ from syntara.workflows.services.scheduled_trigger_service import ScheduledTrigge
 from syntara.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_TYPES, WebhookTriggerService
 from syntara.workflows.services.workflow_diff import generate_change_summary
 from syntara.workflows.validators import (
+    canonicalize_empty_tool_selections,
     get_system_continue_on_failure,
     validate_workflow_references,
     workflow_validator,
@@ -591,6 +592,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         recorder = get_metrics_recorder()
         component = ComponentLabel.WORKFLOW_ENGINE
         system_cof = await get_system_continue_on_failure()
+
+        canonicalize_empty_tool_selections(workflow_definition)
 
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
@@ -1171,6 +1174,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         recorder = get_metrics_recorder()
         system_cof = await get_system_continue_on_failure()
 
+        canonicalize_empty_tool_selections(workflow_definition)
+
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
             labels={"component": ComponentLabel.WORKFLOW_ENGINE.value, "operation": "version_update"},
@@ -1360,6 +1365,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             raise WorkflowVersionNotFoundError(workflow_id, version)
 
         if workflow_definition is not None:
+            canonicalize_empty_tool_selections(workflow_definition)
             target_version = await self._create_and_flush_version(
                 workflow, target_version, workflow_definition, change_description
             )
