@@ -1,9 +1,10 @@
-import { Checkbox, FormGroup, TextInput } from '@patternfly/react-core'
+import { Checkbox, FormGroup } from '@patternfly/react-core'
 import type { FormDefinition, FormField } from '@syntara/contracts'
 import { Controller, useFormContext } from 'react-hook-form'
 
 import { FormFieldTypeEnum } from '../../../forms'
 import { FormFieldError, FormFieldHintOrError } from '../../FormFieldError'
+import { SynNumberInputControl } from '../SynNumberInputControl'
 import { SynTextField } from '../SynTextField'
 
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
@@ -16,7 +17,7 @@ import {
   FORM_FIELD_BUILDER_INITIAL_ANSWER_DYNAMIC_UNAVAILABLE_HINT,
   FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL,
 } from './formFieldBuilderInitialAnswerCopy'
-import { FormFieldBuilderMultiSelectDefaultCheckboxes } from './FormFieldBuilderMultiSelectDefaultCheckboxes'
+import { FormFieldBuilderMultiSelectDefaultSelect } from './FormFieldBuilderMultiSelectDefaultSelect'
 
 type FormFieldBuilderFieldDefaultEditorProps = {
   index: number
@@ -78,24 +79,16 @@ export function FormFieldBuilderFieldDefaultEditor({
             fieldId={`${idPrefix}-default`}
             labelHelp={defaultValueLabelHelp}
           >
-            <TextInput
-              id={`${idPrefix}-default`}
-              type="number"
-              aria-label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
+            <SynNumberInputControl
+              fieldId={`${idPrefix}-default`}
+              ariaLabel={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
               placeholder={examples.defaultValue}
-              validated={fieldState.error ? 'error' : 'default'}
+              value={rhfField.value}
+              emptyValue={null}
               isDisabled={isDisabled}
-              value={
-                typeof rhfField.value === 'number' || typeof rhfField.value === 'string' ? String(rhfField.value) : ''
-              }
-              onChange={(_event, value) => {
-                if (value === '') {
-                  rhfField.onChange(null)
-                  commit()
-                  return
-                }
-                const parsed = Number.parseFloat(value)
-                rhfField.onChange(Number.isFinite(parsed) ? parsed : null)
+              validated={fieldState.error ? 'error' : 'default'}
+              onChange={(next) => {
+                rhfField.onChange(next)
                 commit()
               }}
               onBlur={rhfField.onBlur}
@@ -130,7 +123,7 @@ export function FormFieldBuilderFieldDefaultEditor({
       )
     }
     return (
-      <FormFieldBuilderMultiSelectDefaultCheckboxes
+      <FormFieldBuilderMultiSelectDefaultSelect
         index={index}
         idPrefix={idPrefix}
         isDisabled={isDisabled}
