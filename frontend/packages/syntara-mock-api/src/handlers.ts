@@ -14,7 +14,12 @@ import {
   WorkflowVersionStatusEnum,
 } from '@syntara/contracts'
 import { credentials, credentialTypes, credentialWorkflows } from './resources/credentials'
-import { executionTargets, MOCK_DELETE_CONFLICT_LABEL, MOCK_UPDATE_CONFLICT_LABEL } from './resources/executionTargets'
+import {
+  executionTargets,
+  MOCK_ACTIVE_WORKLOAD_COUNTS,
+  MOCK_DELETE_CONFLICT_LABEL,
+  MOCK_UPDATE_CONFLICT_LABEL,
+} from './resources/executionTargets'
 import { integrations } from './resources/integrations'
 import { models } from './resources/models'
 import { workflows } from './resources/workflows'
@@ -575,6 +580,42 @@ export const handlers = [
       )
     }
     return HttpResponse.json(target)
+  }),
+
+  http.get('/api/execution_plane/v1/execution_targets/:target_id/usage', ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (!canReadExecutionTarget(username)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:read',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const targetId = params.target_id as string
+    const target = executionTargets.find((item) => item.id === targetId)
+    if (!target) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: `Execution target ${targetId} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+
+    return HttpResponse.json({
+      target_id: targetId,
+      active_workload_count: MOCK_ACTIVE_WORKLOAD_COUNTS[targetId] ?? 0,
+    })
   }),
 
   http.post('/api/execution_plane/v1/execution_targets', async ({ request }) => {

@@ -20,6 +20,15 @@ export const MOCK_DELETE_CONFLICT_LABEL = 'mock_delete_conflict'
 export const MOCK_UPDATE_CONFLICT_LABEL = 'mock_update_conflict'
 
 /**
+ * Deterministic active workload counts for `GET .../execution_targets/:id/usage`.
+ * Unlisted targets return 0.
+ */
+export const MOCK_ACTIVE_WORKLOAD_COUNTS: Readonly<Record<string, number>> = {
+  [DEFAULT_EXECUTION_TARGET_ID]: 2,
+  [IN_USE_DELETE_CONFLICT_TARGET_ID]: 7,
+}
+
+/**
  * Single installed OpenShift / Execution Plane cluster (matches the OpenShift
  * integration seeded in `integrations.ts`). Target create requires exactly one.
  */

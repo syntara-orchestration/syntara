@@ -1,10 +1,12 @@
-import { Content, ContentVariants, List, ListItem, Stack, StackItem } from '@patternfly/react-core'
+import { Content, ContentVariants, Spinner, Stack, StackItem } from '@patternfly/react-core'
 import type { ExecutionPlaneAPI } from '@syntara/contracts'
+import type { ReactNode } from 'react'
 
 import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import type { DialogState } from '../../hooks/useDialogState'
 
 import type { useExecutionTargetActions } from './useExecutionTargetActions'
+import { useExecutionTargetUsage } from './useExecutionTargetUsage'
 
 type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
 
@@ -15,12 +17,108 @@ type ExecutionTargetDialogsProps = Readonly<{
   onDisable: () => void
 }>
 
+type UsageState = Readonly<{
+  activeWorkloadCount: number
+  isLoadingUsage: boolean
+  usageFetchError: boolean
+}>
+
+function activeWorkloadLabel(count: number): string {
+  return count === 1 ? '1 active workload' : `${String(count)} active workloads`
+}
+
+function ActiveWorkloadsNotice({
+  count,
+  continuation,
+}: Readonly<{
+  count: number
+  continuation: string
+}>) {
+  if (count <= 0) return null
+
+  return (
+    <Content component={ContentVariants.p}>
+      <strong>{activeWorkloadLabel(count)}</strong> {count === 1 ? 'is' : 'are'} running on this target. {continuation}
+    </Content>
+  )
+}
+
+function UsageLoadingNotice() {
+  return (
+    <Content component={ContentVariants.p}>
+      <Spinner size="md" aria-label="Checking active workloads" /> Checking for active workloads on this target…
+    </Content>
+  )
+}
+
+function UsageFetchErrorNotice() {
+  return <Content component={ContentVariants.p}>Unable to load active workload information for this target.</Content>
+}
+
+function ConfirmationBody({
+  usage,
+  children,
+  continuation,
+}: Readonly<{
+  usage: UsageState
+  children: ReactNode
+  continuation: string
+}>) {
+  if (usage.isLoadingUsage) {
+    return <UsageLoadingNotice />
+  }
+
+  let usageDetails: ReactNode = null
+  if (usage.usageFetchError) {
+    usageDetails = <UsageFetchErrorNotice />
+  } else if (usage.activeWorkloadCount > 0) {
+    usageDetails = <ActiveWorkloadsNotice count={usage.activeWorkloadCount} continuation={continuation} />
+  }
+
+  return (
+    <Stack hasGutter>
+      <StackItem>{children}</StackItem>
+      {usageDetails ? <StackItem>{usageDetails}</StackItem> : null}
+    </Stack>
+  )
+}
+
+function resolveUsageTargetId(
+  deleteDialog: DialogState<ExecutionTarget>,
+  disableDialog: DialogState<ExecutionTarget>
+): string | null {
+  if (deleteDialog.isOpen) {
+    return deleteDialog.item?.id ?? null
+  }
+  if (disableDialog.isOpen) {
+    return disableDialog.item?.id ?? null
+  }
+  return null
+}
+
+function deleteContinuation(count: number): string {
+  if (count === 1) {
+    return 'The target will be deleted after that workload completes.'
+  }
+  return 'The target will be deleted after those workloads complete.'
+}
+
+function disableContinuation(count: number): string {
+  if (count === 1) {
+    return 'That workload will continue to completion.'
+  }
+  return 'Those workloads will continue to completion.'
+}
+
 export function ExecutionTargetDialogs({
   deleteDialog,
   onDelete,
   disableDialog,
   onDisable,
 }: ExecutionTargetDialogsProps) {
+  const usageTargetId = resolveUsageTargetId(deleteDialog, disableDialog)
+  const usage = useExecutionTargetUsage(usageTargetId)
+
   return (
     <>
       <SynConfirmationDialog
@@ -30,25 +128,14 @@ export function ExecutionTargetDialogs({
         title="Disable execution target?"
         confirmLabel="Disable"
         confirmVariant="primary"
+        confirmLoading={usage.isLoadingUsage}
       >
-        <Stack hasGutter>
-          <StackItem>
-            <Content component={ContentVariants.p}>
-              You are about to disable the following execution target: <strong>{disableDialog.item?.name}</strong>
-            </Content>
-          </StackItem>
-          <StackItem>
-            <Content component={ContentVariants.p}>This will immediately:</Content>
-            <List>
-              <ListItem>Workflows already running on this target will continue to completion.</ListItem>
-              <ListItem>Workflows that have not started and require affinity to this target will fail.</ListItem>
-              <ListItem>Workflows routed by labels will shift to other available capacity.</ListItem>
-            </List>
-          </StackItem>
-          <StackItem>
-            <Content component={ContentVariants.p}>You can re-enable this execution target at any time.</Content>
-          </StackItem>
-        </Stack>
+        <ConfirmationBody usage={usage} continuation={disableContinuation(usage.activeWorkloadCount)}>
+          <Content component={ContentVariants.p}>
+            The execution target <strong>{disableDialog.item?.name}</strong> will be disabled. Workflows that have not
+            started and require affinity to this target will fail. You can re-enable it at any time.
+          </Content>
+        </ConfirmationBody>
       </SynConfirmationDialog>
 
       <SynConfirmationDialog
@@ -59,14 +146,18 @@ export function ExecutionTargetDialogs({
         confirmLabel="Delete"
         confirmVariant="danger"
         titleIconVariant="warning"
+        confirmLoading={usage.isLoadingUsage}
         destructiveAcknowledgement={{
           checkboxId: 'delete-execution-target-ack',
           label: 'I understand this execution target will be permanently deleted.',
         }}
       >
-        <Content component={ContentVariants.p}>
-          The execution target <strong>{deleteDialog.item?.name}</strong> will be deleted. This cannot be undone.
-        </Content>
+        <ConfirmationBody usage={usage} continuation={deleteContinuation(usage.activeWorkloadCount)}>
+          <Content component={ContentVariants.p}>
+            The execution target <strong>{deleteDialog.item?.name}</strong> will be permanently deleted. This cannot be
+            undone.
+          </Content>
+        </ConfirmationBody>
       </SynConfirmationDialog>
     </>
   )
