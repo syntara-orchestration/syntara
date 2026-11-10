@@ -1,0 +1,34 @@
+"""add one-time seed markers
+
+Revision ID: 951b438e70fa
+Revises: e7f4a1b2c3d4
+Create Date: 2026-11-05 13:20:29.306419
+
+"""
+
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+import sqlmodel
+from alembic import op
+
+# revision identifiers, used by Alembic.
+revision: str = "951b438e70fa"
+down_revision: str | Sequence[str] | None = "e7f4a1b2c3d4"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+
+def upgrade() -> None:
+    """Create the one-time seed marker table."""
+    op.create_table(
+        "seed_markers",
+        sa.Column("key", sqlmodel.sql.sqltypes.AutoString(length=255), nullable=False),
+        sa.Column("seeded_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.PrimaryKeyConstraint("key"),
+    )
+
+
+def downgrade() -> None:
+    """Drop the one-time seed marker table and its history."""
+    op.drop_table("seed_markers")

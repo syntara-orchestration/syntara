@@ -1,25 +1,29 @@
-"""Seed built-in authz data (groups, default project, admin user).
+"""Seed built-in authz data and the one-time editable step-authoring default.
 
 Built-in roles and policies are no longer stored in the database — they
 live in ``role_conventions.py`` and are resolved at runtime.  This seeder
-only creates groups, the default project, the admin user, and role
-assignments (which reference roles by name).
+creates groups, the default project, the admin user, role assignments,
+and a custom default step-authoring policy and role.
 """
 
 from pathlib import Path
+from typing import Any
 from uuid import UUID, uuid4
 
 import structlog
-from sqlalchemy import insert
+from sqlalchemy import insert, literal
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.authz.models import RoleAssignment
+from syntara.authz.exceptions import PolicyNameConflictError, RoleNameConflictError
+from syntara.authz.models import Policy, Role, RoleAssignment
 from syntara.authz.models.project import Project
 from syntara.core.config.base import get_settings
 from syntara.core.models import User
 from syntara.core.models.group import Group, user_groups
+from syntara.core.models.seed_marker import SeedMarker
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -27,6 +31,8 @@ BOOTSTRAP_ADMIN_USERNAME = "admin"
 BOOTSTRAP_ADMIN_FIRST_NAME = "Administrator"
 # Placeholder only — operators should change this after install (self email update is allowed).
 BOOTSTRAP_ADMIN_EMAIL = "admin@example.com"
+DEFAULT_STEP_ALLOW_SEED_KEY = "authz.default_step_allow.v1"
+DEFAULT_STEP_POLICY_NAME = "step_type:write:any"
 
 
 def _is_duplicate_email_error(exc: IntegrityError) -> bool:
@@ -65,11 +71,7 @@ async def try_set_bootstrap_admin_email(session: AsyncSession, admin_user: User)
 
 
 async def seed_groups_project_admin(session: AsyncSession) -> None:
-    """Seed built-in groups, default project, and admin user.
-
-    Role assignments reference roles by name — no role rows need to
-    exist in the database.
-    """
+    """Seed groups, project, admin, and the one-time custom authoring default."""
     (
         auth_group,
         admin_group,
@@ -80,11 +82,12 @@ async def seed_groups_project_admin(session: AsyncSession) -> None:
     ) = await _seed_groups_and_project(session)
     await session.flush()
     await _seed_assignments_and_admin(session, auth_group, admin_group, auditors_group, users_group, default_project)
+    await _seed_default_step_authoring_once(session, auth_group)
     await session.commit()
 
 
 async def seed_authz_data(session: AsyncSession) -> None:
-    """Seed all built-in authz data into the database.
+    """Seed authz bootstrap data and the one-time custom authoring default.
 
     This is the entry point used by tests after table truncation.
     """
@@ -98,7 +101,82 @@ async def seed_authz_data(session: AsyncSession) -> None:
     ) = await _seed_groups_and_project(session)
     await session.flush()
     await _seed_assignments_and_admin(session, auth_group, admin_group, auditors_group, users_group, default_project)
+    await _seed_default_step_authoring_once(session, auth_group)
     await session.commit()
+
+
+async def _seed_default_step_authoring_once(session: AsyncSession, auth_group: Group) -> None:
+    """Seed editable defaults atomically, preserving subsequent admin changes."""
+    async with session.begin_nested():
+        # The unique insert also serializes competing seeds; rollback releases the claim.
+        claimed = await session.exec(
+            pg_insert(SeedMarker)
+            .values(key=DEFAULT_STEP_ALLOW_SEED_KEY)
+            .on_conflict_do_nothing(index_elements=["key"])
+            .returning(literal(1))
+        )
+        if claimed.scalar_one_or_none() is None:
+            return
+
+        statements: list[dict[str, Any]] = [{"effect": "allow", "actions": ["step_type:write"], "scope": "any"}]
+        policy = (
+            await session.exec(
+                select(Policy).where(
+                    Policy.name == DEFAULT_STEP_POLICY_NAME,
+                    Policy.project_id.is_(None),  # type: ignore[union-attr]
+                )
+            )
+        ).one_or_none()
+        if policy is None:
+            session.add(
+                Policy(
+                    name=DEFAULT_STEP_POLICY_NAME,
+                    description=(
+                        "Allow every authenticated user to author all workflow step "
+                        "types. Deleting this policy, or removing the step-author "
+                        "role assignment, blocks all workflow authoring until an "
+                        "allow is granted again."
+                    ),
+                    statements=statements,
+                )
+            )
+        elif policy.is_builtin or policy.scope != "any" or policy.statements != statements:
+            msg = f"Default step policy name '{DEFAULT_STEP_POLICY_NAME}' is already in use"
+            raise PolicyNameConflictError(msg)
+
+        role = (
+            await session.exec(select(Role).where(Role.name == "step-author", Role.project_id.is_(None)))  # type: ignore[union-attr]
+        ).one_or_none()
+        if role is None:
+            session.add(
+                Role(
+                    name="step-author",
+                    description=(
+                        "Default step-type authoring for all authenticated users. "
+                        "Revoking this role assignment blocks all workflow "
+                        "authoring until an allow is granted again."
+                    ),
+                    policy_names=[DEFAULT_STEP_POLICY_NAME],
+                )
+            )
+        elif role.is_builtin or role.scope != "system" or role.policy_names != [DEFAULT_STEP_POLICY_NAME]:
+            msg = "Default step role name 'step-author' is already in use"
+            raise RoleNameConflictError(msg)
+
+        assignment = (
+            await session.exec(
+                select(RoleAssignment).where(
+                    RoleAssignment.group_id == auth_group.id,
+                    RoleAssignment.role_name == "step-author",
+                    RoleAssignment.project_id.is_(None),  # type: ignore[union-attr]
+                )
+            )
+        ).one_or_none()
+        if assignment is None:
+            session.add(RoleAssignment(group_id=auth_group.id, role_name="step-author", is_builtin=False))
+        else:
+            # Preserve the assignment ID for databases seeded by the former built-in default.
+            assignment.is_builtin = False
 
 
 async def _seed_groups_and_project(
