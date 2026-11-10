@@ -19,6 +19,7 @@ import { StatusLabel } from '../../builder/ExecutionStatus'
 import { executionStatusDisplayLabels } from '../../builder/executionStatusConstants'
 
 import type { CredentialWorkflowRef } from './credentialConstants'
+import styles from './CredentialDetail.module.css'
 import { expandableRowIds, hasTrimmedDescription, RELATED_RESOURCE_DASH } from './credentialRelatedTableUtils'
 import { DescriptionExpandableContent } from './DescriptionExpandableContent'
 
@@ -146,7 +147,7 @@ export function CredentialWorkflowsTab({ credentialId }: Readonly<CredentialWork
   const { expandedRows, allRowsExpanded, handleToggleRow, handleCollapseAll } = useExpandableRowIds(expandableIds)
 
   return (
-    <SynPanelContentStack>
+    <SynPanelContentStack className={styles.relatedResourcesTabContent}>
       <SynListPanelView
         isPending={query.isPending}
         error={query.error}
