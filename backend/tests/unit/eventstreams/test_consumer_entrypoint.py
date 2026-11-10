@@ -12,7 +12,9 @@ from syntara.core.constants import EventWorkerDefaults
 from syntara.core.lib.encryption import SecretEncryptor
 from syntara.eventstreams import consumer_entrypoint as entrypoint
 from syntara.eventstreams import consumer_lifecycle as lifecycle
+from syntara.eventstreams.consumer_health import EventWorkerHealth, probe
 from syntara.eventstreams.consumer_service import EventWorkerManager
+from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
 from syntara.eventstreams.services.subscription_hints import SubscriptionHintListener
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
@@ -39,6 +41,7 @@ async def test_composition_shares_one_client_factory_and_resource_limits(monkeyp
     create_placement = AsyncMock(return_value=placement)
     redis = MagicMock()
     redis.disconnect = AsyncMock()
+    health = EventWorkerHealth(port=0)
 
     async def run(manager, recovery, shared, hints, **kwargs: object) -> None:
         captured.append(True)
@@ -62,16 +65,19 @@ async def test_composition_shares_one_client_factory_and_resource_limits(monkeyp
         assert manager._factory._lookup.cache is redis
         assert hints._client is redis
         assert manager._gate is shared.gate
+        assert not health._closing
+        assert health._ready() == manager.ready
 
     monkeypatch.setattr(entrypoint, "AsyncSessionLocal", sessions)
     monkeypatch.setattr(entrypoint, "run_event_worker", run)
     monkeypatch.setattr(entrypoint.SubscriptionPlacementService, "create", create_placement)
     monkeypatch.setattr(entrypoint, "EventWorkerRedisClient", lambda: redis)
-    await entrypoint._run_connected(service, SecretEncryptor(b"a" * 32), resources, shutdown)
+    await entrypoint._run_connected(service, SecretEncryptor(b"a" * 32), resources, shutdown, health)
     assert captured == [True]
     sessions.assert_not_called()
     create_placement.assert_awaited_once_with(sessions)
     redis.disconnect.assert_awaited_once()
+    assert health._closing
 
 
 async def test_disabled_process_opens_no_temporal_client(monkeypatch):
@@ -107,6 +113,8 @@ async def test_shutdown_cancels_pending_shared_client_connection(monkeypatch):
 
 
 async def test_main_uses_existing_signed_tls_client_and_disposes_database_after_drain(monkeypatch):
+    health_server = EventWorkerHealth(port=0)
+    monkeypatch.setattr(entrypoint, "EventWorkerHealth", lambda: health_server)
     settings = get_settings().model_copy(update={"eventstream_enabled": True})
     monkeypatch.setattr(entrypoint, "get_settings", lambda: settings)
     monkeypatch.setattr(entrypoint, "validate_encryption_key_at_startup", MagicMock())
@@ -120,8 +128,9 @@ async def test_main_uses_existing_signed_tls_client_and_disposes_database_after_
     monkeypatch.setattr(temporal_module, "build_temporal_tls_config", lambda: tls)
     trace = []
 
-    async def run(service, _encryptor, _resources, _shutdown) -> None:
+    async def run(service, _encryptor, _resources, _shutdown, health) -> None:
         assert service.temporal_client is client
+        assert health._server is not None
         trace.append("drained")
 
     async def dispose() -> None:
@@ -237,6 +246,47 @@ async def test_membership_failure_is_monitored_and_closes_process_admission(mana
     assert not context.manager.ready
     assert context.manager.membership_task.done()
     hints.stop.assert_awaited_once()
+
+
+async def test_probes_follow_empty_authoritative_reconciliation_and_close_before_drain(manager_context, monkeypatch):
+    context = manager_context
+    entered, release = asyncio.Event(), asyncio.Event()
+    handlers = {}
+    monkeypatch.setattr(
+        asyncio.get_running_loop(), "add_signal_handler", lambda sig, callback: handlers.update({sig: callback})
+    )
+
+    async def read() -> list[SubscriptionSnapshot]:
+        entered.set()
+        await release.wait()
+        return []
+
+    context.manager._reader.read.side_effect = read
+    recovery = SimpleNamespace(start=MagicMock(), close_claims=MagicMock(), stop=AsyncMock())
+    hints = SimpleNamespace(start=MagicMock(), stop=AsyncMock())
+    shutdown = asyncio.Event()
+    health = EventWorkerHealth(port=0)
+    health.set_readiness(lambda: context.manager.ready)
+    await health.start()
+    task = asyncio.create_task(
+        lifecycle.run_event_worker(context.manager, recovery, context.resources, hints, shutdown_event=shutdown)
+    )
+    try:
+        await entered.wait()
+        assert await asyncio.to_thread(probe, "live", port=health.port)
+        assert not await asyncio.to_thread(probe, "ready", port=health.port)
+        release.set()
+        await eventually(lambda: context.manager.ready)
+        assert not context.manager.subscription_ids
+        assert await asyncio.to_thread(probe, "ready", port=health.port)
+        handlers[signal.SIGTERM]()
+        assert not await asyncio.to_thread(probe, "ready", port=health.port)
+        assert await asyncio.to_thread(probe, "live", port=health.port)
+    finally:
+        release.set()
+        shutdown.set()
+        await task
+        await health.stop()
 
 
 async def test_lifecycle_deadline_settles_drain_children_before_hints_close(manager_context, monkeypatch):

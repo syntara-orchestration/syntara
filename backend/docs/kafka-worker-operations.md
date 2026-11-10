@@ -2,10 +2,12 @@
 
 The existing Kafka worker runs with
 `python -m syntara.eventstreams.consumer_entrypoint`, independently of API,
-workflow execution and background workers. The opt-in local compose profile runs
-that entrypoint directly using the backend image. Operator-managed Kubernetes
-deployment, CRD controls, container launchers and deployment health probes are
-deferred to M2. This guide covers backend configuration, local compose and runtime
+workflow execution and background workers. The backend image packages
+`start-event-stream-worker`, which execs that entrypoint as the container process.
+The opt-in local compose profile uses this launcher. The AO operator's
+`spec.eventStreamWorker` packages an independent Deployment; enable it only after
+the backend image includes the launcher and health module. This guide covers
+backend configuration, local compose and runtime
 recovery safeguards. Kafka infrastructure, broker ACLs and broker credentials
 remain customer managed; the local broker example is disposable development data.
 
@@ -25,7 +27,8 @@ apply the [cache maintenance procedure](#cache-maintenance), including external
 epoch rotation before shorter cleanup bounds, and restart with one consistent
 value before resuming intake. Do not start a
 second pool with a different retention value against the same database. Automatic
-deployment rollout controls are part of the deferred M2 operator integration.
+deployment rollout uses the operator's `Recreate` strategy to prevent mixed values;
+cache epoch maintenance remains an explicit administrator action.
 
 These settings are read at process/runner startup. The backend Settings defaults,
 root and backend `.env.example`, and local compose worker agree:
@@ -137,6 +140,9 @@ bootstrap and advertised broker address/port**, including addresses returned in
 metadata after bootstrap. Network controls must account for all advertised
 endpoints. Private broker hostnames must also be allowed by the
 application's Integration SSRF policy on the API and Kafka worker.
+For operator-managed deployments, `spec.integrationURLAllowedHosts` supplies
+`APP_INTEGRATION_URL_ALLOWED_HOSTS` consistently to the API and all runtime
+workers. Include every private bootstrap and advertised broker hostname.
 
 Startup uses the stable installation/deployment namespace and a fresh worker
 process UUID. It registers/heartbeats membership before claiming a fair share of
@@ -149,8 +155,25 @@ The internal `EventWorkerManager.ready` state follows registration and the first
 successful authoritative reconciliation, including a zero target or no owned
 subscriptions. Such workers remain healthy and idle while membership and
 prepared recovery continue. Readiness does not wait for customer brokers; broker
-failure stays within subscription retries. Deployment probe endpoints and exec
-commands are deferred to M2; local compose installs no worker health probe.
+failure stays within subscription retries.
+
+The backend image includes these exec commands, using only Python's standard
+library in the probe process:
+
+```bash
+python -m syntara.eventstreams.consumer_health live
+python -m syntara.eventstreams.consumer_health ready
+```
+
+They return zero on success and nonzero on failure. Each requires a fresh reply
+from the worker event loop at `127.0.0.1:8765`; no Service, published container
+port, credentials or external dependencies are used. This is an internal probe
+protocol, not an HTTP endpoint. Liveness is available during dependency startup
+and observes only a responsive process, independently of brokers, Redis, traffic
+and lag. Readiness reads the manager's current authoritative state, including
+membership trust, and closes before drain or shared-client cleanup. An exited
+or stalled process cannot pass liveness using a stale health file. Kubernetes
+startup/liveness probes use `live`; readiness and local compose health use `ready`.
 
 For graceful scale-down, close admission/reconciliation and new placement/recovery
 claims, mark membership draining, and keep heartbeats and owned-lease renewals
@@ -305,13 +328,16 @@ recovery controls when retention/compaction removed a required source window.
 
 ## Verification boundary
 
-Unit tests cover the existing worker composition and independent recovery,
-settings, local compose defaults, disposable fixture configuration and the manual
+Unit tests cover worker composition and independent recovery, process-local probe
+responses and exec exit codes, readiness before/after empty reconciliation and
+shutdown, executable launcher/image COPY packaging, settings, local compose
+defaults, disposable fixture configuration and the manual
 example's deployment-scoped mutation boundary. The SQL example is not executed
 against PostgreSQL by these checks. They do
 not establish live deployment, TLS/broker interoperability or restore safety.
-Operator CRDs, deployment builders, reconciliation and deployment probe packaging
-are deferred to M2 and are not covered by this Syntara change.
+Operator CRDs, deployment builders and reconciliation are verified separately in
+the AO operator repository. Static packaging assertions do not build or run the
+backend image.
 Live broker/TLS fixture matrices, CI integration/E2E provisioning, deployment smoke
 runs, scale/soak measurements, backup/restore drills, full Visibility and M4 release
 certification are deferred verification work and do not block this packaging story.
