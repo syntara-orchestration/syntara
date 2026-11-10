@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from uuid import uuid5
 
 import pytest
+from execution_plane_client.commands.control import CompletionStatus
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -72,7 +73,10 @@ async def test_monitor_and_dispatch_share_identity_in_either_order(
                 await reader.exec(select(ActivityExecution).where(ActivityExecution.execution_id == test_execution.id))
             ).all() == []
             await CompletionCommandHandler()._complete_activity(
-                context=AOCommandContext(reader, temporal), work_id=work_id, status="completed", result=result
+                context=AOCommandContext(reader, temporal),
+                work_id=work_id,
+                status=CompletionStatus.COMPLETED,
+                result=result,
             )
     if not monitor_first:
         temporal.complete_async_activity.assert_not_awaited()
@@ -80,7 +84,10 @@ async def test_monitor_and_dispatch_share_identity_in_either_order(
     await monitor._create_all_activities_upfront(test_execution.id, _DEFINITIONS)
     async with test_db_session_factory() as reader:
         await CompletionCommandHandler()._complete_activity(
-            context=AOCommandContext(reader, temporal), work_id=work_id, status="completed", result=result
+            context=AOCommandContext(reader, temporal),
+            work_id=work_id,
+            status=CompletionStatus.COMPLETED,
+            result=result,
         )
         rows = (
             await reader.exec(select(ActivityExecution).where(ActivityExecution.execution_id == test_execution.id))
