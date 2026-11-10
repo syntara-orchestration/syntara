@@ -114,10 +114,17 @@ async def test_consumer_checks_advertised_brokers_and_reconnects(group: Connecti
             async with asyncio.timeout(5):
                 await client.bootstrap()
                 assert len(writers) == 1
+                # subscribe() requested metadata before bootstrap started its
+                # background task. Settle that allowed connection before the
+                # DNS change and the forbidden-reconnect socket assertion.
+                metadata_update = client._md_update_fut
+                assert metadata_update is not None
+                assert await metadata_update
                 connection = await client._get_conn(1, group=group)
                 assert connection is not None
                 assert connection.connected()
-                assert len(writers) == 2
+                expected_connections = 2 + int(group == ConnectionGroup.COORDINATION)
+                assert len(writers) == expected_connections
                 assert await client._get_conn(1, group=group) is connection
                 closed = connection.close()
                 if closed is not None:
@@ -128,7 +135,7 @@ async def test_consumer_checks_advertised_brokers_and_reconnects(group: Connecti
                 with patch.object(asyncio.get_running_loop(), "create_connection", new_callable=AsyncMock) as connect:
                     assert await client._get_conn(1, group=group) is None
                     connect.assert_not_awaited()
-                assert len(writers) == 2
+                assert len(writers) == expected_connections
                 assert vars(aiokafka.client)["create_conn"] is original_factory
     finally:
         await adapter.stop()
