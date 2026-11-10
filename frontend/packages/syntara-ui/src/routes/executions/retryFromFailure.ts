@@ -49,7 +49,7 @@ export function selectedRetryPointId(
 }
 
 /** Sanitized nodes that replace failed start points, independent of the current selection. */
-export function sanitizedReplacementIds(preview: RetryFromFailurePreview | undefined): string[] {
+function sanitizedReplacementIds(preview: RetryFromFailurePreview | undefined): string[] {
   return [...new Set(Object.values(preview?.sanitized_replacements ?? {}).flat())]
 }
 
