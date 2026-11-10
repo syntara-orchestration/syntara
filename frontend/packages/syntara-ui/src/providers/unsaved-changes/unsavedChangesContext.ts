@@ -1,6 +1,6 @@
 import { createContext } from 'react'
 
-import type { NavigationTarget } from '../../app/typedRouteDestinations'
+import type { NavigationTarget } from '../../app/typed-route-destinations'
 
 export type DirtyCheckOptions = {
   check: () => boolean

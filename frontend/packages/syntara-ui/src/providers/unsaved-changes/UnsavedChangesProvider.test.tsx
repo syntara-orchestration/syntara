@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { NavigationTarget } from '../../app/typedRouteDestinations'
+import type { NavigationTarget } from '../../app/typed-route-destinations'
 import { useUnsavedChanges } from '../../app/useUnsavedChanges'
 import { getUserDetailDestination } from '../../routes/access-management/accessManagementPaths'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'

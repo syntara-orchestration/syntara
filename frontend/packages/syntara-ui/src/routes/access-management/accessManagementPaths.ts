@@ -1,12 +1,12 @@
 import { AppRoute } from '../../app/AppRoute'
-import { ACCESS_MANAGEMENT_DETAIL_ROUTES } from '../../app/typedRouteDestinations'
+import { ACCESS_MANAGEMENT_DETAIL_ROUTES } from '../../app/typed-route-destinations'
 import type {
   AccessManagementDetailDestination,
   GroupDetailDestination,
   ProjectDetailDestination,
   ServiceAccountDetailDestination,
   UserDetailDestination,
-} from '../../app/typedRouteDestinations'
+} from '../../app/typed-route-destinations'
 
 import { RolePrincipalType } from './RoleAssignmentTypes'
 

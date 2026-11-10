@@ -1,12 +1,12 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import { ACCESS_MANAGEMENT_DETAIL_ROUTES } from '../../app/typedRouteDestinations'
+import { ACCESS_MANAGEMENT_DETAIL_ROUTES } from '../../app/typed-route-destinations'
 import type {
   GroupDetailDestination,
   ProjectDetailDestination,
   ServiceAccountDetailDestination,
   UserDetailDestination,
-} from '../../app/typedRouteDestinations'
+} from '../../app/typed-route-destinations'
 
 import {
   getGroupDetailDestination,
