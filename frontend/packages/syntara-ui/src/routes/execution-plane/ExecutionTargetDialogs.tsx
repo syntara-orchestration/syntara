@@ -64,12 +64,10 @@ function ConfirmationBody({
   children: ReactNode
   continuation: string
 }>) {
-  if (usage.isLoadingUsage) {
-    return <UsageLoadingNotice />
-  }
-
   let usageDetails: ReactNode = null
-  if (usage.usageFetchError) {
+  if (usage.isLoadingUsage) {
+    usageDetails = <UsageLoadingNotice />
+  } else if (usage.usageFetchError) {
     usageDetails = <UsageFetchErrorNotice />
   } else if (usage.activeWorkloadCount > 0) {
     usageDetails = <ActiveWorkloadsNotice count={usage.activeWorkloadCount} continuation={continuation} />

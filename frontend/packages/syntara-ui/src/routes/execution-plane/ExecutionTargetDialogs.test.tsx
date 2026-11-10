@@ -123,6 +123,9 @@ describe('ExecutionTargetDialogs', () => {
     mockUsage({ isLoadingUsage: true })
     renderDialogs({ deleteDialog: createDialog(target, true) })
 
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/Staging OpenShift/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/This cannot be undone/i)).toBeInTheDocument()
     expect(screen.getByLabelText('Checking active workloads')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Delete/i })).toBeDisabled()
   })
@@ -227,6 +230,17 @@ describe('ExecutionTargetDialogs', () => {
     renderDialogs({ disableDialog: createDialog(target, true) })
 
     expect(screen.queryByText(/active workload/i)).not.toBeInTheDocument()
+  })
+
+  it('shows a loading state in the disable confirmation while usage is fetching', () => {
+    mockUsage({ isLoadingUsage: true })
+    renderDialogs({ disableDialog: createDialog(target, true) })
+
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/Staging OpenShift/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/require affinity to this target will fail/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Checking active workloads')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Disable/i })).toBeDisabled()
   })
 
   it('fetches usage for the open disable dialog target', () => {
