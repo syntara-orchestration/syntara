@@ -2,7 +2,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import type { NavigationTarget } from '../../app/typedRouteDestinations'
 import { useUnsavedChanges } from '../../app/useUnsavedChanges'
+import { getUserDetailDestination } from '../../routes/access-management/accessManagementPaths'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { resetAll } from '../../stores/workflowStoreActions'
 import { routerTestState } from '../../test/setup'
@@ -20,17 +22,17 @@ vi.mock('../../stores/workflowStoreActions', () => ({
 
 // Test helper component
 function TestConsumer({
-  targetPath = '/workflows',
+  target = '/workflows',
   saveHandler,
 }: {
-  targetPath?: string
+  target?: NavigationTarget
   saveHandler?: () => Promise<boolean>
 }) {
   const { requestNavigation, registerSaveHandler } = useUnsavedChanges()
 
   return (
     <div>
-      <button onClick={() => requestNavigation(targetPath)}>Navigate Away</button>
+      <button onClick={() => requestNavigation(target)}>Navigate Away</button>
       {saveHandler && <button onClick={() => registerSaveHandler(saveHandler)}>Register Handler</button>}
     </div>
   )
@@ -78,6 +80,23 @@ describe('UnsavedChangesProvider', () => {
 
       expect(resetAll).toHaveBeenCalled()
       expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/workflows' })
+    })
+
+    it('keeps typed route params when navigating after discarding changes', async () => {
+      const user = userEvent.setup()
+      render(
+        <UnsavedChangesProvider>
+          <TestConsumer target={getUserDetailDestination('u-123')} />
+        </UnsavedChangesProvider>
+      )
+
+      await user.click(screen.getByText('Navigate Away'))
+      await user.click(screen.getByRole('button', { name: 'Exit without saving' }))
+
+      expect(routerTestState.navigate).toHaveBeenCalledWith({
+        to: '/system-administration/access-management/users/$userId',
+        params: { userId: 'u-123' },
+      })
     })
 
     it('saves and navigates when save succeeds', async () => {
@@ -169,7 +188,7 @@ describe('UnsavedChangesProvider', () => {
       const user = userEvent.setup()
       render(
         <UnsavedChangesProvider>
-          <TestConsumer targetPath="/workflow-builder/456" />
+          <TestConsumer target="/workflow-builder/456" />
         </UnsavedChangesProvider>
       )
 

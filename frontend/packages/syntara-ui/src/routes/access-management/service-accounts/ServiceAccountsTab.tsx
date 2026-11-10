@@ -21,7 +21,7 @@ import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { detachPromise } from '../../../utils/detachPromise'
 import { accessClient } from '../../access/accessClient'
-import { getProjectDetailPath, getServiceAccountDetailPath } from '../accessManagementPaths'
+import { getProjectDetailDestination, getServiceAccountDetailDestination } from '../accessManagementPaths'
 
 import { CreateServiceAccountModal } from './CreateServiceAccountModal'
 import { EditServiceAccountModal } from './EditServiceAccountModal'
@@ -96,13 +96,13 @@ function ServiceAccountRow({
   return (
     <Tr>
       <Td dataLabel="Name">
-        <SynLink to={getServiceAccountDetailPath(sa.id)}>
+        <SynLink to={getServiceAccountDetailDestination(sa.id)}>
           <Truncate content={sa.name} />
         </SynLink>
       </Td>
       <Td dataLabel="Owning project">
         {sa.project_name ? (
-          <SynLink to={getProjectDetailPath(sa.project_id)}>{sa.project_name}</SynLink>
+          <SynLink to={getProjectDetailDestination(sa.project_id)}>{sa.project_name}</SynLink>
         ) : (
           sa.project_id
         )}

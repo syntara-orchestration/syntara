@@ -1,7 +1,7 @@
 import { Timestamp } from '@patternfly/react-core'
 import type { CredentialsAPI } from '@syntara/contracts'
 
-import { getUserDetailPath } from '../../routes/access-management/accessManagementPaths'
+import { getUserDetailDestination } from '../../routes/access-management/accessManagementPaths'
 import { toDisplayDate } from '../../utils/dateUtils'
 import { toLinkedUserId, toUserReferenceName } from '../../utils/userReference'
 import { SynLink } from '../SynLink'
@@ -39,7 +39,7 @@ export function UserTimestamp({
   const formattedDate = date ? <Timestamp date={date} dateFormat="medium" timeFormat="medium" /> : '-'
 
   const userLink = userId ? (
-    <SynLink to={getUserDetailPath(userId)}>{displayName}</SynLink>
+    <SynLink to={getUserDetailDestination(userId)}>{displayName}</SynLink>
   ) : (
     <span className={styles.userName}>{displayName}</span>
   )
