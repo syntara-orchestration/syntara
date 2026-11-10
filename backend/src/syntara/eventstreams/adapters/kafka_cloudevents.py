@@ -1,5 +1,7 @@
 """Kafka binary-mode CloudEvents header mapping without broker dependencies."""
 
+from pydantic import ValidationError
+
 from syntara.eventstreams.core.cloudevents import CloudEventAttributes, validate_attribute_string
 from syntara.eventstreams.core.envelope import RawEventHeader
 from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCode
@@ -50,5 +52,8 @@ def decode_kafka_cloudevents(
         return CloudEventAttributes.model_validate(
             {**attributes, "datacontenttype": datacontenttype, "extensions": extensions}
         )
+    except ValidationError:
+        failure = EventDecodeFailure(code=EventFailureCode.malformed_cloudevents)
     except ValueError:
-        return EventDecodeFailure(code=EventFailureCode.malformed_cloudevents)
+        failure = EventDecodeFailure(code=EventFailureCode.malformed_cloudevents)
+    return failure

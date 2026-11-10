@@ -121,3 +121,57 @@ def test_definition_requires_explicit_bindings(definition: dict[str, Any], field
 def test_optional_schema_supported(definition: dict[str, Any], input_schema: dict[str, Any] | None) -> None:
     definition["triggers"][0]["parameters"]["input_schema"] = input_schema
     WorkflowValidator().validate_workflow_definition(definition)
+
+
+async def test_cloudevents_definition_to_envelope_output_mapping(definition: dict[str, Any]) -> None:
+    definition["triggers"][0]["parameters"]["input_schema"] = {
+        "type": "object",
+        "required": ["orderId"],
+        "properties": {"orderId": {"type": "integer"}},
+        "additionalProperties": False,
+    }
+    validator = WorkflowValidator()
+    validator.validate_workflow_definition(definition)
+    assert validator.collect_findings(definition).error_count == 0
+    config = validate_event_subscribe_parameters(definition["triggers"][0]["parameters"])
+    source = RawEvent(
+        value=b'{"orderId":123}',
+        key=b"order-123",
+        headers=[
+            RawEventHeader(name="content-type", value=b"application/json"),
+            RawEventHeader(name="ce_specversion", value=b"1.0"),
+            RawEventHeader(name="ce_id", value=b"event-123"),
+            RawEventHeader(name="ce_source", value=b"/orders"),
+            RawEventHeader(name="ce_type", value=b"order.created"),
+            RawEventHeader(name="routing", value=b"orders"),
+            RawEventHeader(name="routing", value=None),
+        ],
+        source_metadata=KafkaSourceMetadata(
+            integration_id=config.integration_id,
+            subscription_id=uuid4(),
+            source_generation=1,
+            received_at=datetime.now(UTC),
+            topic=config.topic,
+            partition=0,
+            offset="42",
+        ),
+    )
+    before = source.model_copy(deep=True)
+    decoded = JsonEventDecoder().decode(source, schema=config.input_schema)
+    assert isinstance(decoded, EventDecodeSuccess)
+    envelope = json.loads(encode_envelope(decoded.envelope))
+    frozen = copy.deepcopy(envelope)
+    assert await event_subscribe_trigger(envelope, None) == {"output": frozen}
+    assert await event_subscribe_trigger(
+        envelope,
+        {"orderId": "${result.payload.orderId}", "eventType": "${result.cloudevents.type}"},
+    ) == {"output": {"orderId": 123, "eventType": "order.created"}}
+    assert envelope["payload"] == {"orderId": 123}
+    assert envelope["cloudevents"]["id"] == "event-123"
+    assert envelope["original"]["key_base64"] == "b3JkZXItMTIz"
+    assert envelope["original"]["headers"][-2:] == [
+        {"name": "routing", "value_base64": "b3JkZXJz"},
+        {"name": "routing", "value_base64": None},
+    ]
+    assert envelope == frozen
+    assert source == before
