@@ -57,7 +57,7 @@ class KafkaPublishParameters(SQLModel):
 
     model_config = {"extra": "forbid"}
     integration_id: StrictStr = Field(pattern=_UUID_PATTERN)
-    credential_id: StrictStr | None = Field(default=None, pattern=_UUID_PATTERN)
+    credential_id: StrictStr = Field(pattern=_UUID_PATTERN, description="Required runtime Kafka credential reference")
     topic: StrictStr = Field(
         min_length=1, max_length=249, pattern=r"^[a-zA-Z0-9._-]+$", json_schema_extra={"not": {"enum": [".", ".."]}}
     )
@@ -67,10 +67,9 @@ class KafkaPublishParameters(SQLModel):
 
     @field_validator("integration_id", "credential_id")
     @classmethod
-    def fixed_reference(cls, value: str | None) -> str | None:
+    def fixed_reference(cls, value: str) -> str:
         """Reject templated references chosen by workflow data."""
-        if value is not None:
-            UUID(value)
+        UUID(value)
         return value
 
     @field_validator("topic")

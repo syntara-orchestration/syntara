@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 import structlog
+from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -28,9 +29,11 @@ from syntara.core.models import User
 from syntara.core.models.group import user_groups
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin
+from syntara.core.services.secret_service import create_secret_service
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
+from syntara.credentials.exceptions import CredentialError
 from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
-from syntara.credentials.lib.kafka_connection import kafka_credential_required
+from syntara.credentials.lib.kafka_connection import resolve_publish_kafka_login
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.eventstreams.adapters.subscribe_parameters import (
@@ -505,11 +508,18 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
     async def _validate_kafka_publish_bindings(self, workflow_definition: dict[str, Any]) -> None:
         """Apply shared visibility and credential rules before binding a Publish node."""
-        configs = [
-            KafkaPublishParameters.model_validate(node.get("parameters", {}))
-            for node in workflow_definition.get("nodes", [])
-            if node.get("type") == NodeType.KAFKA_PUBLISH
-        ]
+        try:
+            configs = [
+                KafkaPublishParameters.model_validate(node.get("parameters", {}))
+                for node in workflow_definition.get("nodes", [])
+                if node.get("type") == NodeType.KAFKA_PUBLISH
+            ]
+        except ValidationError as exc:
+            if any(error["loc"] == ("credential_id",) for error in exc.errors(include_input=False)):
+                msg = "Select a runtime Kafka credential using a literal resource UUID for every connection mode"
+            else:
+                msg = "Invalid Kafka Publish configuration"
+            raise SafeValueError(msg) from None
         if not configs:
             return
         visible_ids = None if self.is_cert_authenticated else await self._resolve_visible_integration_ids()
@@ -528,11 +538,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             ):
                 msg = "One or more Kafka Publish resource references are unavailable"
                 raise SafeValueError(msg)
-            if config.credential_id is None:
-                if kafka_credential_required(integration.configuration.security_protocol):
-                    msg = "Kafka Publish requires a runtime Kafka credential for SASL_SSL"
-                    raise SafeValueError(msg)
-                continue
             credential_id = UUID(config.credential_id)
             credential = await self.session.get(Credential, credential_id)
             if credential is None or not credential.enabled:
@@ -541,6 +546,19 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             await integration_service._validate_credential_type(  # noqa: SLF001 -- reuse shared compatibility rules
                 IntegrationType.KAFKA, credential_id
             )
+            try:
+                await resolve_publish_kafka_login(
+                    self.session,
+                    create_secret_service(self.session),
+                    runtime_credential_id=credential_id,
+                    security_protocol=integration.configuration.security_protocol,
+                )
+            except CredentialError:
+                msg = (
+                    "The selected runtime Kafka credential is unavailable "
+                    "or missing fields required by the connection mode"
+                )
+                raise SafeValueError(msg) from None
 
     async def _validate_event_subscribe_bindings(
         self, workflow_definition: dict[str, Any], *, allow_incomplete: bool = False

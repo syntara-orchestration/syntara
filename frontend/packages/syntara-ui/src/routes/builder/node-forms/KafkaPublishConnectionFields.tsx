@@ -35,15 +35,13 @@ export function KafkaPublishConnectionFields({ projectId }: Readonly<{ projectId
     },
     { enabled: !!integrationId }
   )
-  const credentialRequired = (data?.configuration.security_protocol ?? 'SASL_SSL') === 'SASL_SSL'
   const connectionReady = !!integrationId && !!data && !isError
 
   // Synchronize validation with the connection returned by the Integration API.
   useEffect(() => {
-    setValue('credential_required', credentialRequired)
     setValue('connection_ready', connectionReady)
     if (isSubmitted) detachPromise(trigger(['integration_id', 'connection_ready', 'credential_id']))
-  }, [credentialRequired, connectionReady, integrationId, isSubmitted, setValue, trigger])
+  }, [connectionReady, integrationId, isSubmitted, setValue, trigger])
 
   return (
     <Stack className={styles.connectionFields}>
@@ -64,9 +62,9 @@ export function KafkaPublishConnectionFields({ projectId }: Readonly<{ projectId
               value={field.value}
               isDisabled={readOnly}
               onChange={(value) => {
+                if ((value ?? '') === field.value) return
                 field.onChange(value ?? '')
                 setValue('credential_id', '', { shouldDirty: true })
-                setValue('credential_required', true)
                 setValue('connection_ready', false)
               }}
             />
@@ -97,7 +95,7 @@ export function KafkaPublishConnectionFields({ projectId }: Readonly<{ projectId
                 credentialLabel="Kafka credential"
                 isPending={(!connectionReady && !isError) || isCredentialPending}
                 isDisabled={readOnly || isError}
-                isRequired={credentialRequired}
+                isRequired
                 isCompact
                 errorMessage={fieldState.error?.message}
               >
@@ -115,7 +113,7 @@ export function KafkaPublishConnectionFields({ projectId }: Readonly<{ projectId
                       onSelected()
                     }}
                     errorMessage={fieldState.error?.message}
-                    isRequired={credentialRequired}
+                    isRequired
                     isDisabled={readOnly || !connectionReady}
                   />
                 )}

@@ -8,11 +8,13 @@ from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.models import Project
 from syntara.core.models import User
 from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES, preseed_credential_types
+from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.workflows.models import Workflow, WorkflowVersion
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
@@ -31,6 +33,28 @@ async def preseeded_types(test_db_session: AsyncSession) -> None:
 
 class TestCreateCredential:
     """POST /api/v1/credentials."""
+
+    @pytest.mark.usefixtures("preseeded_types")
+    async def test_kafka_credential_accepts_empty_inputs_for_non_sasl_connections(
+        self, auth_client: AsyncClient, test_db_session: AsyncSession, test_project_id: str
+    ) -> None:
+        credential_type = (
+            await test_db_session.exec(select(CredentialType).where(CredentialType.name == "Kafka"))
+        ).one()
+        response = await auth_client.post(
+            "/api/v1/credentials",
+            json={
+                "name": f"Kafka TLS runtime {uuid4().hex}",
+                "credential_type_id": str(credential_type.id),
+                "project_id": test_project_id,
+                "inputs": {},
+            },
+        )
+        assert response.status_code == 201
+        assert response.json()["inputs"] == {}
+        stored = await test_db_session.get(Credential, UUID(response.json()["id"]))
+        assert stored is not None
+        assert stored.secret_id is None
 
     @pytest.mark.asyncio
     async def test_create_returns_201_with_masked_inputs(

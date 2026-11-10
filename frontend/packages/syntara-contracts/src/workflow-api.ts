@@ -2323,8 +2323,11 @@ export interface components {
     KafkaPublishParameters: {
       /** Integration Id */
       integration_id: string
-      /** Credential Id */
-      credential_id?: string | null
+      /**
+       * Credential Id
+       * @description Required runtime Kafka credential reference
+       */
+      credential_id: string
       /** Topic */
       topic: string
       /**

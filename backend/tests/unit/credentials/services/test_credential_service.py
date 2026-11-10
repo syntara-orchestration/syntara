@@ -402,8 +402,8 @@ class TestUpdateCredential:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("field", ["username", "password"])
-    @pytest.mark.parametrize("value", [None, "", "    "])
-    async def test_patch_rejects_explicitly_cleared_kafka_login_before_storage(
+    @pytest.mark.parametrize("value", [None, ""])
+    async def test_patch_rejects_incomplete_kafka_login_before_storage(
         self,
         mock_session: MagicMock,
         mock_user: MagicMock,
@@ -426,6 +426,7 @@ class TestUpdateCredential:
         mock_result.one_or_none.return_value = credential
         mock_session.exec.return_value = mock_result
         mock_session.get.side_effect = [None, credential_type]
+        mock_secret_service.retrieve_secret.return_value = {"username": "runtime", "password": "runtime-secret"}
 
         with pytest.raises(CredentialValidationError, match=field):
             await service.update_credential(credential.id, CredentialUpdate(inputs={field: value}))

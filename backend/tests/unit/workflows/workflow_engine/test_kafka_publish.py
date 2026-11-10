@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
 PARAMETERS: dict[str, Any] = {
     "integration_id": "11111111-1111-4111-8111-111111111111",
+    "credential_id": "22222222-2222-4222-8222-222222222222",
     "topic": "automation.outcomes",
     "payload": {"ok": True},
 }
@@ -71,6 +72,7 @@ def test_ordered_binary_headers_and_null_empty_distinction() -> None:
         {"topic": "${trigger.topic}"},
         {"integration_id": "${trigger.integration_id}"},
         {"credential_id": "${trigger.credential_id}"},
+        {"credential_id": None},
         {"topic": ".."},
         {"key": {"encoding": "utf-8", "value": 42}},
         {"headers": [{"name": "x"}]},
@@ -85,7 +87,7 @@ def test_invalid_parameters_rejected(patch: dict[str, Any]) -> None:
 
 def test_payload_required_even_though_explicit_null_allowed() -> None:
     with pytest.raises(ValidationError):
-        KafkaPublishParameters.model_validate({"integration_id": PARAMETERS["integration_id"], "topic": "outcomes"})
+        KafkaPublishParameters.model_validate({key: value for key, value in PARAMETERS.items() if key != "payload"})
 
 
 @pytest.mark.parametrize("payload", [float("nan"), float("inf"), {1: "key"}, b"bytes", {"bad": {1, 2}}])
@@ -265,3 +267,10 @@ async def test_worker_restart_keeps_retiring_producers_counted() -> None:
             other.ack()
         await pool.close()
         set_kafka_publish_pool(None)
+
+
+def test_runtime_credential_is_required() -> None:
+    with pytest.raises(ValidationError, match="credential_id"):
+        KafkaPublishParameters.model_validate(
+            {key: value for key, value in PARAMETERS.items() if key != "credential_id"}
+        )

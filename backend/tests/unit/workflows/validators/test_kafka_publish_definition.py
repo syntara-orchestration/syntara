@@ -30,6 +30,7 @@ def test_api_and_runtime_schemas_accept_json_null_and_header_templates() -> None
     definition = _definition(
         {
             "integration_id": "11111111-1111-4111-8111-111111111111",
+            "credential_id": "22222222-2222-4222-8222-222222222222",
             "topic": "outcomes",
             "payload": None,
             "headers": "${trigger.headers}",
@@ -44,6 +45,7 @@ def test_api_schema_resolves_encoded_key_and_header_definitions() -> None:
     definition = _definition(
         {
             "integration_id": "11111111-1111-4111-8111-111111111111",
+            "credential_id": "22222222-2222-4222-8222-222222222222",
             "topic": "outcomes",
             "payload": [True, None],
             "key": {"encoding": "base64", "value": "AAEC"},
@@ -66,7 +68,22 @@ def test_api_schema_resolves_encoded_key_and_header_definitions() -> None:
 )
 def test_api_schema_rejects_dynamic_destinations_and_producer_overrides(patch: dict[str, Any]) -> None:
     definition = _definition(
-        {"integration_id": "11111111-1111-4111-8111-111111111111", "topic": "outcomes", "payload": None, **patch}
+        {
+            "integration_id": "11111111-1111-4111-8111-111111111111",
+            "credential_id": "22222222-2222-4222-8222-222222222222",
+            "topic": "outcomes",
+            "payload": None,
+            **patch,
+        }
     )
     with pytest.raises(SafeValueError):
         WorkflowValidator().validate_workflow_definition(definition)
+
+
+@pytest.mark.parametrize("omit", [True, False])
+def test_api_schema_requires_non_null_runtime_credential(*, omit: bool) -> None:
+    parameters = {"integration_id": "11111111-1111-4111-8111-111111111111", "topic": "outcomes", "payload": None}
+    if not omit:
+        parameters["credential_id"] = None
+    with pytest.raises(SafeValueError):
+        WorkflowValidator().validate_workflow_definition(_definition(parameters))

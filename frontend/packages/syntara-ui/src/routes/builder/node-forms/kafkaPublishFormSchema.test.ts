@@ -11,8 +11,7 @@ import {
 const valid = {
   name: 'Publish result',
   integration_id: '11111111-1111-4111-8111-111111111111',
-  credential_id: '',
-  credential_required: false,
+  credential_id: '22222222-2222-4222-8222-222222222222',
   connection_ready: true,
   topic: 'automation.outcomes',
   payload: 'null',
@@ -65,6 +64,7 @@ describe('Kafka Publish form contract', () => {
       ...valid,
       ...kafkaPublishInitialFields({
         integration_id: valid.integration_id,
+        credential_id: valid.credential_id,
         topic: valid.topic,
         payload: null,
         key: { encoding: 'base64', value: 'AAEC' },
@@ -75,7 +75,7 @@ describe('Kafka Publish form contract', () => {
       payload: null,
       key,
       headers: [...headers, { name: 'binary', value: { encoding: 'base64', value: '' } }],
-      credential_id: null,
+      credential_id: valid.credential_id,
     })
   })
 
@@ -121,16 +121,25 @@ describe('Kafka Publish form contract', () => {
     if (!result.success) expect(result.error.issues).toContainEqual(expect.objectContaining({ path: ['headers'] }))
   })
 
-  it('requires a runtime credential only when the connection requires it', () => {
-    expect(kafkaPublishFormSchema.safeParse({ ...valid, credential_required: true }).success).toBe(false)
-    expect(
-      kafkaPublishFormSchema.safeParse({
-        ...valid,
-        credential_required: true,
-        credential_id: '22222222-2222-4222-8222-222222222222',
-      }).success
-    ).toBe(true)
-    expect(kafkaPublishFormSchema.safeParse(valid).success).toBe(true)
+  it.each(['', null, undefined])('requires a runtime credential: %s', (credential_id) => {
+    const result = kafkaPublishFormSchema.safeParse({ ...valid, credential_id })
+    expect(result.success).toBe(false)
+    if (!result.success)
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({ path: ['credential_id'], message: 'Select a runtime Kafka credential' })
+      )
+  })
+
+  it.each([null, undefined])('opens incomplete saved drafts for credential correction: %s', (credential_id) => {
+    const saved = kafkaPublishParametersSchema.parse({
+      integration_id: valid.integration_id,
+      credential_id,
+      topic: valid.topic,
+      payload: null,
+    })
+    const fields = kafkaPublishInitialFields(saved)
+    expect(fields.credential_id).toBe('')
+    expect(kafkaPublishFormSchema.safeParse({ ...valid, ...fields }).success).toBe(false)
   })
 
   it('blocks an unloaded connection without marking the selected integration as invalid', () => {
