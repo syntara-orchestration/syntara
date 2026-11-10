@@ -20,6 +20,7 @@ import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBad
 import { SynPanel } from '../../components/layout/SynPanel'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 
+import styles from './ExecutionDetailsPanel.module.css'
 import { StatusLabel } from './ExecutionStatus'
 
 export type ViewMode = 'overview' | 'details'
@@ -143,23 +144,26 @@ export function NoSelectionState() {
 export function LoadingErrorState({ queryState }: Readonly<{ queryState: React.ReactNode }>) {
   return (
     <SynPanel
-      style={{
-        height: '100%',
-        maxHeight: '100%',
-        width: '24rem',
-        flexShrink: 0,
-        display: 'flex',
-        flexDirection: 'column',
-      }}
+      hasNoPadding
+      isFullHeight
+      className={styles.loadingErrorPanel}
+      data-testid="execution-details-query-fallback-panel"
     >
-      <Stack>
-        <StackItem style={{ padding: 'var(--pf-t--global--spacer--lg)' }}>
-          <Title headingLevel="h2" size={TitleSizes.lg}>
-            Current run details
+      <Stack className={styles.loadingErrorStack}>
+        <StackItem className={styles.loadingErrorHeader}>
+          <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
+            Run details
           </Title>
         </StackItem>
-        <StackItem isFilled style={{ padding: 'var(--pf-t--global--spacer--lg)' }}>
-          {queryState}
+        <StackItem isFilled className={styles.loadingErrorBody}>
+          <Flex
+            justifyContent={{ default: 'justifyContentCenter' }}
+            alignItems={{ default: 'alignItemsCenter' }}
+            className={styles.loadingErrorContent}
+            data-testid="execution-details-query-state-region"
+          >
+            {queryState}
+          </Flex>
         </StackItem>
       </Stack>
     </SynPanel>
