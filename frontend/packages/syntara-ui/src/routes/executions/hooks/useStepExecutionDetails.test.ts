@@ -167,7 +167,7 @@ describe('useStepExecutionDetails', () => {
   })
 
   describe('Shiki readiness', () => {
-    it('keeps selected activity data hidden until Shiki preload settles', async () => {
+    it('keeps activity data hidden until Shiki preload settles', async () => {
       let finishPreload: (() => void) | undefined
       const preloadPromise = new Promise<void>((resolve) => {
         finishPreload = resolve

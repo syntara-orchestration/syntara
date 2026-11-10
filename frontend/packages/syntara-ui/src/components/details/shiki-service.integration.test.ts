@@ -16,10 +16,8 @@ describe('Shiki JSON highlighter', () => {
 
     expect(reconstructedSource).toBe(source)
     expect(hasDualThemeStyle).toBe(true)
-    expect(statusToken?.style).toMatchObject({
-      '--shiki-light': expect.any(String),
-      '--shiki-dark': expect.any(String),
-    })
+    expect(typeof statusToken?.style['--shiki-light']).toBe('string')
+    expect(typeof statusToken?.style['--shiki-dark']).toBe('string')
   })
 
   it('colors matching bracket pairs by nesting depth in both themes', async () => {
