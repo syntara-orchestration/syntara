@@ -241,6 +241,7 @@ async def _seed_assignments_and_admin(
 ) -> None:
     """Seed group-role assignments and bootstrap admin user."""
     await _ensure_role_assignment(session, auth_group, "authenticated")
+    await _ensure_role_assignment(session, auth_group, "step-author")
     await _ensure_role_assignment(session, users_group, "user")
     await _ensure_role_assignment(session, admin_group, "admin")
     await _ensure_role_assignment(session, auditors_group, "auditor")
