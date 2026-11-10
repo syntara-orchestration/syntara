@@ -40,12 +40,17 @@ class ActivitySyncMonitorMixin:
     _sync_failed_nodes: Any
     _sync_skipped_nodes: Any
     _sync_detached_nodes: Any
+    _sync_cancelled_step_nodes: Any
+    _query_completed_nodes: Any
     _update_execution_status_from_event: Any
     _schedule_describe_probe: Any
     _process_synthetic_activity_started: Any
     _process_synthetic_partial_output: Any
     _TRIGGER_ACTIVITY_TYPES: Any
     _extract_failed_activities_from_event: Any
+    _extract_cancelled_activities_from_event: Any
+    _extract_completed_nodes_from_event: Any
+    _sync_cancelled_step_fallback: Any
     temporal_client: Any
     _initialize_monitoring: Any
     _process_activity_scheduled: Any
@@ -134,6 +139,17 @@ class ActivitySyncMonitorMixin:
         finally:
             await queue.put(None)
 
+    async def _sync_cancelled_nodes(
+        self,
+        metadata: ExecutionMonitorMetadata,
+        handle: WorkflowHandle[Any, Any],
+        event: HistoryEvent,
+    ) -> None:
+        """Sync cancelled step nodes, falling back to the completion payload on query failure."""
+        cancelled_node_map = await self._sync_cancelled_step_nodes(metadata, handle)
+        if cancelled_node_map is None:
+            await self._sync_cancelled_step_fallback(metadata, self._extract_cancelled_activities_from_event(event))
+
     async def _process_history_event(
         self,
         event: HistoryEvent,
@@ -173,7 +189,11 @@ class ActivitySyncMonitorMixin:
                 failed_node_map = self._extract_failed_activities_from_event(event)
             await self._sync_skipped_nodes(metadata, handle)
             await self._sync_detached_nodes(metadata, handle)
-            await self._update_execution_status_from_event(metadata, event, failed_node_map)
+            await self._sync_cancelled_nodes(metadata, handle, event)
+            completed_node_ids = await self._query_completed_nodes(metadata, handle)
+            if completed_node_ids is None:
+                completed_node_ids = self._extract_completed_nodes_from_event(event)
+            await self._update_execution_status_from_event(metadata, event, failed_node_map, completed_node_ids)
             metadata.last_processed_event_id = event.event_id
             return not self._shutdown
 

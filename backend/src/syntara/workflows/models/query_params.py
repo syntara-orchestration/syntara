@@ -2,6 +2,7 @@
 
 import re
 
+from pydantic import Field as PydanticField
 from pydantic import field_validator
 from sqlmodel import Field, SQLModel
 
@@ -28,6 +29,16 @@ class ExecutionListParams(BaseListParams):
     # Allow filtering by execution-specific fields
     # Note: Additional query parameters are handled by the service layer
     # for complex filtering operations like workflow_id, status, etc.
+
+
+class ChildExecutionListParams(BaseListParams):
+    """Query parameters for child execution list endpoint."""
+
+    node_id: str | None = PydanticField(
+        default=None,
+        description="Filter by parent sub-workflow node ID.",
+        json_schema_extra={"x-query-param": True},
+    )
 
 
 class ActivityListParams(BaseListParams):

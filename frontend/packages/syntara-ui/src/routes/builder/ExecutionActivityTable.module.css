@@ -1,0 +1,16 @@
+.childRunLink {
+  margin-top: var(--pf-t--global--spacer--xs);
+}
+
+.errorCell {
+  /*
+   * Remove the error row cell's top padding. The original inline `paddingTop: 0`
+   * won on specificity (inline styles always do); a plain CSS-module class cannot
+   * beat PatternFly's cell-padding rule
+   * `.pf-v6-c-table tr:where(.pf-v6-c-table__tr) > :where(th, td)` (specificity
+   * 0,1,1, logical `padding-block-start`). Override the token that rule reads
+   * instead: a value set directly on this <td> beats the value inherited from the
+   * <tr>, so only this cell's top padding is zeroed and nothing else changes.
+   */
+  --pf-v6-c-table--cell--PaddingBlockStart: 0;
+}
