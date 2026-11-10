@@ -397,7 +397,13 @@ services:
     profiles:
       - eventstream
     image: ${APP_IMAGE:-localhost/syntara:latest}
-    command: [python, -m, syntara.eventstreams.consumer_entrypoint]
+    command: [start-event-stream-worker]
+    healthcheck:
+      test: [CMD, python, -m, syntara.eventstreams.consumer_health, ready]
+      interval: 10s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
     # Longer than the default 20s drain; raise together if the drain is increased.
     stop_grace_period: 60s
     restart: "no"
