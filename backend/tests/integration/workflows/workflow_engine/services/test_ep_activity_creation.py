@@ -88,12 +88,13 @@ async def test_monitor_and_dispatch_share_identity_in_either_order(
             assert (
                 await reader.exec(select(ActivityExecution).where(ActivityExecution.execution_id == test_execution.id))
             ).all() == []
-            await CompletionCommandHandler()._complete_activity(
+            delivered = await CompletionCommandHandler()._complete_activity(
                 context=AOCommandContext(reader, temporal),
                 work_id=work_id,
                 status=CompletionStatus.COMPLETED,
                 result=result,
             )
+            assert delivered is monitor_first
     if not monitor_first:
         temporal.complete_async_activity.assert_not_awaited()
 

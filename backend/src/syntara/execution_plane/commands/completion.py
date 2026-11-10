@@ -13,7 +13,7 @@ from sqlmodel import col, select
 from temporalio.exceptions import ApplicationError
 
 from syntara.execution_plane.commands.context import AOCommandContext
-from syntara.execution_plane.commands.errors import CommandDependencyUnavailableError
+from syntara.execution_plane.commands.errors import CommandDependencyUnavailableError, CommandResourceNotFoundError
 from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.models.execution import Execution
 
@@ -57,7 +57,7 @@ class CompletionCommandHandler:
         work_id: UUID,
         status: CompletionStatus,
         result: dict[str, Any],
-    ) -> None:
+    ) -> bool:
         """Complete or fail the async activity named by a work-item UUID."""
         row = (
             await context.session.exec(
@@ -67,11 +67,7 @@ class CompletionCommandHandler:
             )
         ).first()
         if row is None:
-            logger.warning(
-                "Ignoring Execution Plane completion without a matching AO activity",
-                work_id=work_id,
-            )
-            return
+            return False
         temporal_workflow_id, temporal_activity_id = row
         temporal_service = context.temporal_service
         if temporal_service is None:
@@ -94,6 +90,7 @@ class CompletionCommandHandler:
                 activity_id=temporal_activity_id,
                 error=self._failure_error(status, result),
             )
+        return True
 
     async def handle(
         self, message: MessageEnvelope, payload: CommandPayload, context: AOCommandContext
@@ -109,12 +106,14 @@ class CompletionCommandHandler:
         ):
             raise ProtocolConflict
 
-        await self._complete_activity(
+        delivered = await self._complete_activity(
             context=context,
             work_id=work_id,
             status=payload.status,
             result=payload.result,
         )
+        if not delivered:
+            raise CommandResourceNotFoundError
         logger.info(
             "Delivered Execution Plane completion command",
             command_id=str(message.command_id),

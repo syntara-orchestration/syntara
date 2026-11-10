@@ -3,3 +3,7 @@
 
 class CommandDependencyUnavailableError(RuntimeError):
     """A required command dependency is unavailable."""
+
+
+class CommandResourceNotFoundError(LookupError):
+    """The command does not address an existing AO resource."""
