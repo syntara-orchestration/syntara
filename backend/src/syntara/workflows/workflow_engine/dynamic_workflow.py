@@ -804,7 +804,11 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
     ) -> None:
         """Mark in-flight predecessors as detached when a converge node fails."""
         for pred_id in graph.get_predecessors(node_id):
-            if pred_id in pending_tasks and not self.resolver.has_namespace(pred_id):
+            if (
+                pred_id in pending_tasks
+                and not self.resolver.has_namespace(pred_id)
+                and not self._is_selected_retry_path_node(pred_id, graph)
+            ):
                 self._detached_nodes.add(pred_id)
 
     def _remove_detached_tasks(self, pending_tasks: dict[str, asyncio.Task[Any]]) -> None:
