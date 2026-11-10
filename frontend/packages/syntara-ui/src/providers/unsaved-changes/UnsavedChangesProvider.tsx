@@ -2,7 +2,7 @@ import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/
 import { useBlocker, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
-import { navigateToTarget, type NavigationTarget } from '../../app/typedRouteDestinations'
+import { navigateToTarget, type NavigationTarget } from '../../app/typed-route-destinations'
 import { useBlurOnOpen } from '../../hooks/useBlurOnOpen'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { resetAll } from '../../stores/workflowStoreActions'

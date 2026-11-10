@@ -7,7 +7,7 @@ import {
 } from '../providers/unsaved-changes/unsavedChangesContext'
 import { detachPromise } from '../utils/detachPromise'
 
-import { navigateToTarget, type NavigationTarget } from './typedRouteDestinations'
+import { navigateToTarget, type NavigationTarget } from './typed-route-destinations'
 
 const noop = () => () => {}
 

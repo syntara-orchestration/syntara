@@ -1,7 +1,7 @@
 import { Truncate } from '@patternfly/react-core'
 import { cloneElement, isValidElement, useRef, type ReactNode, type RefObject } from 'react'
 
-import type { NavigationTarget } from '../../app/typedRouteDestinations'
+import type { NavigationTarget } from '../../app/typed-route-destinations'
 import { SynLink } from '../SynLink'
 
 import styles from './LinkCell.module.css'

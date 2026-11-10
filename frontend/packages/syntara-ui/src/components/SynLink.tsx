@@ -2,7 +2,7 @@ import { Button } from '@patternfly/react-core'
 import { Link as TanStackLink } from '@tanstack/react-router'
 import type { ComponentProps, ReactNode, Ref } from 'react'
 
-import type { AccessManagementDetailDestination } from '../app/typedRouteDestinations'
+import type { AccessManagementDetailDestination } from '../app/typed-route-destinations'
 
 type ButtonOnClick = ComponentProps<typeof Button>['onClick']
 
