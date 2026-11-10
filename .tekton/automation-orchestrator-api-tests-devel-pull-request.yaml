@@ -57,8 +57,16 @@ spec:
       value: '{{pull_request_number}}'
     - name: ep-git-url
       value: https://github.com/syntara-orchestration/syntara-execution-plane.git
+    # VALIDATION PIN: deploy the EP half of the AAP-99749 cancellation work
+    # (syntara-execution-plane#174's branch), the revision that pairs with
+    # syntara#1214, rather than devel.
     - name: ep-revision
-      value: devel
+      value: AAP-99749
+    # VALIDATION PIN (ansible/aap-dev#1184, throwaway PR): build the syntara
+    # image from the aap-dev branch that drops git-core, proving this line
+    # (PyPI execution-plane-client) deploys without git in the image.
+    - name: aap-dev-revision
+      value: goneri/remove-git-core-syntara-image
   pipelineRef:
     params:
       - name: name
