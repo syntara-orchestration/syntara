@@ -25,7 +25,7 @@ import { ExpandableCodeEditor } from '../components/ExpandableCodeEditor'
 import { FileUpload, type UploadedFile } from '../components/file-upload'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
 import { DroppableField } from '../panels/fields/DroppableField'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { AIAgentFileContext } from './aiAgentFileContext'
 import { AIAgentFileUploadSection } from './AIAgentFileUploadSection'
@@ -170,7 +170,7 @@ function AIAgentFormFields({
   hasExistingFiles,
   hasNoIntegrations,
 }: AIAgentFormFieldsProps) {
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const { register, control, getValues, setValue } = useFormContext<AIAgentFormData>()
   const { toolSelection, handleToolSelectionChange } = useToolSelection(control, setValue)
   const { errors } = useFormState({ control })

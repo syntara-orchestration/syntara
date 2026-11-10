@@ -1,4 +1,5 @@
-import { Content, FlexItem } from '@patternfly/react-core'
+import { Alert, AlertActionLink, Content, FlexItem } from '@patternfly/react-core'
+import type { ReactNode } from 'react'
 
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { EditVersionDialog } from '../EditVersionDialog'
@@ -9,13 +10,53 @@ import { VersionHistoryPanel } from '../VersionHistoryPanel'
 
 import styles from './VersionHistorySidePanel.module.css'
 
+type RestorePermissionDialog = VersionSidePanelState['restoreDialog']
+
+function restorePermissionMessage(restoreDialog: RestorePermissionDialog): ReactNode {
+  if (restoreDialog.permissionCheckError) {
+    return (
+      <Alert
+        variant="danger"
+        isInline
+        title="Unable to check step-type permissions."
+        actionLinks={
+          <AlertActionLink onClick={restoreDialog.onRetryPermissionCheck}>Retry permission check</AlertActionLink>
+        }
+      >
+        Restore is disabled until permissions can be checked.
+      </Alert>
+    )
+  }
+  if (restoreDialog.blockedStepTypes.length > 0) {
+    return (
+      <Alert variant="warning" isInline title="The selected version contains blocked step types.">
+        Blocked step types: {restoreDialog.blockedStepTypes.join(', ')}.
+      </Alert>
+    )
+  }
+  if (restoreDialog.permissionCheckLoading) {
+    return <Alert variant="info" isInline title="Checking step-type permissions." />
+  }
+  return (
+    <Content component="p">
+      This will replace your current editor state with the selected version. Any unsaved changes will be lost.
+    </Content>
+  )
+}
+
 type VersionHistorySidePanelProps = Readonly<{
   sidePanel: VersionSidePanelState
   isStepEditorOpen: boolean
-  editPermission?: { canEdit: boolean; tooltip: string }
+  editPermission?: { canEdit: boolean; tooltip: string; canCreate: boolean; createTooltip: string }
+  projectId?: string
 }>
 
-export function VersionHistorySidePanel({ sidePanel, isStepEditorOpen, editPermission }: VersionHistorySidePanelProps) {
+export function VersionHistorySidePanel({
+  sidePanel,
+  isStepEditorOpen,
+  editPermission,
+  projectId,
+}: VersionHistorySidePanelProps) {
   return (
     <>
       {!isStepEditorOpen && sidePanel.show && (
@@ -37,6 +78,9 @@ export function VersionHistorySidePanel({ sidePanel, isStepEditorOpen, editPermi
             onStatusFilterChange={sidePanel.onStatusFilterChange}
             canEdit={editPermission?.canEdit}
             editTooltip={editPermission?.tooltip}
+            canCreate={editPermission?.canCreate}
+            createTooltip={editPermission?.createTooltip}
+            projectId={projectId}
             publishedVersionName={sidePanel.publishedVersionName}
             paginationFooterProps={sidePanel.paginationFooterProps}
           />
@@ -48,6 +92,12 @@ export function VersionHistorySidePanel({ sidePanel, isStepEditorOpen, editPermi
         isPublishing={false}
         onClose={sidePanel.publishDialog.onClose}
         onPublish={sidePanel.publishDialog.onPublish}
+        canPublish={sidePanel.publishDialog.canPublish}
+        editTooltip={sidePanel.publishDialog.editTooltip}
+        permissionCheckError={sidePanel.publishDialog.permissionCheckError}
+        permissionCheckLoading={sidePanel.publishDialog.permissionCheckLoading}
+        blockedStepTypes={sidePanel.publishDialog.blockedStepTypes}
+        onRetryPermissionCheck={sidePanel.publishDialog.onRetryPermissionCheck}
       />
 
       <SaveBeforeViewDialog
@@ -64,6 +114,10 @@ export function VersionHistorySidePanel({ sidePanel, isStepEditorOpen, editPermi
         onSave={sidePanel.editDialog.onSave}
         initialName={sidePanel.editDialog.initialName}
         initialDescription={sidePanel.editDialog.initialDescription}
+        canEdit={sidePanel.editDialog.canEdit}
+        editTooltip={sidePanel.editDialog.editTooltip}
+        permissionCheckError={sidePanel.editDialog.permissionCheckError}
+        onRetryPermissionCheck={sidePanel.editDialog.onRetryPermissionCheck}
       />
 
       {sidePanel.restoreDialog.onConfirm && (
@@ -75,10 +129,9 @@ export function VersionHistorySidePanel({ sidePanel, isStepEditorOpen, editPermi
           confirmLabel="Restore version"
           titleIconVariant="warning"
           confirmLoading={sidePanel.restoreDialog.isLoading}
+          confirmDisabled={!sidePanel.restoreDialog.canConfirm}
         >
-          <Content component="p">
-            This will replace your current editor state with the selected version. Any unsaved changes will be lost.
-          </Content>
+          {restorePermissionMessage(sidePanel.restoreDialog)}
         </SynConfirmationDialog>
       )}
     </>

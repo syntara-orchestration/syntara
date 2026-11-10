@@ -299,15 +299,30 @@ type StepDetailsPanelProps = {
   workflowMetadata?: WorkflowMetadata
   onRunStep?: () => void
   readOnly?: boolean
+  isViewingVersion?: boolean
   onStepAdded?: () => void
 }
 
 function createAddStepHandler(
   nodeId: string | undefined,
-  onAddStep: ((sourceNodeId: string, sourceHandle?: string) => void) | undefined
+  onAddStep: ((sourceNodeId: string, sourceHandle?: string) => void) | undefined,
+  readOnly: boolean | undefined
 ): ((handle?: string) => void) | undefined {
-  if (!nodeId || !onAddStep) return undefined
+  if (readOnly || !nodeId || !onAddStep) return undefined
   return (handle?: string) => onAddStep(nodeId, handle)
+}
+
+function renderPanelMenuActions(readOnly: boolean | undefined, actions: ReturnType<typeof buildPanelMenuActions>) {
+  return readOnly || actions.length === 0 ? null : <SynStepMenu menuActions={actions} />
+}
+
+function createStepIfWritable(
+  readOnly: boolean | undefined,
+  createStep: (data: Record<string, unknown>) => Promise<boolean>,
+  data: Record<string, unknown>
+): Promise<boolean> {
+  if (readOnly) return Promise.resolve(false)
+  return createStep(data)
 }
 
 export function StepDetailsPanel(props: StepDetailsPanelProps) {
@@ -327,6 +342,7 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
     onAddStep,
     onRunStep,
     readOnly,
+    isViewingVersion,
     onStepAdded,
   } = props
   const { showError } = useAlerts()
@@ -339,7 +355,7 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
   const isTriggerNode = node?.type === FlowNodeType.TRIGGER
   const triggerIndex = isTriggerNode ? parseTriggerIndex(nodeId ?? '') : undefined
   const stepMenuCategory = resolveStepMenuCategory(node?.type)
-  const nodeAddStepHandler = createAddStepHandler(nodeId, onAddStep)
+  const nodeAddStepHandler = createAddStepHandler(nodeId, onAddStep, readOnly)
   const menuActions = useStepMenuActions({
     nodeId: nodeId ?? 'unknown',
     stepCategory: stepMenuCategory,
@@ -347,7 +363,7 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
     disabled: getNodeDisabledState(node),
   })
   const panelMenuActions = buildPanelMenuActions(mode, node, menuActions, onClose)
-  const headerActions = panelMenuActions.length > 0 ? <SynStepMenu menuActions={panelMenuActions} /> : null
+  const headerActions = renderPanelMenuActions(readOnly, panelMenuActions)
 
   const iconDescriptor =
     mode === 'edit' && node
@@ -410,6 +426,10 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
 
       const handleCreate = (data: Record<string, unknown>): Promise<boolean> =>
         new Promise((resolve) => {
+          if (readOnly) {
+            resolve(false)
+            return
+          }
           let settled = false
           const settle = (ok: boolean) => {
             if (settled) {
@@ -465,7 +485,7 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
           initialData={initialData}
           submitButtonText={submitButtonText}
           onCancel={onClose}
-          onSubmit={(data) => handleCreate(data as Record<string, unknown>)}
+          onSubmit={(data) => createStepIfWritable(readOnly, handleCreate, data as Record<string, unknown>)}
           onHeaderContentChange={setHeaderContent}
           projectId={projectId}
         />
@@ -516,6 +536,7 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
       workflowMetadata={props.workflowMetadata}
       tabBarAction={tabBarAction}
       readOnly={readOnly}
+      isViewingVersion={isViewingVersion}
       mode={mode}
     />
   )

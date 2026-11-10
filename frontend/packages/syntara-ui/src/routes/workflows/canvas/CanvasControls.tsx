@@ -90,7 +90,7 @@ function CanvasLegendPopoverBlock() {
 }
 
 export function CanvasControls(
-  props: Readonly<{ onLayout: (options?: { markDirty?: boolean }) => void; hideLayout?: boolean }>
+  props: Readonly<{ onLayout?: (options?: { markDirty?: boolean }) => void; hideLayout?: boolean }>
 ) {
   const { fitView, zoomIn, zoomOut } = useReactFlow()
   const { expandAllEvent, collapseAllEvent } = React.use(SynStepExpandedAllContext)
@@ -139,48 +139,46 @@ export function CanvasControls(
               }
             />
           </FlexItem>
+          <FlexItem>
+            <Button
+              variant="plain"
+              isCircle
+              onClick={() => collapseAllEvent.dispatchEvent(new Event('collapseAll'))}
+              aria-label="Collapse all"
+              icon={
+                <Icon isInline>
+                  <RhUiCaretUpIcon />
+                </Icon>
+              }
+            />
+          </FlexItem>
+          <FlexItem>
+            <Button
+              variant="plain"
+              isCircle
+              onClick={() => expandAllEvent.dispatchEvent(new Event('expandAll'))}
+              aria-label="Expand all"
+              icon={
+                <Icon isInline>
+                  <RhUiCaretDownIcon />
+                </Icon>
+              }
+            />
+          </FlexItem>
           {!props.hideLayout && (
-            <>
-              <FlexItem>
-                <Button
-                  variant="plain"
-                  isCircle
-                  onClick={() => collapseAllEvent.dispatchEvent(new Event('collapseAll'))}
-                  aria-label="Collapse all"
-                  icon={
-                    <Icon isInline>
-                      <RhUiCaretUpIcon />
-                    </Icon>
-                  }
-                />
-              </FlexItem>
-              <FlexItem>
-                <Button
-                  variant="plain"
-                  isCircle
-                  onClick={() => expandAllEvent.dispatchEvent(new Event('expandAll'))}
-                  aria-label="Expand all"
-                  icon={
-                    <Icon isInline>
-                      <RhUiCaretDownIcon />
-                    </Icon>
-                  }
-                />
-              </FlexItem>
-              <FlexItem>
-                <Button
-                  variant="plain"
-                  isCircle
-                  onClick={() => props.onLayout({ markDirty: true })}
-                  aria-label="Reset layout"
-                  icon={
-                    <Icon isInline>
-                      <RhUiCleanUpFillIcon />
-                    </Icon>
-                  }
-                />
-              </FlexItem>
-            </>
+            <FlexItem>
+              <Button
+                variant="plain"
+                isCircle
+                onClick={() => props.onLayout?.({ markDirty: true })}
+                aria-label="Reset layout"
+                icon={
+                  <Icon isInline>
+                    <RhUiCleanUpFillIcon />
+                  </Icon>
+                }
+              />
+            </FlexItem>
           )}
         </Flex>
       </SynPanel>

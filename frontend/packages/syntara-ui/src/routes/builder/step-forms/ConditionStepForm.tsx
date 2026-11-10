@@ -8,7 +8,7 @@ import { SynForm } from '../../../components/forms/SynForm'
 import { SynFormField } from '../../../components/forms/SynFormField'
 import { useSynForm } from '../../../hooks/useSynForm'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { conditionFormSchema, type ConditionFormData } from './conditionFormSchema'
 import { ActivityNameField } from './shared/ActivityNameField'
@@ -30,7 +30,7 @@ function ConditionFormFields({
 }: {
   onHeaderContentChange?: (content: ReactNode | null) => void
 }) {
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const { control } = useFormContext<ConditionFormData>()
 
   const nameField = useMemo(

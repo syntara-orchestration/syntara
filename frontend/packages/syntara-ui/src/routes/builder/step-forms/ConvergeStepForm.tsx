@@ -24,7 +24,7 @@ import { useSynForm } from '../../../hooks/useSynForm'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
 import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
 import { formatDuration } from '../utils/timeUtils'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { convergeFormSchema, type ConvergeFormData, type ConvergeStrategy } from './convergeFormSchema'
 import { ActivityNameField } from './shared/ActivityNameField'
@@ -115,7 +115,7 @@ function ConvergeFormFields({
     setValue,
     formState: { errors: contextErrors },
   } = useFormContext<ConvergeFormData>()
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const errors = validationErrors ?? contextErrors
   const strategy = useWatch({ control, name: 'strategy' })
   const waitDuration = useWatch({ control, name: 'wait_duration' })

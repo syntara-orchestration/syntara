@@ -22,7 +22,7 @@ import { SynSelect } from '../../../components/SynSelect'
 import { useSynForm } from '../../../hooks/useSynForm'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
 import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { loopFormSchema, type LoopFormData } from './loopFormSchema'
 import { ActivityNameField } from './shared/ActivityNameField'
@@ -101,7 +101,7 @@ function LoopFormFields({
     control,
     formState: { errors: contextErrors },
   } = useFormContext<LoopFormData>()
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const errors = validationErrors ?? contextErrors
   const type = useWatch({ control, name: 'type' })
   const { defaults } = useWorkflowEngineDefaults()

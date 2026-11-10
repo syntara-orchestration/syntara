@@ -2,6 +2,7 @@ import type { WorkflowWithVersion } from '@syntara/contracts'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { convertYamlToWorkflow } from '../utils/convertYamlToWorkflow'
+import { getWorkflowStepTypes } from '../utils/workflowStepTypes'
 
 // Get the directory of this module
 const __filename = fileURLToPath(import.meta.url)
@@ -100,6 +101,10 @@ export const workflows: (WorkflowWithVersion & { project_id: string })[] = yamlF
     const id = file.replace(/\.yaml$/, '').replace(/\//g, '-')
     const workflow = convertYamlToWorkflow(filePath, id, 'system', examplesDir)
     const projectId = projectIds[stableHash(id) % projectIds.length]
-    return { ...workflow, project_id: projectId }
+    return {
+      ...workflow,
+      project_id: projectId,
+      step_types: getWorkflowStepTypes([workflow.version?.workflow_definition]),
+    }
   })
   .sort((a, b) => a.name.localeCompare(b.name))

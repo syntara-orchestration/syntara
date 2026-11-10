@@ -50,12 +50,12 @@ describe('CanvasControls', () => {
     })
   })
 
-  it('hides collapse, expand, and layout controls when hideLayout is set (e.g. execution view)', () => {
+  it('keeps collapse and expand available while hiding layout reset when read-only', () => {
     renderWithFlow(<CanvasControls onLayout={() => undefined} hideLayout />)
 
-    expect(screen.queryByRole('button', { name: 'Collapse all' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Expand all' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Layout' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Collapse all' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Expand all' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reset layout' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Show step legend' })).toBeInTheDocument()
   })
 

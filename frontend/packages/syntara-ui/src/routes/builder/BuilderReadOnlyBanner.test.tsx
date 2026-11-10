@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { BuilderReadOnlyBanner } from './BuilderReadOnlyBanner'
@@ -39,6 +40,39 @@ describe('BuilderReadOnlyBanner', () => {
     ).toBeInTheDocument()
   })
 
+  it('lists blocked step display names without policy details', () => {
+    render(
+      <BuilderReadOnlyBanner
+        canEdit={false}
+        isLoading={false}
+        isBuiltin={false}
+        blockedStepTypes={['Script', 'REST API']}
+      />
+    )
+
+    expect(screen.getByText('You are viewing this workflow in read-only mode.')).toBeInTheDocument()
+    expect(screen.getByText('Blocked step types: Script, REST API.')).toBeInTheDocument()
+    expect(screen.queryByText(/policy|scope/i)).not.toBeInTheDocument()
+  })
+
+  it('offers a retry action when permission checks fail', async () => {
+    const user = userEvent.setup()
+    const onRetryPermissionCheck = vi.fn()
+    render(
+      <BuilderReadOnlyBanner
+        canEdit={false}
+        isLoading={false}
+        isBuiltin={false}
+        permissionCheckError
+        onRetryPermissionCheck={onRetryPermissionCheck}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Retry permission check' }))
+
+    expect(onRetryPermissionCheck).toHaveBeenCalledOnce()
+  })
+
   it('has no accessibility violations when showing builtin banner', async () => {
     const { container } = render(<BuilderReadOnlyBanner canEdit={false} isLoading={false} isBuiltin={true} />)
     expect(await axe(container)).toHaveNoViolations()
@@ -47,5 +81,24 @@ describe('BuilderReadOnlyBanner', () => {
   it('has no accessibility violations when showing read-only banner', async () => {
     const { container } = render(<BuilderReadOnlyBanner canEdit={false} isLoading={false} isBuiltin={false} />)
     expect(await axe(container)).toHaveNoViolations()
+  })
+  it('shows policy scopes and missing allows without inventing a denying policy', () => {
+    render(
+      <BuilderReadOnlyBanner
+        canEdit={false}
+        isLoading={false}
+        isBuiltin={false}
+        blockedStepTypes={['Script', 'REST API']}
+        blockedStepTypeReasons={[
+          'Script (no-scripts, project payments).',
+          'No policy grants write permission for REST API in project payments.',
+        ]}
+      />
+    )
+    expect(
+      screen.getByText(
+        'Script (no-scripts, project payments). No policy grants write permission for REST API in project payments.'
+      )
+    ).toBeInTheDocument()
   })
 })

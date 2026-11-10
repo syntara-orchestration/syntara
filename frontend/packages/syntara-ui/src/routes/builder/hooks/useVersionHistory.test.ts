@@ -33,10 +33,6 @@ vi.mock('../../../providers/alerts', () => ({
   }),
 }))
 
-vi.mock('../../../utils/apiErrors', () => ({
-  getErrorMessage: (e: unknown) => (e instanceof Error ? e.message : 'Unknown error'),
-}))
-
 const mockDownloadVersionExport = vi.fn().mockResolvedValue(undefined)
 vi.mock('../../../utils/downloadWorkflowExport', () => ({
   downloadVersionExport: (workflowId: string, version: number) =>
@@ -585,6 +581,19 @@ describe('useVersionHistory', () => {
         title: 'Failed to update version',
         description: 'Update failed',
       })
+    })
+
+    it('shows blocked types when a version label edit is denied', () => {
+      const detail = "You can't edit version metadata: Script (write denied)."
+      mockMutate.mockImplementation((_args: unknown, callbacks: { onError?: (error: unknown) => void }) => {
+        callbacks.onError?.({ cause: { code: 'NODE_KIND_WRITE_DENIED', detail } })
+      })
+      const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
+        wrapper: makeWrapper(queryClient),
+      })
+      act(() => result.current.updateVersionMetadata(2, 'new name', 'new description'))
+      expect(mockShowError).toHaveBeenCalledWith({ title: 'Failed to update version', description: detail })
+      expect(mockShowSuccess).not.toHaveBeenCalled()
     })
 
     it('does not call mutate when workflowId is null', () => {

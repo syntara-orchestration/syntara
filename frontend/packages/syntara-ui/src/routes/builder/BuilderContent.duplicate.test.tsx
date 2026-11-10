@@ -77,6 +77,17 @@ vi.mock('./useBuilderPermissions', () => ({
   useBuilderPermissions: () => mockBuilderPermissions,
 }))
 
+vi.mock('../workflows/useStepTypePermissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../workflows/useStepTypePermissions')>()),
+  useStepTypePermissions: () => ({
+    canAuthor: true,
+    blockedStepTypes: [],
+    isChecking: false,
+    isError: false,
+    retry: vi.fn(),
+  }),
+}))
+
 import { BuilderContent } from './BuilderContent'
 
 const queryClient = new QueryClient({

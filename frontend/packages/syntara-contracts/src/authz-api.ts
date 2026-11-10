@@ -190,6 +190,18 @@ export interface components {
        * @description Name of the deny policy (empty if allowed)
        */
       denied_by: string
+      /**
+       * Denied Scope
+       * @description Scope of the denying policy statement
+       * @default
+       */
+      denied_scope?: string
+      /**
+       * Denied Project
+       * @description Project of the denying statement or missing grant
+       * @default
+       */
+      denied_project?: string
     }
     /**
      * WhoCanRequest

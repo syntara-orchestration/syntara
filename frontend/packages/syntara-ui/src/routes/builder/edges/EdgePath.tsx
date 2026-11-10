@@ -3,7 +3,7 @@ import type { EdgeProps, MarkerType } from '@xyflow/react'
 import { BaseEdge } from '@xyflow/react'
 import { useMemo } from 'react'
 
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { BUTTON_EDGE_DEFAULT_STROKE, CANVAS_EDGE_HIGHLIGHT_STROKE } from './buttonEdgeStrokeColor'
 import { EDGE_INTERACTION_DROP_SHADOW } from './edgeInteractionStyles'
@@ -43,7 +43,7 @@ type EdgePathProps = {
  */
 export function EdgePath(props: EdgePathProps) {
   const { edgePath, markerEnd, style, selected, isEdgeHovered, data, sourceHandle, onMouseEnter, onMouseLeave } = props
-  const isVersionView = useIsVersionView()
+  const isReadOnly = useIsStepFormReadOnly()
 
   // Determine stroke color and style: execution status > approval handle > interactive state > default
   const { strokeColor, strokeOpacity, strokeDasharray } = useMemo(() => {
@@ -144,7 +144,7 @@ export function EdgePath(props: EdgePathProps) {
         <BaseEdge path={edgePath} markerEnd={effectiveMarkerEnd as EdgeProps['markerEnd']} style={edgeStyle} />
       )}
       {/* Invisible wider path for hover detection */}
-      {!data?.isPending && !isVersionView && (
+      {!data?.isPending && !isReadOnly && (
         <path
           d={edgePath}
           fill="none"
