@@ -14,6 +14,7 @@ import { expectPageTitle } from '../../test/pageTitle'
 import ExecutionTargetDetail from './ExecutionTargetDetail'
 
 const mockDeleteMutate = vi.fn()
+const mockHealthMutate = vi.fn()
 const mockPatchMutateAsync = vi.fn()
 
 vi.mock('../../client', () => ({
@@ -22,6 +23,9 @@ vi.mock('../../client', () => ({
     useMutation: vi.fn((method: string) => {
       if (method === 'patch') {
         return { mutateAsync: mockPatchMutateAsync, isPending: false }
+      }
+      if (method === 'get') {
+        return { mutate: mockHealthMutate, isPending: false }
       }
       return { mutate: mockDeleteMutate, isPending: false }
     }),
@@ -230,6 +234,28 @@ describe('ExecutionTargetDetail', () => {
     expect(await screen.findByText('Delete execution target?')).toBeInTheDocument()
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText(/Prod OpenShift West/)).toBeInTheDocument()
+  })
+
+  it('tests connection from the header actions menu and shows a success toast', async () => {
+    const user = userEvent.setup()
+    mockHealthMutate.mockImplementation(
+      (_params: unknown, callbacks?: { onSuccess?: (data: unknown) => void; onSettled?: () => void }) => {
+        callbacks?.onSuccess?.({ healthy: true, message: null, skipped: false })
+        callbacks?.onSettled?.()
+      }
+    )
+
+    render(<ExecutionTargetDetail />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Prod OpenShift West' }))
+    await user.click(screen.getByRole('menuitem', { name: /Test connection/i }))
+
+    expect(mockHealthMutate).toHaveBeenCalledWith(
+      { params: { path: { target_id: 'et-001' } } },
+      expect.objectContaining({ onSuccess: expect.any(Function) as unknown as () => void })
+    )
+    expect(await screen.findByText('Connection successful')).toBeInTheDocument()
+    expect(screen.getByText('Successfully connected to execution target "Prod OpenShift West".')).toBeInTheDocument()
   })
 
   it('navigates to the Execution Plane list after a successful delete', async () => {

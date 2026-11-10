@@ -19,6 +19,12 @@ export const MOCK_DELETE_CONFLICT_LABEL = 'mock_delete_conflict'
 /** Label key the PATCH mock uses to force a concurrent-edit conflict (409). */
 export const MOCK_UPDATE_CONFLICT_LABEL = 'mock_update_conflict'
 
+/** Label key the health mock uses to return healthy: false. */
+export const MOCK_HEALTH_FAILURE_LABEL = 'mock_health_failure'
+
+/** Seeded target (Worker Pool 03) whose health probe returns unhealthy. */
+export const HEALTH_FAILURE_TARGET_ID = 'a1000000-0000-4000-8000-000000000103'
+
 /**
  * Deterministic active workload counts for `GET .../execution_targets/:id/usage`.
  * Unlisted targets return 0.
@@ -71,6 +77,7 @@ function buildExtraTargets(count: number): ExecutionTargetRead[] {
         integration_id: INSTALLED_EXECUTION_PLANE_CLUSTER_ID,
         ...(id === IN_USE_DELETE_CONFLICT_TARGET_ID ? { [MOCK_DELETE_CONFLICT_LABEL]: 'in-use' } : {}),
         ...(id === UPDATE_CONFLICT_TARGET_ID ? { [MOCK_UPDATE_CONFLICT_LABEL]: 'stale' } : {}),
+        ...(id === HEALTH_FAILURE_TARGET_ID ? { [MOCK_HEALTH_FAILURE_LABEL]: 'unreachable' } : {}),
       },
       created_at: mockDate.daysAgo1,
       last_ran_at: index % 4 === 0 ? mockDate.hoursAgo2 : null,

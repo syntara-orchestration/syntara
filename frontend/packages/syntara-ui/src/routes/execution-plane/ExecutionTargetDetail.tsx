@@ -40,11 +40,13 @@ import { useDocLink } from '../../utils/docs/useDocLink'
 import { buildExecutionTargetDeleteAction } from './executionTargetDeleteAction'
 import { ExecutionTargetDialogs } from './ExecutionTargetDialogs'
 import { ExecutionTargetStatusLabel } from './ExecutionTargetStatusLabel'
+import { buildExecutionTargetTestConnectionAction } from './executionTargetTestConnectionAction'
 import { getNodeSelectors } from './getNodeSelectors'
 import { NodeSelectorsCell } from './NodeSelectorsCell'
 import { useExecutionTargetActions } from './useExecutionTargetActions'
 import { useExecutionTargetEnabledToggle } from './useExecutionTargetEnabledToggle'
 import { useExecutionTargetPermissions } from './useExecutionTargetPermissions'
+import { useExecutionTargetTestConnection } from './useExecutionTargetTestConnection'
 
 type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
 
@@ -153,6 +155,8 @@ function ExecutionTargetDetailToolbar({
   isPatchPending,
   deleteDialog,
   permissions,
+  onTestConnection,
+  isTestingConnection,
 }: Readonly<{
   target: ExecutionTarget
   onEdit: () => void
@@ -160,6 +164,8 @@ function ExecutionTargetDetailToolbar({
   isPatchPending: boolean
   deleteDialog: { open: (item: ExecutionTarget) => void }
   permissions: ReturnType<typeof useExecutionTargetPermissions>
+  onTestConnection: (target: ExecutionTarget) => void
+  isTestingConnection: boolean
 }>) {
   const permissionBlocked = permissions.isLoading || !permissions.canUpdate
   const toggleBlocked = permissionBlocked || isPatchPending
@@ -187,7 +193,13 @@ function ExecutionTargetDetailToolbar({
         </Button>
       </DisabledWithTooltip>
       <SynKebabMenu
-        actions={[buildExecutionTargetDeleteAction(target, deleteDialog, permissions)]}
+        actions={[
+          buildExecutionTargetTestConnectionAction(target, onTestConnection, {
+            isDisabled: isTestingConnection,
+          }),
+          { key: 'sep-delete', isSeparator: true },
+          buildExecutionTargetDeleteAction(target, deleteDialog, permissions),
+        ]}
         aria-label={`Actions for ${target.name}`}
       />
     </>
@@ -213,6 +225,8 @@ export default function ExecutionTargetDetail() {
   const { deleteDialog, handleDelete } = useExecutionTargetActions({
     onSuccess: () => detachPromise(navigate({ to: AppRoute.ExecutionPlane.Root })),
   })
+
+  const { testConnection, isTestingTarget } = useExecutionTargetTestConnection()
 
   const serverTarget = query.data
   const {
@@ -277,6 +291,8 @@ export default function ExecutionTargetDetail() {
             isPatchPending={isPatchPending}
             deleteDialog={deleteDialog}
             permissions={permissions}
+            onTestConnection={testConnection}
+            isTestingConnection={isTestingTarget(target.id)}
           />
         }
       />
