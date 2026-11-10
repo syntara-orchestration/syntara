@@ -80,7 +80,6 @@ export default tseslint.config(
       'dist',
       'storybook-static/**',
       'coverage/**',
-      '**/.stryker-tmp/**',
       'playwright.config.ts',
       'test-results/**',
       'playwright-report/**',
