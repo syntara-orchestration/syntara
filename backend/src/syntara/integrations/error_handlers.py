@@ -18,6 +18,7 @@ if TYPE_CHECKING:
         IntegrationNotFoundError,
         IntegrationRefreshNotSupportedError,
         IntegrationScopeError,
+        IntegrationTypeConflictError,
         IntegrationTypeMismatchError,
         LLMModelNotFoundError,
     )
@@ -48,6 +49,20 @@ def integration_name_conflict_handler(request: Request, exc: "IntegrationNameCon
         title="Integration Name Conflict",
         detail=exc.message,
         code="INTEGRATION_NAME_CONFLICT",
+        retryable=False,
+        instance=str(request.url),
+    )
+
+
+def integration_type_conflict_handler(request: Request, exc: "IntegrationTypeConflictError") -> JSONResponse:
+    """Handle IntegrationTypeConflictError with RFC 9457 format."""
+    logger.warning("Integration type conflict", integration_type=exc.integration_type)
+    return create_problem_details_response(
+        status_code=status.HTTP_409_CONFLICT,
+        problem_type=PROBLEM_TYPES["name_conflict"],
+        title="Integration Type Conflict",
+        detail=exc.message,
+        code="INTEGRATION_TYPE_CONFLICT",
         retryable=False,
         instance=str(request.url),
     )

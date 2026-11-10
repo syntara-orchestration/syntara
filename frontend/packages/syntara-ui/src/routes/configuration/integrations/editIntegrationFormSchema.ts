@@ -57,7 +57,6 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
       description: z.string(),
       integration_type: z.string(),
       base_url: z.string().optional(),
-      namespace: z.string().optional(),
       allow_http: z.boolean(),
       insecure_skip_tls_verify: z.boolean(),
       ca_certificate: z.string().optional().nullable(),
@@ -123,8 +122,9 @@ export function buildConfiguration(integrationType: string, values: EditIntegrat
     return {
       integration_type: IntegrationTypeEnum.OPENSHIFT,
       base_url: values.base_url ?? '',
-      namespace: values.namespace ?? '',
-      ...securityFields(values),
+      allow_http: false,
+      insecure_skip_tls_verify: false,
+      ca_certificate: values.ca_certificate,
     }
   }
   if (integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM) {

@@ -8,9 +8,14 @@ import { integrationsClient } from '../../../../client'
 import type { useFormMutationErrorHandler } from '../../../../hooks/useFormMutationErrorHandler'
 import { useAlerts } from '../../../../providers/alerts'
 import { detachPromise } from '../../../../utils/detachPromise'
+import { EXECUTION_PLANE_SINGLETON_HELP } from '../integrationFieldHelpText'
 import { useProjectAssignmentSync } from '../useProjectAssignmentSync'
 
 import type { IntegrationFormData } from './integrationFormSchema'
+import {
+  fetchOpenShiftIntegrationExists,
+  OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY,
+} from './useOpenShiftIntegrationExists'
 
 type UseCreateIntegrationOptions = {
   handleError: ReturnType<typeof useFormMutationErrorHandler>
@@ -46,6 +51,34 @@ export function useCreateIntegration({ handleError, onBeforeNavigate }: UseCreat
       detachPromise(
         (async () => {
           try {
+            if (formData.integration_type === IntegrationTypeEnum.OPENSHIFT) {
+              let openShiftExists: boolean
+              try {
+                openShiftExists = await queryClient.fetchQuery({
+                  queryKey: OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY,
+                  queryFn: fetchOpenShiftIntegrationExists,
+                })
+              } catch {
+                showAlert({
+                  title: 'Unable to create integration',
+                  description:
+                    'Could not verify whether an Execution plane infrastructure integration already exists. Try again.',
+                  variant: 'danger',
+                  autoDismiss: true,
+                })
+                return
+              }
+              if (openShiftExists) {
+                showAlert({
+                  title: 'Unable to create integration',
+                  description: EXECUTION_PLANE_SINGLETON_HELP,
+                  variant: 'danger',
+                  autoDismiss: true,
+                })
+                return
+              }
+            }
+
             const created = await createIntegration({
               body: {
                 name: formData.name,
@@ -59,6 +92,8 @@ export function useCreateIntegration({ handleError, onBeforeNavigate }: UseCreat
                 discovered_models: discoveredModels ?? null,
               },
             })
+
+            await queryClient.invalidateQueries({ queryKey: OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY })
 
             if (formData.scope === 'project' && formData.project_ids.length > 0 && created.id) {
               const result = await syncAssignments(created.id, [], formData.project_ids)

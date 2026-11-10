@@ -42,7 +42,6 @@ import { useDocLink } from '../../../utils/docs/useDocLink'
 
 import styles from './IntegrationDetail.module.css'
 import { IntegrationDialogs } from './IntegrationDialogs'
-import { getIntegrationFieldConfig } from './integrationFieldHelp'
 import { INTEGRATION_TYPE_LABELS, PROVIDER_HINT_LABELS } from './integrationFilters'
 import {
   getBaseUrl,
@@ -101,9 +100,7 @@ function IntegrationDetailsTab({
     <Stack hasGutter className={styles.tabContent}>
       <StackItem>
         <DescriptionList isHorizontal>
-          <SynDetail label={getIntegrationFieldConfig(integration.integration_type).nameLabel}>
-            {integration.name}
-          </SynDetail>
+          <SynDetail label={isLLMProvider(integration) ? 'Name' : 'Server name / ID'}>{integration.name}</SynDetail>
           <SynDetail label="Description">{integration.description}</SynDetail>
           <SynDetail label="Integration type">
             {INTEGRATION_TYPE_LABELS[integration.integration_type ?? ''] ?? integration.integration_type ?? ''}
@@ -129,9 +126,6 @@ function IntegrationDetailsTab({
             </SynDetail>
           )}
           <SynDetail label="URL">{getBaseUrl(integration) || '—'}</SynDetail>
-          {integration.configuration && 'namespace' in integration.configuration && (
-            <SynDetail label="Namespace">{integration.configuration.namespace}</SynDetail>
-          )}
           <SynDetail label="Connection credential">
             {!credentialId || !credentialName ? (
               <>None</>

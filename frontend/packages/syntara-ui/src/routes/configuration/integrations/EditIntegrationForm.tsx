@@ -42,7 +42,7 @@ import type { EditIntegrationFormValues, IntegrationRead } from './editIntegrati
 import { buildConfiguration, buildEditSchema, editIntegrationSchema } from './editIntegrationFormSchema'
 import { EditSecurityFields } from './EditSecurityFields'
 import { ScopeFields } from './form/ScopeFields'
-import { getIntegrationFieldConfig, integrationHelp } from './integrationFieldHelp'
+import { integrationHelp } from './integrationFieldHelp'
 import {
   CREDENTIAL_REQUIRED_TYPES,
   CREDENTIAL_TYPES_BY_INTEGRATION,
@@ -56,8 +56,6 @@ import { useEditTestConnection } from './useEditTestConnection'
 import { useProjectAssignmentSync } from './useProjectAssignmentSync'
 
 const CREDENTIAL_DESCRIPTION: Record<string, string> = {
-  [IntegrationTypeEnum.OPENSHIFT]:
-    'This bearer token is used to check connectivity and authenticate with the OpenShift API. A successful connection test does not verify workload permissions.',
   [IntegrationTypeEnum.MCP_SERVER]:
     'This credential is used for tool discovery and connection status checks. MCP servers that do not require authentication can be configured without one.',
   [IntegrationTypeEnum.LLM_PROVIDER]:
@@ -85,8 +83,7 @@ function EditIntegrationFormFields({
 }: FormFieldsProps) {
   const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integration.integration_type ?? '')
   const isTestDisabled = (isCredentialRequired && !credentialId) || isTesting
-  const fieldConfig = getIntegrationFieldConfig(integration.integration_type)
-  const isOpenShift = integration.integration_type === IntegrationTypeEnum.OPENSHIFT
+  const isAnsibleAutomationPlatform = integration.integration_type === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
   const isLLM = isLLMProvider(integration)
   const hideBaseUrl = isLLM && PROVIDERS_HIDING_BASE_URL.has(getProviderHint(integration))
 
@@ -112,10 +109,10 @@ function EditIntegrationFormFields({
 
       <SynTextField<EditIntegrationFormValues, 'name'>
         name="name"
-        label={fieldConfig.nameLabel}
+        label={isLLM ? 'Name' : 'Server name / ID'}
         fieldId="edit-name"
         isRequired
-        labelHelp={fieldConfig.nameHelp}
+        labelHelp={isLLM ? integrationHelp.name : integrationHelp.serverName}
       />
 
       <SynTextAreaField<EditIntegrationFormValues, 'description'>
@@ -128,23 +125,13 @@ function EditIntegrationFormFields({
       {!hideBaseUrl && (
         <SynTextField<EditIntegrationFormValues, 'base_url'>
           name="base_url"
-          label={fieldConfig.urlLabel}
+          label="API URL"
           fieldId="edit-base-url"
           isRequired={!isLLM}
-          labelHelp={fieldConfig.urlHelp}
+          labelHelp={isAnsibleAutomationPlatform ? integrationHelp.aapUrl : integrationHelp.apiUrl}
         />
       )}
 
-      {isOpenShift && (
-        <SynTextField<EditIntegrationFormValues, 'namespace'>
-          name="namespace"
-          label="Namespace"
-          fieldId="edit-namespace"
-          placeholder="e.g., syntara-workers"
-          isRequired
-          hint="Namespace for future execution workloads"
-        />
-      )}
       <EditSecurityFields />
 
       <ScopeFields<EditIntegrationFormValues>
@@ -173,7 +160,7 @@ function EditIntegrationFormFields({
         label="Health check credential"
         fieldId="edit-credential-select"
         isRequired={isCredentialRequired}
-        labelHelp={isOpenShift ? integrationHelp.openshiftCredential : integrationHelp.healthCheckCredential}
+        labelHelp={integrationHelp.healthCheckCredential}
         hideFormGroupLabel
         hideFooter
       >
@@ -189,7 +176,7 @@ function EditIntegrationFormFields({
             isRequired={isCredentialRequired}
             allowCreate
             placeholder="Select a credential"
-            labelHelp={isOpenShift ? integrationHelp.openshiftCredential : integrationHelp.healthCheckCredential}
+            labelHelp={integrationHelp.healthCheckCredential}
           />
         )}
       </SynFormField>
@@ -278,7 +265,6 @@ export function EditIntegrationForm() {
       description: integration.description ?? '',
       integration_type: integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER,
       base_url: 'base_url' in config ? String(config.base_url ?? '') : '',
-      namespace: 'namespace' in config ? config.namespace : undefined,
       allow_http: 'allow_http' in config ? Boolean(config.allow_http) : false,
       insecure_skip_tls_verify: 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
       ca_certificate: 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,

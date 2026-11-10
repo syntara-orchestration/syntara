@@ -16,7 +16,6 @@ class OpenShiftConfiguration:
 
     Attributes:
         base_url (str): OpenShift Kubernetes API URL
-        namespace (str): Namespace reserved for future execution workloads
         integration_type (Literal['openshift'] | Unset):  Default: 'openshift'.
         allow_http (bool | Unset): Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over
             HTTP. Default: False.
@@ -26,7 +25,6 @@ class OpenShiftConfiguration:
     """
 
     base_url: str
-    namespace: str
     integration_type: Literal["openshift"] | Unset = "openshift"
     allow_http: bool | Unset = False
     insecure_skip_tls_verify: bool | Unset = False
@@ -34,8 +32,6 @@ class OpenShiftConfiguration:
 
     def to_dict(self) -> dict[str, Any]:
         base_url = self.base_url
-
-        namespace = self.namespace
 
         integration_type = self.integration_type
 
@@ -54,7 +50,6 @@ class OpenShiftConfiguration:
         field_dict.update(
             {
                 "base_url": base_url,
-                "namespace": namespace,
             }
         )
         if integration_type is not UNSET:
@@ -72,8 +67,6 @@ class OpenShiftConfiguration:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
         base_url = d.pop("base_url")
-
-        namespace = d.pop("namespace")
 
         integration_type = cast(Literal["openshift"] | Unset, d.pop("integration_type", UNSET))
         if integration_type != "openshift" and not isinstance(integration_type, Unset):
@@ -94,7 +87,6 @@ class OpenShiftConfiguration:
 
         openshift_configuration = cls(
             base_url=base_url,
-            namespace=namespace,
             integration_type=integration_type,
             allow_http=allow_http,
             insecure_skip_tls_verify=insecure_skip_tls_verify,

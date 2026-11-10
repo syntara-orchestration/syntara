@@ -1,4 +1,5 @@
 import type { IntegrationsAPI } from '@syntara/contracts'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 
 import { AppRoute } from '../../../app/AppRoute'
@@ -8,10 +9,13 @@ import { useAlerts } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 
+import { OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY } from './form/useOpenShiftIntegrationExists'
+
 type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
 export function useIntegrationActions(refetch: () => Promise<unknown>) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { showAlert } = useAlerts()
 
   const validateDialog = useDialogState<IntegrationRead>()
@@ -41,6 +45,7 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
             variant: result.success ? 'success' : 'danger',
             autoDismiss: true,
           })
+          detachPromise(queryClient.invalidateQueries({ queryKey: OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY }))
           detachPromise(refetch())
         },
         onError: (error: unknown) => {

@@ -279,7 +279,7 @@ describe('IntegrationDetail', () => {
       expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1)
     })
 
-    it('shows OpenShift cluster details and namespace', () => {
+    it('shows OpenShift cluster details without namespace', () => {
       setupDefaultMocks({
         integration: {
           name: 'Production cluster',
@@ -287,7 +287,6 @@ describe('IntegrationDetail', () => {
           configuration: {
             integration_type: IntegrationTypeEnum.OPENSHIFT,
             base_url: 'https://api.example.com:6443',
-            namespace: 'workers',
             allow_http: false,
             insecure_skip_tls_verify: false,
           },
@@ -296,11 +295,10 @@ describe('IntegrationDetail', () => {
       render(<IntegrationDetail />, { wrapper })
 
       expect(screen.getByRole('heading', { name: 'Production cluster', level: 1 })).toBeInTheDocument()
-      expect(screen.getByText('Cluster name')).toBeInTheDocument()
-      expect(screen.getByText('OpenShift')).toBeInTheDocument()
+      expect(screen.getByText('Server name / ID')).toBeInTheDocument()
+      expect(screen.getByText('Execution plane infrastructure')).toBeInTheDocument()
       expect(screen.getByText('https://api.example.com:6443')).toBeInTheDocument()
-      expect(screen.getByText('Namespace')).toBeInTheDocument()
-      expect(screen.getByText('workers')).toBeInTheDocument()
+      expect(screen.queryByText('Namespace')).not.toBeInTheDocument()
     })
 
     it('shows credential name as a link when credential is assigned', () => {

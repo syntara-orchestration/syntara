@@ -15,7 +15,7 @@ from syntara.integrations.services.integration_service import ALLOWED_CREDENTIAL
 
 
 def _config() -> OpenShiftConfiguration:
-    return OpenShiftConfiguration(base_url="https://api.example.com:6443", namespace="ep-dev-workers")
+    return OpenShiftConfiguration(base_url="https://api.example.com:6443")
 
 
 def _mock_client(response: httpx.Response) -> tuple[AsyncMock, MagicMock]:
@@ -33,19 +33,13 @@ def _mock_client(response: httpx.Response) -> tuple[AsyncMock, MagicMock]:
 )
 def test_openshift_configuration_requires_https_host_url(invalid_url: str) -> None:
     with pytest.raises(ValidationError):
-        OpenShiftConfiguration(base_url=invalid_url, namespace="workers")
-
-
-@pytest.mark.parametrize("invalid_namespace", ["", "UPPERCASE", "bad/name", "-bad"])
-def test_openshift_configuration_rejects_invalid_namespace(invalid_namespace: str) -> None:
-    with pytest.raises(ValidationError):
-        OpenShiftConfiguration(base_url="https://api.example.com", namespace=invalid_namespace)
+        OpenShiftConfiguration(base_url=invalid_url)
 
 
 @pytest.mark.parametrize("tls_override", [{"allow_http": True}, {"insecure_skip_tls_verify": True}])
 def test_openshift_configuration_requires_verified_tls(tls_override: dict[str, bool]) -> None:
     with pytest.raises(ValidationError):
-        OpenShiftConfiguration(base_url="https://api.example.com", namespace="workers", **tls_override)
+        OpenShiftConfiguration(base_url="https://api.example.com", **tls_override)
 
 
 def test_integration_accepts_openshift_without_execution_plane_target() -> None:
@@ -58,7 +52,7 @@ def test_integration_accepts_openshift_without_execution_plane_target() -> None:
     assert ALLOWED_CREDENTIAL_TYPES[IntegrationType.OPENSHIFT] == {"HTTP Bearer Token"}
     assert IntegrationType.OPENSHIFT in CREDENTIAL_REQUIRED_TYPES
     with pytest.raises(ValidationError):
-        OpenShiftConfiguration(base_url="https://api.example.com", namespace="workers", execution_target_id="unused")
+        OpenShiftConfiguration(base_url="https://api.example.com", execution_target_id="unused")
 
 
 @pytest.mark.asyncio

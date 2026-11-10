@@ -45247,14 +45247,6 @@
             "title": "Base Url",
             "description": "OpenShift Kubernetes API URL"
           },
-          "namespace": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 63,
-            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
-            "title": "Namespace",
-            "description": "Namespace reserved for future execution workloads"
-          },
           "allow_http": {
             "type": "boolean",
             "title": "Allow Http",
@@ -45281,8 +45273,7 @@
           }
         },
         "required": [
-          "base_url",
-          "namespace"
+          "base_url"
         ],
         "title": "OpenShiftConfiguration",
         "type": "object"

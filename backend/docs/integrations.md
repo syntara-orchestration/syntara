@@ -217,7 +217,7 @@ The AAP integration stores the API URL and TLS configuration. It does not discov
 
 ### OpenShift
 
-An OpenShift integration stores the Kubernetes API URL and the namespace intended for future execution workloads. Its management credential must be an existing Syntara **HTTP Bearer Token** credential. The token is resolved only when validating the connection; it is not stored in the integration configuration or returned by the integration API. A custom CA certificate is supported for clusters using a private CA.
+An OpenShift integration stores the Kubernetes API URL. Its management credential must be an existing Syntara **HTTP Bearer Token** credential. The token is resolved only when validating the connection; it is not stored in the integration configuration or returned by the integration API. A custom CA certificate is supported for clusters using a private CA. The create form presents OpenShift as **Execution plane infrastructure**, sets its scope to global, and permits one OpenShift integration per Syntara instance.
 
 Create the integration through the existing `POST /integrations` API with a payload shaped like:
 
@@ -227,8 +227,7 @@ Create the integration through the existing `POST /integrations` API with a payl
   "integration_type": "openshift",
   "configuration": {
     "integration_type": "openshift",
-    "base_url": "https://api.example.com:6443",
-    "namespace": "workers"
+    "base_url": "https://api.example.com:6443"
   },
   "management_credential_id": "<existing HTTP Bearer Token credential UUID>"
 }
@@ -236,7 +235,7 @@ Create the integration through the existing `POST /integrations` API with a payl
 
 The `validate` and unsaved `discover` actions ask the cluster to identify the bearer credential through Kubernetes `SelfSubjectReview`. That API returns identity information without persisting a resource. The adapter does not list, create, exec into, or delete pods, and it does not check permissions for future workload operations. Resource refresh is unsupported. Pod lifecycle and workflow routing remain separate follow-up work.
 
-> **Security note:** The connection test verifies the token's identity only; it does not check access to the configured namespace. Before a future workflow activity uses this integration, ensure the service account has the RBAC permissions that activity requires in that namespace.
+> **Security note:** The connection test verifies the token's identity only; it does not check whether the service account has the RBAC permissions required by future workload operations.
 
 ## TLS and Security
 
