@@ -4,7 +4,7 @@ import re
 from collections.abc import Mapping
 from typing import ClassVar, Literal
 
-from pydantic import ConfigDict, Field, JsonValue, field_validator
+from pydantic import ConfigDict, Field, JsonValue, ValidationError, field_validator
 from rfc3339_validator import validate_rfc3339  # type: ignore[import-untyped]
 from rfc3986_validator import validate_rfc3986  # type: ignore[import-untyped]
 from sqlmodel import SQLModel
@@ -134,5 +134,7 @@ def normalize_cloudevents(attributes: Mapping[str, JsonValue]) -> CloudEventAttr
             if name not in _STANDARD_ATTRIBUTES and value is not None
         }
         return CloudEventAttributes.model_validate({**standard, "extensions": extensions})
+    except ValidationError:
+        return EventDecodeFailure(code=EventFailureCode.malformed_cloudevents)
     except ValueError:
         return EventDecodeFailure(code=EventFailureCode.malformed_cloudevents)
