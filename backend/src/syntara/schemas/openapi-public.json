@@ -58068,16 +58068,10 @@
             "title": "Integration Id"
           },
           "credential_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Credential Id"
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
+            "title": "Credential Id",
+            "description": "Required runtime Kafka credential reference"
           },
           "topic": {
             "not": {
@@ -58125,6 +58119,7 @@
         "type": "object",
         "required": [
           "integration_id",
+          "credential_id",
           "topic",
           "payload"
         ],

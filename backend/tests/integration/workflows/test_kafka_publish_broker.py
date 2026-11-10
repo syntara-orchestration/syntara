@@ -69,6 +69,7 @@ async def test_wire_values_missing_topic_and_lower_broker_limit(
     )
     base: dict[str, Any] = {
         "integration_id": str(uuid4()),
+        "credential_id": str(uuid4()),
         "topic": topic,
         "_resolved_credentials": {"extra_vars": {}},
         "_resolved_integration": config.model_dump(mode="json"),

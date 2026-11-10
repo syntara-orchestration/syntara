@@ -14,8 +14,10 @@ In Parameters, select an **Integration**, then choose **Set up connection** to
 select the runtime Kafka credential. Selection collapses to the credential name
 with a **Change** action. **Cancel** closes the picker without changing the
 selection. Changing the Integration clears the credential and closes setup.
-Credential setup is hidden until an Integration is selected. SASL_SSL requires a
-runtime credential; SSL and opted-in PLAINTEXT show it as optional. The
+Credential setup is hidden until an Integration is selected. Every connection
+mode requires a runtime Kafka credential. SASL_SSL needs username and password;
+SSL and opted-in PLAINTEXT can use a Kafka credential with empty inputs. Omitted
+or null credential references prevent saving the action configuration. The
 Integration's management credential is never substituted. Integration choices
 show their broker addresses and validation status. Set the **Target topic**
 below the connection controls.
@@ -42,6 +44,7 @@ npm --prefix frontend/packages/syntara-ui run vitest -- \
   src/routes/builder/node-forms/KafkaCredentialConnection.test.tsx \
   src/routes/builder/components/CredentialSelector.test.tsx \
   src/routes/builder/components/IntegrationSelector.test.tsx \
+  src/routes/configuration/credentials/form/CredentialTypeHelp.test.tsx \
   src/routes/workflows/canvas/nodeTypeColors.test.ts \
   src/routes/workflows/canvas/nodes/nodeIconResolver.test.ts \
   src/routes/workflows/canvas/nodes/renderNodeIcon.test.tsx

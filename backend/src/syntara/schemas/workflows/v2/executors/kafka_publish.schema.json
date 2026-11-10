@@ -13,17 +13,10 @@
         "type": "string"
       },
       "credential_id": {
-        "anyOf": [
-          {
-            "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
-            "type": "string"
-          },
-          {
-            "type": "null"
-          }
-        ],
-        "default": null,
-        "title": "Credential Id"
+        "description": "Required runtime Kafka credential reference",
+        "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
+        "title": "Credential Id",
+        "type": "string"
       },
       "topic": {
         "maxLength": 249,
@@ -70,6 +63,7 @@
     },
     "required": [
       "integration_id",
+      "credential_id",
       "topic",
       "payload"
     ],

@@ -68,7 +68,7 @@ describe('nodeIconResolver', () => {
         type: ActivityTypeEnum.KAFKA_PUBLISH,
         id: 'publish',
         name: 'Publish outcome',
-        parameters: { integration_id: 'integration', topic: 'outcomes', payload: null },
+        parameters: { integration_id: 'integration', credential_id: 'credential', topic: 'outcomes', payload: null },
       })
 
       expect(result.id).toBe(RegistryNodeId.ACTION_KAFKA)

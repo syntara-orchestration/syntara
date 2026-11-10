@@ -21,17 +21,17 @@ class KafkaPublishParameters:
 
     Attributes:
         integration_id (str):
+        credential_id (str): Required runtime Kafka credential reference
         topic (str):
         payload (Any): Required JSON value; explicit null publishes JSON null, not a tombstone
-        credential_id (None | str | Unset):
         key (KafkaEncodedValue | None | Unset):
         headers (list[KafkaPublishHeader] | str | Unset):
     """
 
     integration_id: str
+    credential_id: str
     topic: str
     payload: Any
-    credential_id: None | str | Unset = UNSET
     key: KafkaEncodedValue | None | Unset = UNSET
     headers: list[KafkaPublishHeader] | str | Unset = UNSET
 
@@ -40,15 +40,11 @@ class KafkaPublishParameters:
 
         integration_id = self.integration_id
 
+        credential_id = self.credential_id
+
         topic = self.topic
 
         payload = self.payload
-
-        credential_id: None | str | Unset
-        if isinstance(self.credential_id, Unset):
-            credential_id = UNSET
-        else:
-            credential_id = self.credential_id
 
         key: dict[str, Any] | None | Unset
         if isinstance(self.key, Unset):
@@ -75,12 +71,11 @@ class KafkaPublishParameters:
         field_dict.update(
             {
                 "integration_id": integration_id,
+                "credential_id": credential_id,
                 "topic": topic,
                 "payload": payload,
             }
         )
-        if credential_id is not UNSET:
-            field_dict["credential_id"] = credential_id
         if key is not UNSET:
             field_dict["key"] = key
         if headers is not UNSET:
@@ -96,18 +91,11 @@ class KafkaPublishParameters:
         d = dict(src_dict)
         integration_id = d.pop("integration_id")
 
+        credential_id = d.pop("credential_id")
+
         topic = d.pop("topic")
 
         payload = d.pop("payload")
-
-        def _parse_credential_id(data: object) -> None | str | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(None | str | Unset, data)
-
-        credential_id = _parse_credential_id(d.pop("credential_id", UNSET))
 
         def _parse_key(data: object) -> KafkaEncodedValue | None | Unset:
             if data is None:
@@ -148,9 +136,9 @@ class KafkaPublishParameters:
 
         kafka_publish_parameters = cls(
             integration_id=integration_id,
+            credential_id=credential_id,
             topic=topic,
             payload=payload,
-            credential_id=credential_id,
             key=key,
             headers=headers,
         )

@@ -1,5 +1,6 @@
 """Publish bindings use the same actor and credential rules as other actions."""
 
+from collections.abc import Iterator
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -8,6 +9,7 @@ from uuid import uuid4
 import pytest
 
 from syntara.core.exceptions import SafeValueError
+from syntara.credentials.exceptions import CredentialValidationError
 from syntara.integrations.exceptions import IntegrationCredentialTypeMismatchError
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 from syntara.workflows.services.workflow_service import WorkflowService
@@ -16,6 +18,14 @@ from syntara.workflows.services.workflow_service import WorkflowService
 @pytest.fixture
 def service() -> WorkflowService:
     return WorkflowService(AsyncMock(), MagicMock(id=uuid4()), MagicMock())
+
+
+@pytest.fixture(autouse=True)
+def login_validation() -> Iterator[AsyncMock]:
+    with patch(
+        "syntara.workflows.services.workflow_service.resolve_publish_kafka_login", new_callable=AsyncMock
+    ) as login:
+        yield login
 
 
 @pytest.fixture
@@ -69,12 +79,18 @@ async def test_publish_requires_visible_integration_and_compatible_credential(
 
 
 @pytest.mark.parametrize("protocol", ["SASL_SSL", "SSL", "PLAINTEXT"])
-async def test_runtime_credential_requirement_uses_transport_without_management_fallback(
+@pytest.mark.parametrize("omit", [True, False])
+async def test_runtime_credential_required_without_management_fallback(
     service: WorkflowService,
     definition: dict[str, Any],
     protocol: str,
+    *,
+    omit: bool,
 ) -> None:
-    del definition["nodes"][0]["parameters"]["credential_id"]
+    if omit:
+        del definition["nodes"][0]["parameters"]["credential_id"]
+    else:
+        definition["nodes"][0]["parameters"]["credential_id"] = None
     session = service.session
     assert isinstance(session, AsyncMock)
     session.get.return_value = SimpleNamespace(
@@ -87,13 +103,74 @@ async def test_runtime_credential_requirement_uses_transport_without_management_
             allow_plaintext=protocol == "PLAINTEXT",
         ),
     )
-    with patch.object(service, "_resolve_visible_integration_ids", return_value=None):
-        if protocol == "SASL_SSL":
-            with pytest.raises(SafeValueError, match="runtime Kafka credential"):
-                await service._validate_kafka_publish_bindings(definition)
-        else:
-            await service._validate_kafka_publish_bindings(definition)
-    assert session.get.await_count == 1
+    with pytest.raises(SafeValueError, match="Select a runtime Kafka credential"):
+        await service._validate_kafka_publish_bindings(definition)
+    session.get.assert_not_awaited()
+
+
+@pytest.mark.parametrize("protocol", ["SASL_SSL", "SSL", "PLAINTEXT"])
+async def test_selected_credential_validated_for_connection_mode(
+    service: WorkflowService,
+    definition: dict[str, Any],
+    protocol: str,
+    login_validation: AsyncMock,
+) -> None:
+    session = service.session
+    assert isinstance(session, AsyncMock)
+    session.get.side_effect = [
+        SimpleNamespace(
+            enabled=True,
+            integration_type="kafka",
+            configuration=KafkaConfiguration(
+                bootstrap_servers=["broker.example:9093"],
+                security_protocol=protocol,
+                allow_plaintext=protocol == "PLAINTEXT",
+            ),
+        ),
+        SimpleNamespace(enabled=True),
+    ]
+    with (
+        patch.object(service, "_resolve_visible_integration_ids", return_value=None),
+        patch(
+            "syntara.workflows.services.workflow_service.IntegrationService._validate_credential_type",
+            new_callable=AsyncMock,
+        ),
+    ):
+        await service._validate_kafka_publish_bindings(definition)
+    assert login_validation.await_args is not None
+    assert (
+        str(login_validation.await_args.kwargs["runtime_credential_id"])
+        == definition["nodes"][0]["parameters"]["credential_id"]
+    )
+    assert login_validation.await_args.kwargs["security_protocol"] == protocol
+
+
+async def test_invalid_credential_contents_are_sanitized(
+    service: WorkflowService,
+    definition: dict[str, Any],
+    login_validation: AsyncMock,
+) -> None:
+    session = service.session
+    assert isinstance(session, AsyncMock)
+    session.get.side_effect = [
+        SimpleNamespace(
+            enabled=True,
+            integration_type="kafka",
+            configuration=KafkaConfiguration(bootstrap_servers=["broker.example:9093"]),
+        ),
+        SimpleNamespace(enabled=True),
+    ]
+    login_validation.side_effect = CredentialValidationError("sensitive diagnostic")
+    with (
+        patch.object(service, "_resolve_visible_integration_ids", return_value=None),
+        patch(
+            "syntara.workflows.services.workflow_service.IntegrationService._validate_credential_type",
+            new_callable=AsyncMock,
+        ),
+        pytest.raises(SafeValueError, match="missing fields required by the connection mode") as error,
+    ):
+        await service._validate_kafka_publish_bindings(definition)
+    assert "sensitive diagnostic" not in str(error.value)
 
 
 async def test_incompatible_runtime_credential_rejected(service: WorkflowService, definition: dict[str, Any]) -> None:
@@ -125,3 +202,13 @@ async def test_binding_checks_run_when_publish_has_no_credential(
     with patch.object(service, "_validate_kafka_publish_bindings", new_callable=AsyncMock) as bindings:
         await service._validate_credential_project_scope(definition, uuid4())
     bindings.assert_awaited_once_with(definition)
+
+
+async def test_malformed_configuration_does_not_expose_payload(
+    service: WorkflowService, definition: dict[str, Any]
+) -> None:
+    definition["nodes"][0]["parameters"].update(topic="${trigger.topic}", payload="sensitive payload")
+    with pytest.raises(SafeValueError, match="Invalid Kafka Publish configuration") as error:
+        await service._validate_kafka_publish_bindings(definition)
+    assert "sensitive payload" not in str(error.value)
+    assert error.value.__suppress_context__

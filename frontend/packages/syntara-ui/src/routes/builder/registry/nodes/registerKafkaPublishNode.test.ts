@@ -39,8 +39,7 @@ describe('Kafka Publish registration', () => {
       {
         name: 'Publish outcome',
         integration_id: '11111111-1111-4111-8111-111111111111',
-        credential_id: '',
-        credential_required: false,
+        credential_id: '22222222-2222-4222-8222-222222222222',
         connection_ready: true,
         topic: 'outcomes',
         payload: 'false',
@@ -71,8 +70,7 @@ describe('Kafka Publish registration', () => {
       {
         name: 'Publish outcome',
         integration_id: '11111111-1111-4111-8111-111111111111',
-        credential_id: '',
-        credential_required: false,
+        credential_id: '22222222-2222-4222-8222-222222222222',
         connection_ready: true,
         topic: 'outcomes',
         payload: 'sensitive-message-data is not JSON',

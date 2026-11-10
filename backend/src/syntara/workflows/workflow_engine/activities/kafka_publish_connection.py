@@ -62,17 +62,14 @@ async def current_publish_resources(
         fail_publish("kafka_invalid_reference")
     config = integration.configuration
     revision: list[str] = [str(integration.id), str(integration.updated_at)]
-    if parameters.credential_id is not None:
-        credential = await session.get(Credential, UUID(parameters.credential_id))
-        if credential is None or not credential.enabled or str(credential.project_id) != project_id:
-            fail_publish("kafka_invalid_reference")
-        credential_type = await session.get(CredentialType, credential.credential_type_id)
-        if (
-            credential_type is None
-            or credential_type.name != KAFKA_CONNECTION_TYPE_NAME
-            or credential.secret_id is None
-        ):
-            fail_publish("kafka_invalid_reference")
+    credential = await session.get(Credential, UUID(parameters.credential_id))
+    if credential is None or not credential.enabled or str(credential.project_id) != project_id:
+        fail_publish("kafka_invalid_reference")
+    credential_type = await session.get(CredentialType, credential.credential_type_id)
+    if credential_type is None or credential_type.name != KAFKA_CONNECTION_TYPE_NAME:
+        fail_publish("kafka_invalid_reference")
+    secret_updated_at = None
+    if credential.secret_id is not None:
         secret_updated_at = (
             await session.exec(
                 select(EncryptedSecret.updated_at).where(EncryptedSecret.secret_id == credential.secret_id)
@@ -80,19 +77,19 @@ async def current_publish_resources(
         ).one_or_none()
         if secret_updated_at is None:
             fail_publish("kafka_invalid_reference")
-        revision.extend(
-            str(value)
-            for value in (
-                credential.id,
-                credential.updated_at,
-                credential_type.id,
-                credential_type.updated_at,
-                credential.secret_id,
-                secret_updated_at,
-            )
-        )
     elif kafka_credential_required(config.security_protocol):
         fail_publish("kafka_invalid_reference")
+    revision.extend(
+        str(value)
+        for value in (
+            credential.id,
+            credential.updated_at,
+            credential_type.id,
+            credential_type.updated_at,
+            credential.secret_id,
+            secret_updated_at,
+        )
+    )
     return config, hashlib.sha256(json.dumps(revision).encode()).hexdigest()
 
 
@@ -157,8 +154,13 @@ async def prepare_kafka_publish(
                 # database snapshot when a credential rotates during preparation.
                 await session.connection(execution_options={"isolation_level": "REPEATABLE READ"})
                 config, revision = await current_publish_resources(session, model, project_id)
-                credentials: dict[str, Any] = {"extra_vars": {}, "_secret_values": []}
-                if model.credential_id is not None:
+                credentials: dict[str, Any] = {
+                    "credential_id": model.credential_id,
+                    "credential_type_name": KAFKA_CONNECTION_TYPE_NAME,
+                    "extra_vars": {},
+                    "_secret_values": [],
+                }
+                if kafka_credential_required(config.security_protocol):
                     credentials = await _resolve_single_credential(
                         session, create_secret_service(session), "kafka_publish", model.credential_id, project_id
                     )

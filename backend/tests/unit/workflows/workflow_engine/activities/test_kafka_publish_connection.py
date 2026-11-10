@@ -75,3 +75,35 @@ async def test_each_invocation_resolves_selected_credential_once(monkeypatch: py
     assert second["_resolved_credentials"] == {"extra_vars": {"kafka_password": "rotated"}}
     assert credentials.await_count == 2
     assert all(call.args[3] == selected for call in credentials.await_args_list)
+
+
+@pytest.mark.parametrize("protocol", ["SSL", "PLAINTEXT"])
+async def test_non_sasl_preparation_binds_credential_without_sasl_fields(
+    monkeypatch: pytest.MonkeyPatch, protocol: str
+) -> None:
+    config = KafkaConfiguration(
+        bootstrap_servers=["broker.example:9093"], security_protocol=protocol, allow_plaintext=protocol == "PLAINTEXT"
+    )
+    context = MagicMock()
+    context.return_value.__aenter__ = AsyncMock()
+    context.return_value.__aexit__ = AsyncMock(return_value=False)
+    monkeypatch.setattr(module, "_session_factory", context)
+    monkeypatch.setattr(module, "current_publish_resources", AsyncMock(return_value=(config, "revision")))
+    credentials = AsyncMock()
+    monkeypatch.setattr(module, "_resolve_single_credential", credentials)
+    preflight = AsyncMock()
+    monkeypatch.setattr(module, "check_publish_topic", preflight)
+    selected = str(uuid4())
+    prepared = await ActivityEnvironment().run(
+        module.prepare_kafka_publish,
+        {"integration_id": str(uuid4()), "credential_id": selected, "topic": "outcomes", "payload": None},
+        "project",
+    )
+    assert prepared["_resolved_credentials"] == {
+        "credential_id": selected,
+        "credential_type_name": "Kafka",
+        "extra_vars": {},
+        "_secret_values": [],
+    }
+    credentials.assert_not_awaited()
+    preflight.assert_awaited_once_with(config, {}, "outcomes")

@@ -83,7 +83,6 @@ export function KafkaPublishNodeForm(props: Readonly<KafkaPublishNodeFormProps>)
       name: '',
       integration_id: '',
       credential_id: '',
-      credential_required: true,
       connection_ready: false,
       topic: '',
       payload: '{}',

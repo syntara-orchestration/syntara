@@ -16,9 +16,29 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
   let projectId: string | undefined
   let integrationId: string | undefined
   let workflowId: string | undefined
+  let credentialId: string | undefined
   try {
     const project = await createProjectViaApi(app, name)
     projectId = project.id
+    const types = await apiRequest(app, 'get', '/credential_types', { token })
+    expect(types.ok()).toBeTruthy()
+    const kafkaType = z
+      .object({ resources: z.array(z.object({ id: z.string(), name: z.string() })) })
+      .parse(await types.json())
+      .resources.find((type) => type.name === 'Kafka')
+    if (!kafkaType) throw new Error('Kafka credential type is not seeded')
+    const credential = await apiRequest(app, 'post', '/credentials', {
+      token,
+      data: {
+        name: `${name}-runtime`,
+        credential_type_id: kafkaType.id,
+        project_id: project.id,
+        enabled: true,
+        inputs: {},
+      },
+    })
+    expect(credential.ok()).toBeTruthy()
+    credentialId = z.object({ id: z.string() }).parse(await credential.json()).id
     const integration = await apiRequest(app, 'post', '/kafka_integrations', {
       token,
       data: {
@@ -73,7 +93,7 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     await app.getByRole('button', { name: 'Integration', exact: true }).click()
     await expect(app.getByRole('option', { name: new RegExp(`^${name}`) })).toContainText('localhost:9093')
     await app.getByRole('option', { name: new RegExp(`^${name}`) }).click()
-    await expect(app.getByText('Kafka credential optional', { exact: true })).toBeVisible()
+    await expect(app.getByText('Kafka credential not configured', { exact: true })).toBeVisible()
     await app.getByRole('button', { name: 'Set up connection', exact: true }).click()
     await expect(app.getByRole('button', { name: 'Runtime credential', exact: true })).toContainText(
       'Select a credential'
@@ -81,6 +101,13 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     await app.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(app.getByRole('button', { name: 'Runtime credential', exact: true })).toBeHidden()
     await expect(app.getByRole('button', { name: 'Set up connection', exact: true })).toBeFocused()
+    await app.getByRole('button', { name: 'Create', exact: true }).click()
+    await expect(app.getByText('Select a runtime Kafka credential', { exact: true })).toBeVisible()
+    await app.getByRole('button', { name: 'Set up connection', exact: true }).click()
+    await app.getByRole('button', { name: 'Runtime credential', exact: true }).click()
+    await expect(app.getByRole('option', { name: 'No credential', exact: true })).toBeHidden()
+    await app.getByRole('option', { name: `${name}-runtime`, exact: true }).click()
+    await expect(app.getByText(`${name}-runtime`, { exact: true })).toBeVisible()
     await app.getByRole('textbox', { name: 'Target topic', exact: true }).fill('automation.outcomes')
     await app.getByRole('textbox', { name: 'JSON payload', exact: true }).fill('null')
     await app.getByRole('button', { name: 'Message key encoding', exact: true }).click()
@@ -112,7 +139,8 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     await clickSaveAndWait(app)
     await app.reload()
     await clickNode(app, 'Publish outcome')
-    await expect(app.getByRole('button', { name: 'Set up connection', exact: true })).toBeEnabled()
+    await expect(app.getByRole('button', { name: 'Change', exact: true })).toBeEnabled()
+    await expect(app.getByText(`${name}-runtime`, { exact: true })).toBeVisible()
     await expect(app.getByRole('button', { name: 'Runtime credential', exact: true })).toBeHidden()
     await expect(app.getByRole('textbox', { name: 'JSON payload', exact: true })).toHaveValue('null')
     await expect(app.getByRole('textbox', { name: 'Message key value', exact: true })).toHaveValue('AAEC')
@@ -137,6 +165,7 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     const body: unknown = await saved.json()
     expect(JSON.stringify(body)).toContain('automation.outcomes.updated')
     expect(JSON.stringify(body)).toContain('"max_retries":0')
+    expect(JSON.stringify(body)).toContain(`"credential_id":"${credentialId}"`)
     await clickNode(app, 'Publish outcome')
     await app.getByRole('textbox', { name: 'JSON payload', exact: true }).fill('${trigger.payload}')
     await app.getByRole('button', { name: 'Header source', exact: true }).click()
@@ -146,7 +175,8 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     await clickSaveAndWait(app)
     await app.reload()
     await clickNode(app, 'Publish outcome')
-    await expect(app.getByRole('button', { name: 'Set up connection', exact: true })).toBeEnabled()
+    await expect(app.getByRole('button', { name: 'Change', exact: true })).toBeEnabled()
+    await expect(app.getByText(`${name}-runtime`, { exact: true })).toBeVisible()
     await expect(app.getByRole('button', { name: 'Runtime credential', exact: true })).toBeHidden()
     await expect(app.getByRole('textbox', { name: 'JSON payload', exact: true })).toHaveValue('${trigger.payload}')
     await expect(app.getByRole('textbox', { name: 'Headers template', exact: true })).toHaveValue(
@@ -178,6 +208,7 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
   } finally {
     if (workflowId) await deleteWorkflowViaApi(app, workflowId)
     if (integrationId) await apiRequest(app, 'delete', `/integrations/${integrationId}`, { token }).catch(() => {})
+    if (credentialId) await apiRequest(app, 'delete', `/credentials/${credentialId}`, { token }).catch(() => {})
     if (projectId) await deleteProjectViaApi(app, projectId).catch(() => {})
   }
 })

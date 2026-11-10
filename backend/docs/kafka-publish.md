@@ -1,7 +1,7 @@
 # Kafka Publish workflow action
 
 Add **Kafka Publish** from the workflow builder's Add step panel. Choose a Kafka
-integration, select the runtime Kafka credential when the connection uses SASL,
+integration, select a compatible runtime Kafka credential for every connection mode,
 and enter an existing, fixed topic. Publish runs in the normal workflow worker;
 that worker must be able to reach the integration's brokers.
 
@@ -13,8 +13,9 @@ template** accepts a template that resolves to the complete ordered header list.
 Define referenced trigger inputs in the trigger's input schema before publishing.
 
 Runtime credential selection becomes available once the chosen integration's
-connection settings have loaded. SASL_SSL requires a compatible runtime Kafka
-credential. SSL and opted-in PLAINTEXT allow omission. Changing the integration
+connection settings have loaded. Every mode requires a compatible runtime Kafka
+credential. SASL_SSL requires username and password; SSL and opted-in PLAINTEXT
+do not require SASL fields. Omitted or null credential references are invalid. Changing the integration
 clears the previous runtime credential. The integration's management credential
 is never substituted. Published versions show these controls read-only.
 
@@ -134,12 +135,13 @@ metadata. Output mappings and normal continuation/failure policies apply.
 
 Invocation preparation resolves the selected credential and connection settings
 once, using existing credential encryption/scrubbing in Temporal history. It
-never falls back to the integration's management credential. SSL or explicitly
-opted-in PLAINTEXT connections can omit a runtime credential under the shared
-Kafka connection rules.
+never falls back to the integration's management credential. Every connection
+mode requires a selected runtime Kafka credential. For SSL or explicitly opted-in
+PLAINTEXT, a Kafka credential with empty inputs (`{}`) is valid; unused SASL fields
+are not decrypted or passed to the producer.
 
-Saving a workflow checks Integration visibility and runtime credential
-compatibility. Preparation reads the revision and credential within one database
+Saving a workflow checks Integration visibility, runtime credential compatibility
+and enabled state, and the credential contents required by the connection mode. Preparation reads the revision and credential within one database
 snapshot so concurrent rotation cannot associate a secret with the wrong
 producer revision. Preparation also heartbeats for cancellation and receives the
 original invocation deadline on every retry, including after queueing.

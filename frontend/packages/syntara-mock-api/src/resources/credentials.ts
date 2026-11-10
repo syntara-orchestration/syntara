@@ -35,23 +35,6 @@ function typeInjectors(extra_vars: Record<string, string>) {
 
 export const credentialTypes: CredentialTypeRead[] = [
   {
-    id: 'ctype-kafka',
-    name: 'Kafka',
-    description: 'Kafka SASL authentication',
-    managed: true,
-    inputs: typeInputs(
-      [
-        { id: 'username', label: 'Username', type: 'string' },
-        { id: 'password', label: 'Password', type: 'string', secret: true },
-      ],
-      ['username', 'password']
-    ),
-    injectors: typeInjectors({ username: '{{username}}', password: '{{password}}' }),
-    created_at: '2026-06-15T10:00:00.000Z',
-    updated_at: '2026-06-15T10:00:00.000Z',
-    labels: {},
-  },
-  {
     id: 'ctype-bearer',
     name: 'HTTP Bearer Token',
     description: 'Bearer token authentication for HTTP APIs',
@@ -184,7 +167,7 @@ export const credentialTypes: CredentialTypeRead[] = [
   {
     id: 'ctype-kafka',
     name: 'Kafka',
-    description: 'SASL username and password for connector validation and listener runtime',
+    description: 'Kafka connection credential; SASL_SSL requires a username and password',
     inputs: typeInputs(
       [
         {
@@ -192,17 +175,18 @@ export const credentialTypes: CredentialTypeRead[] = [
           type: 'string',
           label: 'Username',
           secret: false,
-          help_text: 'SASL username used for connector validation and listener runtime.',
+          help_text: 'Required for SASL_SSL. Leave blank for SSL or opted-in PLAINTEXT.',
         },
         {
           id: 'password',
           type: 'string',
           label: 'Password',
           secret: true,
-          help_text: 'Kafka SASL password. Encrypted at rest.',
+          help_text: 'Required for SASL_SSL. Encrypted at rest. Omit for SSL or opted-in PLAINTEXT.',
         },
       ],
-      ['username', 'password']
+      [],
+      { required_together: [['username', 'password']] }
     ),
     injectors: typeInjectors({
       auth_type: 'kafka_connection',

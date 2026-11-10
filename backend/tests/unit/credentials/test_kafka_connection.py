@@ -6,16 +6,17 @@ from uuid import uuid4
 import pytest
 
 from syntara.core.lib.encryption import ENCRYPTED_SENTINEL, EncryptionError
-from syntara.credentials.exceptions import CredentialDecryptionError, CredentialValidationError
+from syntara.credentials.exceptions import CredentialDecryptionError, CredentialDisabledError, CredentialValidationError
 from syntara.credentials.lib.kafka_connection import (
     resolve_connector_kafka_login,
     resolve_listener_kafka_login,
+    resolve_publish_kafka_login,
     resolve_supplied_kafka_login,
 )
 from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
-from syntara.credentials.services.credential_service import CredentialService
+from syntara.credentials.services.credential_service import CredentialService, _validate_inputs
 
 
 def _kafka_type() -> CredentialType:
@@ -287,3 +288,50 @@ class TestConnectorValidationCallSite:
         assert resolved["kafka_username"] == "admin"
         assert resolved["kafka_password"] == "  admin-secret  "  # noqa: S105
         secret_service.retrieve_secret.assert_awaited_once_with(credential.secret_id)
+
+
+@pytest.mark.parametrize("protocol", ["SSL", "PLAINTEXT"])
+async def test_publish_non_sasl_accepts_selected_empty_credential(protocol: str) -> None:
+    credential, cred_type, secret_service = _stored_kafka_credential("unused", "unused-secret")
+    credential.secret_id = None
+    session = _session_for({credential.id: credential}, {credential.credential_type_id: cred_type})
+    assert (
+        await resolve_publish_kafka_login(
+            session, secret_service, runtime_credential_id=credential.id, security_protocol=protocol
+        )
+        is None
+    )
+    secret_service.retrieve_secret.assert_not_awaited()
+
+
+@pytest.mark.parametrize("protocol", ["SASL_SSL", "SSL", "PLAINTEXT"])
+async def test_publish_rejects_disabled_selected_credential(protocol: str) -> None:
+    credential, cred_type, secret_service = _stored_kafka_credential("unused", "unused-secret")
+    credential.enabled = False
+    session = _session_for({credential.id: credential}, {credential.credential_type_id: cred_type})
+    with pytest.raises(CredentialDisabledError):
+        await resolve_publish_kafka_login(
+            session, secret_service, runtime_credential_id=credential.id, security_protocol=protocol
+        )
+    secret_service.retrieve_secret.assert_not_awaited()
+
+
+async def test_publish_sasl_requires_login_fields() -> None:
+    credential, cred_type, secret_service = _stored_kafka_credential("", "")
+    session = _session_for({credential.id: credential}, {credential.credential_type_id: cred_type})
+    with pytest.raises(CredentialValidationError, match="username and password are required"):
+        await resolve_publish_kafka_login(
+            session, secret_service, runtime_credential_id=credential.id, security_protocol="SASL_SSL"
+        )
+
+
+def test_kafka_credential_can_be_created_without_sasl_fields() -> None:
+    _validate_inputs({}, _kafka_type().inputs)
+
+
+@pytest.mark.parametrize(
+    "inputs", [{"username": "user"}, {"password": "secret"}, {"username": "user", "password": "x"}]
+)
+def test_supplied_kafka_login_fields_remain_validated(inputs: dict[str, str]) -> None:
+    with pytest.raises(CredentialValidationError):
+        _validate_inputs(inputs, _kafka_type().inputs)

@@ -1,8 +1,9 @@
 """Kafka credential rules.
 
-The credential stores only the SASL username and password. Connection settings
-stay on the Kafka integration. This module decides when that credential is
-required and loads the login from the credential id the caller supplied.
+The credential stores SASL username/password fields when the connection needs
+them. Connection settings stay on the Kafka integration. Publish requires a
+credential reference in every mode; connector and listener references follow
+their shared connection rules. Login resolution reads only the supplied id.
 """
 
 from enum import StrEnum
@@ -81,6 +82,8 @@ def resolve_supplied_kafka_login(
             msg = "SASL_SSL requires a Kafka credential"
             raise CredentialValidationError(msg)
         return None
+    if not required:
+        return None
     if decrypted_inputs is None:
         msg = "Kafka credential inputs were not supplied for the requested credential"
         raise CredentialValidationError(msg)
@@ -118,7 +121,7 @@ async def _load_supplied_kafka_login(
         return None
 
     credential = await session.get(Credential, credential_id)
-    if credential is None or credential.secret_id is None:
+    if credential is None:
         msg = "Kafka credential inputs were not supplied for the requested credential"
         raise CredentialValidationError(msg)
     if not credential.enabled:
@@ -127,6 +130,12 @@ async def _load_supplied_kafka_login(
     cred_type = await session.get(CredentialType, credential.credential_type_id)
     if cred_type is None or cred_type.name != KAFKA_CONNECTION_TYPE_NAME:
         msg = "The supplied credential is not a Kafka credential"
+        raise CredentialValidationError(msg)
+
+    if not required:
+        return None
+    if credential.secret_id is None:
+        msg = "Kafka credential inputs were not supplied for the requested credential"
         raise CredentialValidationError(msg)
 
     try:
@@ -174,6 +183,22 @@ async def resolve_listener_kafka_login(
     The id is the credential selected on the listener step. This function
     has no management-credential parameter, so it cannot substitute one.
     """
+    return await _load_supplied_kafka_login(
+        session,
+        secret_service,
+        credential_id=runtime_credential_id,
+        security_protocol=security_protocol,
+    )
+
+
+async def resolve_publish_kafka_login(
+    session: AsyncSession,
+    secret_service: "SecretService",
+    *,
+    runtime_credential_id: UUID,
+    security_protocol: str,
+) -> dict[str, str] | None:
+    """Validate a required Publish binding with mode-specific credential contents."""
     return await _load_supplied_kafka_login(
         session,
         secret_service,

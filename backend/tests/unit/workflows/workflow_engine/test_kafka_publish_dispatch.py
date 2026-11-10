@@ -15,6 +15,7 @@ from syntara.workflows.workflow_engine.graph import ActivityNode
 
 PARAMETERS: dict[str, Any] = {
     "integration_id": "11111111-1111-4111-8111-111111111111",
+    "credential_id": "22222222-2222-4222-8222-222222222222",
     "topic": "outcomes",
     "payload": "${trigger.payload}",
     "headers": "${trigger.headers}",

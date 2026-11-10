@@ -6,16 +6,19 @@ import { nodeSettingsSchema } from './shared/nodeSettingsSchema'
 export const KAFKA_MAX_HEADERS = 128
 const fullTemplate = /^\$\{[\s\S]+\}$/
 const templateExpression = /\$\{[^}]+\}/
-const reference = z
-  .string()
-  .regex(/^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i, 'Use a literal resource UUID')
+const resourceUuid = /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i
+const reference = z.string().regex(resourceUuid, 'Use a literal resource UUID')
 const encodedValue = z.strictObject({ encoding: z.enum(['utf-8', 'base64']), value: z.string() })
 const header = z.strictObject({ name: z.string(), value: encodedValue.nullable() })
 
 /** Check saved value structures against the generated contract, allowing incomplete draft destinations to be edited. */
 export const kafkaPublishParametersSchema = z.strictObject({
   integration_id: z.string().default(''),
-  credential_id: z.string().nullable().optional(),
+  // Older incomplete drafts can be repaired in the editor; submission requires a UUID.
+  credential_id: z
+    .string()
+    .nullish()
+    .transform((value) => value ?? ''),
   topic: z.string().default(''),
   payload: z.unknown(),
   key: encodedValue.nullable().optional(),
@@ -48,8 +51,10 @@ export const kafkaPublishFormSchema = z
   .object({
     name: z.string(),
     integration_id: reference.or(z.literal('')).refine((value) => value !== '', 'Select a Kafka integration'),
-    credential_id: z.union([reference, z.literal('')]),
-    credential_required: z.boolean(),
+    credential_id: z
+      .string({ error: 'Select a runtime Kafka credential' })
+      .min(1, 'Select a runtime Kafka credential')
+      .regex(resourceUuid, 'Use a literal resource UUID'),
     connection_ready: z.boolean(),
     topic: z
       .string()
@@ -70,13 +75,6 @@ export const kafkaPublishFormSchema = z
         code: 'custom',
         path: ['connection_ready'],
         message: 'Kafka connection settings are not available',
-      })
-    }
-    if (data.connection_ready && data.credential_required && !data.credential_id) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['credential_id'],
-        message: 'Select a runtime Kafka credential for SASL_SSL',
       })
     }
     if (!validBytes(data.key)) {
@@ -121,7 +119,7 @@ export function buildKafkaPublishParameters(
 ): WorkflowAPI.components['schemas']['KafkaPublishParameters'] {
   return {
     integration_id: data.integration_id,
-    credential_id: data.credential_id || null,
+    credential_id: data.credential_id,
     topic: data.topic,
     payload: parseJsonOrTemplate(data.payload),
     key: buildBytes(data.key),
