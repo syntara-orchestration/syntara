@@ -1,12 +1,13 @@
-import { FormGroup, MenuToggle, type MenuToggleElement, SelectList, SelectOption } from '@patternfly/react-core'
+import { FormGroup } from '@patternfly/react-core'
 import type { FormDefinition } from '@syntara/contracts'
 import type { ReactElement } from 'react'
-import { useCallback, useMemo, useState } from 'react'
-import { Controller, useFormContext, useWatch, type FieldError } from 'react-hook-form'
+import { useCallback, useMemo } from 'react'
+import type { FieldError } from 'react-hook-form'
+import { Controller, useFormContext, useWatch } from 'react-hook-form'
 
 import { FormFieldError } from '../../FormFieldError'
-import { SynSelect } from '../../SynSelect'
-import { optionKey, type OptionScalarValue } from '../dynamicForm/synDynamicFormSelectHelpers'
+import { OptionsTypeaheadSelect } from '../dynamicForm/OptionsTypeaheadSelect'
+import { type OptionScalarValue } from '../dynamicForm/synDynamicFormSelectHelpers'
 
 import styles from './formFieldBuilder.module.css'
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
@@ -30,59 +31,11 @@ type FormFieldBuilderDropdownDefaultSelectProps = {
   labelHelp?: ReactElement
 }
 
-function findOptionByKey(options: ReadonlyArray<StaticOptionRow>, key: string): StaticOptionRow | undefined {
-  return options.find((option) => optionKey(option.value) === key)
-}
-
-function defaultToggleText(
-  current: OptionScalarValue | null | undefined,
-  options: ReadonlyArray<StaticOptionRow>
-): string {
-  if (current == null) {
-    return FORM_FIELD_BUILDER_INITIAL_ANSWER_DROPDOWN_PLACEHOLDER
-  }
-  const match = options.find((option) => option.value === current)
-  return match?.display_label ?? String(current)
-}
-
-type DropdownDefaultSelectToggleProps = Readonly<{
-  toggleRef: React.Ref<MenuToggleElement>
-  isOpen: boolean
-  isDisabled?: boolean
-  isPlaceholder: boolean
-  toggleText: string
-  onToggle: () => void
-}>
-
-function DropdownDefaultSelectToggle({
-  toggleRef,
-  isOpen,
-  isDisabled,
-  isPlaceholder,
-  toggleText,
-  onToggle,
-}: DropdownDefaultSelectToggleProps) {
-  return (
-    <MenuToggle
-      ref={toggleRef}
-      onClick={onToggle}
-      isExpanded={isOpen}
-      isDisabled={isDisabled}
-      isFullWidth
-      aria-label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
-    >
-      <span className={isPlaceholder ? styles.staticDefaultPlaceholder : undefined}>{toggleText}</span>
-    </MenuToggle>
-  )
-}
-
 type DropdownDefaultSelectControlProps = Readonly<{
   idPrefix: string
   labelHelp?: ReactElement
   isDisabled?: boolean
   options: ReadonlyArray<StaticOptionRow>
-  isOpen: boolean
-  setIsOpen: React.Dispatch<React.SetStateAction<boolean>>
   currentDefault: OptionScalarValue | null | undefined
   onDefaultChange: (value: OptionScalarValue | null) => void
   fieldError?: FieldError
@@ -93,66 +46,61 @@ function DropdownDefaultSelectControl({
   labelHelp,
   isDisabled,
   options,
-  isOpen,
-  setIsOpen,
   currentDefault,
   onDefaultChange,
   fieldError,
 }: DropdownDefaultSelectControlProps) {
   const commit = useFormFieldBuilderCommit()
-  const selectedKey = currentDefault == null ? STATIC_DEFAULT_NONE : optionKey(currentDefault)
-  const toggleText = defaultToggleText(currentDefault, options)
-  const isPlaceholder = currentDefault == null
-  const handleToggle = useCallback(() => setIsOpen((open) => !open), [setIsOpen])
-  const renderToggle = useCallback(
-    (toggleRef: React.Ref<MenuToggleElement>) => (
-      <DropdownDefaultSelectToggle
-        toggleRef={toggleRef}
-        isOpen={isOpen}
-        isDisabled={isDisabled}
-        isPlaceholder={isPlaceholder}
-        toggleText={toggleText}
-        onToggle={handleToggle}
-      />
-    ),
-    [handleToggle, isDisabled, isOpen, isPlaceholder, toggleText]
+  const fieldId = `${idPrefix}-default`
+
+  const selectOptions = useMemo(
+    () => options.map((option) => ({ label: option.display_label, value: option.value })),
+    [options]
+  )
+
+  const noneOption = useMemo(
+    () => [
+      {
+        key: STATIC_DEFAULT_NONE,
+        label: 'None',
+        isSelected: currentDefault == null,
+        onSelect: () => {
+          onDefaultChange(null)
+          commit()
+        },
+      },
+    ],
+    [commit, currentDefault, onDefaultChange]
+  )
+
+  const handleChange = useCallback(
+    (value: unknown) => {
+      if (value === '' || value === null || value === undefined) {
+        onDefaultChange(null)
+      } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        onDefaultChange(value)
+      }
+      commit()
+    },
+    [commit, onDefaultChange]
   )
 
   return (
-    <FormGroup label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL} fieldId={`${idPrefix}-default`} labelHelp={labelHelp}>
-      <SynSelect
-        id={`${idPrefix}-default`}
-        isOpen={isOpen}
-        onOpenChange={setIsOpen}
-        selected={selectedKey}
-        onSelect={(_event, selection) => {
-          const key = String(selection)
-          if (key === STATIC_DEFAULT_NONE) {
-            onDefaultChange(null)
-          } else {
-            const matched = findOptionByKey(options, key)
-            onDefaultChange(matched?.value ?? null)
-          }
-          commit()
-          setIsOpen(false)
-        }}
-        shouldFocusToggleOnSelect
-        toggle={renderToggle}
-      >
-        <SelectList aria-label={FORM_FIELD_BUILDER_INITIAL_ANSWER_OPTIONS_LIST_ARIA_LABEL}>
-          <SelectOption value={STATIC_DEFAULT_NONE} isSelected={currentDefault == null}>
-            None
-          </SelectOption>
-          {options.map((option) => {
-            const key = optionKey(option.value)
-            return (
-              <SelectOption key={key} value={key} isSelected={currentDefault === option.value}>
-                {option.display_label}
-              </SelectOption>
-            )
-          })}
-        </SelectList>
-      </SynSelect>
+    <FormGroup label={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL} fieldId={fieldId} labelHelp={labelHelp}>
+      <div className={currentDefault == null ? styles.staticDefaultTypeaheadPlaceholder : undefined}>
+        <OptionsTypeaheadSelect
+          fieldId={fieldId}
+          ariaLabel={FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL}
+          listAriaLabel={FORM_FIELD_BUILDER_INITIAL_ANSWER_OPTIONS_LIST_ARIA_LABEL}
+          options={selectOptions}
+          value={currentDefault ?? ''}
+          onChange={handleChange}
+          isMulti={false}
+          isDisabled={isDisabled}
+          emptyPlaceholder={FORM_FIELD_BUILDER_INITIAL_ANSWER_DROPDOWN_PLACEHOLDER}
+          additionalOptions={noneOption}
+        />
+      </div>
       <FormFieldError error={fieldError} />
     </FormGroup>
   )
@@ -164,7 +112,6 @@ export function FormFieldBuilderDropdownDefaultSelect({
   isDisabled,
   labelHelp,
 }: Readonly<FormFieldBuilderDropdownDefaultSelectProps>) {
-  const [isOpen, setIsOpen] = useState(false)
   const { control } = useFormContext<FormDefinition>()
 
   const staticValues = useWatch({
@@ -184,8 +131,6 @@ export function FormFieldBuilderDropdownDefaultSelect({
           labelHelp={labelHelp}
           isDisabled={isDisabled}
           options={options}
-          isOpen={isOpen}
-          setIsOpen={setIsOpen}
           currentDefault={rhfField.value as OptionScalarValue | null | undefined}
           onDefaultChange={rhfField.onChange}
           fieldError={fieldState.error}
