@@ -111,9 +111,10 @@ class KafkaPolicyClient(AIOKafkaClient):
         node_id: int | str,
         *,
         group: ConnectionGroup = ConnectionGroup.DEFAULT,
-        no_hint: bool = False,  # noqa: ARG002 - upstream signature
+        no_hint: bool = False,
     ) -> AIOKafkaConnection | None:
         """Protect every new broker/coordinator socket, including reconnections."""
+        del no_hint  # Keep the upstream keyword without changing connection policy.
         key = (node_id, group)
         if key in self._conns:
             connection = self._conns[key]

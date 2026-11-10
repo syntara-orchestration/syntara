@@ -375,7 +375,7 @@ acknowledge the old process's stop. Lease expiry or a missing heartbeat never
 clears that evidence automatically.
 
 For a confirmed stopped process, an administrator may use the
-[targeted stop acknowledgement example](../samples/kafka/acknowledge-stopped-worker.example.sql):
+[targeted stop acknowledgement example](https://github.com/syntara-orchestration/syntara/blob/devel/backend/samples/kafka/acknowledge-stopped-worker.example.sql):
 
 1. Identify the exact deployment, source and old process UUID from the runtime
    row. Close admission for the source through workflow publication controls;
