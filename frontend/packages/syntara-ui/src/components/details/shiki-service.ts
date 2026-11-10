@@ -1,13 +1,19 @@
 import { transformerColorizedBrackets } from '@shikijs/colorized-brackets'
+import { shikiToMonaco, textmateThemeToMonacoTheme } from '@shikijs/monaco'
+import type * as monacoEditorCore from 'monaco-editor-core'
 import { createHighlighterCore } from 'shiki/core'
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
 
+import { SHIKI_THEME_DARK, SHIKI_THEME_LIGHT } from './shiki-theme'
+import type { ShikiThemeName } from './shiki-theme'
+
 type Highlighter = Awaited<ReturnType<typeof createHighlighterCore>>
+type Monaco = typeof monacoEditorCore
 type HastRoot = ReturnType<Highlighter['codeToHast']>
 type HastElement = Extract<HastRoot['children'][number], { type: 'element' }>
 type HastContent = HastElement['children'][number]
 
-export type ShikiLanguage = 'bash' | 'json'
+export type ShikiLanguage = 'bash' | 'json' | 'python'
 
 export type ShikiToken = Readonly<{
   content: string
@@ -20,6 +26,9 @@ let highlighterPromise: Promise<Highlighter> | undefined
 let highlighter: Highlighter | undefined
 let bashLanguagePromise: Promise<void> | undefined
 let isBashLanguageLoaded = false
+let pythonLanguagePromise: Promise<void> | undefined
+let isPythonLanguageLoaded = false
+const monacoInitializationByInstance = new WeakMap<Monaco, Promise<void>>()
 const bracketColorizer = transformerColorizedBrackets()
 
 function getHighlighter(): Promise<Highlighter> {
@@ -56,6 +65,18 @@ function loadLanguage(initializedHighlighter: Highlighter, language: ShikiLangua
           throw error
         })
       return bashLanguagePromise
+    case 'python':
+      if (isPythonLanguageLoaded) return Promise.resolve()
+      pythonLanguagePromise ??= import('@shikijs/langs/python')
+        .then(({ default: pythonLanguage }) => initializedHighlighter.loadLanguage(pythonLanguage))
+        .then(() => {
+          isPythonLanguageLoaded = true
+        })
+        .catch((error: unknown) => {
+          pythonLanguagePromise = undefined
+          throw error
+        })
+      return pythonLanguagePromise
   }
 }
 
@@ -67,7 +88,37 @@ export async function preloadShiki(language: ShikiLanguage = 'json'): Promise<vo
 
 /** Reports whether a component can render tokens without waiting for initialization. */
 export function isShikiReady(language: ShikiLanguage = 'json'): boolean {
-  return highlighter !== undefined && (language === 'json' || isBashLanguageLoaded)
+  return (
+    highlighter !== undefined &&
+    (language === 'json' ||
+      (language === 'bash' && isBashLanguageLoaded) ||
+      (language === 'python' && isPythonLanguageLoaded))
+  )
+}
+
+/** Registers the shared Shiki grammars and themes with a Monaco instance once it mounts. */
+export function setupMonacoShiki(monaco: Monaco, themeName: ShikiThemeName): Promise<void> {
+  const existingSetup = monacoInitializationByInstance.get(monaco)
+  if (existingSetup) return existingSetup.then(() => monaco.editor.setTheme(themeName))
+
+  const setup = Promise.all([preloadShiki('bash'), preloadShiki('json'), preloadShiki('python')])
+    .then(async () => {
+      const initializedHighlighter = await getHighlighter()
+      shikiToMonaco(initializedHighlighter, monaco)
+
+      const lightTheme = textmateThemeToMonacoTheme(initializedHighlighter.getTheme(SHIKI_THEME_LIGHT))
+      monaco.editor.defineTheme(SHIKI_THEME_LIGHT, { ...lightTheme, base: 'hc-light', inherit: true })
+
+      const darkTheme = textmateThemeToMonacoTheme(initializedHighlighter.getTheme(SHIKI_THEME_DARK))
+      monaco.editor.defineTheme(SHIKI_THEME_DARK, { ...darkTheme, base: 'hc-black', inherit: true })
+    })
+    .catch((error: unknown) => {
+      monacoInitializationByInstance.delete(monaco)
+      throw error
+    })
+
+  monacoInitializationByInstance.set(monaco, setup)
+  return setup.then(() => monaco.editor.setTheme(themeName))
 }
 
 /** Highlights source synchronously after the cached highlighter has initialized. */
@@ -76,7 +127,7 @@ export function highlightCodeSync(source: string, language: ShikiLanguage): Shik
 
   const hast = highlighter.codeToHast(source, {
     lang: language,
-    themes: { light: 'github-light-high-contrast', dark: 'github-dark-high-contrast' },
+    themes: { light: SHIKI_THEME_LIGHT, dark: SHIKI_THEME_DARK },
     defaultColor: false,
     structure: 'classic',
     transformers: [bracketColorizer],
