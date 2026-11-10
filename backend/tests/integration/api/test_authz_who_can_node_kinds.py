@@ -6,7 +6,8 @@ from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
-from sqlmodel import select
+from sqlalchemy import delete
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.engine import AuthzRequest, authorize
@@ -50,6 +51,13 @@ class _RealEvaluator:
 
     def evaluate(self, authz_input: dict[str, Any]) -> dict[str, Any]:
         return evaluate_policy_input(authz_input)
+
+
+@pytest.fixture
+async def without_default_step_allow(test_db_session: AsyncSession) -> None:
+    """Simulate a missing baseline grant directly; the built-in assignment is API-protected."""
+    await test_db_session.exec(delete(RoleAssignment).where(col(RoleAssignment.role_name) == "step-author"))
+    await test_db_session.commit()
 
 
 @pytest.mark.asyncio
@@ -185,6 +193,43 @@ async def test_who_can_applies_default_allow_and_explicit_denial_with_pagination
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("without_default_step_allow")
+async def test_who_can_excludes_explicit_and_implicit_denials_without_default_allow(
+    admin_client: AsyncClient, test_db_session: AsyncSession, user_factory: Callable[..., Awaitable[User]]
+) -> None:
+    db = test_db_session
+    allowed = await user_factory(username="step-allowed-no-default", email="step-allowed-no-default@example.com")
+    denied = await user_factory(username="step-denied-no-default", email="step-denied-no-default@example.com")
+    implicit = await user_factory(username="step-no-allow", email="step-no-allow@example.com")
+    for user in (allowed, denied):
+        await _assign_policy(db, user, f"allow-{user.username}", [_statement("allow")])
+    await _assign_policy(db, denied, "deny-script-no-default", [_statement("deny", kind="script")])
+    for kind in ("script", "http_request"):
+        usernames: list[str] = []
+        cursor = None
+        while True:
+            body = {
+                "action": "write",
+                "resource_type": "step_type",
+                "resource_labels": {"kind": kind},
+                "limit": 1,
+                "include_total": True,
+            }
+            if cursor:
+                body["cursor"] = cursor
+            response = await admin_client.post("/api/v1/authz/who_can", json=body)
+            assert response.status_code == 200, response.text
+            data = response.json()
+            usernames.extend(user["username"] for user in data["resources"])
+            assert data["total"] == (1 if kind == "script" else 2)
+            cursor = data.get("next")
+            if not cursor:
+                break
+        assert set(usernames) == ({allowed.username} if kind == "script" else {allowed.username, denied.username})
+        assert implicit.username not in usernames
+
+
+@pytest.mark.asyncio
 async def test_who_can_keeps_existing_query_gate(
     auth_client: AsyncClient, user_factory: Callable[..., Awaitable[User]], auth_as: Callable[[User], None]
 ) -> None:
@@ -218,6 +263,23 @@ async def test_authenticated_default_step_allow_is_reported_by_can_i(
     assert response.json()["allowed"] is True
     assert response.json()["denied"] is False
     assert response.json()["matched_policy"] == "step_type:write:any"
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("without_default_step_allow")
+async def test_missing_allow_is_reported_by_can_i(auth_client: AsyncClient) -> None:
+    response = await auth_client.post(
+        "/api/v1/authz/can_i",
+        json={
+            "action": "write",
+            "resource_type": "step_type",
+            "resource_labels": {"kind": "script"},
+            "resource_project": "payments",
+        },
+    )
+    assert response.json()["allowed"] is False
+    assert response.json()["denied"] is False
+    assert response.json()["denied_by"] == ""
 
 
 @pytest.mark.asyncio

@@ -30,6 +30,7 @@ def mock_service() -> WorkflowService:
     service = WorkflowService.__new__(WorkflowService)
     service.session = session
     service.user = user
+    service._check_node_kind_write_permission = AsyncMock()  # type: ignore[method-assign]
     return service
 
 
@@ -755,7 +756,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
         workflow_id, mock_workflow = _deleted_workflow_mock()
 
         with (
-            patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
+            patch.object(mock_service, "_get_workflow_for_update", new_callable=AsyncMock, return_value=mock_workflow),
             patch.object(mock_service.session, "scalar", new_callable=AsyncMock, return_value=0),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
             patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
@@ -852,7 +853,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
             raise AssertionError
 
         with (
-            patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
+            patch.object(mock_service, "_get_workflow_for_update", new_callable=AsyncMock, return_value=mock_workflow),
             patch.object(mock_service.session, "scalar", new_callable=AsyncMock, return_value=0),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock) as mock_commit,
             patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
@@ -1057,7 +1058,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
         workflow_id, mock_workflow = _deleted_workflow_mock()
 
         with (
-            patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
+            patch.object(mock_service, "_get_workflow_for_update", new_callable=AsyncMock, return_value=mock_workflow),
             patch.object(mock_service.session, "scalar", new_callable=AsyncMock, return_value=0),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock, side_effect=RuntimeError("db down")),
             patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),

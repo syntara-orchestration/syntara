@@ -9,6 +9,18 @@ import {
 } from './importWorkflowErrors'
 
 describe('getImportWorkflowApiErrorMessage', () => {
+  it('shows blocked step types when import is denied', () => {
+    expect(
+      getImportWorkflowApiErrorMessage({
+        cause: {
+          code: 'NODE_KIND_WRITE_DENIED',
+          detail: "You can't import workflow: Script (write denied).",
+          blocked_step_types: [{ kind: 'script', label: 'Script', reason: 'explicit_deny', project: null }],
+        },
+      })
+    ).toBe("You can't import workflow: Script (write denied).")
+  })
+
   it('maps workflow name conflict to a friendly message', () => {
     expect(
       getImportWorkflowApiErrorMessage({
