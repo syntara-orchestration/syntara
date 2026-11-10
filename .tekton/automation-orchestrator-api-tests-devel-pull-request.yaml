@@ -57,8 +57,16 @@ spec:
       value: '{{pull_request_number}}'
     - name: ep-git-url
       value: https://github.com/syntara-orchestration/syntara-execution-plane.git
+    # VALIDATION PIN (throwaway PR): the EP branch that stops
+    # auto-provisioning the default ExecutionTarget
+    # (syntara-execution-plane#173), paired with the aap-dev branch that
+    # registers targets explicitly (ansible/aap-dev#1179). The syntara
+    # under test is this PR's head (feat/ANSTRAT-1803 + this pin). Drop
+    # once #173 and #1179 merge.
     - name: ep-revision
-      value: devel
+      value: codex/independent-cluster-registration
+    - name: aap-dev-revision
+      value: codex/explicit-ep-target-registration
   pipelineRef:
     params:
       - name: name
