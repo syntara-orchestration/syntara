@@ -47,7 +47,7 @@ _T = TypeVar("_T")
 # Cluster load can leave activity rows and stdout 30s+ behind a terminal execution.
 _ACTIVITY_SYNC_POLLS = 90
 _ACTIVITY_SYNC_INTERVAL = 1
-_TRANSIENT_GATEWAY_STATUSES = {502, 503, 504}
+_TRANSIENT_GATEWAY_STATUSES = {502}
 _TERMINAL_ACTIVITY_STATUSES = frozenset({"completed", "failed", "skipped", "cancelled"})
 
 
