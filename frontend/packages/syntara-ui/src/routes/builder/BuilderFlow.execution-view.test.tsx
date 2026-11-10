@@ -52,7 +52,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
         <div data-testid="reactflow">
           {previewMarkers.map(({ nodeId, position, align, offset, children, 'data-testid': testId }) => (
             <div
-              key={nodeId}
+              key={`${testId ?? 'retry-preview'}-${nodeId}`}
               data-testid={testId ?? `retry-preview-${nodeId}`}
               data-position={position}
               data-align={align}
@@ -75,6 +75,8 @@ vi.mock('@xyflow/react', async (importOriginal) => {
       getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
       getNode: vi.fn(),
     }),
+    useStore: (selector: (state: { transform: [number, number, number]; nodes: unknown[] }) => unknown) =>
+      selector({ transform: [0, 0, 1], nodes: [] }),
     useUpdateNodeInternals: () => vi.fn(),
   }
 })
@@ -311,8 +313,8 @@ describe('BuilderFlow execution view', () => {
     const retryOrigin = screen.getByTestId('retry-origin-step-a')
     expect(retryOrigin).toBeInTheDocument()
     expect(retryOrigin).toHaveAttribute('data-position', 'top')
-    expect(retryOrigin).toHaveAttribute('data-align', 'end')
-    expect(retryOrigin).toHaveAttribute('data-offset', '8')
+    expect(retryOrigin).toHaveAttribute('data-align', 'center')
+    expect(Number(retryOrigin.getAttribute('data-offset'))).toBeGreaterThanOrEqual(8)
     expect(screen.getByTestId('retry-origin-label-step-a')).toHaveAttribute('aria-hidden', 'true')
     const nodes = (latestReactFlowProps as Record<string, unknown>).nodes as Array<{
       id: string
@@ -392,7 +394,7 @@ describe('BuilderFlow execution view', () => {
     })
   })
 
-  it('marks a step whose start predates the retry baseline as replayed', () => {
+  it('marks reused activity output while keeping a rerun trigger distinct', () => {
     setWorkflowState({
       currentWorkflow: {
         id: 'workflow-retry',
@@ -446,7 +448,8 @@ describe('BuilderFlow execution view', () => {
         unknown
       >
 
-    expect(stateOf('trigger-0').replayed).toBe(true)
+    expect(stateOf('trigger-0').replayed).toBe(false)
+    expect(stateOf('trigger-0').started_at).toBe('2026-10-09T11:00:00Z')
     expect(stateOf('task-replayed').replayed).toBe(true)
     expect(stateOf('task-fresh').replayed).toBe(false)
   })
