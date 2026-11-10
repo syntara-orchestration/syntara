@@ -269,6 +269,7 @@ class TestPrepareFormPromptArgs:
             args = await wf._prepare_form_prompt_input(node, graph, config)
 
         message = args["message"]
+        assert message is not None
         assert "secret123" not in message
         assert "[REDACTED]" in message
 
