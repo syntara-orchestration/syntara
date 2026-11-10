@@ -1533,3 +1533,71 @@ def test_retry_starts_at_sanitized_http_dependency(
     assert _timestamp(retry_activities["consume"], "started_at") > _timestamp(
         source_activities["consume"], "started_at"
     )
+
+
+def test_retry_keeps_selected_branch_when_unselected_approval_stays_failed(
+    syntara_api: SyntaraApiRegistry,
+    first_project_id: UUID,
+) -> None:
+    """An unselected expired approval must not cancel the selected All-join branch."""
+    name = unique_name("e2e-retry-approval-all-join")
+    definition = _workflow_definition(
+        name,
+        [
+            {
+                "id": "approval_gate",
+                "name": "Approval",
+                "type": "approval",
+                "parameters": {"decision_window": 1, "fallback_decision": "reject"},
+            },
+            _script_node("selected_failure", "raise SystemExit(1)"),
+            {"id": "join", "name": "Join", "type": "converge", "parameters": {"strategy": "all"}},
+            _script_node("after_join", "print('should-not-run')"),
+        ],
+        [
+            {"from": "trigger", "to": "approval_gate"},
+            {"from": "trigger", "to": "selected_failure"},
+            {"from": "approval_gate", "to": "join", "from_port": "approved"},
+            {"from": "approval_gate", "to": "join", "from_port": "rejected"},
+            {"from": "selected_failure", "to": "join"},
+            {"from": "join", "to": "after_join"},
+        ],
+    )
+    source = _create_and_run(syntara_api, name, definition, timeout=90, project_id=first_project_id)
+    assert source.status == ExecutionStatus.FAILED
+    source = _wait_for_activity_ids(syntara_api, source, {"approval_gate", "selected_failure", "join"})
+    source_activities = _activities_by_id(source)
+    assert source_activities["selected_failure"].status == "failed"
+    assert source_activities["approval_gate"].status == "failed"
+    assert source_activities["join"].status == "failed"
+
+    preview = _preview_retry(syntara_api, source.id)
+    assert preview.eligible is True
+    assert {"approval_gate", "selected_failure"} <= set(_id_list(preview.eligible_point_ids))
+
+    retried = _start_retry(
+        syntara_api,
+        source.id,
+        ["selected_failure"],
+        overrides={"selected_failure": {"code": "print('repaired-selected')"}},
+    )
+    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
+    assert final.status == ExecutionStatus.FAILED, final.error_details
+    final = _wait_for_activity_ids(
+        syntara_api,
+        final,
+        {"approval_gate", "selected_failure", "join"},
+        required_stdouts={"selected_failure": "repaired-selected"},
+    )
+    retry_activities = _activities_by_id(final)
+    assert retry_activities["selected_failure"].status == "completed"
+    assert _timestamp(retry_activities["selected_failure"], "started_at") > _timestamp(
+        source_activities["selected_failure"], "started_at"
+    )
+    assert retry_activities["approval_gate"].status == "failed"
+    assert _timestamp(retry_activities["approval_gate"], "started_at") == _timestamp(
+        source_activities["approval_gate"], "started_at"
+    )
+    assert retry_activities["join"].status == "failed"
+    after_join = retry_activities.get("after_join")
+    assert after_join is None or after_join.status == "skipped"
