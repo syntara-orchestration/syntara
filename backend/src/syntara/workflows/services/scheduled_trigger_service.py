@@ -9,7 +9,6 @@ updated, published, unpublished, or deleted.
 """
 
 import asyncio
-import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -33,7 +32,7 @@ from temporalio.common import SearchAttributeKey, SearchAttributePair, TypedSear
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.config.base import get_settings
-from syntara.core.tls.temporal import build_temporal_tls_config
+from syntara.core.temporal.client import CONNECTION_ERRORS, get_shared_client, invalidate_on_connection_error
 from syntara.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
 from syntara.workflows.utils.schedule_parser import (
     SCHEDULE_ID_PREFIX,
@@ -49,39 +48,7 @@ logger = structlog.stdlib.get_logger(__name__)
 
 SA_ORCHESTRATOR_WORKFLOW_ID = SearchAttributeKey.for_keyword("OrchestratorWorkflowId")
 
-_client_lock = asyncio.Lock()
-_cached_client: Client | None = None
-_connect_task: asyncio.Task[Client | None] | None = None
-_connect_started_at: float | None = None
-
-# Strong refs so the event loop does not GC an in-flight connect task.
-# ``asyncio.create_task`` keeps only a weak reference, and ``_connect_task``
-# holds a strong one only while the task is current. When a stale connect is
-# replaced (older than the waiter budget) the previous task would otherwise be
-# referenced solely by waiters still in ``asyncio.shield``; once they time out
-# nothing holds it and CPython GC-cancels ``Client.connect`` ("Task was
-# destroyed but it is pending"), dropping a late success. This set keeps every
-# connect alive until it finishes so a replaced connect can still cache its
-# client. Same pattern as ``_pending_schedule_delete_tasks`` in
-# ``workflow_service``.
-_pending_connect_tasks: set[asyncio.Task[Client | None]] = set()
-
-
-def _on_connect_task_done(task: asyncio.Task[Client | None]) -> None:
-    """Drop the strong ref once a shared connect finishes."""
-    _pending_connect_tasks.discard(task)
-
-
-# Waiters bound how long they join an in-flight connect. A timeout returns
-# None to that waiter only; the connect keeps running so overlapping waiters
-# can still receive it. A new wait replaces ``_connect_task`` when the
-# current one is older than this budget, without cancelling waiters still
-# joined to the previous task.
-_CONNECT_TIMEOUT_SECONDS = 10.0
-
 _search_attr_available: bool | None = None
-
-_CONNECTION_ERRORS = frozenset({RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED})
 
 
 async def _abort_schedule_delete(
@@ -130,61 +97,6 @@ async def _update_schedule_with_retry(
             if attempt == max_retries - 1:
                 raise
             await asyncio.sleep(2)
-
-
-def _invalidate_client_cache() -> None:
-    """Clear the cached Temporal client so the next call reconnects.
-
-    Leaves ``_connect_task`` in place. An in-flight connect must keep a
-    strong reference; ``_get_shared_client`` starts a new task only after
-    the current one is done or older than the waiter budget.
-    """
-    global _cached_client, _search_attr_available  # noqa: PLW0603
-    _cached_client = None
-    _search_attr_available = None
-
-
-async def _close_temporal_client(client: Client) -> None:
-    """Close a discarded Temporal client; ignore SDK/mock close failures."""
-    close = getattr(client, "close", None)
-    if not callable(close):
-        return
-    try:
-        result = close()
-        if asyncio.iscoroutine(result):
-            await result
-    except Exception:  # noqa: BLE001
-        logger.warning("Failed to close discarded Temporal client", exc_info=True)
-
-
-def _should_start_shared_connect(now: float) -> bool:
-    """Return True when a new wait should start a connect task.
-
-    Caller must hold ``_client_lock``. Replacing ``_connect_task`` does not
-    cancel the previous task; waiters already joined to it keep awaiting
-    that result.
-    """
-    if _connect_task is None or _connect_task.done():
-        return True
-    if _connect_started_at is None:
-        return True
-    return now - _connect_started_at >= _CONNECT_TIMEOUT_SECONDS
-
-
-def _start_shared_connect_locked(now: float) -> asyncio.Task[Client | None]:
-    """Start a new shared connect. Caller must hold ``_client_lock``.
-
-    The new task is tracked in ``_pending_connect_tasks`` so replacing a stale
-    ``_connect_task`` does not leave the previous connect without a strong
-    reference (which would let CPython GC-cancel it once its waiters time out).
-    """
-    global _connect_task, _connect_started_at  # noqa: PLW0603
-    task = asyncio.create_task(_connect_shared_client())
-    _pending_connect_tasks.add(task)
-    task.add_done_callback(_on_connect_task_done)
-    _connect_task = task
-    _connect_started_at = now
-    return task
 
 
 async def _ensure_search_attribute(client: Client) -> bool:
@@ -245,71 +157,6 @@ async def _ensure_search_attribute(client: Client) -> bool:
         return False
 
 
-async def _connect_shared_client() -> Client | None:
-    """Open a Temporal client without holding ``_client_lock``.
-
-    Waiters share this task via ``_get_shared_client``. Cancellation of a
-    waiter must not cancel this connect (see ``asyncio.shield`` there).
-    A late success does not replace an already-cached client.
-    """
-    global _cached_client  # noqa: PLW0603
-    try:
-        settings = get_settings()
-        client = await Client.connect(
-            settings.temporal_address,
-            namespace=settings.temporal_namespace,
-            tls=build_temporal_tls_config(),
-        )
-    except (OSError, RuntimeError, RPCError) as e:
-        logger.warning("Temporal unavailable for schedule management", error=str(e))
-        return None
-
-    extra: Client | None = None
-    cached: Client | None
-    async with _client_lock:
-        if _cached_client is None:
-            _cached_client = client
-            return client
-        extra = client if client is not _cached_client else None
-        cached = _cached_client
-
-    if extra is not None:
-        await _close_temporal_client(extra)
-    return cached
-
-
-async def _get_shared_client() -> Client | None:
-    """Return a module-level cached Temporal client.
-
-    Connects once and reuses across all ``ScheduledTriggerService`` instances
-    so that lifecycle hooks share a single gRPC connection.  The cache is
-    invalidated on connection-level errors so the next call reconnects.
-
-    ``Client.connect`` runs outside ``_client_lock``. The lock only serializes
-    starting the in-flight connect task, so a hung connect cannot block the
-    schedule reconciler from taking the lock. Waiters use ``asyncio.shield``
-    so a timed-out reconciler cycle does not cancel an in-flight connect.
-    Each waiter is bounded: a timeout returns None to that waiter only and
-    leaves the connect running so overlapping waiters can still receive it.
-    A new wait replaces ``_connect_task`` when the current one is older than
-    the budget, without cancelling waiters still joined to the previous task.
-    """
-    async with _client_lock:
-        if _cached_client is not None:
-            return _cached_client
-        now = time.monotonic()
-        connect_task = _start_shared_connect_locked(now) if _should_start_shared_connect(now) else _connect_task
-        if connect_task is None:
-            connect_task = _start_shared_connect_locked(now)
-
-    try:
-        async with asyncio.timeout(_CONNECT_TIMEOUT_SECONDS):
-            return await asyncio.shield(connect_task)
-    except TimeoutError:
-        logger.warning("Temporal connect timed out")
-        return None
-
-
 class ScheduledTriggerService:
     """Service for managing Temporal Schedules for scheduled triggers.
 
@@ -339,7 +186,7 @@ class ScheduledTriggerService:
         """
         if self._temporal_client is not None:
             return self._temporal_client
-        return await _get_shared_client()
+        return await get_shared_client()
 
     @staticmethod
     def validate_trigger_configs(workflow_definition: dict[str, Any]) -> None:
@@ -616,8 +463,8 @@ class ScheduledTriggerService:
                     workflow_id=workflow_id,
                     trigger_node_id=trigger_node_id,
                 )
-            elif isinstance(e, RPCError) and e.status in _CONNECTION_ERRORS:
-                _invalidate_client_cache()
+            elif isinstance(e, RPCError) and e.status in CONNECTION_ERRORS:
+                invalidate_on_connection_error(e, client)
                 raise
             else:
                 raise
@@ -659,8 +506,8 @@ class ScheduledTriggerService:
                 schedule_ids.add(entry.id)
             return schedule_ids
         except RPCError as e:
-            if e.status in _CONNECTION_ERRORS:
-                _invalidate_client_cache()
+            if e.status in CONNECTION_ERRORS:
+                invalidate_on_connection_error(e, client)
                 raise
             logger.warning(
                 "Search attribute query failed, falling back to prefix scan",
@@ -692,8 +539,8 @@ class ScheduledTriggerService:
             return True
         except RPCError as e:
             if e.status != RPCStatusCode.NOT_FOUND:
-                if e.status in _CONNECTION_ERRORS:
-                    _invalidate_client_cache()
+                if e.status in CONNECTION_ERRORS:
+                    invalidate_on_connection_error(e, client)
                 raise
             logger.debug("No schedule to delete", schedule_id=schedule_id)
             return False

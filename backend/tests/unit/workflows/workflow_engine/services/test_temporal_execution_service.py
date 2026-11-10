@@ -10,6 +10,7 @@ from uuid import UUID
 
 import pytest
 import yaml
+from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.config.base import get_settings
 from syntara.core.exceptions import SafeValueError
@@ -165,6 +166,86 @@ class TestStartWorkflow:
             )
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED])
+    async def test_start_workflow_invalidates_client_on_connection_error(
+        self,
+        valid_workflow_dict: dict[str, Any],
+        status: RPCStatusCode,
+    ) -> None:
+        mock_client = Mock()
+        mock_client.start_workflow = AsyncMock(side_effect=RPCError("err", status=status, raw_grpc_status=b""))
+        service = TemporalExecutionService(temporal_client=mock_client, task_queue="test-queue")
+
+        with (
+            patch("syntara.core.temporal.client.invalidate_client") as mock_invalidate,
+            pytest.raises(RPCError),
+        ):
+            await service.start_workflow(
+                workflow_def=valid_workflow_dict,
+                workflow_name="test-workflow",
+                trigger_node_id="trigger_manual",
+            )
+
+        mock_invalidate.assert_called_once_with(mock_client)
+
+    @pytest.mark.asyncio
+    async def test_start_workflow_connection_error_on_injected_client_spares_shared_cache(
+        self,
+        valid_workflow_dict: dict[str, Any],
+    ) -> None:
+        """A connection error from a non-shared client must not evict the shared one.
+
+        Exercises the real invalidate_on_connection_error implementation
+        (no patching): the service here runs on an injected client that is
+        not the cached shared client, so a connection-class failure on it
+        must leave the healthy shared connection cached.
+        """
+        import syntara.core.temporal.client as client_mod
+
+        shared_client = Mock()
+        injected_client = Mock()
+        injected_client.start_workflow = AsyncMock(
+            side_effect=RPCError("err", status=RPCStatusCode.UNAVAILABLE, raw_grpc_status=b"")
+        )
+        client_mod._cached_client = shared_client
+        service = TemporalExecutionService(temporal_client=injected_client, task_queue="test-queue")
+
+        try:
+            with pytest.raises(RPCError):
+                await service.start_workflow(
+                    workflow_def=valid_workflow_dict,
+                    workflow_name="test-workflow",
+                    trigger_node_id="trigger_manual",
+                )
+
+            assert client_mod._cached_client is shared_client
+        finally:
+            client_mod._cached_client = None
+
+    @pytest.mark.asyncio
+    async def test_start_workflow_does_not_invalidate_on_non_connection_error(
+        self,
+        valid_workflow_dict: dict[str, Any],
+    ) -> None:
+        mock_client = Mock()
+        mock_client.start_workflow = AsyncMock(
+            side_effect=RPCError("bad", status=RPCStatusCode.INVALID_ARGUMENT, raw_grpc_status=b"")
+        )
+        service = TemporalExecutionService(temporal_client=mock_client, task_queue="test-queue")
+
+        with (
+            patch("syntara.core.temporal.client.invalidate_client") as mock_invalidate,
+            pytest.raises(RPCError),
+        ):
+            await service.start_workflow(
+                workflow_def=valid_workflow_dict,
+                workflow_name="test-workflow",
+                trigger_node_id="trigger_manual",
+            )
+
+        mock_invalidate.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_start_workflow_requires_trigger_node_id(self) -> None:
         """Test that start_workflow uses the explicitly provided trigger_node_id."""
         multi_trigger_workflow = {
@@ -269,28 +350,45 @@ class TestCreateTemporalExecutionService:
 
     @pytest.mark.asyncio
     async def test_create_temporal_execution_service_defaults(self) -> None:
-        """Test creating execution service with default parameters."""
+        """Default path (no overrides) uses the shared cached client."""
         mock_client = Mock()
 
-        with patch("syntara.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class:
-            mock_client_class.connect = AsyncMock(return_value=mock_client)
-
+        with patch(
+            "syntara.workflows.workflow_engine.services.temporal_execution_service.get_shared_client",
+            new_callable=AsyncMock,
+            return_value=mock_client,
+        ) as mock_get_shared:
             service = await create_temporal_execution_service()
 
-            assert isinstance(service, TemporalExecutionService)
-            assert service.temporal_client is mock_client
-            assert service.task_queue == get_settings().task_queue
+        assert isinstance(service, TemporalExecutionService)
+        assert service.temporal_client is mock_client
+        assert service.task_queue == get_settings().task_queue
+        mock_get_shared.assert_awaited_once()
 
-            mock_client_class.connect.assert_awaited_once()
-            call_args = mock_client_class.connect.await_args
-            assert call_args[0][0] == get_settings().temporal_address
-            assert call_args[1]["namespace"] == get_settings().temporal_namespace
-            assert call_args[1]["tls"] is None
-            assert len(call_args[1]["interceptors"]) == 1
+    @pytest.mark.asyncio
+    async def test_create_temporal_execution_service_shared_client_unavailable(self) -> None:
+        """Without overrides, an unavailable shared client raises OSError.
+
+        The factory must not open an ad hoc per-request connection when the
+        shared client is down — that would reintroduce a connection storm
+        during exactly the outage window where it hurts most.
+        """
+        with (
+            patch(
+                "syntara.workflows.workflow_engine.services.temporal_execution_service.get_shared_client",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch("syntara.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class,
+        ):
+            with pytest.raises(OSError, match="shared client unavailable"):
+                await create_temporal_execution_service()
+
+        mock_client_class.connect.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_create_temporal_execution_service_custom_params(self) -> None:
-        """Test creating execution service with custom parameters."""
+        """Explicit address/namespace overrides create a dedicated Client.connect."""
         mock_client = Mock()
 
         with patch("syntara.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class:
@@ -310,6 +408,17 @@ class TestCreateTemporalExecutionService:
             assert call_args[1]["namespace"] == "production"
             assert call_args[1]["tls"] is None
             assert len(call_args[1]["interceptors"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_create_temporal_execution_service_override_timeout_raises_oserror(self) -> None:
+        """TimeoutError from an explicit-override Client.connect is re-raised as OSError."""
+        with patch("syntara.workflows.workflow_engine.services.temporal_execution_service.Client") as mock_client_class:
+            mock_client_class.connect = AsyncMock(side_effect=TimeoutError)
+            with pytest.raises(OSError, match="timed out"):
+                await create_temporal_execution_service(
+                    temporal_address="temporal.example.com:7233",
+                    namespace="production",
+                )
 
 
 class TestBuiltinWorkflowRouting:
