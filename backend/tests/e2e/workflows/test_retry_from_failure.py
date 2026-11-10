@@ -7,7 +7,7 @@ They assert observable execution state and outputs rather than workflow-engine i
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, TypeVar
@@ -60,7 +60,7 @@ def _script_node(node_id: str, code: str, *, environment: dict[str, str] | None 
 
 
 def _id_list(value: object) -> list[str]:
-    if isinstance(value, Unset) or value is None:
+    if isinstance(value, Unset) or not isinstance(value, Iterable) or isinstance(value, str | bytes):
         return []
     return [str(item) for item in value]
 
