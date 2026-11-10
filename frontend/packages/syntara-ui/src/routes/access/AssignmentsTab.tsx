@@ -204,7 +204,9 @@ function AssignmentsTableBody({
                 <ProjectLabel projectId={row.projectId} projectNameMap={projectNameMap} />
               </Td>
               <Td isActionCell>
-                <ActionsColumn items={getAssignmentRowActions(row, permissions, onEdit, onDelete)} />
+                {!row.isBuiltin && (
+                  <ActionsColumn items={getAssignmentRowActions(row, permissions, onEdit, onDelete)} />
+                )}
               </Td>
             </Tr>
             {row.rolePolicies.length > 0 && (
