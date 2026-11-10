@@ -26,7 +26,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
 
   test('trigger step on canvas', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
     // Add a manual trigger so a TriggerNode renders on the canvas
     await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -41,7 +41,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
 
   test('condition step with expression group', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
     // Add manual trigger first
     await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -56,7 +56,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
     await expect(panel).toHaveCount(1)
     await panel.getByRole('button', { name: 'Logic', exact: true }).click()
 
-    // After clicking Logic, the panel heading changes to "Select a logic step"
+    // After clicking Logic, the panel heading changes to "Select a logic step type"
     await app.getByRole('button', { name: 'Conditional', exact: true }).click()
 
     // Wait for the condition form to render
@@ -66,7 +66,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
 
   test('scheduled trigger with schedule builder', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible()
 
     // Add a scheduled trigger
     await app.getByRole('button', { name: 'Schedule trigger' }).click()
