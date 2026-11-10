@@ -49,8 +49,10 @@ export type SynDynamicFormProps = {
   onSubmit: (data: FormSubmissionData) => void | Promise<void>
   onValidationError?: (errors: readonly FormFieldValidationError[]) => void
   submitLabel?: string
-  /** Disables inputs and hides the submit button. */
+  /** Disables inputs; submit is hidden unless {@link showSubmitWhenReadOnly}. */
   isReadOnly?: boolean
+  /** Shows a disabled submit button while {@link isReadOnly} (form builder / preview surfaces). */
+  showSubmitWhenReadOnly?: boolean
   /**
    * When fields are non-interactive, shown on hover over each field (permission / responder UX).
    * Use `permissionTooltip()` for missing policy; pass explicit copy for responder restrictions.

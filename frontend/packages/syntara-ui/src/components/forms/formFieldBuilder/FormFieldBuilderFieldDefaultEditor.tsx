@@ -36,6 +36,10 @@ export function FormFieldBuilderFieldDefaultEditor({
   const { control } = useFormContext<FormDefinition>()
 
   const defaultValueLabelHelp = formFieldBuilderLabelHelp('defaultValue', FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL)
+  const dateDefaultValueLabelHelp = formFieldBuilderLabelHelp(
+    'dateDefaultValue',
+    FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL
+  )
   const examples = getFormFieldBuilderExamplePlaceholders(field.type)
 
   if (field.type === FormFieldTypeEnum.CHECKBOX) {
@@ -138,7 +142,7 @@ export function FormFieldBuilderFieldDefaultEditor({
         index={index}
         idPrefix={idPrefix}
         isDisabled={isDisabled}
-        labelHelp={defaultValueLabelHelp}
+        labelHelp={dateDefaultValueLabelHelp}
       />
     )
   }

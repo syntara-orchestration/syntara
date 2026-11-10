@@ -36,3 +36,21 @@ export const SampleDefinition: Story = {
     onChange: fn(),
   },
 }
+
+export const PreviewTabWithPresentationOptions: Story = {
+  args: {
+    value: sampleDynamicFormDefinition,
+    onChange: fn(),
+    previewSubmitLabel: 'Start workflow',
+    previewCssOverrideSource: '.form-step-response-form label { font-weight: 700; }',
+    previewDescription: 'Complete the fields below before continuing.',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Open the Preview tab to see submit label, message, and CSS override applied (same as the builder Preview form modal).',
+      },
+    },
+  },
+}

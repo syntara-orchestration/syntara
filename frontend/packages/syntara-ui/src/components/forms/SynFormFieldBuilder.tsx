@@ -37,6 +37,10 @@ export type SynFormFieldBuilderProps = {
   serverFieldErrors?: ReadonlyArray<FormDefinitionFieldServerError>
   /** Registers flush/read handlers so the parent can sync field edits before submit. */
   registerCommit?: (handlers: { flush: () => void; readPreparedDefinition: () => FormDefinition } | null) => void
+  /** Optional presentation options for the Preview tab (submit label, CSS override). */
+  previewSubmitLabel?: string | null
+  previewCssOverrideSource?: string | null
+  previewDescription?: string | null
 }
 
 /**
@@ -54,6 +58,9 @@ export function SynFormFieldBuilder({
   optionsMode = 'default',
   serverFieldErrors,
   registerCommit,
+  previewSubmitLabel,
+  previewCssOverrideSource,
+  previewDescription,
 }: Readonly<SynFormFieldBuilderProps>) {
   const [activeTab, setActiveTab] = useState<BuilderTab>('design')
   const lastEmittedRef = useRef(JSON.stringify(value))
@@ -138,7 +145,11 @@ export function SynFormFieldBuilder({
               </Tab>
               <Tab eventKey="preview" title={<TabTitleText>Preview</TabTitleText>}>
                 <div className={styles.tabPanelBody}>
-                  <FormFieldBuilderPreviewTab />
+                  <FormFieldBuilderPreviewTab
+                    submitLabel={previewSubmitLabel}
+                    cssOverrideSource={previewCssOverrideSource}
+                    description={previewDescription}
+                  />
                 </div>
               </Tab>
               <Tab eventKey="json" title={<TabTitleText>JSON Schema</TabTitleText>}>

@@ -2,7 +2,7 @@ import { Alert, Content, Modal, ModalBody, ModalHeader, Stack, StackItem } from 
 import type { FormDefinition } from '@syntara/contracts'
 import { useMemo } from 'react'
 
-import { SynDynamicForm } from '../../../components/forms/SynDynamicForm'
+import { SynFormDefinitionPreview } from '../../../components/forms/SynFormDefinitionPreview'
 import { safeParseFormDefinition } from '../../../forms'
 import {
   formDefinitionHasUnresolvedDynamicOptions,
@@ -15,9 +15,18 @@ type FormPromptPreviewModalProps = Readonly<{
   onClose: () => void
   formDefinition: FormDefinition
   message?: string | null
+  submitLabel?: string | null
+  cssOverrideSource?: string | null
 }>
 
-export function FormPromptPreviewModal({ isOpen, onClose, formDefinition, message }: FormPromptPreviewModalProps) {
+export function FormPromptPreviewModal({
+  isOpen,
+  onClose,
+  formDefinition,
+  message,
+  submitLabel,
+  cssOverrideSource,
+}: FormPromptPreviewModalProps) {
   const parsed = useMemo(() => safeParseFormDefinition(formDefinition), [formDefinition])
   const showDynamicOptionsNotice = parsed.success && formDefinitionHasUnresolvedDynamicOptions(parsed.data)
 
@@ -37,12 +46,11 @@ export function FormPromptPreviewModal({ isOpen, onClose, formDefinition, messag
               </StackItem>
             ) : null}
             <StackItem>
-              <SynDynamicForm
+              <SynFormDefinitionPreview
                 definition={parsed.data}
-                description={message?.trim() || undefined}
-                hideSubmitButton
-                isReadOnly
-                onSubmit={() => undefined}
+                description={message}
+                submitLabel={submitLabel}
+                cssOverrideSource={cssOverrideSource}
               />
             </StackItem>
           </Stack>

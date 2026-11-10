@@ -37,8 +37,10 @@ export const AllFieldTypes: Story = {
 export const PreviewMode: Story = {
   args: {
     definition: sampleDynamicFormDefinition,
+    description: 'Preview of the configured form.',
+    submitLabel: 'Send request',
     isReadOnly: true,
-    hideSubmitButton: true,
+    showSubmitWhenReadOnly: true,
     onSubmit: fn(),
   },
 }
