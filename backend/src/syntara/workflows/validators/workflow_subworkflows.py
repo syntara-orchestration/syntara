@@ -179,7 +179,7 @@ def _validate_target_workflow(
             )
         ]
 
-    workflow_name, target_project_id, published_version_id, published_definition = target_workflow
+    _workflow_name, target_project_id, published_version_id, published_definition = target_workflow
     if target_project_id != project_id:
         return [
             _invalid_reference_finding(
@@ -193,7 +193,7 @@ def _validate_target_workflow(
             ValidationFinding(
                 severity=ValidationSeverity.warning,
                 category=ValidationCategory.invalid_reference,
-                message=f"Child workflow '{workflow_name}' has no published version",
+                message="The selected child workflow has no published version",
                 node_id=node_id,
                 field_path="parameters.workflow_id",
             )
@@ -212,7 +212,7 @@ def _validate_target_workflow(
         ValidationFinding(
             severity=ValidationSeverity.warning,
             category=ValidationCategory.missing_field,
-            message=(f"Child workflow '{workflow_name}' requires input '{input_name}', not provided in input_mapping"),
+            message=f"The selected child workflow requires input '{input_name}', not provided in input_mapping",
             node_id=node_id,
             field_path=f"parameters.input_mapping.{input_name}",
         )

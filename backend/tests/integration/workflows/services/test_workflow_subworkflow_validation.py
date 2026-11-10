@@ -507,8 +507,8 @@ async def test_missing_required_child_inputs_warn_on_save_and_allow_publish(
             "parameters.input_mapping.region",
         ]
         assert [finding.message for finding in validation_result.findings] == [
-            f"Child workflow '{child.name}' requires input 'target_host', not provided in input_mapping",
-            f"Child workflow '{child.name}' requires input 'region', not provided in input_mapping",
+            "The selected child workflow requires input 'target_host', not provided in input_mapping",
+            "The selected child workflow requires input 'region', not provided in input_mapping",
         ]
 
         published_workflow, published_version, warning = await service.publish_workflow_version(
