@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
 from orchestrator_test_sdk.e2e.auth import api_for
-from orchestrator_test_sdk.e2e.helpers import create_and_run_workflow, poll_execution_until_complete
+from orchestrator_test_sdk.e2e.helpers import HTTPBIN_URL, create_and_run_workflow, poll_execution_until_complete
 from syntara_api_client.models import ExecutionCreate, RetryFailureRequest, RetryFromFailureValidationResponse
 from syntara_api_client.models.execution_status import ExecutionStatus
 from syntara_api_client.types import UnexpectedResponseException, Unset
@@ -29,6 +29,7 @@ if TYPE_CHECKING:
         ProjectRoleFactory,
         UserFactory,
     )
+    from orchestrator_test_sdk.factories.credentials import CredentialFactory
     from syntara_api_client.api import SyntaraApiRegistry
     from syntara_api_client.models import ExecutionRead
     from syntara_api_client.models.activity_data import ActivityData
@@ -56,6 +57,33 @@ def _script_node(node_id: str, code: str, *, environment: dict[str, str] | None 
     if environment is not None:
         parameters["environment"] = environment
     return {"id": node_id, "name": node_id, "type": "script", "parameters": parameters}
+
+
+def _id_list(value: object) -> list[str]:
+    if isinstance(value, Unset) or value is None:
+        return []
+    return [str(item) for item in value]
+
+
+def _sanitized_replacements(preview: RetryFromFailureValidationResponse) -> dict[str, list[str]]:
+    value = preview.sanitized_replacements
+    if isinstance(value, Unset) or value is None:
+        return {}
+    extra = getattr(value, "additional_properties", None)
+    if not isinstance(extra, Mapping):
+        return {}
+    return {str(key): [str(item) for item in items] for key, items in extra.items()}
+
+
+def _skip_if_http_unreachable(execution: ExecutionRead, activity_id: str) -> None:
+    activities = _activities_by_id(execution)
+    output = _activity_output(activities[activity_id]) if activity_id in activities else {}
+    error = str(output.get("error") or "")
+    if "SSRF blocked" in error:
+        msg = f"HTTP request SSRF-blocked; allowlist missing httpbin: {error}"
+        raise AssertionError(msg)
+    if execution.status == ExecutionStatus.FAILED and not output.get("status_code"):
+        pytest.skip("Backend could not reach httpbin — network connectivity issue in this environment")
 
 
 def _workflow_definition(
@@ -770,6 +798,11 @@ def test_retry_any_converge_does_not_wait_for_an_unnecessary_slow_branch(
     assert retry_activities["repair"].status == "completed"
     slow_retry = retry_activities.get("slow_branch")
     assert slow_retry is None or slow_retry.status != "completed"
+    retry_started = retried.created_at
+    assert isinstance(retry_started, datetime)
+    retry_started = retry_started.replace(tzinfo=UTC) if retry_started.tzinfo is None else retry_started.astimezone(UTC)
+    retry_elapsed = (_timestamp(retry_activities["repair"], "completed_at") - retry_started).total_seconds()
+    assert retry_elapsed < 30, f"Retry waited on the unused slow branch ({retry_elapsed:.1f}s)"
 
 
 def test_retrying_a_quorum_branch_prevents_stale_failed_converge_restoration(
@@ -1310,3 +1343,193 @@ def test_retry_input_overrides_are_run_local_and_reject_unknown_keys(
         raise
     later_run_final = poll_execution_until_complete(syntara_api, later_run.id, max_polls=60, poll_interval=1)
     assert later_run_final.status == ExecutionStatus.FAILED
+
+
+def test_retry_handles_an_unselected_switch_branch_without_replay_output(
+    syntara_api: SyntaraApiRegistry,
+    first_project_id: UUID,
+) -> None:
+    """A switch retries the recorded case and leaves unselected cases skipped."""
+    name = unique_name("e2e-retry-switch-missing-branch")
+    definition = _workflow_definition(
+        name,
+        [
+            {
+                "id": "router",
+                "name": "Router",
+                "type": "switch",
+                "parameters": {
+                    "cases": [
+                        {"port": "case_0", "label": "Taken", "condition": "1 == 1"},
+                        {"port": "case_1", "label": "Untaken", "condition": "1 == 0"},
+                    ],
+                    "default_port": "default",
+                },
+            },
+            _script_node("taken_branch", "raise SystemExit(1)"),
+            _script_node("untaken_branch", "print('must-not-run')"),
+            _script_node("default_branch", "print('must-not-run-default')"),
+        ],
+        [
+            {"from": "trigger", "to": "router"},
+            {"from": "router", "to": "taken_branch", "from_port": "case_0"},
+            {"from": "router", "to": "untaken_branch", "from_port": "case_1"},
+            {"from": "router", "to": "default_branch", "from_port": "default"},
+        ],
+    )
+    source = _create_and_run(syntara_api, name, definition, timeout=60, project_id=first_project_id)
+    assert source.status == ExecutionStatus.FAILED
+    source = _wait_for_activity_ids(syntara_api, source, {"router", "taken_branch"})
+    source_activities = _activities_by_id(source)
+    assert source_activities["taken_branch"].status == "failed"
+    for skipped_id in ("untaken_branch", "default_branch"):
+        skipped = source_activities.get(skipped_id)
+        assert skipped is None or skipped.status == "skipped"
+
+    retried = _start_retry(
+        syntara_api,
+        source.id,
+        ["taken_branch"],
+        overrides={"taken_branch": {"code": "print('recovered')"}},
+    )
+    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=60, poll_interval=1)
+    assert final.status == ExecutionStatus.COMPLETED, final.error_details
+    final = _wait_for_activity_ids(syntara_api, final, {"taken_branch"}, required_stdouts={"taken_branch": "recovered"})
+    retry_activities = _activities_by_id(final)
+    assert retry_activities["taken_branch"].status == "completed"
+    for skipped_id in ("untaken_branch", "default_branch"):
+        skipped = retry_activities.get(skipped_id)
+        assert skipped is None or skipped.status == "skipped"
+
+
+def test_retry_resumes_do_while_at_failed_iteration(
+    syntara_api: SyntaraApiRegistry,
+    first_project_id: UUID,
+) -> None:
+    """A do-while body failure is retryable and the repaired occurrence completes the loop."""
+    name = unique_name("e2e-retry-do-while-resume")
+    definition = _workflow_definition(
+        name,
+        [
+            {
+                "id": "loop",
+                "name": "Loop",
+                "type": "loop",
+                "parameters": {"type": "do_while", "condition": "False", "max_iterations": 3},
+            },
+            _script_node("loop_body", "raise SystemExit(1)"),
+        ],
+        [
+            {"from": "trigger", "to": "loop"},
+            {"from": "loop", "to": "loop_body", "from_port": "iterate"},
+            {"from": "loop_body", "to": "loop", "to_port": "iterate"},
+        ],
+    )
+    source = _create_and_run(syntara_api, name, definition, timeout=90, project_id=first_project_id)
+    assert source.status == ExecutionStatus.FAILED
+    source_rows = _wait_until(
+        lambda: _activity_executions_by(syntara_api, source.id, lambda activity: activity.temporal_activity_id),
+        lambda rows: any(
+            str(temporal_id).startswith("loop_body") and _activity_status(row) == "failed"
+            for temporal_id, row in rows.items()
+        ),
+        lambda rows: f"loop body rows={sorted(str(key) for key in rows)}",
+        description="failed do-while body occurrence",
+        max_polls=_ACTIVITY_SYNC_POLLS,
+        poll_interval=_ACTIVITY_SYNC_INTERVAL,
+    )
+    source_failed_id = next(
+        temporal_id
+        for temporal_id, row in source_rows.items()
+        if str(temporal_id).startswith("loop_body") and _activity_status(row) == "failed"
+    )
+    source_failed = source_rows[source_failed_id]
+
+    preview = _preview_retry(syntara_api, source.id)
+    assert preview.eligible is True
+    assert "loop_body" in preview.eligible_point_ids
+
+    retried = _start_retry(
+        syntara_api,
+        source.id,
+        ["loop_body"],
+        overrides={"loop_body": {"code": "print('recovered-do-while')"}},
+    )
+    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
+    assert final.status == ExecutionStatus.COMPLETED, final.error_details
+    retry_rows = _wait_for_activity_executions(
+        syntara_api,
+        final.id,
+        {source_failed_id},
+        required_stdouts={source_failed_id: "recovered-do-while"},
+    )
+    retry_failed = retry_rows[source_failed_id]
+    assert _activity_status(retry_failed) == "completed"
+    assert _timestamp(retry_failed, "started_at") > _timestamp(source_failed, "started_at")
+
+
+def test_retry_starts_at_sanitized_http_dependency(
+    syntara_api: SyntaraApiRegistry,
+    first_project_id: UUID,
+    create_credential: CredentialFactory,
+) -> None:
+    """A redacted HTTP output is not reused; retry starts at that HTTP node and reruns the failed step."""
+    cred_id, *_ = create_credential(
+        api=syntara_api, project_id=first_project_id, name=unique_name("e2e-retry-http-sanitized")
+    )
+    name = unique_name("e2e-retry-http-sanitized")
+    definition = _workflow_definition(
+        name,
+        [
+            {
+                "id": "fetch",
+                "name": "Fetch",
+                "type": "http_request",
+                "parameters": {
+                    "method": "GET",
+                    "url": f"{HTTPBIN_URL}/bearer",
+                    "credential_id": str(cred_id),
+                },
+            },
+            _script_node(
+                "consume",
+                "import os; print(os.environ['TOKEN']); raise SystemExit(1)",
+                environment={"TOKEN": "${fetch.body.token}"},
+            ),
+        ],
+        [
+            {"from": "trigger", "to": "fetch"},
+            {"from": "fetch", "to": "consume"},
+        ],
+    )
+    source = _create_and_run(syntara_api, name, definition, timeout=90, project_id=first_project_id)
+    source = _wait_for_activity_ids(syntara_api, source, {"fetch", "consume"})
+    _skip_if_http_unreachable(source, "fetch")
+    assert source.status == ExecutionStatus.FAILED
+    source_activities = _activities_by_id(source)
+    assert source_activities["fetch"].status == "completed"
+    assert "[REDACTED]" in str(_activity_output(source_activities["fetch"]))
+    assert source_activities["consume"].status == "failed"
+
+    preview = _preview_retry(syntara_api, source.id)
+    assert preview.eligible is True
+    assert _id_list(preview.eligible_point_ids) == ["fetch"]
+    assert _id_list(preview.auto_included_node_ids) == ["fetch"]
+    assert _sanitized_replacements(preview) == {"consume": ["fetch"]}
+
+    retried = _start_retry(
+        syntara_api,
+        source.id,
+        overrides={"consume": {"code": "import os; print(os.environ['TOKEN'])"}},
+    )
+    final = poll_execution_until_complete(syntara_api, retried.id, max_polls=90, poll_interval=1)
+    final = _wait_for_activity_ids(syntara_api, final, {"fetch", "consume"})
+    _skip_if_http_unreachable(final, "fetch")
+    assert final.status == ExecutionStatus.COMPLETED, final.error_details
+    retry_activities = _activities_by_id(final)
+    assert retry_activities["fetch"].status == "completed"
+    assert _timestamp(retry_activities["fetch"], "started_at") > _timestamp(source_activities["fetch"], "started_at")
+    assert retry_activities["consume"].status == "completed"
+    assert _timestamp(retry_activities["consume"], "started_at") > _timestamp(
+        source_activities["consume"], "started_at"
+    )
