@@ -104,6 +104,7 @@ export function useBuilderVersionHistory({
   const viewedVersionName = viewedVersionQuery.data?.name ?? null
   const viewedVersionPublishedAt = viewedVersionQuery.data?.last_published_at ?? null
   const viewedVersionUnpublishedAt = viewedVersionQuery.data?.last_unpublished_at ?? null
+  const viewedVersionDefinition = viewedVersionQuery.data?.workflow_definition
 
   useEffect(() => {
     if (!isViewingVersion || !viewedVersionQuery.data?.workflow_definition) return
@@ -192,6 +193,9 @@ export function useBuilderVersionHistory({
     viewedVersionName,
     viewedVersionPublishedAt,
     viewedVersionUnpublishedAt,
+    viewedVersionDefinition,
+    viewedVersionIsLoading: viewedVersionQuery.isLoading,
+    refetchViewedVersion: viewedVersionQuery.refetch,
     handleExitVersionView,
     handleConfirmRestore,
     restoreDialog,

@@ -5,6 +5,7 @@ import { axe } from 'vitest-axe'
 
 import type { AdjacentSteps } from './panels/hooks/useAdjacentSteps'
 import { StepEditorLayout } from './StepEditorLayout'
+import { StepFormReadOnlyContext } from './VersionViewContext'
 
 vi.mock('./panels/InputPanel', () => ({
   InputPanel: ({
@@ -588,5 +589,15 @@ describe('StepEditorLayout', () => {
       expect(screen.queryByRole('link', { name: /Documentation/i })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /Documentation/i })).not.toBeInTheDocument()
     })
+  })
+  it('explains blocked step types in the step editor', () => {
+    const reason = 'Script (no-scripts, project payments).'
+    render(
+      <StepFormReadOnlyContext.Provider value={reason}>
+        <StepEditorLayout parametersContent={<div>Parameters</div>} showInputPanel={false} readOnly />
+      </StepFormReadOnlyContext.Provider>
+    )
+    expect(screen.getByText(reason)).toBeInTheDocument()
+    expect(screen.queryByText(/viewing a previous version/)).not.toBeInTheDocument()
   })
 })

@@ -27,6 +27,7 @@ type UseWorkflowImportExportOptions = Readonly<{
   workflowName: string
   workflowDescription: string
   onPendingImport: (data: PendingImportData) => void
+  canEdit?: boolean
 }>
 
 export function applyImportToCanvas(
@@ -62,6 +63,7 @@ export function useWorkflowImportExport({
   workflowName,
   workflowDescription,
   onPendingImport,
+  canEdit = true,
 }: UseWorkflowImportExportOptions) {
   const importFileRef = useRef<HTMLInputElement>(null)
   const { showError } = useAlerts()
@@ -69,6 +71,10 @@ export function useWorkflowImportExport({
 
   const handleImportFile = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
+      if (!canEdit) {
+        event.target.value = ''
+        return
+      }
       const file = event.target.files?.[0]
       if (!file) return
 
@@ -100,7 +106,7 @@ export function useWorkflowImportExport({
 
       event.target.value = ''
     },
-    [dispatch, markDirty, showError, isNew, onPendingImport]
+    [dispatch, markDirty, showError, isNew, onPendingImport, canEdit]
   )
 
   const handleExport = useCallback(() => {

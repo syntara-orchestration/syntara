@@ -40,6 +40,7 @@ const baseWorkflow: Workflow = {
   is_builtin: false,
   is_enabled: false,
   published_version_id: null,
+  step_types: [],
   project_id: 'proj-1',
   created_at: '2023-01-01T12:00:00Z',
   updated_at: '2023-01-02T12:00:00Z',
@@ -215,6 +216,53 @@ describe('WorkflowsTableBody', () => {
       })
       expect(accessFetchClient.POST).toHaveBeenCalledWith('/authz/can_i', {
         body: { action: 'create', resource_type: 'workflow', resource_project: 'proj-1' },
+      })
+    })
+
+    it('disables authoring menu actions for a blocked workflow type while preserving run, history, and export', async () => {
+      const user = userEvent.setup()
+      vi.mocked(accessFetchClient.POST).mockImplementation((_path, options) => {
+        const body = Reflect.get(options, 'body') as {
+          resource_type?: string
+          resource_labels?: { kind?: string }
+        }
+        const allowed = body?.resource_type === 'step_type' ? body.resource_labels?.kind !== 'script' : true
+        return Promise.resolve({ data: { allowed } })
+      })
+      const workflow: Workflow = {
+        ...baseWorkflow,
+        published_version_id: 'version-1',
+        step_types: ['script'],
+      }
+      renderInTable(
+        <FlatWorkflowsTableBody
+          workflows={[workflow]}
+          isWorkflowProjectBuiltin={isWorkflowProjectBuiltin}
+          rowActionCallbacks={rowActionCallbacks}
+        />
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Actions for Deploy Pipeline' }))
+
+      const editItem = await screen.findByRole('menuitem', { name: /Edit workflow/ })
+      expect(editItem).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('menuitem', { name: /Duplicate workflow/ })).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('menuitem', { name: /Publish workflow/ })).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('menuitem', { name: /Unpublish workflow/ })).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('menuitem', { name: /Delete workflow/ })).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('menuitem', { name: /Run published version/ })).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+      expect(screen.getByRole('menuitem', { name: /View run history/ })).not.toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('menuitem', { name: /Export workflow/ })).not.toHaveAttribute('aria-disabled', 'true')
+      expect(accessFetchClient.POST).toHaveBeenCalledWith('/authz/can_i', {
+        body: {
+          action: 'write',
+          resource_type: 'step_type',
+          resource_labels: { kind: 'script' },
+          resource_project: 'proj-1',
+        },
       })
     })
 

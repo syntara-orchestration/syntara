@@ -12,6 +12,17 @@ import { expectPageTitle } from '../../test/pageTitle'
 import { routerTestState } from '../../test/setup'
 import { accessClient } from '../access/accessClient'
 
+vi.mock('./useStepTypePermissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./useStepTypePermissions')>()),
+  useStepTypePermissions: () => ({
+    canAuthor: true,
+    blockedStepTypes: [],
+    isChecking: false,
+    isError: false,
+    retry: vi.fn(),
+  }),
+}))
+
 import Workflows from './Workflows'
 
 // Mock dependencies
@@ -1818,7 +1829,10 @@ describe('Workflows Component', () => {
       })
     })
 
-    it('shows error alert when creating duplicate fails', async () => {
+    it.each([
+      { code: 'WORKFLOW_NAME_CONFLICT', detail: 'Name conflict' },
+      { code: 'NODE_KIND_WRITE_DENIED', detail: "You can't create workflow: Script (write denied)." },
+    ])('shows the duplicate failure message for $code', async ({ code, detail }) => {
       const user = userEvent.setup()
       vi.mocked(workflowFetchClient.GET).mockResolvedValue(
         mockGetResponse({
@@ -1839,8 +1853,8 @@ describe('Workflows Component', () => {
         mockPostResponse(undefined, {
           type: 'https://api.example.com/errors/name-conflict',
           title: 'Workflow Name Conflict',
-          detail: 'Name conflict',
-          code: 'WORKFLOW_NAME_CONFLICT',
+          detail,
+          code,
           retryable: false,
         })
       )
@@ -1852,6 +1866,7 @@ describe('Workflows Component', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Failed to duplicate workflow')).toBeInTheDocument()
+        expect(screen.getByText(detail)).toBeInTheDocument()
       })
     })
 

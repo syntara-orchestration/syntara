@@ -8,6 +8,7 @@ import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { WorkflowPublishStatusBadge } from '../../components/WorkflowPublishStatusBadge'
 import { useDialogState } from '../../hooks/useDialogState'
+import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
 import { CancelExecutionButton } from '../executions/CancelExecutionButton'
 import { isExecutionCancellable } from '../executions/executionCancellable'
@@ -61,6 +62,8 @@ type BuilderToolbarContentProps = Readonly<{
   versionHistoryOpen?: boolean
   onExitVersionView?: () => void
   onRestoreVersion?: () => void
+  isRestoreDisabled?: boolean
+  restoreTooltip?: string
   onToggleVersionHistory?: () => void
   isStepEditorOpen?: boolean
 }>
@@ -110,6 +113,8 @@ function BuilderToolbarContent({
   versionHistoryOpen,
   onExitVersionView,
   onRestoreVersion,
+  isRestoreDisabled = false,
+  restoreTooltip,
   onToggleVersionHistory,
   isStepEditorOpen,
 }: BuilderToolbarContentProps) {
@@ -117,11 +122,18 @@ function BuilderToolbarContent({
     return (
       <>
         {onRestoreVersion && (
-          <DisabledWithTooltip isDisabled={!builderPermissions.canEdit} content={builderPermissions.tooltips.edit}>
+          <DisabledWithTooltip
+            isDisabled={!builderPermissions.canEdit || isRestoreDisabled}
+            content={
+              isRestoreDisabled
+                ? (restoreTooltip ?? builderPermissions.tooltips.edit)
+                : builderPermissions.tooltips.edit
+            }
+          >
             <Button
               variant="secondary"
-              onClick={onRestoreVersion}
-              isAriaDisabled={!builderPermissions.canEdit}
+              onClick={builderPermissions.canEdit && !isRestoreDisabled ? onRestoreVersion : undefined}
+              isAriaDisabled={!builderPermissions.canEdit || isRestoreDisabled}
               icon={
                 <Icon isInline>
                   <RhUiUndoIcon />
@@ -251,6 +263,7 @@ function BuilderEditorTitleSlot({
             value={workflowName}
             isDisabled={!builderPermissions.canEdit}
             onChange={(_event, value) => {
+              if (!builderPermissions.canEdit) return
               dispatch({ type: 'SET_WORKFLOW_NAME', payload: value })
               markDirty()
             }}
@@ -264,6 +277,7 @@ function BuilderEditorTitleSlot({
             name={workflowName}
             description={workflowDescription}
             onApply={(name, description) => {
+              if (!builderPermissions.canEdit) return
               const nameChanged = name !== workflowName
               const descriptionChanged = description !== workflowDescription
               if (nameChanged) dispatch({ type: 'SET_WORKFLOW_NAME', payload: name })
@@ -332,6 +346,8 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   viewedVersionStatus?: string | null
   onExitVersionView?: () => void
   onRestoreVersion?: () => void
+  isRestoreDisabled?: boolean
+  restoreTooltip?: string
   onPendingImport: (data: PendingImportData) => void
   isStepEditorOpen?: boolean
 }>
@@ -381,6 +397,8 @@ export function BuilderWorkflowPageHeader({
   viewedVersionStatus,
   onExitVersionView,
   onRestoreVersion,
+  isRestoreDisabled,
+  restoreTooltip,
   onPendingImport,
   isStepEditorOpen,
 }: BuilderWorkflowPageHeaderProps) {
@@ -427,6 +445,8 @@ export function BuilderWorkflowPageHeader({
       versionHistoryOpen={versionHistoryOpen}
       onExitVersionView={onExitVersionView}
       onRestoreVersion={onRestoreVersion}
+      isRestoreDisabled={isRestoreDisabled}
+      restoreTooltip={restoreTooltip}
       onToggleVersionHistory={handleToggleVersionHistory}
       isStepEditorOpen={isStepEditorOpen}
     />
@@ -479,6 +499,19 @@ export function BuilderWorkflowPageHeader({
         isOpen={publishDialog.isOpen}
         isPublishing={isPublishing}
         onClose={publishDialog.close}
+        canPublish={builderPermissions.canEdit}
+        editTooltip={builderPermissions.tooltips.publish}
+        permissionCheckError={builderPermissions.stepTypePermissionError}
+        permissionCheckLoading={builderPermissions.stepTypePermissionLoading}
+        blockedStepTypes={builderPermissions.blockedStepTypes}
+        onRetryPermissionCheck={
+          builderPermissions.retryStepTypePermissions
+            ? () => {
+                const retry = builderPermissions.retryStepTypePermissions
+                if (retry) detachPromise(retry())
+              }
+            : undefined
+        }
         onPublish={(publishName, description) => {
           onPublish(publishName, description, publishDialog.close)
         }}

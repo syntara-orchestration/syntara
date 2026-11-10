@@ -98,8 +98,21 @@ const mockBuilderPermissions = vi.hoisted(() => ({
   tooltips: { edit: '', save: '', publish: '', unpublish: '', run: '', delete: '', create: '' },
 }))
 
+const mockStepTypePermissions = vi.hoisted(() => ({
+  canAuthor: true,
+  blockedStepTypes: [] as { kind: string; label: string; description?: string }[],
+  isChecking: false,
+  isError: false,
+  retry: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('./useBuilderPermissions', () => ({
   useBuilderPermissions: () => mockBuilderPermissions,
+}))
+
+vi.mock('../workflows/useStepTypePermissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../workflows/useStepTypePermissions')>()),
+  useStepTypePermissions: () => mockStepTypePermissions,
 }))
 
 vi.mock('../../hooks/useCanI', () => ({
@@ -282,6 +295,10 @@ describe('BuilderContent', () => {
     vi.clearAllMocks()
     globalThis.localStorage.removeItem(workflowBuilderQolStorageKey)
     queryClient.clear()
+    mockStepTypePermissions.canAuthor = true
+    mockStepTypePermissions.blockedStepTypes = []
+    mockStepTypePermissions.isChecking = false
+    mockStepTypePermissions.isError = false
 
     vi.mocked(approvalsClient.useQuery).mockReturnValue({ data: undefined, refetch: vi.fn() })
     vi.mocked(approvalsClient.useMutation).mockReturnValue({ mutate: vi.fn(), isPending: false })
@@ -3417,6 +3434,24 @@ describe('BuilderContent', () => {
   })
 
   describe('RBAC read-only mode', () => {
+    it('opens a blocked workflow read-only and unlocks it when permissions change', async () => {
+      mockStepTypePermissions.canAuthor = false
+      mockStepTypePermissions.blockedStepTypes = [
+        { kind: 'script', label: 'Script', description: 'Script (no-scripts, project payments).' },
+      ]
+      const props = { workflow: mockWorkflow, isNew: false, workflowId: 'workflow-1' }
+      const view = await renderBuilder(props)
+      expect(screen.getByText('Script (no-scripts, project payments).')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Workflow name')).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Save workflow' })).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('button', { name: 'Run' })).toBeEnabled()
+      mockStepTypePermissions.canAuthor = true
+      mockStepTypePermissions.blockedStepTypes = []
+      view.rerender(<BuilderContent {...props} />)
+      expect(screen.getByPlaceholderText('Workflow name')).toBeEnabled()
+      expect(screen.queryByText('Script (no-scripts, project payments).')).not.toBeInTheDocument()
+    })
+
     afterEach(() => {
       mockBuilderPermissions.canEdit = true
       mockBuilderPermissions.isLoading = false

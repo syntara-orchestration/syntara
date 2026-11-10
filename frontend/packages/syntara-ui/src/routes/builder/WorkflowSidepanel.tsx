@@ -24,6 +24,7 @@ type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVe
 
 type WorkflowSidepanelProps = {
   workflow: WorkflowWithVersion
+  canEdit: boolean
   workflowName: string
   workflowDescription: string
   onNameChange: (name: string) => void
@@ -65,7 +66,10 @@ export function WorkflowSidepanel(props: WorkflowSidepanelProps) {
                   id="workflow-sidepanel-name"
                   type="text"
                   value={props.workflowName}
-                  onChange={(_event, value) => props.onNameChange(value)}
+                  isDisabled={!props.canEdit}
+                  onChange={(_event, value) => {
+                    if (props.canEdit) props.onNameChange(value)
+                  }}
                   aria-label="Workflow name in workflow details"
                 />
               </DescriptionListDescription>
@@ -75,7 +79,10 @@ export function WorkflowSidepanel(props: WorkflowSidepanelProps) {
               <DescriptionListDescription>
                 <TextArea
                   value={props.workflowDescription}
-                  onChange={(_event, value) => props.onDescriptionChange(value)}
+                  isDisabled={!props.canEdit}
+                  onChange={(_event, value) => {
+                    if (props.canEdit) props.onDescriptionChange(value)
+                  }}
                   rows={3}
                   aria-label="Description"
                 />

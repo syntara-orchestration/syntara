@@ -10,6 +10,7 @@ import { useStepExecutionData } from './panels/hooks/useStepExecutionData'
 import { StepEditorPanelBody } from './panels/StepEditorPanelBody'
 import { StepFormTabBarProvider } from './step-forms/shared/StepFormTabBarContext'
 import type { WorkflowMetadata } from './types/workflowMetadata'
+import { useStepFormReadOnlyReason } from './VersionViewContext'
 
 function DocumentationButton({ href }: Readonly<{ href: string }>) {
   return (
@@ -49,6 +50,7 @@ type StepEditorLayoutProps = {
   workflowMetadata?: WorkflowMetadata
   tabBarAction?: ReactNode
   readOnly?: boolean
+  isViewingVersion?: boolean
   mode?: 'add' | 'edit'
 }
 
@@ -73,8 +75,10 @@ export function StepEditorLayout({
   workflowMetadata,
   tabBarAction,
   readOnly,
+  isViewingVersion = false,
   mode = 'edit',
 }: StepEditorLayoutProps) {
+  const readOnlyReason = useStepFormReadOnlyReason(isViewingVersion, readOnly)
   const { inputData, outputData } = useStepExecutionData(nodeId ?? '', executionId, workflowId)
   let closeAriaLabel = 'Cancel without saving'
   if (readOnly) closeAriaLabel = 'Close step editor'
@@ -132,9 +136,7 @@ export function StepEditorLayout({
                       <Button
                         variant={readOnly ? 'secondary' : 'link'}
                         size={readOnly ? 'sm' : undefined}
-                        onClick={() => {
-                          onClose?.()
-                        }}
+                        onClick={onClose}
                         aria-label={closeAriaLabel}
                         type="button"
                       >
@@ -170,13 +172,9 @@ export function StepEditorLayout({
             </FlexItem>
           </Flex>
         </StackItem>
-        {readOnly && (
+        {readOnlyReason && (
           <StackItem style={{ padding: '0 var(--pf-t--global--spacer--sm)' }}>
-            <Alert
-              variant="info"
-              isInline
-              title="You are viewing a previous version. Return to the editor to make changes."
-            />
+            <Alert variant="info" isInline title={readOnlyReason} />
           </StackItem>
         )}
         <StackItem
