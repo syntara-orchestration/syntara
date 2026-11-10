@@ -26,7 +26,7 @@ import { detachPromise } from '../../utils/detachPromise'
 import { getUserIdFromToken } from '../../utils/jwtUtils'
 import { accessClient } from '../access/accessClient'
 
-import { getUserDetailPath } from './accessManagementPaths'
+import { getUserDetailDestination } from './accessManagementPaths'
 import { AUTH_SOURCE_LOCAL } from './adminConstants'
 import { BuiltInAdminCard } from './BuiltInAdminCard'
 import { useAdminToggle } from './useAdminToggle'
@@ -232,7 +232,7 @@ function UserTableRow({
   return (
     <Tr>
       <Td dataLabel="Username">
-        <SynLink to={getUserDetailPath(user.id)}>
+        <SynLink to={getUserDetailDestination(user.id)}>
           <Truncate content={user.username} />
         </SynLink>
       </Td>

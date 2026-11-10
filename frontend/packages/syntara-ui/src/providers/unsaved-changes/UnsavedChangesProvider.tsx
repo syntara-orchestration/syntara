@@ -2,6 +2,7 @@ import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/
 import { useBlocker, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
+import { navigateToTarget, type NavigationTarget } from '../../app/typedRouteDestinations'
 import { useBlurOnOpen } from '../../hooks/useBlurOnOpen'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { resetAll } from '../../stores/workflowStoreActions'
@@ -60,7 +61,7 @@ export function UnsavedChangesProvider({ children }: Readonly<UnsavedChangesProv
 
   const proceedNavRef = useRef<(() => void) | null>(null)
   const resetNavRef = useRef<(() => void) | null>(null)
-  const pendingTargetRef = useRef<string | null>(null)
+  const pendingTargetRef = useRef<NavigationTarget | null>(null)
 
   const dirtyChecksRef = useRef(new Map<number, DirtyCheckOptions>())
 
@@ -88,13 +89,13 @@ export function UnsavedChangesProvider({ children }: Readonly<UnsavedChangesProv
   }, [isBuilderDirty, getActiveDirtyCheck])
 
   const requestNavigation = useCallback(
-    (targetPath: string) => {
-      if (targetPath.startsWith('/workflow-builder') || !hasUnsavedChanges()) {
-        detachPromise(tsNavigate({ to: targetPath }))
+    (target: NavigationTarget) => {
+      if ((typeof target === 'string' && target.startsWith('/workflow-builder')) || !hasUnsavedChanges()) {
+        detachPromise(navigateToTarget(tsNavigate, target))
         return
       }
 
-      pendingTargetRef.current = targetPath
+      pendingTargetRef.current = target
       setIsModalOpen(true)
     },
     [hasUnsavedChanges, tsNavigate]
@@ -123,7 +124,8 @@ export function UnsavedChangesProvider({ children }: Readonly<UnsavedChangesProv
       proceedNavRef.current = null
       resetNavRef.current = null
     } else if (pendingTargetRef.current) {
-      detachPromise(tsNavigate({ to: pendingTargetRef.current }))
+      const target = pendingTargetRef.current
+      detachPromise(navigateToTarget(tsNavigate, target))
       pendingTargetRef.current = null
     }
   }, [tsNavigate])

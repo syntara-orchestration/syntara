@@ -43,7 +43,7 @@ import { detachPromise } from '../../../utils/detachPromise'
 import { accessClient } from '../../access/accessClient'
 import { TypeaheadSelect } from '../../access/TypeaheadSelect'
 import { useAllGroups } from '../../access/useAllGroups'
-import { getGroupDetailPath } from '../accessManagementPaths'
+import { getGroupDetailDestination } from '../accessManagementPaths'
 import { BUILTIN_AUTHENTICATED_GROUP_NAME } from '../adminConstants'
 import { MembershipSourceLabels } from '../MembershipSourceLabels'
 import { getMembershipSources } from '../membershipSourceUtils'
@@ -383,7 +383,7 @@ export function UserGroupsPanel({ userId }: Readonly<UserGroupsPanelProps>) {
                 <Tr key={group.id}>
                   <Td dataLabel="Name">
                     {group.id ? (
-                      <LinkCell href={getGroupDetailPath(group.id)}>
+                      <LinkCell href={getGroupDetailDestination(group.id)}>
                         <Truncate content={group.name} />
                       </LinkCell>
                     ) : (

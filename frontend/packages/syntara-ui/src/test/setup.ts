@@ -33,17 +33,23 @@ export const mockUseSearch = vi.fn(() => ({}))
 
 export function MockLink({
   to,
+  params,
   children,
   className,
   style,
   ...rest
 }: {
   to: string
+  params?: Record<string, string>
   children: React.ReactNode
   className?: string
   style?: React.CSSProperties
 }) {
-  return React.createElement('a', { href: String(to), className, style, ...rest }, children)
+  const href = Object.entries(params ?? {}).reduce(
+    (path, [key, value]) => path.replaceAll(`$${key}`, encodeURIComponent(value)),
+    String(to)
+  )
+  return React.createElement('a', { href, className, style, ...rest }, children)
 }
 
 export const routerTestState = {
