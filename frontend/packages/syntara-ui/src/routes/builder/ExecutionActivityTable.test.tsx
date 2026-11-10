@@ -105,6 +105,16 @@ describe('ExecutionActivityTable', () => {
       expect(screen.getByTestId('activity-status-label-replayed')).toBeInTheDocument()
     })
 
+    it('does not mark a retained failure as replayed', () => {
+      renderTable({
+        states: new Map([state('task-1', { status: 'failed', startedAt: T0 })]),
+        order: [{ id: 'task-1', name: 'Script' }],
+        replayBaselineAt: T2,
+      })
+
+      expect(screen.queryByTestId('activity-status-label-replayed')).not.toBeInTheDocument()
+    })
+
     it('does not mark a row replayed when there is no retry baseline', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'completed', startedAt: T0 })]),

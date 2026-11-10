@@ -82,6 +82,28 @@ function AAPJobLink({ url }: Readonly<{ url: string }>) {
   )
 }
 
+function ActivityErrorDetailsRow({
+  errorDetails,
+  executionError,
+  columnCount,
+}: Readonly<{
+  errorDetails?: string | null
+  executionError?: string | null
+  columnCount: number
+}>) {
+  if (!errorDetails || errorDetails === executionError) return null
+
+  return (
+    <Tr>
+      <Td colSpan={columnCount} style={{ paddingTop: 0 }}>
+        <Content component={ContentVariants.small} style={ERROR_STYLE}>
+          {errorDetails}
+        </Content>
+      </Td>
+    </Tr>
+  )
+}
+
 function ActivityRow({
   id,
   name,
@@ -109,7 +131,7 @@ function ActivityRow({
   const displayName = name ?? id
   const jobUrl = isAAPNodeType(type) ? extractAAPJobUrl(state?.outputData) : null
   const columnCount = hasAAPColumn ? 6 : 5
-  const replayed = isReplayedStep(state?.startedAt, replayBaselineAt)
+  const replayed = isReplayedStep(state?.startedAt, replayBaselineAt, state?.status)
 
   return (
     <Fragment>
@@ -127,15 +149,11 @@ function ActivityRow({
         </Td>
         {hasAAPColumn && <Td dataLabel="AAP Job">{jobUrl ? <AAPJobLink url={jobUrl} /> : null}</Td>}
       </Tr>
-      {state?.errorDetails && state.errorDetails !== executionError && (
-        <Tr>
-          <Td colSpan={columnCount} style={{ paddingTop: 0 }}>
-            <Content component={ContentVariants.small} style={ERROR_STYLE}>
-              {state.errorDetails}
-            </Content>
-          </Td>
-        </Tr>
-      )}
+      <ActivityErrorDetailsRow
+        errorDetails={state?.errorDetails}
+        executionError={executionError}
+        columnCount={columnCount}
+      />
     </Fragment>
   )
 }

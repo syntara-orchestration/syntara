@@ -364,6 +364,247 @@ async def test_validate_retry_default_selection_cascades_through_chained_depende
     assert verdict.total_step_count == 4
 
 
+def _chained_sanitized_session(execution: Mock) -> AsyncSession:
+    """step_0 -> step_1 -> failed step_2, with both upstream outputs redacted."""
+    step_0 = {"id": "step_0", "type": "script", "parameters": {"code": "echo hi"}}
+    step_1 = {
+        "id": "step_1",
+        "type": "script",
+        "parameters": {"code": "echo hi", "input_ref": "${step_0.value}"},
+    }
+    step_2 = {
+        "id": "step_2",
+        "type": "script",
+        "parameters": {"code": "exit 1", "input_ref": "${step_1.token}"},
+    }
+    step_3 = {"id": "step_3", "type": "script", "parameters": {"code": "echo done"}}
+    snapshot = _make_version(1, nodes=[step_0, step_1, step_2, step_3])
+    snapshot.workflow_definition["edges"] = [
+        {"from": "trigger_1", "to": "step_0"},
+        {"from": "step_0", "to": "step_1"},
+        {"from": "step_1", "to": "step_2"},
+        {"from": "step_2", "to": "step_3"},
+    ]
+    return _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        (
+            [
+                _make_completed_activity("step_0", {"value": "[REDACTED]"}),
+                _make_completed_activity("step_1", {"token": "[REDACTED]"}),
+            ],
+            "all",
+        ),
+        (snapshot, "one"),
+    )
+
+
+@pytest.mark.asyncio
+async def test_explicit_replacement_auto_includes_chained_sanitized_ancestors() -> None:
+    """Selecting a mid-chain replacement still pulls in further sanitized ancestors."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    verdict = await validate_retry_from_failure(_chained_sanitized_session(execution), execution.id, ["step_1"])
+    assert verdict.eligible is True
+    assert verdict.eligible_point_ids == ["step_0", "step_1"]
+    assert verdict.auto_included_node_ids == ["step_0"]
+    assert verdict.sanitized_node_ids == []
+    assert verdict.sanitized_replacements == {"step_2": ["step_0", "step_1"]}
+
+
+@pytest.mark.asyncio
+async def test_explicit_failed_node_reports_immediate_sanitized_taint() -> None:
+    """Rejecting an explicit failed node lists the injectable sanitized node, not the full chain."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    verdict = await validate_retry_from_failure(_chained_sanitized_session(execution), execution.id, ["step_2"])
+    assert verdict.eligible is False
+    assert verdict.sanitized_node_ids == ["step_1"]
+    assert verdict.auto_included_node_ids == []
+    assert verdict.sanitized_replacements == {"step_2": ["step_0", "step_1"]}
+    assert "step_1" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_accepts_explicit_sanitized_replacement() -> None:
+    """Selecting the sanitized replacement retries that path instead of rejecting."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    ref_nodes = [
+        dict(n, parameters={**n.get("parameters", {}), "input_ref": "${step_1.token}"}) if n["id"] == "step_2" else n
+        for n in NODES
+    ]
+    snapshot = _make_version(1, nodes=ref_nodes)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1", {"token": "[REDACTED]"})], "all"),
+        (snapshot, "one"),
+    )
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_1"])
+    assert verdict.eligible is True
+    assert verdict.eligible_point_ids == ["step_1"]
+    assert verdict.auto_included_node_ids == []
+    assert verdict.sanitized_node_ids == []
+    assert verdict.sanitized_replacements == {"step_2": ["step_1"]}
+
+
+@pytest.mark.asyncio
+async def test_explicit_replacement_does_not_expand_another_selected_failure() -> None:
+    """A selected replacement must not widen an unrelated failed branch's retry scope."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    nodes = [
+        {"id": "step_a", "type": "script", "parameters": {"code": "echo a"}},
+        {
+            "id": "failed_a",
+            "type": "script",
+            "parameters": {"code": "exit 1", "input_ref": "${step_a.token}"},
+        },
+        {"id": "step_b", "type": "script", "parameters": {"code": "echo b"}},
+        {
+            "id": "failed_b",
+            "type": "script",
+            "parameters": {"code": "exit 1", "input_ref": "${step_b.token}"},
+        },
+    ]
+    snapshot = _make_version(1, nodes=nodes)
+    snapshot.workflow_definition["edges"] = [
+        {"from": "trigger_1", "to": "step_a"},
+        {"from": "step_a", "to": "failed_a"},
+        {"from": "trigger_1", "to": "step_b"},
+        {"from": "step_b", "to": "failed_b"},
+    ]
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("failed_a"), _make_activity("failed_b")], "all"),
+        (
+            [
+                _make_completed_activity("step_a", {"token": "[REDACTED]"}),
+                _make_completed_activity("step_b", {"token": "[REDACTED]"}),
+            ],
+            "all",
+        ),
+        (snapshot, "one"),
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a", "failed_b"])
+
+    assert verdict.eligible is False
+    assert verdict.eligible_point_ids == ["failed_b", "step_a"]
+    assert verdict.sanitized_node_ids == ["step_b"]
+    assert verdict.auto_included_node_ids == []
+    assert "step_b" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_explicit_both_replacements_retry_both_sanitized_branches() -> None:
+    """Selecting both sanitized replacements retries each branch and does not expand extras."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    nodes = [
+        {"id": "step_a", "type": "script", "parameters": {"code": "echo a"}},
+        {
+            "id": "failed_a",
+            "type": "script",
+            "parameters": {"code": "exit 1", "input_ref": "${step_a.token}"},
+        },
+        {"id": "step_b", "type": "script", "parameters": {"code": "echo b"}},
+        {
+            "id": "failed_b",
+            "type": "script",
+            "parameters": {"code": "exit 1", "input_ref": "${step_b.token}"},
+        },
+    ]
+    snapshot = _make_version(1, nodes=nodes)
+    snapshot.workflow_definition["edges"] = [
+        {"from": "trigger_1", "to": "step_a"},
+        {"from": "step_a", "to": "failed_a"},
+        {"from": "trigger_1", "to": "step_b"},
+        {"from": "step_b", "to": "failed_b"},
+    ]
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("failed_a"), _make_activity("failed_b")], "all"),
+        (
+            [
+                _make_completed_activity("step_a", {"token": "[REDACTED]"}),
+                _make_completed_activity("step_b", {"token": "[REDACTED]"}),
+            ],
+            "all",
+        ),
+        (snapshot, "one"),
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a", "step_b"])
+
+    assert verdict.eligible is True
+    assert verdict.eligible_point_ids == ["step_a", "step_b"]
+    assert verdict.auto_included_node_ids == []
+    assert verdict.sanitized_node_ids == []
+
+
+@pytest.mark.asyncio
+async def test_explicit_replacement_with_unaffected_failure_stays_eligible() -> None:
+    """A sanitized replacement plus an unrelated failed node with no sanitized deps both run."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    step_x = {"id": "step_x", "type": "script", "parameters": {"code": "echo hi"}}
+    step_a = {"id": "step_a", "type": "script", "parameters": {"code": "exit 1", "input_ref": "${step_x.token}"}}
+    step_b = {"id": "step_b", "type": "script", "parameters": {"code": "exit 1"}}
+    nodes = [step_x, step_a, step_b]
+    edges = [
+        {"from": "trigger_1", "to": "step_x"},
+        {"from": "step_x", "to": "step_a"},
+        {"from": "trigger_1", "to": "step_b"},
+    ]
+    snapshot = _make_version(1, nodes=nodes)
+    snapshot.workflow_definition["edges"] = edges
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_a"), _make_activity("step_b")], "all"),
+        ([_make_completed_activity("step_x", {"token": "[REDACTED]"})], "all"),
+        (snapshot, "one"),
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_x", "step_b"])
+
+    assert verdict.eligible is True
+    assert verdict.eligible_point_ids == ["step_b", "step_x"]
+    assert verdict.auto_included_node_ids == []
+    assert verdict.sanitized_node_ids == []
+    assert verdict.sanitized_replacements == {"step_a": ["step_x"]}
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_explicit_replacement_does_not_force_other_failures() -> None:
+    """Two failed branches: the sanitized replacement is selectable independently."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    step_x = {"id": "step_x", "type": "script", "parameters": {"code": "echo hi"}}
+    step_a = {"id": "step_a", "type": "script", "parameters": {"code": "exit 1", "input_ref": "${step_x.token}"}}
+    step_b = {"id": "step_b", "type": "script", "parameters": {"code": "exit 1"}}
+    nodes = [step_x, step_a, step_b]
+    edges = [
+        {"from": "trigger_1", "to": "step_x"},
+        {"from": "step_x", "to": "step_a"},
+        {"from": "trigger_1", "to": "step_b"},
+    ]
+    snapshot = _make_version(1, nodes=nodes)
+    snapshot.workflow_definition["edges"] = edges
+
+    def _session() -> AsyncSession:
+        return _mock_session(
+            (execution, "one"),
+            ([_make_activity("step_a"), _make_activity("step_b")], "all"),
+            ([_make_completed_activity("step_x", {"token": "[REDACTED]"})], "all"),
+            (snapshot, "one"),
+        )
+
+    only_sanitized = await validate_retry_from_failure(_session(), execution.id, ["step_x"])
+    assert only_sanitized.eligible is True
+    assert only_sanitized.eligible_point_ids == ["step_x"]
+    assert only_sanitized.auto_included_node_ids == []
+
+    only_other = await validate_retry_from_failure(_session(), execution.id, ["step_b"])
+    assert only_other.eligible is True
+    assert only_other.eligible_point_ids == ["step_b"]
+    assert only_other.auto_included_node_ids == []
+
+
 @pytest.mark.asyncio
 async def test_eligible_points_excludes_failed_points_superseded_by_auto_inclusion() -> None:
     """Failed points downstream of an auto-included sanitized node are superseded; sanitized nodes stay."""
@@ -374,6 +615,8 @@ async def test_eligible_points_excludes_failed_points_superseded_by_auto_inclusi
     assert _eligible_points(definition, {"step_2"}, set()) == {"step_2"}
     # step_2 is strictly downstream of auto-included step_1: superseded.
     assert _eligible_points(definition, {"step_1", "step_2"}, {"step_1"}) == {"step_1"}
+    # Explicit sanitized replacement also supersedes the failed downstream node.
+    assert _eligible_points(definition, {"step_1", "step_2"}, set(), failed_ids={"step_2"}) == {"step_1"}
 
 
 @pytest.mark.asyncio
@@ -404,6 +647,8 @@ async def test_validate_retry_replacements_scoped_to_affected_failed_nodes() -> 
     )
     verdict = await validate_retry_from_failure(session, execution.id, [])
     assert verdict.eligible is True
+    assert verdict.eligible_point_ids == ["step_b", "step_x"]
+    assert verdict.auto_included_node_ids == ["step_x"]
     assert verdict.sanitized_replacements == {"step_a": ["step_x"]}
 
 
