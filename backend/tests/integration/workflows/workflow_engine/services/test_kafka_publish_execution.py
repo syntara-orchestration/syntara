@@ -112,7 +112,7 @@ async def test_publish_retries_and_downstream_execution(
         return future
 
     producer = MagicMock(start=AsyncMock(), stop=AsyncMock(), send=AsyncMock(side_effect=send))
-    monkeypatch.setattr(sender, "AIOKafkaProducer", MagicMock(return_value=producer))
+    monkeypatch.setattr(sender, "create_kafka_publish_producer", MagicMock(return_value=producer))
     pool = KafkaPublishPool(2)
     set_kafka_publish_pool(pool)
     parameters = {
