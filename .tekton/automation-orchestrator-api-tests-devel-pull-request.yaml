@@ -37,6 +37,11 @@ spec:
       value: '{{revision}}'
     - name: pipeline-github-pr-number
       value: '{{pull_request_number}}'
+    # Drop this pin once the devel operator bundle includes PR #1706.
+    - name: ao-operator-git-url
+      value: https://github.com/automation-nexus/automation-orchestrator-operator.git
+    - name: ao-operator-revision
+      value: devel
   pipelineRef:
     params:
       - name: name
