@@ -10,7 +10,11 @@ paths:
       tags:
         - Filtering
       summary: Test a CEL filter expression
-      description: 'Evaluate caller-supplied JSON with the shared CEL evaluator. #magic___^_^___line #magic___^_^___line Authentication is required; no stored resources are read or changed. #magic___^_^___line Invalid CEL returns 422. Evaluation returns match, no_match or evaluation_error.'
+      description: |-
+        Evaluate caller-supplied JSON with the shared CEL evaluator.
+
+        Authentication is required; no stored resources are read or changed.
+        Invalid CEL returns 422. Evaluation returns match, no_match or evaluation_error.
       operationId: test_cel_filter
       requestBody:
         content:
@@ -170,7 +174,11 @@ components:
       required:
         - input
       title: FilterTestRequest
-      description: 'An optional CEL expression and required JSON bound directly as input. #magic___^_^___line #magic___^_^___line Omitted, empty and whitespace-only expressions mean no filter. No Kafka #magic___^_^___line decoding, input restructuring or payload-schema validation is performed.'
+      description: |-
+        An optional CEL expression and required JSON bound directly as input.
+
+        Omitted, empty and whitespace-only expressions mean no filter. No Kafka
+        decoding, input restructuring or payload-schema validation is performed.
     FilterValidationProblem:
       properties:
         type:
