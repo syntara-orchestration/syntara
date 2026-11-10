@@ -7,6 +7,7 @@ This package contains:
 """
 
 from .approval import ApprovalResult
+from .form_prompt import FormPromptActivityInput
 from .responses import (
     WorkflowResultResponse,
     WorkflowStartResponse,
@@ -34,6 +35,7 @@ __all__ = [
     "ActivityTerminalStatus",
     "AgenticExecutorParameters",
     "ApprovalResult",
+    "FormPromptActivityInput",
     "FormPromptNodeParameters",
     "FormPromptOutput",
     "IntegrationConnectionConfig",

@@ -1,7 +1,7 @@
 """Unit tests for OrchestratorWorkflow form_prompt context preparation methods.
 
 Tests cover:
-- _prepare_form_prompt_args: assembling the full argument list for create_form_prompt_activity
+- _prepare_form_prompt_input: assembling the named input for create_form_prompt_activity
 - _execute_form_prompt_node: dispatch routing, timeout handling, and fallback behavior
 - _expire_form_prompts, _cancel_form_prompts: cleanup operations
 - _fail_detached_form_prompt_activity: Temporal activity resolution
@@ -25,18 +25,6 @@ from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkf
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
-
-_FORM_DEFINITION_ARG = 3
-_TIMEOUT_AT_ARG = 4
-_RESPONDER_USER_IDS_ARG = 5
-_RESPONDER_GROUP_IDS_ARG = 6
-_LOOP_PATH_ARG = 8
-_TEMPORAL_ID_ARG = 9
-_MESSAGE_ARG = 10
-_SUBMIT_LABEL_ARG = 11
-_SUCCESS_MESSAGE_ARG = 12
-_CSS_OVERRIDE_ARG = 13
-_NEW_FORM_PROMPT_ARG_COUNT = 14
 
 
 @pytest.fixture(autouse=True)
@@ -122,11 +110,11 @@ def _build_form_prompt_graph(*, with_predecessor: bool = True, with_successor: b
 
 
 class TestPrepareFormPromptArgs:
-    """Tests for _prepare_form_prompt_args method."""
+    """Tests for _prepare_form_prompt_input method."""
 
     @pytest.mark.asyncio
     async def test_basic_form_prompt_args(self) -> None:
-        """Returns a 16-element arg list with all required fields."""
+        """Returns one named input object with all required fields."""
         resolver = NamespaceResolver()
         resolver.set_namespace("trigger", {"source": "api"})
         wf = _make_workflow(execution_id="exec-456", resolver=resolver)
@@ -135,17 +123,32 @@ class TestPrepareFormPromptArgs:
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
         with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
-            args = await wf._prepare_form_prompt_args(node, graph, node.parameters)
+            args = await wf._prepare_form_prompt_input(node, graph, node.parameters)
 
-        assert len(args) == _NEW_FORM_PROMPT_ARG_COUNT
-        assert args[0] == "exec-456"  # execution_id
-        assert args[1] == "form1"  # prompt_node_id
-        assert args[2] == "Data Collection"  # name
-        assert args[_FORM_DEFINITION_ARG] == {}  # form_definition
-        assert args[_RESPONDER_USER_IDS_ARG] == []  # responder_user_ids
-        assert args[_RESPONDER_GROUP_IDS_ARG] == []  # responder_group_ids
-        assert args[_LOOP_PATH_ARG] == []  # loop_iteration_path
-        assert args[_TEMPORAL_ID_ARG] == "form1"  # temporal_activity_id
+        assert set(args) == {
+            "execution_id",
+            "prompt_node_id",
+            "name",
+            "form_definition",
+            "timeout_at",
+            "responder_user_ids",
+            "responder_group_ids",
+            "project_id",
+            "loop_iteration_path",
+            "temporal_activity_id",
+            "message",
+            "submit_label",
+            "success_message",
+            "css_override",
+        }
+        assert args["execution_id"] == "exec-456"
+        assert args["prompt_node_id"] == "form1"
+        assert args["name"] == "Data Collection"
+        assert args["form_definition"] == {}
+        assert args["responder_user_ids"] == []
+        assert args["responder_group_ids"] == []
+        assert args["loop_iteration_path"] == []
+        assert args["temporal_activity_id"] == "form1"
 
     @pytest.mark.asyncio
     async def test_form_prompt_args_inside_loop(self) -> None:
@@ -158,11 +161,11 @@ class TestPrepareFormPromptArgs:
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
         with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
-            args = await wf._prepare_form_prompt_args(node, graph, node.parameters)
+            args = await wf._prepare_form_prompt_input(node, graph, node.parameters)
 
-        assert args[1] == "form1"
-        assert args[_LOOP_PATH_ARG] == [1]
-        assert args[_TEMPORAL_ID_ARG] == "form1_iter_1"
+        assert args["prompt_node_id"] == "form1"
+        assert args["loop_iteration_path"] == [1]
+        assert args["temporal_activity_id"] == "form1_iter_1"
 
     @pytest.mark.asyncio
     async def test_form_prompt_args_with_responder_config(self) -> None:
@@ -181,11 +184,10 @@ class TestPrepareFormPromptArgs:
 
         mock_execute = AsyncMock(return_value={"user_ids": [alice_id, bob_id], "group_ids": [data_team_id]})
         with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
-            args = await wf._prepare_form_prompt_args(node, graph, config)
+            args = await wf._prepare_form_prompt_input(node, graph, config)
 
-        assert len(args) == _NEW_FORM_PROMPT_ARG_COUNT
-        assert args[_RESPONDER_USER_IDS_ARG] == [alice_id, bob_id]
-        assert args[_RESPONDER_GROUP_IDS_ARG] == [data_team_id]
+        assert args["responder_user_ids"] == [alice_id, bob_id]
+        assert args["responder_group_ids"] == [data_team_id]
 
         # Verify the resolution activity was called
         mock_execute.assert_called_once()
@@ -201,9 +203,9 @@ class TestPrepareFormPromptArgs:
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
         with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
-            args = await wf._prepare_form_prompt_args(node, graph, {"response_window": 1800})
+            args = await wf._prepare_form_prompt_input(node, graph, {"response_window": 1800})
 
-        timeout_at = args[_TIMEOUT_AT_ARG]
+        timeout_at = args["timeout_at"]
         assert timeout_at is not None
         parsed = datetime.fromisoformat(timeout_at)
         mock_now = datetime(2026, 4, 10, 12, 0, 0, tzinfo=UTC)
@@ -225,9 +227,9 @@ class TestPrepareFormPromptArgs:
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
         with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
-            args = await wf._prepare_form_prompt_args(node, graph, node.parameters)
+            args = await wf._prepare_form_prompt_input(node, graph, node.parameters)
 
-        assert args[2] == "Form prompt for my_form"
+        assert args["name"] == "Form prompt for my_form"
 
     @pytest.mark.asyncio
     async def test_form_definition_passed_through(self) -> None:
@@ -249,9 +251,9 @@ class TestPrepareFormPromptArgs:
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
         with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
-            args = await wf._prepare_form_prompt_args(node, graph, config)
+            args = await wf._prepare_form_prompt_input(node, graph, config)
 
-        assert args[_FORM_DEFINITION_ARG] == form_def
+        assert args["form_definition"] == form_def
 
     @pytest.mark.asyncio
     async def test_message_scrubbed_and_truncated(self) -> None:
@@ -264,9 +266,9 @@ class TestPrepareFormPromptArgs:
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
         with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
-            args = await wf._prepare_form_prompt_args(node, graph, config)
+            args = await wf._prepare_form_prompt_input(node, graph, config)
 
-        message = args[_MESSAGE_ARG]
+        message = args["message"]
         assert "secret123" not in message
         assert "[REDACTED]" in message
 
@@ -284,11 +286,11 @@ class TestPrepareFormPromptArgs:
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
         with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
-            args = await wf._prepare_form_prompt_args(node, graph, config)
+            args = await wf._prepare_form_prompt_input(node, graph, config)
 
-        assert args[_SUBMIT_LABEL_ARG] == "Send"
-        assert args[_SUCCESS_MESSAGE_ARG] == "Thanks!"
-        assert args[_CSS_OVERRIDE_ARG] == ".form { color: blue; }"
+        assert args["submit_label"] == "Send"
+        assert args["success_message"] == "Thanks!"
+        assert args["css_override"] == ".form { color: blue; }"
 
     @pytest.mark.asyncio
     async def test_missing_submitted_successor_raises(self) -> None:
@@ -302,7 +304,7 @@ class TestPrepareFormPromptArgs:
             patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
             pytest.raises(SafeValueError, match="no submitted successor"),
         ):
-            await wf._prepare_form_prompt_args(node, graph, node.parameters)
+            await wf._prepare_form_prompt_input(node, graph, node.parameters)
 
 
 class TestPrepareFormPromptArgsDynamicOptions:
@@ -346,9 +348,9 @@ class TestPrepareFormPromptArgsDynamicOptions:
 
         with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
             resolved = wf._resolve_node_parameters(node)
-            args = await wf._prepare_form_prompt_args(node, graph, resolved)
+            args = await wf._prepare_form_prompt_input(node, graph, resolved)
 
-        assert args[_FORM_DEFINITION_ARG]["fields"][0]["options"] == {
+        assert args["form_definition"]["fields"][0]["options"] == {
             "source": "dynamic_resolved",
             "values": [
                 {"display_label": "A", "value": "a"},
@@ -371,9 +373,9 @@ class TestPrepareFormPromptArgsDynamicOptions:
             "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
-            args = await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+            args = await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
 
-        assert args[_FORM_DEFINITION_ARG]["fields"][0]["options"]["source"] == "dynamic_resolved"
+        assert args["form_definition"]["fields"][0]["options"]["source"] == "dynamic_resolved"
 
     @pytest.mark.asyncio
     async def test_types_preserved_end_to_end(self) -> None:
@@ -398,12 +400,12 @@ class TestPrepareFormPromptArgsDynamicOptions:
             "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
-            args = await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+            args = await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
 
-        values = args[_FORM_DEFINITION_ARG]["fields"][0]["options"]["values"]
+        values = args["form_definition"]["fields"][0]["options"]["values"]
         assert [value["value"] for value in values] == [1, 2, 3]
         assert all(type(value["value"]) is int for value in values)
-        json.dumps(args[_FORM_DEFINITION_ARG])
+        json.dumps(args["form_definition"])
 
     @pytest.mark.asyncio
     async def test_record_options_materialized_with_configured_keys(self) -> None:
@@ -429,9 +431,9 @@ class TestPrepareFormPromptArgsDynamicOptions:
             "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
-            args = await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+            args = await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
 
-        assert args[_FORM_DEFINITION_ARG]["fields"][0]["options"]["values"] == [{"display_label": "US", "value": "us"}]
+        assert args["form_definition"]["fields"][0]["options"]["values"] == [{"display_label": "US", "value": "us"}]
 
     @pytest.mark.asyncio
     async def test_static_options_unchanged(self) -> None:
@@ -453,9 +455,9 @@ class TestPrepareFormPromptArgsDynamicOptions:
             "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
-            args = await wf._prepare_form_prompt_args(node, graph, node.parameters)
+            args = await wf._prepare_form_prompt_input(node, graph, node.parameters)
 
-        assert args[_FORM_DEFINITION_ARG] == form_definition
+        assert args["form_definition"] == form_definition
 
     @pytest.mark.asyncio
     async def test_mixed_static_and_dynamic_fields(self) -> None:
@@ -482,9 +484,9 @@ class TestPrepareFormPromptArgsDynamicOptions:
             "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
-            args = await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+            args = await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
 
-        fields = args[_FORM_DEFINITION_ARG]["fields"]
+        fields = args["form_definition"]["fields"]
         assert fields[0] == static_field
         assert fields[1]["options"]["source"] == "dynamic_resolved"
 
@@ -508,9 +510,9 @@ class TestPrepareFormPromptArgsDynamicOptions:
             "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
-            args = await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+            args = await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
 
-        fields = args[_FORM_DEFINITION_ARG]["fields"]
+        fields = args["form_definition"]["fields"]
         assert fields[0]["options"]["values"][0]["value"] == "us"
         assert fields[1]["options"]["values"][0]["value"] == "platform"
 
@@ -528,7 +530,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
             patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
             pytest.raises(SafeValueError, match="region"),
         ):
-            await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+            await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
 
         mock_execute.assert_not_awaited()
 
@@ -554,7 +556,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
             patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
             pytest.raises(SafeValueError, match="default value 'emea'"),
         ):
-            await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+            await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
 
         mock_execute.assert_not_awaited()
 
@@ -571,7 +573,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
             "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
-            await wf._prepare_form_prompt_args(node, graph, wf._resolve_node_parameters(node))
+            await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
 
         assert node.parameters == before
 
@@ -614,7 +616,7 @@ class TestExecuteFormPromptNode:
         graph = _build_form_prompt_graph()
         node = ActivityNode("form1", "form_prompt", {}, name="Form")
 
-        mock_prep_args = AsyncMock(return_value=[])
+        mock_prep_args = AsyncMock(return_value={})
         mock_execute = AsyncMock(
             return_value={
                 "output": {
@@ -628,7 +630,7 @@ class TestExecuteFormPromptNode:
         )
 
         with (
-            patch.object(wf, "_prepare_form_prompt_args", mock_prep_args),
+            patch.object(wf, "_prepare_form_prompt_input", mock_prep_args),
             patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
         ):
             result = await wf._execute_form_prompt_node(node, graph, {})
@@ -644,7 +646,7 @@ class TestExecuteFormPromptNode:
         graph = _build_form_prompt_graph()
         node = ActivityNode("form1", "form_prompt", {}, name="Form")
 
-        mock_prep_args = AsyncMock(return_value=[])
+        mock_prep_args = AsyncMock(return_value={})
 
         # Create a real ActivityError with a mocked cause property
         timeout_error = TemporalTimeoutError("Activity timed out", type=None, last_heartbeat_details=[])
@@ -663,7 +665,7 @@ class TestExecuteFormPromptNode:
         mock_execute = AsyncMock(side_effect=activity_error)
 
         with (
-            patch.object(wf, "_prepare_form_prompt_args", mock_prep_args),
+            patch.object(wf, "_prepare_form_prompt_input", mock_prep_args),
             patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
             pytest.raises(ActivityError),
         ):
@@ -676,7 +678,7 @@ class TestExecuteFormPromptNode:
         graph = _build_form_prompt_graph()
         node = ActivityNode("form1", "form_prompt", {}, name="Form")
 
-        mock_prep_args = AsyncMock(return_value=[])
+        mock_prep_args = AsyncMock(return_value={})
         mock_execute = AsyncMock(
             return_value={
                 "output": {
@@ -687,7 +689,7 @@ class TestExecuteFormPromptNode:
         )
 
         with (
-            patch.object(wf, "_prepare_form_prompt_args", mock_prep_args),
+            patch.object(wf, "_prepare_form_prompt_input", mock_prep_args),
             patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
             pytest.raises(ApplicationError, match="Invalid form prompt outcome"),
         ):
