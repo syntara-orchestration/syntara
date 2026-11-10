@@ -8,10 +8,10 @@ import pytest
 import syntara.workflows.validators.template_expressions
 from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
 from syntara.workflows.validators.template_expressions import (
-    _extract_element_expressions,
     _extract_expressions,
     _identify_loop_body_nodes,
     check_template_expressions,
+    extract_element_expressions,
 )
 
 
@@ -272,6 +272,67 @@ class TestAllValidExpressions:
         node_ids = {"t1", "n1"}
         errors = check_template_expressions(defn, node_ids)
         assert errors == []
+
+
+class TestSubWorkflowDynamicOutputs:
+    """Sub-workflow outputs allow dynamic paths only below Result.outputs."""
+
+    @pytest.mark.parametrize(
+        "expression",
+        [
+            "${child}",
+            "${child.Result}",
+            "${child.Result.outputs}",
+            "${child.Result.outputs.deploy.Result.artifact_url}",
+            "${child.Result.outputs.deploy.StatusCode}",
+            "${child.Result.outputs.deploy.deeply.nested.field}",
+        ],
+    )
+    def test_dynamic_output_paths_are_accepted(self, expression: str) -> None:
+        defn = _base_definition(
+            nodes=[
+                {"id": "child", "type": "sub_workflow", "parameters": {}},
+                _script_node("consumer", environment={"VALUE": expression}),
+            ],
+        )
+
+        assert check_template_expressions(defn, {"t1", "child", "consumer"}) == []
+
+    @pytest.mark.parametrize(
+        "expression",
+        [
+            "${child.invalid_field}",
+            "${child.Result.invalid_field}",
+            "${child.Result.outputs_typo.deploy.value}",
+            "${child.StatusCode.nested}",
+            "${child.Result.child_status.nested}",
+        ],
+    )
+    def test_invalid_static_output_paths_are_rejected(self, expression: str) -> None:
+        defn = _base_definition(
+            nodes=[
+                {"id": "child", "type": "sub_workflow", "parameters": {}},
+                _script_node("consumer", environment={"VALUE": expression}),
+            ],
+        )
+
+        findings = check_template_expressions(defn, {"t1", "child", "consumer"})
+
+        assert len(findings) == 1
+        assert findings[0].severity == ValidationSeverity.error
+        assert findings[0].category == ValidationCategory.invalid_reference
+        assert findings[0].node_id == "consumer"
+        assert findings[0].field_path == "parameters.environment.VALUE"
+
+    def test_dynamic_output_behavior_is_specific_to_subworkflow_nodes(self) -> None:
+        defn = _base_definition(
+            nodes=[
+                _script_node("child"),
+                _script_node("consumer", environment={"VALUE": "${child.any.deep.field}"}),
+            ],
+        )
+
+        assert check_template_expressions(defn, {"t1", "child", "consumer"}) == []
 
 
 # ---------------------------------------------------------------------------
@@ -537,29 +598,29 @@ class TestExtractExpressions:
 
 
 class TestExtractElementExpressions:
-    """_extract_element_expressions respects skip rules."""
+    """extract_element_expressions respects skip rules."""
 
     def test_skips_code_field_for_script(self) -> None:
         node = _script_node("n1", code="${something}")
-        result = _extract_element_expressions(node)
+        result = extract_element_expressions(node)
         codes = [expr for expr, _ in result if "something" in expr]
         assert codes == []
 
     def test_includes_environment_for_script(self) -> None:
         node = _script_node("n1", environment={"K": "${step_1.val}"})
-        result = _extract_element_expressions(node)
+        result = extract_element_expressions(node)
         assert len(result) == 1
         assert result[0][0] == "step_1.val"
 
     def test_node_without_type_uses_empty_skip(self) -> None:
         node: dict[str, Any] = {"id": "n1", "parameters": {"url": "${ghost.val}"}}
-        result = _extract_element_expressions(node)
+        result = extract_element_expressions(node)
         assert len(result) == 1
         assert result[0][0] == "ghost.val"
 
     def test_node_with_empty_parameters(self) -> None:
         node: dict[str, Any] = {"id": "n1", "type": "http_request", "parameters": {}}
-        result = _extract_element_expressions(node)
+        result = extract_element_expressions(node)
         assert result == []
 
 

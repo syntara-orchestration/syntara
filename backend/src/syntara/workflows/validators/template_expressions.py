@@ -1,8 +1,9 @@
 """Template expression validation for V2 workflow definitions.
 
 Validates that ``${...}`` expressions in node parameters reference valid
-scopes and existing activity/trigger IDs.  Produces errors for unresolved
-activity references and invalid namespace scopes.
+scopes and existing activity/trigger IDs. Sub-workflow output fields are
+checked against their model except for dynamic child entries under
+``Result.outputs``.
 """
 
 import re
@@ -10,6 +11,10 @@ from collections import deque
 from typing import Any
 
 from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
+from syntara.workflows.workflow_engine.models.workflow_definition import (
+    SubWorkflowOutput,
+    SubWorkflowOutputResult,
+)
 
 TEMPLATE_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
@@ -25,6 +30,46 @@ BUILTIN_SCOPES: frozenset[str] = frozenset(
 _SKIP_FIELDS_BY_NODE_TYPE: dict[str, frozenset[str]] = {
     "script": frozenset({"code"}),
 }
+
+_SUBWORKFLOW_OUTPUT_FIELDS = frozenset(SubWorkflowOutput.model_fields)
+_SUBWORKFLOW_RESULT_FIELDS = frozenset(SubWorkflowOutputResult.model_fields)
+
+
+def _validate_subworkflow_output_path(
+    expr_body: str,
+    node_id: str | None,
+    field_path: str,
+) -> ValidationFinding | None:
+    """Validate static Sub-workflow output fields, leaving ``Result.outputs`` dynamic."""
+    _, *path = expr_body.split(".")
+    if not path:
+        return None
+
+    output_field, *path = path
+    if output_field not in _SUBWORKFLOW_OUTPUT_FIELDS:
+        message = f"Expression '${{{expr_body}}}' references unknown Sub-workflow output field '{output_field}'"
+    elif output_field != "Result" and path:
+        message = f"Expression '${{{expr_body}}}' cannot access a nested field through '{output_field}'"
+    elif output_field == "Result" and path:
+        result_field, *path = path
+        if result_field not in _SUBWORKFLOW_RESULT_FIELDS:
+            message = f"Expression '${{{expr_body}}}' references unknown Sub-workflow Result field '{result_field}'"
+        elif result_field == "outputs":
+            return None
+        elif path:
+            message = f"Expression '${{{expr_body}}}' cannot access a nested field through 'Result.{result_field}'"
+        else:
+            return None
+    else:
+        return None
+
+    return ValidationFinding(
+        severity=ValidationSeverity.error,
+        category=ValidationCategory.invalid_reference,
+        message=message,
+        node_id=node_id,
+        field_path=field_path,
+    )
 
 
 def _identify_loop_body_nodes(workflow_definition: dict[str, Any]) -> dict[str, str]:
@@ -90,7 +135,7 @@ def _extract_expressions(value: Any, path_prefix: str, *, _depth: int = 0) -> li
     return results
 
 
-def _extract_element_expressions(
+def extract_element_expressions(
     node: dict[str, Any],
 ) -> list[tuple[str, str]]:
     """Extract template expressions from an element's parameters, skipping excluded fields."""
@@ -98,6 +143,8 @@ def _extract_element_expressions(
     skip_fields = _SKIP_FIELDS_BY_NODE_TYPE.get(node_type, frozenset())
 
     params = node.get("parameters", {})
+    if not isinstance(params, dict):
+        return []
     results: list[tuple[str, str]] = []
     for key, val in params.items():
         if key in skip_fields:
@@ -123,18 +170,29 @@ def check_template_expressions(
         *workflow_definition.get("triggers", []),
         *workflow_definition.get("nodes", []),
     ]
+    subworkflow_node_ids = {
+        element.get("id")
+        for element in workflow_definition.get("nodes", [])
+        if isinstance(element, dict) and element.get("type") == "sub_workflow" and isinstance(element.get("id"), str)
+    }
     for element in all_elements:
+        if not isinstance(element, dict):
+            continue
         element_id = element.get("id")
-        expressions = _extract_element_expressions(element)
+        expressions = extract_element_expressions(element)
         in_loop_body = element_id in loop_body_map
 
-        for expr_body, _field_path in expressions:
+        for expr_body, field_path in expressions:
             scope = expr_body.split(".")[0]
 
             if scope in BUILTIN_SCOPES:
                 continue
 
             if scope in node_ids:
+                if scope in subworkflow_node_ids:
+                    finding = _validate_subworkflow_output_path(expr_body, element_id, field_path)
+                    if finding is not None:
+                        findings.append(finding)
                 continue
 
             if scope == "loop":

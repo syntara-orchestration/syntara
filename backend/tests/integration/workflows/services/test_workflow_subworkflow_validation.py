@@ -11,7 +11,7 @@ from syntara.authz.models.project import Project
 from syntara.core.models import User
 from syntara.workflows.exceptions import WorkflowNotPublishedError, WorkflowPublishValidationError
 from syntara.workflows.models import Workflow
-from syntara.workflows.models.validation_finding import ValidationCategory, ValidationResult
+from syntara.workflows.models.validation_finding import ValidationCategory, ValidationResult, ValidationSeverity
 from syntara.workflows.models.workflow import WorkflowCreate
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.workflow_service import WorkflowService
@@ -63,6 +63,24 @@ def _definition_without_subworkflow() -> dict[str, Any]:
     }
 
 
+def _definition_with_subworkflow_output_references(
+    child_workflow_id: UUID,
+    references: list[str],
+) -> dict[str, Any]:
+    """Build a parent definition whose downstream condition uses child outputs."""
+    definition = _definition_with_subworkflow(child_workflow_id)
+    definition["nodes"].append(
+        {
+            "id": "consume_output",
+            "name": "Consume child output",
+            "type": "condition",
+            "parameters": {"condition": " and ".join(f"${{{reference}}}" for reference in references)},
+        }
+    )
+    definition["edges"].append({"from": "call_child", "to": "consume_output"})
+    return definition
+
+
 async def _create_child_workflow(
     session: AsyncSession,
     user: User,
@@ -73,6 +91,7 @@ async def _create_child_workflow(
     trigger_type: str = "subworkflow_trigger",
     input_schema: dict[str, Any] | None = None,
     additional_triggers: list[dict[str, Any]] | None = None,
+    child_step_ids: list[str] | None = None,
 ) -> Workflow:
     child = Workflow(
         name=f"child-{uuid4().hex[:8]}",
@@ -96,7 +115,7 @@ async def _create_child_workflow(
                 "schema_version": "2.0.0",
                 "name": child.name,
                 "triggers": triggers,
-                "nodes": [],
+                "nodes": [{"id": step_id, "type": "script"} for step_id in child_step_ids or []],
                 "edges": [],
             },
             created_by=user.id,
@@ -330,7 +349,119 @@ async def test_same_project_reference_can_be_saved_and_published(
 
 
 @pytest.mark.asyncio
-async def test_missing_required_child_inputs_warn_on_save_and_block_publish(
+async def test_reference_to_existing_published_child_step_has_no_finding(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        child_step_ids=["deploy"],
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            ["call_child.Result.outputs.deploy.Result.artifact_url"],
+        ),
+        test_project_id,
+    )
+
+    assert findings == []
+
+
+@pytest.mark.asyncio
+async def test_stale_child_step_references_each_produce_warnings(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        child_step_ids=["still_present"],
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            [
+                "call_child.Result.outputs.removed_a.Result.value",
+                "call_child.Result.outputs.still_present.Result.value",
+                "call_child.Result.outputs.removed_b.StatusCode",
+            ],
+        ),
+        test_project_id,
+    )
+
+    assert len(findings) == 2
+    assert all(finding.severity == ValidationSeverity.warning for finding in findings)
+    assert [finding.message for finding in findings] == [
+        "Parent references child step 'removed_a' which no longer exists",
+        "Parent references child step 'removed_b' which no longer exists",
+    ]
+    assert all(finding.node_id == "call_child" for finding in findings)
+    assert [finding.field_path for finding in findings] == [
+        "Result.outputs.removed_a",
+        "Result.outputs.removed_b",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_stale_child_step_warning_does_not_block_publish(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(test_db_session, test_user, test_project_id)
+    service = WorkflowService(test_db_session, test_user)
+
+    with (
+        patch(
+            "syntara.workflows.services.workflow_service.workflow_validator",
+            _valid_workflow_validator(),
+        ),
+        patch(
+            "syntara.workflows.services.workflow_service.get_system_continue_on_failure",
+            new_callable=AsyncMock,
+            return_value=False,
+        ),
+        patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as webhook_service,
+    ):
+        webhook_service.return_value.sync_webhook_triggers = AsyncMock()
+        parent, version, validation_result = await service.create_workflow(
+            name=f"parent-{uuid4().hex[:8]}",
+            description=None,
+            labels={},
+            workflow_definition=_definition_with_subworkflow_output_references(
+                child.id,
+                ["call_child.Result.outputs.removed_step.Result.value"],
+            ),
+            project_id=test_project_id,
+        )
+
+        assert validation_result.error_count == 0
+        assert validation_result.warning_count == 1
+        assert validation_result.findings[0].message == (
+            "Parent references child step 'removed_step' which no longer exists"
+        )
+
+        published_workflow, published_version, warning = await service.publish_workflow_version(
+            workflow_id=parent.id,
+            version=version.version,
+        )
+
+    assert published_workflow.published_version_id == published_version.id
+    assert "Parent references child step 'removed_step' which no longer exists" in warning
+
+
+@pytest.mark.asyncio
+async def test_missing_required_child_inputs_warn_on_save_and_allow_publish(
     test_db_session: AsyncSession,
     test_user: User,
     test_project_id: UUID,
@@ -357,7 +488,9 @@ async def test_missing_required_child_inputs_warn_on_save_and_block_publish(
             new_callable=AsyncMock,
             return_value=False,
         ),
+        patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as webhook_service,
     ):
+        webhook_service.return_value.sync_webhook_triggers = AsyncMock()
         parent, version, validation_result = await service.create_workflow(
             name=f"parent-{uuid4().hex[:8]}",
             description=None,
@@ -378,11 +511,14 @@ async def test_missing_required_child_inputs_warn_on_save_and_block_publish(
             f"Child workflow '{child.name}' requires input 'region', not provided in input_mapping",
         ]
 
-        with pytest.raises(WorkflowPublishValidationError) as exc_info:
-            await service.publish_workflow_version(workflow_id=parent.id, version=version.version)
+        published_workflow, published_version, warning = await service.publish_workflow_version(
+            workflow_id=parent.id,
+            version=version.version,
+        )
 
-    assert exc_info.value.validation_result.error_count == 0
-    assert exc_info.value.validation_result.warning_count == 2
+    assert published_workflow.published_version_id == published_version.id
+    assert "requires input 'target_host'" in warning
+    assert "requires input 'region'" in warning
 
 
 @pytest.mark.asyncio
@@ -394,7 +530,7 @@ async def test_missing_required_child_inputs_warn_on_save_and_block_publish(
         ("published", "child_entry", "manual_trigger", "child_entry", "parameters.trigger_node_id"),
     ],
 )
-async def test_unavailable_child_invocation_is_reported_when_saved_and_blocks_publish(
+async def test_unavailable_child_invocation_severity_controls_publishability(
     test_db_session: AsyncSession,
     test_user: User,
     test_project_id: UUID,
@@ -424,7 +560,9 @@ async def test_unavailable_child_invocation_is_reported_when_saved_and_blocks_pu
             new_callable=AsyncMock,
             return_value=False,
         ),
+        patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as webhook_service,
     ):
+        webhook_service.return_value.sync_webhook_triggers = AsyncMock()
         parent, _initial_version, _initial_validation = await service.create_workflow(
             name=f"parent-{uuid4().hex[:8]}",
             description=None,
@@ -441,14 +579,24 @@ async def test_unavailable_child_invocation_is_reported_when_saved_and_blocks_pu
 
         assert version is not None
         assert parent.has_validation_issues is True
-        assert validation_result.error_count == 1
+        expected_severity = ValidationSeverity.warning if child_state == "unpublished" else ValidationSeverity.error
+        assert validation_result.error_count == int(expected_severity == ValidationSeverity.error)
+        assert validation_result.warning_count == int(expected_severity == ValidationSeverity.warning)
+        assert validation_result.findings[0].severity == expected_severity
         assert validation_result.findings[0].field_path == expected_field_path
 
-        with pytest.raises(WorkflowPublishValidationError) as exc_info:
-            await service.publish_workflow_version(workflow_id=parent.id, version=version.version)
-
-    assert exc_info.value.validation_result.error_count == 1
-    assert exc_info.value.validation_result.findings[0].field_path == expected_field_path
+        if child_state == "unpublished":
+            published_workflow, published_version, warning = await service.publish_workflow_version(
+                workflow_id=parent.id,
+                version=version.version,
+            )
+            assert published_workflow.published_version_id == published_version.id
+            assert "has no published version" in warning
+        else:
+            with pytest.raises(WorkflowPublishValidationError) as exc_info:
+                await service.publish_workflow_version(workflow_id=parent.id, version=version.version)
+            assert exc_info.value.validation_result.error_count == 1
+            assert exc_info.value.validation_result.findings[0].field_path == expected_field_path
 
 
 @pytest.mark.asyncio
