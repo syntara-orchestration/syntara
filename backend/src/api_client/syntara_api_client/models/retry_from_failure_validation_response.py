@@ -33,8 +33,10 @@ class RetryFromFailureValidationResponse:
             reports the pre-expansion selection that was assessed.
         sanitized_node_ids (list[str] | Unset): Upstream nodes with sanitized stored outputs referenced on the retry
             path. Populated when the verdict rejects; empty on eligible verdicts (see auto_included_node_ids).
-        auto_included_node_ids (list[str] | Unset): Sanitized nodes added as retry points on the default path. Empty on
-            explicit selections, which reject instead.
+        auto_included_node_ids (list[str] | Unset): Sanitized nodes added as retry points so redacted outputs can be
+            regenerated. Set on the default path and when an explicit sanitized replacement still has further sanitized
+            ancestors. Empty when that chain was already selected, or when an explicit failed node with sanitized
+            dependencies is rejected.
         sanitized_replacements (RetryFromFailureValidationResponseSanitizedReplacements | Unset): For each currently-
             failed node, the sanitized nodes it must be replaced by, if any.
         step_count_by_eligible_point (RetryFromFailureValidationResponseStepCountByEligiblePoint | Unset): Re-run step

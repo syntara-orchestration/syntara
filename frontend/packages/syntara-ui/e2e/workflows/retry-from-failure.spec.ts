@@ -154,7 +154,7 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await expect(
         panel.getByText(/This retry uses the same workflow version as this run, preserving the definition that ran/)
       ).toBeVisible()
-      await expect(panel.getByText(/Nodes outside the selected retry scope will not re-execute/)).toBeVisible()
+      await expect(panel.getByText(/Steps outside the selected retry scope will not re-execute/)).toBeVisible()
       await expect(panel.getByText(/may repeat external side effects/)).toBeVisible()
       await expect(panel.getByText(/To change the parameters for this retry, select the failed node/)).toBeVisible()
       await expect(panel.getByRole('heading', { name: 'Retry plan' })).toBeVisible()
@@ -197,8 +197,8 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await app.getByTestId('retry-from-failure-button').click()
 
       const panel = app.getByRole('complementary', { name: 'Retry run from failure review' })
-      const allPoints = panel.getByRole('radio', { name: 'All eligible failure points' })
-      const choosePoints = panel.getByRole('radio', { name: 'Choose failure points' })
+      const allPoints = panel.getByRole('radio', { name: 'Retry all affected branches' })
+      const choosePoints = panel.getByRole('radio', { name: 'Choose branches' })
       const retryPlanCard = panel.getByTestId('retry-plan-card')
       await expect(retryPlanCard.getByRole('radiogroup', { name: 'Retry scope' })).toBeVisible()
       const retryOrigin = app.getByTestId('retry-origin-step2')

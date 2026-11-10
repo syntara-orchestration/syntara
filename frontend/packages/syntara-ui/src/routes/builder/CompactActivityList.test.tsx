@@ -111,6 +111,18 @@ describe('CompactActivityList', () => {
     expect(screen.getAllByTestId('activity-status-label-replayed')).toHaveLength(1)
   })
 
+  it('does not mark a retained failure as replayed', () => {
+    render(
+      <CompactActivityList
+        activityStates={new Map([state('task-1', { status: 'failed', startedAt: '2024-01-01T00:00:00Z' })])}
+        activityOrder={[{ id: 'task-1', name: 'Script' }]}
+        replayBaselineAt="2024-01-02T00:00:00Z"
+      />
+    )
+
+    expect(screen.queryByTestId('activity-status-label-replayed')).not.toBeInTheDocument()
+  })
+
   it('does not mark a row replayed when there is no retry baseline', () => {
     render(<CompactActivityList activityStates={states} activityOrder={order} />)
 
