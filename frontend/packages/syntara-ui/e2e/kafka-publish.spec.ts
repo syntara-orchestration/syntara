@@ -101,15 +101,20 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     await app.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(app.getByRole('button', { name: 'Runtime credential', exact: true })).toBeHidden()
     await expect(app.getByRole('button', { name: 'Set up connection', exact: true })).toBeFocused()
+    await app.getByRole('textbox', { name: 'Target topic', exact: true }).fill('automation.outcomes')
+    await app.getByRole('textbox', { name: 'JSON payload', exact: true }).fill('null')
     await app.getByRole('button', { name: 'Create', exact: true }).click()
-    await expect(app.getByText('Select a runtime Kafka credential', { exact: true })).toBeVisible()
+    await expect(app.getByRole('button', { name: 'Create', exact: true })).toBeVisible()
+    // PatternFly helper text includes a screen-reader-only error status suffix.
+    await expect(app.getByText('Select a runtime Kafka credential')).toBeVisible()
+    await expect(app.getByRole('button', { name: 'Set up connection', exact: true })).toHaveAccessibleDescription(
+      /Select a runtime Kafka credential/
+    )
     await app.getByRole('button', { name: 'Set up connection', exact: true }).click()
     await app.getByRole('button', { name: 'Runtime credential', exact: true }).click()
     await expect(app.getByRole('option', { name: 'No credential', exact: true })).toBeHidden()
     await app.getByRole('option', { name: `${name}-runtime`, exact: true }).click()
     await expect(app.getByText(`${name}-runtime`, { exact: true })).toBeVisible()
-    await app.getByRole('textbox', { name: 'Target topic', exact: true }).fill('automation.outcomes')
-    await app.getByRole('textbox', { name: 'JSON payload', exact: true }).fill('null')
     await app.getByRole('button', { name: 'Message key encoding', exact: true }).click()
     await app.getByRole('option', { name: 'Base64 binary', exact: true }).click()
     await app.getByRole('textbox', { name: 'Message key value', exact: true }).fill('AAEC')
