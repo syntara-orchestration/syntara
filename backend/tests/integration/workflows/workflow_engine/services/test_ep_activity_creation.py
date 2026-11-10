@@ -6,8 +6,9 @@ completion are doubles; row creation and callback lookups use PostgreSQL.
 
 from collections.abc import Generator
 from datetime import UTC, datetime
+from typing import Self
 from unittest.mock import AsyncMock, Mock, patch
-from uuid import uuid5
+from uuid import UUID, uuid4, uuid5
 
 import pytest
 from execution_plane_client.commands.control import CompletionStatus
@@ -15,6 +16,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.execution_plane import cancellation
 from syntara.execution_plane.commands.completion import CompletionCommandHandler
 from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
@@ -27,6 +29,20 @@ _DEFINITIONS = {
     _NODE_ID: {"type": "script"},
     "other_activity": {"type": "http_request"},
 }
+
+
+class _FakeExecutionPlaneClient:
+    def __init__(self) -> None:
+        self.cancelled: list[UUID] = []
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        return None
+
+    async def cancel_work_item(self, *, work_item_id: UUID) -> None:
+        self.cancelled.append(work_item_id)
 
 
 @pytest.fixture
@@ -130,3 +146,66 @@ async def test_monitor_updates_row_created_after_dispatch(
         assert row is not None
         assert row.status == ActivityStatus.COMPLETED
         assert row.output_data == {"output": {"stdout": "ok"}}
+
+
+@pytest.mark.asyncio
+async def test_cancellation_uses_base_activity_id_for_active_loop_iteration(
+    test_execution: Execution,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Only supported base activity records map to Execution Plane work items."""
+    base_id = uuid5(test_execution.id, _NODE_ID)
+    unsupported_id = uuid5(test_execution.id, "other_activity")
+    non_derived_id = uuid4()
+    iteration_id = uuid4()
+    async with test_db_session_factory() as writer:
+        writer.add_all(
+            [
+                ActivityExecution(
+                    id=base_id,
+                    execution_id=test_execution.id,
+                    activity_name=_NODE_ID,
+                    node_type="script",
+                    temporal_activity_id=_NODE_ID,
+                    status=ActivityStatus.COMPLETED,
+                    iteration=0,
+                ),
+                ActivityExecution(
+                    id=unsupported_id,
+                    execution_id=test_execution.id,
+                    activity_name="other_activity",
+                    node_type="http_request",
+                    temporal_activity_id="other_activity",
+                    status=ActivityStatus.RUNNING,
+                ),
+                ActivityExecution(
+                    id=iteration_id,
+                    execution_id=test_execution.id,
+                    activity_name=f"{_NODE_ID}#iter-1",
+                    node_type="script",
+                    temporal_activity_id=f"{_NODE_ID}#iter-1",
+                    status=ActivityStatus.RUNNING,
+                    iteration=1,
+                ),
+                ActivityExecution(
+                    id=non_derived_id,
+                    execution_id=test_execution.id,
+                    activity_name="pre-resolved-script",
+                    node_type="script",
+                    temporal_activity_id="pre-resolved-script",
+                    status=ActivityStatus.COMPLETED,
+                ),
+            ]
+        )
+        await writer.commit()
+
+    client = _FakeExecutionPlaneClient()
+    with (
+        patch.object(cancellation, "execution_plane_supported_node_types", return_value=frozenset({"script"})),
+        patch.object(cancellation, "ExecutionPlaneHttpClient", return_value=client),
+    ):
+        async with test_db_session_factory() as session:
+            cancelled = await cancellation.cancel_execution_plane_work_for_execution(session, test_execution.id)
+
+    assert cancelled == [base_id]
+    assert client.cancelled == [base_id]

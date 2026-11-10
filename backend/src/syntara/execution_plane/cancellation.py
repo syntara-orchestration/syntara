@@ -6,11 +6,11 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING
 
 import structlog
-from sqlmodel import col, select
+from sqlmodel import col, or_, select
 
 from syntara.execution_plane.client import ExecutionPlaneHttpClient, ExecutionPlaneRejectedError
 from syntara.execution_plane.utils import execution_plane_supported_node_types, execution_plane_work_item_id
-from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+from syntara.workflows.models.activity_execution import ActivityExecution
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -18,14 +18,6 @@ if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
 logger = structlog.stdlib.get_logger(__name__)
-
-_ACTIVE_ACTIVITY_STATUSES = (
-    ActivityStatus.PENDING,
-    ActivityStatus.RUNNING,
-    ActivityStatus.WAITING,
-    ActivityStatus.RETRYING,
-)
-_ITERATION_RECORD_SEPARATOR = "#iter-"
 
 
 async def cancel_execution_plane_work_items(
@@ -39,6 +31,11 @@ async def cancel_execution_plane_work_items(
     the others. The returned list contains IDs for which cancellation succeeded.
     """
     work_item_ids = [execution_plane_work_item_id(execution_id, activity_id) for activity_id in activity_ids]
+    return await _cancel_execution_plane_work_item_ids(execution_id, work_item_ids)
+
+
+async def _cancel_execution_plane_work_item_ids(execution_id: UUID, work_item_ids: list[UUID]) -> list[UUID]:
+    """Cancel Execution Plane work for the supplied work-item IDs."""
     if not work_item_ids:
         return []
 
@@ -72,21 +69,42 @@ async def cancel_execution_plane_work_items(
     return cancelled
 
 
-async def _active_execution_plane_activity_ids(session: AsyncSession, execution_id: UUID) -> list[str]:
-    """Return base activity IDs for non-terminal Execution Plane activities."""
+async def _execution_plane_work_item_ids(session: AsyncSession, execution_id: UUID) -> list[UUID]:
+    """Return stable work-item IDs for EP-capable base activity records.
+
+    Dispatch creates work items from the derived identity
+    ``uuid5(execution_id, activity_id)``. Upfront activity creation seeds the
+    matching base ``ActivityExecution.id`` with that value, so selecting the ORM
+    ID directly avoids reconstructing the identity from activity names.
+
+    Loop nodes complicate that mapping: each iteration gets its own database
+    row and composite activity name, while EP work continues to use the base
+    node identity. The base row can also be terminal while a later iteration is
+    still active, so the base row is selected independently of status.
+
+    Not every ``ActivityExecution`` uses the derived ID as its primary key.
+    Comparing each base row's ID with the identity derived from its activity
+    name therefore excludes unrelated activity records while preserving the
+    direct ORM-to-work-item mapping used by dispatch.
+    """
     supported_node_types = execution_plane_supported_node_types()
     if not supported_node_types:
         return []
 
     result = await session.exec(
-        select(ActivityExecution.activity_name).where(
+        select(ActivityExecution.id, ActivityExecution.activity_name).where(
             ActivityExecution.execution_id == execution_id,
             col(ActivityExecution.node_type).in_(supported_node_types),
-            col(ActivityExecution.status).in_(_ACTIVE_ACTIVITY_STATUSES),
+            or_(col(ActivityExecution.iteration).is_(None), col(ActivityExecution.iteration) == 0),
         )
     )
-    activity_ids = {row.split(_ITERATION_RECORD_SEPARATOR, 1)[0] for row in result.all()}
-    return sorted(activity_ids)
+    return sorted(
+        {
+            work_item_id
+            for work_item_id, activity_name in result.all()
+            if work_item_id == execution_plane_work_item_id(execution_id, activity_name)
+        }
+    )
 
 
 async def cancel_execution_plane_work_for_execution(
@@ -94,14 +112,14 @@ async def cancel_execution_plane_work_for_execution(
     execution_id: UUID,
 ) -> list[UUID]:
     """Cancel all active Execution Plane work belonging to an execution."""
-    activity_ids = await _active_execution_plane_activity_ids(session, execution_id)
-    if not activity_ids:
+    work_item_ids = await _execution_plane_work_item_ids(session, execution_id)
+    if not work_item_ids:
         logger.debug("No active Execution Plane work to cancel", execution_id=execution_id)
         return []
 
     logger.info(
         "Cancelling Execution Plane work for execution",
         execution_id=execution_id,
-        count=len(activity_ids),
+        count=len(work_item_ids),
     )
-    return await cancel_execution_plane_work_items(execution_id, activity_ids)
+    return await _cancel_execution_plane_work_item_ids(execution_id, work_item_ids)
