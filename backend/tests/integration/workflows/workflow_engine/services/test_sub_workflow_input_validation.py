@@ -21,6 +21,7 @@ from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.workflow_engine.activities.sub_workflow_setup_activity import (
     SubWorkflowSetupActivity,
 )
+from tests.integration.helpers.subworkflow import seed_parent_execution
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -100,7 +101,13 @@ async def test_valid_input_passes(
     )
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
-    result = await setup.run(_params(wf_id, {"greeting": "hi"}), str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+    result = await setup.run(
+        _params(wf_id, {"greeting": "hi"}),
+        str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+        "sub_wf_node",
+        str(test_user.id),
+        0,
+    )
 
     assert result["child_workflow_version"] == 1
 
@@ -120,7 +127,13 @@ async def test_missing_required_field_raises_non_retryable_naming_field(
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
     with pytest.raises(ApplicationError) as exc_info:
-        await setup.run(_params(wf_id, {}), str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+        await setup.run(
+            _params(wf_id, {}),
+            str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+            "sub_wf_node",
+            str(test_user.id),
+            0,
+        )
 
     assert exc_info.value.type == "SubWorkflowInputValidationError"
     assert exc_info.value.non_retryable is True
@@ -145,7 +158,13 @@ async def test_wrong_type_raises_non_retryable(
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
     with pytest.raises(ApplicationError) as exc_info:
-        await setup.run(_params(wf_id, {"greeting": 123}), str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+        await setup.run(
+            _params(wf_id, {"greeting": 123}),
+            str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+            "sub_wf_node",
+            str(test_user.id),
+            0,
+        )
 
     assert exc_info.value.type == "SubWorkflowInputValidationError"
     assert exc_info.value.non_retryable is True
@@ -165,7 +184,13 @@ async def test_no_input_schema_skips_validation(
     )
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
-    result = await setup.run(_params(wf_id, {"anything": 1}), str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+    result = await setup.run(
+        _params(wf_id, {"anything": 1}),
+        str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+        "sub_wf_node",
+        str(test_user.id),
+        0,
+    )
 
     assert result["child_workflow_version"] == 1
 
@@ -190,7 +215,13 @@ async def test_schema_default_is_applied_to_child_input(
     )
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
-    result = await setup.run(_params(wf_id, {}), str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+    result = await setup.run(
+        _params(wf_id, {}),
+        str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+        "sub_wf_node",
+        str(test_user.id),
+        0,
+    )
 
     async with test_db_session_factory() as session:
         child_execution = await session.get(Execution, UUID(result["execution_id"]))

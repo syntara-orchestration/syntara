@@ -62,6 +62,8 @@ from syntara.workflows.workflow_engine.services.temporal_execution_service impor
 from syntara.workflows.workflow_engine.signals.processor import resolve_signal_failure_message
 
 if TYPE_CHECKING:
+    from sqlalchemy import ColumnElement
+
     from syntara.metrics.recorder import MetricsRecorder
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -951,14 +953,16 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         ``parent_node_id`` in its ``execution_metadata`` when the Sub-workflow
         setup activity creates it. No new data is written.
 
-        The ``execution_metadata`` match is a JSONB filter on a small id-only
-        query; the resulting ids are then paged through the shared
-        ``list_resources`` pipeline via ``id_restriction``, so this endpoint
-        inherits cursor pagination, project-visibility scoping, eager-loaded
-        workflow metadata, and the automatic ``id`` sort tiebreaker that makes
-        ordering deterministic — including ``for_each`` children created in the
-        same instant. This deliberately avoids adding ``parent_execution_id`` /
-        ``parent_node_id`` to the model-wide ``__filterable_fields__``.
+        The ``execution_metadata`` match is pushed into the shared ``list_resources``
+        pipeline as ``extra_predicates`` (a JSONB filter applied directly to the
+        paginated and COUNT queries), so each page's database work is bounded by the
+        page size rather than materializing every matching child id into an
+        unbounded ``IN (...)`` restriction. The endpoint still inherits cursor
+        pagination, project-visibility scoping, eager-loaded workflow metadata, and
+        the automatic ``id`` sort tiebreaker that makes ordering deterministic —
+        including ``for_each`` children created in the same instant. This keeps
+        ``parent_execution_id`` / ``parent_node_id`` out of the model-wide
+        ``__filterable_fields__`` (they are not exposed as public list filters).
 
         Args:
             parent_execution_id: Parent execution whose children to list. It is
@@ -985,12 +989,11 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         if parent_result.one_or_none() is None:
             raise ExecutionNotFoundError(parent_execution_id)
 
-        id_query = select(Execution.id).where(
+        predicates: list[ColumnElement[bool]] = [
             col(Execution.execution_metadata)["parent_execution_id"].astext == str(parent_execution_id)
-        )
+        ]
         if node_id is not None:
-            id_query = id_query.where(col(Execution.execution_metadata)["parent_node_id"].astext == node_id)
-        child_ids = list((await self.session.exec(id_query)).all())
+            predicates.append(col(Execution.execution_metadata)["parent_node_id"].astext == node_id)
 
         return await self.list_resources(
             model=Execution,
@@ -1000,7 +1003,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             sort=sort or "created_at",
             include_total=include_total,
             allowed_projects=allowed_projects,
-            id_restriction=child_ids,
+            extra_predicates=predicates,
         )
 
     async def list_execution_activities(

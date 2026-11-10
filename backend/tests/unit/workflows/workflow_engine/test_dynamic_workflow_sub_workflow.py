@@ -251,7 +251,7 @@ class TestSetupActivityIdempotency:
     async def test_existing_execution_returns_without_creating(self) -> None:
         activity = _make_setup_activity()
         child_wf_id = uuid4()
-        parent_exec_id = "parent-exec-001"
+        parent_exec_id = str(uuid4())
         parent_node_id = "sub_wf_node"
         user_id = str(uuid4())
 
@@ -276,8 +276,10 @@ class TestSetupActivityIdempotency:
         existing_execution.created_at = None
 
         mock_session_resume = AsyncMock()
+        mock_parent = MagicMock()
+        mock_parent.project_id = mock_workflow.project_id
         mock_session_resume.get = AsyncMock(
-            side_effect=[existing_execution, mock_version, mock_workflow],
+            side_effect=[existing_execution, mock_version, mock_workflow, mock_parent],
         )
 
         mock_session_persist = AsyncMock()
@@ -306,7 +308,7 @@ class TestSetupActivityIdempotency:
         """On retry, the definition comes from the pinned version, not a re-resolved one."""
         activity = _make_setup_activity()
         child_wf_id = uuid4()
-        parent_exec_id = "parent-exec-002"
+        parent_exec_id = str(uuid4())
         parent_node_id = "sub_wf_node"
 
         expected_child_exec_id = uuid5(_SUB_WORKFLOW_NAMESPACE, f"{parent_exec_id}:{parent_node_id}")
@@ -331,8 +333,10 @@ class TestSetupActivityIdempotency:
         existing_execution.created_at = None
 
         mock_session_resume = AsyncMock()
+        mock_parent = MagicMock()
+        mock_parent.project_id = mock_workflow.project_id
         mock_session_resume.get = AsyncMock(
-            side_effect=[existing_execution, mock_version, mock_workflow],
+            side_effect=[existing_execution, mock_version, mock_workflow, mock_parent],
         )
         mock_session_persist = AsyncMock()
         persist_result = MagicMock()
@@ -364,7 +368,7 @@ class TestSetupActivityExecution:
     async def test_creates_execution_and_returns_launch_data(self) -> None:
         activity = _make_setup_activity()
         child_wf_id = uuid4()
-        parent_exec_id = "parent-exec-001"
+        parent_exec_id = str(uuid4())
         parent_node_id = "sub_wf_node"
         user_id = str(uuid4())
 
@@ -386,6 +390,9 @@ class TestSetupActivityExecution:
         exec_result = MagicMock()
         exec_result.first.return_value = (mock_workflow, mock_version)
         mock_session_create.exec = AsyncMock(return_value=exec_result)
+        mock_parent = MagicMock()
+        mock_parent.project_id = mock_workflow.project_id
+        mock_session_create.get = AsyncMock(return_value=mock_parent)
 
         mock_session_persist = AsyncMock()
         persist_result = MagicMock()
@@ -925,8 +932,10 @@ class TestSetupActivityDisabledWorkflow:
         mock_version = MagicMock()
         mock_row.first.return_value = (mock_workflow, mock_version)
 
+        mock_parent = MagicMock()
+        mock_parent.project_id = mock_workflow.project_id
         mock_session = AsyncMock()
-        mock_session.get = AsyncMock(return_value=None)
+        mock_session.get = AsyncMock(side_effect=[None, mock_parent])
         mock_session.exec = AsyncMock(return_value=mock_row)
 
         @contextlib.asynccontextmanager
@@ -942,7 +951,7 @@ class TestSetupActivityDisabledWorkflow:
                     "trigger_node_id": "trigger",
                     "input_mapping": {},
                 },
-                parent_execution_id="parent-exec-1",
+                parent_execution_id=str(uuid4()),
                 parent_node_id="sub_wf_node",
                 created_by_user_id=str(uuid4()),
                 current_depth=0,

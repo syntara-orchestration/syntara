@@ -356,3 +356,157 @@ async def test_visibility_excludes_other_project(
     in_scope = AllowedProjectsResult(all_projects=False, project_ids=[test_project_id])
     allowed = await service.list_child_executions(parent_id, allowed_projects=in_scope)
     assert len(allowed.resources) == 1
+
+
+# ---------------------------------------------------------------------------
+# DB-level pagination (the extra_predicates rewrite): bounded pages, accurate
+# totals, stable ordering, empty results, and preserved project visibility.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_pagination_walks_all_children_in_stable_order(
+    test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+) -> None:
+    """Cursor pagination returns every child exactly once, in a stable order, bounded per page."""
+    wf_id, ver_id = await _create_workflow_version(
+        test_db_session, created_by=test_user.id, project_id=test_project_id, name="child-wf"
+    )
+    parent_id = await _create_execution(
+        test_db_session, created_by=test_user.id, project_id=test_project_id, wf_id=wf_id, ver_id=ver_id
+    )
+    created = [
+        await _create_execution(
+            test_db_session,
+            created_by=test_user.id,
+            project_id=test_project_id,
+            wf_id=wf_id,
+            ver_id=ver_id,
+            parent_execution_id=str(parent_id),
+            parent_node_id="loop_node",
+        )
+        for _ in range(5)
+    ]
+
+    service = ExecutionService(test_db_session, test_user)
+    collected: list[UUID] = []
+    cursor: str | None = None
+    pages = 0
+    while True:
+        page = await service.list_child_executions(parent_id, node_id="loop_node", limit=2, cursor=cursor)
+        pages += 1
+        assert len(page.resources) <= 2  # bounded by page size, not total matches
+        collected.extend(e.id for e in page.resources)
+        if page.next is None:
+            break
+        cursor = page.next
+        assert pages <= 5  # guard against a pagination loop
+
+    assert len(collected) == len(set(collected)) == 5  # each child once, none missing/duplicated
+    assert set(collected) == set(created)
+    # Order is deterministic: a second full walk yields the same sequence.
+    second = (await service.list_child_executions(parent_id, node_id="loop_node", limit=5)).resources
+    assert [e.id for e in second] == collected
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_total_count_reflects_all_children_not_page(
+    test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+) -> None:
+    """include_total counts all matching children via the predicate, independent of page size."""
+    wf_id, ver_id = await _create_workflow_version(
+        test_db_session, created_by=test_user.id, project_id=test_project_id, name="child-wf"
+    )
+    parent_id = await _create_execution(
+        test_db_session, created_by=test_user.id, project_id=test_project_id, wf_id=wf_id, ver_id=ver_id
+    )
+    for _ in range(5):
+        await _create_execution(
+            test_db_session,
+            created_by=test_user.id,
+            project_id=test_project_id,
+            wf_id=wf_id,
+            ver_id=ver_id,
+            parent_execution_id=str(parent_id),
+            parent_node_id="loop_node",
+        )
+
+    service = ExecutionService(test_db_session, test_user)
+    page = await service.list_child_executions(parent_id, node_id="loop_node", limit=2, include_total=True)
+
+    assert len(page.resources) == 2
+    assert page.total == 5
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_parent_with_no_children_is_empty(
+    test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+) -> None:
+    """A parent with no sub-workflow children yields an empty page and a zero total."""
+    wf_id, ver_id = await _create_workflow_version(
+        test_db_session, created_by=test_user.id, project_id=test_project_id, name="child-wf"
+    )
+    parent_id = await _create_execution(
+        test_db_session, created_by=test_user.id, project_id=test_project_id, wf_id=wf_id, ver_id=ver_id
+    )
+
+    service = ExecutionService(test_db_session, test_user)
+    page = await service.list_child_executions(parent_id, include_total=True)
+
+    assert page.resources == []
+    assert page.total == 0
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_project_visibility_scopes_children(
+    test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+) -> None:
+    """A child in a project outside allowed_projects is excluded; the predicate does not bypass scope."""
+    from syntara.authz.models.project import Project
+
+    wf_a, ver_a = await _create_workflow_version(
+        test_db_session, created_by=test_user.id, project_id=test_project_id, name="child-a"
+    )
+    parent_id = await _create_execution(
+        test_db_session, created_by=test_user.id, project_id=test_project_id, wf_id=wf_a, ver_id=ver_a
+    )
+    visible = await _create_execution(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=test_project_id,
+        wf_id=wf_a,
+        ver_id=ver_a,
+        parent_execution_id=str(parent_id),
+        parent_node_id="sub_wf_node",
+    )
+
+    other_project = Project(name=f"other-{uuid4().hex[:8]}", description="out-of-scope")
+    test_db_session.add(other_project)
+    await test_db_session.flush()
+    wf_b, ver_b = await _create_workflow_version(
+        test_db_session, created_by=test_user.id, project_id=other_project.id, name="child-b"
+    )
+    await _create_execution(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=other_project.id,
+        wf_id=wf_b,
+        ver_id=ver_b,
+        parent_execution_id=str(parent_id),
+        parent_node_id="sub_wf_node",
+    )
+
+    service = ExecutionService(test_db_session, test_user)
+    scoped = await service.list_child_executions(
+        parent_id,
+        node_id="sub_wf_node",
+        include_total=True,
+        allowed_projects=AllowedProjectsResult(all_projects=False, project_ids=[test_project_id]),
+    )
+
+    assert [e.id for e in scoped.resources] == [visible]
+    assert scoped.total == 1

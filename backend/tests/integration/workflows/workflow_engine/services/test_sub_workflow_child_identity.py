@@ -22,6 +22,7 @@ from syntara.workflows.workflow_engine.activities.sub_workflow_setup_activity im
     _SUB_WORKFLOW_NAMESPACE,
     SubWorkflowSetupActivity,
 )
+from tests.integration.helpers.subworkflow import seed_parent_execution
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -83,7 +84,7 @@ async def test_non_loop_identity_unchanged(
     """Outside any loop (no invocation_node_id) the child id is the canvas-node derivation."""
     wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
-    parent_exec = str(uuid4())
+    parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
 
     result = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0)
 
@@ -101,7 +102,7 @@ async def test_different_iterations_create_distinct_children(
     """Two iterations of the same node (distinct invocation ids) create distinct children."""
     wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
-    parent_exec = str(uuid4())
+    parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
 
     r0 = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0, "sub_wf_node_iter_0")
     r1 = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0, "sub_wf_node_iter_1")
@@ -120,7 +121,7 @@ async def test_same_invocation_reuses_child(
     """Repeating the same logical invocation (same invocation id) reuses the child (idempotent)."""
     wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
-    parent_exec = str(uuid4())
+    parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
 
     first = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0, "sub_wf_node_iter_2")
     second = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0, "sub_wf_node_iter_2")
@@ -139,7 +140,7 @@ async def test_nested_loops_produce_unique_identities(
     """Different inner iterations under the same outer iteration create distinct children."""
     wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
-    parent_exec = str(uuid4())
+    parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
 
     a = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0, "sub_wf_node_iter_1_iter_0")
     b = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0, "sub_wf_node_iter_1_iter_1")
@@ -159,8 +160,22 @@ async def test_separate_parents_produce_distinct_children(
     wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
-    a = await setup.run(_params(wf_id), str(uuid4()), "sub_wf_node", str(test_user.id), 0, "sub_wf_node_iter_0")
-    b = await setup.run(_params(wf_id), str(uuid4()), "sub_wf_node", str(test_user.id), 0, "sub_wf_node_iter_0")
+    a = await setup.run(
+        _params(wf_id),
+        str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+        "sub_wf_node",
+        str(test_user.id),
+        0,
+        "sub_wf_node_iter_0",
+    )
+    b = await setup.run(
+        _params(wf_id),
+        str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+        "sub_wf_node",
+        str(test_user.id),
+        0,
+        "sub_wf_node_iter_0",
+    )
 
     assert a["execution_id"] != b["execution_id"]
 
@@ -176,7 +191,7 @@ async def test_lineage_metadata_preserves_canvas_node_id(
     """The child id is iteration-aware, but persisted lineage keeps the canvas node id."""
     wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
-    parent_exec = str(uuid4())
+    parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
 
     result = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0, "sub_wf_node_iter_3")
 

@@ -182,6 +182,7 @@ class SubWorkflowSetupActivity:
                     input_mapping=input_mapping,
                     created_by_user_id=created_by_user_id,
                     current_depth=current_depth,
+                    parent_execution_id=parent_execution_id,
                 )
         if resume_result is not None:
             return resume_result
@@ -203,6 +204,14 @@ class SubWorkflowSetupActivity:
                 )
 
             child_workflow, child_version = row
+
+            await self._assert_child_in_parent_project(
+                session,
+                parent_execution_id=parent_execution_id,
+                child_workflow_id=child_workflow_id,
+                child_project_id=child_workflow.project_id,
+                child_execution_id_str=child_execution_id_str,
+            )
 
             if not child_workflow.is_enabled:
                 msg = (
@@ -286,6 +295,62 @@ class SubWorkflowSetupActivity:
             "child_workflow_version": child_version_number,
         }
 
+    async def _assert_child_in_parent_project(
+        self,
+        session: AsyncSession,
+        *,
+        parent_execution_id: str,
+        child_workflow_id: UUID,
+        child_project_id: UUID,
+        child_execution_id_str: str,
+    ) -> None:
+        """Reject a cross-project sub-workflow invocation before the child is created.
+
+        Loads the parent execution in the caller's session and requires the child
+        workflow to share its project. A missing or malformed parent id is rejected
+        rather than bypassed, so neither the new-invocation path nor the idempotent
+        resume path can create or resume a child across a project boundary.
+
+        This is project isolation only. It is NOT the execute-permission (RBAC) check
+        required by ANSTRAT-2347 AC-3; runtime execution authorization is tracked under
+        AAP-91266 and must land before the feature reaches devel.
+
+        Raises:
+            ApplicationError: Non-retryable ``SubWorkflowProjectScopeError`` when the
+                parent execution is missing or malformed, or is in a different project
+                from the child workflow.
+
+        """
+        from syntara.workflows.models.execution import Execution  # noqa: PLC0415
+
+        try:
+            parent_uuid = UUID(parent_execution_id)
+        except (ValueError, TypeError):
+            msg = (
+                f"Sub-workflow invocation has an invalid parent execution id "
+                f"'{parent_execution_id}'; refusing to create child execution "
+                f"'{child_execution_id_str}' without project-scope validation."
+            )
+            raise ApplicationError(msg, type="SubWorkflowProjectScopeError", non_retryable=True) from None
+
+        parent = await session.get(Execution, parent_uuid)
+        if parent is None:
+            msg = (
+                f"Parent execution '{parent_execution_id}' not found; refusing to create "
+                f"child execution '{child_execution_id_str}' without project-scope validation."
+            )
+            raise ApplicationError(msg, type="SubWorkflowProjectScopeError", non_retryable=True)
+
+        if parent.project_id != child_project_id:
+            # Do not echo the parent/child project ids: a caller denied cross-project
+            # access should not learn the other project's identifier from the error.
+            msg = (
+                f"Cross-project sub-workflow invocation rejected: child workflow "
+                f"'{child_workflow_id}' is not in the parent execution's project. "
+                f"A sub-workflow must be in the same project as its parent."
+            )
+            raise ApplicationError(msg, type="SubWorkflowProjectScopeError", non_retryable=True)
+
     async def _resume_pinned_child_execution(
         self,
         session: AsyncSession,
@@ -297,6 +362,7 @@ class SubWorkflowSetupActivity:
         input_mapping: dict[str, Any],
         created_by_user_id: str,
         current_depth: int,
+        parent_execution_id: str,
     ) -> dict[str, Any]:
         """Resume an already-created child execution from its pinned version.
 
@@ -335,6 +401,14 @@ class SubWorkflowSetupActivity:
         if child_workflow is None:
             msg = f"Workflow '{existing.workflow_id}' for child execution '{child_execution_id_str}' no longer exists."
             raise ApplicationError(msg, type="WorkflowMissingError", non_retryable=True)
+
+        await self._assert_child_in_parent_project(
+            session,
+            parent_execution_id=parent_execution_id,
+            child_workflow_id=existing.workflow_id,
+            child_project_id=child_workflow.project_id,
+            child_execution_id_str=child_execution_id_str,
+        )
 
         author_name = await resolve_user_display_name(session, child_workflow.created_by)
         created_at = existing.created_at or datetime.now(UTC)

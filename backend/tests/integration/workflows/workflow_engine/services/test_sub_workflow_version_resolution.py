@@ -30,6 +30,7 @@ from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.workflow_engine.activities.sub_workflow_setup_activity import (
     SubWorkflowSetupActivity,
 )
+from tests.integration.helpers.subworkflow import seed_parent_execution
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -121,7 +122,13 @@ async def test_resolves_published_version_at_invocation(
     )
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
-    result = await setup.run(_params(wf_id), str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+    result = await setup.run(
+        _params(wf_id),
+        str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+        "sub_wf_node",
+        str(test_user.id),
+        0,
+    )
 
     assert result["child_workflow_version"] == 1
     assert result["workflow_definition"]["nodes"][0]["parameters"]["code"] == "echo v1"
@@ -146,7 +153,13 @@ async def test_republished_version_used_on_next_run_without_caller_change(
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
     params = _params(wf_id)  # identical caller params for both runs
 
-    first = await setup.run(params, str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+    first = await setup.run(
+        params,
+        str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+        "sub_wf_node",
+        str(test_user.id),
+        0,
+    )
     assert first["child_workflow_version"] == 1
     assert first["workflow_definition"]["nodes"][0]["parameters"]["code"] == "echo v1"
 
@@ -156,7 +169,13 @@ async def test_republished_version_used_on_next_run_without_caller_change(
     workflow.published_version_id = version_ids[2]
     await test_db_session.commit()
 
-    second = await setup.run(params, str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+    second = await setup.run(
+        params,
+        str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+        "sub_wf_node",
+        str(test_user.id),
+        0,
+    )
     assert second["child_workflow_version"] == 2
     assert second["workflow_definition"]["nodes"][0]["parameters"]["code"] == "echo v2"
 
@@ -180,7 +199,13 @@ async def test_unpublished_target_raises_non_retryable_naming_target(
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
     with pytest.raises(ApplicationError) as exc_info:
-        await setup.run(_params(wf_id), str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+        await setup.run(
+            _params(wf_id),
+            str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+            "sub_wf_node",
+            str(test_user.id),
+            0,
+        )
 
     assert exc_info.value.type == "WorkflowNotPublishedError"
     assert exc_info.value.non_retryable is True
@@ -209,7 +234,13 @@ async def test_resolved_version_pinned_on_child_execution(
     )
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
-    result = await setup.run(_params(wf_id), str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+    result = await setup.run(
+        _params(wf_id),
+        str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+        "sub_wf_node",
+        str(test_user.id),
+        0,
+    )
     child_execution_id = UUID(result["execution_id"])
 
     # Republish v2 after the child execution was created.
@@ -247,7 +278,9 @@ async def test_retry_after_republish_resumes_pinned_version(
         publish=1,
     )
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
-    parent_exec = str(uuid4())  # stable across attempts -> same derived child execution id
+    parent_exec = str(
+        await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)
+    )  # stable across attempts -> same derived child execution id
 
     first = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0)
     assert first["child_workflow_version"] == 1
@@ -294,7 +327,9 @@ async def test_retry_after_unpublish_resumes_pinned_version(
         publish=1,
     )
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
-    parent_exec = str(uuid4())  # stable across attempts -> same derived child execution id
+    parent_exec = str(
+        await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)
+    )  # stable across attempts -> same derived child execution id
 
     first = await setup.run(_params(wf_id), parent_exec, "sub_wf_node", str(test_user.id), 0)
     assert first["child_workflow_version"] == 1
@@ -342,7 +377,13 @@ async def test_new_invocation_after_republish_pins_new_version(
     )
     setup = SubWorkflowSetupActivity(session_factory=test_db_session_factory, task_queue=_TASK_QUEUE)
 
-    first = await setup.run(_params(wf_id), str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+    first = await setup.run(
+        _params(wf_id),
+        str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+        "sub_wf_node",
+        str(test_user.id),
+        0,
+    )
     assert first["child_workflow_version"] == 1
 
     # Republish v2 before the next (distinct) invocation.
@@ -351,7 +392,13 @@ async def test_new_invocation_after_republish_pins_new_version(
     workflow.published_version_id = version_ids[2]
     await test_db_session.commit()
 
-    second = await setup.run(_params(wf_id), str(uuid4()), "sub_wf_node", str(test_user.id), 0)
+    second = await setup.run(
+        _params(wf_id),
+        str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id)),
+        "sub_wf_node",
+        str(test_user.id),
+        0,
+    )
 
     assert second["execution_id"] != first["execution_id"]
     assert second["child_workflow_version"] == 2

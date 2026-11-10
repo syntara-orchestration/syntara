@@ -144,9 +144,16 @@ class _MockSession:
             return _MockExecResult(val)
         return _MockExecResult(None)
 
-    async def get(self, _model: type, _id: object) -> None:
-        """Always return None (no existing record)."""
-        return
+    async def get(self, _model: type, _id: object) -> object | None:
+        """Return a same-project parent for the parent-execution lookup; None otherwise.
+
+        The idempotency check (``get(Execution, child_id)``) must see no existing record,
+        while the project-scope gate (``get(Execution, parent_id)``) needs the parent
+        execution to exist in the child's project.
+        """
+        if str(_id) == _PARENT_EXECUTION_ID:
+            return SimpleNamespace(project_id=_CHILD_PROJECT_ID)
+        return None
 
     def add(self, _obj: object) -> None:
         """No-op."""

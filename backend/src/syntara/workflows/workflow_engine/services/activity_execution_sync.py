@@ -427,8 +427,11 @@ class ActivityExecutionSyncMixin:
           (``preserve_io=True``).
         - COMPLETED (payload present): writes the reconstructed I/O summaries and,
           for a non-iterated node, ``runtime_metadata``, through the shared writer.
-          ``for_each`` overwrites the single aggregate row per iteration, so the
-          last iteration's setup result wins (preserving prior behaviour).
+          ``for_each`` overwrites the single aggregate row per iteration. The
+          synchronizer applies pending events in ascending Temporal scheduled-event-id
+          order, so this is deterministic: the iteration with the highest scheduled
+          event id (the latest-scheduled iteration) wins — not necessarily the
+          iteration whose child workflow completed last — independent of set order.
         - Terminal row: an I/O-only, set-if-empty backfill (see
           ``_backfill_terminal_subworkflow_io``) — never touches status/timestamps/
           error_details/runtime_metadata and never overwrites non-empty I/O, so a
