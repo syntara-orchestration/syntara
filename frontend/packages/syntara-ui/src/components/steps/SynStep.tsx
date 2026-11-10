@@ -295,6 +295,7 @@ export function SynStep(props: {
             retryCount={props.executionState?.retry_count}
             nodeType={props.nodeProps.type}
             replayed={props.executionState?.replayed ?? false}
+            retryOrigin={props.nodeProps.data.__retryPreviewOrigin === true}
           />
         )}
         {!isSemanticZoom && (

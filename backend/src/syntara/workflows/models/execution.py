@@ -503,8 +503,10 @@ class RetryFromFailureValidationResponse(SQLModel):
     )
     auto_included_node_ids: list[str] = Field(
         default_factory=list,
-        description="Sanitized nodes added as retry points on the default path. "
-        "Empty on explicit selections, which reject instead.",
+        description="Sanitized nodes added as retry points so redacted outputs can be regenerated. "
+        "Set on the default path and when an explicit sanitized replacement still has further "
+        "sanitized ancestors. Empty when that chain was already selected, or when an explicit "
+        "failed node with sanitized dependencies is rejected.",
     )
     sanitized_replacements: dict[str, list[str]] = Field(
         default_factory=dict,

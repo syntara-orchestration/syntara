@@ -12,6 +12,8 @@ import { ActivityTypeEnum } from '@syntara/contracts'
 import type { ActivityStatus } from '../../../routes/workflows/execution/types'
 import { activityStatusColors } from '../executionStatusConstants'
 
+import styles from './ExecutionStatusBadge.module.css'
+
 export const EXECUTION_BADGE_DATA_ATTR = 'data-execution-badge'
 export const EXECUTION_BADGE_SELECTOR = `[${EXECUTION_BADGE_DATA_ATTR}]`
 
@@ -21,6 +23,8 @@ type ExecutionStatusBadgeProps = {
   nodeType?: string
   /** True when this step reused a previous run's output instead of executing. */
   replayed?: boolean
+  /** True when this step is the selected retry origin. */
+  retryOrigin?: boolean
 }
 
 type VisualStatus = 'pending' | 'running' | 'waiting' | 'success' | 'error' | 'skipped' | 'cancelled'
@@ -105,6 +109,7 @@ export function ExecutionStatusBadge({
   retryCount,
   nodeType,
   replayed = false,
+  retryOrigin = false,
 }: Readonly<ExecutionStatusBadgeProps>) {
   const normalized = normalizeStatus(status, nodeType)
   const config = visualStatusConfig[normalized.visualStatus]
@@ -115,6 +120,7 @@ export function ExecutionStatusBadge({
 
   return (
     <div
+      className={retryOrigin ? styles.retryOrigin : undefined}
       style={{
         position: 'absolute',
         bottom: '-20px',

@@ -370,8 +370,8 @@ test.describe('Retry from failure — real backend', () => {
     await openRetryPanel(app)
 
     const panel = app.getByRole('complementary', { name: 'Retry run from failure review' })
-    const allPoints = panel.getByRole('radio', { name: 'All eligible failure points' })
-    const choosePoints = panel.getByRole('radio', { name: 'Choose failure points' })
+    const allPoints = panel.getByRole('radio', { name: 'Retry all affected branches' })
+    const choosePoints = panel.getByRole('radio', { name: 'Choose branches' })
     const branchAOrigin = app.getByTestId('retry-origin-branch_a')
     const branchBOrigin = app.getByTestId('retry-origin-branch_b')
     await expect(panel.getByRole('radiogroup', { name: 'Retry scope' })).toBeVisible()

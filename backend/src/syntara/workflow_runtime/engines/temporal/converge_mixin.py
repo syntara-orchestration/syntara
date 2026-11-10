@@ -67,6 +67,9 @@ class WorkflowConvergeMixin:
         except OutputMappingError:
             return output_model_class().model_dump()
 
+    @staticmethod
+    def _walk_downstream(start_node_id: str, graph: WorkflowGraph) -> set[str]: ...  # type: ignore[empty-body]
+
     async def _execute_node(self, node: ActivityNode, graph: WorkflowGraph) -> dict[str, Any]: ...  # type: ignore[empty-body]
 
     def _mark_downstream_as_skipped(
@@ -240,6 +243,16 @@ class WorkflowConvergeMixin:
         predecessor_ids = graph.get_predecessors(converge_id)
         if strategy == ConvergeStrategy.ALL:
             failed_preds = [p for p in predecessor_ids if p in self.failed_nodes and p not in self._cof_failed_nodes]
+            # A retry that re-runs this join (downstream of a selected point,
+            # so not a replay candidate) must wait for the selected branch.
+            # Restoring an unselected sibling as failed would otherwise
+            # fail-fast and detach that in-flight work, which the safety net
+            # then records as cancelled. Replay-candidate joins still fail-fast
+            # so source comparison can run; live runs keep the original fail-fast.
+            if (
+                failed_preds or (upstream_failure_id and upstream_failure_id not in self._cof_failed_nodes)
+            ) and self._retry_all_gate_should_wait(converge_id, predecessor_ids):
+                return None
             if failed_preds:
                 return (
                     f"Converge node {converge_id}: predecessor(s) "
@@ -265,6 +278,28 @@ class WorkflowConvergeMixin:
     def _is_retry_converge_candidate(self, node_id: str) -> bool:
         """Whether this retry must compare source metadata before failing a gate."""
         return bool(self.retry_context) and node_id in self._retry_replay_candidates
+
+    def _retry_all_gate_should_wait(self, converge_id: str, predecessor_ids: list[str]) -> bool:
+        """Whether a retry ALL-join must wait for selected work before failing.
+
+        True only for a retry whose join is being re-evaluated (not restored)
+        and still has a non-terminal predecessor. That predecessor is the
+        selected path; failing now would cancel it.
+        """
+        return (
+            bool(self.retry_context)
+            and not self._is_retry_converge_candidate(converge_id)
+            and not self._all_predecessors_terminal(predecessor_ids)
+        )
+
+    def _is_selected_retry_path_node(self, node_id: str, graph: WorkflowGraph) -> bool:
+        """Whether this node is a selected retry point or downstream of one."""
+        if not self.retry_context:
+            return False
+        selected = list(self.retry_context.get("eligible_point_ids") or [])
+        if node_id in selected:
+            return True
+        return any(node_id in self._walk_downstream(point, graph) for point in selected)
 
     def _schedule_retry_converge_failure(
         self,
@@ -412,6 +447,7 @@ class WorkflowConvergeMixin:
                     node_id in converge_ids
                     and branch_node_id in pending_tasks
                     and not self.resolver.has_namespace(branch_node_id)
+                    and not self._is_selected_retry_path_node(branch_node_id, graph)
                 ):
                     self._detached_nodes.add(branch_node_id)
         if cof:
@@ -474,6 +510,7 @@ class WorkflowConvergeMixin:
                     node_id in converge_ids
                     and branch_node_id in pending_tasks
                     and not self.resolver.has_namespace(branch_node_id)
+                    and not self._is_selected_retry_path_node(branch_node_id, graph)
                 ):
                     self._detached_nodes.add(branch_node_id)
 
@@ -547,7 +584,7 @@ class WorkflowConvergeMixin:
         newly_skipped = []
         for pred_id in graph.get_predecessors(node_id):
             if pred_id not in self.skipped_nodes and not self.resolver.has_namespace(pred_id):
-                if pred_id in pending_tasks:
+                if pred_id in pending_tasks or self._is_selected_retry_path_node(pred_id, graph):
                     workflow.logger.info(f"Converge: predecessor {pred_id} is still in flight, not skipping")
                     continue
                 self.skipped_nodes.add(pred_id)
