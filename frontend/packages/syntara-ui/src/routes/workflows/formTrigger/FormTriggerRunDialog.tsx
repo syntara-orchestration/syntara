@@ -3,13 +3,13 @@ import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
+import { resolveFormPromptCssOverride } from '../../../components/forms/resolveFormPromptCssOverride'
 import { SynDynamicForm } from '../../../components/forms/SynDynamicForm'
+import formStepResponseSurfaceStyles from '../../../components/forms/synFormStepResponseSurface.module.css'
 import { FormDataValidationError } from '../../../forms'
 import { useBlurOnOpen } from '../../../hooks/useBlurOnOpen'
 import { useAlerts } from '../../../providers/alerts'
 import { detachPromise } from '../../../utils/detachPromise'
-import { resolveFormPromptCssOverride } from '../../executions/formPrompt/resolveFormPromptCssOverride'
-import styles from '../../executions/FormPromptResponseContent.module.css'
 
 import type { FormTriggerPresentation } from './formTriggerRunUtils'
 import { submitFormTriggerExecution } from './submitFormTriggerExecution'
@@ -110,7 +110,7 @@ export function FormTriggerRunDialog({
         ) : null}
         <Stack hasGutter>
           <StackItem>
-            <div className={`${styles.formStepResponseForm} form-step-response-form`}>
+            <div className={`${formStepResponseSurfaceStyles.formStepResponseForm} form-step-response-form`}>
               {cssOverride ? <style>{cssOverride}</style> : null}
               <SynDynamicForm
                 id={formId}
@@ -122,7 +122,7 @@ export function FormTriggerRunDialog({
                 isLoading={formBusy}
                 disabledFieldTooltip={permissionTooltip}
                 hideSubmitButton
-                textAreaControlClassName={styles.formStepResponseTextAreaControl}
+                textAreaControlClassName={formStepResponseSurfaceStyles.formStepResponseTextAreaControl}
                 onSubmit={handleSubmit}
                 onValidationError={() => setSubmitFailed(false)}
               />

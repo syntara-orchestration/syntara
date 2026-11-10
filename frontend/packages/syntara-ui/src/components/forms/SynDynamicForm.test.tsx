@@ -48,6 +48,20 @@ describe('SynDynamicForm', () => {
     expect(subscribe).toBeRequired()
   })
 
+  it('shows a disabled submit button in read-only mode when showSubmitWhenReadOnly is set', () => {
+    renderWithQueryClient(
+      <SynDynamicForm
+        definition={sampleDynamicFormDefinition}
+        onSubmit={vi.fn()}
+        isReadOnly
+        showSubmitWhenReadOnly
+        submitLabel="Preview submit"
+      />
+    )
+
+    expect(screen.getByRole('button', { name: 'Preview submit' })).toBeDisabled()
+  })
+
   it('shows SynErrorState for invalid definition defaults', () => {
     renderWithQueryClient(<SynDynamicForm definition={invalidDynamicFormDefinition} onSubmit={vi.fn()} />)
 
