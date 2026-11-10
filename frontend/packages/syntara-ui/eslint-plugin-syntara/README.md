@@ -10,7 +10,7 @@ Disallows raw HTTP usage in UI source code: references to the global `fetch` and
 
 `axios` is blocked at the import boundary via `no-restricted-imports` (error level) in `eslint.config.js`.
 
-Non-`RhUi` icon imports from `@patternfly/react-icons` are also flagged via `no-restricted-imports` (warn level) as part of the icon migration — existing legacy imports are being phased out incrementally.
+Non-`RhUi` icon imports from `@patternfly/react-icons` are rejected by `no-restricted-imports` at error level in production TypeScript files.
 
 For `fetch`, the rule flags any reference to the global identifier (direct calls, aliasing, passing as a callback). Property access such as `window.fetch` is allowed.
 
@@ -198,7 +198,7 @@ export default function Workflows() {
 }
 ```
 
-The rule only fires on files with a `default export` (i.e. page components) and is scoped via `eslint.config.js` to the explicit list of route-level page files. Sub-components and test files are not checked.
+The rule only fires on files with a default export, including a local alias such as `export { Page as default }`, and is scoped via `eslint.config.js` to the explicit list of route-level page files. Sub-components and test files are not checked.
 
 ## Contributing
 

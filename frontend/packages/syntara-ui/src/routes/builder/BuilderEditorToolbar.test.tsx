@@ -44,8 +44,8 @@ describe('BuilderEditorToolbar', () => {
     isKebabOpen: false,
     publishedVersionId: null as string | null,
     currentVersion: 1 as number | undefined,
-    isAddNodePanelOpen: false,
-    hasNoWorkflowNodes: false,
+    isAddStepPanelOpen: false,
+    hasNoWorkflowSteps: false,
     workflowName: 'Test Workflow',
     workflowDescription: 'A test workflow',
     dispatch: vi.fn(),
@@ -85,25 +85,25 @@ describe('BuilderEditorToolbar', () => {
   })
 
   it('shows active state when Add step panel is open', () => {
-    render(<BuilderEditorToolbar {...defaultProps} isAddNodePanelOpen />)
+    render(<BuilderEditorToolbar {...defaultProps} isAddStepPanelOpen />)
 
     expect(screen.getByRole('button', { name: /Add Step/i })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('shows inactive state when Add step panel is closed', () => {
-    render(<BuilderEditorToolbar {...defaultProps} isAddNodePanelOpen={false} />)
+    render(<BuilderEditorToolbar {...defaultProps} isAddStepPanelOpen={false} />)
 
     expect(screen.getByRole('button', { name: /Add Step/i })).toHaveAttribute('aria-pressed', 'false')
   })
 
   it('hides Add Step button when workflow has no triggers or steps yet', () => {
-    render(<BuilderEditorToolbar {...defaultProps} isNew hasNoWorkflowNodes isAddNodePanelOpen workflow={undefined} />)
+    render(<BuilderEditorToolbar {...defaultProps} isNew hasNoWorkflowSteps isAddStepPanelOpen workflow={undefined} />)
 
     expect(screen.queryByRole('button', { name: /Add Step/i })).not.toBeInTheDocument()
     expect(screen.getAllByRole('separator')).toHaveLength(2)
   })
 
-  it('opens add node panel when Add Step is clicked', async () => {
+  it('opens add step panel when Add Step is clicked', async () => {
     const user = userEvent.setup()
     const dispatch = vi.fn()
 
@@ -422,8 +422,8 @@ describe('BuilderEditorToolbar', () => {
       expect(screen.getByRole('button', { name: /^Run$/i })).toHaveAttribute('aria-disabled', 'true')
     })
 
-    it('disables Run button when isNodeEditorOpen is true', () => {
-      render(<BuilderEditorToolbar {...defaultProps} isNodeEditorOpen />)
+    it('disables Run button when isStepEditorOpen is true', () => {
+      render(<BuilderEditorToolbar {...defaultProps} isStepEditorOpen />)
 
       expect(screen.getByRole('button', { name: /^Run$/i })).toHaveAttribute('aria-disabled', 'true')
     })
@@ -446,7 +446,7 @@ describe('BuilderEditorToolbar', () => {
       <BuilderEditorToolbar
         {...defaultProps}
         isNew
-        hasNoWorkflowNodes
+        hasNoWorkflowSteps
         workflow={undefined}
         builderPermissions={{
           ...defaultProps.builderPermissions,
@@ -900,7 +900,7 @@ describe('BuilderEditorToolbar', () => {
     })
 
     it('renders Run and Publish without Add step when existing workflow has no nodes', () => {
-      render(<BuilderEditorToolbar {...defaultProps} isNew={false} workflow={{ id: 'wf-1' }} hasNoWorkflowNodes />)
+      render(<BuilderEditorToolbar {...defaultProps} isNew={false} workflow={{ id: 'wf-1' }} hasNoWorkflowSteps />)
 
       expect(screen.queryByRole('button', { name: /Add step/i })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: /^Run$/i })).toBeInTheDocument()
@@ -908,13 +908,13 @@ describe('BuilderEditorToolbar', () => {
       expect(screen.getByRole('button', { name: /^Save workflow$/i })).toBeInTheDocument()
     })
 
-    it('renders toolbar when canEdit is false and hasNoWorkflowNodes is true but isNew is false', () => {
+    it('renders toolbar when canEdit is false and hasNoWorkflowSteps is true but isNew is false', () => {
       const { container } = render(
         <BuilderEditorToolbar
           {...defaultProps}
           isNew={false}
           workflow={{ id: 'wf-1' }}
-          hasNoWorkflowNodes
+          hasNoWorkflowSteps
           builderPermissions={{ ...defaultProps.builderPermissions, canEdit: false }}
         />
       )
@@ -923,12 +923,12 @@ describe('BuilderEditorToolbar', () => {
       expect(screen.getByRole('button', { name: /^Run$/i })).toBeInTheDocument()
     })
 
-    it('renders toolbar when canEdit is false and isNew is true but hasNoWorkflowNodes is false', () => {
+    it('renders toolbar when canEdit is false and isNew is true but hasNoWorkflowSteps is false', () => {
       const { container } = render(
         <BuilderEditorToolbar
           {...defaultProps}
           isNew
-          hasNoWorkflowNodes={false}
+          hasNoWorkflowSteps={false}
           workflow={undefined}
           builderPermissions={{ ...defaultProps.builderPermissions, canEdit: false }}
         />
@@ -1022,7 +1022,7 @@ describe('BuilderEditorToolbar', () => {
 
     it('renders dividers correctly for existing workflow with nodes', () => {
       render(
-        <BuilderEditorToolbar {...defaultProps} isNew={false} workflow={{ id: 'wf-1' }} hasNoWorkflowNodes={false} />
+        <BuilderEditorToolbar {...defaultProps} isNew={false} workflow={{ id: 'wf-1' }} hasNoWorkflowSteps={false} />
       )
 
       expect(screen.getAllByRole('separator').length).toBeGreaterThanOrEqual(3)
@@ -1034,7 +1034,7 @@ describe('BuilderEditorToolbar', () => {
           {...defaultProps}
           isNew
           workflow={undefined}
-          hasNoWorkflowNodes
+          hasNoWorkflowSteps
           builderPermissions={{ ...defaultProps.builderPermissions, canEdit: true }}
         />
       )

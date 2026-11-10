@@ -13,9 +13,10 @@ import { test, expect, toAppUrl } from '../fixtures'
 import {
   buildUniqueName,
   deleteWorkflow,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   createWorkflowWithTrigger,
-  addScriptNode,
+  addScriptStep,
+  expectCanvasStepTitleVisible,
 } from '../helpers/workflows'
 
 test('workflow auto-saves when clicking Run with unsaved changes', async ({ app }) => {
@@ -23,12 +24,12 @@ test('workflow auto-saves when clicking Run with unsaved changes', async ({ app 
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await closeStepEditorPanel(app)
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Make changes to the workflow (add multiple nodes to verify complex state)
-    await addScriptNode(app, 'Auto-Save Test 1', 'print("auto-save-1")')
-    await addScriptNode(app, 'Auto-Save Test 2', 'print("auto-save-2")')
+    await addScriptStep(app, 'Auto-Save Test 1', 'print("auto-save-1")')
+    await addScriptStep(app, 'Auto-Save Test 2', 'print("auto-save-2")')
 
     // Verify the nodes are added (workflow is now dirty)
     await expect(
@@ -39,7 +40,7 @@ test('workflow auto-saves when clicking Run with unsaved changes', async ({ app 
     ).toBeVisible()
 
     // Click the Run button without manually saving
-    const runButton = app.getByRole('button', { name: 'Run' })
+    const runButton = app.getByRole('button', { name: 'Run', exact: true })
     await expect(runButton).toBeVisible()
     await runButton.click()
 
@@ -74,7 +75,7 @@ test('workflow auto-saves when clicking Run with unsaved changes', async ({ app 
 
     // Wait for builder to load
     await expect(app).toHaveURL(/workflow-builder/)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Verify both auto-saved nodes are present
     await expect(
@@ -93,13 +94,13 @@ test('run confirmation shows "Run now" when workflow has no unsaved changes', as
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await closeStepEditorPanel(app)
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Do NOT make changes - workflow is already saved
 
     // Click the Run button
-    const runButton = app.getByRole('button', { name: 'Run' })
+    const runButton = app.getByRole('button', { name: 'Run', exact: true })
     await expect(runButton).toBeVisible()
     await runButton.click()
 
@@ -129,17 +130,17 @@ test('canceling run dialog with unsaved changes keeps workflow dirty', async ({ 
   await createWorkflowWithTrigger(app, workflowName)
 
   try {
-    await closeNodeEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await closeStepEditorPanel(app)
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Make changes
-    await addScriptNode(app, 'Cancel Run Test', 'print("cancel")')
+    await addScriptStep(app, 'Cancel Run Test', 'print("cancel")')
     await expect(
       app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Cancel Run Test' })
     ).toBeVisible()
 
-    // Click Run
-    const runButton = app.getByRole('button', { name: 'Run' })
+    // exact: true avoids Edit/expand labels that contain "Run" (e.g. "Cancel Run Test")
+    const runButton = app.getByRole('button', { name: 'Run', exact: true })
     await runButton.click()
 
     // Wait for confirmation dialog

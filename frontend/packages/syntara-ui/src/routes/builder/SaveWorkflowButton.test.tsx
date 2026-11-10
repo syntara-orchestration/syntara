@@ -76,21 +76,21 @@ describe('SaveWorkflowButton', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('is aria-disabled when isNodeEditorOpen is true', () => {
-    render(<SaveWorkflowButton {...defaultProps} isNodeEditorOpen={true} />)
+  it('is aria-disabled when isStepEditorOpen is true', () => {
+    render(<SaveWorkflowButton {...defaultProps} isStepEditorOpen={true} />)
     expect(screen.getByRole('button', { name: /save/i })).toHaveAttribute('aria-disabled', 'true')
   })
 
-  it('does not call onSave when isNodeEditorOpen is true', async () => {
+  it('does not call onSave when isStepEditorOpen is true', async () => {
     const onSave = vi.fn()
-    render(<SaveWorkflowButton {...defaultProps} onSave={onSave} isNodeEditorOpen={true} />)
+    render(<SaveWorkflowButton {...defaultProps} onSave={onSave} isStepEditorOpen={true} />)
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: /save/i }))
     expect(onSave).not.toHaveBeenCalled()
   })
 
-  it('shows "finish editing" tooltip when isNodeEditorOpen is true', async () => {
-    render(<SaveWorkflowButton {...defaultProps} isNodeEditorOpen={true} />)
+  it('shows "finish editing" tooltip when isStepEditorOpen is true', async () => {
+    render(<SaveWorkflowButton {...defaultProps} isStepEditorOpen={true} />)
     const user = userEvent.setup()
     await user.hover(screen.getByRole('button', { name: /save/i }))
     expect(await screen.findByText(/Finish editing the current step before saving/)).toBeInTheDocument()

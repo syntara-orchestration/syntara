@@ -6,6 +6,8 @@ import type { useAlerts } from '../../providers/alerts'
 import { getErrorMessage } from '../../utils/apiErrors'
 
 import { resolveWorkflowRunTrigger } from './resolveWorkflowRunTrigger'
+import { getWorkflowRunTriggerDetailsErrorMessage } from './workflowRunTriggerDetailsError'
+import { getWorkflowStartErrorAlert } from './workflowStartErrors'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -44,12 +46,20 @@ export function useWorkflowActions({
 
       let resolvedTriggerNodeId = triggerNodeId
       if (!resolvedTriggerNodeId) {
-        const trigger = await resolveWorkflowRunTrigger(workflow)
-        if (!trigger) {
-          showError({ title: 'Cannot run workflow', description: 'Workflow has no triggers configured' })
+        try {
+          const trigger = await resolveWorkflowRunTrigger(workflow)
+          if (!trigger) {
+            showError({ title: 'Cannot run workflow', description: 'Workflow has no triggers configured' })
+            return
+          }
+          resolvedTriggerNodeId = trigger.triggerNodeId
+        } catch (error: unknown) {
+          showError({
+            title: 'Cannot run workflow',
+            description: getWorkflowRunTriggerDetailsErrorMessage(error),
+          })
           return
         }
-        resolvedTriggerNodeId = trigger.triggerNodeId
       }
 
       const { data, error } = await executionsFetchClient.POST('/executions', {
@@ -61,10 +71,7 @@ export function useWorkflowActions({
         },
       })
       if (error || !data?.id) {
-        showError({
-          title: 'Failed to run workflow',
-          description: `Failed to start workflow "${workflow.name}": ${getErrorMessage(error)}`,
-        })
+        showError(getWorkflowStartErrorAlert(error, workflow.name))
       } else {
         onNavigate(`/executions/${data.id}`)
       }

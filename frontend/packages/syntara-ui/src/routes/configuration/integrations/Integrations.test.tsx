@@ -11,7 +11,7 @@ import { useFilterState } from '../../../hooks/useFilterState'
 import { AlertProvider } from '../../../providers/alerts'
 import { assertUrlParam } from '../../../test/filter-test-helpers'
 import { routerTestState } from '../../../test/setup'
-import { formatDateTime } from '../../../utils/dateUtils.ts'
+import { formatDateTime } from '../../../utils/dateUtils'
 
 import Integrations from './Integrations'
 
@@ -36,10 +36,6 @@ vi.mock('../../../hooks/useFilterState', async (importOriginal) => {
 
 const mockSearchParams = new URLSearchParams()
 const mockSetSearchParams = vi.fn()
-
-vi.mock('wouter', () => ({
-  useLocation: () => ['/configuration/integrations', routerTestState.navigate],
-}))
 
 vi.mock('../../../hooks/routing/useLocation', () => ({
   useLocation: () => '/configuration/integrations',

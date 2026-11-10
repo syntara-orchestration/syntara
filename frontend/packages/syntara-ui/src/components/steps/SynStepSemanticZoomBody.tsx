@@ -1,92 +1,155 @@
-import { Content, ContentVariants, Stack, StackItem, Tooltip } from '@patternfly/react-core'
-import type { CSSProperties, ReactNode } from 'react'
+import { Flex, FlexItem } from '@patternfly/react-core'
+import { useNodeId, useStore, useUpdateNodeInternals } from '@xyflow/react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
 import { SemanticZoomBranchSourceHandles } from '../../routes/workflows/canvas/nodes/common/SemanticZoomBranchSourceHandles'
-import { SEMANTIC_ZOOM_BAR_HEIGHT_PX } from '../../routes/workflows/canvas/semanticZoom'
+import { StandardStepHeader } from '../../routes/workflows/canvas/nodes/common/StandardStepHeader'
+import type { StepMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useStepMenuActions'
+import { SEMANTIC_ZOOM_TILE_SIZE_PX } from '../../routes/workflows/canvas/semanticZoom'
 import type { SemanticZoomBranchSource } from '../../routes/workflows/canvas/semanticZoomTypes'
 
+import { SYN_STEP_DEFAULT_NODE_WIDTH } from './synStepNodeWidth'
 import styles from './SynStepSemanticZoomBody.module.css'
+
+function usePreviewInteraction() {
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
+
+  const openPreview = () => setPreviewOpen(true)
+  const closePreviewIfOutside = (relatedTarget: EventTarget | null) => {
+    if (!(relatedTarget instanceof Element) || !rootRef.current?.contains(relatedTarget)) {
+      setPreviewOpen(false)
+    }
+  }
+
+  return { rootRef, previewOpen, openPreview, closePreviewIfOutside }
+}
 
 export function SynStepSemanticZoomBody(props: {
   title: string
   typeLabel: string
-  backgroundColor: string
-  /** Invisible source handles on the bar right edge (branching nodes only). */
+  accentColor: string
+  icon?: ReactNode
+  previewIcon?: ReactNode
+  menuActions?: readonly StepMenuAction[]
   branchSources?: readonly SemanticZoomBranchSource[]
   selected: boolean
   hasDashedBorder: boolean
-  /** Pass-through from node (e.g. trigger pill radii on the color bar). */
-  barStyle?: Pick<CSSProperties, 'borderRadius' | 'borderTopLeftRadius' | 'borderBottomLeftRadius'>
+  tileStyle?: Pick<
+    CSSProperties,
+    | 'borderRadius'
+    | 'borderTopLeftRadius'
+    | 'borderBottomLeftRadius'
+    | 'borderTopRightRadius'
+    | 'borderBottomRightRadius'
+  >
+  previewCardStyle?: Pick<CSSProperties, 'paddingLeft' | 'paddingRight'>
 }): ReactNode {
-  /** Tooltip surface uses inverse background; Content’s default text color is for the main page and reads as white here. */
-  const tooltipTextColor = 'var(--pf-t--global--text--color--inverse)'
+  const nodeId = useNodeId()
+  const updateNodeInternals = useUpdateNodeInternals()
+  const viewportZoom = useStore((s) => s.transform[2])
+  const previewInverseScale = viewportZoom > 0 ? 1 / viewportZoom : 1
+  const { rootRef, previewOpen, openPreview, closePreviewIfOutside } = usePreviewInteraction()
+  const previewHeaderIcon = props.previewIcon ?? props.icon
 
-  const tooltipContent = (
-    <Stack style={{ textAlign: 'center', color: tooltipTextColor }}>
-      <StackItem>
-        <Content
-          component="p"
-          style={{
-            margin: 0,
-            color: tooltipTextColor,
-            fontWeight: 'var(--pf-t--global--font--weight--heading--default)',
-          }}
-        >
-          {props.title}
-        </Content>
-      </StackItem>
-      <StackItem>
-        <Content
-          component={ContentVariants.small}
-          style={{
-            margin: 0,
-            color: tooltipTextColor,
-            opacity: 0.82,
-          }}
-        >
-          {props.typeLabel}
-        </Content>
-      </StackItem>
-    </Stack>
-  )
+  const menuActions = props.menuActions ?? []
 
-  const baseBarStyle: CSSProperties = {
-    width: '100%',
-    height: '100%',
-    minHeight: '100%',
-    backgroundColor: props.backgroundColor,
-    boxSizing: 'border-box',
-    ...props.barStyle,
+  useLayoutEffect(() => {
+    if (!nodeId) return
+    updateNodeInternals(nodeId)
+  }, [nodeId, updateNodeInternals, props.branchSources?.length])
+
+  const tileRadiusStyle: CSSProperties = {
+    borderRadius: props.tileStyle?.borderRadius ?? 'var(--pf-t--global--border--radius--medium)',
+    borderTopLeftRadius: props.tileStyle?.borderTopLeftRadius,
+    borderBottomLeftRadius: props.tileStyle?.borderBottomLeftRadius,
+    borderTopRightRadius: props.tileStyle?.borderTopRightRadius,
+    borderBottomRightRadius: props.tileStyle?.borderBottomRightRadius,
   }
 
-  if (props.hasDashedBorder && !props.selected) {
-    baseBarStyle.border = '2px dashed rgba(196, 181, 253, 0.5)'
-  } else if (props.selected) {
-    baseBarStyle.outline = '2px solid var(--pf-t--global--color--brand--default)'
-    baseBarStyle.outlineOffset = 2
-  }
+  const tileClassName = [
+    styles.tile,
+    props.hasDashedBorder && !props.selected ? styles.tileDashed : '',
+    props.selected ? styles.tileSelected : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
-  const rowStyle: CSSProperties = {
-    position: 'relative',
-    width: '100%',
-    height: SEMANTIC_ZOOM_BAR_HEIGHT_PX,
-    minHeight: SEMANTIC_ZOOM_BAR_HEIGHT_PX,
-    // Click bubbles to the ReactFlow node, which selects / opens the builder detail path.
-    cursor: 'pointer',
-  }
+  const ariaLabel = `${props.title}, ${props.typeLabel}`
+  const showPreview = previewOpen
 
   return (
-    <div style={rowStyle}>
-      <Tooltip content={tooltipContent} position="top">
-        {/*
-          PatternFly Tooltip opens on focus; the native <button> gives keyboard
-          users a focus target and announces the node name + type to screen readers.
-        */}
-        <button type="button" aria-label={`${props.title}, ${props.typeLabel}`} className={styles.tooltipTrigger}>
-          <div style={baseBarStyle} />
+    <div
+      ref={rootRef}
+      className={styles.root}
+      style={
+        {
+          '--syn-step-semantic-zoom-tile-size': `${SEMANTIC_ZOOM_TILE_SIZE_PX}px`,
+          '--syn-step-semantic-zoom-accent': props.accentColor,
+          '--syn-step-semantic-zoom-preview-width': `${SYN_STEP_DEFAULT_NODE_WIDTH}px`,
+          '--syn-step-semantic-zoom-preview-inverse-scale': `${previewInverseScale}`,
+        } as CSSProperties
+      }
+      data-selected={props.selected ? 'true' : 'false'}
+      data-semantic-zoom-preview-open={showPreview ? 'true' : undefined}
+      onPointerEnter={openPreview}
+      onPointerLeave={(event) => closePreviewIfOutside(event.relatedTarget)}
+      onFocusCapture={openPreview}
+      onBlurCapture={(event) => {
+        const related = event.relatedTarget
+        if (related == null) return
+        closePreviewIfOutside(related)
+      }}
+    >
+      <div className={styles.tileRegion}>
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          className={styles.tileFocusTarget}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              event.stopPropagation()
+            }
+          }}
+        >
+          <Flex
+            className={tileClassName}
+            style={tileRadiusStyle}
+            alignItems={{ default: 'alignItemsCenter' }}
+            justifyContent={{ default: 'justifyContentCenter' }}
+          >
+            {props.icon ? <FlexItem className={styles.iconSlot}>{props.icon}</FlexItem> : null}
+          </Flex>
         </button>
-      </Tooltip>
-      <SemanticZoomBranchSourceHandles handles={props.branchSources ?? []} />
+
+        {showPreview ? (
+          <div
+            className={`${styles.preview} ${styles.previewOpen} nodrag nopan`}
+            data-testid="semantic-zoom-preview"
+            onPointerEnter={openPreview}
+          >
+            <div
+              className={styles.previewCard}
+              style={{
+                borderTopColor: props.accentColor,
+                ...tileRadiusStyle,
+                ...props.previewCardStyle,
+              }}
+            >
+              <StandardStepHeader
+                icon={previewHeaderIcon}
+                title={props.title}
+                subtitle={props.typeLabel}
+                menuActions={[...menuActions]}
+                menuPopperProps={{ position: 'right' }}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        <SemanticZoomBranchSourceHandles handles={props.branchSources ?? []} />
+      </div>
     </div>
   )
 }

@@ -40,9 +40,6 @@ export type ManifestBuildResult = {
 export const SOURCE_PARITY_EXCEPTIONS = new Set([
   // Declared in AppRoute but unused; not a live browser route.
   '/dashboard',
-  // Placeholder support links — no createRoute yet.
-  '/support/documentation',
-  '/support/faq',
   // Nav section root; children are real routes.
   '/system-administration',
 ])

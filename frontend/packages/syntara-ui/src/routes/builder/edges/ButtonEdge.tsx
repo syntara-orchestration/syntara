@@ -184,7 +184,7 @@ export function ButtonEdge(props: ButtonEdgeProps) {
         role="button"
         aria-label="Add connected step"
         data-testid={sourceHandleId ? `add-node-button-${sourceHandleId}` : undefined}
-        tabIndex={0}
+        tabIndex={-1}
         stroke={isFocused ? 'var(--pf-t--global--color--brand--default)' : 'none'}
         strokeWidth={isFocused ? 2 : 0}
         style={{ cursor: 'pointer', pointerEvents: 'all', zIndex: 100 }}

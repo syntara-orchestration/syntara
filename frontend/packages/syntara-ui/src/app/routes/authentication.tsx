@@ -6,10 +6,42 @@ import {
   EditGroupMapping,
   EditIdentityProvider,
   IdentityProviderDetail,
+  IdentityProviderDetailsTabRoute,
+  IdentityProviderGroupMappingTabRoute,
+  IdentityProviderUnknownTabRoute,
 } from '../lazyRoutes'
 import { makeRouteComponent } from '../makeRouteComponent'
 
 import { rootRoute } from './__root'
+
+const identityProviderDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/system-administration/authentication/identity-providers/$providerId',
+  component: makeRouteComponent(<IdentityProviderDetail />),
+})
+
+const identityProviderDetailTabRoutes = [
+  createRoute({
+    getParentRoute: () => identityProviderDetailRoute,
+    path: '/',
+    component: makeRouteComponent(<IdentityProviderDetailsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => identityProviderDetailRoute,
+    path: '/details',
+    component: makeRouteComponent(<IdentityProviderDetailsTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => identityProviderDetailRoute,
+    path: '/group-mapping',
+    component: makeRouteComponent(<IdentityProviderGroupMappingTabRoute />),
+  }),
+  createRoute({
+    getParentRoute: () => identityProviderDetailRoute,
+    path: '/$tab',
+    component: makeRouteComponent(<IdentityProviderUnknownTabRoute />),
+  }),
+]
 
 export const authenticationRoutes = [
   createRoute({
@@ -32,14 +64,5 @@ export const authenticationRoutes = [
     path: '/system-administration/authentication/identity-providers/$providerId/group-mapping/edit',
     component: makeRouteComponent(<EditGroupMapping />),
   }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/authentication/identity-providers/$providerId',
-    component: makeRouteComponent(<IdentityProviderDetail />),
-  }),
-  createRoute({
-    getParentRoute: () => rootRoute,
-    path: '/system-administration/authentication/identity-providers/$providerId/$tab',
-    component: makeRouteComponent(<IdentityProviderDetail />),
-  }),
+  identityProviderDetailRoute.addChildren(identityProviderDetailTabRoutes),
 ]
