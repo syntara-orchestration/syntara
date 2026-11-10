@@ -270,6 +270,24 @@ describe('SynCodeBlock', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Copy to clipboard' }))
       expect(mockWriteText).toHaveBeenLastCalledWith(source)
     })
+
+    it('matches whitespace-only search terms literally', () => {
+      mockIsShikiReady.mockReturnValue(true)
+      const source = '{\n  "status": "failed"\n}'
+
+      render(
+        <SynCodeBlock language="json" searchTerm=" ">
+          {source}
+        </SynCodeBlock>
+      )
+
+      expect(
+        screen
+          .getAllByRole('mark')
+          .map((mark) => mark.textContent)
+          .join('')
+      ).toBe('   ')
+    })
   })
 
   it('renders JSON object formatted', () => {

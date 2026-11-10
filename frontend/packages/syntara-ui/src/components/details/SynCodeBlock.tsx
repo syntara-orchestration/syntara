@@ -87,7 +87,7 @@ function resolveCopySource(options: {
 }
 
 function findSearchRanges(source: string, searchTerm: string): SearchRange[] {
-  if (!searchTerm.trim()) return []
+  if (searchTerm.length === 0) return []
 
   const escapedTerm = searchTerm.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const ranges: SearchRange[] = []
