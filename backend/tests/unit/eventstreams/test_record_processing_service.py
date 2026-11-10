@@ -533,8 +533,10 @@ async def test_pending_inspection_identity_requests_content_without_new_admissio
         ),
     ],
 )
-async def test_structured_failure_is_held_without_scheduling_or_terminal_discard(monkeypatch, body, code) -> None:
+async def test_structured_failure_is_durably_rejected_without_scheduling(monkeypatch, body, code) -> None:
     context, service, admission, event = processing_context(monkeypatch)
+    log = Mock()
+    monkeypatch.setattr(module, "logger", log)
     event = event.model_copy(
         update={
             "value": json.dumps(body).encode(),
@@ -542,11 +544,20 @@ async def test_structured_failure_is_held_without_scheduling_or_terminal_discard
         }
     )
     result = await service.process(context.snapshot, context.identity, event, "worker")
-    assert isinstance(result, HeldRecord)
-    assert result.reason == "activity_log_unavailable"
-    assert result.permanent_content_error
-    assert context.store.defer.call_args.kwargs["error_code"] == code.value
+    assert isinstance(result, ResolvedDelivery)
+    assert result.terminal.identity == context.identity
+    assert result.terminal.state == DeliveryState.REJECTED
+    assert result.terminal.execution_id is None
+    row = context.rows[EventDelivery]
+    assert row.state == DeliveryState.REJECTED
+    assert row.last_error_code == code.value
+    assert row.resolved_at == result.terminal.resolved_at
+    assert row.frozen_binding is None
     assert context.events[-1] == "commit"
+    context.store.finish_inspection.assert_awaited_once()
+    log.error.assert_called_once()
+    assert log.error.call_args.args == ("event_subscription_content_rejected",)
+    assert log.error.call_args.kwargs["error_code"] == code.value
     context.store.finalize_without_execution.assert_not_awaited()
     context.store.freeze.assert_not_awaited()
     admission.schedule.assert_not_awaited()
