@@ -142,7 +142,7 @@ async def test_inspection_marker_is_allowed_behind_admission_holds_and_survives_
     assert source.delivery_evidence_revision == 1
 
 
-@pytest.mark.parametrize("invalid", ["token", "owner", "expired", "permanent", "frozen"])
+@pytest.mark.parametrize("invalid", ["token", "owner", "expired", "permanent", "frozen", "execution", "acceptance"])
 async def test_inspection_finish_cannot_clear_stale_or_replaced_evidence(monkeypatch, invalid) -> None:
     row = delivery()
     row.last_error_code = CONTENT_INSPECTION_PENDING
@@ -155,14 +155,24 @@ async def test_inspection_finish_cannot_clear_stale_or_replaced_evidence(monkeyp
         row.lease_until = NOW
     elif invalid == "permanent":
         row.last_error_code = EventFailureCode.invalid_json.value
-    else:
+    elif invalid == "frozen":
         row.frozen_binding = binding()
+    elif invalid == "execution":
+        row.execution_id = row.execution_identity
+    else:
+        row.execution_confirmed_at = NOW
     repository = store()
+    monkeypatch.setattr(deduplication_store, "lock_source_lifecycle", AsyncMock(return_value=inspection_lifecycle()))
     monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=row))
     monkeypatch.setattr(repository, "_now", AsyncMock(return_value=NOW))
     defer = AsyncMock()
     monkeypatch.setattr(repository, "defer", defer)
-    assert isinstance(await repository.finish_inspection(claim, None), ClaimLost)
+    assert isinstance(
+        await repository.finish_inspection(
+            claim, None, expected=DeliveryExpectation(published_version_id=UUID(int=7), configuration_revision=2)
+        ),
+        ClaimLost,
+    )
     defer.assert_not_awaited()
 
 
@@ -175,27 +185,89 @@ async def test_inspection_finish_cannot_clear_stale_or_replaced_evidence(monkeyp
         (EventDecodeFailure(code=EventFailureCode.invalid_json), True, EventFailureCode.invalid_json.value),
     ],
 )
-async def test_inspection_finish_retains_unresolved_safe_evidence_and_changes_revision(
+async def test_inspection_finish_rejects_failures_and_changes_evidence_revision(
     monkeypatch, failure, keep_pending, expected_code
 ) -> None:
     row = delivery()
     row.last_error_code = CONTENT_INSPECTION_PENDING
-    _, source = inspection_lifecycle()
+    subscription, source = inspection_lifecycle()
     session = MagicMock(spec=AsyncSession)
     session.get.return_value = source
     repository = store(session)
+    monkeypatch.setattr(deduplication_store, "lock_source_lifecycle", AsyncMock(return_value=(subscription, source)))
     monkeypatch.setattr(repository, "_current", AsyncMock(return_value=row))
     monkeypatch.setattr(repository, "_now", AsyncMock(return_value=NOW))
     defer = AsyncMock(return_value=None)
     monkeypatch.setattr(repository, "defer", defer)
-    claim = repository._claim(row)
-    assert await repository.finish_inspection(claim, failure, keep_pending=keep_pending) is None
-    defer.assert_awaited_once_with(
-        claim,
-        next_attempt_at=EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT if failure is not None else NOW,
-        error_code=expected_code,
+    change = AsyncMock(
+        return_value=row.model_copy(
+            update={
+                "state": DeliveryState.REJECTED,
+                "resolved_at": NOW,
+                "last_error_code": expected_code,
+            }
+        )
     )
+    monkeypatch.setattr(repository, "_change", change)
+    claim = repository._claim(row)
+    result = await repository.finish_inspection(
+        claim,
+        failure,
+        keep_pending=keep_pending,
+        expected=DeliveryExpectation(published_version_id=UUID(int=7), configuration_revision=2),
+    )
+    if failure is None:
+        assert result is None
+        defer.assert_awaited_once_with(claim, next_attempt_at=NOW, error_code=expected_code)
+        change.assert_not_awaited()
+    else:
+        assert isinstance(result, TerminalDelivery)
+        assert result.state == DeliveryState.REJECTED
+        assert result.execution_id is None
+        assert change.call_args.kwargs["last_error_code"] == expected_code
+        assert change.call_args.kwargs["claim_token"] is None
+        defer.assert_not_awaited()
     assert source.delivery_evidence_revision == 1
+
+
+@pytest.mark.parametrize("changed", ["revision", "version"])
+async def test_content_rejection_refuses_a_changed_publication(monkeypatch, changed: str) -> None:
+    subscription, source = inspection_lifecycle()
+    expected = DeliveryExpectation(published_version_id=subscription.published_version_id, configuration_revision=2)
+    if changed == "revision":
+        subscription.configuration_revision += 1
+    else:
+        subscription.published_version_id = uuid4()
+    repository = store()
+    monkeypatch.setattr(deduplication_store, "lock_source_lifecycle", AsyncMock(return_value=(subscription, source)))
+    current = AsyncMock()
+    monkeypatch.setattr(repository, "_current", current)
+    result = await repository.finish_inspection(
+        repository._claim(delivery()),
+        EventDecodeFailure(code=EventFailureCode.invalid_json),
+        expected=expected,
+    )
+    assert isinstance(result, RevisionChanged)
+    current.assert_not_awaited()
+    assert source.delivery_evidence_revision == 0
+
+
+async def test_content_rejection_losing_its_conditional_write_has_no_terminal_proof(monkeypatch) -> None:
+    row = delivery()
+    row.last_error_code = CONTENT_INSPECTION_PENDING
+    subscription, source = inspection_lifecycle()
+    repository = store()
+    monkeypatch.setattr(deduplication_store, "lock_source_lifecycle", AsyncMock(return_value=(subscription, source)))
+    monkeypatch.setattr(repository, "_current", AsyncMock(return_value=row))
+    change = AsyncMock(return_value=None)
+    monkeypatch.setattr(repository, "_change", change)
+    result = await repository.finish_inspection(
+        repository._claim(row),
+        EventDecodeFailure(code=EventFailureCode.invalid_json),
+        expected=DeliveryExpectation(published_version_id=subscription.published_version_id, configuration_revision=2),
+    )
+    assert isinstance(result, ClaimLost)
+    assert source.delivery_evidence_revision == 0
     assert row.state == DeliveryState.IN_PROGRESS
 
 

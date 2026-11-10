@@ -119,6 +119,89 @@ and [runtime operating guidance](docs/kafka-worker-operations.md).
 Operator-managed deployment, container launchers and deployment health probes are
 deferred to M2. This local packaging adds no autoscaling or per-subscription deployments.
 
+### CEL Subscription Filters and Testing
+
+The listener and test endpoint use the official CEL C++ engine through
+`cel-expr-python`. There is no Python CEL interpreter fallback or custom wildcard
+function. Use standard CEL equality, `startsWith()`, `endsWith()`, `contains()` and
+RE2 `matches()`; regex matching searches for a substring unless anchored.
+
+A Subscribe trigger saves one original expression:
+
+```json
+{
+  "filter": {
+    "expression": "input.key.text.startsWith('node-') || input.payload.value.severity == 'critical'"
+  }
+}
+```
+
+There is no filter ID or filter-format version. The backend does not add implicit
+AND conditions. Cleared/whitespace-only expressions are normalized to `filter:
+null` in workflow saves and published subscriptions. Non-empty source is preserved.
+Publication rejects invalid CEL and statically known non-boolean return types;
+input-dependent return types remain runtime checks.
+
+On loading a subscription, the backend prepares the native expression once. It
+reads the compiler's checked protobuf AST to identify safe key/header-only checks.
+A mandatory AND operand can reject early only when it returns boolean false;
+errors in extracted operands require full evaluation. OR, NOT, dynamic root
+access and unsupported/deep AST structures fall back to full evaluation unless
+the entire expression is independent of payload decoding. Original source is
+never split or regenerated. Native AST descriptors and their regeneration command
+are documented in `src/syntara/filtering/_proto/README.md`.
+
+The listener recovers pending prepared executions before normal partition intake.
+No-match and CEL evaluation-error outcomes then complete locally without per-record
+PostgreSQL reads/writes, audit insertion or cache writes. They emit best-effort
+INFO and ERROR system logs respectively, carrying safe record identity and revision.
+Log failure does not block completion. New records require open lifecycle and
+dependency gates. Closing admission stops new processing; already completed
+records, including local CEL skips, may still commit during the bounded drain.
+Every commit requires current Kafka ownership/assignment epoch, open dependency
+checks and no recovery fence. Only the contiguous completed prefix can advance.
+A new filter cannot abandon an already prepared execution. Decoding/schema failures
+require a committed, claim-fenced delivery rejection before offset advancement.
+Their system error log is best effort; there is no activity-log requirement.
+Uncommitted rejection writes and infrastructure failures hold the record for retry.
+If an unbufferable record arrives after partition checks expire, the listener
+rewinds it and refreshes recovery/lifecycle checks before filtering it again;
+queue pressure alone does not create a database inspection marker for a CEL skip.
+Deferring a record before inspection/admission also creates no permanent local
+content hold: after shutdown, the next consumer can read the uncommitted record.
+CloudEvents normalization remains separate work.
+
+Authenticated callers can use `POST /api/v1/filtering/test` without workflow,
+project, Integration or Credential permissions. Supply required JSON as `input`;
+it is bound directly, with no wrapping, Kafka decoding, schema validation or
+CloudEvents conversion. The expression is optional; omitted, null, empty or
+whitespace-only expressions return Match.
+
+```json
+{
+  "expression": "input.payload.value.severity == 'critical'",
+  "input": {
+    "payload": {"value": {"severity": "critical"}}
+  }
+}
+```
+
+Responses contain `outcome` (`match`, `no_match`, `evaluation_error`) and a safe
+`error_code` for evaluation errors. Invalid requests/CEL return HTTP 422. Compiler
+errors use problem details with a safe `code` and optional one-based `line` and
+`column`; source excerpts and sample contents are never returned or logged.
+
+Saved and test CEL expressions are limited to 16,384 characters. Oversized
+expressions are rejected before compilation. No filtering-specific sample-size
+limit or evaluation timeout is added. General API, workflow, broker, message and
+queue protections still apply.
+Nested predicates can be expensive; native evaluation is not a hard CPU budget.
+JSON integers outside the native signed 64-bit domain produce `filter_invalid_input`
+without rounding or string conversion. Standard CEL presence checks use
+`has(input.field)` or `"field-name" in input`; `has(input["field-name"])` is invalid.
+Mixed unresolved errors follow native CEL selection rules; no custom error
+priority is added.
+
 ### Dependency Management
 
 This project uses `uv` for dependency management with two key files:

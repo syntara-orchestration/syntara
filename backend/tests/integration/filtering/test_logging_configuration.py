@@ -1,6 +1,6 @@
 """Real logging configuration and CEL/RE2 integration in isolated Python processes.
 
-Isolation loads CEL_TRACE before celpy imports and avoids replacing pytest's
+Isolation captures native C++ diagnostics and avoids replacing pytest's
 handlers. No collector, broker, database or Temporal connectivity is claimed.
 """
 
@@ -65,7 +65,7 @@ except FilterValidationError as error:
 else:
     raise AssertionError("Invalid expression was accepted")
 
-for name in ("celpy", "celpy.Evaluator", "celpy.future.child"):
+for name in ("cel_expr_python", "cel_expr_python.Evaluator", "cel_expr_python.future.child"):
     dependency_logger = logging.getLogger(name)
     dependency_logger.setLevel(logging.DEBUG)
     for level in (logging.DEBUG, logging.ERROR, logging.CRITICAL):
@@ -81,11 +81,9 @@ print("filtering-integration-ok")
 
 
 @pytest.mark.parametrize("configuration", ["application", "uvicorn"])
-@pytest.mark.parametrize("trace", ["", "1"])
-def test_real_logging_setup_keeps_filter_inputs_private(configuration: str, trace: str) -> None:
+def test_real_logging_setup_keeps_filter_inputs_private(configuration: str) -> None:
     environment = {
         **os.environ,
-        "CEL_TRACE": trace,
         "APP_OTEL_ENABLED": "false",
         "APP_LOG_OUTPUT_FORMAT": "json",
         "PYTHONDONTWRITEBYTECODE": "1",

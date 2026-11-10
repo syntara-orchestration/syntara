@@ -67,7 +67,8 @@ async def test_pending_query_uses_numeric_offsets_and_bounded_source_partition_s
     assert "event_deliveries.source_id" in sql
     assert "event_deliveries.source_generation" in sql
     assert "record_identity ->> 'partition'" in sql
-    assert "rejected" in sql
+    assert "event_deliveries.state = 'in_progress'" in sql
+    assert "rejected" not in sql
     assert "invalid_json" in sql
 
 
@@ -89,7 +90,8 @@ async def test_content_gate_query_covers_retained_source_errors_across_generatio
     assert "event_deliveries.transport = 'kafka'" in sql
     assert "record_identity ->> 'partition'" in sql
     assert " = 0" in sql
-    assert "event_deliveries.state = 'rejected'" in sql
+    assert "event_deliveries.state = 'in_progress'" in sql
+    assert "rejected" not in sql
     assert all(f"'{code.value}'" in sql for code in EventFailureCode)
     assert f"'{CONTENT_INSPECTION_PENDING}'" in sql
     assert "LIMIT 1" in sql

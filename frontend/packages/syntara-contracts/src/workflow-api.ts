@@ -508,6 +508,13 @@ export interface components {
       input_schema: {
         [key: string]: unknown
       } | null
+      /**
+       * Filter
+       * @description Original published CEL expression
+       */
+      filter?: {
+        [key: string]: unknown
+      } | null
       /** Desired Enabled */
       desired_enabled: boolean
       /** Paused */
@@ -608,12 +615,28 @@ export interface components {
       initial_partition_ids?: number[] | null
     }
     /**
+     * FilterConfiguration
+     * @description One original CEL expression, with no implicit conditions or field grouping.
+     *
+     *     Empty or whitespace-only expressions mean no filter. Publication validates
+     *     syntax, names and statically known boolean types; dynamic types are checked
+     *     during evaluation. The original non-empty expression is preserved unchanged.
+     */
+    FilterConfiguration: {
+      /**
+       * Expression
+       * @description Complete CEL expression (maximum 16,384 characters).
+       */
+      expression: string
+    }
+    /**
      * KafkaSubscribeParameters
      * @description One exact topic; consumer groups and connection settings are not inputs.
      *
      *     Tightens the transport-neutral ``topic`` with Kafka's naming constraints.
      */
     KafkaSubscribeParameters: {
+      filter?: components['schemas']['FilterConfiguration'] | null
       /**
        * Integration Id
        * Format: uuid

@@ -54,6 +54,7 @@ class EventSubscriptionRead(SQLModel):
     configuration_revision: int
     runtime_credential_id: UUID | None
     input_schema: dict[str, Any] | None
+    filter: dict[str, Any] | None = Field(default=None, description="Original published CEL expression")
     desired_enabled: bool
     paused: bool
     created_at: datetime

@@ -94,7 +94,7 @@ class SubscriptionSupervisor:
             reason = RuntimeFailureCode.STOP_INCOMPLETE.value if self._stop_retry_at is not None else None
         elif not self._closed:
             if self._retained_content_gate:
-                state, reason = RuntimeState.BLOCKED, "activity_log_unavailable"
+                state, reason = RuntimeState.BLOCKED, "content_resolution_pending"
             elif self._desired is not None and self._active(self._desired) and not self._placement.is_current():
                 state = RuntimeState.DRAINING if self._placement.local_in_use else RuntimeState.BLOCKED
                 reason = RuntimeFailureCode.PLACEMENT_LOST.value

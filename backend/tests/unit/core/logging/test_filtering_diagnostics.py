@@ -20,7 +20,7 @@ def configured_logging(
     root = logging.getLogger()
     previous_handlers = root.handlers[:]
     previous_level = root.level
-    cel_logger = logging.getLogger("celpy")
+    cel_logger = logging.getLogger("cel_expr_python")
     previous_cel_handlers = cel_logger.handlers[:]
     previous_cel_propagate = cel_logger.propagate
     uvicorn_levels = {name: logging.getLogger(name).level for name in module._UVICORN_LOGGER_NAMES}
@@ -52,7 +52,7 @@ def test_debug_logging_excludes_real_evaluator_values(configured_logging: String
     result = prepared.evaluate({"secret": private_marker})
     assert result.outcome == FilterOutcome.EVALUATION_ERROR
     assert result.error_code == FilterErrorCode.WRONG_TYPE
-    logging.getLogger("celpy.Evaluator").error("Unsafe dependency diagnostic: %s", private_marker)
+    logging.getLogger("cel_expr_python.Evaluator").error("Unsafe dependency diagnostic: %s", private_marker)
     logging.getLogger("syntara.filtering").warning("filter_wrong_type")
     captured = capfd.readouterr()
     assert private_marker not in captured.out + captured.err
@@ -61,7 +61,9 @@ def test_debug_logging_excludes_real_evaluator_values(configured_logging: String
     assert "filter_wrong_type" in configured_logging.getvalue()
 
 
-@pytest.mark.parametrize("logger_name", ["celpy", "celpy.Evaluator", "celpy.future.child"])
+@pytest.mark.parametrize(
+    "logger_name", ["cel_expr_python", "cel_expr_python.Evaluator", "cel_expr_python.future.child"]
+)
 @pytest.mark.parametrize("level", [logging.DEBUG, logging.ERROR, logging.CRITICAL])
 def test_later_root_handler_cannot_receive_cel_inputs(
     configured_logging: StringIO, capfd: pytest.CaptureFixture[str], logger_name: str, level: int
@@ -118,6 +120,6 @@ def test_uvicorn_reconfiguration_keeps_dependency_filter() -> None:
     assert config["filters"][filter_name]["()"] == "syntara.core.logging.logging.ExcludeCELDiagnostics"
     assert filter_name in config["handlers"]["syntara"]["filters"]
     assert "syntara" in config["root"]["handlers"]
-    assert config["loggers"]["celpy"]["propagate"] is False
-    assert config["loggers"]["celpy"]["handlers"] == ["discard_cel_diagnostics"]
+    assert config["loggers"]["cel_expr_python"]["propagate"] is False
+    assert config["loggers"]["cel_expr_python"]["handlers"] == ["discard_cel_diagnostics"]
     assert config["handlers"]["discard_cel_diagnostics"]["class"] == "logging.NullHandler"

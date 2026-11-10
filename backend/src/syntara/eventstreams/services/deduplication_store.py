@@ -359,10 +359,10 @@ class EventDeliveryStore:
             return self._terminal(row)
         if row.frozen_binding is not None:
             return HeldRecord(reason="frozen_evidence_requires_recovery")
-        if row.last_error_code in {code.value for code in EventFailureCode}:
-            return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
         now = await self._now()
-        if row.last_error_code == CONTENT_INSPECTION_PENDING and (row.lease_until is None or row.lease_until <= now):
+        if row.last_error_code in {CONTENT_INSPECTION_PENDING, *(code.value for code in EventFailureCode)} and (
+            row.lease_until is None or row.lease_until <= now
+        ):
             row.next_attempt_at = now
             await self.session.flush()
         claim = await self._takeover(row, owner_worker_id)
@@ -376,28 +376,59 @@ class EventDeliveryStore:
         return ClaimLost() if changed is None else self._claim(changed)
 
     async def finish_inspection(
-        self, claim: DeliveryClaim, failure: EventDecodeFailure | None, *, keep_pending: bool = False
-    ) -> ClaimLost | None:
-        """Replace only a live inspection token; never resolve the delivery."""
+        self,
+        claim: DeliveryClaim,
+        failure: EventDecodeFailure | None,
+        *,
+        expected: DeliveryExpectation,
+        keep_pending: bool = False,
+    ) -> TerminalDelivery | ClaimLost | RevisionChanged | None:
+        """Commit a content rejection or release a successfully inspected record.
+
+        Content inspection may settle behind a recovery fence, but cannot erase
+        frozen execution evidence or classify a changed publication. The caller
+        must commit this transaction before using the returned terminal proof.
+        """
+        lifecycle = await lock_source_lifecycle(self.session, claim.identity.source_id)
+        if (
+            lifecycle is None
+            or not self._matches_scope(claim.identity, *lifecycle)
+            or lifecycle[0].configuration_revision != expected.configuration_revision
+            or lifecycle[0].published_version_id != expected.published_version_id
+        ):
+            return RevisionChanged()
         row = await self._current(claim)
-        if row is None or row.frozen_binding is not None or row.last_error_code != CONTENT_INSPECTION_PENDING:
+        if (
+            row is None
+            or row.frozen_binding is not None
+            or row.attempt_count
+            or row.first_start_attempt_at is not None
+            or row.temporal_run_id is not None
+            or row.execution_confirmed_at is not None
+            or row.execution_id is not None
+            or row.last_error_code != CONTENT_INSPECTION_PENDING
+        ):
             return ClaimLost()
-        source = await self.session.get(EventSubscriptionSource, claim.identity.source_id)
-        if source is None:
-            return ClaimLost()
-        result = await self.defer(
-            claim,
-            next_attempt_at=EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT if failure is not None else await self._now(),
-            error_code=(
-                failure.code.value
-                if failure is not None
-                else CONTENT_INSPECTION_PENDING
-                if keep_pending
-                else CONTENT_VALIDATED
-            ),
-        )
-        if result is None:
-            source.delivery_evidence_revision += 1
+        result: TerminalDelivery | ClaimLost | None
+        if failure is not None:
+            changed = await self._change(
+                claim,
+                state=DeliveryState.REJECTED.value,
+                resolved_at=func.clock_timestamp(),
+                last_error_code=failure.code.value,
+                claim_token=None,
+                owner_worker_id=None,
+                lease_until=None,
+            )
+            result = ClaimLost() if changed is None else self._terminal(changed)
+        else:
+            result = await self.defer(
+                claim,
+                next_attempt_at=await self._now(),
+                error_code=CONTENT_INSPECTION_PENDING if keep_pending else CONTENT_VALIDATED,
+            )
+        if not isinstance(result, ClaimLost):
+            lifecycle[1].delivery_evidence_revision += 1
             await self.session.flush()
         return result
 

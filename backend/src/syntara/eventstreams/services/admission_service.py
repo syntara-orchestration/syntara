@@ -107,7 +107,7 @@ class EventAdmissionService:
             lifecycle = await lock_source_lifecycle(session, claim.identity.source_id)
             if lifecycle is None:
                 return ClaimLost()
-            snapshot = SubscriptionSnapshot.from_models(*lifecycle)
+            snapshot = SubscriptionSnapshot.from_models(*lifecycle, prepare_filter=False)
         result = await self._preparation.prepare_delivery(
             snapshot, claim.identity, None, claim.owner_worker_id, claim=claim
         )

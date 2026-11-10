@@ -1,0 +1,271 @@
+---
+openapi: 3.1.0
+info:
+  title: Syntara Filtering API
+  version: 1.0.0
+  description: Authenticated CEL expression testing over caller-supplied JSON. Uses the same shared evaluator as event listeners.
+paths:
+  /filtering/test:
+    post:
+      tags:
+        - Filtering
+      summary: Test a CEL filter expression
+      description: 'Evaluate caller-supplied JSON with the shared CEL evaluator. #magic___^_^___line #magic___^_^___line Authentication is required; no stored resources are read or changed. #magic___^_^___line Invalid CEL returns 422. Evaluation returns match, no_match or evaluation_error.'
+      operationId: test_cel_filter
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilterTestRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterResult'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: ../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: ../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: ../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: ../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: ../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Invalid request or CEL expression
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/FilterValidationProblem'
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: ../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: ../base/shared-resources.openapi.yaml#/components/schemas/ErrorData
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: null
+        action: null
+components:
+  schemas:
+    FilterErrorCode:
+      type: string
+      enum:
+        - filter_invalid_input
+        - filter_non_boolean
+        - filter_wrong_type
+        - filter_evaluation_failed
+      title: FilterErrorCode
+      description: Safe categories that never contain expression or input contents.
+    FilterOutcome:
+      type: string
+      enum:
+        - match
+        - no_match
+        - evaluation_error
+      title: FilterOutcome
+      description: Content decisions without persistence or acknowledgement authority.
+    FilterResult:
+      properties:
+        outcome:
+          $ref: '#/components/schemas/FilterOutcome'
+        error_code:
+          anyOf:
+            - $ref: '#/components/schemas/FilterErrorCode'
+            - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+        - outcome
+      title: FilterResult
+      description: One evaluation result; callers own any delivery or audit effects.
+    FilterTestRequest:
+      properties:
+        expression:
+          anyOf:
+            - type: string
+              maxLength: 16384
+            - type: 'null'
+          title: Expression
+          description: Complete CEL expression (maximum 16,384 characters).
+        input:
+          $ref: '#/components/schemas/JsonValue'
+      additionalProperties: false
+      type: object
+      required:
+        - input
+      title: FilterTestRequest
+      description: 'An optional CEL expression and required JSON bound directly as input. #magic___^_^___line #magic___^_^___line Omitted, empty and whitespace-only expressions mean no filter. No Kafka #magic___^_^___line decoding, input restructuring or payload-schema validation is performed.'
+    FilterValidationProblem:
+      properties:
+        type:
+          type: string
+          maxLength: 500
+          minLength: 1
+          title: Type
+          description: URI reference identifying the problem type
+          examples:
+            - https://api.example.com/errors/llm-error
+        title:
+          type: string
+          maxLength: 200
+          minLength: 1
+          title: Title
+          description: Short, human-readable summary of the problem
+          examples:
+            - LLM Service Unavailable
+        detail:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Detail
+          description: Human-readable explanation specific to this occurrence
+          examples:
+            - 'OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.'
+        code:
+          type: string
+          maxLength: 100
+          minLength: 1
+          title: Code
+          description: Machine-readable error code for programmatic handling
+          examples:
+            - RATE_LIMIT_EXCEEDED
+        retryable:
+          type: boolean
+          title: Retryable
+          description: Whether this error can be retried by creating a new invocation
+          examples:
+            - true
+        instance:
+          anyOf:
+            - type: string
+              maxLength: 2048
+            - type: 'null'
+          title: Instance
+          description: Optional URI reference identifying the specific occurrence
+          examples:
+            - /invocations/550e8400-e29b-41d4-a716-446655440000
+        line:
+          anyOf:
+            - type: integer
+              minimum: 1.0
+            - type: 'null'
+          title: Line
+          description: One-based compiler source line, when available
+        column:
+          anyOf:
+            - type: integer
+              minimum: 1.0
+            - type: 'null'
+          title: Column
+          description: One-based compiler source column, when available
+      type: object
+      required:
+        - type
+        - title
+        - detail
+        - code
+        - retryable
+      title: FilterValidationProblem
+      description: Invalid CEL with a safe category and optional one-based compiler location.
+      examples:
+        - code: RATE_LIMIT_EXCEEDED
+          detail: OpenRouter API rate limit exceeded. Please try again in a few moments.
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          retryable: true
+          title: LLM Rate Limit Exceeded
+          type: https://api.example.com/errors/llm-error
+        - code: STREAM_TIMEOUT
+          detail: LLM streaming timed out after 30 seconds
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          retryable: true
+          title: Streaming Timeout
+          type: https://api.example.com/errors/timeout-error
+    JsonValue: {}
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: JWT token authentication
+      scheme: bearer
+      bearerFormat: JWT
+servers:
+  - url: /api/v1
+    description: API v1
+tags:
+  - name: Filtering
+    description: Shared CEL expression testing

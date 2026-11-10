@@ -14,7 +14,6 @@ from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.models.credential import Credential
 from syntara.eventstreams.core.deduplication import DeliveryState
 from syntara.eventstreams.core.handler import ResolvedDelivery
-from syntara.eventstreams.core.processing import HeldRecord
 from syntara.eventstreams.core.results import EventFailureCode
 from syntara.eventstreams.core.runtime import RuntimeRevision, RuntimeState
 from syntara.eventstreams.models.delivery import EventDelivery
@@ -210,7 +209,7 @@ async def test_publication_replacement_keeps_prepared_version_credential_and_inp
     assert recovered.workflow_arguments() == context.prepared.workflow_arguments()
 
 
-async def test_pause_resume_preserves_durable_permanent_content_evidence(runtime):
+async def test_pause_resume_finishes_retained_content_rejection(runtime):
     context, supervisor = runtime.context, runtime.supervisor
     claim = await context.delivery.claim(offset=10)
     async with context.delivery.session_factory() as session, session.begin():
@@ -224,7 +223,7 @@ async def test_pause_resume_preserves_durable_permanent_content_evidence(runtime
         )
     async with context.delivery.session_factory() as session:
         row = await session.get(EventDelivery, claim.identity.digest)
-        retained = row.model_dump()
+        retained_identity = row.delivery_identity()
     await supervisor.apply(await persisted_snapshot(context))
     await supervisor.apply(await change_lifecycle(context, "paused"))
     resumed = await change_lifecycle(context, "resumed")
@@ -234,14 +233,14 @@ async def test_pause_resume_preserves_durable_permanent_content_evidence(runtime
         EventExecutionPreparationService(context.delivery.session_factory),
         context.admission,
     )
-    held = await processing.process(resumed, claim.identity, None, "resumed")
-    assert isinstance(held, HeldRecord)
-    assert held.permanent_content_error
-    assert held.retry_at is None
-    assert held.reason == "activity_log_unavailable"
+    resolved = await processing.process(resumed, claim.identity, None, "resumed")
+    assert isinstance(resolved, ResolvedDelivery)
+    assert resolved.terminal.state == DeliveryState.REJECTED
     async with context.delivery.session_factory() as session:
         row = await session.get(EventDelivery, claim.identity.digest)
-        assert row.model_dump() == retained
-        assert row.state == DeliveryState.IN_PROGRESS
+        assert row.delivery_identity() == retained_identity
+        assert row.state == DeliveryState.REJECTED
+        assert row.resolved_at is not None
+        assert row.last_error_code == EventFailureCode.invalid_json.value
         assert row.frozen_binding is None
     assert context.temporal.starts == []

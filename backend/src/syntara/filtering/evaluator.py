@@ -1,99 +1,172 @@
-"""Prepare CEL once and evaluate generic input values without delivery side effects."""
+"""Compile and evaluate CEL through the official C++ engine's Python bindings."""
 
 import math
+import re
+from typing import cast
 
-from celpy import Environment, celtypes
-from celpy.celparser import CELParseError
-from celpy.evaluation import CELEvalError, CELUnsupportedError
+from cel_expr_python import cel  # type: ignore[import-untyped]  # Native wheel has no py.typed marker.
 
 from syntara.filtering.exceptions import FilterValidationCode, FilterValidationError
 from syntara.filtering.models.result import FilterErrorCode, FilterOutcome, FilterResult
-from syntara.filtering.runtime import FilterRunner, is_missing_field_error, safe_matches
-from syntara.filtering.validation import validate_expression_tree
+
+_MIN_INT = -(2**63)
+_MAX_INT = 2**63 - 1
+_COMPILER_DIAGNOSTIC = re.compile(r"^INVALID_ARGUMENT: ERROR: <input>:(\d+):(\d+): (.*)$")
 
 
-def _to_cel(value: object) -> celtypes.Value:  # noqa: PLR0911 - explicit supported-type dispatch
-    """Adapt JSON-compatible values without coercing objects or non-finite numbers."""
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return celtypes.BoolType(value)
+def _validate_input(value: object) -> None:
+    """Reject coercion, unsupported objects and values outside CEL's JSON domain."""
+    if value is None or isinstance(value, bool):
+        return
+    if isinstance(value, str):
+        value.encode("utf-8", errors="strict")
+        return
     if isinstance(value, int):
-        return celtypes.IntType(value)
+        if not _MIN_INT <= value <= _MAX_INT:
+            message = "Filter input integer is outside the CEL int range"
+            raise ValueError(message)
+        return
     if isinstance(value, float):
         if not math.isfinite(value):
-            msg = "Filter input numbers must be finite"
-            raise ValueError(msg)
-        return celtypes.DoubleType(value)
-    if isinstance(value, str):
-        return celtypes.StringType(value)
+            message = "Filter input numbers must be finite"
+            raise ValueError(message)
+        return
     if isinstance(value, list):
-        return celtypes.ListType([_to_cel(item) for item in value])
+        for item in value:
+            _validate_input(item)
+        return
     if isinstance(value, dict):
-        if any(not isinstance(key, str) for key in value):
-            msg = "Filter input dictionary keys must be text"
-            raise ValueError(msg)
-        return celtypes.MapType({celtypes.StringType(key): _to_cel(item) for key, item in value.items()})
-    msg = "Unsupported filter input type"
-    raise TypeError(msg)
+        _validate_mapping(value)
+        return
+    message = "Unsupported filter input type"
+    raise TypeError(message)
+
+
+def _validate_mapping(value: dict[object, object]) -> None:
+    """Validate JSON dictionary keys and recursively validate their values."""
+    for key, item in value.items():
+        if not isinstance(key, str):
+            message = "Filter input dictionary keys must be text"
+            raise TypeError(message)
+        _validate_input(key)
+        _validate_input(item)
+
+
+def _compile_error(expression: str, error: Exception) -> FilterValidationCode:
+    """Classify only the native diagnostic header; never emit its source excerpt."""
+    header = str(error).partition("\n")[0]
+    diagnostic = _COMPILER_DIAGNOSTIC.fullmatch(header)
+    if diagnostic is None:
+        return FilterValidationCode.INVALID_EXPRESSION
+    line, column, message = diagnostic.groups()
+    if message.startswith("Syntax error:"):
+        return FilterValidationCode.INVALID_SYNTAX
+    if message.startswith("has() argument"):
+        return FilterValidationCode.INVALID_MACRO
+    if message.startswith("undeclared reference to "):
+        lines = expression.splitlines()
+        line_index, column_index = int(line) - 1, int(column) - 1
+        is_call = (
+            0 <= line_index < len(lines)
+            and 0 <= column_index < len(lines[line_index])
+            and lines[line_index][column_index] == "("
+        )
+        return FilterValidationCode.UNSUPPORTED_FUNCTION if is_call else FilterValidationCode.UNSUPPORTED_VARIABLE
+    return FilterValidationCode.INVALID_EXPRESSION
+
+
+def compile_expression(expression: str) -> cel.Expression:
+    """Create one native checked program with only input available as a root variable."""
+    environment = cel.NewEnv(variables={"input": cel.Type.DYN})
+    try:
+        program = environment.compile(expression)
+    except (RuntimeError, ValueError, LookupError, RecursionError) as error:
+        diagnostic = _COMPILER_DIAGNOSTIC.fullmatch(str(error).partition("\n")[0])
+        raise FilterValidationError(
+            _compile_error(expression, error),
+            line=int(diagnostic[1]) if diagnostic is not None else None,
+            column=int(diagnostic[2]) if diagnostic is not None else None,
+        ) from None
+    if program.return_type() not in (cel.Type.BOOL, cel.Type.DYN):
+        raise FilterValidationError(FilterValidationCode.NON_BOOLEAN)
+    return program
 
 
 def _failure(code: FilterErrorCode) -> FilterResult:
     return FilterResult(outcome=FilterOutcome.EVALUATION_ERROR, error_code=code)
 
 
-def _evaluation_error(error: CELEvalError) -> FilterResult:
-    """Recognize only celpy's missing-map errors; other failures remain errors.
+def _native_error(value: object) -> FilterResult:
+    """Map pinned native status prefixes to safe outcomes, never returning raw details.
 
-    Inspect the final error, after CEL's own boolean/presence handling. Do not
-    search exception text for arbitrary input field names or convert subexpression
-    errors to false before CEL has finished evaluating the expression.
+    Inspect an ERROR value only after native CEL has resolved boolean logic.
+    Native CEL decides which unresolved error wins when several operands fail.
+    Unrecognized statuses fail closed as evaluation errors rather than no-match.
     """
-    cause_type = error.args[1] if len(error.args) > 1 else None
-    if is_missing_field_error(error):
-        return FilterResult(outcome=FilterOutcome.NO_MATCH)
-    if cause_type is TypeError or cause_type is AttributeError:
-        return _failure(FilterErrorCode.WRONG_TYPE)
+    if isinstance(value, str):
+        if value.startswith("NOT_FOUND: Key not found in map : "):
+            return FilterResult(outcome=FilterOutcome.NO_MATCH)
+        if value.startswith("UNKNOWN: No matching overloads found : "):
+            return _failure(FilterErrorCode.WRONG_TYPE)
+        if value == "INVALID_ARGUMENT: Applying SELECT to non-message type" or value.startswith(
+            "INVALID_ARGUMENT: Invalid container type: "
+        ):
+            return _failure(FilterErrorCode.WRONG_TYPE)
     return _failure(FilterErrorCode.EVALUATION_FAILED)
 
 
 class PreparedFilter:
-    """A reusable interpreted CEL program, owned by one application thread.
+    """A reusable native C++ CEL program with per-evaluation input and arena lifetime.
 
-    Bind only ``input`` and collection-macro locals. This library neither decodes
-    transports nor owns sessions, audit events, workflow launches or commits.
-    Preparation validates syntax/names; message-dependent types are evaluated
-    by CEL. No dedicated expression resource limits are introduced here.
+    The compiler checks syntax, names and statically known types. The input root
+    is dynamic; message-dependent types remain runtime checks. This adapter owns
+    no transport, database session, audit event or delivery acknowledgement.
     """
 
-    def __init__(self, expression: str) -> None:
-        """Prepare one expression; reject configuration using sanitized errors."""
-        if not isinstance(expression, str) or not expression.strip():
+    def __init__(self, expression: str | None = None) -> None:
+        """Prepare once and discard native diagnostics containing source text."""
+        if expression is not None and not isinstance(expression, str):
             raise FilterValidationError(FilterValidationCode.INVALID_EXPRESSION)
-        environment = Environment(runner_class=FilterRunner)
+        self._program = compile_expression(expression) if expression is not None and expression.strip() else None
+
+    @property
+    def serialized(self) -> bytes | None:
+        """Expose the compiler's checked AST for conservative preparation plans."""
+        return None if self._program is None else cast("bytes", self._program.serialize())
+
+    @classmethod
+    def from_serialized(cls, serialized: bytes) -> "PreparedFilter":
+        """Reuse a checked native subtree; never compile generated CEL source."""
+        prepared = cls()
+        prepared._program = cel.NewEnv(variables={"input": cel.Type.DYN}).deserialize(serialized)
+        return prepared
+
+    def is_definitely_false(self, value: object) -> bool:
+        """Reject an extracted conjunct only on boolean false, never on error."""
+        if self._program is None:
+            return False
         try:
-            tree = environment.compile(expression)
-            validate_expression_tree(tree)
-            self._runner = environment.program(tree, functions={"matches": safe_matches})
-        except CELParseError:
-            raise FilterValidationError(FilterValidationCode.INVALID_SYNTAX) from None
-        except RecursionError:
-            raise FilterValidationError(FilterValidationCode.INVALID_EXPRESSION) from None
+            _validate_input(value)
+            result = self._program.eval(data={"input": value})
+            return bool(result.type() == cel.Type.BOOL and result.value() is False)
+        except (RuntimeError, TypeError, ValueError, LookupError, ArithmeticError, RecursionError):
+            return False
 
     def evaluate(self, value: object) -> FilterResult:
-        """Evaluate a fresh activation without exposing values or exception contents."""
+        """Use a fresh native activation/arena; return no native values or diagnostics."""
+        if self._program is None:
+            return FilterResult(outcome=FilterOutcome.MATCH)
         try:
-            adapted = _to_cel(value)
+            _validate_input(value)
         except (TypeError, ValueError, ArithmeticError, RecursionError):
             return _failure(FilterErrorCode.INVALID_INPUT)
         try:
-            result = self._runner.evaluate({"input": adapted})
-        except CELEvalError as error:
-            return _evaluation_error(error)
-        except (TypeError, AttributeError):
-            return _failure(FilterErrorCode.WRONG_TYPE)
-        except (ArithmeticError, ValueError, LookupError, RecursionError, CELUnsupportedError):
+            result = self._program.eval(data={"input": value})
+            result_type = result.type()
+            if result_type == cel.Type.ERROR:
+                return _native_error(result.value())
+            if result_type != cel.Type.BOOL:
+                return _failure(FilterErrorCode.NON_BOOLEAN)
+            return FilterResult(outcome=FilterOutcome.MATCH if result.value() is True else FilterOutcome.NO_MATCH)
+        except (RuntimeError, TypeError, ValueError, LookupError, ArithmeticError, RecursionError):
             return _failure(FilterErrorCode.EVALUATION_FAILED)
-        if not isinstance(result, celtypes.BoolType):
-            return _failure(FilterErrorCode.NON_BOOLEAN)
-        return FilterResult(outcome=FilterOutcome.MATCH if bool(result) else FilterOutcome.NO_MATCH)

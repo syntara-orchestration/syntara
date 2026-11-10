@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -28,9 +28,9 @@ CONTENT_GATES = frozenset({CONTENT_INSPECTION_PENDING, *(code.value for code in 
 
 
 def reject_content_gates(deliveries: list[EventDelivery]) -> None:
-    """Known errors and uninspected content cannot bypass the activity-log gate."""
-    if any(row.state == DeliveryState.REJECTED or row.last_error_code in CONTENT_GATES for row in deliveries):
-        msg = "permanent_content_error_requires_activity_log"
+    """Unresolved content needs a durable outcome before it can be discarded."""
+    if any(row.state == DeliveryState.IN_PROGRESS and row.last_error_code in CONTENT_GATES for row in deliveries):
+        msg = "content_resolution_pending"
         raise EventSubscriptionControlConflictError(msg)
 
 
@@ -42,6 +42,8 @@ async def cancel_unstarted(session: AsyncSession, delivery: EventDelivery, now: 
     therefore prevents both future attempts and stale workers from starting.
     """
     reject_content_gates([delivery])
+    if delivery.state != DeliveryState.IN_PROGRESS:
+        return
     if (
         delivery.attempt_count
         or delivery.first_start_attempt_at
@@ -111,16 +113,14 @@ class EventRetirementService:
                 select(EventDelivery.identity_digest)
                 .where(
                     EventDelivery.source_id == source_id,
-                    or_(
-                        col(EventDelivery.state) == DeliveryState.REJECTED.value,
-                        col(EventDelivery.last_error_code).in_(CONTENT_GATES),
-                    ),
+                    col(EventDelivery.state) == DeliveryState.IN_PROGRESS.value,
+                    col(EventDelivery.last_error_code).in_(CONTENT_GATES),
                 )
                 .limit(1)
             )
         ).first()
         if runtime is not None or delivery is not None:
-            msg = "permanent_content_error_requires_activity_log"
+            msg = "content_resolution_pending"
             raise EventSubscriptionControlConflictError(msg)
 
     async def can_detach(self, source: EventSubscriptionSource) -> bool:
@@ -176,7 +176,7 @@ class EventRetirementService:
             )
         ).first()
         if gate is not None:
-            msg = "permanent_content_error_requires_activity_log"
+            msg = "content_resolution_pending"
             raise EventSubscriptionControlConflictError(msg)
         return (
             await self.session.exec(
@@ -196,11 +196,7 @@ class EventRetirementService:
                     select(EventDelivery)
                     .where(
                         EventDelivery.source_id == source_id,
-                        or_(
-                            col(EventDelivery.state) == DeliveryState.IN_PROGRESS.value,
-                            col(EventDelivery.state) == DeliveryState.REJECTED.value,
-                            col(EventDelivery.last_error_code).in_(CONTENT_GATES),
-                        ),
+                        col(EventDelivery.state) == DeliveryState.IN_PROGRESS.value,
                     )
                     .order_by(EventDelivery.identity_digest)
                     .with_for_update()

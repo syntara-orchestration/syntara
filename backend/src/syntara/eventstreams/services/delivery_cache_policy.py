@@ -92,13 +92,13 @@ class DeliveryEvidencePolicy(DeliveryValue):
         return resolved_at + timedelta(seconds=self.retention_seconds)
 
     def trusts(self, proof: TerminalProof, identity: DeliveryIdentity, now: datetime) -> bool:
-        """Clamp old proofs to shorter current settings; M1 trusts scheduling only."""
+        """Trust committed scheduling/rejection proofs within current expiry bounds."""
         return (
             self.enabled
             and now.tzinfo is not None
             and proof.cache_epoch == self.cache_epoch
             and proof.identity == identity
             and proof.identity_digest == identity.digest
-            and proof.outcome == DeliveryState.SCHEDULED
+            and proof.outcome in {DeliveryState.SCHEDULED, DeliveryState.REJECTED}
             and proof.resolved_at <= now < min(proof.valid_until, self.proof_deadline(proof.resolved_at))
         )

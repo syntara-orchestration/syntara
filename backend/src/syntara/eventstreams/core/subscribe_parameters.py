@@ -3,8 +3,10 @@
 from typing import Any, ClassVar
 from uuid import UUID
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, field_validator
 from sqlmodel import SQLModel
+
+from syntara.eventstreams.models.filter_configuration import FilterConfiguration, normalize_filter
 
 
 class EventSubscribeParameters(SQLModel):
@@ -21,5 +23,8 @@ class EventSubscribeParameters(SQLModel):
     credential_id: UUID
     topic: str = Field(min_length=1, max_length=1024)
     input_schema: dict[str, Any] | None = None
+    filter: FilterConfiguration | None = None
+
+    _normalize_filter = field_validator("filter")(normalize_filter)
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]

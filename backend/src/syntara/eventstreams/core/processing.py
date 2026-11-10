@@ -1,12 +1,13 @@
 """Unresolved processing results; never broker acknowledgement evidence."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from pydantic import Field
 
 from syntara.eventstreams.core.deduplication import DeliveryIdentity, DeliveryValue
 from syntara.eventstreams.core.results import EventDecodeFailure
+from syntara.filtering.models.result import FilterErrorCode
 
 if TYPE_CHECKING:
     from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
@@ -21,7 +22,8 @@ class RecordProcessingGate(Protocol):
     Reads must be local and bounded. Unknown/stale lifecycle or placement
     evidence closes admission. Known database outages, failed required durable
     writes, source uncertainty and recovery fences also close resolution.
-    Placement expiry alone may leave resolution open for admitted handoffs.
+    Closing admission or placement expiry may leave resolution open for completed
+    records, including local CEL skips, and already admitted durable handoffs.
     """
 
     def admission_open(self, snapshot: "SubscriptionSnapshot") -> bool:
@@ -29,7 +31,7 @@ class RecordProcessingGate(Protocol):
         ...
 
     def resolution_open(self, snapshot: "SubscriptionSnapshot") -> bool:
-        """Permit retained terminal evidence only while dependency/source state is trusted."""
+        """Permit completed records only while dependency/source state is trusted."""
         ...
 
     def dependency_failed(self, snapshot: "SubscriptionSnapshot") -> None:
@@ -45,7 +47,7 @@ class RecordRunnerControl(Protocol):
     """Local placement-loss control; owns no lease storage or placement policy."""
 
     async def close_admission(self) -> None:
-        """Pause fetching and bound drain, preserving frozen durable handoffs."""
+        """Pause fetching and bound drain, preserving completed records and frozen handoffs."""
         ...
 
 
@@ -53,6 +55,15 @@ class InspectedRecord(DeliveryValue):
     """Content validation completed; no workflow or broker resolution is implied."""
 
     identity: DeliveryIdentity
+
+
+class SkippedRecord(DeliveryValue):
+    """Local CEL completion, never a durable delivery proof or cacheable outcome."""
+
+    identity: DeliveryIdentity
+    configuration_revision: int
+    outcome: Literal["no_match", "evaluation_error"]
+    error_code: FilterErrorCode | None = None
 
 
 class PendingContentFailure(DeliveryValue):

@@ -168,14 +168,14 @@ def test_attested_clock_bound_is_covered_by_skew_without_double_subtraction() ->
 
 
 @pytest.mark.parametrize("state", [DeliveryState.FILTERED, DeliveryState.REJECTED])
-def test_future_no_trigger_values_are_representable_but_not_trusted_in_m1(state: DeliveryState) -> None:
+def test_only_durable_rejection_proofs_are_trusted_for_no_trigger_outcomes(state: DeliveryState) -> None:
     data = proof().model_dump()
     data.update(
         outcome=state, execution_id=None, temporal_workflow_id=None, temporal_run_id=None, execution_confirmed_at=None
     )
     value = TerminalProof.model_validate(data)
     assert value.terminal().state == state
-    assert not policy().trusts(value, identity(), NOW)
+    assert policy().trusts(value, identity(), NOW) is (state == DeliveryState.REJECTED)
 
 
 @pytest.mark.parametrize(("ttl", "retention", "skew"), [(60, 3600, 1), (120, 30, 2), (10, 10, 0.5)])

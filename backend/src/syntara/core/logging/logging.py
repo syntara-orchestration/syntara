@@ -26,7 +26,7 @@ class ExcludeCELDiagnostics(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         """Allow application diagnostics, which use sanitized filter error codes."""
-        return record.name != "celpy" and not record.name.startswith("celpy.")
+        return record.name != "cel_expr_python" and not record.name.startswith("cel_expr_python.")
 
 
 class SyntaraLogRecordRenderer(JSONRenderer):
@@ -137,7 +137,7 @@ def build_uvicorn_logging_config(log_level: str) -> dict[str, Any]:
                 name: {"handlers": ["syntara"], "level": log_level, "propagate": False}
                 for name in _UVICORN_LOGGER_NAMES
             },
-            "celpy": {"handlers": ["discard_cel_diagnostics"], "propagate": False},
+            "cel_expr_python": {"handlers": ["discard_cel_diagnostics"], "propagate": False},
         },
         "root": {
             "handlers": ["syntara"],
@@ -216,7 +216,7 @@ def _on_log_level_changed(_key: str, new_value: Any) -> None:  # noqa: ANN401
 def configure_app_logging() -> None:
     """Configure structlog and stdlib logging for structured logs."""
     # Stop dependency records before they can reach root handlers added later.
-    cel_logger = logging.getLogger("celpy")
+    cel_logger = logging.getLogger("cel_expr_python")
     cel_logger.handlers.clear()
     cel_logger.addHandler(logging.NullHandler())
     cel_logger.propagate = False

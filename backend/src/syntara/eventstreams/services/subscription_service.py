@@ -221,6 +221,7 @@ class EventSubscriptionService(BaseService):
             configuration_revision=1,
             runtime_credential_id=parameters.credential_id,
             input_schema=parameters.input_schema,
+            filter=parameters.filter.model_dump(mode="json") if parameters.filter is not None else None,
             desired_enabled=True,
             paused=False,
             retired=False,
@@ -272,10 +273,12 @@ class EventSubscriptionService(BaseService):
             self.session.add(active)
             subscription.active_source_generation = next_generation
 
+        filter_configuration = parameters.filter.model_dump(mode="json") if parameters.filter is not None else None
         config_changed = (
             source_changed
             or subscription.runtime_credential_id != parameters.credential_id
             or subscription.input_schema != parameters.input_schema
+            or subscription.filter != filter_configuration
             or not subscription.desired_enabled
         )
 
@@ -287,6 +290,7 @@ class EventSubscriptionService(BaseService):
         if config_changed:
             subscription.runtime_credential_id = parameters.credential_id
             subscription.input_schema = parameters.input_schema
+            subscription.filter = filter_configuration
             subscription.desired_enabled = True
             subscription.enabled_by = self.user.id
             subscription.updated_by = self.user.id

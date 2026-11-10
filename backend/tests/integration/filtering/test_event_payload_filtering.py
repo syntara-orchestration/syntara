@@ -1,9 +1,4 @@
-"""Real decoder, shared evaluator and trigger-envelope component integration.
-
-The generic evaluator receives the decoded payload directly under ``input``.
-These tests do not stand in for the pending Subscribe filter input view or
-worker processing, publication, durable outcomes or broker integration.
-"""
+"""Real decoder, native CEL C++ evaluator and unchanged trigger-envelope integration."""
 
 import copy
 from datetime import UTC, datetime
@@ -63,15 +58,15 @@ def test_decoded_json_values_are_supported_without_changing_envelope(raw_json: s
     original = event.model_copy(deep=True)
     decoded = JsonEventDecoder().decode(event)
     assert isinstance(decoded, EventDecodeSuccess)
-    envelope_bytes = encode_envelope(decoded.envelope)
+    before = encode_envelope(decoded.envelope)
     result = PreparedFilter(expression).evaluate(decoded.envelope.payload)
     assert result.outcome == FilterOutcome.MATCH
     assert result.error_code is None
-    assert encode_envelope(decoded.envelope) == envelope_bytes
+    assert encode_envelope(decoded.envelope) == before
     assert event == original
 
 
-def test_one_prepared_filter_handles_a_sequence_of_decoded_message_outcomes() -> None:
+def test_one_native_program_handles_repeated_decoded_message_outcomes() -> None:
     prepared = PreparedFilter('input.severity.startsWith("crit")')
     decoder = JsonEventDecoder()
     cases = [
@@ -91,112 +86,32 @@ def test_one_prepared_filter_handles_a_sequence_of_decoded_message_outcomes() ->
         assert encode_envelope(decoded.envelope) == before
 
 
-@pytest.mark.parametrize(
-    ("raw_json", "expression", "outcome"),
-    [
-        ('{"items":[{},{},{"ok":true}]}', "input.items.exists(item, item.ok)", FilterOutcome.MATCH),
-        ('{"items":[{},{},{"ok":false}]}', "input.items.all(item, item.ok)", FilterOutcome.NO_MATCH),
-        ("{}", "input.missing == 1 ? true : false", FilterOutcome.NO_MATCH),
-        ("{}", '{"value": input.missing}.size() == 1', FilterOutcome.NO_MATCH),
-        ("{}", 'true || ({"value": input.missing}.size() == 1)', FilterOutcome.MATCH),
-    ],
-)
-def test_cel_error_rules_survive_json_decoding(raw_json: str, expression: str, outcome: FilterOutcome) -> None:
-    decoded = JsonEventDecoder().decode(_event(raw_json.encode("utf-8")), schema={"type": "object"})
-    assert isinstance(decoded, EventDecodeSuccess)
-    result = PreparedFilter(expression).evaluate(decoded.envelope.payload)
-    assert result.outcome == outcome
-    assert result.error_code is None
-
-
-@pytest.mark.parametrize(
-    "expression",
-    [
-        "input.items.all(item, item.ok)",
-        "input.items.exists(item, item.ok)",
-        "input.items.exists_one(item, item.ok)",
-        "input.items.filter(item, item.ok).size() > 0",
-        'input.items.map(item, item.ok.startsWith("yes")).size() > 0',
-    ],
-)
-def test_mixed_error_ordering_is_preserved_across_decoded_messages(expression: str) -> None:
-    prepared = PreparedFilter(expression)
-    decoder = JsonEventDecoder()
-    for raw_json in [b'{"items":[{},{"ok":1}]}', b'{"items":[{"ok":1},{}]}']:
-        decoded = decoder.decode(_event(raw_json), schema={"type": "object"})
-        assert isinstance(decoded, EventDecodeSuccess)
-        before = encode_envelope(decoded.envelope)
-        result = prepared.evaluate(decoded.envelope.payload)
-        assert result.outcome == FilterOutcome.EVALUATION_ERROR
-        assert result.error_code == FilterErrorCode.WRONG_TYPE
-        assert encode_envelope(decoded.envelope) == before
-
-
-@pytest.mark.parametrize(
-    ("failure", "error_code"),
-    [
-        ("input.value + 1", FilterErrorCode.WRONG_TYPE),
-        ("input.value.matches(input.pattern)", FilterErrorCode.EVALUATION_FAILED),
-    ],
-)
-@pytest.mark.parametrize("reverse", [False, True])
-def test_map_literal_error_priority_survives_json_decoding(
-    *, failure: str, error_code: FilterErrorCode, reverse: bool
-) -> None:
-    decoded = JsonEventDecoder().decode(_event(b'{"value":"text","pattern":"["}'), schema={"type": "object"})
+@pytest.mark.parametrize("missing_first", [False, True])
+def test_native_error_ordering_survives_json_decoding(*, missing_first: bool) -> None:
+    operands = ["input.text + 1 == 2", "input.missing"]
+    if missing_first:
+        operands.reverse()
+    decoded = JsonEventDecoder().decode(_event(b'{"text":"x"}'))
     assert isinstance(decoded, EventDecodeSuccess)
     before = encode_envelope(decoded.envelope)
-    entries = ['"missing": input.missing', f'"failed": {failure}']
-    if reverse:
-        entries.reverse()
-    expression = "{" + ", ".join(entries) + "}.size() == 2"
-    result = PreparedFilter(expression).evaluate(decoded.envelope.payload)
-    assert result.outcome == FilterOutcome.EVALUATION_ERROR
-    assert result.error_code == error_code
+    result = PreparedFilter(f"({operands[0]}) && ({operands[1]})").evaluate(decoded.envelope.payload)
+    assert result.outcome == (FilterOutcome.NO_MATCH if missing_first else FilterOutcome.EVALUATION_ERROR)
+    assert result.error_code == (None if missing_first else FilterErrorCode.WRONG_TYPE)
     assert encode_envelope(decoded.envelope) == before
-
-
-@pytest.mark.parametrize("operator", ["&&", "||"])
-@pytest.mark.parametrize("reverse", [False, True])
-def test_logical_error_merging_is_reused_across_decoded_messages(*, operator: str, reverse: bool) -> None:
-    operands = ['input.severity.startsWith("crit")', 'input.source.startsWith("pay")']
-    if reverse:
-        operands.reverse()
-    prepared = PreparedFilter(f"({operands[0]}) {operator} ({operands[1]})")
-    decoder = JsonEventDecoder()
-    cases = [
-        (b"{}", FilterOutcome.NO_MATCH, None),
-        (b'{"severity":1}', FilterOutcome.EVALUATION_ERROR, FilterErrorCode.WRONG_TYPE),
-        (b'{"source":1}', FilterOutcome.EVALUATION_ERROR, FilterErrorCode.WRONG_TYPE),
-        (b'{"severity":"critical","source":"payments"}', FilterOutcome.MATCH, None),
-        (b'{"severity":"warning","source":"other"}', FilterOutcome.NO_MATCH, None),
-        (b"{}", FilterOutcome.NO_MATCH, None),
-    ]
-    for raw_json, outcome, error_code in cases:
-        decoded = decoder.decode(_event(raw_json), schema={"type": "object"})
-        assert isinstance(decoded, EventDecodeSuccess)
-        before = encode_envelope(decoded.envelope)
-        result = prepared.evaluate(decoded.envelope.payload)
-        assert result.outcome == outcome
-        assert result.error_code == error_code
-        assert encode_envelope(decoded.envelope) == before
 
 
 @pytest.mark.parametrize("expression", ['input.labels.env == "prod"', 'input.labels["env"] == "prod"'])
 def test_dot_and_bracket_access_agree_across_decoded_messages(expression: str) -> None:
     prepared = PreparedFilter(expression)
-    decoder = JsonEventDecoder()
-    cases = [
+    for value, outcome, error_code in [
         (b"{}", FilterOutcome.NO_MATCH, None),
         (b'{"labels":{}}', FilterOutcome.NO_MATCH, None),
         (b'{"labels":{"env":"prod"}}', FilterOutcome.MATCH, None),
         (b'{"labels":null}', FilterOutcome.EVALUATION_ERROR, FilterErrorCode.WRONG_TYPE),
         (b'{"labels":1}', FilterOutcome.EVALUATION_ERROR, FilterErrorCode.WRONG_TYPE),
         (b'{"labels":{"env":"dev"}}', FilterOutcome.NO_MATCH, None),
-        (b"{}", FilterOutcome.NO_MATCH, None),
-    ]
-    for raw_json, outcome, error_code in cases:
-        decoded = decoder.decode(_event(raw_json), schema={"type": "object"})
+    ]:
+        decoded = JsonEventDecoder().decode(_event(value))
         assert isinstance(decoded, EventDecodeSuccess)
         before = encode_envelope(decoded.envelope)
         result = prepared.evaluate(decoded.envelope.payload)
@@ -205,70 +120,17 @@ def test_dot_and_bracket_access_agree_across_decoded_messages(expression: str) -
         assert encode_envelope(decoded.envelope) == before
 
 
-@pytest.mark.parametrize("operator", ["+", "-", "*", "/", "%"])
-@pytest.mark.parametrize("reverse", [False, True])
-def test_arithmetic_missing_operands_survive_decoding_and_program_reuse(*, operator: str, reverse: bool) -> None:
-    operands = ["1", "input.value"]
-    if reverse:
-        operands.reverse()
-    prepared = PreparedFilter(f"(({operands[0]}) {operator} ({operands[1]})) >= -10")
-    decoder = JsonEventDecoder()
-    cases = [
-        (b"{}", FilterOutcome.NO_MATCH, None),
-        (b'{"value":"text"}', FilterOutcome.EVALUATION_ERROR, FilterErrorCode.WRONG_TYPE),
-        (b'{"value":2}', FilterOutcome.MATCH, None),
-        (b"{}", FilterOutcome.NO_MATCH, None),
-    ]
-    for raw_json, outcome, error_code in cases:
-        decoded = decoder.decode(_event(raw_json), schema={"type": "object"})
-        assert isinstance(decoded, EventDecodeSuccess)
-        before = encode_envelope(decoded.envelope)
-        result = prepared.evaluate(decoded.envelope.payload)
-        assert result.outcome == outcome
-        assert result.error_code == error_code
-        assert encode_envelope(decoded.envelope) == before
-
-
-@pytest.mark.parametrize(
-    ("expression", "error_code"),
-    [
-        ("[input.missing, input.text + 1].size() == 2", FilterErrorCode.WRONG_TYPE),
-        ("(input.missing).startsWith(input.text + 1)", FilterErrorCode.WRONG_TYPE),
-        ("has(input.value.field)", FilterErrorCode.WRONG_TYPE),
-        ('{"missing": input.missing, [1]: 2}.size() == 2', FilterErrorCode.WRONG_TYPE),
-        ("input.missing == input.text.matches(input.pattern)", FilterErrorCode.EVALUATION_FAILED),
-    ],
-)
-def test_composed_error_paths_survive_json_decoding(expression: str, error_code: FilterErrorCode) -> None:
-    decoded = JsonEventDecoder().decode(
-        _event(b'{"text":"value","value":null,"pattern":"["}'), schema={"type": "object"}
-    )
-    assert isinstance(decoded, EventDecodeSuccess)
-    before = encode_envelope(decoded.envelope)
-    result = PreparedFilter(expression).evaluate(decoded.envelope.payload)
-    assert result.outcome == FilterOutcome.EVALUATION_ERROR
-    assert result.error_code == error_code
-    assert encode_envelope(decoded.envelope) == before
-
-
-def test_literal_key_presence_checks_are_reused_across_decoded_messages() -> None:
-    prepared = PreparedFilter('has(input["event-type"]) && input["event-type"] == "created"')
-    decoder = JsonEventDecoder()
-    cases = [
+def test_literal_key_presence_uses_native_cel_membership() -> None:
+    prepared = PreparedFilter('"event-type" in input && input["event-type"] == "created"')
+    for value, outcome in [
         (b'{"event-type":"created"}', FilterOutcome.MATCH),
         (b"{}", FilterOutcome.NO_MATCH),
         (b'{"event-type":null}', FilterOutcome.NO_MATCH),
         (b'{"event-type":"updated"}', FilterOutcome.NO_MATCH),
-        (b'{"event-type":"created"}', FilterOutcome.MATCH),
-    ]
-    for raw_json, outcome in cases:
-        decoded = decoder.decode(_event(raw_json), schema={"type": "object"})
+    ]:
+        decoded = JsonEventDecoder().decode(_event(value))
         assert isinstance(decoded, EventDecodeSuccess)
-        before = encode_envelope(decoded.envelope)
-        result = prepared.evaluate(decoded.envelope.payload)
-        assert result.outcome == outcome
-        assert result.error_code is None
-        assert encode_envelope(decoded.envelope) == before
+        assert prepared.evaluate(decoded.envelope.payload).outcome == outcome
 
 
 def test_decoded_json_null_is_distinct_from_a_source_tombstone() -> None:

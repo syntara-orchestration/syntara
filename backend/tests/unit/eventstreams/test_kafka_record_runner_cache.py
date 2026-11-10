@@ -20,7 +20,7 @@ from syntara.eventstreams.adapters.kafka_delivery_reader import KafkaDeliveryRea
 from syntara.eventstreams.adapters.kafka_initial_position import InitializationKind, PositionResult, PositionStatus
 from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaInitialPositionService
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
-from syntara.eventstreams.core.deduplication import DeliveryIdentity, DeliveryState, TerminalProofStorage
+from syntara.eventstreams.core.deduplication import ClaimLost, DeliveryIdentity, DeliveryState, TerminalProofStorage
 from syntara.eventstreams.core.envelope import RawEvent
 from syntara.eventstreams.core.handler import BlockedDelivery, ResolvedDelivery, SchedulingFailureCode
 from syntara.eventstreams.core.preparation import PreparedExecution
@@ -372,21 +372,21 @@ async def test_frozen_repair_needs_neither_placement_nor_consumer_ownership(cach
     context.client.commit.assert_not_awaited()
 
 
-async def test_rejected_database_outcome_stays_held_without_activity_log(cached_runner) -> None:
+async def test_rejected_database_outcome_commits_without_activity_log(cached_runner) -> None:
     context = cached_runner
     context.storage.get.return_value = None
     context.context.store.lookup_terminal.return_value = terminal(
         context.context.identity, DeliveryState.REJECTED
-    ).terminal
+    ).terminal.model_copy(update={"resolved_at": NOW})
     await context.runner._enqueue({2: [record(context)]}, 7)
     state = context.runner._partitions[2]
     await context.runner._advance(state)
     await context.runner._commit_positions((state,))
-    assert state.held.permanent_content_error
-    context.storage.put.assert_not_awaited()
+    assert state.held is None
+    context.storage.put.assert_awaited_once()
     context.decoder.decode.assert_not_called()
     context.admission.schedule.assert_not_awaited()
-    context.client.commit.assert_not_awaited()
+    context.client.commit.assert_awaited_once_with({2: 6}, expected_epoch=7)
 
 
 async def test_pending_preparation_blocks_a_later_cached_record(cached_runner) -> None:
@@ -433,6 +433,10 @@ async def test_partition_gates_cannot_be_bypassed_by_a_valid_proof(cached_runner
             context.context.identity, last_error_code=CONTENT_INSPECTION_PENDING
         )
         state.content_gate_unknown = True
+        # Keep inspection unresolved; invalid JSON may otherwise produce the
+        # committed rejection that now legitimately authorizes advancement.
+        context.context.store.finish_inspection.side_effect = None
+        context.context.store.finish_inspection.return_value = ClaimLost()
     elif gate_kind == "permanent":
         state.held = HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
         state.reconciled_until = 0
@@ -447,6 +451,31 @@ async def test_partition_gates_cannot_be_bypassed_by_a_valid_proof(cached_runner
     context.storage.get.assert_not_awaited()
     context.admission.schedule.assert_not_awaited()
     context.client.commit.assert_not_awaited()
+    if gate_kind == "unknown":
+        assert state.held is not None
+        assert state.held.reason == "inspection_claim_lost"
+        assert state.resolved_next_offset is None
+        assert context.context.rows[EventDelivery].last_error_code == CONTENT_INSPECTION_PENDING
+
+
+async def test_unknown_content_can_advance_after_durable_rejection_without_using_cached_proof(cached_runner) -> None:
+    context = cached_runner
+    state = context.runner._partitions[2]
+    context.context.rows[EventDelivery] = retained(context.context.identity, last_error_code=CONTENT_INSPECTION_PENDING)
+    state.content_gate_unknown = True
+    state.inspection_next_offset = state.inspection_end_offset = 5
+    await context.runner._enqueue({2: [record(context)]}, 7)
+    await context.runner._advance(state)
+    assert state.held is None
+    assert state.resolved_next_offset == 6
+    assert not state.content_gate_unknown
+    assert context.context.rows[EventDelivery].state == DeliveryState.REJECTED
+    context.context.store.finish_inspection.assert_awaited_once()
+    assert context.terminal_result.call_args.args[0].state == DeliveryState.REJECTED
+    context.storage.get.assert_not_awaited()
+    context.admission.schedule.assert_not_awaited()
+    await context.runner._commit_positions((state,))
+    context.client.commit.assert_awaited_once_with({2: 6}, expected_epoch=7)
 
 
 async def test_failed_required_write_closes_the_shared_gate_for_cached_commits(cached_runner) -> None:

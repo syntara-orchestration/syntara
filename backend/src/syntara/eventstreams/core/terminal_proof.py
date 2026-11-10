@@ -18,7 +18,7 @@ def terminal_proof_key(identity: DeliveryIdentity, cache_epoch: UUID) -> str:
 
 
 class TerminalProof(DeliveryValue):
-    """Versioned historical proof; future no-trigger outcomes still need discard gates."""
+    """Versioned historical proof; CEL skips are never durable cached outcomes."""
 
     schema_version: Literal[1]
     cache_epoch: UUID
