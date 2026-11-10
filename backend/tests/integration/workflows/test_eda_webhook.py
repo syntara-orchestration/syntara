@@ -92,6 +92,7 @@ async def eda_workflow(
     test_db_session: AsyncSession,
     test_user: User,
     test_project_id: UUID,
+    allow_all_evaluator,
 ) -> Workflow:
     """Create a published workflow with an EDA trigger and bind the mock SA."""
     workflow_definition = {
@@ -113,7 +114,7 @@ async def eda_workflow(
         "edges": [{"from": "eda_trigger_1", "to": "n1"}],
     }
 
-    service = WorkflowService(test_db_session, test_user)
+    service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
     workflow, _version, _ = await service.create_workflow(
         name="Test EDA Workflow",
         description="Test workflow for EDA triggers",
@@ -131,6 +132,7 @@ async def eda_workflow_with_schema(
     test_db_session: AsyncSession,
     test_user: User,
     test_project_id: UUID,
+    allow_all_evaluator,
 ) -> Workflow:
     """Create a published EDA workflow with input_schema and bind the mock SA."""
     input_schema = {
@@ -162,7 +164,7 @@ async def eda_workflow_with_schema(
         "edges": [{"from": "eda_trigger_validated", "to": "n1"}],
     }
 
-    service = WorkflowService(test_db_session, test_user)
+    service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
     workflow, _version, _ = await service.create_workflow(
         name="Test EDA Workflow With Schema",
         description="EDA workflow with input_schema for validation tests",
@@ -337,9 +339,10 @@ class TestEDAWebhookWorkflowMatching:
         eda_workflow: Workflow,
         test_db_session: AsyncSession,
         test_user: User,
+        allow_all_evaluator,
     ) -> None:
         """Does not trigger disabled workflows."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         await service.unpublish_workflow(eda_workflow.id)
 
         response = await base_client.post(
@@ -430,10 +433,11 @@ class TestCrossTypePathIsolation:
         test_db_session: AsyncSession,
         test_user: User,
         test_project_id: UUID,
+        allow_all_evaluator,
     ) -> tuple[Workflow, Workflow]:
         """Create a generic and an EDA workflow sharing the same webhook_path."""
         shared_path = "shared-path"
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         wf_a, _v_a, _ = await service.create_workflow(
             name="Generic Webhook Workflow",

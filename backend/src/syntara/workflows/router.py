@@ -16,8 +16,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.responses import Response
 
 from syntara.auth import get_current_user
-from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
+from syntara.authz.dependencies import PermissionChecker, VisibilityFilter, get_authz_evaluator
 from syntara.authz.engine import VisibilityResult
+from syntara.authz.evaluator import AuthzEvaluator
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
@@ -47,6 +48,7 @@ from syntara.workflows.models import (
     WorkflowVersionUpdate,
 )
 from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreate
+from syntara.workflows.models.node_permission import WorkflowWriteForbiddenProblemDetail
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
 from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
@@ -203,14 +205,14 @@ def _definition_to_dict(wf_def: WorkflowDefinition | dict[str, Any]) -> dict[str
 def get_workflow_service(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
-    request: Request,
+    evaluator: Annotated[AuthzEvaluator, Depends(get_authz_evaluator)],
 ) -> WorkflowService:
     """Dependency provider for WorkflowService.
 
     FastAPI will call this function automatically, injecting all dependencies.
     This centralizes WorkflowService creation across all endpoints.
     """
-    return WorkflowService(db, current_user, request.app.state.authz_evaluator)
+    return WorkflowService(db, current_user, evaluator)
 
 
 def get_execution_service(
@@ -276,6 +278,7 @@ router.include_router(_validate_router)
     dependencies=[Depends(_wf_perm_create)],
     operation_id="create_workflow",
     response_description="Workflow created",
+    responses={403: {"model": WorkflowWriteForbiddenProblemDetail, "description": "Forbidden"}},
 )
 async def create_workflow(
     request: WorkflowCreate,
@@ -351,6 +354,7 @@ async def get_workflow(
     dependencies=[Depends(_wf_perm_update)],
     operation_id="update_workflow",
     response_description="Updated workflow",
+    responses={403: {"model": WorkflowWriteForbiddenProblemDetail, "description": "Forbidden"}},
 )
 async def update_workflow(
     workflow_id: UUID,
@@ -388,6 +392,7 @@ async def update_workflow(
     dependencies=[Depends(_wf_perm_delete)],
     operation_id="delete_workflow",
     response_description="Workflow deleted",
+    responses={403: {"model": WorkflowWriteForbiddenProblemDetail, "description": "Forbidden"}},
 )
 async def delete_workflow(
     workflow_id: UUID,
@@ -506,6 +511,7 @@ async def get_workflow_version(
     dependencies=[Depends(_wf_perm_update)],
     operation_id="publish_workflow_version",
     response_description="Published workflow version",
+    responses={403: {"model": WorkflowWriteForbiddenProblemDetail, "description": "Forbidden"}},
 )
 async def publish_workflow_version(
     workflow_id: UUID,
@@ -533,6 +539,7 @@ async def publish_workflow_version(
     dependencies=[Depends(_wf_perm_update)],
     operation_id="unpublish_workflow",
     response_description="Unpublished workflow",
+    responses={403: {"model": WorkflowWriteForbiddenProblemDetail, "description": "Forbidden"}},
 )
 async def unpublish_workflow(
     workflow_id: UUID,
@@ -549,6 +556,7 @@ async def unpublish_workflow(
     dependencies=[Depends(_wf_perm_update)],
     operation_id="restore_workflow_version",
     response_description="Restored workflow version",
+    responses={403: {"model": WorkflowWriteForbiddenProblemDetail, "description": "Forbidden"}},
 )
 async def restore_workflow_version(
     workflow_id: UUID,
@@ -609,6 +617,7 @@ async def export_workflow_version(
     operation_id="update_workflow_version_metadata",
     response_description="Updated workflow version",
     responses={
+        403: {"model": WorkflowWriteForbiddenProblemDetail, "description": "Forbidden"},
         404: {"description": WORKFLOW_NOT_FOUND},
     },
 )

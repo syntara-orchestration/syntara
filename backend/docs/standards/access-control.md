@@ -77,3 +77,19 @@ The compliance tests run as part of `make test-unit` and `make test-coverage`. T
 | `src/syntara/authz/resource_actions.py` | Route introspection helpers (`_iter_route_deps`, `_get_dep_instance`) |
 | `tests/unit/api/test_auth_compliance.py` | Compliance test suite |
 | `tests/unit/api/auth_exclusions.yml` | YAML-based exclusion registry (authenticated vs public) |
+
+## Workflow Step-Type Authoring
+
+Workflow create/import and every authoring mutation require both the ordinary workflow permission and
+`step_type:write` permission for every distinct type in the latest saved draft and the submitted or
+selected definition. Save-and-publish checks the submitted definition rather than the selected version
+being replaced. Only unpublish also checks the currently published definition; a denied type in an
+older published version does not block an otherwise permitted draft save or publish. A denial occurs
+before version records, publish pointers, enabled state, triggers, or publish events change.
+Project deletion checks the latest and published definitions of every contained workflow before cleanup.
+
+Policies evaluate the concrete project and `kind` resource label. Missing write grants and explicit
+denies both block authoring. Public denial responses name blocked types and the attempted operation;
+policy provenance is retained in authorization audit events only. The default `step-author` role,
+allow policy and authenticated-group assignment are editable custom records seeded once.
+Built-in workflow seeding writes models directly and is outside caller authoring checks.

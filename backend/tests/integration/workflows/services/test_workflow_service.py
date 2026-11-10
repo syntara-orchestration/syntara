@@ -200,9 +200,11 @@ class TestWorkflowServiceInit(TestWorkflowServiceBase):
     """Test WorkflowService initialization."""
 
     @pytest.mark.asyncio
-    async def test_init_sets_session_and_user(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_init_sets_session_and_user(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test that WorkflowService initialization sets session and user correctly."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         assert service.session == test_db_session
         assert service.user == test_user
@@ -242,10 +244,17 @@ class TestWorkflowServiceDuplicateDetection(TestWorkflowServiceBase):
         ],
     )
     async def test_is_duplicate_name_error_parameterized(
-        self, test_db_session: AsyncSession, test_user: User, statement: str, args: tuple[str, ...], *, expected: bool
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        statement: str,
+        args: tuple[str, ...],
+        allow_all_evaluator,
+        *,
+        expected: bool,
     ) -> None:
         """Test duplicate detection with various error messages and args."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         error = IntegrityError(statement, "SELECT", None)  # type: ignore[arg-type]
         error.args = args
@@ -259,10 +268,10 @@ class TestWorkflowServiceFlushWithDuplicateCheck(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_flush_with_duplicate_check_raises_workflow_name_conflict(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test flush raises WorkflowNameConflictError for duplicate name."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create a workflow first
         workflow = self._create_test_workflow(name="duplicate-name", created_by=test_user.id)
@@ -286,10 +295,10 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_create_workflow_success(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test successful workflow creation."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow_definition = self._create_workflow_definition()
 
@@ -324,10 +333,10 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_create_workflow_validation_error_saves_with_issues(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test workflow creation with invalid definition still saves and reports issues."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow_definition = self._create_workflow_definition()
 
@@ -348,10 +357,10 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_create_workflow_duplicate_name(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test workflow creation with duplicate name."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # First, create a workflow with a specific name
         workflow_definition = self._create_workflow_definition()
@@ -381,10 +390,10 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_create_workflow_same_name_different_project(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Same workflow name in different projects should succeed."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_definition = self._create_workflow_definition()
 
         other_project = Project(name=f"other-project-{uuid4().hex[:8]}", labels={})
@@ -415,10 +424,10 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_create_workflow_same_name_same_project_fails(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Same workflow name in the same project should fail with 409."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_definition = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -444,10 +453,10 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_create_workflow_with_warnings_succeeds(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test workflow creation with warnings succeeds and reports validation issues."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow_definition = self._create_workflow_definition()
 
@@ -468,10 +477,10 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_create_workflow_errors_always_saves(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test workflow creation with errors saves successfully and reports issues."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow_definition = self._create_workflow_definition()
 
@@ -492,10 +501,10 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_create_workflow_valid_has_no_validation_issues(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test workflow creation with valid definition has no validation issues."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow_definition = self._create_workflow_definition()
 
@@ -512,10 +521,10 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_create_workflow_import_skips_foreign_webhook_service_account_bindings(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Import with stale webhook SA UUID succeeds with warnings and strips the ID."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         foreign_sa_id = str(uuid4())
         path = f"import-sa-{uuid4().hex[:8]}"
         workflow_definition = self._create_workflow_definition()
@@ -566,9 +575,11 @@ class TestWorkflowServiceGetWorkflow(TestWorkflowServiceBase):
     """Test get workflow functionality."""
 
     @pytest.mark.asyncio
-    async def test_get_workflow_by_id_success(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_get_workflow_by_id_success(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test successful workflow retrieval by ID."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create a workflow in the database
         workflow = self._create_test_workflow(name="test-workflow", created_by=test_user.id)
@@ -581,9 +592,11 @@ class TestWorkflowServiceGetWorkflow(TestWorkflowServiceBase):
         assert result.name == workflow.name
 
     @pytest.mark.asyncio
-    async def test_get_workflow_by_id_not_found(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_get_workflow_by_id_not_found(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test workflow retrieval when workflow not found."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow_id = uuid4()
 
@@ -593,9 +606,11 @@ class TestWorkflowServiceGetWorkflow(TestWorkflowServiceBase):
         assert str(exc_info.value) == f"Workflow {workflow_id} not found"
 
     @pytest.mark.asyncio
-    async def test_get_workflow_with_version_success(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_get_workflow_with_version_success(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test successful workflow and version retrieval."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflow and version in database
         workflow = self._create_test_workflow(name="test-workflow", current_version=2, created_by=test_user.id)
@@ -612,9 +627,11 @@ class TestWorkflowServiceGetWorkflow(TestWorkflowServiceBase):
         assert result_version.version == 2
 
     @pytest.mark.asyncio
-    async def test_get_workflow_with_version_not_found(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_get_workflow_with_version_not_found(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test workflow with version when version not found."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflow but not its version
         workflow = self._create_test_workflow(name="test-workflow", current_version=2, created_by=test_user.id)
@@ -631,9 +648,11 @@ class TestWorkflowServiceUpdateMetadata(TestWorkflowServiceBase):
     """Test update workflow metadata functionality."""
 
     @pytest.mark.asyncio
-    async def test_update_workflow_metadata_all_fields(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_update_workflow_metadata_all_fields(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test updating all metadata fields."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow = self._create_test_workflow(name="original-name", created_by=test_user.id)
         original_updated_at = workflow.updated_at
@@ -653,10 +672,10 @@ class TestWorkflowServiceUpdateMetadata(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_update_workflow_metadata_partial_fields(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test updating only some metadata fields."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow = self._create_test_workflow(
             name="original-name",
@@ -680,10 +699,10 @@ class TestWorkflowServiceUpdateMetadata(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_update_workflow_metadata_empty_name_error(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test updating with empty name raises SafeValueError."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow = self._create_test_workflow(created_by=test_user.id)
 
@@ -695,9 +714,11 @@ class TestWorkflowServiceCreateVersion(TestWorkflowServiceBase):
     """Test create workflow version functionality."""
 
     @pytest.mark.asyncio
-    async def test_create_workflow_version_success(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_create_workflow_version_success(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test successful version creation with new definition."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow = self._create_test_workflow(name="test-workflow", current_version=1, created_by=test_user.id)
         test_db_session.add(workflow)
@@ -733,9 +754,11 @@ class TestWorkflowServiceCreateVersion(TestWorkflowServiceBase):
             assert db_version is not None
 
     @pytest.mark.asyncio
-    async def test_create_workflow_version_no_change(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_create_workflow_version_no_change(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test version creation when definition hasn't changed."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         same_definition = self._create_workflow_definition()
 
@@ -761,10 +784,10 @@ class TestWorkflowServiceCreateVersion(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_create_workflow_version_validation_error_saves_with_issues(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test version creation with invalid definition still saves and reports issues."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow = self._create_test_workflow(name="invalid-ver-test", current_version=1, created_by=test_user.id)
         test_db_session.add(workflow)
@@ -795,9 +818,11 @@ class TestWorkflowServiceUpdateWorkflow(TestWorkflowServiceBase):
     """Test update workflow functionality."""
 
     @pytest.mark.asyncio
-    async def test_update_workflow_metadata_only(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_update_workflow_metadata_only(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test updating workflow metadata without creating new version."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflow and version in database
         workflow = self._create_test_workflow(name="test-workflow", created_by=test_user.id)
@@ -822,9 +847,11 @@ class TestWorkflowServiceUpdateWorkflow(TestWorkflowServiceBase):
         assert result_version.id == version.id
 
     @pytest.mark.asyncio
-    async def test_update_workflow_with_definition(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_update_workflow_with_definition(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test updating workflow with new definition creates version."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflow and version in database
         workflow = self._create_test_workflow(name="test-workflow", current_version=1, created_by=test_user.id)
@@ -851,9 +878,11 @@ class TestWorkflowServiceUpdateWorkflow(TestWorkflowServiceBase):
             assert result_version.version == 2
 
     @pytest.mark.asyncio
-    async def test_update_workflow_not_found(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_update_workflow_not_found(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test updating non-existent workflow raises error."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow_id = uuid4()
 
@@ -865,13 +894,16 @@ class TestWorkflowServiceDeleteWorkflow(TestWorkflowServiceBase):
     """Test delete workflow functionality."""
 
     @pytest.mark.asyncio
-    async def test_delete_workflow_success(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_delete_workflow_success(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test successful workflow soft deletion."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflow in database
         workflow = self._create_test_workflow(name="test-workflow", created_by=test_user.id)
         test_db_session.add(workflow)
+        test_db_session.add(self._create_test_workflow_version(workflow_id=workflow.id, created_by=test_user.id))
         await test_db_session.commit()
 
         await service.delete_workflow(workflow.id)
@@ -881,9 +913,11 @@ class TestWorkflowServiceDeleteWorkflow(TestWorkflowServiceBase):
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_delete_workflow_not_found(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_delete_workflow_not_found(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test deleting non-existent workflow raises error."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow_id = uuid4()
 
@@ -895,9 +929,11 @@ class TestWorkflowServiceListWorkflows(TestWorkflowServiceBase):
     """Test list workflows functionality."""
 
     @pytest.mark.asyncio
-    async def test_list_workflows_cursor_uses_base_method(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_list_workflows_cursor_uses_base_method(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test that list_workflows_cursor delegates to base list_resources method."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create some workflows (is_enabled=False initially, set after version FK)
         workflow1 = self._create_test_workflow(name="workflow-1", created_by=test_user.id)
@@ -936,9 +972,11 @@ class TestWorkflowServiceListWorkflows(TestWorkflowServiceBase):
         assert all(w.is_enabled for w in result.resources)
 
     @pytest.mark.asyncio
-    async def test_list_workflows_cursor_default_sort(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_list_workflows_cursor_default_sort(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test that list_workflows_cursor uses default sort when none provided."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         result = await service.list_workflows_cursor()
 
@@ -948,10 +986,10 @@ class TestWorkflowServiceListWorkflows(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_cursor_boundary_limit_zero(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test cursor pagination with zero limit."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create test workflow
         workflow = self._create_test_workflow(name="test-workflow", created_by=test_user.id)
@@ -965,10 +1003,10 @@ class TestWorkflowServiceListWorkflows(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_cursor_boundary_large_limit(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test cursor pagination with very large limit."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create multiple workflows
         workflows = [self._create_test_workflow(name=f"workflow-{i}", created_by=test_user.id) for i in range(5)]
@@ -987,10 +1025,10 @@ class TestWorkflowServiceListWorkflows(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_cursor_with_valid_cursor(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test pagination with valid cursor token."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create multiple workflows for pagination
         workflows = [self._create_test_workflow(name=f"workflow-{i:02d}", created_by=test_user.id) for i in range(10)]
@@ -1026,10 +1064,10 @@ class TestWorkflowServiceListWorkflows(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_cursor_with_updated_at_sort(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Cursor pagination must work with datetime sorts like -updated_at (not just name)."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflows = [self._create_test_workflow(name=f"workflow-{i:02d}", created_by=test_user.id) for i in range(10)]
         test_db_session.add_all(workflows)
@@ -1051,10 +1089,10 @@ class TestWorkflowServiceListWorkflows(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_cursor_with_is_enabled_sort(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Cursor pagination must work with boolean sorts like is_enabled (next and prev)."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflows = [self._create_test_workflow(name=f"workflow-{i:02d}", created_by=test_user.id) for i in range(10)]
         test_db_session.add_all(workflows)
@@ -1081,10 +1119,10 @@ class TestWorkflowServiceListWorkflows(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_cursor_empty_results_with_cursor(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test cursor pagination when result set is empty."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create a valid base64 cursor that points to a non-existent record
         cursor_data = {"id": str(uuid4()), "direction": "next"}
@@ -1099,10 +1137,10 @@ class TestWorkflowServiceListWorkflows(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_cursor_different_sort_orders(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test cursor pagination with different sort orders."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflows with different timestamps
         base_time = datetime.now(UTC)
@@ -1142,10 +1180,10 @@ class TestWorkflowServiceListWorkflows(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_cursor_with_include_total(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test cursor pagination with total count included."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflows
         workflows = [self._create_test_workflow(name=f"workflow-{i}", created_by=test_user.id) for i in range(7)]
@@ -1172,10 +1210,10 @@ class TestWorkflowServiceLabelFiltering(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_filter_by_label_key_value(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test filtering workflows by specific label key-value pair."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflows with different labels
         prod_workflow = self._create_test_workflow(
@@ -1201,10 +1239,10 @@ class TestWorkflowServiceLabelFiltering(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_filter_by_label_key_existence(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test filtering workflows by label key existence (without specific value)."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflows with and without specific labels
         with_team_workflow = self._create_test_workflow(
@@ -1228,9 +1266,11 @@ class TestWorkflowServiceLabelFiltering(TestWorkflowServiceBase):
         assert result.resources[0].labels["team"] == "backend"
 
     @pytest.mark.asyncio
-    async def test_list_workflows_filter_multiple_labels(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_list_workflows_filter_multiple_labels(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test filtering workflows with multiple label criteria (AND logic)."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflows with various label combinations
         exact_match = self._create_test_workflow(
@@ -1264,10 +1304,10 @@ class TestWorkflowServiceLabelFiltering(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_filter_nonexistent_label_key(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test filtering by nonexistent label key returns empty results."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflow without the 'nonexistent' label
         workflow = self._create_test_workflow(
@@ -1283,10 +1323,10 @@ class TestWorkflowServiceLabelFiltering(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_filter_nonmatching_label_value(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test filtering by label key with non-matching value."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflow with specific label value
         workflow = self._create_test_workflow(
@@ -1302,10 +1342,10 @@ class TestWorkflowServiceLabelFiltering(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_filter_empty_label_values(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test filtering workflows with empty label values."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflows with empty and non-empty label values
         empty_value_workflow = self._create_test_workflow(
@@ -1340,10 +1380,10 @@ class TestWorkflowServiceLabelFiltering(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_filter_special_characters_in_labels(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test filtering with special characters in label keys and values."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflow with special characters in labels
         special_workflow = self._create_test_workflow(
@@ -1364,9 +1404,11 @@ class TestWorkflowServiceLabelFiltering(TestWorkflowServiceBase):
         assert result.resources[0].labels["app.name"] == "my-app"
 
     @pytest.mark.asyncio
-    async def test_list_workflows_filter_case_sensitivity(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_list_workflows_filter_case_sensitivity(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test label filtering case sensitivity."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create workflow with specific case labels
         workflow = self._create_test_workflow(
@@ -1389,10 +1431,10 @@ class TestWorkflowServiceLabelFiltering(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_filter_combined_with_pagination(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test label filtering combined with cursor pagination."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create multiple workflows with same label for pagination testing
         workflows = []
@@ -1442,10 +1484,10 @@ class TestWorkflowServiceLabelFiltering(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_list_workflows_filter_mixed_with_other_params(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test label filtering combined with other query parameters."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create enabled workflow (requires flush-then-set for CHECK constraint)
         enabled_workflow = self._create_test_workflow(
@@ -1497,10 +1539,10 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_publish_version_success(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test publishing a version creates a published copy and sets workflow state."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_def = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1529,7 +1571,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_publish_switches_pointer(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test publishing a new version updates the published_version_id pointer.
 
@@ -1539,7 +1581,7 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
         - Create v2 (draft)
         - Publish v2 -> published_version_id points to v2
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_def = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1580,10 +1622,10 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_publish_idempotent(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test publishing the same version twice is idempotent with pointer-based publish."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_def = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1607,10 +1649,10 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_publish_nonexistent_version_raises(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test publishing a nonexistent version raises error."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_def = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1626,9 +1668,11 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
             await service.publish_workflow_version(workflow_id=workflow.id, version=99)
 
     @pytest.mark.asyncio
-    async def test_publish_nonexistent_workflow_raises(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_publish_nonexistent_workflow_raises(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test publishing on a nonexistent workflow raises error."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         fake_id = uuid4()
 
         with pytest.raises(WorkflowNotFoundError):
@@ -1636,10 +1680,10 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_publish_syncs_all_trigger_types(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test that publish syncs both webhook and EDA trigger types."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_def = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1667,10 +1711,10 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_publish_blocked_when_definition_has_errors(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test that publishing is blocked when the definition has validation errors."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_def = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1693,10 +1737,10 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_publish_blocked_when_definition_has_warnings(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test that publishing is blocked when the definition has only warnings."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_def = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1719,10 +1763,10 @@ class TestPublishWorkflowVersion(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_publish_blocked_preserves_previous_published_version(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test that a failed publish attempt does not affect the existing published version."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_def = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1766,7 +1810,7 @@ class TestUnpublishWorkflow(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_unpublish_success(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test unpublishing sets workflow state correctly.
 
@@ -1774,7 +1818,7 @@ class TestUnpublishWorkflow(TestWorkflowServiceBase):
         - Publish v1 -> published_version_id points to v1
         - Unpublish -> published_version_id set to None
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_def = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1797,10 +1841,10 @@ class TestUnpublishWorkflow(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_unpublish_when_not_published_raises(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test unpublishing when no version is published raises error."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_def = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1816,9 +1860,11 @@ class TestUnpublishWorkflow(TestWorkflowServiceBase):
             await service.unpublish_workflow(workflow_id=workflow.id)
 
     @pytest.mark.asyncio
-    async def test_unpublish_nonexistent_workflow_raises(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_unpublish_nonexistent_workflow_raises(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test unpublishing a nonexistent workflow raises error."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         fake_id = uuid4()
 
         with pytest.raises(WorkflowNotFoundError):
@@ -1826,10 +1872,10 @@ class TestUnpublishWorkflow(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_unpublish_syncs_all_trigger_types(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test that unpublish syncs both webhook and EDA trigger types."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow_def = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1868,10 +1914,10 @@ class TestRestoreWorkflowVersion(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_restore_creates_new_draft(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test restoring a version creates a new draft with the original definition."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         defn_v1 = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1910,10 +1956,10 @@ class TestRestoreWorkflowVersion(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_restore_current_version_is_noop(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test restoring the current version returns it without creating a new one."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         defn = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1934,10 +1980,10 @@ class TestRestoreWorkflowVersion(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_restore_nonexistent_version_raises(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test restoring a nonexistent version raises error."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         defn = self._create_workflow_definition()
 
         with patch("syntara.workflows.services.workflow_service.workflow_validator", _mock_validator_valid()):
@@ -1953,9 +1999,11 @@ class TestRestoreWorkflowVersion(TestWorkflowServiceBase):
             await service.restore_workflow_version(workflow_id=workflow.id, version=99)
 
     @pytest.mark.asyncio
-    async def test_restore_nonexistent_workflow_raises(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_restore_nonexistent_workflow_raises(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test restoring from a nonexistent workflow raises error."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         fake_id = uuid4()
 
         with pytest.raises(WorkflowNotFoundError):
@@ -2057,9 +2105,10 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         test_user: User,
         project_b_id: UUID,
         credential_in_a: Credential,
+        allow_all_evaluator,
     ) -> None:
         """Workflow in project B cannot reference a credential from project A."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         wf_def = _workflow_definition_with_credential(credential_id=str(credential_in_a.id))
 
         with (
@@ -2112,9 +2161,10 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         test_db_session: AsyncSession,
         test_user: User,
         project_a_id: UUID,
+        allow_all_evaluator,
     ) -> None:
         """Workflow referencing a credential that doesn't exist is rejected."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         wf_def = _workflow_definition_with_credential(credential_id=str(uuid4()))
 
         with (
@@ -2136,9 +2186,10 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         test_db_session: AsyncSession,
         test_user: User,
         project_a_id: UUID,
+        allow_all_evaluator,
     ) -> None:
         """Workflow without credential references skips credential validation."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         wf_def = _workflow_definition_with_credential(credential_id=None)
 
         with (
@@ -2197,13 +2248,7 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
 
         mock_evaluator = MagicMock()
         mock_evaluator.evaluate = MagicMock(
-            return_value={
-                "allowed": False,
-                "denied": True,
-                "matched_policy": "",
-                "denial_reason": "no use permission",
-                "denied_by": "",
-            }
+            side_effect=lambda request: {"allow": request["resource"]["type"] != "credential"}
         )
         service = WorkflowService(test_db_session, test_user, opa_client=mock_evaluator)
         wf_def = _workflow_definition_with_credential(credential_id=str(credential_in_a.id))
@@ -2267,9 +2312,9 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         with patch(_PATCH_VALIDATOR, _mock_validator_valid()):
             new_version, _ = await service.create_workflow_version(workflow, wf_def_v2, "no change to credential")
 
-        assert new_version is None or new_version is not None  # either skipped (no diff) or created
-        # The credential:use authorize call should NOT have been made (same cred, diff is empty)
-        mock_evaluator.evaluate.assert_not_called()
+        assert new_version is None
+        assert mock_evaluator.evaluate.called
+        assert all(call.args[0]["resource"]["type"] == "step_type" for call in mock_evaluator.evaluate.call_args_list)
 
     @pytest.mark.asyncio
     async def test_update_workflow_version_rejects_cross_project_credential(
@@ -2278,9 +2323,10 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         test_user: User,
         project_b_id: UUID,
         credential_in_a: Credential,
+        allow_all_evaluator,
     ) -> None:
         """Updating a workflow version in project B must reject credential from project A."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow = Workflow(
             id=uuid4(),
@@ -2364,9 +2410,10 @@ class TestCredentialProjectScopeValidation(TestWorkflowServiceBase):
         test_user: User,
         project_b_id: UUID,
         credential_in_a: Credential,
+        allow_all_evaluator,
     ) -> None:
         """publish_workflow_version rejects cross-project credentials in inline definition."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow = Workflow(
             id=uuid4(),
@@ -2407,7 +2454,7 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_delete_builtin_workflow_raises(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         workflow = self._create_test_workflow(
             name="Builtin WF", created_by=test_user.id, is_builtin=True, project_id=test_project_id
@@ -2417,13 +2464,13 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         test_db_session.add(version)
         await test_db_session.flush()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         with pytest.raises(BuiltinWorkflowDeleteError, match="Builtin WF"):
             await service.delete_workflow(workflow.id)
 
     @pytest.mark.asyncio
     async def test_delete_non_builtin_workflow_succeeds(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         workflow = self._create_test_workflow(name="Normal WF", created_by=test_user.id, project_id=test_project_id)
         version = self._create_test_workflow_version(workflow_id=workflow.id, created_by=test_user.id)
@@ -2431,7 +2478,7 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         test_db_session.add(version)
         await test_db_session.flush()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         await service.delete_workflow(workflow.id)
 
         result = await test_db_session.get(Workflow, workflow.id)
@@ -2439,7 +2486,7 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_update_builtin_workflow_raises(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         workflow = self._create_test_workflow(
             name="Builtin WF", created_by=test_user.id, is_builtin=True, project_id=test_project_id
@@ -2449,13 +2496,13 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         test_db_session.add(version)
         await test_db_session.flush()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         with pytest.raises(BuiltinWorkflowModifyError, match="Builtin WF"):
             await service.update_workflow(workflow.id, description="hacked")
 
     @pytest.mark.asyncio
     async def test_update_non_builtin_workflow_succeeds(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         workflow = self._create_test_workflow(name="Normal WF", created_by=test_user.id, project_id=test_project_id)
         version = self._create_test_workflow_version(workflow_id=workflow.id, created_by=test_user.id)
@@ -2463,13 +2510,13 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         test_db_session.add(version)
         await test_db_session.flush()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         updated, _, _ = await service.update_workflow(workflow.id, description="updated desc")
         assert updated.description == "updated desc"
 
     @pytest.mark.asyncio
     async def test_unpublish_builtin_workflow_raises(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         workflow = self._create_test_workflow(
             name="Builtin WF", created_by=test_user.id, is_builtin=True, project_id=test_project_id
@@ -2481,13 +2528,13 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         workflow.published_version_id = version.id
         workflow.is_enabled = True
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         with pytest.raises(BuiltinWorkflowModifyError, match="Builtin WF"):
             await service.unpublish_workflow(workflow.id)
 
     @pytest.mark.asyncio
     async def test_unpublish_non_builtin_workflow_succeeds(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         workflow = self._create_test_workflow(name="Normal WF", created_by=test_user.id, project_id=test_project_id)
         version = self._create_test_workflow_version(workflow_id=workflow.id, created_by=test_user.id)
@@ -2497,13 +2544,13 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         workflow.published_version_id = version.id
         workflow.is_enabled = True
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         result = await service.unpublish_workflow(workflow.id)
         assert result.published_version_id is None
 
     @pytest.mark.asyncio
     async def test_update_version_metadata_non_builtin_workflow_succeeds(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         workflow = self._create_test_workflow(name="Normal WF", created_by=test_user.id, project_id=test_project_id)
         version = self._create_test_workflow_version(workflow_id=workflow.id, created_by=test_user.id)
@@ -2511,13 +2558,13 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         test_db_session.add(version)
         await test_db_session.flush()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         result = await service.update_version_metadata(workflow.id, version=1, change_description="valid edit")
         assert result.change_description == "valid edit"
 
     @pytest.mark.asyncio
     async def test_update_version_metadata_builtin_workflow_raises(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         workflow = self._create_test_workflow(
             name="Builtin WF", created_by=test_user.id, is_builtin=True, project_id=test_project_id
@@ -2527,13 +2574,13 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         test_db_session.add(version)
         await test_db_session.flush()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         with pytest.raises(BuiltinWorkflowModifyError, match="Builtin WF"):
             await service.update_version_metadata(workflow.id, version=1, change_description="sneaky edit")
 
     @pytest.mark.asyncio
     async def test_create_workflow_in_builtin_project_raises(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         builtin_project = Project(
             name=f"builtin-{uuid4().hex[:6]}",
@@ -2542,7 +2589,7 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         test_db_session.add(builtin_project)
         await test_db_session.flush()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         with pytest.raises(BuiltinProtectionError, match="built-in project"):
             await service.create_workflow(
                 name="user-workflow",
@@ -2554,7 +2601,7 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_create_workflow_in_normal_project_succeeds(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         normal_project = Project(
             name=f"normal-{uuid4().hex[:6]}",
@@ -2563,7 +2610,7 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         test_db_session.add(normal_project)
         await test_db_session.flush()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, _version, _ = await service.create_workflow(
             name=f"user-workflow-{uuid4().hex[:6]}",
             description="should succeed",
@@ -2574,19 +2621,23 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         assert workflow.project_id == normal_project.id
 
     @pytest.mark.asyncio
-    async def test_publish_builtin_workflow_raises(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_publish_builtin_workflow_raises(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         workflow = self._create_test_workflow(name="Builtin WF", created_by=test_user.id, is_builtin=True)
         version = self._create_test_workflow_version(workflow_id=workflow.id, created_by=test_user.id)
         test_db_session.add(workflow)
         test_db_session.add(version)
         await test_db_session.flush()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         with pytest.raises(BuiltinWorkflowModifyError, match="Builtin WF"):
             await service.publish_workflow_version(workflow.id, version=1)
 
     @pytest.mark.asyncio
-    async def test_publish_non_builtin_workflow_succeeds(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_publish_non_builtin_workflow_succeeds(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         workflow = self._create_test_workflow(name="Normal WF", created_by=test_user.id, is_enabled=False)
         workflow.published_version_id = None
         version = self._create_test_workflow_version(workflow_id=workflow.id, created_by=test_user.id)
@@ -2594,13 +2645,15 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         test_db_session.add(version)
         await test_db_session.flush()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         published, result_version, _warning = await service.publish_workflow_version(workflow.id, version=1)
         assert published.published_version_id == result_version.id
         assert published.is_enabled is True
 
     @pytest.mark.asyncio
-    async def test_restore_builtin_workflow_raises(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_restore_builtin_workflow_raises(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         workflow = self._create_test_workflow(
             name="Builtin WF", created_by=test_user.id, is_builtin=True, current_version=2
         )
@@ -2611,12 +2664,14 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         test_db_session.add(v2)
         await test_db_session.flush()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         with pytest.raises(BuiltinWorkflowModifyError, match="Builtin WF"):
             await service.restore_workflow_version(workflow.id, version=1)
 
     @pytest.mark.asyncio
-    async def test_restore_non_builtin_workflow_succeeds(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_restore_non_builtin_workflow_succeeds(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         workflow = self._create_test_workflow(name="Normal WF", created_by=test_user.id, current_version=2)
         # v1 uses a distinct definition so restore is not a no-op (change detection in _create_version_record
         # skips creation when the definition matches the current version)
@@ -2634,7 +2689,7 @@ class TestBuiltinWorkflowGuards(TestWorkflowServiceBase):
         test_db_session.add(v2)
         await test_db_session.flush()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         _, restored = await service.restore_workflow_version(workflow.id, version=1)
         assert restored.version == 3
 
@@ -2644,10 +2699,10 @@ class TestWorkflowVersionConflictDetection(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_update_with_stale_expected_version_raises_conflict(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """When expected_version < current_version, update should return 409."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow = self._create_test_workflow(
             name=f"conflict-{uuid4().hex[:6]}", current_version=3, created_by=test_user.id
@@ -2671,10 +2726,10 @@ class TestWorkflowVersionConflictDetection(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_update_with_matching_expected_version_succeeds(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """When expected_version == current_version, update should proceed."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow = self._create_test_workflow(
             name=f"match-{uuid4().hex[:6]}", current_version=1, created_by=test_user.id
@@ -2694,10 +2749,10 @@ class TestWorkflowVersionConflictDetection(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_update_without_expected_version_skips_check(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """When expected_version is omitted, no conflict check happens."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow = self._create_test_workflow(
             name=f"nocheck-{uuid4().hex[:6]}", current_version=5, created_by=test_user.id
@@ -2716,10 +2771,10 @@ class TestWorkflowVersionConflictDetection(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_publish_with_stale_expected_version_raises_conflict(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """When expected_version < current_version, publish should return 409."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow = self._create_test_workflow(
             name=f"pub-conflict-{uuid4().hex[:6]}",
@@ -2746,10 +2801,10 @@ class TestWorkflowVersionConflictDetection(TestWorkflowServiceBase):
 
     @pytest.mark.asyncio
     async def test_publish_without_expected_version_skips_check(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """When expected_version is omitted on publish, no conflict check happens."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         workflow = self._create_test_workflow(
             name=f"pub-nocheck-{uuid4().hex[:6]}",
@@ -2801,9 +2856,11 @@ class TestUpdateVersionMetadata(TestWorkflowServiceBase):
         return workflow, version
 
     @pytest.mark.asyncio
-    async def test_update_both_fields(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_update_both_fields(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test updating both name and change_description."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, _ = await self._setup_workflow_with_version(test_db_session, test_user)
 
         result = await service.update_version_metadata(
@@ -2815,9 +2872,11 @@ class TestUpdateVersionMetadata(TestWorkflowServiceBase):
         assert result.updated_by == test_user.id
 
     @pytest.mark.asyncio
-    async def test_partial_update_name_only(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_partial_update_name_only(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test updating only name leaves change_description unchanged."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, _ = await self._setup_workflow_with_version(
             test_db_session, test_user, change_description="Original desc"
         )
@@ -2828,9 +2887,11 @@ class TestUpdateVersionMetadata(TestWorkflowServiceBase):
         assert result.change_description == "Original desc"
 
     @pytest.mark.asyncio
-    async def test_partial_update_change_description_only(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_partial_update_change_description_only(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test updating only change_description leaves name unchanged."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, _ = await self._setup_workflow_with_version(test_db_session, test_user, name="Original Name")
 
         result = await service.update_version_metadata(
@@ -2841,9 +2902,11 @@ class TestUpdateVersionMetadata(TestWorkflowServiceBase):
         assert result.change_description == "New Desc"
 
     @pytest.mark.asyncio
-    async def test_clear_fields_with_explicit_none(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_clear_fields_with_explicit_none(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test clearing fields by sending explicit None values."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, _ = await self._setup_workflow_with_version(
             test_db_session, test_user, name="Has Name", change_description="Has Desc"
         )
@@ -2860,9 +2923,11 @@ class TestUpdateVersionMetadata(TestWorkflowServiceBase):
         assert result.change_description is None
 
     @pytest.mark.asyncio
-    async def test_noop_when_fields_set_is_empty(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_noop_when_fields_set_is_empty(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test that an empty fields_set results in no changes and no commit."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, version = await self._setup_workflow_with_version(test_db_session, test_user)
 
         result = await service.update_version_metadata(workflow.id, 1, fields_set=set())
@@ -2872,27 +2937,33 @@ class TestUpdateVersionMetadata(TestWorkflowServiceBase):
         assert result.updated_by != test_user.id
 
     @pytest.mark.asyncio
-    async def test_workflow_not_found_raises(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_workflow_not_found_raises(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test that a nonexistent workflow_id raises WorkflowNotFoundError."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         nonexistent_id = uuid4()
         with pytest.raises(WorkflowNotFoundError):
             await service.update_version_metadata(nonexistent_id, 1, name="x")
 
     @pytest.mark.asyncio
-    async def test_version_not_found_raises(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_version_not_found_raises(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test that a nonexistent version raises WorkflowVersionNotFoundError."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, _ = await self._setup_workflow_with_version(test_db_session, test_user)
 
         with pytest.raises(WorkflowVersionNotFoundError):
             await service.update_version_metadata(workflow.id, 999, name="x")
 
     @pytest.mark.asyncio
-    async def test_default_fields_set_updates_both(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_default_fields_set_updates_both(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test that fields_set=None defaults to updating both fields."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         workflow, _ = await self._setup_workflow_with_version(test_db_session, test_user)
 
         result = await service.update_version_metadata(

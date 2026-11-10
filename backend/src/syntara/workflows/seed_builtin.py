@@ -281,6 +281,7 @@ async def _seed_one(
     creator_id: UUID,
     project_id: UUID,
 ) -> None:
+    # Startup installs built-ins directly; caller step-type authoring policies do not apply.
     name = workflow_dict["name"]
 
     workflow_validator.validate_workflow_definition(workflow_dict)
