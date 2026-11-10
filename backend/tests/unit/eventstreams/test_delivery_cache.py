@@ -311,8 +311,21 @@ async def test_total_deadline_cancels_stalled_pool_or_command(phase: str, monkey
     service, cache, repository, _, _ = lookup_service(monkeypatch, result)
     service.policy = policy(timeout_seconds=0.01)
     cancelled = asyncio.Event()
+    real_timeout = asyncio.timeout
+    deadlines: list[asyncio.Timeout] = []
+
+    def controlled_timeout(seconds: float | None) -> asyncio.Timeout:
+        assert seconds == service.policy.timeout_seconds
+        deadline = real_timeout(None)
+        deadlines.append(deadline)
+        return deadline
+
+    monkeypatch.setattr(asyncio, "timeout", controlled_timeout)
 
     async def stalled(*_: object) -> None:
+        # Expire the actual operation timeout after entering the stalled I/O,
+        # independently of signing/validation speed or coverage-worker load.
+        deadlines[-1].reschedule(asyncio.get_running_loop().time())
         try:
             await asyncio.Event().wait()
         finally:
@@ -322,8 +335,9 @@ async def test_total_deadline_cancels_stalled_pool_or_command(phase: str, monkey
         cache.get.side_effect = stalled
     else:
         cache.put.side_effect = stalled
-    assert await asyncio.wait_for(service.lookup(identity()), timeout=0.5) == result
+    assert await asyncio.wait_for(service.lookup(identity()), timeout=5) == result
     assert cancelled.is_set()
+    assert sum(deadline.expired() for deadline in deadlines) == 1
     repository.lookup_terminal.assert_awaited_once()
 
 
