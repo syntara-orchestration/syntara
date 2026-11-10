@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import { approvalsClient } from '../../client'
 
 import { ApprovalDetailContent } from './ApprovalDetailContent'
@@ -296,7 +297,11 @@ describe('ApprovalDetailContent', () => {
     expect(workflowLink).toBeInTheDocument()
 
     await user.click(workflowLink)
-    expect(onWorkflowClick).toHaveBeenCalledWith('/workflow-builder/wf-1?version=3')
+    expect(onWorkflowClick).toHaveBeenCalledWith({
+      to: routeRefs.builderEditRoute.fullPath,
+      params: { workflowId: 'wf-1' },
+      search: { version: '3' },
+    })
   })
 
   it('renders workflow name as plain text when no onWorkflowClick', () => {

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import * as routeRefs from '../../../../app/routes/routeReferences'
 import { identityProvidersClient, usersClient } from '../../../../client'
 import { useCanI } from '../../../../hooks/useCanI'
 import { AlertProvider } from '../../../../providers/alerts'
@@ -204,7 +205,8 @@ describe('EditGroupMapping', () => {
     })
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(routerTestState.navigate).toHaveBeenCalledWith({
-      to: `/system-administration/authentication/identity-providers/${VALID_PROVIDER_ID}/group-mapping`,
+      to: routeRefs.identityProviderGroupMappingRoute.fullPath,
+      params: { providerId: VALID_PROVIDER_ID },
     })
   })
 
@@ -337,7 +339,8 @@ describe('EditGroupMapping', () => {
 
     await waitFor(() => {
       expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: `/system-administration/authentication/identity-providers/${VALID_PROVIDER_ID}/group-mapping`,
+        to: routeRefs.identityProviderGroupMappingRoute.fullPath,
+        params: { providerId: VALID_PROVIDER_ID },
       })
     })
   })

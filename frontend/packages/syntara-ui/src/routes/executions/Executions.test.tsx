@@ -56,8 +56,22 @@ vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router')
   return {
     ...actual,
-    Link: ({ to, children, ...rest }: { to: string; children: React.ReactNode }) =>
-      React.createElement('a', { href: String(to), ...rest }, children),
+    Link: ({
+      to,
+      params,
+      children,
+      ...rest
+    }: {
+      to: string
+      params?: Record<string, string | number>
+      children: React.ReactNode
+    }) => {
+      const href = Object.entries(params ?? {}).reduce(
+        (path, [key, value]) => path.replaceAll(`$${key}`, encodeURIComponent(String(value))),
+        to
+      )
+      return React.createElement('a', { href, ...rest }, children)
+    },
     useSearch: vi.fn(() => ({})),
   }
 })

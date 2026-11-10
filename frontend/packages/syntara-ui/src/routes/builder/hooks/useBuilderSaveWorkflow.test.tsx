@@ -1,6 +1,7 @@
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, type MockedFunction } from 'vitest'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { expectStringContaining } from '../../../test/test-helpers'
@@ -179,7 +180,10 @@ describe('useBuilderSaveWorkflow', () => {
     expect(createWorkflow).toHaveBeenCalledTimes(1)
     const [{ body }] = createWorkflow.mock.calls[0]
     expect(body.labels).toBeUndefined()
-    expect(setLocation).toHaveBeenCalledWith('/workflow-builder/new-wf-id')
+    expect(setLocation).toHaveBeenCalledWith({
+      to: routeRefs.builderEditRoute.fullPath,
+      params: { workflowId: 'new-wf-id' },
+    })
   })
 
   it('includes project_id on create when isNew and selectedProject are set', async () => {

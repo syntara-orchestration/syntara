@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { editIdentityProviderGroupMappingRoute } from '../../../../app/routes/authentication'
 import { adminClient, identityProvidersClient } from '../../../../client'
 import { AlertProvider } from '../../../../providers/alerts'
 import { routerTestState } from '../../../../test/setup'
@@ -848,11 +849,10 @@ describe('IdentityProviderDetail', () => {
 
     await user.click(screen.getByRole('menuitem', { name: /edit group mapping/i }))
 
-    expect(routerTestState.navigate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: expect.stringContaining(`/identity-providers/${VALID_PROVIDER_ID}/group-mapping/edit`) as string,
-      })
-    )
+    expect(routerTestState.navigate).toHaveBeenCalledWith({
+      to: editIdentityProviderGroupMappingRoute.fullPath,
+      params: { providerId: VALID_PROVIDER_ID },
+    })
   })
 
   it('disables Edit group mapping in kebab when user lacks identity-provider:update', async () => {

@@ -6,7 +6,10 @@ import { builtinProjectTooltip } from '../../hooks/permissionUtils'
 import type { useWorkflowPermissions } from './useWorkflowPermissions'
 import { buildWorkflowRowActions } from './workflowRowActions'
 
-vi.mock('@tanstack/react-router', () => ({ useNavigate: vi.fn() }))
+vi.mock('@tanstack/react-router', async () => ({
+  ...(await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router')),
+  useNavigate: vi.fn(),
+}))
 vi.mock('../../components/IconLabel', () => ({
   IconLabel: ({ children }: { children: React.ReactNode }) => children,
 }))

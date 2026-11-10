@@ -11,9 +11,13 @@ const mockCreateMutation = vi.fn()
 const mockSyncAssignments = vi.fn()
 const mockHandleError = vi.fn(() => vi.fn())
 
-vi.mock('../../../../app/tanstackRouter', () => ({
-  tanstackRouter: { navigate: vi.fn().mockResolvedValue(undefined) },
-}))
+vi.mock('../../../../app/tanstackRouter', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../app/tanstackRouter')>()
+  return {
+    ...actual,
+    tanstackRouter: { ...actual.tanstackRouter, navigate: vi.fn().mockResolvedValue(undefined) },
+  }
+})
 
 vi.mock('../../../../providers/alerts', () => ({
   useAlerts: vi.fn(() => ({ showAlert: mockShowAlert })),
@@ -23,6 +27,8 @@ vi.mock('../../../../client', () => ({
   integrationsClient: {
     useMutation: vi.fn(() => ({ mutateAsync: mockCreateMutation })),
   },
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
 vi.mock('../useProjectAssignmentSync', () => ({

@@ -7,7 +7,9 @@ import { useIntegrationPermissions } from '../../configuration/integrations/useI
 import { IntegrationRequiredHelper } from './IntegrationRequiredHelper'
 
 vi.mock('../../../components/SynLink', () => ({
-  SynLink: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
+  SynLink: ({ children, options }: { children: React.ReactNode; options: { to: string } }) => (
+    <a href={options.to}>{children}</a>
+  ),
 }))
 
 vi.mock('../../configuration/integrations/useIntegrationPermissions', () => ({

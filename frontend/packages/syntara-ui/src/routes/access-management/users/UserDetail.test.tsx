@@ -14,6 +14,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { AlertProvider } from '../../../providers/alerts'
 import { routerTestState } from '../../../test/setup'
 import { accessClient, accessFetchClient } from '../../access/accessClient'
@@ -580,7 +581,10 @@ describe('UserDetail', () => {
       await user.click(screen.getByText('Okta'))
 
       expect(routerTestState.navigate).toHaveBeenCalledWith(
-        expect.objectContaining({ to: expect.stringContaining('idp-1') as string })
+        expect.objectContaining({
+          to: routeRefs.identityProviderDetailRoute.fullPath,
+          params: { providerId: 'idp-1' },
+        })
       )
     })
 
@@ -920,7 +924,8 @@ describe('UserDetail', () => {
       await user.click(screen.getByRole('button', { name: 'Edit user' }))
 
       expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: `/system-administration/access-management/users/${VALID_USER_ID}/edit`,
+        to: routeRefs.editUserRoute.fullPath,
+        params: { userId: VALID_USER_ID },
       })
     })
 
@@ -1110,7 +1115,8 @@ describe('UserDetail', () => {
       // SynListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
       expect(routerTestState.navigate).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: `/system-administration/access-management/users/${VALID_USER_ID}/identities`,
+          to: routeRefs.userDetailIdentitiesRoute.fullPath,
+          params: { userId: VALID_USER_ID },
         })
       )
     })
@@ -1124,7 +1130,8 @@ describe('UserDetail', () => {
       // SynListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
       expect(routerTestState.navigate).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: `/system-administration/access-management/users/${VALID_USER_ID}/groups`,
+          to: routeRefs.userDetailGroupsRoute.fullPath,
+          params: { userId: VALID_USER_ID },
         })
       )
     })
@@ -1161,7 +1168,8 @@ describe('UserDetail', () => {
       // SynListPanelTabs uses useNavigate (via useUrlTab) for tab navigation
       expect(routerTestState.navigate).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: `/system-administration/access-management/users/${VALID_USER_ID}/roles`,
+          to: routeRefs.userDetailRolesRoute.fullPath,
+          params: { userId: VALID_USER_ID },
         })
       )
     })
@@ -1343,7 +1351,8 @@ describe('UserDetail', () => {
 
       expect(routerTestState.navigate).toHaveBeenCalledWith(
         expect.objectContaining({
-          to: expect.stringContaining('/system-administration/authentication/identity-providers/idp-1') as string,
+          to: routeRefs.identityProviderDetailRoute.fullPath,
+          params: { providerId: 'idp-1' },
         })
       )
     })

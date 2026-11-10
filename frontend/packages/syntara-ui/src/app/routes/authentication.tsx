@@ -21,7 +21,7 @@ export const identityProviderDetailRoute = createRoute({
   component: makeRouteComponent(<IdentityProviderDetail />),
 })
 
-export const identityProviderIndexRoute = createRoute({
+const identityProviderIndexRoute = createRoute({
   getParentRoute: () => identityProviderDetailRoute,
   path: '/',
   component: makeRouteComponent(<IdentityProviderDetailsTabRoute />),

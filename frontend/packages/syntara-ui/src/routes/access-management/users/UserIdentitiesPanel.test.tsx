@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { identityProvidersClient, usersClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 import { routerTestState } from '../../../test/setup'
@@ -853,7 +854,8 @@ describe('UserIdentitiesPanel', () => {
       await user.click(screen.getByRole('button', { name: /transfer identity/i }))
 
       expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/access-management/users/user-1/transfer-identity',
+        to: routeRefs.transferIdentityRoute.fullPath,
+        params: { userId: 'user-1' },
       })
     })
   })

@@ -3,8 +3,15 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { ExecutionRunIdCell } from './ExecutionRunIdCell'
 
-vi.mock('@tanstack/react-router', () => ({
-  Link: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
+vi.mock('@tanstack/react-router', async () => ({
+  ...(await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router')),
+  Link: ({ to, params, children }: { to: string; params?: Record<string, string>; children: React.ReactNode }) => {
+    const href = Object.entries(params ?? {}).reduce(
+      (path, [key, value]) => path.replaceAll(`$${key}`, encodeURIComponent(value)),
+      to
+    )
+    return <a href={href}>{children}</a>
+  },
 }))
 
 describe('ExecutionRunIdCell', () => {

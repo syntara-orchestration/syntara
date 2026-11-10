@@ -16,6 +16,8 @@ vi.mock('../../../../client', () => ({
     useMutation: vi.fn(),
   },
   OIDC_REDIRECT_URI: 'http://localhost/api/v1/auth/oidc/callback',
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
 vi.mock('../../../../hooks/routing/useLocation', () => ({

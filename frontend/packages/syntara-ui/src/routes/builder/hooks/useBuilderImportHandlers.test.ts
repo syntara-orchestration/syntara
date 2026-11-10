@@ -1,6 +1,7 @@
 import { renderHook, act } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import type { PendingImportData } from '../useWorkflowImportExport'
 
 import { useBuilderImportHandlers, type UseBuilderImportHandlersParams } from './useBuilderImportHandlers'
@@ -141,7 +142,10 @@ describe('useBuilderImportHandlers', () => {
         description: 'Created "Imported Workflow"',
       })
       expect(params.showAlert).not.toHaveBeenCalled()
-      expect(params.setLocation).toHaveBeenCalledWith('/workflow-builder/new-wf-1')
+      expect(params.setLocation).toHaveBeenCalledWith({
+        to: routeRefs.builderEditRoute.fullPath,
+        params: { workflowId: 'new-wf-1' },
+      })
     })
 
     it('shows persistent warning alert when import has validation warnings', () => {
@@ -170,7 +174,10 @@ describe('useBuilderImportHandlers', () => {
         description: 'LLM model was removed',
       })
       expect(params.showSuccess).not.toHaveBeenCalled()
-      expect(params.setLocation).toHaveBeenCalledWith('/workflow-builder/new-wf-2')
+      expect(params.setLocation).toHaveBeenCalledWith({
+        to: routeRefs.builderEditRoute.fullPath,
+        params: { workflowId: 'new-wf-2' },
+      })
     })
 
     it('shows error on create failure', () => {

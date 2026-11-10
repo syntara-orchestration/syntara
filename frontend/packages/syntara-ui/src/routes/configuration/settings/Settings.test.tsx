@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { settingsClient } from '../../../client'
 import { useFileStorageStatus } from '../../../hooks/useFileStorageStatus'
 import { WORKFLOW_ENGINE_DEFAULTS_QUERY_KEY } from '../../builder/hooks/useWorkflowEngineDefaults'
@@ -256,7 +257,10 @@ describe('Settings', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Application' }))
 
-    expect(mockSetLocation).toHaveBeenCalledWith({ to: '/system-administration/settings/application' })
+    expect(mockSetLocation).toHaveBeenCalledWith({
+      to: routeRefs.settingsCategoryRoute.fullPath,
+      params: { category: 'application' },
+    })
   })
 
   it('renders correct content when URL points to a different tab', () => {

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { editIdentityProviderGroupMappingRoute } from '../../../../app/routes/authentication'
 import { usersClient } from '../../../../client'
 import { AlertProvider } from '../../../../providers/alerts'
 import { routerTestState } from '../../../../test/setup'
@@ -88,7 +89,9 @@ describe('GroupMappingTab', () => {
       await user.click(screen.getByRole('button', { name: /add manually/i }))
 
       expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/authentication/identity-providers/provider-123/group-mapping/edit?new=1',
+        to: editIdentityProviderGroupMappingRoute.fullPath,
+        params: { providerId: 'provider-123' },
+        search: { new: '1' },
       })
     })
 
@@ -99,7 +102,9 @@ describe('GroupMappingTab', () => {
       await user.click(screen.getByRole('button', { name: /discover groups/i }))
 
       expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/authentication/identity-providers/provider-123/group-mapping/edit?discover=1',
+        to: editIdentityProviderGroupMappingRoute.fullPath,
+        params: { providerId: 'provider-123' },
+        search: { discover: '1' },
       })
     })
   })
@@ -128,7 +133,8 @@ describe('GroupMappingTab', () => {
       await user.click(screen.getByRole('button', { name: /edit group mapping/i }))
 
       expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/authentication/identity-providers/provider-123/group-mapping/edit',
+        to: editIdentityProviderGroupMappingRoute.fullPath,
+        params: { providerId: 'provider-123' },
       })
     })
   })

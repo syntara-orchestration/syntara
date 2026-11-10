@@ -23,6 +23,8 @@ vi.mock('../../../client', () => ({
   credentialsClient: {
     useQuery: vi.fn(() => ({ data: undefined, isPending: false, isError: false, error: null })),
   },
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
 vi.mock('../../access/useAllProjects', () => {
@@ -380,7 +382,10 @@ describe('EditIntegrationForm', () => {
       await user.click(screen.getByRole('button', { name: 'Save integration' }))
 
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith({ to: '/configuration/integrations/int-1' })
+        expect(mockNavigate).toHaveBeenCalledWith({
+          to: '/configuration/integrations/$integrationId',
+          params: { integrationId: 'int-1' },
+        })
       })
     })
 
@@ -494,7 +499,10 @@ describe('EditIntegrationForm', () => {
 
       await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
-      expect(mockNavigate).toHaveBeenCalledWith({ to: '/configuration/integrations/int-1' })
+      expect(mockNavigate).toHaveBeenCalledWith({
+        to: '/configuration/integrations/$integrationId',
+        params: { integrationId: 'int-1' },
+      })
     })
   })
 

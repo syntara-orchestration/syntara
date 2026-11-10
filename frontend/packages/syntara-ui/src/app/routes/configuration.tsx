@@ -25,7 +25,7 @@ export const credentialDetailRoute = createRoute({
   component: makeRouteComponent(<CredentialDetail />),
 })
 
-export const credentialDetailsIndexRoute = createRoute({
+const credentialDetailsIndexRoute = createRoute({
   getParentRoute: () => credentialDetailRoute,
   path: '/',
   component: makeRouteComponent(<CredentialDetailsTabRoute />),
@@ -49,7 +49,7 @@ export const credentialIntegrationsRoute = createRoute({
   component: makeRouteComponent(<CredentialIntegrationsTabRoute />),
 })
 
-export const credentialUnknownTabRoute = createRoute({
+const credentialUnknownTabRoute = createRoute({
   getParentRoute: () => credentialDetailRoute,
   path: '$tab',
   beforeLoad: ({ params }) =>

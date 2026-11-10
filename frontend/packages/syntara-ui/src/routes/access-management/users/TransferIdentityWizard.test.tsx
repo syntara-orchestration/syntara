@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { usersClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 import { routerTestState } from '../../../test/setup'
@@ -44,16 +45,24 @@ vi.mock('@tanstack/react-router', async () => {
     ...actual,
     Link: ({
       to,
+      params,
       children,
       className,
       style,
       ...rest
     }: {
       to: string
+      params?: Record<string, string | number>
       children: React.ReactNode
       className?: string
       style?: React.CSSProperties
-    }) => React.createElement('a', { href: String(to), className, style, ...rest }, children),
+    }) => {
+      const href = Object.entries(params ?? {}).reduce(
+        (path, [key, value]) => path.replaceAll(`$${key}`, encodeURIComponent(String(value))),
+        to
+      )
+      return React.createElement('a', { href, className, style, ...rest }, children)
+    },
     useParams: vi.fn(() => ({ userId: 'target-user' })),
     useNavigate: () => routerTestState.navigate,
     useRouterState: (opts?: { select?: (s: { location: { pathname: string; searchStr: string } }) => unknown }) => {
@@ -441,7 +450,8 @@ describe('TransferIdentityWizard', () => {
       await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
       expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/access-management/users/target-user/identities',
+        to: routeRefs.userDetailIdentitiesRoute.fullPath,
+        params: { userId: 'target-user' },
       })
     })
 
@@ -451,7 +461,8 @@ describe('TransferIdentityWizard', () => {
       await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
       expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/access-management/users/target-user/identities',
+        to: routeRefs.userDetailIdentitiesRoute.fullPath,
+        params: { userId: 'target-user' },
       })
     })
 
@@ -495,7 +506,8 @@ describe('TransferIdentityWizard', () => {
 
       await waitFor(() => {
         expect(routerTestState.navigate).toHaveBeenCalledWith({
-          to: '/system-administration/access-management/users/target-user/identities',
+          to: routeRefs.userDetailIdentitiesRoute.fullPath,
+          params: { userId: 'target-user' },
         })
       })
     })

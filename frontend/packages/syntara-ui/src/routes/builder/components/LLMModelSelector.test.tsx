@@ -32,7 +32,9 @@ vi.mock('../../../components/labels/SynLabel', () => ({
 }))
 
 vi.mock('../../../components/SynLink', () => ({
-  SynLink: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
+  SynLink: ({ options, children }: { options: { to: string }; children: React.ReactNode }) => (
+    <a href={options.to}>{children}</a>
+  ),
 }))
 
 vi.mock('../../configuration/integrations/useIntegrationPermissions', () => ({

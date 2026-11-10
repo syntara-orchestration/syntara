@@ -14,6 +14,8 @@ vi.mock('../../../client', () => ({
   integrationsClient: {
     useMutation: vi.fn(),
   },
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
 type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']

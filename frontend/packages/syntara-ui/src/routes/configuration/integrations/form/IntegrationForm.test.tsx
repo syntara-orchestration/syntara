@@ -37,11 +37,19 @@ vi.mock('../../../../client', () => ({
   credentialsClient: {
     useQuery: vi.fn(() => ({ data: { results: [] }, isLoading: false, error: null, refetch: vi.fn() })),
   },
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
-vi.mock('../../../../app/tanstackRouter', () => ({
-  tanstackRouter: { navigate: vi.fn().mockResolvedValue(undefined) },
-}))
+vi.mock('../../../../app/tanstackRouter', async () => {
+  const actual = await vi.importActual<typeof import('../../../../app/tanstackRouter')>(
+    '../../../../app/tanstackRouter'
+  )
+  return {
+    ...actual,
+    tanstackRouter: { ...actual.tanstackRouter, navigate: vi.fn().mockResolvedValue(undefined) },
+  }
+})
 
 vi.mock('../../../access/useAllProjects', () => {
   const projectsMock = vi.fn(() => ({ projects: [], isLoading: false, error: null, refetch: vi.fn() }))

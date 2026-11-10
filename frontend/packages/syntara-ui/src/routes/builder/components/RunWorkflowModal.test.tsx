@@ -43,6 +43,8 @@ vi.mock('../../../client', () => ({
   executionsClient: {
     useQuery: (...args: unknown[]) => mockUseQuery(...args),
   },
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
 function renderModal(overrides: Partial<React.ComponentProps<typeof RunWorkflowModal>> = {}) {

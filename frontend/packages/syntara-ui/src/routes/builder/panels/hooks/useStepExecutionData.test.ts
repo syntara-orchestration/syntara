@@ -9,6 +9,8 @@ vi.mock('../../../../client', () => ({
   executionsClient: {
     useQuery: (...args: unknown[]) => mockUseQuery(...args),
   },
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
 const mockUpstreamNodes = vi.fn<(...args: unknown[]) => { id: string; name: string; type: string }[]>()

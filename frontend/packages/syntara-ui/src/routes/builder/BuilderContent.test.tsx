@@ -6,6 +6,7 @@ import { ReactFlowProvider } from '@xyflow/react'
 import type { ComponentProps, ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import { approvalsClient, executionsClient, workflowClient, workflowFetchClient } from '../../client'
 import * as useCursorPaginationModule from '../../hooks/useCursorPagination'
 import { AlertProvider } from '../../providers/alerts'
@@ -821,7 +822,11 @@ describe('BuilderContent', () => {
 
       await waitFor(() => {
         expect(mockExecuteMutate).toHaveBeenCalled()
-        expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/executions/exec-123?history=closed' })
+        expect(routerTestState.navigate).toHaveBeenCalledWith({
+          to: routeRefs.executionDetailRoute.fullPath,
+          params: { executionId: 'exec-123' },
+          search: { history: 'closed' },
+        })
       })
     })
 
@@ -1209,7 +1214,11 @@ describe('BuilderContent', () => {
       expect(row).toBeInTheDocument()
       await user.click(row)
       await waitFor(() => {
-        expect(mockRequestNavigation).toHaveBeenCalledWith('/executions/exec-1?history=open')
+        expect(mockRequestNavigation).toHaveBeenCalledWith({
+          to: routeRefs.executionDetailRoute.fullPath,
+          params: { executionId: 'exec-1' },
+          search: { history: 'open' },
+        })
       })
     })
   })
@@ -2546,7 +2555,11 @@ describe('BuilderContent', () => {
 
       await waitFor(() => {
         expect(mockExecuteMutate).toHaveBeenCalled()
-        expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/executions/execution-123?history=closed' })
+        expect(routerTestState.navigate).toHaveBeenCalledWith({
+          to: routeRefs.executionDetailRoute.fullPath,
+          params: { executionId: 'execution-123' },
+          search: { history: 'closed' },
+        })
       })
     })
   })
@@ -3334,7 +3347,10 @@ describe('BuilderContent', () => {
       })
 
       await waitFor(() => {
-        expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/workflow-builder/duplicated-wf-id' })
+        expect(routerTestState.navigate).toHaveBeenCalledWith({
+          to: routeRefs.builderEditRoute.fullPath,
+          params: { workflowId: 'duplicated-wf-id' },
+        })
       })
     })
 

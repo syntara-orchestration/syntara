@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import { adminClient, authFetchClient } from '../../client'
 import { AlertProvider } from '../../providers/alerts'
 import { routerTestState, mockUseSearch } from '../../test/setup'
@@ -694,7 +695,8 @@ describe('UsersTab Component', () => {
       await user.click(editOption)
 
       expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/access-management/users/u2/edit',
+        to: routeRefs.editUserRoute.fullPath,
+        params: { userId: 'u2' },
       })
     })
 

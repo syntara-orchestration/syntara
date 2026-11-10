@@ -22,7 +22,19 @@ vi.mock('../../components/WorkflowName', () => ({
   WorkflowName: ({ workflowId }: { workflowId: string }) => <span>{workflowId}</span>,
 }))
 vi.mock('../../components/SynLink', () => ({
-  SynLink: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
+  SynLink: ({
+    options,
+    children,
+  }: {
+    options: { to: string; params?: Record<string, string> }
+    children: React.ReactNode
+  }) => {
+    const href = Object.entries(options.params ?? {}).reduce(
+      (path, [key, value]) => path.replaceAll(`$${key}`, encodeURIComponent(value)),
+      options.to
+    )
+    return <a href={href}>{children}</a>
+  },
 }))
 
 vi.mock('../../hooks/useCanI', () => ({

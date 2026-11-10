@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
+import * as routeRefs from '../../app/routes/routeReferences'
 import { executionsFetchClient, workflowClient, workflowFetchClient } from '../../client'
 import { AlertProvider } from '../../providers/alerts'
 import { ColorSchemeProvider } from '../../providers/theme/ColorSchemeProvider'
@@ -1327,7 +1328,8 @@ describe('Workflows Component', () => {
 
       await waitFor(() => {
         expect(routerTestState.navigate).toHaveBeenCalledWith({
-          to: '/executions/exec-123',
+          to: routeRefs.executionDetailRoute.fullPath,
+          params: { executionId: 'exec-123' },
         })
       })
     })

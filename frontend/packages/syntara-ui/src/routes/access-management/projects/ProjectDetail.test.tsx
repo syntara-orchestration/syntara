@@ -54,10 +54,8 @@ vi.mock('../../../hooks/routing/useLocation', () => ({
   useLocation: () => '/system-administration/access-management/projects/proj-1/details',
 }))
 
-const mockGoToTab = vi.fn()
 let mockActiveTab = 'details'
 let mockPathname = '/system-administration/access-management/projects/proj-1/details'
-const mockDetailTab = vi.fn(() => [mockActiveTab, mockGoToTab] as const)
 
 function setMockActiveTab(tab: string) {
   mockActiveTab = tab
@@ -72,7 +70,7 @@ function ProjectDetailTestOutlet() {
 }
 
 vi.mock('../../../hooks/useUrlTab', () => ({
-  useUrlTab: () => mockDetailTab(),
+  useUrlTab: () => mockActiveTab,
 }))
 
 vi.mock('./ProjectRoleAssignmentsTab', () => ({
@@ -422,7 +420,10 @@ describe('ProjectDetail', () => {
 
     await user.click(await screen.findByRole('tab', { name: 'Workflows' }))
 
-    expect(mockGoToTab).toHaveBeenCalledWith('workflows')
+    expect(routerTestState.navigate).toHaveBeenCalledWith({
+      to: '/system-administration/access-management/projects/$projectId/workflows',
+      params: { projectId: 'proj-1' },
+    })
   })
 
   it('handles refetch rejection gracefully in onRetry callback', async () => {

@@ -1,3 +1,7 @@
+// Route metadata such as `fullPath` is assigned when TanStack initializes the route tree.
+// Ensure the shared references are read after that initialization.
+import '../tanstackRouter'
+
 export { accessManagementRoute } from './access-management'
 export { accessManagementAssignmentsRoute } from './access-management'
 export { accessManagementCheckAccessRoute } from './access-management'
@@ -14,13 +18,11 @@ export {
   groupDetailMembersRoute,
   groupDetailRoute,
   groupDetailRolesRoute,
-  groupDetailUnknownTabRoute,
 } from './access-management'
 export {
   projectDetailDetailsRoute,
   projectDetailRoleAssignmentsRoute,
   projectDetailRoute,
-  projectDetailUnknownTabRoute,
   projectDetailWorkflowsRoute,
 } from './access-management'
 export {
@@ -38,7 +40,6 @@ export {
   userDetailPermissionsRoute,
   userDetailRolesRoute,
   userDetailRoute,
-  userDetailUnknownTabRoute,
 } from './access-management'
 export { approvalsRoute } from './approvals'
 export {
@@ -58,7 +59,6 @@ export {
   credentialDetailRoute,
   credentialDetailsRoute,
   credentialIntegrationsRoute,
-  credentialUnknownTabRoute,
   credentialWorkflowsRoute,
   credentialsRoute,
   editIntegrationRoute,

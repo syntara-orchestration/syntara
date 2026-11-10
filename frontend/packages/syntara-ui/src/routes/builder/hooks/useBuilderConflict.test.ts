@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import type { ConflictAction, ConflictInfo } from '../VersionConflictDialog'
 
@@ -320,7 +321,10 @@ describe('useBuilderConflict', () => {
         description: 'Description',
         project_id: 'proj-1',
       })
-      expect(params.setLocation).toHaveBeenCalledWith('/workflow-builder/new-id')
+      expect(params.setLocation).toHaveBeenCalledWith({
+        to: routeRefs.builderEditRoute.fullPath,
+        params: { workflowId: 'new-id' },
+      })
       expect(result.current.conflictDialogProps.isOpen).toBe(false)
     })
 
@@ -337,7 +341,11 @@ describe('useBuilderConflict', () => {
       expect(mockExecutionsFetchClientPOST).toHaveBeenCalledWith('/executions', {
         body: { workflow_id: 'new-id', input_data: {}, trigger_node_id: '' },
       })
-      expect(params.setLocation).toHaveBeenCalledWith('/executions/exec-1?history=closed')
+      expect(params.setLocation).toHaveBeenCalledWith({
+        to: routeRefs.executionDetailRoute.fullPath,
+        params: { executionId: 'exec-1' },
+        search: { history: 'closed' },
+      })
     })
 
     it('creates workflow, publishes it, and navigates to builder (publish)', async () => {
@@ -357,7 +365,10 @@ describe('useBuilderConflict', () => {
           body: { name: null, change_description: null },
         })
       )
-      expect(params.setLocation).toHaveBeenCalledWith('/workflow-builder/new-id')
+      expect(params.setLocation).toHaveBeenCalledWith({
+        to: routeRefs.builderEditRoute.fullPath,
+        params: { workflowId: 'new-id' },
+      })
     })
 
     it('shows error and does not navigate when create fails', async () => {
@@ -401,7 +412,10 @@ describe('useBuilderConflict', () => {
         title: 'Run failed',
         description: 'Workflow duplicated but failed to run',
       })
-      expect(params.setLocation).toHaveBeenCalledWith('/workflow-builder/new-id')
+      expect(params.setLocation).toHaveBeenCalledWith({
+        to: routeRefs.builderEditRoute.fullPath,
+        params: { workflowId: 'new-id' },
+      })
     })
   })
 

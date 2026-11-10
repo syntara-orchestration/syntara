@@ -115,7 +115,7 @@ export const userDetailRoute = createRoute({
   component: makeRouteComponent(<UserDetail />),
 })
 
-export const userDetailIndexRoute = createRoute({
+const userDetailIndexRoute = createRoute({
   getParentRoute: () => userDetailRoute,
   path: '/',
   component: makeRouteComponent(<UserDetailTabRoute />),
@@ -167,7 +167,7 @@ export const groupDetailRoute = createRoute({
   component: makeRouteComponent(<GroupDetail />),
 })
 
-export const groupDetailIndexRoute = createRoute({
+const groupDetailIndexRoute = createRoute({
   getParentRoute: () => groupDetailRoute,
   path: '/',
   component: makeRouteComponent(<GroupDetailDetailsTabRoute />),
@@ -187,7 +187,7 @@ export const groupDetailRolesRoute = createRoute({
   path: '/roles',
   component: makeRouteComponent(<GroupDetailAssignmentsTabRoute />),
 })
-export const groupDetailUnknownTabRoute = createRoute({
+const groupDetailUnknownTabRoute = createRoute({
   getParentRoute: () => groupDetailRoute,
   path: '/$tab',
   component: makeRouteComponent(<GroupDetailUnknownTabRoute />),
@@ -207,7 +207,7 @@ export const projectDetailRoute = createRoute({
   component: makeRouteComponent(<ProjectDetail />),
 })
 
-export const projectDetailIndexRoute = createRoute({
+const projectDetailIndexRoute = createRoute({
   getParentRoute: () => projectDetailRoute,
   path: '/',
   component: makeRouteComponent(<ProjectDetailDetailsTabRoute />),
@@ -227,7 +227,7 @@ export const projectDetailRoleAssignmentsRoute = createRoute({
   path: '/role-assignments',
   component: makeRouteComponent(<ProjectDetailAssignmentsTabRoute />),
 })
-export const projectDetailUnknownTabRoute = createRoute({
+const projectDetailUnknownTabRoute = createRoute({
   getParentRoute: () => projectDetailRoute,
   path: '/$tab',
   component: makeRouteComponent(<ProjectDetailUnknownTabRoute />),
@@ -247,7 +247,7 @@ export const serviceAccountDetailRoute = createRoute({
   component: makeRouteComponent(<ServiceAccountDetail />),
 })
 
-export const serviceAccountDetailIndexRoute = createRoute({
+const serviceAccountDetailIndexRoute = createRoute({
   getParentRoute: () => serviceAccountDetailRoute,
   path: '/',
   component: makeRouteComponent(<ServiceAccountDetailDetailsTabRoute />),
@@ -281,7 +281,7 @@ const serviceAccountDetailTabRoutes = [
   serviceAccountDetailUnknownTabRoute,
 ]
 
-export const userDetailUnknownTabRoute = createRoute({
+const userDetailUnknownTabRoute = createRoute({
   getParentRoute: () => userDetailRoute,
   path: '$tab',
   beforeLoad: ({ params }) =>

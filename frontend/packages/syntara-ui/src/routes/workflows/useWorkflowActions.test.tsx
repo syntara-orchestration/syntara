@@ -87,6 +87,8 @@ vi.mock('../../client', () => ({
       }
     }),
   },
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
 function createWrapper() {
@@ -300,7 +302,10 @@ describe('useWorkflowActions', () => {
           use_published: true,
         },
       })
-      expect(mockOnNavigate).toHaveBeenCalledWith('/executions/exec-1')
+      expect(mockOnNavigate).toHaveBeenCalledWith({
+        to: '/executions/$executionId',
+        params: { executionId: 'exec-1' },
+      })
       expect(workflowFetchClient.GET).not.toHaveBeenCalled()
     })
 

@@ -15,6 +15,26 @@ if (Modal.defaultProps) {
 }
 
 const listeners = new Set<() => void>()
+
+type MockLocationOptions = {
+  to: string
+  params?: Record<string, string | number>
+  search?: Record<string, string | number | boolean | null | undefined>
+}
+
+function buildMockHref({ to, params, search }: MockLocationOptions) {
+  const pathname = Object.entries(params ?? {}).reduce(
+    (path, [key, value]) => path.replaceAll(`$${key}`, encodeURIComponent(String(value))),
+    to
+  )
+  const query = new URLSearchParams()
+  Object.entries(search ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) query.set(key, String(value))
+  })
+  const searchString = query.toString()
+  return searchString ? `${pathname}?${searchString}` : pathname
+}
+
 function notifyListeners() {
   listeners.forEach((l) => l())
 }
@@ -34,21 +54,20 @@ export const mockUseSearch = vi.fn(() => ({}))
 export function MockLink({
   to,
   params,
+  search,
   children,
   className,
   style,
   ...rest
 }: {
   to: string
-  params?: Record<string, string>
+  params?: Record<string, string | number>
+  search?: Record<string, string | number | boolean | null | undefined>
   children: React.ReactNode
   className?: string
   style?: React.CSSProperties
 }) {
-  const href = Object.entries(params ?? {}).reduce(
-    (path, [key, value]) => path.replaceAll(`$${key}`, encodeURIComponent(value)),
-    String(to)
-  )
+  const href = buildMockHref({ to, params, search })
   return React.createElement('a', { href, className, style, ...rest }, children)
 }
 
@@ -57,8 +76,8 @@ export const routerTestState = {
   searchStr: '',
   navigate: vi.fn((...args: unknown[]) => {
     const arg = args[0]
-    if (arg && typeof arg === 'object' && 'to' in arg) {
-      applyUrlUpdate(String((arg as { to: string }).to))
+    if (arg && typeof arg === 'object' && 'to' in arg && typeof arg.to === 'string') {
+      applyUrlUpdate(buildMockHref(arg as MockLocationOptions))
     }
     return Promise.resolve()
   }),
@@ -88,12 +107,7 @@ vi.mock('@tanstack/react-router', async () => {
     useRouter: () => ({
       history: { push: routerTestState.historyPush },
       state: { location: { pathname: routerTestState.pathname, searchStr: routerTestState.searchStr } },
-      buildLocation: ({ to, params }: { to: string; params?: Record<string, string> }) => ({
-        href: Object.entries(params ?? {}).reduce(
-          (path, [key, value]) => path.replaceAll(`$${key}`, encodeURIComponent(value)),
-          to
-        ),
-      }),
+      buildLocation: (options: MockLocationOptions) => ({ href: buildMockHref(options) }),
     }),
     useBlocker: () => ({ status: 'idle' }),
     useParams: vi.fn(() => ({})),

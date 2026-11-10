@@ -15,6 +15,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { credentialsClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 import { accessFetchClient } from '../../access/accessClient'
@@ -569,7 +570,12 @@ describe('CredentialDetail', () => {
 
     await user.click(await screen.findByRole('tab', { name: /Workflows/ }))
 
-    expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/configuration/credentials/1/workflows' }))
+    expect(mockNavigate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: routeRefs.credentialWorkflowsRoute.fullPath,
+        params: { credentialId: '1' },
+      })
+    )
   })
 
   it('calls patch mutation to enable credential', async () => {

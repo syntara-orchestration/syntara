@@ -579,7 +579,8 @@ describe('GroupDetail', () => {
       await user.click(screen.getByRole('tab', { name: /Members/i }))
 
       expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: `/system-administration/access-management/groups/${VALID_GROUP_ID}/members`,
+        to: '/system-administration/access-management/groups/$groupId/members',
+        params: { groupId: VALID_GROUP_ID },
       })
     })
 
@@ -590,7 +591,8 @@ describe('GroupDetail', () => {
       await user.click(screen.getByRole('tab', { name: /Assignments/i }))
 
       expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: `/system-administration/access-management/groups/${VALID_GROUP_ID}/roles`,
+        to: '/system-administration/access-management/groups/$groupId/roles',
+        params: { groupId: VALID_GROUP_ID },
       })
     })
 

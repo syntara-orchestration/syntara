@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { identityProviderGroupMappingRoute } from '../../../../app/routes/authentication'
 import { identityProvidersClient } from '../../../../client'
 import { routerTestState } from '../../../../test/setup'
 import { useAllGroups } from '../../../access/useAllGroups'
@@ -340,7 +341,8 @@ describe('useGroupMappingEditForm', () => {
     })
     expect(mockShowSuccess).toHaveBeenCalledWith(expect.objectContaining({ title: 'Group mapping saved' }))
     expect(routerTestState.navigate).toHaveBeenCalledWith({
-      to: `/system-administration/authentication/identity-providers/${VALID_PROVIDER_ID}/group-mapping`,
+      to: identityProviderGroupMappingRoute.fullPath,
+      params: { providerId: VALID_PROVIDER_ID },
     })
   })
 
@@ -362,7 +364,8 @@ describe('useGroupMappingEditForm', () => {
     })
 
     expect(routerTestState.navigate).toHaveBeenCalledWith({
-      to: `/system-administration/authentication/identity-providers/${VALID_PROVIDER_ID}/group-mapping`,
+      to: identityProviderGroupMappingRoute.fullPath,
+      params: { providerId: VALID_PROVIDER_ID },
     })
   })
 

@@ -2,6 +2,7 @@ import { ActivityTypeEnum, type Activity } from '@syntara/contracts'
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, type MockedFunction } from 'vitest'
 
+import * as routeRefs from '../../../app/routes/routeReferences'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { expectStringContaining } from '../../../test/test-helpers'
@@ -238,7 +239,11 @@ describe('useBuilderToolbarHandlers', () => {
     expect(options?.onError).toEqual(expect.any(Function))
     expect(showSuccess).not.toHaveBeenCalled()
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CONFIRM_DIALOG', payload: false })
-    expect(setLocation).toHaveBeenCalledWith('/executions/exec-99?history=closed')
+    expect(setLocation).toHaveBeenCalledWith({
+      to: routeRefs.executionDetailRoute.fullPath,
+      params: { executionId: 'exec-99' },
+      search: { history: 'closed' },
+    })
   })
 
   it('handleRunWorkflow shows error on failure', async () => {
@@ -379,7 +384,7 @@ describe('useBuilderToolbarHandlers', () => {
       title: 'Workflow deleted',
       description: 'Workflow "My workflow" has been deleted.',
     })
-    expect(setLocation).toHaveBeenCalledWith('/workflows')
+    expect(setLocation).toHaveBeenCalledWith({ to: routeRefs.workflowsRoute.fullPath })
   })
 
   it('handleToggleDetails dispatches and clears node selection when opening', () => {

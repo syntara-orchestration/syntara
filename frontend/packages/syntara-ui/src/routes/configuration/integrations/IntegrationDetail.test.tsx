@@ -21,6 +21,8 @@ vi.mock('../../../client', () => ({
   credentialsClient: {
     useQuery: vi.fn(),
   },
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
 const mockUseAllIntegrationTools = vi.fn()
@@ -50,13 +52,10 @@ const mockNavigate = vi.fn()
 
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router')
+  const { MockLink } = await import('../../../test/setup')
   return {
     ...actual,
-    Link: ({ to, children, ...rest }: { to: string; children: ReactNode }) => (
-      <a href={String(to)} {...rest}>
-        {children}
-      </a>
-    ),
+    Link: MockLink,
     useNavigate: () => mockNavigate,
     useParams: vi.fn(() => ({ integrationId: 'int-1' })),
     useRouterState: (opts?: { select?: (s: { location: { pathname: string; searchStr: string } }) => unknown }) => {
@@ -86,7 +85,7 @@ vi.mock('./IntegrationResourcesTab', () => ({
 let mockActiveTab = 'details'
 
 vi.mock('../../../hooks/useUrlTab', () => ({
-  useUrlTab: (): [string, (tab: string) => void] => [mockActiveTab, vi.fn()],
+  useUrlTab: (): string => mockActiveTab,
 }))
 
 const mockRegisterDirtyCheck: ReturnType<typeof vi.fn<(opts: Record<string, unknown>) => () => void>> = vi.fn(
@@ -502,7 +501,10 @@ describe('IntegrationDetail', () => {
 
       await user.click(screen.getByRole('button', { name: 'Edit integration' }))
 
-      expect(mockNavigate).toHaveBeenCalledWith({ to: '/configuration/integrations/int-1/edit' })
+      expect(mockNavigate).toHaveBeenCalledWith({
+        to: '/configuration/integrations/$integrationId/edit',
+        params: { integrationId: 'int-1' },
+      })
     })
 
     it('shows kebab menu', () => {
