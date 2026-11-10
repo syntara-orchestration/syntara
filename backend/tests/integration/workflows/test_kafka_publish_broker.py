@@ -13,6 +13,7 @@ from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import ActivityEnvironment
 from testcontainers.community.kafka import KafkaContainer
+from testcontainers.core.container import ExecConfig
 
 from syntara.core.config.base import get_settings
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
@@ -22,11 +23,25 @@ from syntara.workflows.workflow_engine.constants import ENGINE_TIMEOUT_SECONDS_K
 from syntara.workflows.workflow_engine.services.kafka_publish_pool import KafkaPublishPool, set_kafka_publish_pool
 
 
+class _AtomicKafkaContainer(KafkaContainer):
+    """Expose the startup script only after the Docker archive upload finishes."""
+
+    def create_file(self, content: bytes, path: str) -> None:
+        # KafkaContainer waits for file existence, not upload completion. A
+        # partially uploaded (even empty) script can otherwise exit successfully.
+        staging_path = f"{path}.pending"
+        super().create_file(content, staging_path)
+        result = self.exec(ExecConfig(command=["mv", staging_path, path], user="root"))
+        if result.exit_code != 0:
+            msg = "Unable to publish the complete Kafka startup script"
+            raise RuntimeError(msg)
+
+
 @pytest.fixture(scope="module")
 def kafka_broker() -> Generator[str]:
     """Use an isolated KRaft broker with implicit topic creation disabled."""
     with (
-        KafkaContainer("confluentinc/cp-kafka:7.8.0")
+        _AtomicKafkaContainer("confluentinc/cp-kafka:7.8.0")
         .with_kraft()
         .with_env("KAFKA_AUTO_CREATE_TOPICS_ENABLE", "false") as broker
     ):
