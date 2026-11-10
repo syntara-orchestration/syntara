@@ -1,12 +1,15 @@
 """Supported CloudEvents context attributes, independent of transport and data."""
 
 import re
+from collections.abc import Mapping
 from typing import ClassVar, Literal
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, JsonValue, ValidationError, field_validator
 from rfc3339_validator import validate_rfc3339  # type: ignore[import-untyped]
 from rfc3986_validator import validate_rfc3986  # type: ignore[import-untyped]
 from sqlmodel import SQLModel
+
+from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCode
 
 _ATTRIBUTE_NAME = re.compile(r"[a-z0-9]+")
 _FORBIDDEN_STRING_CHARACTERS = re.compile("[\x00-\x1f\x7f-\x9f\ud800-\udfff\ufdd0-\ufdef]")
@@ -87,3 +90,51 @@ class CloudEventAttributes(SQLModel):
                 raise ValueError(msg)
             validate_attribute_string(text)
         return value
+
+
+_REQUIRED_ATTRIBUTES = frozenset({"specversion", "id", "source", "type"})
+_STANDARD_ATTRIBUTES = frozenset(CloudEventAttributes.model_fields) - {"extensions"}
+_MIN_EXTENSION_INTEGER = -(2**31)
+_MAX_EXTENSION_INTEGER = 2**31 - 1
+
+
+def _canonical_extension(value: JsonValue) -> str:
+    """Normalize supported extension types to the binary binding's string form."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int) and _MIN_EXTENSION_INTEGER <= value <= _MAX_EXTENSION_INTEGER:
+        return str(value)
+    msg = "CloudEvents extensions require a string, Boolean, or signed 32-bit integer."
+    raise ValueError(msg)
+
+
+def normalize_cloudevents(attributes: Mapping[str, JsonValue]) -> CloudEventAttributes | EventDecodeFailure:
+    """Validate attributes from either binding without inferring event data.
+
+    JSON null attributes are unset. Both modes share required/optional attribute
+    validation and extension names; binary strings retain their exact values.
+    """
+    if any(not isinstance(attributes.get(name), str) or not attributes[name] for name in _REQUIRED_ATTRIBUTES):
+        return EventDecodeFailure(code=EventFailureCode.malformed_cloudevents)
+    try:
+        version = attributes["specversion"]
+        if not isinstance(version, str):
+            return EventDecodeFailure(code=EventFailureCode.malformed_cloudevents)
+        validate_attribute_string(version)
+        if version != "1.0":
+            return EventDecodeFailure(code=EventFailureCode.unsupported_cloudevents_version)
+        standard = {
+            name: value for name, value in attributes.items() if name in _STANDARD_ATTRIBUTES and value is not None
+        }
+        extensions = {
+            name: _canonical_extension(value)
+            for name, value in attributes.items()
+            if name not in _STANDARD_ATTRIBUTES and value is not None
+        }
+        return CloudEventAttributes.model_validate({**standard, "extensions": extensions})
+    except ValidationError:
+        return EventDecodeFailure(code=EventFailureCode.malformed_cloudevents)
+    except ValueError:
+        return EventDecodeFailure(code=EventFailureCode.malformed_cloudevents)

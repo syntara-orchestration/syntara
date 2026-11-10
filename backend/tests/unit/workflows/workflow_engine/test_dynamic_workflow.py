@@ -10,6 +10,7 @@ All tests mock Temporal's workflow module to avoid needing a running server.
 """
 
 import asyncio
+import json
 from collections.abc import Generator
 from datetime import UTC, datetime
 from typing import Any
@@ -78,7 +79,8 @@ def _make_workflow(
 
 
 @pytest.mark.parametrize("mapped", [False, True])
-async def test_decoded_cloudevents_reach_successor_inputs(*, mapped: bool) -> None:
+@pytest.mark.parametrize("structured", [False, True])
+async def test_decoded_cloudevents_reach_successor_inputs(*, mapped: bool, structured: bool) -> None:
     """Exercise decoding, trigger output mapping, registration, and successor resolution."""
     record = RawEvent(
         value=b'{"orderId":123}',
@@ -101,6 +103,16 @@ async def test_decoded_cloudevents_reach_successor_inputs(*, mapped: bool) -> No
             offset="1",
         ),
     )
+    if structured:
+        attributes = {
+            header.name.removeprefix("ce_"): header.value.decode() for header in record.headers if header.value
+        }
+        record = record.model_copy(
+            update={
+                "value": json.dumps({**attributes, "data": {"orderId": 123}}).encode(),
+                "headers": (RawEventHeader(name="content-type", value=b"application/cloudevents+json"),),
+            }
+        )
     result = JsonEventDecoder().decode(record)
     assert isinstance(result, EventDecodeSuccess)
     envelope = result.envelope.model_dump(mode="json")

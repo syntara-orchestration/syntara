@@ -123,6 +123,45 @@ def test_optional_schema_supported(definition: dict[str, Any], input_schema: dic
     WorkflowValidator().validate_workflow_definition(definition)
 
 
+@pytest.mark.parametrize("structured", [False, True])
+async def test_cloudevents_definition_decode_and_output_mapping(
+    definition: dict[str, Any], *, structured: bool
+) -> None:
+    WorkflowValidator().validate_workflow_definition(definition)
+    config = validate_event_subscribe_parameters(definition["triggers"][0]["parameters"])
+    attributes = {"specversion": "1.0", "id": "event-1", "source": "/alerts", "type": "alert.created"}
+    headers = [RawEventHeader(name="routing", value=b"route-1")]
+    if structured:
+        value = json.dumps({**attributes, "data": {"count": 2}}).encode()
+        headers.append(RawEventHeader(name="content-type", value=b"application/cloudevents+json"))
+    else:
+        value = b'{"count":2}'
+        headers.extend(RawEventHeader(name="ce_" + name, value=item.encode()) for name, item in attributes.items())
+    source = RawEvent(
+        value=value,
+        key=b"key-1",
+        headers=tuple(headers),
+        source_metadata=KafkaSourceMetadata(
+            integration_id=config.integration_id,
+            subscription_id=uuid4(),
+            source_generation=1,
+            received_at=datetime.now(UTC),
+            topic=config.topic,
+            partition=0,
+            offset="1",
+        ),
+    )
+    decoded = JsonEventDecoder().decode(source, schema=config.input_schema)
+    assert isinstance(decoded, EventDecodeSuccess)
+    envelope = json.loads(encode_envelope(decoded.envelope))
+    output = await event_subscribe_trigger(
+        envelope, {"count": "${result.payload.count}", "eventType": "${result.cloudevents.type}"}
+    )
+    assert output == {"output": {"count": 2, "eventType": "alert.created"}}
+    assert envelope["original"]["key_base64"] == "a2V5LTE="
+    assert envelope["original"]["headers"][0] == {"name": "routing", "value_base64": "cm91dGUtMQ=="}
+
+
 async def test_cloudevents_definition_to_envelope_output_mapping(definition: dict[str, Any]) -> None:
     definition["triggers"][0]["parameters"]["input_schema"] = {
         "type": "object",
