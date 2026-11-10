@@ -45,7 +45,11 @@ export function useDuplicateWorkflow({ showAlert, showError, setLocation, onSucc
 
         const definition = fullWorkflow.version?.workflow_definition as Record<string, unknown> | undefined
         if (!definition) {
-          showError({ title: 'Failed to duplicate workflow', description: 'Workflow has no definition to duplicate' })
+          showError({
+            title: 'Failed to duplicate workflow',
+            description:
+              'This workflow cannot be duplicated because it has no saved content. Try saving the workflow first.',
+          })
           return
         }
 
@@ -85,7 +89,11 @@ export function useDuplicateWorkflow({ showAlert, showError, setLocation, onSucc
         }
 
         if (!workflow.project_id) {
-          showError({ title: 'Failed to duplicate workflow', description: 'Workflow must have a project ID' })
+          showError({
+            title: 'Failed to duplicate workflow',
+            description:
+              'This workflow cannot be duplicated because it is not associated with a project. Open it from within a project.',
+          })
           return
         }
 
