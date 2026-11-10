@@ -175,13 +175,6 @@ class TemporalAcceptance(DeliveryValue):
     input_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
-class RecoveryReservation(DeliveryValue):
-    """Source-wide evidence hold; never expires merely because its owner stops."""
-
-    source_id: UUID
-    token: UUID
-
-
 class CleanupCandidate(DeliveryValue):
     """Evidence snapshot that must be rechecked after out-of-transaction verification."""
 
@@ -207,18 +200,6 @@ class DeliveryCapacityCheck(Protocol):
 
     async def permits_new_delivery(self) -> bool:
         """Check total retained delivery count with the approved hysteresis."""
-        ...
-
-
-class RecoveryEvidenceReservations(Protocol):
-    """Recovery must commit a reservation before depending on retained evidence."""
-
-    async def reserve_recovery(self, source_id: UUID, *, token: UUID | None = None) -> RecoveryReservation | None:
-        """Reserve source evidence, failing closed when its lifecycle is unavailable."""
-        ...
-
-    async def release_recovery(self, reservation: RecoveryReservation) -> bool:
-        """Release only after boundary changes and dependent recovery have settled."""
         ...
 
 

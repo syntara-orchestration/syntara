@@ -11,16 +11,15 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.config.base import get_settings
 from syntara.eventstreams import consumer_lifecycle as lifecycle
+from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition
 from syntara.eventstreams.consumer_service import EventWorkerManager
-from syntara.eventstreams.core.deduplication import DeliveryState, RecoveryReservation
+from syntara.eventstreams.core.deduplication import DeliveryState
 from syntara.eventstreams.core.placement import WorkerIdentity
 from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.models.delivery import EventDelivery
-from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.services.admission_service import EventAdmissionService
-from syntara.eventstreams.services.delivery_retention_service import EventDeliveryRetentionService
 from syntara.eventstreams.services.placement_service import SubscriptionPlacementService
 from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
@@ -29,7 +28,7 @@ from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow import Workflow
 from tests.helpers.eventstream_runtime import IsolatedSubscriptionRunner
 from tests.integration.eventstreams import test_execution_scheduling
-from tests.integration.eventstreams.conftest import DeliveryContext
+from tests.integration.eventstreams.conftest import DeliveryContext, finish_partition_recovery, hold_partition_recovery
 from tests.integration.eventstreams.test_execution_preparation import envelope
 from tests.integration.eventstreams.test_execution_preparation import service as preparation_service
 
@@ -87,8 +86,7 @@ async def test_reader_tracks_persisted_active_state(delivery_context, state):
 
 async def test_recovery_hold_reader_is_scoped_to_the_process_deployment(delivery_context):
     context = delivery_context
-    retention = EventDeliveryRetentionService(context.session_factory)
-    reservation = await retention.reserve_recovery(context.snapshot.source_id)
+    reservation = await hold_partition_recovery(context)
     assert reservation is not None
     reader = EventSubscriptionReader(context.session_factory, deployment_id=context.snapshot.deployment_id)
     foreign = EventSubscriptionReader(context.session_factory, deployment_id=uuid4())
@@ -96,7 +94,7 @@ async def test_recovery_hold_reader_is_scoped_to_the_process_deployment(delivery
         assert await reader.recovery_holds() == {context.snapshot.source_id}
         assert await foreign.recovery_holds() == set()
     finally:
-        assert await retention.release_recovery(reservation)
+        assert await finish_partition_recovery(context, 0, reservation)
 
 
 async def test_processes_share_one_committed_placement_and_stop_on_hint(delivery_context):
@@ -145,19 +143,16 @@ async def test_processes_share_one_committed_placement_and_stop_on_hint(delivery
         await asyncio.gather(*(manager.stop() for manager in managers))
 
 
-async def _prepare_recovery_state(
-    context: test_execution_scheduling.SchedulingContext, state: str
-) -> tuple[EventDeliveryRetentionService, RecoveryReservation | None]:
+async def _prepare_recovery_state(context: test_execution_scheduling.SchedulingContext, state: str) -> UUID | None:
     if state in {"paused", "unpublished", "retired"}:
         await disable(context.delivery, state)
-    retention = EventDeliveryRetentionService(context.delivery.session_factory)
     reservation = None
     if state == "recovery_hold":
         await disable(context.delivery, "paused")
-        reservation = await retention.reserve_recovery(context.delivery.snapshot.source_id)
+        reservation = await hold_partition_recovery(context.delivery)
         assert reservation is not None
     await context.delivery.expire(context.prepared.claim)
-    return retention, reservation
+    return reservation
 
 
 async def _wait_for_scheduled(context: test_execution_scheduling.SchedulingContext) -> None:
@@ -176,7 +171,7 @@ async def _wait_for_scheduled(context: test_execution_scheduling.SchedulingConte
 )
 async def test_scanner_recovers_independently_of_consumers(scheduling_context, state):
     context = scheduling_context
-    retention, reservation = await _prepare_recovery_state(context, state)
+    reservation = await _prepare_recovery_state(context, state)
     release = asyncio.Event()
     runners = []
 
@@ -231,9 +226,9 @@ async def test_scanner_recovers_independently_of_consumers(scheduling_context, s
             assert execution is not None
             assert execution.execution_metadata["event_delivery"]["scheduling_state"] == "confirmed"
             if reservation is not None:
-                hold = await session.get(EventDeliveryRecoveryHold, reservation.token)
+                hold = await session.get(KafkaPartitionInitialPosition, (context.delivery.snapshot.source_id, 0))
                 assert hold is not None
-                assert hold.released_at is None
+                assert hold.recovery_token == reservation
     finally:
         shutdown.set()
         await process
@@ -241,7 +236,7 @@ async def test_scanner_recovers_independently_of_consumers(scheduling_context, s
         if other is not None:
             await other.heartbeat_worker(other.worker, draining=True)
         if reservation is not None:
-            assert await retention.release_recovery(reservation)
+            assert await finish_partition_recovery(context.delivery, 0, reservation)
 
 
 async def test_shutdown_stops_claims_and_preserves_waiting_preparation(scheduling_context, monkeypatch):

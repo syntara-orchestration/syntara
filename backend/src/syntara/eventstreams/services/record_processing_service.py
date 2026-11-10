@@ -234,7 +234,14 @@ class EventRecordProcessingService:
             )
         if existing is not None and existing.last_error_code == CONTENT_INSPECTION_PENDING and event is None:
             return self._hold(CONTENT_INSPECTION_PENDING)
-        return await self._process_new(snapshot, identity, event, owner_worker_id, admission_guard=admission_guard)
+        return await self._process_new(
+            snapshot,
+            identity,
+            event,
+            owner_worker_id,
+            inspection_pending=existing is not None and existing.last_error_code == CONTENT_INSPECTION_PENDING,
+            admission_guard=admission_guard,
+        )
 
     async def hold_content_failure(
         self,
@@ -281,6 +288,7 @@ class EventRecordProcessingService:
         event: RawEvent | None,
         owner_worker_id: str,
         *,
+        inspection_pending: bool = False,
         admission_guard: Callable[[], bool] | None = None,
     ) -> RecordResult:
         if event is None:
@@ -293,13 +301,18 @@ class EventRecordProcessingService:
             or not self._admission_open(snapshot, admission_guard)
         ):
             return self._hold("admission_closed")
-        decoded = (
-            await self._inspect_content(
+        decoded: EventDecodeSuccess | EventDecodeFailure | RecordResult
+        if inspection_pending:
+            # Retained inspection evidence must settle before fresh preparation.
+            decoded = await self._inspect_content(
                 snapshot, identity, event, owner_worker_id, keep_pending=True, admission_guard=admission_guard
             )
-            if snapshot.filter is None
-            else self.evaluate_filter(snapshot, identity, event)
-        )
+        else:
+            decoded = (
+                self._decoder.decode(event, schema=snapshot.model_dump(mode="json")["input_schema"])
+                if snapshot.filter is None
+                else self.evaluate_filter(snapshot, identity, event)
+            )
         return await self._finish_decoded(snapshot, identity, decoded, owner_worker_id, admission_guard=admission_guard)
 
     async def _finish_decoded(

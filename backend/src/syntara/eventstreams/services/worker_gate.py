@@ -46,6 +46,13 @@ class EventWorkerGate:
         self._blocked.add(snapshot.source_id)
         self.database_failed()
 
+    def recovery_started(self, snapshot: SubscriptionSnapshot) -> None:
+        """Keep transport/repair available; only fresh reconciliation may reopen intake."""
+        self._blocked.add(snapshot.source_id)
+        # A new partition fence must reject older reads even if another partition
+        # already blocked this source. Callers suppress repeated observations.
+        self._generation += 1
+
     def membership_confirmed(self, deadline: float, *, generation: int) -> None:
         """Record a committed heartbeat write without clearing a newer failure."""
         self._membership_until = deadline

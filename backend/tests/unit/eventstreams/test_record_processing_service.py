@@ -149,6 +149,20 @@ async def test_evidence_then_decode_prepare_commit_and_schedule(monkeypatch, *, 
                 "headers": (RawEventHeader(name="content-type", value=b"application/cloudevents+json"),),
             }
         )
+    original_decoder: JsonEventDecoder = service._decoder
+    decoder = MagicMock()
+
+    def decode(
+        value: RawEvent, *, schema: dict[str, object] | None = None
+    ) -> "EventDecodeSuccess | EventDecodeFailure":
+        context.store.acquire.assert_not_awaited()
+        context.store.acquire_inspection.assert_not_awaited()
+        assert EventDelivery not in context.rows
+        context.events.append("decode")
+        return original_decoder.decode(value, schema=schema)
+
+    decoder.decode.side_effect = decode
+    service._decoder = decoder
 
     async def lookup(_identity) -> None:
         context.events.append("lookup")
@@ -162,7 +176,14 @@ async def test_evidence_then_decode_prepare_commit_and_schedule(monkeypatch, *, 
     context.store.lookup_terminal.side_effect = lookup
     admission.schedule.side_effect = schedule
     assert isinstance(await service.process(context.snapshot, context.identity, event, "worker"), ResolvedDelivery)
-    assert context.events.index("lookup") < context.events.index("acquire") < context.events.index("freeze")
+    assert (
+        context.events.index("lookup")
+        < context.events.index("decode")
+        < context.events.index("acquire")
+        < context.events.index("freeze")
+    )
+    context.store.acquire_inspection.assert_not_awaited()
+    context.store.finish_inspection.assert_not_awaited()
     assert context.events[-2:] == ["commit", "schedule"]
     if structured:
         execution = context.rows[Execution]
@@ -170,7 +191,7 @@ async def test_evidence_then_decode_prepare_commit_and_schedule(monkeypatch, *, 
         assert execution.input_data["cloudevents"]["id"] == "event-1"
 
 
-@pytest.mark.parametrize("stage", ["lookup", "eligibility", "inspection"])
+@pytest.mark.parametrize("stage", ["lookup", "eligibility", "decode"])
 async def test_placement_loss_during_slow_processing_never_opens_new_admission(monkeypatch, stage):
     context, service, admission, event = processing_context(monkeypatch)
     permitted = [True]
@@ -189,13 +210,13 @@ async def test_placement_loss_during_slow_processing_never_opens_new_admission(m
 
         monkeypatch.setattr(service, "admission_eligible", eligibility)
     else:
+        decoder: JsonEventDecoder = service._decoder
 
-        async def inspect(*_args: object, **_kwargs: object) -> "EventDecodeSuccess | EventDecodeFailure":
+        def decode(*_args: object, **_kwargs: object) -> "EventDecodeSuccess | EventDecodeFailure":
             permitted[0] = False
-            decoder: JsonEventDecoder = service._decoder
             return decoder.decode(event)
 
-        monkeypatch.setattr(service, "_inspect_content", inspect)
+        service._decoder = MagicMock(decode=decode)
 
     result = await service.process(
         context.snapshot, context.identity, event, "worker", admission_guard=lambda: permitted[0]
@@ -205,8 +226,7 @@ async def test_placement_loss_during_slow_processing_never_opens_new_admission(m
     context.store.acquire.assert_not_awaited()
     context.store.freeze.assert_not_awaited()
     admission.schedule.assert_not_awaited()
-    if stage != "inspection":
-        context.store.acquire_inspection.assert_not_awaited()
+    context.store.acquire_inspection.assert_not_awaited()
 
 
 async def test_placement_guard_never_revokes_a_frozen_delivery_recovery(monkeypatch):
@@ -391,7 +411,11 @@ async def test_quota_refusal_is_backpressure_not_content(monkeypatch) -> None:
     assert result.reason == "execution_capacity"
     assert not result.permanent_content_error
     assert context.events[-1] == "rollback"
-    assert context.store.defer.call_args.kwargs["error_code"] == CONTENT_INSPECTION_PENDING
+    context.store.acquire_inspection.assert_not_awaited()
+    context.store.finish_inspection.assert_not_awaited()
+    context.store.defer.assert_not_awaited()
+    assert EventDelivery not in context.rows
+    assert Execution not in context.rows
     admission.schedule.assert_not_awaited()
 
 
@@ -561,3 +585,16 @@ async def test_structured_failure_is_durably_rejected_without_scheduling(monkeyp
     context.store.finalize_without_execution.assert_not_awaited()
     context.store.freeze.assert_not_awaited()
     admission.schedule.assert_not_awaited()
+
+
+async def test_pending_inspection_redelivery_is_reconciled_before_preparation(monkeypatch) -> None:
+    context, service, admission, event = processing_context(monkeypatch)
+    context.rows[EventDelivery] = retained(context.identity, last_error_code=CONTENT_INSPECTION_PENDING)
+
+    result = await service.process(context.snapshot, context.identity, event, "worker")
+
+    assert isinstance(result, ResolvedDelivery)
+    context.store.acquire_inspection.assert_awaited_once()
+    context.store.finish_inspection.assert_awaited_once_with(context.claim, None, keep_pending=True)
+    assert context.events.index("inspection_marker") < context.events.index("acquire") < context.events.index("freeze")
+    admission.schedule.assert_awaited_once()

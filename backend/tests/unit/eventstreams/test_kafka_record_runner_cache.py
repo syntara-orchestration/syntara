@@ -49,6 +49,9 @@ class Gate:
     recovery_open: bool = True
     failures: int = 0
 
+    def transport_open(self, snapshot: SubscriptionSnapshot) -> bool:
+        return self.admission_open(snapshot)
+
     def admission_open(self, snapshot: SubscriptionSnapshot) -> bool:
         return self.placement_trusted and asyncio.get_running_loop().time() < self.placement_expires_at
 
@@ -58,6 +61,9 @@ class Gate:
     def dependency_failed(self, snapshot: SubscriptionSnapshot) -> None:
         self.durable_available = False
         self.failures += 1
+
+    def recovery_started(self, snapshot: SubscriptionSnapshot) -> None:
+        self.recovery_open = False
 
 
 def signed(identity: DeliveryIdentity, **changes: object) -> str:
@@ -490,16 +496,18 @@ async def test_failed_required_write_closes_the_shared_gate_for_cached_commits(c
     await context.runner._advance(other)
     assert other.resolved_next_offset == 12
     context.storage.get.return_value = None
-    context.context.store.finish_inspection.side_effect = SQLAlchemyError("commit unavailable")
+    context.context.store.freeze.side_effect = SQLAlchemyError("commit unavailable")
     await context.runner._enqueue({2: [record(context, value=b'{"count":2}')]}, 7)
     state = context.runner._partitions[2]
     await context.runner._advance(state)
+    context.context.store.freeze.assert_awaited_once()
     assert not context.gate.durable_available
     assert context.gate.failures == 1
     # The other partition's already validated proof cannot bypass this outage.
     await context.runner._commit_positions((state, other))
     context.client.commit.assert_not_awaited()
-    assert context.context.rows[EventDelivery].last_error_code == CONTENT_INSPECTION_PENDING
+    context.admission.schedule.assert_not_awaited()
+    assert state.resolved_next_offset is None
 
 
 async def test_stale_assignment_during_cache_read_prevents_late_commit(cached_runner) -> None:
@@ -614,7 +622,7 @@ async def test_administrative_fence_invalidates_shared_cached_candidates(cached_
 
 @pytest.mark.parametrize(
     "reason",
-    ["storage_unavailable", "source_recreated", "source_identity_unavailable", "waiting_for_source_recovery"],
+    ["storage_unavailable", "source_recreated", "source_identity_unavailable"],
 )
 async def test_initialization_failure_invalidates_other_partitions_cached_candidates(cached_runner, reason) -> None:
     context = cached_runner

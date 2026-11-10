@@ -26,6 +26,10 @@ class RecordProcessingGate(Protocol):
     records, including local CEL skips, and already admitted durable handoffs.
     """
 
+    def transport_open(self, snapshot: "SubscriptionSnapshot") -> bool:
+        """Permit the owned transport to repair positions while intake is fenced."""
+        ...
+
     def admission_open(self, snapshot: "SubscriptionSnapshot") -> bool:
         """Require current lifecycle/resources and a trusted, unexpired placement."""
         ...
@@ -37,9 +41,13 @@ class RecordProcessingGate(Protocol):
     def dependency_failed(self, snapshot: "SubscriptionSnapshot") -> None:
         """Invalidate shared dependency/lifecycle trust until authoritative reconciliation.
 
-        This also closes a known administrative recovery hold; it does not
-        diagnose a database outage or revoke already frozen delivery claims.
+        Use recovery_started for a known recovery hold that preserves database
+        trust. Neither callback revokes already frozen delivery claims.
         """
+        ...
+
+    def recovery_started(self, snapshot: "SubscriptionSnapshot") -> None:
+        """Fence intake and commits without treating a known recovery as a DB failure."""
         ...
 
 

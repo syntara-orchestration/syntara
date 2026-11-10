@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy import event, func, update
+from sqlalchemy import event, func, insert, update
 from sqlalchemy.exc import OperationalError
 from sqlmodel import col, select
 
@@ -21,7 +23,14 @@ from syntara.core.constants import EventDeliveryDefaults
 from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
-from syntara.eventstreams.core.deduplication import ClaimLost, DeliveryClaim, DeliveryState, TemporalAcceptance
+from syntara.eventstreams.core.deduplication import (
+    ClaimLost,
+    DeliveryClaim,
+    DeliveryExpectation,
+    DeliveryState,
+    TemporalAcceptance,
+    TerminalDelivery,
+)
 from syntara.eventstreams.core.handler import (
     BlockedDelivery,
     EventLaunchError,
@@ -33,9 +42,11 @@ from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
+from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
+from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
 from syntara.eventstreams.services.recovery_service import EventExecutionRecoveryService
 from syntara.integrations.models.integration import Integration
 from syntara.workflows.models.execution import Execution, ExecutionStatus
@@ -49,8 +60,6 @@ if TYPE_CHECKING:
     from sqlalchemy.engine import Connection
     from sqlalchemy.orm import Session
     from sqlmodel.ext.asyncio.session import AsyncSession
-
-    from syntara.eventstreams.core.deduplication import TerminalDelivery
 
 pytestmark = pytest.mark.integration
 
@@ -157,6 +166,155 @@ async def test_attempt_commits_before_rpc_and_resolution_is_atomic(scheduling_co
         assert execution.execution_metadata["event_delivery"]["scheduling_state"] == "confirmed"
         assert execution.created_by == context.delivery.principal_id
         assert (await session.exec(select(func.count()).select_from(Execution))).one() == 1
+
+
+@pytest_asyncio.fixture
+async def cleaned_scheduling_context(scheduling_context) -> tuple[SchedulingContext, TerminalDelivery]:
+    """Retain a confirmed Execution after removing its terminal delivery row."""
+    context = scheduling_context
+    result = await context.admission.schedule(context.prepared)
+    assert isinstance(result, ResolvedDelivery)
+    async with context.delivery.session_factory() as session, session.begin():
+        row = await session.get(EventDelivery, context.prepared.claim.identity.digest)
+        assert row.state == DeliveryState.SCHEDULED
+        # Model the database state after retention cleanup, without a time wait.
+        await session.delete(row)
+    return context, result.terminal
+
+
+@pytest.mark.parametrize("entrypoint", ["lookup", "prepare", "inspection", "process"])
+@pytest.mark.parametrize("status", [ExecutionStatus.PENDING, ExecutionStatus.COMPLETED])
+async def test_retained_confirmation_restores_cleaned_delivery(
+    cleaned_scheduling_context, monkeypatch, entrypoint, status
+) -> None:
+    context, original = cleaned_scheduling_context
+    identity = context.prepared.claim.identity
+    async with context.delivery.session_factory() as session, session.begin():
+        execution = await session.get(Execution, context.prepared.execution_id)
+        execution.status = status
+        original_input = deepcopy(execution.input_data)
+        original_metadata = deepcopy(execution.execution_metadata)
+        credential = await session.get(Credential, context.delivery.snapshot.runtime_credential_id)
+        credential.enabled = False
+        subscription = await session.get(EventSubscription, identity.subscription_id)
+        subscription.configuration_revision += 1
+        subscription.input_schema = {"type": "string"}
+        source = await session.get(EventSubscriptionSource, identity.source_id)
+        snapshot = SubscriptionSnapshot.from_models(subscription, source)
+    start, describe = (
+        AsyncMock(side_effect=AssertionError("Confirmed delivery must not start Temporal again")),
+        AsyncMock(side_effect=AssertionError("Retained confirmation needs no Temporal lookup")),
+    )
+    monkeypatch.setattr(context.temporal, "start", start)
+    monkeypatch.setattr(context.temporal, "describe", describe)
+    preparation = EventExecutionPreparationService(context.delivery.session_factory, capacity_check=AvailableCapacity())
+    if entrypoint == "prepare":
+        restored: object = await preparation.prepare_delivery(snapshot, identity, None, "redelivery")
+    elif entrypoint == "process":
+        processor = EventRecordProcessingService(context.delivery.session_factory, preparation, context.admission)
+        result = await processor.process(snapshot, identity, None, "redelivery")
+        assert isinstance(result, ResolvedDelivery)
+        restored = result.terminal
+    else:
+        async with context.delivery.session_factory() as session, session.begin():
+            store = EventDeliveryStore(session)
+            if entrypoint == "lookup":
+                restored = await store.lookup_terminal(identity)
+            else:
+                restored = await store.acquire_inspection(
+                    identity,
+                    DeliveryExpectation(
+                        published_version_id=snapshot.published_version_id,
+                        configuration_revision=snapshot.configuration_revision,
+                    ),
+                    "redelivery",
+                )
+    assert restored == original
+    start.assert_not_awaited()
+    describe.assert_not_awaited()
+    assert len(context.temporal.starts) == 1
+    async with context.delivery.session_factory() as session, session.begin():
+        row = await session.get(EventDelivery, identity.digest)
+        execution = await session.get(Execution, context.prepared.execution_id)
+        assert row.state == DeliveryState.SCHEDULED
+        assert row.frozen_binding == context.prepared.claim.binding
+        assert row.attempt_count == 1
+        assert row.claim_token is row.owner_worker_id is row.lease_until is None
+        assert row.resolved_at == original.resolved_at
+        assert row.execution_confirmed_at == original.execution_confirmed_at
+        assert execution.status == status
+        assert execution.input_data == original_input
+        assert execution.execution_metadata == original_metadata
+        assert (await session.exec(select(func.count()).select_from(Execution))).one() == 1
+        assert await EventDeliveryStore(session).lookup_terminal(identity) == original
+
+
+async def test_retained_confirmation_repairs_recreated_unbound_delivery(cleaned_scheduling_context) -> None:
+    context, original = cleaned_scheduling_context
+    identity = context.prepared.claim.identity
+    async with context.delivery.session_factory() as session, session.begin():
+        # Match the store's insert: omit the binding so PostgreSQL stores SQL NULL,
+        # rather than a JSON null supplied by the ORM's optional JSONB field.
+        await session.execute(
+            insert(EventDelivery).values(
+                **identity.model_dump(exclude={"record"}),
+                identity_digest=identity.digest,
+                transport=identity.record.transport,
+                record_identity=identity.record,
+                execution_identity=identity.execution_id,
+                temporal_workflow_id=identity.temporal_workflow_id,
+            )
+        )
+    async with context.delivery.session_factory() as session, session.begin():
+        assert await EventDeliveryStore(session).lookup_terminal(identity) == original
+    async with context.delivery.session_factory() as session:
+        row = await session.get(EventDelivery, identity.digest)
+        assert row.state == DeliveryState.SCHEDULED
+        assert row.frozen_binding == context.prepared.claim.binding
+    assert len(context.temporal.starts) == 1
+
+
+async def test_legacy_confirmation_keeps_original_confirmation_time(cleaned_scheduling_context) -> None:
+    context, original = cleaned_scheduling_context
+    identity = context.prepared.claim.identity
+    async with context.delivery.session_factory() as session, session.begin():
+        execution = await session.get(Execution, context.prepared.execution_id)
+        metadata = deepcopy(execution.execution_metadata)
+        metadata["event_delivery"].pop("resolved_at")
+        execution.execution_metadata = metadata
+    async with context.delivery.session_factory() as session, session.begin():
+        restored = await EventDeliveryStore(session).lookup_terminal(identity)
+        assert restored == original.model_copy(update={"resolved_at": original.execution_confirmed_at})
+    assert len(context.temporal.starts) == 1
+
+
+@pytest.mark.parametrize("invalid", ["input", "identity", "unconfirmed", "run", "confirmation"])
+async def test_cleaned_delivery_does_not_resolve_conflicting_execution_evidence(
+    cleaned_scheduling_context, invalid
+) -> None:
+    context, _ = cleaned_scheduling_context
+    identity = context.prepared.claim.identity
+    async with context.delivery.session_factory() as session, session.begin():
+        execution = await session.get(Execution, context.prepared.execution_id)
+        metadata = deepcopy(execution.execution_metadata)
+        if invalid == "input":
+            execution.input_data = {"changed": True}
+        elif invalid == "identity":
+            metadata["event"]["identity"]["source_id"] = str(uuid4())
+        elif invalid == "unconfirmed":
+            metadata["event_delivery"]["scheduling_state"] = "prepared"
+        elif invalid == "run":
+            metadata["event_delivery"].pop("temporal_run_id")
+        else:
+            metadata["event_delivery"].pop("confirmed_at")
+        execution.execution_metadata = metadata
+    with pytest.raises(ValueError):
+        async with context.delivery.session_factory() as session, session.begin():
+            await EventDeliveryStore(session).lookup_terminal(identity)
+    async with context.delivery.session_factory() as session:
+        assert await session.get(EventDelivery, identity.digest) is None
+        assert (await session.exec(select(func.count()).select_from(Execution))).one() == 1
+    assert len(context.temporal.starts) == 1
 
 
 async def test_lost_start_response_verifies_same_identity(scheduling_context) -> None:
@@ -328,20 +486,42 @@ async def test_accepted_repair_after_revocation_and_retirement(scheduling_contex
         assert execution.execution_metadata["event_delivery"]["scheduling_state"] == "confirmed"
 
 
-async def test_unscheduled_revoked_binding_waits_for_correction(scheduling_context) -> None:
+@pytest.mark.parametrize("resource", ["credential", "integration"])
+async def test_unscheduled_runtime_retries_automatically_after_correction(scheduling_context, resource) -> None:
     context = scheduling_context
+    model = Credential if resource == "credential" else Integration
+    resource_id = (
+        context.delivery.snapshot.runtime_credential_id
+        if resource == "credential"
+        else context.delivery.snapshot.integration_id
+    )
     async with context.delivery.session_factory() as session, session.begin():
-        credential = await session.get(Credential, context.delivery.snapshot.runtime_credential_id)
-        credential.enabled = False
+        unavailable = await session.get(model, resource_id)
+        unavailable.enabled = False
     result = await context.admission.schedule(context.prepared)
-    assert isinstance(result, BlockedDelivery)
+    assert isinstance(result, RetryDelivery)
     assert result.error_code == SchedulingFailureCode.RUNTIME_UNAVAILABLE
     assert context.temporal.starts == []
     async with context.delivery.session_factory() as session, session.begin():
-        credential = await session.get(Credential, context.delivery.snapshot.runtime_credential_id)
-        credential.enabled = True
-    assert await context.recovery.request_retry(context.prepared.claim.identity)
-    assert isinstance((await context.recovery.recover_due("corrected", limit=1))[0][1], ResolvedDelivery)
+        row = await session.get(EventDelivery, context.prepared.claim.identity.digest)
+        assert row.state == DeliveryState.IN_PROGRESS
+        assert row.frozen_binding == context.prepared.claim.binding
+        assert row.attempt_count == 0
+        assert row.claim_token is None
+        assert row.next_attempt_at == result.next_attempt_at
+        assert row.next_attempt_at != EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT
+        restored = await session.get(model, resource_id)
+        restored.enabled = True
+        # Simulate elapsed backoff without sleeping or invoking manual retry.
+        row.next_attempt_at = (await session.exec(select(func.clock_timestamp()))).one() - timedelta(seconds=1)
+    recovered = await context.recovery.recover_due("automatic-correction", limit=1)
+    assert len(recovered) == 1
+    assert isinstance(recovered[0][1], ResolvedDelivery)
+    assert len(context.temporal.starts) == 1
+    started = context.temporal.starts[0]
+    assert started.execution_id == context.prepared.execution_id
+    assert started.workflow_arguments() == context.prepared.workflow_arguments()
+    assert started.claim.binding == context.prepared.claim.binding
 
 
 @pytest.mark.parametrize("phase", ["reload", "confirmation"])
@@ -560,7 +740,7 @@ async def test_republished_credential_does_not_replace_frozen_binding(scheduling
         assert isinstance(result, ResolvedDelivery)
         assert context.temporal.starts[0].claim.binding == context.prepared.claim.binding
     else:
-        assert isinstance(result, BlockedDelivery)
+        assert isinstance(result, RetryDelivery)
         assert result.error_code == SchedulingFailureCode.RUNTIME_UNAVAILABLE
         assert context.temporal.starts == []
 

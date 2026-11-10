@@ -135,6 +135,7 @@ class SubscriptionRunnerFactory(Protocol):
         Return an unstarted runner for exactly this snapshot; startup must not
         open intake before open_admission. Clean up any
         resources if construction fails before returning. Do not open a database
-        transaction across client startup or install live credential refresh.
+        transaction across client startup. The supervisor separately rechecks
+        connection revisions during ordinary reconciliation.
         """
         ...

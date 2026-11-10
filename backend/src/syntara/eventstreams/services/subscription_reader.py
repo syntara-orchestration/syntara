@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
+from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
@@ -50,10 +50,10 @@ class EventSubscriptionReader:
     async def recovery_holds(self) -> set[UUID]:
         """Read active source recovery fences independently of cached delivery proofs."""
         statement = (
-            select(EventDeliveryRecoveryHold.source_id)
-            .join(EventSubscriptionSource, col(EventSubscriptionSource.id) == EventDeliveryRecoveryHold.source_id)
+            select(KafkaPartitionInitialPosition.source_id)
+            .join(EventSubscriptionSource, col(EventSubscriptionSource.id) == KafkaPartitionInitialPosition.source_id)
             .where(
-                col(EventDeliveryRecoveryHold.released_at).is_(None),
+                col(KafkaPartitionInitialPosition.recovery_token).is_not(None),
                 col(EventSubscriptionSource.deployment_id) == self._deployment_id,
             )
         )

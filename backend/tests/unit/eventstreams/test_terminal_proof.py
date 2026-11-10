@@ -190,11 +190,23 @@ def test_cleanup_always_follows_proof_expiry_plus_clock_margin(ttl: int, retenti
         {"cache_epoch": None},
         {"clock_error_bound_seconds": None},
         {"clock_error_bound_seconds": 1},
+    ],
+)
+def test_untrusted_policy_bypasses_proofs_and_preserves_retention(changes: dict[str, object]) -> None:
+    shared = policy(**changes)
+    assert not shared.enabled
+    assert not shared.trusts(proof(), identity(), NOW)
+    assert shared.cleanup_after(NOW) == NOW + timedelta(seconds=shared.retention_seconds)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
         {"ttl_seconds": 1},
         {"retention_seconds": 1},
         {"timeout_seconds": float("nan")},
     ],
 )
-def test_injected_policies_fail_closed_without_trust(changes: dict[str, object]) -> None:
+def test_invalid_policy_durations_still_fail_validation(changes: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         policy(**changes)

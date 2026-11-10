@@ -51,7 +51,6 @@ from syntara.eventstreams.services.admission_service import EventAdmissionServic
 from syntara.eventstreams.services.delivery_retention_service import EventDeliveryRetentionService
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
-from syntara.eventstreams.services.recovery_request_service import EventRecoveryRequestService
 
 logger = structlog.stdlib.get_logger(__name__)
 _TRANSPORT_ERRORS = (ConsumerNotRunningError, KafkaTransportError, OwnershipRevokedError, StaleEpochError)
@@ -121,7 +120,6 @@ class KafkaRecordRunner:
         work_semaphore: asyncio.Semaphore | None = None,
         lookup: TerminalDeliveryCache | None = None,
         gate: RecordProcessingGate | None = None,
-        recovery_requests: EventRecoveryRequestService | None = None,
         cache_coordination: RecoveryCacheCoordination | None = None,
     ) -> None:
         """Compose completed services; callers may share a downstream concurrency bound."""
@@ -133,7 +131,6 @@ class KafkaRecordRunner:
         self.snapshot = snapshot
         self._client = client
         self._owner = owner_worker_id
-        self._recovery_requests = recovery_requests
         self._settings = get_settings()
         self._lookup = lookup
         self._gate = gate
@@ -204,6 +201,9 @@ class KafkaRecordRunner:
             and self._placement_open()
             and (self._gate is None or self._gate.admission_open(self.snapshot) is True)
         )
+
+    def _transport_open(self) -> bool:
+        return self._placement_open() and (self._gate is None or self._gate.transport_open(self.snapshot) is True)
 
     def bind_placement(self, permits_admission: Callable[[], bool]) -> None:
         """Hold admission closed throughout supervised factory/client startup."""
@@ -483,12 +483,14 @@ class KafkaRecordRunner:
             position = await self._positions.initialize(self._request(state))
             state.initialization = position
             if position.status != PositionStatus.READY or position.assignment_epoch != state.epoch:
-                if position.reason in {
+                if position.reason == "waiting_for_source_recovery":
+                    if self._gate is not None and self._gate.resolution_open(self.snapshot):
+                        self._gate.recovery_started(self.snapshot)
+                elif position.reason in {
                     "storage_unavailable",
                     "source_identity_unavailable",
                     "source_recreated",
                     "source_revision_changed",
-                    "waiting_for_source_recovery",
                     "recovery_hold_unavailable",
                 }:
                     self._invalidate_gate()
@@ -686,28 +688,24 @@ class KafkaRecordRunner:
         return state.held is None or (state.held.retry_at is not None and datetime.now(UTC) >= state.held.retry_at)
 
     async def _recover_requested(self, state: _Partition) -> None:
-        """Only the assigned runner constructs the internal epoch-bearing request."""
-        if self._recovery_requests is None:
+        """Recover only the assigned partition, independently of its processing task."""
+        if not self._owned(state) or self._closing:
+            return
+        if state.initialization is None or state.initialization.status != PositionStatus.RECOVERY_GAP:
             return
         try:
-            request = await self._recovery_requests.read(self.snapshot, state.partition, state.epoch)
-            if request is None or not self._owned(state) or self._closing:
-                return
-            result = await self._positions.recover(request, owner_worker_id=self._owner)
-            if (
-                result.status == PositionStatus.READY
-                and state.fence is not None
-                and not await self.resume_after_recovery(request, token=state.fence)
-            ):
-                result = PositionResult(
-                    status=PositionStatus.BLOCKED, assignment_epoch=state.epoch, reason="recovery_resume_pending"
-                )
-            await self._recovery_requests.record(request, result)
+            request = self._request(state)
+            result = await self._positions.recover_automatically(request, owner_worker_id=self._owner)
+            if result.status == PositionStatus.READY:
+                if state.fence is not None and not await self.resume_after_recovery(request, token=state.fence):
+                    return
+                state.initialization = result
         except (SQLAlchemyError, OSError, TimeoutError, ValueError):
             state.held = self._retry("recovery_control_unavailable")
 
     def _poll_control(self, state: _Partition) -> None:
-        if self._recovery_requests is None or not self._owned(state) or state.closing:
+        automatic = state.initialization is not None and state.initialization.status == PositionStatus.RECOVERY_GAP
+        if not automatic or not self._owned(state) or state.closing:
             return
         if state.control_task is not None and state.control_task.done():
             if not state.control_task.cancelled():
@@ -738,7 +736,7 @@ class KafkaRecordRunner:
     async def _tick(self) -> None:
         if not self._accepting_work():
             return
-        if not self._admission_open():
+        if not self._transport_open():
             await self.close_admission()
             return
         self._start_due_tasks()
@@ -801,6 +799,9 @@ class KafkaRecordRunner:
         for partition in partitions:
             state = self._partitions.get(partition)
             if state is not None and self._owned(state) and state.epoch == epoch:
+                # Fetch errors can include an offset that retention removed.
+                # Reload the checkpoint and bounds before fetching again.
+                state.ready = False
                 state.held = self._retry("broker_unavailable")
                 await self._pause(state, paused=True)
 
@@ -1167,8 +1168,9 @@ class KafkaRecordRunner:
         state = self._partitions.get(request.partition)
         if state is None or not self._matches(request, state) or not self._owned(state):
             return DrainEvidence(quiescent=False, retained_evidence_complete=False, permanent_content_error=True)
+        if state.fence != token and self._gate is not None:
+            self._gate.recovery_started(self.snapshot)
         state.fence = token
-        self._invalidate_gate()
         state.reconciled_until = 0
         state.resolved_next_offset = None
         state.rewind_offset = None
@@ -1207,7 +1209,8 @@ class KafkaRecordRunner:
         state.records.clear()
         state.byte_count = 0
         # A local queue/empty ledger cannot prove complete retained-window
-        # coverage. The service requires explicit duplicate-risk acknowledgement.
+        # coverage. Automatic offset recovery accepts the proposal's bounded
+        # duplicate protection; administrative recovery keeps its explicit guard.
         return DrainEvidence(quiescent=quiescent, retained_evidence_complete=False, permanent_content_error=gated)
 
     async def is_fenced(self, request: PositionRequest, *, token: UUID) -> bool:

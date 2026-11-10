@@ -4,10 +4,13 @@ from datetime import datetime, timedelta
 from typing import Self
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import Field, ValidatorFunctionWrapHandler, field_validator, model_validator
 
 from syntara.core.config.base import get_settings
-from syntara.core.config.event_delivery import validate_delivery_cache_trust_inputs
+from syntara.core.config.event_delivery import (
+    parse_delivery_cache_trust_input,
+    validate_delivery_cache_trust_inputs,
+)
 from syntara.core.constants import EventDeliveryDefaults
 from syntara.eventstreams.core.deduplication import DeliveryIdentity, DeliveryState, DeliveryValue
 from syntara.eventstreams.core.terminal_proof import TerminalProof
@@ -39,10 +42,16 @@ class DeliveryEvidencePolicy(DeliveryValue):
         description="Deployment-attested pairwise clock error, not measured here; covered by skew_seconds",
     )
 
+    @field_validator("cache_epoch", "clock_error_bound_seconds", mode="wrap")
+    @classmethod
+    def parse_trust_input(cls, value: object, handler: ValidatorFunctionWrapHandler) -> object:
+        """Use the same missing-trust fallback as deployment Settings."""
+        return parse_delivery_cache_trust_input(value, handler)
+
     @model_validator(mode="after")
     def validate_trust(self) -> Self:
         """Injected policies enforce the same safety inputs as deployment Settings."""
-        validate_delivery_cache_trust_inputs(
+        enabled = validate_delivery_cache_trust_inputs(
             enabled=self.enabled,
             cache_epoch=self.cache_epoch,
             clock_error_bound_seconds=self.clock_error_bound_seconds,
@@ -50,6 +59,8 @@ class DeliveryEvidencePolicy(DeliveryValue):
             ttl_seconds=self.ttl_seconds,
             retention_seconds=self.retention_seconds,
         )
+        # Normalize during validation; the resulting policy remains immutable.
+        object.__setattr__(self, "enabled", enabled)
         return self
 
     @classmethod

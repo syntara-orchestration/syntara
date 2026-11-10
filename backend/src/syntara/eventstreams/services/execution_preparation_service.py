@@ -96,8 +96,9 @@ class EventExecutionPreparationService:
         """Commit preparation before returning; an existing claim may be recovered.
 
         A recovery caller may omit the envelope: durable input is authoritative.
-        Any non-prepared result rolls back provisional writes. Existing evidence
-        is retained, and no result from this method grants offset commit authority.
+        Prepared or terminal recovery results commit before returning. Other
+        results roll back provisional writes. Existing evidence is retained;
+        preparation alone never grants offset commit authority.
 
         Invalid caller input or missing/inconsistent retained Execution evidence
         raises ValueError rather than returning a PreparationResult. These
@@ -121,10 +122,10 @@ class EventExecutionPreparationService:
                         and (not self._resources.accepting or not self._resources.scheduling_open)
                     ):
                         return PreparationBlocked()
-                    result = _require_prepared(
-                        await self._prepare(session, snapshot, identity, envelope, owner_worker_id, claim)
-                    )
-                return result  # noqa: RET504 - return only after the transaction commits
+                    result = await self._prepare(session, snapshot, identity, envelope, owner_worker_id, claim)
+                    if not isinstance(result, TerminalDelivery):
+                        result = _require_prepared(result)
+                return result
             except _PreparationRefusedError as exc:
                 return exc.result
 

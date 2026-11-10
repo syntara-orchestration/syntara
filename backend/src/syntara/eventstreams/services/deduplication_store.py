@@ -19,6 +19,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.core.config.base import get_settings
 from syntara.core.constants import EventDeliveryDefaults, FieldLimits
 from syntara.core.models.principal import service_principal_id
+from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition
 from syntara.eventstreams.adapters.record_identity import record_matches_source
 from syntara.eventstreams.core.deduplication import (
     ClaimBusy,
@@ -44,12 +45,12 @@ from syntara.eventstreams.core.scheduling_metadata import (
     SCHEDULING_STATE_PREPARED,
 )
 from syntara.eventstreams.models.delivery import EventDelivery
-from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.services.delivery_capacity_service import PostgreSQLDeliveryCapacityCheck
 from syntara.eventstreams.services.subscription_service import lock_source_lifecycle
 from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 
 class _ClaimExpiredError(Exception):
@@ -82,10 +83,10 @@ class EventDeliveryStore:
         """Read under lifecycle locks; recovery holds close new admission as well as cleanup."""
         token = (
             await self.session.exec(
-                select(EventDeliveryRecoveryHold.token)
+                select(KafkaPartitionInitialPosition.partition)
                 .where(
-                    col(EventDeliveryRecoveryHold.source_id) == source_id,
-                    col(EventDeliveryRecoveryHold.released_at).is_(None),
+                    col(KafkaPartitionInitialPosition.source_id) == source_id,
+                    col(KafkaPartitionInitialPosition.recovery_token).is_not(None),
                 )
                 .limit(1)
             )
@@ -250,6 +251,7 @@ class EventDeliveryStore:
         if lifecycle is None or not self._matches_scope(identity, *lifecycle):
             return RevisionChanged()
         row = await self._delivery(identity)
+        row = await self._restore_scheduled(identity, row, lifecycle[0])
         if row is not None:
             if row.state != DeliveryState.IN_PROGRESS:
                 return self._terminal(row)
@@ -321,6 +323,7 @@ class EventDeliveryStore:
         ):
             return RevisionChanged()
         row = await self._delivery(identity)
+        row = await self._restore_scheduled(identity, row, lifecycle[0])
         if row is None:
             try:
                 permitted = await self.capacity_check.permits_new_delivery()
@@ -695,6 +698,7 @@ class EventDeliveryStore:
                 SCHEDULING_STATE_KEY: SCHEDULING_STATE_CONFIRMED,
                 "temporal_run_id": acceptance.temporal_run_id,
                 "confirmed_at": changed.execution_confirmed_at.isoformat() if changed.execution_confirmed_at else None,
+                "resolved_at": changed.resolved_at.isoformat() if changed.resolved_at else None,
             },
         )
         await self.session.flush()
@@ -738,9 +742,103 @@ class EventDeliveryStore:
         )
         return ClaimLost() if changed is None else None
 
+    async def _restore_scheduled(
+        self, identity: DeliveryIdentity, row: EventDelivery | None, subscription: EventSubscription
+    ) -> EventDelivery | None:
+        """Restore cleaned scheduling evidence under the caller's lifecycle locks."""
+        if row is not None and (row.state != DeliveryState.IN_PROGRESS or row.frozen_binding is not None):
+            return row
+        execution = await self.session.get(
+            Execution, identity.execution_id, with_for_update=True, populate_existing=True
+        )
+        if execution is None:
+            return row
+        metadata = execution.execution_metadata or {}
+        event = metadata.get("event")
+        evidence = metadata.get(EVENT_DELIVERY_METADATA_KEY)
+        if (
+            not isinstance(event, dict)
+            or not isinstance(evidence, dict)
+            or event.get("identity") != identity.model_dump(mode="json")
+            or evidence.get("identity_digest") != identity.digest
+            or evidence.get("temporal_workflow_id") != identity.temporal_workflow_id
+            or evidence.get(SCHEDULING_STATE_KEY) != SCHEDULING_STATE_CONFIRMED
+            or execution.project_id != subscription.project_id
+            or execution.trigger_type != NodeType.EVENT_SUBSCRIBE_TRIGGER
+            or execution.trigger_node_id != subscription.trigger_node_id
+            or event.get("trigger_node_id") != subscription.trigger_node_id
+        ):
+            msg = "Retained Execution has no matching confirmed scheduling evidence"
+            raise ValueError(msg)
+        binding = FrozenDeliveryBinding.model_validate(
+            {
+                "workflow_version_id": event.get("workflow_version_id"),
+                "configuration_revision": event.get("configuration_revision"),
+                "runtime_credential_id": event.get("runtime_credential_id"),
+                "connection_revision": event.get("connection_revision"),
+                "execution_principal_id": event.get("execution_principal_id"),
+                "enabled_by": event.get("enabled_by"),
+                "received_at": event.get("received_at"),
+                "prepared_at": event.get("prepared_at"),
+                "input_fingerprint": evidence.get("input_fingerprint"),
+            }
+        )
+        self._validate_execution(identity, binding, execution)
+        terminal = TerminalDelivery.model_validate(
+            {
+                "identity": identity,
+                "state": DeliveryState.SCHEDULED,
+                "execution_id": execution.id,
+                "temporal_run_id": evidence.get("temporal_run_id"),
+                "execution_confirmed_at": evidence.get("confirmed_at"),
+                # Older confirmations stored only confirmed_at. Never replace
+                # that historical timestamp with the time of this recovery.
+                "resolved_at": evidence.get("resolved_at", evidence.get("confirmed_at")),
+            }
+        )
+        attempt_count = evidence.get("attempt_count")
+        first_attempt = evidence.get("first_start_attempt_at")
+        if type(attempt_count) is not int or attempt_count <= 0 or not isinstance(first_attempt, str):
+            msg = "Retained Execution has no valid start-attempt evidence"
+            raise ValueError(msg)
+        first_start_attempt_at = datetime.fromisoformat(first_attempt)
+        if first_start_attempt_at.tzinfo is None:
+            msg = "Retained Execution start-attempt time must include a timezone"
+            raise ValueError(msg)
+        if row is None:
+            row = EventDelivery(
+                **identity.model_dump(exclude={"record"}),
+                identity_digest=identity.digest,
+                transport=identity.record.transport,
+                record_identity=identity.record,
+                execution_identity=identity.execution_id,
+                temporal_workflow_id=identity.temporal_workflow_id,
+                created_at=binding.prepared_at,
+            )
+        row.state = DeliveryState.SCHEDULED.value
+        row.frozen_binding = binding
+        row.execution_id = execution.id
+        row.temporal_run_id = terminal.temporal_run_id
+        row.execution_confirmed_at = terminal.execution_confirmed_at
+        row.resolved_at = terminal.resolved_at
+        row.attempt_count = attempt_count
+        row.first_start_attempt_at = first_start_attempt_at
+        row.claim_token = None
+        row.owner_worker_id = None
+        row.lease_until = None
+        row.last_error_code = None
+        self.session.add(row)
+        await self.session.flush()
+        return row
+
     async def lookup_terminal(self, identity: DeliveryIdentity) -> TerminalDelivery | None:
         """Verify canonical terminal evidence directly in PostgreSQL, even on a cache hit."""
         row = await self.session.get(EventDelivery, identity.digest, populate_existing=True)
+        if row is None or (row.state == DeliveryState.IN_PROGRESS and row.frozen_binding is None):
+            lifecycle = await lock_source_lifecycle(self.session, identity.source_id)
+            if lifecycle is None or not self._matches_scope(identity, *lifecycle):
+                return None
+            row = await self._restore_scheduled(identity, await self._delivery(identity), lifecycle[0])
         if row is None or row.state == DeliveryState.IN_PROGRESS:
             return None
         if row.delivery_identity() != identity:

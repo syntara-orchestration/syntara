@@ -71,8 +71,12 @@ def binding() -> FrozenDeliveryBinding:
 
 def store(session: AsyncSession | None = None) -> EventDeliveryStore:
     """Inject all nonlocal requirements into the isolated repository."""
+    if session is None:
+        isolated = MagicMock(spec=AsyncSession)
+        isolated.get.return_value = None
+        session = isolated
     return EventDeliveryStore(
-        MagicMock(spec=AsyncSession) if session is None else session,
+        session,
         execution_principal_id=PRINCIPAL,
     )
 
@@ -326,6 +330,7 @@ async def test_freeze_validates_pending_inspection_with_prepared_execution(monke
 async def test_inspection_storage_refusal_does_not_insert_a_production_stub(monkeypatch) -> None:
     subscription, source = inspection_lifecycle()
     session = MagicMock(spec=AsyncSession)
+    session.get.return_value = None
     repository = store(session)
     monkeypatch.setattr(deduplication_store, "lock_source_lifecycle", AsyncMock(return_value=(subscription, source)))
     monkeypatch.setattr(repository, "_delivery", AsyncMock(return_value=None))
@@ -558,6 +563,7 @@ async def test_capacity_uncertainty_blocks_new_writes(failure: object, monkeypat
     )
     session = MagicMock(spec=AsyncSession)
     capacity = AsyncMock(spec=DeliveryCapacityCheck)
+    session.get.return_value = None
     if isinstance(failure, Exception):
         capacity.permits_new_delivery.side_effect = failure
     else:

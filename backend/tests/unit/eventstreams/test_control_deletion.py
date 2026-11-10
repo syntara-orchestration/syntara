@@ -34,23 +34,23 @@ async def test_old_frozen_runtime_credentials_remain_protected_after_republicati
     assert "event_deliveries.state" not in statement
 
 
-@pytest.mark.parametrize("protected", ["hold", "gap", "request"])
-async def test_resource_detachment_requires_no_recovery_dependency(monkeypatch, protected):
+@pytest.mark.parametrize("gap_partition", [0, 1, None])
+async def test_resource_detachment_requires_no_partition_recovery_gap(monkeypatch, gap_partition):
     session = MagicMock(spec=AsyncSession)
     source = _source(_subscription())
     source.retired_at = NOW
     service = EventRetirementService(session)
     monkeypatch.setattr(service, "stopped", AsyncMock(return_value=True))
-    monkeypatch.setattr(service, "deliveries", AsyncMock(return_value=[]))
     monkeypatch.setattr(service, "has_retained_deliveries", AsyncMock(return_value=False))
-    values = ["held" if protected == name else None for name in ("hold", "gap", "request")]
-    results = []
-    for value in values:
-        result = MagicMock()
-        result.first.return_value = value
-        results.append(result)
-    session.exec.side_effect = results
-    assert not await service.can_detach(source)
+    result = MagicMock()
+    result.first.return_value = gap_partition
+    session.exec.return_value = result
+    assert await service.can_detach(source) is (gap_partition is None)
+    session.exec.assert_awaited_once()
+    statement = str(session.exec.call_args.args[0])
+    assert "kafka_partition_initial_positions.gap_detected_at IS NOT NULL" in statement
+    assert "event_delivery_recovery_holds" not in statement
+    assert "event_subscription_recoveries" not in statement
     session.delete.assert_not_awaited()
 
 

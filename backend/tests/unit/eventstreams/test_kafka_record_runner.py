@@ -443,8 +443,26 @@ async def test_broker_failure_pauses_and_backs_off_active_partitions(harness) ->
         assert state.held.reason == "broker_unavailable"
         assert state.held.retry_at > datetime.now(UTC)
         assert state.paused
+        assert not state.ready
     await harness.runner._tick()
     assert harness.client.fetch.await_args.args[0] == []
+    harness.client.commit.assert_not_awaited()
+
+
+async def test_fetch_failure_rechecks_offsets_before_resuming(harness) -> None:
+    runner = harness.runner
+    await runner._broker_failed([0], harness.client.epoch)
+    state = runner._partitions[0]
+    state.held = None
+    harness.positions.initialize.side_effect = None
+    harness.positions.initialize.return_value = PositionResult(
+        status=PositionStatus.RECOVERY_GAP, assignment_epoch=state.epoch, reason="out_of_range"
+    )
+    await runner._advance(state)
+    harness.positions.initialize.assert_awaited_once_with(runner._request(state))
+    assert state.initialization.status == PositionStatus.RECOVERY_GAP
+    assert not state.ready
+    assert runner._partitions[1].ready
     harness.client.commit.assert_not_awaited()
 
 
@@ -1333,61 +1351,47 @@ async def test_placement_loss_never_bypasses_assignment_or_drain_deadline(harnes
     assert state.resolved_next_offset == 42
 
 
-async def test_persisted_recovery_dispatch_does_not_drain_its_own_shielded_caller(harness, monkeypatch) -> None:
-    from unittest.mock import AsyncMock
-
-    from syntara.eventstreams.services.recovery_request_service import EventRecoveryRequestService
-
+async def test_offset_gap_dispatches_automatic_recovery_without_a_manual_request(harness, monkeypatch) -> None:
     runner = harness.runner
     state = runner._partitions[0]
-    requests = MagicMock(spec=EventRecoveryRequestService)
-    request = RecoveryRequest(
-        **runner._request(state).model_dump(),
-        expected_recovery_revision=0,
-        policy=RecoveryPolicy.CURRENT_END,
-        reason="offset_expired",
+    state.ready = False
+    state.initialization = PositionResult(
+        status=PositionStatus.RECOVERY_GAP, assignment_epoch=state.epoch, reason="missing_commit"
     )
-    requests.read.return_value = request
-    runner._recovery_requests = requests
     observations = []
 
     async def recover(value, *, owner_worker_id) -> PositionResult:
-        assert value.assignment_epoch == harness.client.epoch
         assert owner_worker_id == "worker"
 
         async def shielded_operation() -> PositionResult:
             evidence = await runner.close_and_drain(value, token=uuid4(), boundary=0)
             observations.append(evidence)
-            return PositionResult(status=PositionStatus.READY, assignment_epoch=value.assignment_epoch)
+            return PositionResult(status=PositionStatus.READY, next_offset=0, assignment_epoch=state.epoch)
 
         return await asyncio.shield(asyncio.create_task(shielded_operation()))
 
-    harness.positions.recover.side_effect = recover
-    monkeypatch.setattr(runner, "resume_after_recovery", AsyncMock(return_value=True))
-    state.control_task = asyncio.create_task(runner._recover_requested(state))
+    harness.positions.recover_automatically.side_effect = recover
+    resume = AsyncMock(return_value=True)
+    monkeypatch.setattr(runner, "resume_after_recovery", resume)
+    runner._poll_control(state)
+    assert state.control_task is not None
     await asyncio.wait_for(state.control_task, timeout=1)
     assert observations[0].quiescent
-    requests.record.assert_awaited_once()
-    assert requests.record.call_args.args[1].status == PositionStatus.READY
+    resume.assert_awaited_once()
+    assert state.initialization.status == PositionStatus.READY
+    harness.positions.recover.assert_not_awaited()
+    assert harness.client.commit.await_count == 0
 
 
-async def test_recovery_request_cannot_dispatch_after_assignment_loss(harness) -> None:
-    from syntara.eventstreams.services.recovery_request_service import EventRecoveryRequestService
-
+async def test_automatic_recovery_cannot_dispatch_after_assignment_loss(harness) -> None:
     runner = harness.runner
     state = runner._partitions[0]
-    requests = MagicMock(spec=EventRecoveryRequestService)
-    requests.read.return_value = RecoveryRequest(
-        **runner._request(state).model_dump(),
-        expected_recovery_revision=0,
-        policy=RecoveryPolicy.CURRENT_END,
-        reason="offset_expired",
+    state.initialization = PositionResult(
+        status=PositionStatus.RECOVERY_GAP, assignment_epoch=state.epoch, reason="missing_commit"
     )
-    runner._recovery_requests = requests
     harness.client.epoch += 1
     await runner._recover_requested(state)
-    harness.positions.recover.assert_not_awaited()
-    requests.record.assert_not_awaited()
+    harness.positions.recover_automatically.assert_not_awaited()
 
 
 async def test_revocation_preserves_known_content_gate_after_partition_state_is_removed(harness) -> None:

@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from aiokafka import AIOKafkaConsumer, TopicPartition
@@ -47,6 +47,7 @@ from syntara.eventstreams.exceptions import (
     OwnershipRevokedError,
     StaleEpochError,
 )
+from syntara.integrations.lib.kafka_client import KafkaPolicyClient
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine, Iterable, Iterator
@@ -175,23 +176,26 @@ class KafkaPartitionConsumer:
             raise KafkaTransportError(msg)
 
         settings = get_settings()
-        consumer = AIOKafkaConsumer(
-            bootstrap_servers=list(self._connection.bootstrap_servers),
-            client_id=self._client_id or f"syntara-event-{self._source_config.group_id}",
-            group_id=self._source_config.group_id,
-            security_protocol=self._connection.security_protocol,
-            sasl_mechanism=self._connection.sasl_mechanism,
-            sasl_plain_username=(
+        connection_options: dict[str, Any] = {  # aiokafka's untyped constructor boundary
+            "bootstrap_servers": list(self._connection.bootstrap_servers),
+            "client_id": self._client_id or f"syntara-event-{self._source_config.group_id}",
+            "security_protocol": self._connection.security_protocol,
+            "sasl_mechanism": self._connection.sasl_mechanism,
+            "sasl_plain_username": (
                 self._connection.sasl_plain_username.get_secret_value()
                 if self._connection.sasl_plain_username is not None
                 else None
             ),
-            sasl_plain_password=(
+            "sasl_plain_password": (
                 self._connection.sasl_plain_password.get_secret_value()
                 if self._connection.sasl_plain_password is not None
                 else None
             ),
-            ssl_context=self._connection.ssl_context,
+            "ssl_context": self._connection.ssl_context,
+        }
+        consumer = AIOKafkaConsumer(
+            **connection_options,
+            group_id=self._source_config.group_id,
             enable_auto_commit=False,
             auto_offset_reset="none",
             isolation_level="read_committed",
@@ -200,6 +204,10 @@ class KafkaPartitionConsumer:
             fetch_max_bytes=settings.event_queue_max_bytes,
             max_partition_fetch_bytes=settings.event_queue_max_bytes,
         )
+        # aiokafka 0.14 has no public client/factory injection. Its constructor
+        # has not opened sockets or started tasks yet. Replace the internal
+        # client before startup so coordinator and metadata paths use policy too.
+        consumer._client = KafkaPolicyClient(**connection_options)  # noqa: SLF001 - aiokafka has no client injection API
 
         # Startup can be cancelled by a deadline or shutdown; retain ownership
         # so the runner's cleanup can close a partially started client.

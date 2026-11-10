@@ -3,7 +3,7 @@
 import asyncio
 import random
 import time
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from contextlib import suppress
 from datetime import UTC, datetime
 from uuid import UUID
@@ -46,11 +46,13 @@ class EventWorkerManager:
         resources: EventWorkerResources,
         *,
         controls: EventRuntimeControlService | None = None,
+        connection_revision: Callable[[SubscriptionSnapshot], Awaitable[str]] | None = None,
     ) -> None:
         """Inject completed provider ports and process-owned limits, never a session."""
         self._reader = reader
         self._factory = runner_factory
         self._controls = controls
+        self._connection_revision = connection_revision
         self._registered: dict[UUID, SubscriptionSnapshot] = {}
         self._placement = placement
         self._resources = resources
@@ -380,6 +382,7 @@ class EventWorkerManager:
                 self._factory,
                 placement=authority,
                 startup_timeout_seconds=EventWorkerDefaults.STARTUP_TIMEOUT_SECONDS,
+                connection_revision=self._connection_revision,
             )
             self._supervisors[key] = supervisor
         status = await supervisor.apply(snapshot)

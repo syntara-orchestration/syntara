@@ -12,6 +12,8 @@ from redis.exceptions import RedisError
 from sqlalchemy.exc import OperationalError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.core.constants import EventDeliveryDefaults
+from syntara.core.exceptions import SafeValueError
 from syntara.eventstreams.core.deduplication import (
     ClaimLost,
     DeliveryClaim,
@@ -114,6 +116,194 @@ def confirmation_context(prepared: PreparedExecution, monkeypatch: pytest.Monkey
         sessions=sessions,
         terminal=terminal,
     )
+
+
+@pytest.fixture
+def renewal_context(prepared: PreparedExecution, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
+    """Exercise the renewal loop with isolated short database transactions."""
+    service, launcher, _ = harness(prepared, monkeypatch)
+    factory, sessions = session_factory()
+    service._session_factory = factory
+    resources = SimpleNamespace(
+        scheduling_open=True,
+        finalization=asyncio.Semaphore(0),
+        database_failed=MagicMock(),
+    )
+    service._resources = resources
+    renewed = asyncio.Event()
+    tasks: set[asyncio.Task[object]] = set()
+    store = SimpleNamespace(renew=AsyncMock())
+
+    async def renew(claim: DeliveryClaim) -> DeliveryClaim:
+        assert claim.identity == prepared.claim.identity
+        assert claim.token == prepared.claim.token
+        assert claim.owner_worker_id == prepared.claim.owner_worker_id
+        current = asyncio.current_task()
+        assert current is not None
+        tasks.add(current)
+        if store.renew.await_count >= 2:
+            renewed.set()
+        return claim.model_copy(update={"lease_until": datetime.now(UTC) + timedelta(seconds=60)})
+
+    store.renew.side_effect = renew
+    monkeypatch.setattr(module, "EventDeliveryStore", lambda _session: store)
+    monkeypatch.setattr(EventDeliveryDefaults, "CLAIM_RENEWAL_INTERVAL_SECONDS", 0.01)
+    return SimpleNamespace(
+        service=service,
+        launcher=launcher,
+        factory=factory,
+        sessions=sessions,
+        resources=resources,
+        store=store,
+        renewed=renewed,
+        tasks=tasks,
+    )
+
+
+@pytest.mark.parametrize("phase", ["reload", "start", "finalization"])
+async def test_periodic_renewal_covers_slow_handoff_and_capacity_waits(
+    renewal_context, prepared: PreparedExecution, monkeypatch, phase
+) -> None:
+    context = renewal_context
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    if phase == "reload":
+
+        async def reload(_claim: DeliveryClaim) -> PreparedExecution:
+            entered.set()
+            await release.wait()
+            return prepared
+
+        context.service._reload.side_effect = reload
+    else:
+
+        async def start(value: PreparedExecution) -> TemporalAcceptance:
+            entered.set()
+            if phase == "start":
+                await release.wait()
+            return acceptance(value)
+
+        context.launcher.start.side_effect = start
+        if phase == "finalization":
+            resolved = context.service._confirm.return_value
+            monkeypatch.setattr(context.service, "_confirm", EventAdmissionService._confirm.__get__(context.service))
+            monkeypatch.setattr(context.service, "_finalize", AsyncMock(return_value=resolved))
+
+    task = asyncio.create_task(context.service.schedule(prepared))
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=2)
+        await asyncio.wait_for(context.renewed.wait(), timeout=2)
+        assert not task.done()
+        assert context.store.renew.await_count >= 2
+        assert len(context.sessions) >= 2
+        for session in context.sessions:
+            session.begin.return_value.__aexit__.assert_awaited_once_with(None, None, None)
+            session.__aexit__.assert_awaited_once_with(None, None, None)
+        if phase == "finalization":
+            context.service._finalize.assert_not_awaited()
+            context.resources.finalization.release()
+        release.set()
+        assert isinstance(await asyncio.wait_for(task, timeout=2), ResolvedDelivery)
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    assert context.tasks
+    assert all(renewal.done() for renewal in context.tasks)
+    count = context.store.renew.await_count
+    await asyncio.sleep(0)
+    assert context.store.renew.await_count == count
+    context.resources.database_failed.assert_not_called()
+
+
+async def renewal_failure(context: SimpleNamespace, claim: DeliveryClaim, failure: str) -> DeliveryClaim | ClaimLost:
+    """Inject each failure at the renewal boundary without changing handoff setup."""
+    private_message = "PRIVATE"
+    if failure == "lost":
+        return ClaimLost()
+    if failure == "database":
+        statement = "renew"
+        raise OperationalError(statement, {}, RuntimeError(private_message))
+    if failure == "timeout":
+        await asyncio.Event().wait()
+    if failure == "commit":
+        context.sessions[-1].begin.return_value.__aexit__.side_effect = OperationalError(
+            "commit", {}, RuntimeError(private_message)
+        )
+    if failure == "evidence":
+        raise ValueError(private_message)
+    return claim
+
+
+@pytest.mark.parametrize("phase", ["retention", "start"])
+@pytest.mark.parametrize("failure", ["lost", "database", "commit", "timeout", "evidence"])
+async def test_failed_renewal_stops_handoff_without_finalization(renewal_context, prepared, phase, failure) -> None:
+    context = renewal_context
+    entered, cancelled = asyncio.Event(), asyncio.Event()
+
+    async def wait(*_args: object) -> None:
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    if phase == "retention":
+        context.launcher.history_retention_seconds.side_effect = wait
+    else:
+        context.launcher.start.side_effect = wait
+
+    async def renew(_claim: DeliveryClaim) -> DeliveryClaim | ClaimLost:
+        await entered.wait()
+        return await renewal_failure(context, prepared.claim, failure)
+
+    context.store.renew.side_effect = renew
+    result = await asyncio.wait_for(context.service.schedule(prepared), timeout=2)
+    assert cancelled.is_set()
+    if failure == "lost":
+        assert isinstance(result, ClaimLost)
+    else:
+        assert isinstance(result, BlockedDelivery)
+        assert result.error_code == (
+            SchedulingFailureCode.EVIDENCE_MISMATCH
+            if failure == "evidence"
+            else SchedulingFailureCode.STORAGE_UNAVAILABLE
+        )
+    if failure in {"database", "commit", "timeout"}:
+        context.resources.database_failed.assert_called_once()
+    context.service._confirm.assert_not_awaited()
+    context.service._failure.assert_not_awaited()
+    if phase == "retention":
+        context.service._record_attempt.assert_not_awaited()
+        context.launcher.start.assert_not_awaited()
+
+
+async def test_caller_cancellation_stops_and_awaits_claim_renewal(renewal_context, prepared) -> None:
+    context = renewal_context
+
+    async def start(_prepared: PreparedExecution) -> None:
+        await asyncio.Event().wait()
+
+    context.launcher.start.side_effect = start
+    task = asyncio.create_task(context.service.schedule(prepared))
+    try:
+        await asyncio.wait_for(context.renewed.wait(), timeout=2)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    assert context.tasks
+    assert all(renewal.done() for renewal in context.tasks)
+    context.service._confirm.assert_not_awaited()
+
+
+async def test_completed_result_wins_over_simultaneous_claim_release(prepared, monkeypatch) -> None:
+    service, _, _ = harness(prepared, monkeypatch)
+    resolved = service._confirm.return_value
+    monkeypatch.setattr(service, "_recover_prepared_claim", AsyncMock(return_value=resolved))
+    monkeypatch.setattr(service, "_renew_claim", AsyncMock(return_value=ClaimLost()))
+    assert await service.schedule(prepared) is resolved
 
 
 def fail_confirmation_transaction(context: SimpleNamespace, *, verified_read: bool | None = None) -> None:
@@ -357,6 +547,31 @@ async def test_lost_token_prevents_rpc(prepared, monkeypatch) -> None:
     assert isinstance(await service.schedule(prepared), ClaimLost)
     launcher.start.assert_not_awaited()
     service._confirm.assert_not_awaited()
+
+
+async def test_unavailable_frozen_runtime_is_retryable(prepared, monkeypatch) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.get.return_value = SimpleNamespace(project_id=uuid4())
+    provider = SimpleNamespace(resolve_frozen=AsyncMock(side_effect=SafeValueError("PRIVATE credential contents")))
+    monkeypatch.setattr(module, "EventConnectionProvider", lambda _session: provider)
+    with pytest.raises(EventLaunchError) as failure:
+        await EventAdmissionService._check_runtime(session, prepared, prepared.claim)
+    assert failure.value.code == SchedulingFailureCode.RUNTIME_UNAVAILABLE
+    assert failure.value.transient
+    assert "PRIVATE" not in str(failure.value)
+    provider.resolve_frozen.assert_awaited_once_with(prepared.claim, session.get.return_value.project_id)
+
+
+async def test_missing_execution_evidence_remains_non_retryable(prepared, monkeypatch) -> None:
+    session = MagicMock(spec=AsyncSession)
+    session.get.return_value = None
+    provider = MagicMock()
+    monkeypatch.setattr(module, "EventConnectionProvider", provider)
+    with pytest.raises(EventLaunchError) as failure:
+        await EventAdmissionService._check_runtime(session, prepared, prepared.claim)
+    assert failure.value.code == SchedulingFailureCode.EVIDENCE_MISMATCH
+    assert not failure.value.transient
+    provider.assert_not_called()
 
 
 @pytest.mark.parametrize(

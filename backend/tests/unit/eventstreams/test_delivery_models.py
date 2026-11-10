@@ -6,9 +6,9 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
+from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition
 from syntara.eventstreams.core.deduplication import DeliveryState, TerminalDelivery
 from syntara.eventstreams.models.delivery import EventDelivery
-from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
 from tests.unit.eventstreams.test_delivery_identity import identity
 
 
@@ -45,11 +45,11 @@ def test_bounded_due_and_terminal_indexes() -> None:
     assert "::bigint" in str(kafka.expressions[-1])
 
 
-def test_recovery_reservation_has_no_automatic_expiry() -> None:
-    """Worker and claim lease expiration cannot remove an evidence reservation."""
-    columns = set(EventDeliveryRecoveryHold.__table__.columns.keys())  # type: ignore[attr-defined]
-    assert "released_at" in columns
-    assert not {"expires_at", "lease_until", "payload", "secret"} & columns
+def test_partition_recovery_token_has_no_separate_hold_or_expiry() -> None:
+    """The partition retains its recovery fence independently of worker leases."""
+    columns = KafkaPartitionInitialPosition.__table__.columns  # type: ignore[attr-defined]
+    assert not columns.recovery_token.foreign_keys
+    assert not {"expires_at", "lease_until"} & set(columns.keys())
 
 
 @pytest.mark.parametrize("state", [DeliveryState.IN_PROGRESS, DeliveryState.SCHEDULED])

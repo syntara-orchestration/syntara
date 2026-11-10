@@ -18,9 +18,8 @@ from syntara.eventstreams.core.processing import CONTENT_INSPECTION_PENDING
 from syntara.eventstreams.core.results import EventFailureCode
 from syntara.eventstreams.core.scheduling_metadata import EVENT_DELIVERY_METADATA_KEY, SCHEDULING_STATE_KEY
 from syntara.eventstreams.exceptions import EventSubscriptionControlConflictError
-from syntara.eventstreams.models.control import EventSubscriptionRecovery, EventSubscriptionRuntime
+from syntara.eventstreams.models.control import EventSubscriptionRuntime
 from syntara.eventstreams.models.delivery import EventDelivery
-from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 
@@ -131,16 +130,6 @@ class EventRetirementService:
             or await self.has_retained_deliveries(source.id)
         ):
             return False
-        hold = (
-            await self.session.exec(
-                select(EventDeliveryRecoveryHold.token)
-                .where(
-                    EventDeliveryRecoveryHold.source_id == source.id,
-                    col(EventDeliveryRecoveryHold.released_at).is_(None),
-                )
-                .limit(1)
-            )
-        ).first()
         position = (
             await self.session.exec(
                 select(KafkaPartitionInitialPosition.partition)
@@ -151,17 +140,7 @@ class EventRetirementService:
                 .limit(1)
             )
         ).first()
-        request = (
-            await self.session.exec(
-                select(EventSubscriptionRecovery.partition)
-                .where(
-                    EventSubscriptionRecovery.source_id == source.id,
-                    col(EventSubscriptionRecovery.completed).is_(False),
-                )
-                .limit(1)
-            )
-        ).first()
-        return hold is None and position is None and request is None
+        return position is None
 
     async def stopped(self, source_id: UUID) -> bool:
         """Registration serializes with publication; missing acknowledgements persist."""
@@ -240,13 +219,6 @@ class EventRetirementService:
         if await self.has_retained_deliveries(source.id):
             msg = "retained_delivery_evidence_blocks_deletion"
             raise EventSubscriptionControlConflictError(msg)
-        holds = list(
-            (
-                await self.session.exec(
-                    select(EventDeliveryRecoveryHold).where(EventDeliveryRecoveryHold.source_id == source.id)
-                )
-            ).all()
-        )
         positions = list(
             (
                 await self.session.exec(
@@ -254,26 +226,12 @@ class EventRetirementService:
                 )
             ).all()
         )
-        if any(hold.released_at is None for hold in holds) or any(
-            position.gap_detected_at is not None or position.recovery_token is not None for position in positions
-        ):
+        if any(position.gap_detected_at is not None or position.recovery_token is not None for position in positions):
             msg = "recovery_evidence_blocks_deletion"
-            raise EventSubscriptionControlConflictError(msg)
-        requests = list(
-            (
-                await self.session.exec(
-                    select(EventSubscriptionRecovery).where(EventSubscriptionRecovery.source_id == source.id)
-                )
-            ).all()
-        )
-        if any(not request.completed for request in requests):
-            msg = "recovery_request_pending"
             raise EventSubscriptionControlConflictError(msg)
         for position in positions:
             await self.session.delete(position)
         await self.session.flush()
-        for item in [*holds, *requests]:
-            await self.session.delete(item)
         runtimes = (
             await self.session.exec(
                 select(EventSubscriptionRuntime).where(EventSubscriptionRuntime.source_id == source.id)

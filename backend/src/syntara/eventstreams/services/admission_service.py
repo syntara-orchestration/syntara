@@ -75,12 +75,56 @@ class EventAdmissionService:
         if self._resources is not None and not self._resources.scheduling_open:
             return BlockedDelivery(error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE)
         try:
+            return await self._recover_with_renewal(claim)
+        except _STORAGE_ERRORS:
+            if self._resources is not None:
+                self._resources.database_failed()
+            return BlockedDelivery(error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE)
+        except ValueError:
+            return BlockedDelivery(error_code=SchedulingFailureCode.EVIDENCE_MISMATCH)
+
+    async def _recover_with_renewal(self, claim: DeliveryClaim) -> SchedulingResult:
+        """Keep a committed claim live through reload, RPCs and finalization waits."""
+
+        async def recover() -> SchedulingResult:
             try:
                 return await self._recover_prepared_claim(claim)
             except ValueError:
                 return await self._failure(
                     claim, EventLaunchError(SchedulingFailureCode.EVIDENCE_MISMATCH, transient=False)
                 )
+
+        processing = asyncio.create_task(recover())
+        renewal = asyncio.create_task(self._renew_claim(claim))
+        try:
+            await asyncio.wait({processing, renewal}, return_when=asyncio.FIRST_COMPLETED)
+            # Finalization or retry may have released the claim while renewal
+            # observed it. Prefer the completed operation's durable result.
+            return processing.result() if processing.done() else renewal.result()
+        finally:
+            for task in (processing, renewal):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(processing, renewal, return_exceptions=True)
+
+    async def _renew_claim(self, claim: DeliveryClaim) -> ClaimLost | BlockedDelivery:
+        """Renew the same token in fresh transactions; never revive expired claims."""
+        loop = asyncio.get_running_loop()
+        interval = EventDeliveryDefaults.CLAIM_RENEWAL_INTERVAL_SECONDS
+        next_renewal = loop.time() + interval
+        try:
+            while True:
+                await asyncio.sleep(max(0, next_renewal - loop.time()))
+                next_renewal = loop.time() + interval
+                if self._resources is not None and not self._resources.scheduling_open:
+                    return BlockedDelivery(error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE)
+                # A blocked database call must not leave local work running
+                # indefinitely without a confirmed renewal.
+                async with asyncio.timeout(interval):
+                    async with self._session_factory() as session, session.begin():
+                        result = await EventDeliveryStore(session).renew(claim)
+                if isinstance(result, ClaimLost):
+                    return result
         except _STORAGE_ERRORS:
             if self._resources is not None:
                 self._resources.database_failed()
@@ -209,7 +253,7 @@ class EventAdmissionService:
         try:
             await EventConnectionProvider(session).resolve_frozen(claim, execution.project_id)
         except (SafeValueError, IntegrationCredentialNotFoundError):
-            raise EventLaunchError(SchedulingFailureCode.RUNTIME_UNAVAILABLE, transient=False) from None
+            raise EventLaunchError(SchedulingFailureCode.RUNTIME_UNAVAILABLE, transient=True) from None
 
     async def _write_attempt(
         self, prepared: PreparedExecution, retention: int, attempt_id: UUID

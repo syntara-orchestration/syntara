@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.core.constants import FieldLimits
 from syntara.eventstreams.core.deduplication import DeliveryIdentity
 from syntara.eventstreams.services.admission_service import EventAdmissionService, SchedulingResult
 from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
@@ -18,10 +19,19 @@ class EventExecutionRecoveryService:
         self._admission = admission
 
     async def recover_due(self, owner_worker_id: str, *, limit: int) -> list[tuple[DeliveryIdentity, SchedulingResult]]:
-        """Commit at most 100 claims, then recover serially without Kafka ownership."""
-        async with self._session_factory() as session, session.begin():
-            claims = await EventDeliveryStore(session).claim_due(owner_worker_id, limit=limit, prepared_only=True)
-        return [(claim.identity, await self._admission.recover_claim(claim)) for claim in claims]
+        """Recover at most 100 deliveries, claiming each only when ready to use it."""
+        if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= FieldLimits.MAX_ITEMS_PER_PAGE:
+            msg = "Recovery batch size must be between 1 and 100"
+            raise ValueError(msg)
+        results: list[tuple[DeliveryIdentity, SchedulingResult]] = []
+        for _ in range(limit):
+            async with self._session_factory() as session, session.begin():
+                claims = await EventDeliveryStore(session).claim_due(owner_worker_id, limit=1, prepared_only=True)
+            if not claims:
+                break
+            claim = claims[0]
+            results.append((claim.identity, await self._admission.recover_claim(claim)))
+        return results
 
     async def request_retry(self, identity: DeliveryIdentity) -> bool:
         """Wake recovery after a caller-authorized correction; no new start permission."""

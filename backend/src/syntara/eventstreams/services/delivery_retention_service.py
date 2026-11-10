@@ -1,68 +1,31 @@
-"""Serialized recovery reservations and fail-closed minimum-retention cleanup."""
+"""Minimum-retention cleanup protected by durable partition recovery fences."""
 
 import asyncio
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import cast
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import structlog
-from sqlalchemy import func
+from sqlalchemy import func, or_, tuple_
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.constants import EventDeliveryDefaults, FieldLimits
+from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition
 from syntara.eventstreams.core.deduplication import (
     CleanupCandidate,
     CommittedPositionUnavailableError,
     CommittedPositionVerifier,
     DeliveryIdentity,
     DeliveryState,
-    RecoveryReservation,
 )
+from syntara.eventstreams.models.control import EventSubscriptionRuntime
 from syntara.eventstreams.models.delivery import EventDelivery
-from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
-from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.services.delivery_cache_policy import DeliveryEvidencePolicy
 from syntara.eventstreams.services.subscription_service import lock_source_lifecycle
 
 logger = structlog.stdlib.get_logger(__name__)
-
-
-async def reserve_recovery_locked(
-    session: AsyncSession, source: EventSubscriptionSource, token: UUID
-) -> RecoveryReservation | None:
-    """Reserve evidence inside a caller transaction already holding source lifecycle locks.
-
-    The result becomes durable only after that transaction commits. This lets
-    boundary recovery close admission and cleanup atomically with its metadata.
-    """
-    existing = await session.get(EventDeliveryRecoveryHold, token, populate_existing=True)
-    if existing is not None:
-        if existing.source_id != source.id or existing.released_at is not None:
-            return None
-        return RecoveryReservation(source_id=source.id, token=token)
-    now = cast("datetime", (await session.exec(select(func.clock_timestamp()))).one())
-    session.add(EventDeliveryRecoveryHold(token=token, source_id=source.id, created_at=now))
-    source.delivery_evidence_revision += 1
-    await session.flush()
-    return RecoveryReservation(source_id=source.id, token=token)
-
-
-async def release_recovery_locked(
-    session: AsyncSession, source: EventSubscriptionSource, reservation: RecoveryReservation
-) -> bool:
-    """Release a named hold while the caller still owns the source lifecycle lock."""
-    if reservation.source_id != source.id:
-        return False
-    hold = await session.get(EventDeliveryRecoveryHold, reservation.token, with_for_update=True, populate_existing=True)
-    if hold is None or hold.source_id != source.id:
-        return False
-    if hold.released_at is None:
-        hold.released_at = cast("datetime", (await session.exec(select(func.clock_timestamp()))).one())
-        source.delivery_evidence_revision += 1
-        await session.flush()
-    return True
 
 
 class EventDeliveryRetentionService:
@@ -75,6 +38,8 @@ class EventDeliveryRetentionService:
         verifier: CommittedPositionVerifier | None = None,
         retention_seconds: int | None = None,
         policy: DeliveryEvidencePolicy | None = None,
+        deployment_id: UUID | None = None,
+        permits_cleanup: Callable[[], bool] | None = None,
     ) -> None:
         """Inject the committed-position port; absent verification always retains evidence."""
         if retention_seconds is not None and (
@@ -91,36 +56,30 @@ class EventDeliveryRetentionService:
             DeliveryEvidencePolicy.from_settings(retention_seconds=retention_seconds) if policy is None else policy
         )
         self.retention_seconds = self.policy.retention_seconds
-
-    async def reserve_recovery(self, source_id: UUID, *, token: UUID | None = None) -> RecoveryReservation | None:
-        """Commit a hold before recovery depends on evidence or changes any boundary.
-
-        Missing source state fails closed. A reservation protects remaining
-        evidence; callers must still establish that their required evidence exists.
-        """
-        reservation_token = uuid4() if token is None else token
-        async with self.session_factory() as session, session.begin():
-            lifecycle = await lock_source_lifecycle(session, source_id)
-            if lifecycle is None:
-                return None
-            _, source = lifecycle
-            return await reserve_recovery_locked(session, source, reservation_token)
-
-    async def release_recovery(self, reservation: RecoveryReservation) -> bool:
-        """Release only the named reservation after its recovery dependency is resolved."""
-        async with self.session_factory() as session, session.begin():
-            lifecycle = await lock_source_lifecycle(session, reservation.source_id)
-            if lifecycle is None:
-                return False
-            _, source = lifecycle
-            return await release_recovery_locked(session, source, reservation)
+        self.deployment_id = deployment_id
+        self._permits_cleanup = permits_cleanup
+        self._scan_lock = asyncio.Lock()
+        self._scan_after: tuple[UUID, datetime, str] | None = None
+        self._scan_cutoff: datetime | None = None
+        self.last_scan_count = 0
 
     async def _candidate(self, session: AsyncSession, identity: DeliveryIdentity) -> CleanupCandidate | None:
+        if (self.deployment_id is not None and identity.deployment_id != self.deployment_id) or (
+            self._permits_cleanup is not None and not self._permits_cleanup()
+        ):
+            return None
         lifecycle = await lock_source_lifecycle(session, identity.source_id)
         if lifecycle is None:
             return None
         subscription, source = lifecycle
-        if subscription.id != identity.subscription_id or subscription.workflow_id != identity.workflow_id:
+        if (
+            subscription.id != identity.subscription_id
+            or subscription.workflow_id != identity.workflow_id
+            or source.generation != identity.source_generation
+            or source.deployment_id != identity.deployment_id
+            or source.integration_identity != identity.integration_identity
+            or source.transport != identity.record.transport
+        ):
             return None
         row = (
             await session.exec(
@@ -138,23 +97,41 @@ class EventDeliveryRetentionService:
         ):
             return None
         now = cast("datetime", (await session.exec(select(func.clock_timestamp()))).one())
-        if now < self.policy.cleanup_after(row.resolved_at):
+        if now < self.policy.cleanup_after(row.resolved_at) or await self._protected(session, identity):
             return None
+        return CleanupCandidate(
+            identity=identity, resolved_at=row.resolved_at, evidence_revision=source.delivery_evidence_revision
+        )
+
+    async def _protected(self, session: AsyncSession, identity: DeliveryIdentity) -> bool:
+        """Check recovery and content protection while the caller holds lifecycle locks."""
         hold = (
             await session.exec(
-                select(EventDeliveryRecoveryHold.token)
+                select(KafkaPartitionInitialPosition.partition)
                 .where(
-                    col(EventDeliveryRecoveryHold.source_id) == identity.source_id,
-                    col(EventDeliveryRecoveryHold.released_at).is_(None),
+                    col(KafkaPartitionInitialPosition.source_id) == identity.source_id,
+                    or_(
+                        col(KafkaPartitionInitialPosition.recovery_token).is_not(None),
+                        col(KafkaPartitionInitialPosition.gap_detected_at).is_not(None),
+                    ),
                 )
                 .limit(1)
             )
         ).first()
         if hold is not None:
-            return None
-        return CleanupCandidate(
-            identity=identity, resolved_at=row.resolved_at, evidence_revision=source.delivery_evidence_revision
-        )
+            return True
+        # Durable content errors remain protective after consumer stop.
+        content_gate = (
+            await session.exec(
+                select(EventSubscriptionRuntime.source_id)
+                .where(
+                    EventSubscriptionRuntime.source_id == identity.source_id,
+                    col(EventSubscriptionRuntime.permanent_content_error).is_(True),
+                )
+                .limit(1)
+            )
+        ).first()
+        return content_gate is not None or (self._permits_cleanup is not None and not self._permits_cleanup())
 
     async def cleanup_one(self, identity: DeliveryIdentity) -> bool:
         """Remove only old terminal evidence with verified progress and unchanged protection."""
@@ -177,35 +154,82 @@ class EventDeliveryRetentionService:
         async with self.session_factory() as session, session.begin():
             current = await self._candidate(session, identity)
             row = await session.get(EventDelivery, identity.digest)
-            if current != candidate or row is None:
+            if (
+                current != candidate
+                or row is None
+                or (self._permits_cleanup is not None and not self._permits_cleanup())
+            ):
                 return False
             await session.delete(row)
             return True
 
+    async def _cleanup_page(self, limit: int) -> list[tuple[DeliveryIdentity, datetime]]:
+        """Read the next bounded page, including rows previous batches could not delete.
+
+        Freeze the eligible resolution-time boundary for one sweep. Otherwise a
+        busy early source could keep adding eligible rows ahead of the cursor and
+        prevent later sources from ever being visited. Deletion still rechecks
+        current database time, recovery holds and broker evidence per record.
+        """
+        async with self.session_factory() as session, session.begin():
+            if self._scan_cutoff is None:
+                self._scan_cutoff = cast(
+                    "datetime",
+                    (
+                        await session.exec(select(func.clock_timestamp() - timedelta(seconds=self.retention_seconds)))
+                    ).one(),
+                )
+            statement = select(EventDelivery).where(
+                col(EventDelivery.state) != DeliveryState.IN_PROGRESS.value,
+                col(EventDelivery.resolved_at) <= self._scan_cutoff,
+            )
+            if self.deployment_id is not None:
+                statement = statement.where(EventDelivery.deployment_id == self.deployment_id)
+            if self._scan_after is not None:
+                statement = statement.where(
+                    tuple_(
+                        col(EventDelivery.source_id), col(EventDelivery.resolved_at), col(EventDelivery.identity_digest)
+                    )
+                    > self._scan_after
+                )
+            rows = (
+                await session.exec(
+                    statement.order_by(
+                        col(EventDelivery.source_id), col(EventDelivery.resolved_at), col(EventDelivery.identity_digest)
+                    ).limit(limit)
+                )
+            ).all()
+            # Detach values while the session is open; callers must not depend
+            # on ORM attributes after its transaction has committed.
+            return [(row.delivery_identity(), cast("datetime", row.resolved_at)) for row in rows]
+
     async def cleanup(self, *, limit: int) -> int:
-        """Bound each cleanup batch; a missing verifier performs no deletion."""
+        """Scan one bounded page; retain unsafe rows without starving later sources.
+
+        A cursor is local and disposable, never permission to delete. A restart
+        begins another sweep; an empty page wraps back to previously retained
+        rows. Callers must keep the service instance across batches and use
+        last_scan_count, not the deletion count, to detect scan progress.
+        """
         if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= FieldLimits.MAX_ITEMS_PER_PAGE:
             msg = "Cleanup batch size must be between 1 and 100"
             raise ValueError(msg)
-        if self.verifier is None:
-            return 0
-        async with self.session_factory() as session, session.begin():
-            rows = (
-                await session.exec(
-                    select(EventDelivery)
-                    .where(
-                        col(EventDelivery.state) != DeliveryState.IN_PROGRESS.value,
-                        col(EventDelivery.resolved_at)
-                        <= func.clock_timestamp() - timedelta(seconds=self.retention_seconds),
-                    )
-                    .order_by(
-                        col(EventDelivery.source_id), col(EventDelivery.resolved_at), col(EventDelivery.identity_digest)
-                    )
-                    .limit(limit)
-                )
-            ).all()
-            identities = [row.delivery_identity() for row in rows]
-        removed = 0
-        for identity in identities:
-            removed += await self.cleanup_one(identity)
-        return removed
+        async with self._scan_lock:
+            self.last_scan_count = 0
+            if self.verifier is None:
+                return 0
+            rows = await self._cleanup_page(limit)
+            if not rows:
+                self._scan_after = None
+                self._scan_cutoff = None
+                return 0
+            removed = 0
+            for identity, resolved_at in rows:
+                # Advance even when verification retains the row or fails. It
+                # will be revisited next sweep; no evidence is erased by a skip.
+                try:
+                    removed += await self.cleanup_one(identity)
+                finally:
+                    self._scan_after = (identity.source_id, resolved_at, identity.digest)
+                    self.last_scan_count += 1
+            return removed

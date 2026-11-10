@@ -20,7 +20,6 @@ from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapsh
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.connection_provider import EventConnectionProvider
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
-from syntara.eventstreams.services.recovery_request_service import EventRecoveryRequestService
 from syntara.eventstreams.services.worker_resources import EventWorkerResources
 from syntara.integrations.adapters.kafka import KafkaAdapter
 from syntara.integrations.adapters.kafka_credentials import resolve_kafka_authentication
@@ -59,7 +58,7 @@ class ManagedRunnerFactory:
         if snapshot.transport != "kafka" or not isinstance(snapshot.configuration, KafkaSourceConfiguration):
             raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE)
         try:
-            connection = await self._resolve_connection(snapshot)
+            connection = await self.resolve_connection(snapshot)
         except SQLAlchemyError as exc:
             self._resources.database_failed()
             raise SubscriptionRuntimeError(RuntimeFailureCode.CONNECTION_UNAVAILABLE, transient=True) from exc
@@ -76,11 +75,22 @@ class ManagedRunnerFactory:
             work_semaphore=self._resources.processing,
             lookup=self._lookup,
             gate=self._resources.gate,
-            recovery_requests=EventRecoveryRequestService(self._session_factory),
             cache_coordination=self._cache_coordination,
         )
 
-    async def _resolve_connection(self, snapshot: SubscriptionSnapshot) -> ResolvedKafkaConnection:
+    async def connection_revision(self, snapshot: SubscriptionSnapshot) -> str:
+        """Recheck current resources and return their existing non-secret revision."""
+        try:
+            async with self._session_factory() as session, session.begin():
+                secrets = SecretService(session, self._encryptor, DatabaseBackend(session))
+                revision = await EventConnectionProvider(session, secret_service=secrets).resolve_revision(snapshot)
+                return revision.digest
+        except SQLAlchemyError:
+            self._resources.database_failed()
+            raise
+
+    async def resolve_connection(self, snapshot: SubscriptionSnapshot) -> ResolvedKafkaConnection:
+        """Resolve runtime or retained-source credentials without starting a consumer."""
         async with self._session_factory() as session, session.begin():
             secrets = SecretService(session, self._encryptor, DatabaseBackend(session))
             await EventConnectionProvider(session, secret_service=secrets).resolve_revision(snapshot)

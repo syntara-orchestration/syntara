@@ -27,6 +27,13 @@ becomes a recovery gap. Valid current group commits govern resumption. An
 established partition with a missing/invalid checkpoint is never reclassified as
 a newly added partition.
 
+The assigned runner automatically recovers missing or out-of-range checkpoints
+and expired incomplete initialization boundaries from retained beginning.
+It saves the reset reason, boundary and revision, retains unresolved delivery
+bindings, and retries interrupted recovery without manual acknowledgement.
+Only an expired saved recovery boundary is replaced with a newly saved retained
+beginning. Uncertain broker observations and source identity conflicts stay blocked.
+
 `source.initialized_at` is written once, after all members of the saved first set
 have confirmed initial commits. An added partition neither completes nor resets
 that timestamp. Previously ready partitions remain independently eligible while
@@ -72,13 +79,34 @@ the evidence revision or reconstruct missing history.
 
 ## Cache coordination and recovery
 
+Active recovery protection lives in
+`KafkaPartitionInitialPosition.recovery_token`, alongside its pending boundary
+and revision. Any active token protects the entire source from new admission,
+terminal cleanup and source deletion. Beginning, replacing and confirming a
+recovery updates the source evidence revision under the same lifecycle locks.
+One partition finishing does not release another partition's protection.
+The runner keeps its owned transport and recovery control tasks available while
+the source is held, including after restart. Gap reconciliation claims one
+prepared delivery at a time, immediately before repair, so later deliveries do
+not wait with expiring claims. A fresh authoritative lifecycle read must observe
+the cleared hold before normal intake and record commits resume.
+
+Migration `c4a8f17d2e93` removes the separate manual-request and recovery-hold
+tables. Stop ingestion/recovery workers before applying it. Existing automatic
+partition tokens are retained. Resolve pending manual requests, incompatible
+manual recovery decisions and standalone holds using the previous compatible
+version first; the migration refuses to drop those unresolved protections.
+Downgrade recreates the legacy hold rows for active partition tokens.
+
 Initialization and administrative commits never consult terminal-cache hits as
 checkpoint evidence. Recovery retains its durable gap, boundary, revision, and
 hold until the selected Kafka commit and database confirmation are reconciled.
-Permanent-content-error and duplicate-risk acknowledgement gates still apply.
+Permanent-content-error gates still apply. Ordinary automatic offset recovery
+preserves terminal outcomes and their cache-proof lifetimes, so it needs neither
+duplicate-risk acknowledgement nor cache-epoch coordination.
 
-Backward recovery below the effective authorized lower bound, and recovery with
-an unknown original lower bound, require an injected `RecoveryCacheCoordination`
+Administrative recovery below the effective authorized lower bound, or with an
+unknown original lower bound, requires an injected `RecoveryCacheCoordination`
 guard. The guard must establish deployment-wide close/drain and external
 cache-epoch isolation for the exact source request, recovery token, revision,
 and boundary. It must also prevent old readers/writers from remaining trusted.

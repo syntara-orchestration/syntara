@@ -2,6 +2,7 @@
 
 import asyncio
 import random
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -45,6 +46,7 @@ class SubscriptionSupervisor:
         *,
         placement: PlacementAuthority,
         startup_timeout_seconds: float | None = None,
+        connection_revision: Callable[[SubscriptionSnapshot], Awaitable[str]] | None = None,
     ) -> None:
         """Keep retry/circuit state local and reuse the existing drain deadline."""
         if placement.subscription_id != subscription_id:
@@ -55,12 +57,15 @@ class SubscriptionSupervisor:
         self._placement = placement
         self._placement_task: asyncio.Task[None] | None = None
         self._startup_timeout = startup_timeout_seconds
+        self._connection_revision = connection_revision
+        self._connection_available = True
         self._drain_timeout = get_settings().event_drain_timeout_seconds
         self._lock = asyncio.Lock()
         self._desired: SubscriptionSnapshot | None = None
-        self._target: tuple[RuntimeRevision, bool] | None = None
+        self._target: tuple[RuntimeRevision, bool, str | None] | None = None
         self._runner: SubscriptionRunner | None = None
         self._runner_revision: RuntimeRevision | None = None
+        self._runner_connection_revision: str | None = None
         self._applied: RuntimeRevision | None = None
         self._task: asyncio.Task[None] | None = None
         self._startup_task: asyncio.Task[None] | None = None
@@ -101,6 +106,9 @@ class SubscriptionSupervisor:
             elif self._local_contention and self._desired is not None and self._active(self._desired):
                 state = RuntimeState.BLOCKED
                 reason = RuntimeFailureCode.LOCAL_RUNNER_BUSY.value
+            elif self._desired is not None and self._active(self._desired) and not self._connection_available:
+                state = RuntimeState.BLOCKED
+                reason = RuntimeFailureCode.CONFIGURATION_UNAVAILABLE.value
             elif self._failure is not None:
                 state = RuntimeState.BACKOFF if self._failure.transient and not circuit else RuntimeState.BLOCKED
                 reason = self._failure.code.value
@@ -127,7 +135,7 @@ class SubscriptionSupervisor:
         )
 
     async def apply(self, snapshot: SubscriptionSnapshot) -> SubscriptionRuntimeStatus:
-        """Reconcile the latest request; identical snapshots never reset retry budgets."""
+        """Reconcile desire; unchanged publication/connection revisions keep retry budgets."""
         if snapshot.subscription_id != self._subscription_id:
             msg = "Snapshot belongs to a different subscription"
             raise ValueError(msg)
@@ -235,14 +243,15 @@ class SubscriptionSupervisor:
                 return
             if deadline is not None and active:
                 return  # A superseded inactive request must not start newer active work.
-            target = (revision, active)
-            if target != self._target:
-                self._target = target
-                self._clear_failure()
+            target = await self._refresh_target(snapshot, revision, active=active)
+            if target is None:
+                continue
+            active, connection_revision = target
             if self._runner is not None:
                 if (
                     active
                     and self._runner_revision == revision
+                    and self._runner_connection_revision == connection_revision
                     and self._task is not None
                     and not self._task.done()
                     and not self._draining
@@ -260,17 +269,44 @@ class SubscriptionSupervisor:
                 )
             ):
                 return
-            await self._start_runner(snapshot, revision)
+            await self._start_runner(snapshot, revision, connection_revision)
             if self._desired == snapshot or self._draining:
                 return
 
-    async def _start_runner(self, snapshot: SubscriptionSnapshot, revision: RuntimeRevision) -> None:
+    async def _refresh_target(
+        self, snapshot: SubscriptionSnapshot, revision: RuntimeRevision, *, active: bool
+    ) -> tuple[bool, str | None] | None:
+        """Refresh connection availability and retry state unless the desired snapshot changed."""
+        connection_revision = None
+        available = True
+        if active and self._connection_revision is not None:
+            try:
+                async with asyncio.timeout(self._startup_timeout):
+                    connection_revision = await self._connection_revision(snapshot)
+            except (SyntaraError, ValueError, OSError):
+                # Recheck on the next existing reconciliation. An unavailable
+                # credential must stop the old client, not become a permanent
+                # failure requiring a workflow republish or manual retry.
+                available = False
+            if self._desired != snapshot:
+                return None
+        self._connection_available = available
+        active = active and available
+        target = (revision, active, connection_revision)
+        if target != self._target:
+            self._target = target
+            self._clear_failure()
+        return active, connection_revision
+
+    async def _start_runner(
+        self, snapshot: SubscriptionSnapshot, revision: RuntimeRevision, connection_revision: str | None
+    ) -> None:
         if not self._placement.reserve_local(self):
             self._local_contention = self._placement.is_current()
             return
         self._local_contention = False
         self._starting = True
-        self._startup_task = asyncio.create_task(self._open_runner(snapshot, revision))
+        self._startup_task = asyncio.create_task(self._open_runner(snapshot, revision, connection_revision))
         try:
             await self._startup_task
             if self._closed or self._desired != snapshot or not self._placement.is_current():
@@ -294,10 +330,13 @@ class SubscriptionSupervisor:
             self._startup_task = None
             self._starting = False
 
-    async def _open_runner(self, snapshot: SubscriptionSnapshot, revision: RuntimeRevision) -> None:
+    async def _open_runner(
+        self, snapshot: SubscriptionSnapshot, revision: RuntimeRevision, connection_revision: str | None
+    ) -> None:
         async with asyncio.timeout(self._startup_timeout):
             runner = await self._factory(snapshot)
             self._runner, self._runner_revision = runner, revision
+            self._runner_connection_revision = connection_revision
             if runner.snapshot != snapshot:
                 raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE)
             runner.bind_placement(self._placement.is_current)
@@ -366,6 +405,7 @@ class SubscriptionSupervisor:
         self._drain_task = None
         self._runner = None
         self._runner_revision = self._applied = None
+        self._runner_connection_revision = None
         self._task = None
         self._draining = False
         self._stop_retry_at = None

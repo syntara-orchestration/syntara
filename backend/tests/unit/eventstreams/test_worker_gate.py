@@ -1,13 +1,20 @@
 """Process gate composition with actual runner/cache ports and isolated dependencies."""
 
+import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
+import pytest
 import pytest_asyncio
 from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 
-from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition, PositionStatus
+from syntara.eventstreams.adapters.kafka_initial_position import (
+    KafkaPartitionInitialPosition,
+    PositionResult,
+    PositionStatus,
+)
 from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaInitialPositionService
 from syntara.eventstreams.core.handler import BlockedDelivery, ResolvedDelivery
 from syntara.eventstreams.core.preparation import PreparedExecution
@@ -88,6 +95,125 @@ async def test_heartbeat_started_before_a_failure_cannot_restore_write_trust(gat
     assert not context.gate.scheduling_open
 
 
+@pytest.mark.parametrize("already_blocked", [False, True])
+async def test_recovery_fence_preserves_database_trust_and_rejects_stale_reconciliation(
+    gate_context, *, already_blocked: bool
+):
+    context = gate_context
+    if already_blocked:
+        assert context.gate.reconciled(
+            [context.snapshot], {context.snapshot.source_id}, generation=context.gate.generation, started=100.0
+        )
+    previous = context.gate.generation
+    context.gate.recovery_started(context.snapshot)
+    assert context.gate.scheduling_open
+    assert context.gate.transport_open(context.snapshot)
+    assert not context.gate.admission_open(context.snapshot)
+    assert not context.gate.resolution_open(context.snapshot)
+    assert not context.gate.reconciled([context.snapshot], set(), generation=previous, started=100.0)
+    current = context.gate.generation
+    assert current == previous + 1
+    context.gate.membership_confirmed(160.0, generation=current)
+    assert context.gate.reconciled([context.snapshot], {context.snapshot.source_id}, generation=current, started=100.0)
+    assert not context.gate.admission_open(context.snapshot)
+    assert context.gate.reconciled([context.snapshot], set(), generation=current, started=100.0)
+    assert context.gate.admission_open(context.snapshot)
+
+
+@pytest.mark.parametrize("persisted_hold", [False, True])
+async def test_runner_tick_recovers_with_real_shared_gate_and_persisted_hold(
+    cached_runner, monkeypatch, *, persisted_hold: bool
+):
+    context = cached_runner
+    runner = context.runner
+    shared = await gate_for(context.context.snapshot)
+    runner._gate = context.processing._gate = shared.gate
+    if persisted_hold:
+        assert shared.gate.reconciled(
+            [shared.snapshot], {shared.snapshot.source_id}, generation=shared.gate.generation, started=100.0
+        )
+    state = runner._partitions[2]
+    state.ready = state.eligible = False
+    state.initialization = None
+    repaired = False
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def initialize(request) -> PositionResult:
+        return PositionResult(
+            status=PositionStatus.READY if repaired else PositionStatus.RECOVERY_GAP,
+            next_offset=0 if repaired else None,
+            assignment_epoch=request.assignment_epoch,
+            reason=None if repaired else "missing_commit",
+        )
+
+    async def recover(request, *, owner_worker_id) -> PositionResult:
+        nonlocal repaired
+        token, generation = uuid4(), shared.gate.generation
+        evidence = await runner.close_and_drain(request, token=token, boundary=0)
+        assert evidence.quiescent
+        assert (await runner.close_and_drain(request, token=token, boundary=0)).quiescent
+        assert shared.gate.generation == generation + 1
+        assert shared.gate.scheduling_open
+        assert shared.gate.transport_open(shared.snapshot)
+        assert not shared.gate.admission_open(shared.snapshot)
+        entered.set()
+        await release.wait()
+        repaired = True
+        # The normal manager must observe the cleared durable hold before intake resumes.
+        shared.gate.membership_confirmed(160.0, generation=shared.gate.generation)
+        assert shared.gate.reconciled([shared.snapshot], set(), generation=shared.gate.generation, started=100.0)
+        return await initialize(request)
+
+    context.positions.initialize.side_effect = initialize
+    context.positions.recover_automatically.side_effect = recover
+    monkeypatch.setattr(context.processing, "admission_eligible", AsyncMock(return_value=True))
+    await runner._tick()
+    assert state.task is not None
+    await asyncio.wait_for(state.task, timeout=2)
+    await runner._tick()
+    assert state.control_task is not None
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=2)
+        # The initial unready tick may poll the client with an empty partition list.
+        # Measure fetches only while the recovery hold is active.
+        context.client.fetch.reset_mock()
+        await runner._tick()
+        assert not runner._closing
+        context.client.fetch.assert_not_awaited()
+        context.client.commit.assert_not_awaited()
+    finally:
+        release.set()
+        await asyncio.wait_for(state.control_task, timeout=2)
+    assert not runner._closing
+    assert state.ready
+    assert state.initialization.status == PositionStatus.READY
+    assert shared.gate.admission_open(shared.snapshot)
+
+
+async def test_other_partition_waiting_for_recovery_fences_commits_without_stopping_repair(cached_runner):
+    context = cached_runner
+    shared = await gate_for(context.context.snapshot)
+    context.runner._gate = context.processing._gate = shared.gate
+    ready = context.runner._partitions[2]
+    await context.runner._enqueue({2: [cache_tests.record(context)]}, 7)
+    await context.runner._advance(ready)
+    assert ready.resolved_next_offset == 6
+    context.client.assignment = frozenset({2, 3})
+    await context.runner.on_partitions_assigned(context.client.assignment, 7)
+    context.positions.initialize.side_effect = lambda request: PositionResult(
+        status=PositionStatus.BLOCKED,
+        assignment_epoch=request.assignment_epoch,
+        reason="waiting_for_source_recovery",
+    )
+    await context.runner._advance(context.runner._partitions[3])
+    assert shared.gate.scheduling_open
+    assert shared.gate.transport_open(shared.snapshot)
+    assert not shared.gate.admission_open(shared.snapshot)
+    assert not shared.gate.resolution_open(shared.snapshot)
+    await context.runner._commit_positions((ready,))
+    context.client.commit.assert_not_awaited()
+
+
 async def test_actual_cached_hit_cannot_commit_after_shared_database_outage(cached_runner):
     context = cached_runner
     shared = await gate_for(context.context.snapshot)
@@ -163,7 +289,7 @@ async def test_recovery_hold_allows_frozen_repair_before_hold_release(monkeypatc
     service, launcher, _ = admission_harness(prepared, monkeypatch)
     service._resources = EventWorkerResources(shared.gate)
     positions = position_tests.Harness(position=position_tests.row(gap=True))
-    positions.store.reconcile_claims.return_value = [prepared.claim]
+    positions.store.reconcile_claims.side_effect = [[prepared.claim], []]
 
     async def begin(request) -> KafkaPartitionInitialPosition:
         result: KafkaPartitionInitialPosition = await positions.begin_recovery(request)

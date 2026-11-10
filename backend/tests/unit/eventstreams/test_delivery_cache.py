@@ -55,6 +55,33 @@ async def test_valid_proof_returns_without_opening_database(monkeypatch: pytest.
     cache.put.assert_not_awaited()
 
 
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"cache_epoch": None},
+        {"cache_epoch": "invalid"},
+        {"cache_epoch": UUID(int=0)},
+        {"clock_error_bound_seconds": None},
+        {"clock_error_bound_seconds": 1},
+        {"clock_error_bound_seconds": "invalid"},
+    ],
+)
+async def test_untrusted_configuration_uses_database_without_cache_io(
+    changes: dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service, cache, repository, factory, _ = lookup_service(monkeypatch, terminal())
+    service.policy = policy(**changes)
+    cache.get.return_value = signed_proof().model_dump_json()
+
+    assert await service.lookup(identity()) == terminal()
+    await service.populate(identity())
+
+    repository.lookup_terminal.assert_awaited_once_with(identity())
+    factory.assert_called_once()
+    cache.get.assert_not_awaited()
+    cache.put.assert_not_awaited()
+
+
 async def test_proof_expiring_during_redis_io_uses_database_without_refresh(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

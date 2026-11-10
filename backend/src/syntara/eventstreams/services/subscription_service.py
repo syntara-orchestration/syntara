@@ -280,6 +280,7 @@ class EventSubscriptionService(BaseService):
             or subscription.input_schema != parameters.input_schema
             or subscription.filter != filter_configuration
             or not subscription.desired_enabled
+            or subscription.paused
         )
 
         # The published-version pointer advances on every successful republish, even
@@ -292,6 +293,7 @@ class EventSubscriptionService(BaseService):
             subscription.input_schema = parameters.input_schema
             subscription.filter = filter_configuration
             subscription.desired_enabled = True
+            subscription.paused = False
             subscription.enabled_by = self.user.id
             subscription.updated_by = self.user.id
             subscription.configuration_revision += 1

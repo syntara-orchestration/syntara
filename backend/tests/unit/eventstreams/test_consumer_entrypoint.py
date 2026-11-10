@@ -13,6 +13,7 @@ from syntara.core.lib.encryption import SecretEncryptor
 from syntara.eventstreams import consumer_entrypoint as entrypoint
 from syntara.eventstreams import consumer_lifecycle as lifecycle
 from syntara.eventstreams.consumer_service import EventWorkerManager
+from syntara.eventstreams.services.delivery_cleanup_worker import EventDeliveryCleanupWorker
 from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
 from syntara.eventstreams.services.subscription_hints import SubscriptionHintListener
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
@@ -23,6 +24,7 @@ from tests.helpers.eventstream_worker import IsolatedPlacementPool, IsolatedPlac
 from tests.unit.eventstreams import test_consumer_service as consumer_tests
 from tests.unit.eventstreams.test_connection_provider import connection_context
 from tests.unit.eventstreams.test_consumer_service import eventually
+from tests.unit.eventstreams.test_delivery_cleanup_worker import context as cleanup_context
 from tests.unit.eventstreams.test_worker_resources import TrackingSessionFactory
 
 manager_context = consumer_tests.manager_context
@@ -44,9 +46,18 @@ async def test_composition_shares_one_client_factory_and_resource_limits(monkeyp
         captured.append(True)
         assert shared is resources
         assert kwargs["shutdown_event"] is shutdown
+        cleanup = kwargs["cleanup"]
+        assert isinstance(cleanup, EventDeliveryCleanupWorker)
+        assert cleanup._resources is shared
+        assert cleanup._retention.session_factory is sessions
+        assert cleanup._retention.deployment_id == placement.worker.deployment_id
+        assert cleanup._retention.verifier is cleanup._verifier
+        assert cleanup._verifier._deployment_id == placement.worker.deployment_id
+        assert cleanup._verifier._resolve_connection == manager._factory.resolve_connection
         assert manager._reader._session_factory is sessions
         assert manager._factory._session_factory is sessions
         assert manager._factory._resources is shared
+        assert manager._connection_revision == manager._factory.connection_revision
         assert recovery._resources is shared
         assert manager._factory._admission is recovery._admission
         assert recovery._admission._launcher._client is client
@@ -163,13 +174,15 @@ async def test_signal_stops_starts_and_claims_while_recovery_is_independent(monk
     )
     remove = MagicMock()
     monkeypatch.setattr(loop, "remove_signal_handler", remove)
-    task = asyncio.create_task(lifecycle.run_event_worker(manager, recovery, resources, hints))
+    cleanup = SimpleNamespace(start=MagicMock(), close_batches=MagicMock(), stop=AsyncMock())
+    task = asyncio.create_task(lifecycle.run_event_worker(manager, recovery, resources, hints, cleanup=cleanup))
     try:
         await runner.start_entered.wait()
         await eventually(lambda: store.claim_due.await_count > 0)
         assert manager.ready
         assert not runner.started
         handlers[sig]()
+        cleanup.close_batches.assert_called_once()
         assert recovery.draining
         assert not resources.accepting
         assert not manager.ready
@@ -180,6 +193,7 @@ async def test_signal_stops_starts_and_claims_while_recovery_is_independent(monk
         assert store.claim_due.await_count == claims
         assert runner.stopped
         hints.stop.assert_awaited_once()
+        cleanup.stop.assert_awaited_once()
         assert remove.call_count == 2
     finally:
         release.set()
@@ -205,17 +219,28 @@ async def test_recovery_scans_with_zero_active_consumers(monkeypatch):
     redis.disconnect = AsyncMock()
     hints = SubscriptionHintListener(manager.request_reconcile, redis)
     shutdown = asyncio.Event()
-    task = asyncio.create_task(lifecycle.run_event_worker(manager, recovery, resources, hints, shutdown_event=shutdown))
+    maintenance = cleanup_context(idle_seconds=0.01)
+    cleanup = maintenance.worker
+    cleanup._resources = resources
+    task = asyncio.create_task(
+        lifecycle.run_event_worker(manager, recovery, resources, hints, shutdown_event=shutdown, cleanup=cleanup)
+    )
     try:
         await eventually(
-            lambda: manager.ready and store.claim_due.await_count > 0 and redis.pubsub_subscribe.await_count > 0
+            lambda: manager.ready
+            and store.claim_due.await_count > 0
+            and redis.pubsub_subscribe.await_count > 0
+            and maintenance.retention.cleanup.await_count > 0
         )
         assert not manager.subscription_ids
+        assert cleanup._task is not None
         factory.assert_not_awaited()
     finally:
         shutdown.set()
         await task
     assert recovery.draining
+    assert cleanup._closing
+    assert cleanup._task is None
     assert not resources.accepting
     redis.disconnect.assert_not_awaited()  # Only the entrypoint owns the shared pool.
 

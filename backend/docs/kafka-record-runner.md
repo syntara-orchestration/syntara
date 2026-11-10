@@ -36,10 +36,13 @@ Gate reads must be local, bounded and fail closed for unknown or stale evidence.
 unexpired placement lease. `resolution_open(snapshot)` must reject known database
 outages, failed required durable writes, source-incarnation uncertainty and
 administrative recovery blocks. Required durable failures observed by processing
-or initialization call `dependency_failed(snapshot)`. A locally created
-administrative fence and discovered lifecycle/source evidence failures also
-invalidate that shared trust. Only authoritative process reconciliation may
-reopen the shared gate after the hold is resolved. Source correction/restore still
+or initialization call `dependency_failed(snapshot)`. Discovered lifecycle/source
+evidence failures also invalidate that shared trust. A known recovery fence calls
+`recovery_started(snapshot)` instead: new intake and record commits remain closed,
+while `transport_open(snapshot)` keeps the owned Kafka client and recovery control
+tasks available. Prepared-delivery repair retains database trust. Only a fresh
+authoritative process reconciliation may reopen intake after the hold is resolved;
+a reconciliation started before the fence cannot reopen it. Source correction/restore still
 requires the completed cache provider's external epoch coordination.
 
 The runner also checks local content/unknown-content gates, initialized partition
@@ -82,17 +85,22 @@ failures close the shared resolution gate.
 
 ## Content inspection evidence
 
-Before decoding, the processing service commits an ordinary delivery row with
-`last_error_code=content_inspection_pending` and a finite, token-fenced inspection
-claim. This records unknown content status without storing the source body.
-The marker remains protective after lease expiry, cancellation and restart.
+For normal processing, retained outcomes are checked first. New records are
+decoded and validated before acquiring a delivery claim. Valid records then use
+one transaction to acquire the claim and freeze the prepared Execution. A failure
+before preparation leaves the Kafka offset uncommitted for redelivery.
 
-Successful validation-only inspection replaces the marker with
-`content_validated`. Normal processing keeps the marker until durable Execution
-preparation is frozen. A permanent decoding/schema error replaces it with its
-safe error code and remains unresolved until the required activity log exists.
-Failed inspection finalization retains the pending marker. Dependency, permission,
-quota and capacity failures do not become permanent content decisions.
+Validation-only recovery inspection still commits an ordinary delivery row with
+`last_error_code=content_inspection_pending` before decoding. This records unknown
+content status without storing the source body. Existing pending inspection rows
+also retain this token-fenced recovery path. Successful validation-only inspection
+replaces the marker with `content_validated`; normal redelivery of an existing
+pending row keeps its marker until durable Execution preparation is frozen.
+
+A permanent decoding/schema error is persisted with its safe error code and
+remains unresolved until the required activity log exists. Failed inspection
+finalization retains the pending marker. Dependency, permission, quota and
+capacity failures do not become permanent content decisions.
 
 Gap reconciliation, boundary confirmation and retention verification all respect
 pending inspection evidence. Missing source records or unavailable evidence must
@@ -117,9 +125,8 @@ the marker, or advancing Kafka offsets are not safe substitutes for evidence.
 Queue, concurrency and drain defaults are configured through the documented
 `APP_EVENT_*` settings in `.env.example`. Changes apply on runner restart.
 
-See [event subscription controls](event-subscription-controls.md) for revision-checked
-operator actions, durable shutdown acknowledgements, retirement guards and the
-additional control-coordination migration.
+See [Kafka Subscribe connection testing](event-subscription-controls.md) for the
+builder's non-consuming connection test and its existing workflow permissions.
 
 See [Kafka worker operations](kafka-worker-operations.md) for runtime defaults,
 local compose configuration, sizing and recovery/rollout ordering.

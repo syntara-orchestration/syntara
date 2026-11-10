@@ -349,6 +349,87 @@ async def test_configuration_failure_requires_explicit_retry_without_live_refres
     assert (await context.supervisor.retry()).state == RuntimeState.ACTIVE
 
 
+async def test_unchanged_connection_revision_keeps_the_existing_consumer(harness):
+    reader = AsyncMock(return_value="connection-1")
+    harness.supervisor._connection_revision = reader
+    await harness.supervisor.apply(harness.snapshot)
+    await harness.supervisor.apply(harness.snapshot)
+    assert reader.await_count == 2
+    harness.factory.assert_awaited_once()
+    assert not harness.runners[0].stopped
+
+
+async def test_connection_change_replaces_consumer_without_changing_source(harness):
+    reader = AsyncMock(return_value="connection-1")
+    harness.supervisor._connection_revision = reader
+    await harness.supervisor.apply(harness.snapshot)
+    old = harness.runners[0]
+    old.drain_release = asyncio.Event()
+    reader.return_value = "connection-2"
+    replacing = asyncio.create_task(harness.supervisor.apply(harness.snapshot))
+    await old.drain_entered.wait()
+    assert not old.accepting
+    assert len(harness.runners) == 1
+    old.drain_release.set()
+    result = await replacing
+    assert result.state == RuntimeState.ACTIVE
+    assert old.stopped
+    assert len(harness.runners) == 2
+    assert all(runner.snapshot == harness.snapshot for runner in harness.runners)
+    assert harness.runners[1].snapshot.configuration.group_id == old.snapshot.configuration.group_id
+    assert harness.supervisor._runner_connection_revision == "connection-2"
+
+
+async def test_unavailable_connection_stops_and_resumes_without_republish(harness):
+    reader = AsyncMock(return_value="connection-1")
+    harness.supervisor._connection_revision = reader
+    await harness.supervisor.apply(harness.snapshot)
+    reader.side_effect = SafeValueError("PRIVATE credential contents")
+    status = await harness.supervisor.apply(harness.snapshot)
+    assert harness.runners[0].stopped
+    assert status.state == RuntimeState.BLOCKED
+    assert status.desired_active  # The published subscription is still desired.
+    assert status.reason == "configuration_unavailable"
+    assert "PRIVATE" not in status.model_dump_json()
+    await harness.supervisor.apply(harness.snapshot)
+    harness.factory.assert_awaited_once()
+    reader.side_effect = None
+    # Availability can recover without changed timestamps, for example after
+    # restoring an Integration's existing project assignment.
+    status = await harness.supervisor.apply(harness.snapshot)
+    assert status.state == RuntimeState.ACTIVE
+    assert harness.factory.await_count == 2
+    assert harness.runners[1].snapshot == harness.snapshot
+
+
+async def test_corrected_connection_revision_clears_a_startup_configuration_failure(harness):
+    reader = AsyncMock(return_value="connection-1")
+    harness.supervisor._connection_revision = reader
+    harness.factory.side_effect = SafeValueError("invalid connection settings")
+    assert (await harness.supervisor.apply(harness.snapshot)).state == RuntimeState.BLOCKED
+    harness.factory.side_effect = harness.spawn
+    await harness.supervisor.apply(harness.snapshot)
+    harness.factory.assert_awaited_once()  # The same revision keeps its retry policy.
+    reader.return_value = "connection-2"
+    assert (await harness.supervisor.apply(harness.snapshot)).state == RuntimeState.ACTIVE
+    assert harness.factory.await_count == 2
+
+
+async def test_connection_refresh_preserves_permanent_content_error(harness):
+    reader = AsyncMock(return_value="connection-1")
+    harness.supervisor._connection_revision = reader
+    await harness.supervisor.apply(harness.snapshot)
+    harness.runners[0].observation = RunnerStatus(
+        state=RuntimeState.BLOCKED, reason="activity_log_unavailable", permanent_content_error=True
+    )
+    reader.return_value = "connection-2"
+    status = await harness.supervisor.apply(harness.snapshot)
+    assert harness.runners[0].stopped
+    assert status.permanent_content_error
+    assert status.state == RuntimeState.BLOCKED
+    harness.factory.assert_awaited_once()
+
+
 async def test_one_subscription_failure_does_not_stop_another_supervisor(harness):
     context = harness
     context.factory.side_effect = OSError("PRIVATE connection error")
@@ -714,7 +795,7 @@ async def test_frozen_work_remains_discoverable_by_consumer_independent_recovery
         await supervisor.apply(context.snapshot.model_copy(update=updates))
     if change not in {"revision", "placement"}:
         assert supervisor.status.state == RuntimeState.STOPPED
-    context.store.claim_due.return_value = [prepared.claim]
+    context.store.claim_due.side_effect = [[prepared.claim], []]
     monkeypatch.setattr(recovery_module, "EventDeliveryStore", lambda _session: context.store)
     admission = MagicMock(spec=EventAdmissionService)
 
@@ -729,7 +810,10 @@ async def test_frozen_work_remains_discoverable_by_consumer_independent_recovery
         "recovery", limit=10
     )
     assert isinstance(recovered[0][1], ResolvedDelivery)
-    context.store.claim_due.assert_awaited_once_with("recovery", limit=10, prepared_only=True)
+    assert context.store.claim_due.await_count == 2
+    for request in context.store.claim_due.await_args_list:
+        assert request.args == ("recovery",)
+        assert request.kwargs == {"limit": 1, "prepared_only": True}
     admission.recover_claim.assert_awaited_once_with(prepared.claim)
     assert execution.model_dump() == frozen
     assert context.events.count("freeze") == 1

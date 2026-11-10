@@ -1,8 +1,8 @@
-"""Kafka initialization and explicit recovery metadata, never ongoing checkpoints."""
+"""Kafka initialization and recovery metadata, never ongoing checkpoints."""
 
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Annotated, ClassVar
+from typing import Annotated, ClassVar, Literal
 from uuid import UUID
 
 from pydantic import BeforeValidator, ConfigDict, PlainSerializer, WithJsonSchema
@@ -44,6 +44,11 @@ class InitializationKind(StrEnum):
 
     FIRST_ACTIVATION = "first_activation"
     ADDED_PARTITION = "added_partition"
+
+
+AUTOMATIC_RECOVERY_REASONS = frozenset(
+    {GapReason.MISSING_COMMIT, GapReason.OUT_OF_RANGE, GapReason.BELOW_AUTHORIZED_BOUNDARY}
+)
 
 
 class RecoveryPolicy(StrEnum):
@@ -93,6 +98,14 @@ class RecoveryReplacementRequest(RecoveryRequest):
     """Explicitly supersede an expired pending decision, never an ordinary retry."""
 
     expected_pending_boundary: Offset
+
+
+class AutomaticRecoveryRequest(RecoveryRequest):
+    """Internal earliest-only reset; never supplied by an administrative route."""
+
+    policy: Literal[RecoveryPolicy.RETAINED_BEGINNING] = RecoveryPolicy.RETAINED_BEGINNING
+    acknowledge_duplicate_risk: Literal[False] = False
+    allow_unscheduled_disposition: Literal[False] = False
 
 
 class PositionResult(PositionValue):
@@ -159,9 +172,7 @@ class KafkaPartitionInitialPosition(SQLModel, table=True):
     duplicate_risk_acknowledged: bool = Field(default=False)
     gap_detected_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore[call-overload]
     gap_reason: str | None = Field(default=None, max_length=100)
-    recovery_token: UUID | None = Field(
-        default=None, foreign_key="event_delivery_recovery_holds.token", ondelete="RESTRICT"
-    )
+    recovery_token: UUID | None = None
     pending_boundary: int | None = Field(default=None, sa_type=BigInteger)
     pending_policy: str | None = Field(default=None, max_length=32)
     pending_reason: str | None = Field(default=None, max_length=100)

@@ -1,6 +1,7 @@
 """Runtime credential composition and Kafka construction outside database sessions."""
 
 import ssl
+from datetime import timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -110,3 +111,49 @@ async def test_database_resolution_failure_closes_shared_gate_and_is_transient(m
     assert failure.value.transient
     resources.gate.database_failed.assert_called_once()
     construct.assert_not_called()
+
+
+@pytest.mark.parametrize("changed", ["integration", "credential", "credential_type", "secret"])
+async def test_connection_revision_reads_existing_resource_changes_without_constructing_consumer(monkeypatch, changed):
+    context = connection_context()
+    context.session.__aenter__.return_value = context.session
+    monkeypatch.setattr(module, "SecretService", lambda *_args: context.secrets)
+    monkeypatch.setattr(module, "EventConnectionProvider", lambda *_args, **_kwargs: context.provider)
+    construct = MagicMock()
+    monkeypatch.setattr(module, "KafkaPartitionConsumer", construct)
+    factory = module.ManagedRunnerFactory(
+        MagicMock(return_value=context.session),
+        MagicMock(),
+        MagicMock(),
+        EventWorkerResources(),
+        SecretEncryptor(b"a" * 32),
+        owner_worker_id="test-worker",
+    )
+    before = await factory.connection_revision(context.snapshot)
+    if changed == "secret":
+        context.session.exec.return_value.one_or_none.return_value += timedelta(microseconds=1)
+    else:
+        getattr(context, changed).updated_at += timedelta(microseconds=1)
+    after = await factory.connection_revision(context.snapshot)
+    assert before != after
+    assert "PRIVATE" not in before + after
+    assert context.session.__aexit__.await_count == 2
+    construct.assert_not_called()
+
+
+async def test_connection_revision_database_failure_closes_shared_gate(monkeypatch):
+    context = connection_context()
+    context.session.__aenter__.side_effect = SQLAlchemyError("unavailable")
+    resources = EventWorkerResources()
+    resources.gate = MagicMock()
+    factory = module.ManagedRunnerFactory(
+        MagicMock(return_value=context.session),
+        MagicMock(),
+        MagicMock(),
+        resources,
+        SecretEncryptor(b"a" * 32),
+        owner_worker_id="test-worker",
+    )
+    with pytest.raises(SQLAlchemyError):
+        await factory.connection_revision(context.snapshot)
+    resources.gate.database_failed.assert_called_once()

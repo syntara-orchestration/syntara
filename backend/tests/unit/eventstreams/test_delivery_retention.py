@@ -111,6 +111,36 @@ async def test_ineligible_or_held_evidence_is_not_verified(monkeypatch: pytest.M
     verifier.is_committed_beyond.assert_not_awaited()
 
 
+async def test_scan_advances_after_verification_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """One failed candidate cannot trap a later batch on the same page."""
+    service = EventDeliveryRetentionService(MagicMock(), verifier=AsyncMock(spec=CommittedPositionVerifier))
+    row = delivery()
+    row.state = "scheduled"
+    row.resolved_at = NOW
+    monkeypatch.setattr(service, "_cleanup_page", AsyncMock(return_value=[(row.delivery_identity(), NOW)]))
+    monkeypatch.setattr(service, "cleanup_one", AsyncMock(side_effect=RuntimeError("unavailable")))
+    with pytest.raises(RuntimeError, match="unavailable"):
+        await service.cleanup(limit=1)
+    assert service.last_scan_count == 1
+    assert service._scan_after == (row.source_id, NOW, row.identity_digest)
+
+
+async def test_empty_page_restarts_sweep_without_deleting_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Retained rows are retried on the next sweep, rather than forgotten."""
+    service = EventDeliveryRetentionService(MagicMock(), verifier=AsyncMock(spec=CommittedPositionVerifier))
+    monkeypatch.setattr(service, "_scan_after", (identity().source_id, NOW, identity().digest))
+    monkeypatch.setattr(service, "_scan_cutoff", NOW)
+    service.last_scan_count = 1
+    monkeypatch.setattr(service, "_cleanup_page", AsyncMock(return_value=[]))
+    remove = AsyncMock()
+    monkeypatch.setattr(service, "cleanup_one", remove)
+    assert await service.cleanup(limit=1) == 0
+    assert service.last_scan_count == 0
+    assert service._scan_after is None
+    assert service._scan_cutoff is None
+    remove.assert_not_awaited()
+
+
 @pytest.mark.parametrize("limit", [0, -1, 101, True])
 async def test_cleanup_is_bounded(limit: int) -> None:
     """Batch limits apply even when no committed-position verifier is installed."""
@@ -148,7 +178,12 @@ async def test_cleanup_retains_evidence_through_proof_expiry_and_skew(
     row.resolved_at = NOW
     now = shared.proof_deadline(NOW) if at_deadline else NOW + timedelta(seconds=10)
     subscription = MagicMock(id=identity().subscription_id, workflow_id=identity().workflow_id)
-    source = MagicMock()
+    source = MagicMock(
+        generation=identity().source_generation,
+        deployment_id=identity().deployment_id,
+        integration_identity=identity().integration_identity,
+        transport="kafka",
+    )
     monkeypatch.setattr(
         delivery_retention_service, "lock_source_lifecycle", AsyncMock(return_value=(subscription, source))
     )

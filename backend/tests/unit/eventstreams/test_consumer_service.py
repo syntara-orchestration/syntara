@@ -220,6 +220,9 @@ async def test_partial_kafka_start_is_closed_on_timeout_or_shutdown(manager_cont
         return runner
 
     monkeypatch.setattr("syntara.eventstreams.adapters.kafka_consumer.AIOKafkaConsumer", client)
+    monkeypatch.setattr(
+        "syntara.eventstreams.adapters.kafka_consumer.KafkaPolicyClient", lambda **_kwargs: clients[-1]._client
+    )
     context.factory.side_effect = construct
     await context.manager.start()
     await eventually(lambda: bool(clients) and clients[0].start.await_count == 1)
@@ -258,6 +261,29 @@ async def test_repeated_and_hinted_reads_keep_one_client(manager_context):
     assert len(context.runners) == 1
     assert context.factory.await_count == 1
     assert context.manager.subscription_ids == {context.snapshot.subscription_id}
+
+
+async def test_connection_refresh_restarts_only_the_changed_subscription(manager_context):
+    context = manager_context
+    other = context.snapshot.model_copy(update={"subscription_id": uuid4(), "source_id": uuid4()})
+    context.reader.read.return_value = [context.snapshot, other]
+    revisions = {context.snapshot.subscription_id: "connection-1", other.subscription_id: "other-1"}
+    reader = AsyncMock(side_effect=lambda snapshot: revisions[snapshot.subscription_id])
+    context.manager._connection_revision = reader
+    await context.manager.start()
+    await eventually(lambda: len(context.runners) == 2 and all(runner.started for runner in context.runners))
+    original = next(
+        runner for runner in context.runners if runner.snapshot.subscription_id == context.snapshot.subscription_id
+    )
+    unchanged = next(runner for runner in context.runners if runner.snapshot.subscription_id == other.subscription_id)
+    revisions[context.snapshot.subscription_id] = "connection-2"
+    await context.manager.reconcile()
+    await eventually(lambda: len(context.runners) == 3 and context.runners[-1].started)
+    assert original.stopped
+    assert not unchanged.stopped
+    assert unchanged.start_calls == 1
+    assert context.runners[-1].snapshot == original.snapshot
+    assert len(context.pool.leases) == 2
 
 
 async def test_periodic_reconciliation_uses_jitter(manager_context, monkeypatch):

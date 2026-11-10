@@ -25,11 +25,22 @@ from typing import Any, Self
 from urllib.parse import urlparse
 from uuid import UUID
 
-from pydantic import Field, HttpUrl, SecretStr, computed_field, field_validator, model_validator
+from pydantic import (
+    Field,
+    HttpUrl,
+    SecretStr,
+    ValidatorFunctionWrapHandler,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
-from syntara.core.config.event_delivery import validate_delivery_cache_trust_inputs
+from syntara.core.config.event_delivery import (
+    parse_delivery_cache_trust_input,
+    validate_delivery_cache_trust_inputs,
+)
 from syntara.core.constants import (
     EventDeliveryDefaults,
     EventPlacementDefaults,
@@ -1611,10 +1622,16 @@ class EventStreamSettings(BaseSettings):
         ),
     )
 
+    @field_validator("event_delivery_cache_epoch", "event_delivery_cache_clock_error_bound_seconds", mode="wrap")
+    @classmethod
+    def parse_delivery_cache_trust(cls, value: object, handler: ValidatorFunctionWrapHandler) -> object:
+        """Unusable cache trust inputs disable the optimization, not processing."""
+        return parse_delivery_cache_trust_input(value, handler)
+
     @model_validator(mode="after")
     def validate_delivery_cache_trust(self) -> Self:
-        """Reject enabled proof caching without its external trust and expiry inputs."""
-        validate_delivery_cache_trust_inputs(
+        """Disable proof caching without trust while retaining expiry validation."""
+        self.event_delivery_cache_enabled = validate_delivery_cache_trust_inputs(
             enabled=self.event_delivery_cache_enabled,
             cache_epoch=self.event_delivery_cache_epoch,
             clock_error_bound_seconds=self.event_delivery_cache_clock_error_bound_seconds,

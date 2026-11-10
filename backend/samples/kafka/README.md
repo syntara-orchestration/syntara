@@ -99,8 +99,9 @@ Shorter TTL/retention or changed skew needs coordinated drain and external epoch
 rotation before shorter cleanup. Ordinary Redis eviction/loss needs neither
 database recovery nor epoch rotation; never flush shared Redis.
 
-To stop the example, first pause/retire its subscription through normal controls,
-then stop the worker with its grace period and remove only the disposable broker:
+To stop the example, first unpublish its workflow. To retire the subscription,
+remove its Subscribe listener and publish the updated workflow. Then stop the
+worker with its grace period and remove only the disposable broker:
 
 ```bash
 uv run --project backend podman-compose --profile eventstream stop eventstream-consumer
@@ -121,3 +122,9 @@ It is never part of disposable broker initialization, setup or compose startup.
 It requires every old worker/cache reader/writer to be stopped, external epoch
 coordination, and the existing deployment UUID. It clears only that deployment's
 membership and active-generation placement; delivery claims and evidence remain.
+
+`acknowledge-stopped-worker.example.sql` is a separate, targeted maintenance
+example for a process confirmed stopped before it could acknowledge shutdown.
+Follow the [missing stop acknowledgement procedure](../../docs/kafka-worker-operations.md#recovering-a-missing-consumer-stop-acknowledgement).
+It updates only one runtime participant, preserves content-error and delivery
+evidence, and is never run automatically. Lease expiry alone is insufficient.

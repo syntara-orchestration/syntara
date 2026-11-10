@@ -43,6 +43,7 @@ from syntara.eventstreams.exceptions import (
     OwnershipRevokedError,
     StaleEpochError,
 )
+from syntara.integrations.lib.kafka_client import KafkaPolicyClient
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -175,7 +176,10 @@ def mock_aiokafka() -> Iterator[MagicMock]:
         "syntara.eventstreams.adapters.kafka_consumer.AIOKafkaConsumer",
         return_value=_mock_consumer(),
     ) as mock_cls:
-        yield mock_cls
+        with patch(
+            "syntara.eventstreams.adapters.kafka_consumer.KafkaPolicyClient", return_value=mock_cls.return_value._client
+        ):
+            yield mock_cls
 
 
 async def _start_with_partitions(
@@ -1256,6 +1260,7 @@ async def test_installed_aiokafka_metadata_transport_contract() -> None:
         assert isinstance(consumer, AIOKafkaConsumer)
         client = consumer._client
         assert isinstance(client, AIOKafkaClient)
+        assert isinstance(client, KafkaPolicyClient)
         response = MetadataResponse_v0(brokers=[], topics=[(0, adapter.topic, [(0, 0, 1, [1], [1])])])
         with (
             patch.object(client, "get_random_node", autospec=True, return_value=1),

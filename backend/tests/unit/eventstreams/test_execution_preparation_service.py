@@ -14,7 +14,14 @@ from syntara.core.models.principal import service_principal_id
 from syntara.eventstreams.adapters.kafka_metadata import KafkaSourceMetadata
 from syntara.eventstreams.adapters.kafka_record_identity import KafkaRecordIdentity
 from syntara.eventstreams.core.connection_revision import ConnectionRevision
-from syntara.eventstreams.core.deduplication import ClaimLost, DeliveryClaim, DeliveryIdentity, RevisionChanged
+from syntara.eventstreams.core.deduplication import (
+    ClaimLost,
+    DeliveryClaim,
+    DeliveryIdentity,
+    DeliveryState,
+    RevisionChanged,
+    TerminalDelivery,
+)
 from syntara.eventstreams.core.envelope import RawEvent, RawEventHeader, WorkflowEventEnvelope
 from syntara.eventstreams.core.preparation import ExecutionCapacityUnavailable, PreparationBlocked, PreparedExecution
 from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCode
@@ -354,6 +361,31 @@ async def test_commit_failure_cannot_return_prepared_execution(monkeypatch: pyte
     with pytest.raises(RuntimeError, match="commit failed"):
         await context.prepare()
     context.store.freeze.assert_awaited_once()
+
+
+@pytest.mark.parametrize("commit_fails", [False, True])
+async def test_terminal_recovery_requires_committed_transaction(monkeypatch, *, commit_fails) -> None:
+    context = preparation_context(monkeypatch)
+    terminal = TerminalDelivery(
+        identity=context.identity,
+        state=DeliveryState.SCHEDULED,
+        resolved_at=NOW,
+        execution_id=context.identity.execution_id,
+        temporal_run_id="retained-run",
+        execution_confirmed_at=NOW,
+    )
+    context.store.acquire.side_effect = None
+    context.store.acquire.return_value = terminal
+    if commit_fails:
+        context.transaction.__aexit__.side_effect = RuntimeError("recovery commit failed")
+        with pytest.raises(RuntimeError, match="recovery commit failed"):
+            await context.prepare()
+    else:
+        assert await context.prepare() == terminal
+        assert context.events[-1] == "commit"
+    context.provider.assert_not_awaited()
+    context.capacity.assert_not_awaited()
+    context.store.freeze.assert_not_awaited()
 
 
 async def test_recovery_renews_current_token_and_rejects_tampered_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
