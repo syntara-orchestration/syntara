@@ -7,6 +7,7 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
+from ...models.workflow_write_forbidden_problem_detail import WorkflowWriteForbiddenProblemDetail
 from ...types import Response
 
 
@@ -21,7 +22,9 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | ErrorData | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Any | ErrorData | WorkflowWriteForbiddenProblemDetail | None:
     if response.status_code == 204:
         response_204 = cast(Any, None)
         return response_204
@@ -37,7 +40,7 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return response_401
 
     if response.status_code == 403:
-        response_403 = ErrorData.from_dict(response.json())
+        response_403 = WorkflowWriteForbiddenProblemDetail.from_dict(response.json())
 
         return response_403
 
@@ -72,7 +75,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any | ErrorData]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[Any | ErrorData | WorkflowWriteForbiddenProblemDetail]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -87,7 +92,7 @@ def sync_detailed(
     project_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | ErrorData]:
+) -> Response[Any | ErrorData | WorkflowWriteForbiddenProblemDetail]:
     """Delete project
 
      Delete a project (hard-delete). Requires: project:delete permission scoped to this project.
@@ -100,7 +105,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | ErrorData]
+        Response[Any | ErrorData | WorkflowWriteForbiddenProblemDetail]
     """
 
     kwargs = _get_kwargs(
@@ -118,7 +123,7 @@ def sync(
     project_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Any | ErrorData | None:
+) -> Any | ErrorData | WorkflowWriteForbiddenProblemDetail | None:
     """Delete project
 
      Delete a project (hard-delete). Requires: project:delete permission scoped to this project.
@@ -131,7 +136,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | ErrorData
+        Any | ErrorData | WorkflowWriteForbiddenProblemDetail
     """
 
     return sync_detailed(
@@ -144,7 +149,7 @@ async def asyncio_detailed(
     project_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Response[Any | ErrorData]:
+) -> Response[Any | ErrorData | WorkflowWriteForbiddenProblemDetail]:
     """Delete project
 
      Delete a project (hard-delete). Requires: project:delete permission scoped to this project.
@@ -157,7 +162,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | ErrorData]
+        Response[Any | ErrorData | WorkflowWriteForbiddenProblemDetail]
     """
 
     kwargs = _get_kwargs(
@@ -173,7 +178,7 @@ async def asyncio(
     project_id: UUID,
     *,
     client: AuthenticatedClient,
-) -> Any | ErrorData | None:
+) -> Any | ErrorData | WorkflowWriteForbiddenProblemDetail | None:
     """Delete project
 
      Delete a project (hard-delete). Requires: project:delete permission scoped to this project.
@@ -186,7 +191,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | ErrorData
+        Any | ErrorData | WorkflowWriteForbiddenProblemDetail
     """
 
     return (

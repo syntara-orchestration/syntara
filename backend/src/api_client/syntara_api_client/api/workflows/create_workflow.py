@@ -8,6 +8,7 @@ from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
 from ...models.workflow_create import WorkflowCreate
 from ...models.workflow_read import WorkflowRead
+from ...models.workflow_write_forbidden_problem_detail import WorkflowWriteForbiddenProblemDetail
 from ...types import Response
 
 
@@ -32,7 +33,7 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | WorkflowRead | None:
+) -> ErrorData | WorkflowRead | WorkflowWriteForbiddenProblemDetail | None:
     if response.status_code == 201:
         response_201 = WorkflowRead.from_dict(response.json())
 
@@ -49,7 +50,7 @@ def _parse_response(
         return response_401
 
     if response.status_code == 403:
-        response_403 = ErrorData.from_dict(response.json())
+        response_403 = WorkflowWriteForbiddenProblemDetail.from_dict(response.json())
 
         return response_403
 
@@ -86,7 +87,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[ErrorData | WorkflowRead]:
+) -> Response[ErrorData | WorkflowRead | WorkflowWriteForbiddenProblemDetail]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -101,7 +102,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: WorkflowCreate,
-) -> Response[ErrorData | WorkflowRead]:
+) -> Response[ErrorData | WorkflowRead | WorkflowWriteForbiddenProblemDetail]:
     """Create workflow
 
      Create a new workflow with initial version.
@@ -118,7 +119,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | WorkflowRead]
+        Response[ErrorData | WorkflowRead | WorkflowWriteForbiddenProblemDetail]
     """
 
     kwargs = _get_kwargs(
@@ -136,7 +137,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: WorkflowCreate,
-) -> ErrorData | WorkflowRead | None:
+) -> ErrorData | WorkflowRead | WorkflowWriteForbiddenProblemDetail | None:
     """Create workflow
 
      Create a new workflow with initial version.
@@ -153,7 +154,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | WorkflowRead
+        ErrorData | WorkflowRead | WorkflowWriteForbiddenProblemDetail
     """
 
     return sync_detailed(
@@ -166,7 +167,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: WorkflowCreate,
-) -> Response[ErrorData | WorkflowRead]:
+) -> Response[ErrorData | WorkflowRead | WorkflowWriteForbiddenProblemDetail]:
     """Create workflow
 
      Create a new workflow with initial version.
@@ -183,7 +184,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | WorkflowRead]
+        Response[ErrorData | WorkflowRead | WorkflowWriteForbiddenProblemDetail]
     """
 
     kwargs = _get_kwargs(
@@ -199,7 +200,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: WorkflowCreate,
-) -> ErrorData | WorkflowRead | None:
+) -> ErrorData | WorkflowRead | WorkflowWriteForbiddenProblemDetail | None:
     """Create workflow
 
      Create a new workflow with initial version.
@@ -216,7 +217,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | WorkflowRead
+        ErrorData | WorkflowRead | WorkflowWriteForbiddenProblemDetail
     """
 
     return (

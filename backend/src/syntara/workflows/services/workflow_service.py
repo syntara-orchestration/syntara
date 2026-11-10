@@ -62,6 +62,7 @@ from syntara.workflows.models.validation_finding import (
 )
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from syntara.workflows.node_permissions import check_node_kind_write_permission
 from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_TYPES, WebhookTriggerService
 from syntara.workflows.services.workflow_diff import generate_change_summary
@@ -134,6 +135,38 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         """Initialize WorkflowService with database session and user context."""
         super().__init__(session, user, convert_resource_mixin=WorkflowConvertResourceMixin())
         self.opa_client = opa_client
+
+    async def _check_node_kind_write_permission(
+        self,
+        workflow: Workflow,
+        operation: str,
+        definition: dict[str, Any] | None = None,
+        *,
+        include_published: bool = False,
+    ) -> None:
+        """Check latest and submitted/selected definitions; include published for unpublish."""
+        current = await self._get_version_or_none(workflow.id, workflow.current_version)
+        if current is None:
+            raise WorkflowVersionNotFoundError(workflow.id, workflow.current_version)
+        definitions = [current.workflow_definition]
+        if include_published and workflow.published_version_id is not None:
+            published = await self.session.get(WorkflowVersion, workflow.published_version_id)
+            if published is None or published.workflow_id != workflow.id:
+                msg = "Cannot verify step-type write permission without the published workflow version"
+                raise AuthorizationDeniedError(msg)
+            definitions.append(published.workflow_definition)
+        if definition is not None:
+            definitions.append(definition)
+        await check_node_kind_write_permission(
+            self.session,
+            self.opa_client,
+            self.user,
+            definitions,
+            project_id=workflow.project_id,
+            operation=operation,
+            resource_id=str(workflow.id),
+            resource_name=workflow.name,
+        )
 
     @staticmethod
     def _emit_lifecycle_event(
@@ -245,11 +278,10 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
     async def _create_and_flush_version(
         self,
         workflow: Workflow,
-        fallback: WorkflowVersion,
         workflow_definition: dict[str, Any],
         change_description: str | None,
     ) -> WorkflowVersion:
-        """Create a new version and flush, returning it or *fallback* if unchanged."""
+        """Return the submitted definition's new version, or the latest version if unchanged."""
         new_version = await self._create_version_record(
             workflow,
             workflow_definition=workflow_definition,
@@ -258,7 +290,10 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if new_version:
             await self.session.flush()
             return new_version
-        return fallback
+        current = await self._get_version_or_none(workflow.id, workflow.current_version)
+        if current is None:
+            raise WorkflowVersionNotFoundError(workflow.id, workflow.current_version)
+        return current
 
     @staticmethod
     async def _sync_scheduled_triggers(
@@ -622,6 +657,15 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             msg = f"Cannot create workflows in built-in project '{project.name}'"
             raise BuiltinProtectionError(msg)
 
+        await check_node_kind_write_permission(
+            self.session,
+            self.opa_client,
+            self.user,
+            [workflow_definition],
+            project_id=project_id,
+            operation="import workflow" if is_import else "create workflow",
+            resource_name=name,
+        )
         await self._validate_credential_project_scope(workflow_definition, project_id)
         await self._validate_no_secret_url_conflicts(workflow_definition)
         ref_findings = await validate_workflow_references(
@@ -1083,7 +1127,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             WorkflowVersionNotFoundError: If version not found
 
         """
-        workflow = await self.get_workflow_by_id(workflow_id)
+        workflow = await self._get_workflow_for_update(workflow_id)
         if workflow.is_builtin:
             raise BuiltinWorkflowModifyError(workflow.name)
 
@@ -1091,6 +1135,9 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if not version_record:
             raise WorkflowVersionNotFoundError(workflow_id, version)
 
+        await self._check_node_kind_write_permission(
+            workflow, "edit version metadata", version_record.workflow_definition
+        )
         update_fields = fields_set if fields_set is not None else {"name", "change_description"}
         changed = False
         if "name" in update_fields:
@@ -1168,6 +1215,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             If identical, no new version is created (returns None).
 
         """
+        await self._check_node_kind_write_permission(workflow, "save workflow", workflow_definition)
         recorder = get_metrics_recorder()
         system_cof = await get_system_continue_on_failure()
 
@@ -1250,15 +1298,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         await self._check_expected_version(workflow, expected_version)
 
-        # Update metadata fields
-        if any([name is not None, description is not None, labels is not None]):
-            await self.update_workflow_metadata(
-                workflow,
-                name=name,
-                description=description,
-                labels=labels,
-            )
-
         # Capture old definition for audit change summary
         old_definition: dict[str, Any] | None = None
         if workflow_definition is not None:
@@ -1275,6 +1314,11 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 workflow_definition=workflow_definition,
                 change_description=change_description,
             )
+        else:
+            await self._check_node_kind_write_permission(workflow, "update workflow")
+
+        if any([name is not None, description is not None, labels is not None]):
+            await self.update_workflow_metadata(workflow, name=name, description=description, labels=labels)
 
         # Flush with name uniqueness check (stays within the same transaction)
         await self._flush_with_duplicate_check(workflow.name)
@@ -1327,7 +1371,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         return workflow, current_version, validation_result
 
-    async def publish_workflow_version(  # noqa: C901, PLR0915
+    async def publish_workflow_version(  # noqa: C901, PLR0912, PLR0915
         self,
         workflow_id: UUID,
         version: int,
@@ -1360,8 +1404,15 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             raise WorkflowVersionNotFoundError(workflow_id, version)
 
         if workflow_definition is not None:
-            target_version = await self._create_and_flush_version(
-                workflow, target_version, workflow_definition, change_description
+            await self._check_node_kind_write_permission(
+                workflow,
+                "save and publish workflow",
+                workflow_definition,
+            )
+            target_version = await self._create_and_flush_version(workflow, workflow_definition, change_description)
+        else:
+            await self._check_node_kind_write_permission(
+                workflow, "publish workflow", target_version.workflow_definition
             )
 
         definition = target_version.workflow_definition
@@ -1496,6 +1547,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if workflow.published_version_id is None:
             raise WorkflowNotPublishedError(workflow_id)
 
+        await self._check_node_kind_write_permission(workflow, "unpublish workflow", include_published=True)
+
         published_version = await self.session.get(WorkflowVersion, workflow.published_version_id)
         if not published_version:
             logger.warning(
@@ -1599,6 +1652,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if not target_version:
             raise WorkflowVersionNotFoundError(workflow_id, version)
 
+        await self._check_node_kind_write_permission(workflow, "restore workflow", target_version.workflow_definition)
         # Capture current definition for audit change summary
         current_version_record = await self._get_version_or_none(workflow.id, workflow.current_version)
         old_definition = current_version_record.workflow_definition if current_version_record else None
@@ -1675,11 +1729,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             WorkflowHasActiveExecutionsError: If workflow has non-terminal executions
 
         """
-        workflow = await self.get_workflow_by_id(workflow_id)
+        workflow = await self._get_workflow_for_update(workflow_id)
 
         if workflow.is_builtin:
             raise BuiltinWorkflowDeleteError(workflow.name)
 
+        await self._check_node_kind_write_permission(workflow, "delete workflow")
         non_terminal_count = await self.session.scalar(
             select(func.count())
             .select_from(Execution)

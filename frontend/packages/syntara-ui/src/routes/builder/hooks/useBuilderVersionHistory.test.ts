@@ -397,7 +397,35 @@ describe('useBuilderVersionHistory', () => {
         result.current.handleConfirmRestore()
       })
 
-      expect(params.showError).toHaveBeenCalledWith({ title: 'Failed to restore version' })
+      expect(params.showError).toHaveBeenCalledWith({
+        title: 'Failed to restore version',
+        description: 'An unexpected error occurred',
+      })
+    })
+
+    it('shows blocked step types and keeps the restore dialog open when permission is denied', () => {
+      mockRestoreMutate.mockImplementation((_params: unknown, callbacks?: { onError?: (error: unknown) => void }) => {
+        callbacks?.onError?.({
+          cause: {
+            code: 'NODE_KIND_WRITE_DENIED',
+            blocked_step_types: [{ kind: 'script', label: 'Script', reason: 'explicit_deny' }],
+          },
+        })
+      })
+      const params = createDefaultParams()
+      const { result } = renderHook(() => useBuilderVersionHistory(params), {
+        wrapper: makeWrapper(queryClient),
+      })
+
+      act(() => result.current.restoreDialog.open({ version: 1, dateTime: '2026-05-19T14:30:00.000Z' }))
+      act(() => result.current.handleConfirmRestore())
+
+      expect(params.showError).toHaveBeenCalledWith({
+        title: 'Failed to restore version',
+        description: 'Step types not allowed: Script (write denied).',
+      })
+      expect(result.current.restoreDialog.isOpen).toBe(true)
+      expect(params.showSuccess).not.toHaveBeenCalled()
     })
   })
 

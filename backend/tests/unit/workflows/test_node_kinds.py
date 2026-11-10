@@ -11,6 +11,7 @@ from syntara.workflows.node_kinds import (
     NODE_KINDS,
     node_kind_display_label,
     node_labels,
+    step_types_in_definitions,
     validate_node_kind_statements,
 )
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
@@ -106,3 +107,12 @@ def test_node_labels_without_a_type(node: dict[str, Any]) -> None:
 def test_node_labels_excludes_parameters() -> None:
     """Parameters are neither policy selectors nor exposed resource labels."""
     assert node_labels({"type": "script", "parameters": {"language": "bash", "code": "secret"}}) == {"kind": "script"}
+
+
+def test_step_types_in_definitions_are_sorted_distinct_and_include_triggers() -> None:
+    assert step_types_in_definitions(
+        [
+            {"triggers": [{"type": "manual_trigger"}], "nodes": [{"type": "script"}, {"type": "wait"}]},
+            {"triggers": [{"type": "manual_trigger"}], "nodes": [{"type": "script"}]},
+        ]
+    ) == ["manual_trigger", "script", "wait"]
