@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
 from sqlmodel import and_, col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel.sql._expression_select_cls import SelectOfScalar
 from temporalio.exceptions import ApplicationError
 
 from syntara.audit.dispatcher import AuditEventDispatcher
@@ -25,6 +26,7 @@ from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
+from syntara.execution_plane.cancellation import cancel_execution_plane_work_for_execution
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
@@ -98,7 +100,9 @@ async def count_active_executions(session: "AsyncSession") -> int:
 class ExecutionsEnrichQueryMixin(EnrichQueryMixin):
     """Eager-load workflow and workflow_version relationships so list queries include the name and version number."""
 
-    def enrich(self, query: Select) -> Select:  # type: ignore[type-arg]
+    def enrich(  # type: ignore[override]
+        self, query: Select[tuple[Execution]] | SelectOfScalar[tuple[Execution]]
+    ) -> Select[tuple[Execution]] | SelectOfScalar[tuple[Execution]]:
         """Add selectinload for workflow and workflow_version to the query.
 
         Only applies when the root entity is Execution (skips ActivityExecution queries).
@@ -1135,6 +1139,17 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
                 error_type=type(exc).__name__,
             )
             raise
+
+        # Best-effort: cancel any in-flight Execution Plane work linked to
+        # this execution.  Execution Plane work use async-completion, so the
+        # Temporal cancellation above does not reach work running externally.
+        try:
+            await cancel_execution_plane_work_for_execution(self.session, execution_id)
+        except Exception:
+            logger.exception(
+                "Best-effort Execution Plane work cancellation failed",
+                execution_id=execution_id,
+            )
 
         # Best-effort: cancel any in-flight agentic invocations linked to
         # this execution.  Agentic activities use async-completion so the

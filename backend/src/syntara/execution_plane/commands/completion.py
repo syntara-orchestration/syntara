@@ -5,7 +5,7 @@ from uuid import UUID
 
 import structlog
 from execution_plane_client.commands.base import CommandPayload
-from execution_plane_client.commands.control import Completion
+from execution_plane_client.commands.control import Completion, CompletionStatus
 from execution_plane_client.errors import ProtocolConflict
 from execution_plane_client.handlers import HandlingResult
 from execution_plane_client.protocol import MessageEnvelope, ResourceReference
@@ -13,10 +13,7 @@ from sqlmodel import col, select
 from temporalio.exceptions import ApplicationError
 
 from syntara.execution_plane.commands.context import AOCommandContext
-from syntara.execution_plane.commands.errors import (
-    CommandDependencyUnavailableError,
-    CommandResourceNotFoundError,
-)
+from syntara.execution_plane.commands.errors import CommandDependencyUnavailableError, CommandResourceNotFoundError
 from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.models.execution import Execution
 
@@ -27,16 +24,16 @@ class CompletionCommandHandler:
     """Deliver a completion command to its originating Temporal activity."""
 
     @staticmethod
-    def _failure_error(status: str, result: dict[str, Any]) -> ApplicationError:
+    def _failure_error(status: CompletionStatus, result: dict[str, Any]) -> ApplicationError:
         """Translate a non-completed EP status into a non-retryable activity failure."""
-        if status == "cancelled":
+        if status is CompletionStatus.CANCELLED:
             return ApplicationError(
                 "Execution Plane work was cancelled before execution",
                 result,
                 type="ExecutionPlaneWorkCancelled",
                 non_retryable=True,
             )
-        if status == "reconciliation_required":
+        if status is CompletionStatus.RECONCILIATION_REQUIRED:
             message = "Execution Plane could not determine the work outcome"
             # Surface the Execution Plane's reason (worker crash, lost callback,
             # conflicting cold-start Job, ...) so executions are self-diagnosing.
@@ -58,7 +55,7 @@ class CompletionCommandHandler:
         *,
         context: AOCommandContext,
         work_id: UUID,
-        status: str,
+        status: CompletionStatus,
         result: dict[str, Any],
     ) -> bool:
         """Complete or fail the async activity named by a work-item UUID."""
@@ -76,11 +73,16 @@ class CompletionCommandHandler:
         if temporal_service is None:
             raise CommandDependencyUnavailableError
 
-        if status == "completed":
+        if status is CompletionStatus.COMPLETED:
             await temporal_service.complete_async_activity(
                 temporal_workflow_id=temporal_workflow_id,
                 activity_id=temporal_activity_id,
                 result=result,
+            )
+        elif status is CompletionStatus.CANCELLED:
+            await temporal_service.report_cancellation_async_activity(
+                temporal_workflow_id=temporal_workflow_id,
+                activity_id=temporal_activity_id,
             )
         else:
             await temporal_service.fail_async_activity(
@@ -104,16 +106,10 @@ class CompletionCommandHandler:
         ):
             raise ProtocolConflict
 
-        statuses = {
-            "succeeded": "completed",
-            "failed": "failed",
-            "cancelled": "cancelled",
-            "outcome_unknown": "reconciliation_required",
-        }
         delivered = await self._complete_activity(
             context=context,
             work_id=work_id,
-            status=statuses[payload.status],
+            status=payload.status,
             result=payload.result,
         )
         if not delivered:

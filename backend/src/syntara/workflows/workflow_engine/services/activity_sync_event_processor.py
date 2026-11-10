@@ -171,11 +171,12 @@ class ActivitySyncEventProcessorMixin:
         scheduled_id = attrs.scheduled_event_id
         if scheduled_id in metadata.pending_activity_updates:
             update = metadata.pending_activity_updates[scheduled_id]
-            is_cancelled = bool(
-                attrs.failure
-                and attrs.failure.application_failure_info
-                and attrs.failure.application_failure_info.type == "InvocationCancelledError"
+            failure_type = (
+                attrs.failure.application_failure_info.type
+                if attrs.failure and attrs.failure.application_failure_info
+                else None
             )
+            is_cancelled = failure_type in {"InvocationCancelledError", "ExecutionPlaneWorkCancelled"}
             update["status"] = ActivityStatus.CANCELLED if is_cancelled else ActivityStatus.FAILED
             update["completed_at"] = ensure_timezone_aware(event.event_time)
             if attrs.failure:

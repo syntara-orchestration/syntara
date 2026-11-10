@@ -16,12 +16,13 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid5
 
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
 from orchestrator_test_sdk.e2e.helpers import _retry_api_call, create_and_run_workflow, poll_for_pending_approval
 from syntara_api_client.api import SyntaraApiRegistry
+from syntara_api_client.client import AuthenticatedClient
 from syntara_api_client.models import (
     ExecutionCreate,
     WorkflowCreate,
@@ -53,6 +54,26 @@ def _workflow_definition_with_nodes(
             "edges": edges or [],
         }
     )
+
+
+def _list_work_items(
+    syntara_client: AuthenticatedClient,
+    syntara_base_url: str,
+    work_item_id: UUID,
+) -> list[dict[str, Any]]:
+    """List one work item through the AO Execution Plane facade."""
+    response = _retry_api_call(
+        lambda: syntara_client.get_httpx_client().get(
+            f"{syntara_base_url}/api/execution_plane/v1/work_items",
+            params={"id": str(work_item_id), "limit": 10, "include_total": "true"},
+        )
+    )
+    response.raise_for_status()
+    body = response.json()
+    resources = body.get("resources") if isinstance(body, dict) else None
+    if not isinstance(resources, list):
+        pytest.fail(f"Unexpected Execution Plane work-item payload: {body!r}")
+    return [resource for resource in resources if isinstance(resource, dict)]
 
 
 class TestWorkflowExecution:
@@ -568,6 +589,86 @@ class TestWorkflowExecution:
         assert cancelled_execution.completed_at is not None, "Cancelled execution should have completed_at timestamp"
         assert cancelled_execution.created_at < cancelled_execution.completed_at, (
             "Completed time should be after created time"
+        )
+
+    def test_cancel_execution_cancels_execution_plane_work(
+        self,
+        syntara_api: SyntaraApiRegistry,
+        syntara_client: AuthenticatedClient,
+        syntara_base_url: str,
+        workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+        first_project_id: UUID,
+    ):
+        """Cancelling an execution cancels its in-flight Execution Plane work.
+
+        The script sleeps for five minutes, but the test waits only until EP
+        records the work item, cancels the execution, and polls for EP to mark
+        that work item cancelled.
+        """
+        workflow_name = unique_name("e2e-cancel-ep-work")
+
+        workflow_data = WorkflowCreate(
+            name=workflow_name,
+            description="Workflow for cancelling in-flight Execution Plane work",
+            project_id=first_project_id,
+            workflow_definition=_workflow_definition_with_nodes(
+                workflow_name,
+                {
+                    "id": "script_node",
+                    "name": "Long Script",
+                    "type": "script",
+                    "parameters": {"language": "bash", "code": "sleep 300"},
+                },
+                edges=[{"from": "trigger_manual", "to": "script_node"}],
+            ),
+        )
+        workflow = workflow_factory(workflow_data)
+        execution = syntara_api.executions.create(
+            body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger_manual")
+        ).assert_and_get()
+        execution_id = UUID(str(execution.id))
+        work_item_id = uuid5(execution_id, "script_node")
+
+        work_items: list[dict[str, Any]] = []
+        for _ in range(30):
+            work_items = _list_work_items(syntara_client, syntara_base_url, work_item_id)
+            if work_items:
+                break
+            time.sleep(1)
+
+        assert work_items, f"Execution Plane work item {work_item_id} did not appear within 30s"
+
+        cancel_response = syntara_api.executions.cancel(execution_id=execution_id)
+        assert cancel_response.status_code == HTTPStatus.ACCEPTED, (
+            f"Expected 202 Accepted, got {cancel_response.status_code}: {cancel_response.content!r}"
+        )
+
+        cancelled_execution = None
+        cancelled_work_items: list[dict[str, Any]] = []
+        for _ in range(45):
+            current_execution = syntara_api.executions.get(
+                execution_id=execution_id, include="activities"
+            ).assert_and_get()
+            if str(current_execution.status) == "cancelled":
+                cancelled_execution = current_execution
+
+            cancelled_work_items = _list_work_items(syntara_client, syntara_base_url, work_item_id)
+            if (
+                cancelled_execution
+                and cancelled_work_items
+                and all(work_item.get("status") == "cancelled" for work_item in cancelled_work_items)
+            ):
+                break
+
+            time.sleep(1)
+
+        assert cancelled_execution is not None, (
+            f"Execution did not transition to cancelled within 45s. Last status: {current_execution.status!s}"
+        )
+        assert cancelled_work_items, f"Execution Plane work item {work_item_id} disappeared after cancellation"
+        work_item_statuses = {work_item.get("status") for work_item in cancelled_work_items}
+        assert work_item_statuses == {"cancelled"}, (
+            f"Execution Plane work item should be cancelled, got {work_item_statuses}"
         )
 
 
