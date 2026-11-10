@@ -8,13 +8,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from aiokafka import AIOKafkaProducer
 from pydantic import ValidationError
 from sqlalchemy.exc import OperationalError
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.integrations.adapters.kafka import KafkaAdapter
+from syntara.integrations.lib.kafka_producer import create_kafka_publish_producer
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 from syntara.workflows.workflow_engine.activities.common import HEARTBEAT_STOP_MONITOR
 from syntara.workflows.workflow_engine.activities.kafka_publish_connection import (
@@ -127,7 +127,9 @@ async def _publish_once(
         attempt.waiting_for_capacity = False
 
     attempt.waiting_for_capacity = True
-    async with pool.acquire(reuse_key, identity, lambda: AIOKafkaProducer(**options), on_admission=admitted) as entry:
+    async with pool.acquire(
+        reuse_key, identity, lambda: create_kafka_publish_producer(**options), on_admission=admitted
+    ) as entry:
         attempt.waiting_for_capacity = True
         attempt.send = await pool.submit(entry, parameters.topic, value, key, headers, size, before_send=before_send)
         attempt.waiting_for_capacity = False

@@ -29,7 +29,7 @@ async def publisher(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     producer.send = AsyncMock(return_value=future)
     producer.stop = AsyncMock()
     constructor = MagicMock(return_value=producer)
-    monkeypatch.setattr(module, "AIOKafkaProducer", constructor)
+    monkeypatch.setattr(module, "create_kafka_publish_producer", constructor)
     monkeypatch.setattr(activity, "info", lambda: SimpleNamespace(attempt=1))
     monkeypatch.setattr(activity, "heartbeat", MagicMock())
     session_factory = MagicMock()

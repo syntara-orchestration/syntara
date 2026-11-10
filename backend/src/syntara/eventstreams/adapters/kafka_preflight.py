@@ -9,16 +9,17 @@ import asyncio
 import ssl
 from collections.abc import Iterable
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
 import structlog
-from aiokafka.conn import AIOKafkaConnection, collect_hosts, create_conn
+from aiokafka.conn import AIOKafkaConnection, collect_hosts
 from aiokafka.errors import AuthenticationFailedError, IncompatibleBrokerVersion, KafkaError, SaslAuthenticationFailed
 from aiokafka.protocol.api import Request
 from aiokafka.protocol.metadata import MetadataRequest_v4, MetadataRequest_v5
 
 from syntara.eventstreams.models.responses import EventSubscriptionTestResponse
 from syntara.integrations.adapters.kafka import KafkaAdapter, KafkaAuthenticationConfigurationError
+from syntara.integrations.lib.kafka_connection import create_pinned_connection as create_conn
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
 _PREFLIGHT_TIMEOUT_SECONDS = 10
@@ -45,7 +46,7 @@ class NonCreatingMetadataRequest(Request[MetadataRequest_v4 | MetadataRequest_v5
 async def _connect(config: KafkaConfiguration, options: dict[str, Any]) -> AIOKafkaConnection | None:
     for host, port, _ in collect_hosts(list(config.bootstrap_servers), randomize=False):
         try:
-            return cast("AIOKafkaConnection", await create_conn(host, port, **options))
+            return await create_conn(host, port, **options)
         except (ssl.SSLError, IncompatibleBrokerVersion, AuthenticationFailedError, SaslAuthenticationFailed):
             # Classified by the caller. Both subclass the fallback errors below.
             raise
@@ -112,7 +113,7 @@ async def test_kafka_connection(
     except ssl.SSLError:
         result.connection = "failed"
         result.error_code = "tls_failed"
-    except (OSError, KafkaError):
+    except (OSError, KafkaError, ValueError):
         result.connection = "failed"
         result.error_code = "connection_failed"
     finally:

@@ -138,6 +138,13 @@ metadata after bootstrap. Network controls must account for all advertised
 endpoints. Private broker hostnames must also be allowed by the
 application's Integration SSRF policy on the API and Kafka worker.
 
+Kafka Publish preflight and producer connections enforce that same policy at
+socket creation. Each new connection uses an approved numeric address while TLS
+continues to verify the original broker hostname. Metadata-advertised brokers and
+reconnects, including DNS changes on reused producers, go through the shared
+policy again. The Publish connection wrapper preserves aiokafka's normal producer
+shutdown and pending-delivery ownership.
+
 Startup uses the stable installation/deployment namespace and a fresh worker
 process UUID. It registers/heartbeats membership before claiming a fair share of
 active subscriptions, then reconciles authoritative configuration and starts

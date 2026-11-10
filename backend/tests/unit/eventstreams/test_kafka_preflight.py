@@ -1,5 +1,6 @@
 """Preflight sends non-creating metadata only and never claims runtime ACLs."""
 
+import asyncio
 import ssl
 from types import SimpleNamespace
 from typing import Any
@@ -61,6 +62,7 @@ async def test_missing_denied_or_unavailable_topic_is_safe(topics: list[tuple[An
         (TimeoutError("private-value"), "timeout"),
         (KafkaConnectionError("private-value"), "connection_failed"),
         (IncompatibleBrokerVersion("old"), "safe_metadata_unsupported"),
+        (ValueError("private-value"), "connection_failed"),
     ],
 )
 async def test_failures_are_sanitized_and_close_connections(error: Exception, code: str) -> None:
@@ -105,6 +107,21 @@ async def test_empty_credentials_never_connect(credential: dict[str, Any]) -> No
         result = await preflight(CONFIG, credential, "alerts")
     assert result.error_code == "authentication_configuration"
     create.assert_not_called()
+
+
+async def test_destination_policy_failure_is_sanitized() -> None:
+    with (
+        patch(
+            "syntara.integrations.lib.kafka_connection.approved_broker_addresses",
+            new=AsyncMock(side_effect=ValueError("private-address")),
+        ),
+        patch.object(asyncio.get_running_loop(), "create_connection", new=AsyncMock()) as socket,
+    ):
+        result = await preflight(CONFIG, CREDENTIAL, "alerts")
+    assert not result.success
+    assert result.error_code == "connection_failed"
+    assert "private-address" not in result.model_dump_json()
+    socket.assert_not_awaited()
 
 
 @pytest.mark.parametrize("version", [4, 5])
