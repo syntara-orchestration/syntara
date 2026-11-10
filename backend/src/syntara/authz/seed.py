@@ -131,7 +131,12 @@ async def _seed_default_step_authoring_once(session: AsyncSession, auth_group: G
             session.add(
                 Policy(
                     name=DEFAULT_STEP_POLICY_NAME,
-                    description="Author all workflow step types",
+                    description=(
+                        "Allow every authenticated user to author all workflow step "
+                        "types. Deleting this policy, or removing the step-author "
+                        "role assignment, blocks all workflow authoring until an "
+                        "allow is granted again."
+                    ),
                     statements=statements,
                 )
             )
@@ -146,7 +151,11 @@ async def _seed_default_step_authoring_once(session: AsyncSession, auth_group: G
             session.add(
                 Role(
                     name="step-author",
-                    description="Author all workflow step types",
+                    description=(
+                        "Default step-type authoring for all authenticated users. "
+                        "Revoking this role assignment blocks all workflow "
+                        "authoring until an allow is granted again."
+                    ),
                     policy_names=[DEFAULT_STEP_POLICY_NAME],
                 )
             )
