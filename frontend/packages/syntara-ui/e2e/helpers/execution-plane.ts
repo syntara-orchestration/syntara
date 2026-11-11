@@ -124,7 +124,7 @@ export const EXECUTION_TARGET_PATCH_TIMEOUT = 20_000
 export async function confirmDisableExecutionTarget(app: Page): Promise<void> {
   const dialog = app.getByRole('dialog')
   await expect(dialog.getByText('Disable execution target?')).toBeVisible()
-  await expect(dialog.getByText(/This will immediately:/i)).toBeVisible()
+  await expect(dialog.getByText(/require affinity to this target will fail/i)).toBeVisible()
 
   const patchDone = app.waitForResponse(isExecutionTargetPatchResponse, {
     timeout: EXECUTION_TARGET_PATCH_TIMEOUT,
