@@ -16,6 +16,7 @@ import { SynPageTitle } from '../../components/SynPageTitle'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useAlerts } from '../../providers/alerts'
+import { useFeatureFlag } from '../../providers/use-feature-flag'
 import type { FilterConfig } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
@@ -43,6 +44,7 @@ import { useExecutionStepClick } from './hooks/useExecutionStepClick'
 import { useExecutionStreaming, useSyncActivityStore } from './hooks/useExecutionStreaming'
 import { useExecutionWorkflow } from './hooks/useExecutionWorkflow'
 import { useForkWorkflow } from './hooks/useForkWorkflow'
+import { useRunDetailsPanelExpand } from './hooks/useRunDetailsPanelExpand'
 
 /** Returns true when the page should render a fallback (missing ID, loading, or error) instead of the main content. */
 function shouldShowFallbackState(
@@ -142,6 +144,12 @@ function ExecutionDetailContent({
   const { showError } = useAlerts()
   const prevStatusRef = useRef(execution?.status)
   const [panelHeight, setPanelHeight] = useState(300)
+  const isWorkflowBuilderQolEnabled = useFeatureFlag('workflow_builder_qol')
+  const { isPanelExpanded, panelExpandControl } = useRunDetailsPanelExpand(
+    panelHeight,
+    setPanelHeight,
+    isWorkflowBuilderQolEnabled
+  )
 
   const showFailureToast = useCallback(() => {
     showError({
@@ -212,26 +220,32 @@ function ExecutionDetailContent({
           </Flex>
         )}
         <SynPanelStack>
-          <SynPanelStackItem isFilled>
-            <ExecutionViewContent
-              workflow={workflow}
-              executionStatus={execution?.status ?? null}
-              executionActivities={activities}
-              executionId={executionId}
-              onNodeClick={onNodeClick}
-              selectedActivityId={currentApprovalNodeId ?? selectedStepId}
-            />
-          </SynPanelStackItem>
+          {!isPanelExpanded && (
+            <SynPanelStackItem isFilled>
+              <ExecutionViewContent
+                workflow={workflow}
+                executionStatus={execution?.status ?? null}
+                executionActivities={activities}
+                executionId={executionId}
+                onNodeClick={onNodeClick}
+                selectedActivityId={currentApprovalNodeId ?? selectedStepId}
+              />
+            </SynPanelStackItem>
+          )}
 
-          <ResizableDivider onResize={handleResize} currentValue={panelHeightPercent} />
+          {!isPanelExpanded && <ResizableDivider onResize={handleResize} currentValue={panelHeightPercent} />}
 
-          <SynPanelStackItem style={{ height: `${String(panelHeight)}px` }}>
+          <SynPanelStackItem
+            isFilled={isPanelExpanded}
+            style={isPanelExpanded ? { minHeight: 0 } : { height: `${String(panelHeight)}px` }}
+          >
             <ExecutionDetailsPanel
               executionId={executionId}
               workflowDefinition={workflow?.version.workflow_definition}
               selectedNodeId={selectedStepId}
               selectedNodeName={selectedStepName}
               onNodeSelect={onStepSelect}
+              panelExpandControl={panelExpandControl}
             />
           </SynPanelStackItem>
         </SynPanelStack>
