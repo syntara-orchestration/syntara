@@ -38,6 +38,8 @@ def _wf(
     wf.skipped_nodes = set()
     wf.failed_nodes = {}
     wf.node_inputs = {}
+    wf.activity_input_history = {}
+    wf.activity_output_history = {}
     wf.node_control_data = {}
     wf.loop_state = {}
     wf.loop_body_map = {}

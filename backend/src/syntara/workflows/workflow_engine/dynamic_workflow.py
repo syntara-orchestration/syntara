@@ -415,7 +415,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         if restored_status == ActivityStatus.SKIPPED.value:
             workflow.logger.info(
                 f"Node {node_id} restored as skipped, not scheduling successors",
-                pending=list(pending_tasks.keys()),
+                extra={"pending": list(pending_tasks.keys())},
             )
             self._cancel_skipped_pending_tasks(pending_tasks)
             return

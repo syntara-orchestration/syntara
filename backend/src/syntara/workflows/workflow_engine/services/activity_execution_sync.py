@@ -453,7 +453,16 @@ class ActivityExecutionSyncMixin:
                 activity_data["error_details"] = error_details
 
         preserve_timestamp_values = bool(replayed_state.get("_preserve_timestamp_values"))
-        if replayed_state.get("started_at") is not None or preserve_timestamp_values:
+        # A replayed terminal node may never have started in the source run (for
+        # example, a branch skipped after its sibling failed). Clear the synthetic
+        # replay activity's start time in that case; otherwise its current-run start
+        # can be later than the source completion time and violate the timestamp
+        # ordering constraint when the restored row is persisted.
+        if (
+            replayed_state.get("started_at") is not None
+            or preserve_timestamp_values
+            or (source_status in RESTORABLE_SOURCE_STATUSES and "started_at" in replayed_state)
+        ):
             activity_data["started_at"] = replayed_state.get("started_at")
         # Applied for any terminal status, not just COMPLETED: a restored skip or
         # failure carries the source time too, and stamping this run's time instead

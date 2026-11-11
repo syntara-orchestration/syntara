@@ -6529,13 +6529,16 @@ class TestReplayedNodeStateOverride:
         self.service._apply_replayed_state(
             {
                 "status": "skipped",
-                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                # A skipped source node never started; do not keep the replay
+                # activity's later start time beside this earlier completion.
+                "started_at": None,
                 "completed_at": datetime(2026, 1, 1, 0, 1, 0, tzinfo=UTC),
             },
             activity_data,
         )
 
         assert activity_data["status"] == ActivityStatus.SKIPPED
+        assert activity_data["started_at"] is None
         assert activity_data["completed_at"] == datetime(2026, 1, 1, 0, 1, 0, tzinfo=UTC)
 
     def test_apply_restores_an_unselected_failure_with_its_reason(self) -> None:
