@@ -133,13 +133,13 @@ make run-all
 # Install dependencies and setup project
 make install
 
-# Start the database (Terminal 1)
-make db-run
+# Start PostgreSQL, Redis, Temporal (server, UI, and workers), moto, and the MCP servers in the background
+make services-run
 
-# Start the cache/Redis (Terminal 2 — required for authentication)
-make cache-run
+# Repeat until the database and temporal containers show (healthy)
+podman ps --format '{{.Names}}\t{{.Status}}'
 
-# Start the development server (Terminal 3)
+# Start the development server (runs migrations and seeders first)
 make dev
 
 # Run tests
@@ -149,7 +149,7 @@ make test-all
 make lint
 ```
 
-> **Note:** The API server requires Redis (`make cache-run`) for authentication and streaming. Authorization is evaluated in-process via regopy from `src/syntara/authz/rego/authz.rego`.
+> **Note:** `make dev` needs PostgreSQL to be accepting connections before it starts, because it runs migrations first. The API server also requires Redis for authentication and streaming, and Temporal to run workflows. Authorization is evaluated in-process via regopy from `src/syntara/authz/rego/authz.rego`.
 
 ### Database Setup
 

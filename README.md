@@ -35,6 +35,23 @@ make dev
 make -C backend run-all
 ```
 
+## Updating After `git pull`
+
+`make setup` is a one-time bootstrap. After you pull new changes, start the stack in this order:
+
+```bash
+make install        # Sync Python and npm dependencies (needed when uv.lock or package-lock.json changed)
+make services-up    # Start PostgreSQL, Redis, Temporal, moto, and the MCP servers in the background
+podman ps --format '{{.Names}}\t{{.Status}}'   # Repeat until the database and temporal containers show (healthy)
+make dev            # Run migrations and seeders, then start the API, Temporal workers, and UI
+```
+
+- `make services-up` rebuilds and recreates the containers, and returns before they are ready. Wait for the database and Temporal to report `(healthy)` before you run `make dev`.
+- If `make dev` starts too early, the migrations fail with `Connect call failed ('127.0.0.1', 5432)`, the API exits, and the login page fails because the UI's `/api/v1/auth/login` requests get `ECONNREFUSED`. The UI keeps running, so it can look like the server is up. Stop `make dev`, wait for the services to be healthy, and start it again.
+- `make dev` runs `alembic upgrade head` and the seeders every time it starts, so you don't need to run `make db-migrate` first.
+- The generated TypeScript contracts are committed, so you only need `make gen-contracts` when you change a backend schema yourself.
+- If the services are already running and the pull didn't change any lockfiles, `make dev` is enough.
+
 ## Common Commands
 
 | Command | Description |
