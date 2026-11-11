@@ -4,7 +4,7 @@
  * Covers:
  * - List kebab → success toast
  * - Detail kebab → success toast
- * - Seeded unhealthy target → failure reason toast
+ * - Intercepted unhealthy health response → failure reason toast
  * - Slow health request → pending (aria-disabled) until settled
  *
  * Skipped when Execution Plane API is unreachable (compose CI does not start it).
@@ -21,7 +21,6 @@ import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 
 const LIST_URL = '/execution-plane'
-const HEALTH_FAILURE_TARGET_NAME = 'Worker Pool 03'
 const HEALTH_TIMEOUT = 20_000
 
 function isExecutionTargetHealthResponse(response: Response): boolean {
@@ -95,22 +94,41 @@ test.describe('Execution Plane — test connection', { tag: '@pr-check' }, () =>
   })
 
   test('shows the failure reason when the health request is unhealthy', async ({ app }) => {
-    await app.goto(toAppUrl(LIST_URL))
-    await expect(app.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
-    await filterTargetsByName(app, HEALTH_FAILURE_TARGET_NAME)
+    const name = buildUniqueName('e2e-et-health-fail')
+    const created = await createExecutionTargetViaApi(app, { name })
+    const targetId = created.id
+    const failureMessage = `Unable to reach execution target "${name}": connection refused`
+    const healthRoute = `**/api/execution_plane/v1/execution_targets/${targetId}/health`
 
-    const row = app.getByRole('row', { name: new RegExp(HEALTH_FAILURE_TARGET_NAME) })
-    await expect(row).toBeVisible({ timeout: 15_000 })
+    try {
+      await app.route(healthRoute, async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ healthy: false, message: failureMessage, skipped: false }),
+        })
+      })
 
-    const healthDone = app.waitForResponse(isExecutionTargetHealthResponse, { timeout: HEALTH_TIMEOUT })
-    await openRowKebab(row, /Test connection/i)
-    await app.getByRole('menuitem', { name: /Test connection/i }).click()
+      await app.goto(toAppUrl(LIST_URL))
+      await expect(app.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+      await filterTargetsByName(app, name)
 
-    const response = await healthDone
-    expect(response.ok(), `GET health returned ${String(response.status())}`).toBe(true)
+      const row = app.getByRole('row', { name: new RegExp(name) })
+      await expect(row).toBeVisible({ timeout: 15_000 })
 
-    await expect(app.getByText('Connection failed')).toBeVisible()
-    await expect(app.getByText(/connection refused/i)).toBeVisible()
+      const healthDone = app.waitForResponse(isExecutionTargetHealthResponse, { timeout: HEALTH_TIMEOUT })
+      await openRowKebab(row, /Test connection/i)
+      await app.getByRole('menuitem', { name: /Test connection/i }).click()
+
+      const response = await healthDone
+      expect(response.ok(), `GET health returned ${String(response.status())}`).toBe(true)
+
+      await expect(app.getByText('Connection failed')).toBeVisible()
+      await expect(app.getByText(failureMessage)).toBeVisible()
+    } finally {
+      await app.unroute(healthRoute)
+      await deleteExecutionTargetViaApi(app, targetId)
+    }
   })
 
   test('disables Test connection while a slow health request is pending', async ({ app }) => {
