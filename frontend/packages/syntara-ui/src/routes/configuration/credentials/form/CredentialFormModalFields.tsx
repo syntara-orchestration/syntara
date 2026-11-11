@@ -9,7 +9,6 @@ import { AuthMethodSelector } from './AuthMethodSelector'
 import { credentialHelp } from './credentialFieldHelp'
 import type { CredentialFormData } from './credentialFormSchema'
 import { CredentialTypeSelect, ProjectSelect } from './CredentialFormSelects'
-import { CREDENTIAL_TYPE_HELP } from './CredentialTypeHelp'
 import { DynamicFieldRenderer } from './DynamicFieldRenderer'
 import type { useCredentialFormModal } from './useCredentialFormModal'
 
@@ -89,7 +88,7 @@ export function CredentialFormModalFields({ form, state }: Readonly<CredentialFo
         label="Credential type"
         fieldId="credential-type"
         isRequired
-        labelHelp={CREDENTIAL_TYPE_HELP}
+        labelHelp={credentialHelp.credentialType}
         hint={credentialTypeHint}
       >
         {({ field, fieldState }) => (

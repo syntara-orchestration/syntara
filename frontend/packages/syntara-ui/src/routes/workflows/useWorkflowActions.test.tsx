@@ -7,6 +7,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { executionsFetchClient, workflowFetchClient } from '../../client'
 
 import { useWorkflowActions } from './useWorkflowActions'
+import {
+  WORKFLOW_START_DEFAULT_TITLE,
+  WORKFLOW_START_NOT_PUBLISHED_DESCRIPTION,
+  WORKFLOW_START_NOT_PUBLISHED_TITLE,
+  WORKFLOW_START_SERVICE_UNAVAILABLE_DESCRIPTION,
+  WORKFLOW_START_SERVICE_UNAVAILABLE_TITLE,
+} from './workflowStartErrors'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -377,6 +384,125 @@ describe('useWorkflowActions', () => {
         description: 'Workflow has no triggers configured',
       })
       expect(executionsFetchClient.POST).not.toHaveBeenCalled()
+    })
+
+    it('maps WORKFLOW_NOT_PUBLISHED to a friendly not-published alert', async () => {
+      vi.mocked(executionsFetchClient.POST).mockResolvedValue({
+        data: undefined,
+        error: {
+          code: 'WORKFLOW_NOT_PUBLISHED',
+          detail: 'The requested workflow has no published version',
+          status: 400,
+        },
+      })
+
+      const { result } = renderHook(
+        () =>
+          useWorkflowActions({
+            showSuccess: mockShowSuccess,
+            showError: mockShowError,
+            onNavigate: mockOnNavigate,
+            onRefetch: mockOnRefetch,
+          }),
+        { wrapper: createWrapper() }
+      )
+
+      await result.current.handleRunWorkflow(mockWorkflow(), {}, 'trigger-1')
+
+      expect(mockShowError).toHaveBeenCalledWith({
+        title: WORKFLOW_START_NOT_PUBLISHED_TITLE,
+        description: WORKFLOW_START_NOT_PUBLISHED_DESCRIPTION,
+      })
+      expect(mockOnNavigate).not.toHaveBeenCalled()
+    })
+
+    it('maps service unavailable errors to a friendly alert without Temporal jargon', async () => {
+      vi.mocked(executionsFetchClient.POST).mockResolvedValue({
+        data: undefined,
+        error: {
+          code: 'TEMPORAL_UNAVAILABLE',
+          detail: 'Temporal worker unavailable',
+          status: 503,
+        },
+      })
+
+      const { result } = renderHook(
+        () =>
+          useWorkflowActions({
+            showSuccess: mockShowSuccess,
+            showError: mockShowError,
+            onNavigate: mockOnNavigate,
+            onRefetch: mockOnRefetch,
+          }),
+        { wrapper: createWrapper() }
+      )
+
+      await result.current.handleRunWorkflow(mockWorkflow(), {}, 'trigger-1')
+
+      expect(mockShowError).toHaveBeenCalledWith({
+        title: WORKFLOW_START_SERVICE_UNAVAILABLE_TITLE,
+        description: WORKFLOW_START_SERVICE_UNAVAILABLE_DESCRIPTION,
+      })
+      expect(JSON.stringify(mockShowError.mock.calls)).not.toMatch(/Temporal/i)
+      expect(mockOnNavigate).not.toHaveBeenCalled()
+    })
+
+    it('maps unknown start failures to the default friendly alert', async () => {
+      vi.mocked(executionsFetchClient.POST).mockResolvedValue({
+        data: undefined,
+        error: {
+          detail: 'raw backend boom with stack',
+          status: 500,
+        },
+      })
+
+      const { result } = renderHook(
+        () =>
+          useWorkflowActions({
+            showSuccess: mockShowSuccess,
+            showError: mockShowError,
+            onNavigate: mockOnNavigate,
+            onRefetch: mockOnRefetch,
+          }),
+        { wrapper: createWrapper() }
+      )
+
+      await result.current.handleRunWorkflow(mockWorkflow({ name: 'Test Workflow' }), {}, 'trigger-1')
+
+      expect(mockShowError).toHaveBeenCalledWith({
+        title: WORKFLOW_START_DEFAULT_TITLE,
+        description:
+          'Could not start workflow "Test Workflow". Try again, or contact your administrator if this continues.',
+      })
+      expect(JSON.stringify(mockShowError.mock.calls)).not.toContain('raw backend boom')
+      expect(mockOnNavigate).not.toHaveBeenCalled()
+    })
+
+    it('shows the default friendly alert when POST succeeds but returns no execution id', async () => {
+      vi.mocked(executionsFetchClient.POST).mockResolvedValue({
+        data: {},
+        error: undefined,
+      })
+
+      const { result } = renderHook(
+        () =>
+          useWorkflowActions({
+            showSuccess: mockShowSuccess,
+            showError: mockShowError,
+            onNavigate: mockOnNavigate,
+            onRefetch: mockOnRefetch,
+          }),
+        { wrapper: createWrapper() }
+      )
+
+      await result.current.handleRunWorkflow(mockWorkflow({ name: 'My Workflow' }), {}, 'trigger-1')
+
+      expect(mockShowError).toHaveBeenCalledWith({
+        title: WORKFLOW_START_DEFAULT_TITLE,
+        description:
+          'Could not start workflow "My Workflow". Try again, or contact your administrator if this continues.',
+      })
+      expect(mockOnNavigate).not.toHaveBeenCalled()
     })
   })
 })

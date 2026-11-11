@@ -112,6 +112,7 @@ class ActivitySyncService(
         self.session_factory = session_factory
         self.activity_publisher = activity_publisher or ActivityUpdatePublisher()
         self._sync_tasks: dict[str, asyncio.Task[None]] = {}
+        self._loop_body_activity_ids_by_version: dict[UUID, set[str]] = {}
         self._shutdown = False
         self._lifecycle = ActivitySyncLifecycle(self)
         self._execution_synchronizer = ActivityExecutionSynchronizer(self)
@@ -458,6 +459,7 @@ class ActivitySyncService(
             workflow_version = version_result.one_or_none()
 
         activity_definitions_map = await self._fetch_activity_definitions_map(workflow_version_id)
+        loop_body_activity_ids = self._loop_body_activity_ids_by_version.get(workflow_version_id, set())
 
         await self._create_all_activities_upfront(execution_id, activity_definitions_map)
 
@@ -489,6 +491,7 @@ class ActivitySyncService(
             pending_activity_updates={},
             terminal_activity_ids=terminal_activity_ids,
             iteration_counters=iteration_counters,
+            loop_body_activity_ids=loop_body_activity_ids,
             workflow_id=workflow_id,
             request_id=request_id,
             workflow_name=workflow_name,

@@ -19,7 +19,7 @@ test.describe('Publish dialog regression', () => {
       const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Desc input step')
       await openWorkflowInBuilder(app, workflowName, id)
 
-      await app.getByRole('button', { name: /Publish/i }).click()
+      await app.getByRole('button', { name: 'Publish workflow', exact: true }).click()
 
       const dialog = app.getByRole('dialog')
       await expect(dialog).toBeVisible()
@@ -57,7 +57,7 @@ test.describe('Workflow publish/unpublish', () => {
       await openWorkflowInBuilder(app, workflowName, id)
 
       // Click Publish button in toolbar
-      await app.getByRole('button', { name: /Publish/i }).click()
+      await app.getByRole('button', { name: 'Publish workflow', exact: true }).click()
 
       // Verify dialog opens with expected content
       const dialog = app.getByRole('dialog')
@@ -90,7 +90,7 @@ test.describe('Workflow publish/unpublish', () => {
       await openWorkflowInBuilder(app, workflowName, id)
 
       // Click Publish button in toolbar
-      await app.getByRole('button', { name: /Publish/i }).click()
+      await app.getByRole('button', { name: 'Publish workflow', exact: true }).click()
 
       // Submit the dialog
       const dialog = app.getByRole('dialog')
