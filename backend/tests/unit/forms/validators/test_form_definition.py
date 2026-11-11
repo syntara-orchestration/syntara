@@ -72,6 +72,13 @@ class TestValidDefinitions:
 class TestInvalidDefaults:
     """Defaults the responder-time coercer would reject are caught at author time."""
 
+    @pytest.mark.parametrize("default", [float("nan"), float("inf"), float("-inf")])
+    def test_non_finite_number_default_rejected(self, default: float) -> None:
+        """Non-finite native number defaults are rejected by the shared coercer."""
+        errors = _errors(_form(_field("number", "x", default=default)))
+
+        assert [(e.field, e.code) for e in errors] == [("x", "invalid_default")]
+
     def test_malformed_email_default(self) -> None:
         """Regression: this previously saved fine and failed for every responder."""
         errors = _errors(_form(_field("email", "contact", default="not-an-email")))
