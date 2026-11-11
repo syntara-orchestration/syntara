@@ -19,6 +19,7 @@ describe('FieldHelpPopover', () => {
     const user = userEvent.setup()
     render(<FieldHelpPopover headerContent="Input schema" helpText="Define an input schema." />)
     await user.click(screen.getByRole('button', { name: 'More info for Input schema' }))
+    expect(await screen.findByRole('dialog', { name: 'Input schema' })).toBeVisible()
     expect(screen.getByText('Input schema')).toBeInTheDocument()
     expect(screen.getByText('Define an input schema.')).toBeInTheDocument()
   })
@@ -46,18 +47,13 @@ describe('FieldHelpPopover', () => {
     expect(screen.getByText('Body copy.')).toBeInTheDocument()
   })
 
-  it('uses a custom aria-label on the popover when provided', async () => {
+  it('uses a custom fallback dialog name when there is no header', async () => {
     const user = userEvent.setup()
-    render(
-      <FieldHelpPopover
-        helpText="Issuer URL help body."
-        headerContent="Issuer URL"
-        aria-label="Issuer URL field help"
-      />
-    )
+    render(<FieldHelpPopover helpText="Issuer URL help body." aria-label="Issuer URL field help" />)
 
-    await user.click(screen.getByRole('button', { name: 'More info for Issuer URL' }))
+    await user.click(screen.getByRole('button', { name: 'More info' }))
 
+    expect(await screen.findByRole('dialog', { name: 'Issuer URL field help' })).toBeVisible()
     expect(screen.getByText('Issuer URL help body.')).toBeInTheDocument()
   })
 

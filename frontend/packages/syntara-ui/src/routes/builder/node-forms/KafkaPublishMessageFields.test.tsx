@@ -65,7 +65,7 @@ describe('Kafka Publish prototype message controls', () => {
     const { user } = setup()
     expect(screen.queryByRole('textbox', { name: 'Message key value' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'More info for Message key encoding' }))
-    expect(await screen.findByRole('dialog', { name: 'Field help' })).toHaveTextContent(
+    expect(await screen.findByRole('dialog', { name: 'Message key encoding' })).toHaveTextContent(
       'Null sends no bytes. An empty UTF-8 or Base64 value sends an empty byte sequence.'
     )
   })
@@ -137,10 +137,10 @@ describe('Kafka Publish prototype message controls', () => {
       )
     ).toBeVisible()
     await user.click(screen.getByRole('button', { name: 'More info for Header source' }))
-    expect(await screen.findByRole('dialog', { name: 'Field help' })).toHaveTextContent(
+    expect(await screen.findByRole('dialog', { name: 'Header source' })).toHaveTextContent(
       "Ordered entries: Configure each header's name, encoding, and value."
     )
-    expect(screen.getByRole('dialog', { name: 'Field help' })).toHaveTextContent(
+    expect(screen.getByRole('dialog', { name: 'Header source' })).toHaveTextContent(
       'Full-value template: Provide one expression that resolves to an ordered list of headers.'
     )
     expect(screen.getByText('Ordered entries:', { exact: true }).tagName).toBe('STRONG')

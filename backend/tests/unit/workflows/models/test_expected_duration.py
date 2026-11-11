@@ -41,6 +41,7 @@ def test_expected_duration_does_not_change_timeout_or_retries() -> None:
             "settings": {**settings, "expected_duration": 1},
         }
     )
-    assert warning.to_dict()["settings"]["expected_duration"] == 1
+    assert isinstance(warning.settings, NodeSettingsFull)
+    assert warning.settings.expected_duration == 1
     assert resolve_timeout(warning, {}) == resolve_timeout(original, {}) == 30
     assert resolve_retry_policy(warning, {}) == resolve_retry_policy(original, {})

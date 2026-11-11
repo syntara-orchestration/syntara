@@ -269,7 +269,9 @@ describe('NodeSettingsForm', () => {
     it('shows fallback text when no system default', () => {
       vi.mocked(useWorkflowEngineDefaults).mockReturnValue({ defaults: null, isLoading: false })
       setup({ timeoutFormat: 'duration' })
-      expect(screen.getByText(/Falls back to system default if not set/)).toBeInTheDocument()
+      expect(
+        screen.getByText('How long to wait before timing out. Falls back to system default if not set.')
+      ).toBeInTheDocument()
     })
   })
 

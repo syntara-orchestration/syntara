@@ -9,7 +9,7 @@ export type FieldHelpPopoverProps = Readonly<{
   helpText: ReactNode
   /** Optional header shown at the top of the popover. */
   headerContent?: ReactNode
-  /** Accessible name for the popover dialog. Defaults to "Field help". */
+  /** Fallback dialog name without a header. A provided header labels the dialog instead. */
   'aria-label'?: string
 }>
 

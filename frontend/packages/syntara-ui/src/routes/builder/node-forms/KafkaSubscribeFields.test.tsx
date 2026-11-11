@@ -338,7 +338,9 @@ describe('Kafka Subscribe form', () => {
   it('presents a missing Integration without replacing its saved reference', async () => {
     vi.mocked(integrationsFetchClient.GET).mockResolvedValue({ data: { resources: [] }, response: new Response() })
     renderKafka()
-    expect(await screen.findByText(/Select an available Kafka Integration/)).toBeInTheDocument()
+    const integration = await screen.findByRole('textbox', { name: 'Kafka Integration' })
+    await waitFor(() => expect(integration).toHaveAccessibleDescription(/Select an available Kafka Integration/))
+    expect(integration).toHaveValue('Selected Integration unavailable')
   })
 
   it.each(['unknown', 'error', 'available'] as const)('omits persistent Integration health for %s', async (status) => {
