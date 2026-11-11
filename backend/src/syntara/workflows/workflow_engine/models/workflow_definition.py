@@ -1115,7 +1115,7 @@ class SubWorkflowOutputResult(BaseModel):
     """Result payload for Sub-workflow steps containing child execution metadata.
 
     This is the Result field of the StandardOutputWrapper structure.
-    Contains aggregate child execution metadata and nested child step outputs.
+    Contains aggregate child execution metadata and flattened child step outputs.
     """
 
     child_execution_id: str | None = None
@@ -1123,7 +1123,13 @@ class SubWorkflowOutputResult(BaseModel):
     child_workflow_name: str | None = Field(default=None, max_length=255)
     child_workflow_version: int | None = None
     child_status: WorkflowTerminalStatus | None = None
-    outputs: dict[str, StandardOutputWrapper] | None = Field(default=None, max_length=1000)
+    outputs: dict[str, dict[str, Any]] | None = Field(
+        default=None,
+        max_length=1000,
+        description=(
+            "Child workflow step outputs. Keys are child step IDs, values are their output data as raw objects."
+        ),
+    )
 
 
 class SubWorkflowOutput(StandardOutputWrapper, NodeOutput):
@@ -1138,8 +1144,12 @@ class SubWorkflowOutput(StandardOutputWrapper, NodeOutput):
     specification and avoid future breaking changes.
 
     The outputs field (nested in Result) is a dict where keys are child step IDs
-    and values are their StandardOutputWrapper outputs. This allows dotted-path
-    template expressions like: ${sub_workflow_step.Result.outputs.child_step_id.field}
+    and values are their raw output data as objects. The StandardOutputWrapper
+    envelope applies to the Sub-workflow step itself, while child outputs are
+    exposed directly for simplified access.
+
+    This allows flat dotted-path template expressions like:
+    ${sub_workflow_step.Result.outputs.child_step_id.artifact_url}
     """
 
     Result: SubWorkflowOutputResult | None = None  # Override to specify concrete Result type

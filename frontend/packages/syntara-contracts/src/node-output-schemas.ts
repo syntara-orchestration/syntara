@@ -137,17 +137,8 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
           name: 'outputs',
           type: 'object',
           description:
-            'Child workflow terminal step outputs. Keys are child step IDs, values are StandardOutputWrapper envelopes. May be null if authorization denied.',
-          additionalProperties: [
-            { name: 'Result', type: 'unknown', description: 'Primary task return payload (type varies by step)' },
-            {
-              name: 'StatusCode',
-              type: 'number',
-              description: 'Execution status code (0=success, non-zero=failure per POSIX convention)',
-            },
-            { name: 'StatusMessage', type: 'string', description: 'Human-readable status summary (max 500 chars)' },
-            { name: 'ErrorMessage', type: 'string', description: 'Detailed error diagnostics (max 10k chars)' },
-          ],
+            'Child workflow step outputs. Keys are child step IDs, values are their output data as raw objects. May be null if authorization denied.',
+          additionalProperties: [],
         },
       ],
     },

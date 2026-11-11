@@ -90,10 +90,11 @@
         },
         "outputs": {
           "type": ["object", "null"],
-          "description": "Child workflow terminal step outputs. Keys are child step IDs, values are StandardOutputWrapper envelopes. May be null if authorization denied.",
+          "description": "Child workflow step outputs. Keys are child step IDs, values are their output data as raw objects. May be null if authorization denied.",
           "maxProperties": 1000,
           "additionalProperties": {
-            "$ref": "#/$defs/StandardOutputWrapper"
+            "type": "object",
+            "additionalProperties": true
           }
         }
       },
