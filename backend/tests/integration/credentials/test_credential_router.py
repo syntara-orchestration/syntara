@@ -200,7 +200,7 @@ class TestListCredentials:
             assert create_resp.status_code == 201
             credential_ids.append(create_resp.json()["id"])
 
-        resp = await auth_client.get("/api/v1/credentials", params={"project_id": test_project_id})
+        resp = await auth_client.get("/api/v1/credentials")
         assert resp.status_code == 200
         body = resp.json()
         resources = body["resources"]
@@ -875,7 +875,7 @@ class TestEnabledFilter:
         patch_resp = await auth_client.patch(f"/api/v1/credentials/{disabled_id}", json={"enabled": False})
         assert patch_resp.status_code == 200
 
-        resp = await auth_client.get("/api/v1/credentials", params={"project_id": test_project_id, "enabled": "true"})
+        resp = await auth_client.get("/api/v1/credentials", params={"enabled": "true"})
         assert resp.status_code == 200
         resources = resp.json()["resources"]
         listed_ids = {resource["id"] for resource in resources}
@@ -904,7 +904,7 @@ class TestEnabledFilter:
         patch_resp = await auth_client.patch(f"/api/v1/credentials/{cred_id}", json={"enabled": False})
         assert patch_resp.status_code == 200
 
-        resp = await auth_client.get("/api/v1/credentials", params={"project_id": test_project_id, "enabled": "false"})
+        resp = await auth_client.get("/api/v1/credentials", params={"enabled": "false"})
         assert resp.status_code == 200
         resources = resp.json()["resources"]
         assert cred_id in {resource["id"] for resource in resources}
