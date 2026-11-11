@@ -376,6 +376,88 @@ describe('buildWorkflowDefinition', () => {
         approver_users: [{ id: 'user-1', username: 'alice' }],
       })
     })
+
+    it('canonicalizes agentic node with SELECTED strategy and missing tool selections to NONE', () => {
+      const activities: Activity[] = [
+        {
+          id: 'agent-1',
+          type: ActivityTypeEnum.AGENTIC,
+          name: 'Task Agent',
+          parameters: {
+            prompt: 'Say hello',
+            tool_selection_strategy: 'SELECTED',
+          },
+        },
+      ]
+
+      const result = buildWorkflowDefinition({
+        workflowName: 'Test',
+        workflowDescription: '',
+        activities: activities,
+        triggers: [],
+        edges: [],
+      })
+
+      expect(result.nodes[0].parameters).toEqual({
+        prompt: 'Say hello',
+        tool_selection_strategy: 'NONE',
+      })
+      expect(result.nodes[0].parameters).not.toHaveProperty('tool_selections')
+    })
+
+    it('canonicalizes agentic node with SELECTED strategy and empty tool selections to NONE', () => {
+      const activities: Activity[] = [
+        {
+          id: 'agent-1',
+          type: ActivityTypeEnum.AGENTIC,
+          name: 'Task Agent',
+          parameters: {
+            tool_selection_strategy: 'SELECTED',
+            tool_selections: [],
+          },
+        },
+      ]
+
+      const result = buildWorkflowDefinition({
+        workflowName: 'Test',
+        workflowDescription: '',
+        activities: activities,
+        triggers: [],
+        edges: [],
+      })
+
+      expect(result.nodes[0].parameters).toEqual({
+        tool_selection_strategy: 'NONE',
+      })
+      expect(result.nodes[0].parameters).not.toHaveProperty('tool_selections')
+    })
+
+    it('keeps agentic node with SELECTED strategy and non-empty tool selections unchanged', () => {
+      const activities: Activity[] = [
+        {
+          id: 'agent-1',
+          type: ActivityTypeEnum.AGENTIC,
+          name: 'Task Agent',
+          parameters: {
+            tool_selection_strategy: 'SELECTED',
+            tool_selections: ['tool-1', 'tool-2'],
+          },
+        },
+      ]
+
+      const result = buildWorkflowDefinition({
+        workflowName: 'Test',
+        workflowDescription: '',
+        activities: activities,
+        triggers: [],
+        edges: [],
+      })
+
+      expect(result.nodes[0].parameters).toEqual({
+        tool_selection_strategy: 'SELECTED',
+        tool_selections: ['tool-1', 'tool-2'],
+      })
+    })
   })
 
   describe('Edge mapping', () => {
@@ -1301,6 +1383,67 @@ describe('transformStepParameters', () => {
       const result = transformStepParameters(ActivityTypeEnum.CONVERGE, { timeout: 30 })
 
       expect(result).toEqual({ timeout: 30 })
+    })
+  })
+
+  describe('agentic', () => {
+    it('rewrites SELECTED with missing tool_selections to NONE', () => {
+      const result = transformStepParameters(ActivityTypeEnum.AGENTIC, {
+        prompt: 'Say hello',
+        tool_selection_strategy: 'SELECTED',
+      })
+
+      expect(result).toEqual({
+        prompt: 'Say hello',
+        tool_selection_strategy: 'NONE',
+      })
+      expect(result).not.toHaveProperty('tool_selections')
+    })
+
+    it('rewrites SELECTED with empty tool_selections to NONE and drops the key', () => {
+      const result = transformStepParameters(ActivityTypeEnum.AGENTIC, {
+        tool_selection_strategy: 'SELECTED',
+        tool_selections: [],
+      })
+
+      expect(result.tool_selection_strategy).toBe('NONE')
+      expect(result).not.toHaveProperty('tool_selections')
+    })
+
+    it('keeps SELECTED with non-empty tool_selections unchanged', () => {
+      const result = transformStepParameters(ActivityTypeEnum.AGENTIC, {
+        tool_selection_strategy: 'SELECTED',
+        tool_selections: ['tool-1', 'tool-2'],
+      })
+
+      expect(result).toEqual({
+        tool_selection_strategy: 'SELECTED',
+        tool_selections: ['tool-1', 'tool-2'],
+      })
+    })
+
+    it('leaves ALL and NONE strategies unchanged', () => {
+      expect(transformStepParameters(ActivityTypeEnum.AGENTIC, { tool_selection_strategy: 'ALL' })).toEqual({
+        tool_selection_strategy: 'ALL',
+      })
+      expect(transformStepParameters(ActivityTypeEnum.AGENTIC, { tool_selection_strategy: 'NONE' })).toEqual({
+        tool_selection_strategy: 'NONE',
+      })
+    })
+
+    it('leaves parameters without a strategy unchanged', () => {
+      const result = transformStepParameters(ActivityTypeEnum.AGENTIC, { prompt: 'Say hello' })
+
+      expect(result).toEqual({ prompt: 'Say hello' })
+      expect(result).not.toHaveProperty('tool_selection_strategy')
+    })
+
+    it('does not rewrite strategy on non-agentic nodes', () => {
+      const result = transformStepParameters(ActivityTypeEnum.SCRIPT, {
+        tool_selection_strategy: 'SELECTED',
+      })
+
+      expect(result.tool_selection_strategy).toBe('SELECTED')
     })
   })
 })

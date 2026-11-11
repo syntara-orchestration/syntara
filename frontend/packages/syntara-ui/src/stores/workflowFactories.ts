@@ -127,7 +127,27 @@ export type CreateAgenticActivityOptions = {
 }
 
 /**
+ * Canonical form of an agentic node's tool selection strategy.
+ *
+ * Mirrors the backend's save-time canonicalization: a `SELECTED` strategy with a
+ * missing or empty `tool_selections` list means "no tools" and is rewritten to
+ * `NONE`. The workflow JSON Schema rejects `SELECTED` without `tool_selections`,
+ * and `/workflows/validate` checks definitions exactly as sent — so the builder
+ * must never emit that shape, or verification and publish stay blocked. Only the
+ * exact string 'SELECTED' is rewritten; template expressions and other values
+ * pass through untouched, matching the backend rule.
+ */
+export function canonicalToolSelectionStrategy(strategy: unknown, selections: unknown): unknown {
+  if (strategy !== 'SELECTED') return strategy
+  const hasSelections = Array.isArray(selections) ? selections.length > 0 : Boolean(selections)
+  return hasSelections ? strategy : 'NONE'
+}
+
+/**
  * Create an agentic node (v2).
+ *
+ * The tool selection strategy is canonicalized: `SELECTED` without tool
+ * selections is stored as `NONE` (see `canonicalToolSelectionStrategy`).
  */
 export function createAgenticActivity(options: CreateAgenticActivityOptions): Activity {
   const {
@@ -149,8 +169,9 @@ export function createAgenticActivity(options: CreateAgenticActivityOptions): Ac
   if (llmModelId) config.llm_model_id = llmModelId
 
   if (toolSelectionStrategy !== undefined) {
-    config.tool_selection_strategy = toolSelectionStrategy
-    if (toolSelectionStrategy === 'SELECTED' && toolSelections?.length) {
+    const strategy = canonicalToolSelectionStrategy(toolSelectionStrategy, toolSelections)
+    config.tool_selection_strategy = strategy
+    if (strategy === 'SELECTED') {
       config.tool_selections = toolSelections
     }
   }
