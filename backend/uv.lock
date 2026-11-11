@@ -3831,6 +3831,27 @@ wheels = [
 ]
 
 [[package]]
+name = "rfc3339-validator"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/28/ea/a9387748e2d111c3c2b275ba970b735e04e15cdb1eb30693b6b5708c4dbd/rfc3339_validator-0.1.4.tar.gz", hash = "sha256:138a2abdf93304ad60530167e51d2dfb9549521a836871b88d7f4695d0022f6b", size = 5513, upload-time = "2021-05-12T16:37:54.178Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7b/44/4e421b96b67b2daff264473f7465db72fbdf36a07e05494f50300cc7b0c6/rfc3339_validator-0.1.4-py2.py3-none-any.whl", hash = "sha256:24f6ec1eda14ef823da9e36ec7113124b39c04d50a4d3d3a3c2859577e7791fa", size = 3490, upload-time = "2021-05-12T16:37:52.536Z" },
+]
+
+[[package]]
+name = "rfc3986-validator"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/88/f270de456dd7d11dcc808abfa291ecdd3f45ff44e3b549ffa01b126464d0/rfc3986_validator-0.1.1.tar.gz", hash = "sha256:3d44bde7921b3b9ec3ae4e3adca370438eccebc676456449b145d533b240d055", size = 6760, upload-time = "2019-10-28T16:00:19.144Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/51/17023c0f8f1869d8806b979a2bffa3f861f26a3f1a66b094288323fba52f/rfc3986_validator-0.1.1-py2.py3-none-any.whl", hash = "sha256:2f235c432ef459970b4306369336b9d5dbdda31b510ca1e327636e01f528bfa9", size = 4242, upload-time = "2019-10-28T16:00:13.976Z" },
+]
+
+[[package]]
 name = "rich"
 version = "14.3.4"
 source = { registry = "https://pypi.org/simple" }
@@ -4400,6 +4421,8 @@ dependencies = [
     { name = "rapidfuzz" },
     { name = "redis" },
     { name = "regopy" },
+    { name = "rfc3339-validator" },
+    { name = "rfc3986-validator" },
     { name = "scikit-learn" },
     { name = "segment-analytics-python" },
     { name = "spacy" },
@@ -4528,6 +4551,8 @@ requires-dist = [
     { name = "redis", specifier = ">=7.1.0,<8.0.0" },
     { name = "regopy", specifier = ">=1.5.1" },
     { name = "respx", marker = "extra == 'dev'", specifier = ">=0.20.0" },
+    { name = "rfc3339-validator", specifier = ">=0.1.4,<0.2.0" },
+    { name = "rfc3986-validator", specifier = ">=0.1.1,<0.2.0" },
     { name = "ruamel-yaml", marker = "extra == 'dev'", specifier = ">=0.17.40" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0,<0.14.4" },
     { name = "scikit-learn", specifier = ">=1.7.2" },

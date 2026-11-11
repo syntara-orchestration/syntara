@@ -10,13 +10,20 @@ All tests mock Temporal's workflow module to avoid needing a running server.
 """
 
 import asyncio
+import json
 from collections.abc import Generator
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
 import pytest
 
+from syntara.eventstreams.adapters.kafka_metadata import KafkaSourceMetadata
+from syntara.eventstreams.core.envelope import RawEvent, RawEventHeader
+from syntara.eventstreams.core.serialization import EventDecodeSuccess, JsonEventDecoder
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflows.workflow_engine.activities.event_subscribe_trigger import event_subscribe_trigger
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
@@ -69,6 +76,76 @@ def _make_workflow(
     wf.pre_resolved_outputs = {}
     wf.stop_after_nodes = set()
     return wf
+
+
+@pytest.mark.parametrize("mapped", [False, True])
+@pytest.mark.parametrize("structured", [False, True])
+async def test_decoded_cloudevents_reach_successor_inputs(*, mapped: bool, structured: bool) -> None:
+    """Exercise decoding, trigger output mapping, registration, and successor resolution."""
+    record = RawEvent(
+        value=b'{"orderId":123}',
+        headers=tuple(
+            RawEventHeader(name=name, value=value)
+            for name, value in {
+                "ce_specversion": b"1.0",
+                "ce_id": b"order-123",
+                "ce_source": b"/orders",
+                "ce_type": b"order.created",
+            }.items()
+        ),
+        source_metadata=KafkaSourceMetadata(
+            integration_id=UUID(int=1),
+            subscription_id=UUID(int=2),
+            source_generation=1,
+            received_at=datetime(2026, 11, 5, tzinfo=UTC),
+            topic="orders",
+            partition=0,
+            offset="1",
+        ),
+    )
+    if structured:
+        attributes = {
+            header.name.removeprefix("ce_"): header.value.decode() for header in record.headers if header.value
+        }
+        record = record.model_copy(
+            update={
+                "value": json.dumps({**attributes, "data": {"orderId": 123}}).encode(),
+                "headers": (RawEventHeader(name="content-type", value=b"application/cloudevents+json"),),
+            }
+        )
+    result = JsonEventDecoder().decode(record)
+    assert isinstance(result, EventDecodeSuccess)
+    envelope = result.envelope.model_dump(mode="json")
+    outputs = {"orderId": "${result.payload.orderId}", "eventType": "${result.cloudevents.type}"} if mapped else None
+    backend = InMemoryGraphBackend()
+    backend.add_node(
+        "subscription", {"id": "subscription", "type": "event_subscribe_trigger", "parameters": {}, "outputs": outputs}
+    )
+    backend.add_node(
+        "next",
+        {
+            "id": "next",
+            "type": "script",
+            "parameters": {
+                "orderId": "${trigger.orderId}" if mapped else "${trigger.payload.orderId}",
+                "eventType": "${subscription.eventType}" if mapped else "${subscription.cloudevents.type}",
+            },
+        },
+    )
+    backend.add_edge("subscription", "next", None)
+    graph = WorkflowGraph(backend)
+    wf = _make_workflow()
+    activity_result = await event_subscribe_trigger(envelope, outputs)
+    with (
+        patch(
+            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+            new=AsyncMock(return_value=activity_result),
+        ),
+        patch.object(wf, "_schedule_successors", new_callable=AsyncMock),
+    ):
+        await wf._execute_trigger("subscription", envelope, graph, {})
+    assert wf._resolve_node_parameters(graph.get_node("next")) == {"orderId": 123, "eventType": "order.created"}
+    assert result.envelope.model_dump(mode="json") == envelope
 
 
 def _build_linear_graph() -> WorkflowGraph:

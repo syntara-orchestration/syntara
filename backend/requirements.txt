@@ -764,6 +764,14 @@ requests-toolbelt==1.0.0 \
     --hash=sha256:7681a0a3d047012b5bdc0ee37d7f8f07ebe76ab08caeccfc3921ce23c88d5bc6 \
     --hash=sha256:cccfdd665f0a24fcf4726e690f65639d272bb0637b9b92dfd91a5568ccf6bd06
     # via langsmith
+rfc3339-validator==0.1.4 \
+    --hash=sha256:138a2abdf93304ad60530167e51d2dfb9549521a836871b88d7f4695d0022f6b \
+    --hash=sha256:24f6ec1eda14ef823da9e36ec7113124b39c04d50a4d3d3a3c2859577e7791fa
+    # via syntara
+rfc3986-validator==0.1.1 \
+    --hash=sha256:2f235c432ef459970b4306369336b9d5dbdda31b510ca1e327636e01f528bfa9 \
+    --hash=sha256:3d44bde7921b3b9ec3ae4e3adca370438eccebc676456449b145d533b240d055
+    # via syntara
 rich==14.3.4 \
     --hash=sha256:07e7adb4690f68864777b1450859253bed81a99a31ac321ac1817b2313558952 \
     --hash=sha256:817e02727f2b25b40ef56f5aa2217f400c8489f79ca8f46ea2b70dd5e14558a9
@@ -820,7 +828,9 @@ shellingham==1.5.4 \
 six==1.17.0 \
     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274 \
     --hash=sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81
-    # via python-dateutil
+    # via
+    #   python-dateutil
+    #   rfc3339-validator
 smart-open==7.7.1 \
     --hash=sha256:9414ba5733e28309f29b28a303b0f1054ad23fe0275f1a1b600c80a724f4bd1a \
     --hash=sha256:cb62dc45f519bf39b612564d326d2a17556f3a6056e3c3a86a07215d670d45bc

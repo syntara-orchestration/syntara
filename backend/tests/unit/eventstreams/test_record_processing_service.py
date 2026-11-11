@@ -1,5 +1,6 @@
 """Record processing composition with real decoding/preparation and isolated I/O."""
 
+import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
@@ -17,7 +18,7 @@ from syntara.eventstreams.core.deduplication import (
     DeliveryState,
     TerminalDelivery,
 )
-from syntara.eventstreams.core.envelope import RawEvent
+from syntara.eventstreams.core.envelope import RawEvent, RawEventHeader
 from syntara.eventstreams.core.handler import ResolvedDelivery, RetryDelivery, SchedulingFailureCode
 from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.core.processing import (
@@ -32,6 +33,7 @@ from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.services import record_processing_service as module
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
+from syntara.workflows.models.execution import Execution
 from tests.unit.eventstreams.test_execution_preparation_service import preparation_context
 
 if TYPE_CHECKING:
@@ -116,8 +118,24 @@ def processing_context(monkeypatch: pytest.MonkeyPatch):
     return context, service, admission, event
 
 
-async def test_evidence_then_decode_prepare_commit_and_schedule(monkeypatch) -> None:
+@pytest.mark.parametrize("structured", [False, True])
+async def test_evidence_then_decode_prepare_commit_and_schedule(monkeypatch, *, structured: bool) -> None:
     context, service, admission, event = processing_context(monkeypatch)
+    if structured:
+        event = event.model_copy(
+            update={
+                "value": json.dumps(
+                    {
+                        "specversion": "1.0",
+                        "id": "event-1",
+                        "source": "/example",
+                        "type": "example",
+                        "data": {"count": 2},
+                    }
+                ).encode(),
+                "headers": (RawEventHeader(name="content-type", value=b"application/cloudevents+json"),),
+            }
+        )
 
     async def lookup(_identity) -> None:
         context.events.append("lookup")
@@ -133,6 +151,10 @@ async def test_evidence_then_decode_prepare_commit_and_schedule(monkeypatch) -> 
     assert isinstance(await service.process(context.snapshot, context.identity, event, "worker"), ResolvedDelivery)
     assert context.events.index("lookup") < context.events.index("acquire") < context.events.index("freeze")
     assert context.events[-2:] == ["commit", "schedule"]
+    if structured:
+        execution = context.rows[Execution]
+        assert execution.input_data["payload"] == {"count": 2}
+        assert execution.input_data["cloudevents"]["id"] == "event-1"
 
 
 @pytest.mark.parametrize("stage", ["lookup", "eligibility", "inspection"])
@@ -419,4 +441,33 @@ async def test_pending_inspection_identity_requests_content_without_new_admissio
     assert not result.permanent_content_error
     context.store.acquire_inspection.assert_not_awaited()
     context.store.acquire.assert_not_awaited()
+    admission.schedule.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("body", "code"),
+    [
+        ({"data": {}}, EventFailureCode.malformed_cloudevents),
+        (
+            {"specversion": "1.0", "id": "1", "source": "/source", "type": "example", "data_base64": "e30="},
+            EventFailureCode.unsupported_cloudevents_data,
+        ),
+    ],
+)
+async def test_structured_failure_is_held_without_scheduling_or_terminal_discard(monkeypatch, body, code) -> None:
+    context, service, admission, event = processing_context(monkeypatch)
+    event = event.model_copy(
+        update={
+            "value": json.dumps(body).encode(),
+            "headers": (RawEventHeader(name="content-type", value=b"application/cloudevents+json"),),
+        }
+    )
+    result = await service.process(context.snapshot, context.identity, event, "worker")
+    assert isinstance(result, HeldRecord)
+    assert result.reason == "activity_log_unavailable"
+    assert result.permanent_content_error
+    assert context.store.defer.call_args.kwargs["error_code"] == code.value
+    assert context.events[-1] == "commit"
+    context.store.finalize_without_execution.assert_not_awaited()
+    context.store.freeze.assert_not_awaited()
     admission.schedule.assert_not_awaited()
