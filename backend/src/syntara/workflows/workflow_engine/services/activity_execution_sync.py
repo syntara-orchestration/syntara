@@ -34,12 +34,18 @@ class ActivityExecutionSyncMixin:
         self,
         handle: WorkflowHandle[Any, Any],
         activity_id: str,
+        iteration: int | None = None,
     ) -> dict[str, Any] | None:
         """Resolve output for a completed activity when the initial query returned None."""
         try:
             return cast(
                 "dict[str, Any] | None",
-                await handle.execute_update("get_activity_output_when_ready", activity_id),
+                await handle.execute_update(
+                    "get_activity_output_when_ready",
+                    args=[activity_id, iteration],
+                )
+                if iteration is not None
+                else await handle.execute_update("get_activity_output_when_ready", activity_id),
             )
         except RPCError as e:
             if e.status == RPCStatusCode.NOT_FOUND:
@@ -51,7 +57,9 @@ class ActivityExecutionSyncMixin:
                 try:
                     return cast(
                         "dict[str, Any] | None",
-                        await handle.query("get_activity_output", activity_id),
+                        await handle.query("get_activity_output", args=[activity_id, iteration])
+                        if iteration is not None
+                        else await handle.query("get_activity_output", activity_id),
                     )
                 except (TemporalError, ValueError):
                     logger.warning(
@@ -141,15 +149,23 @@ class ActivityExecutionSyncMixin:
         input_data: dict[str, Any] = {}
         output_data = initial_output_data
 
+        iteration = activity_data.get("iteration")
+        history_activity_id = activity_data.get("_history_activity_id")
+        query_activity_id = history_activity_id or activity_id
+        query_iteration = None if history_activity_id else iteration
         try:
-            input_data = await handle.query("get_activity_input", activity_id) or {}
-            queried_output = await handle.query("get_activity_output", activity_id)
+            if query_iteration is not None:
+                input_data = await handle.query("get_activity_input", args=[query_activity_id, query_iteration]) or {}
+                queried_output = await handle.query("get_activity_output", args=[query_activity_id, query_iteration])
+            else:
+                input_data = await handle.query("get_activity_input", query_activity_id) or {}
+                queried_output = await handle.query("get_activity_output", query_activity_id)
         except (TemporalError, ValueError):
             logger.warning("Could not query activity data", activity_id=activity_id)
             raise
 
         if queried_output is None and activity_data["status"] == ActivityStatus.COMPLETED:
-            queried_output = await self._fetch_completed_activity_output(handle, activity_id)
+            queried_output = await self._fetch_completed_activity_output(handle, query_activity_id, query_iteration)
 
         if queried_output is not None:
             output_data = self._merge_output(initial_output_data, queried_output)

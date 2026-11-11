@@ -60,6 +60,11 @@ def innermost_iteration_index(activity_id: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
+def iteration_indices(activity_id: str) -> list[int]:
+    """Return every loop index in a Temporal activity ID, outermost first."""
+    return [int(value) for value in re.findall(r"_iter_(\d+)", activity_id)]
+
+
 def join_loop_iteration_id(node_id: str, indices: Sequence[int]) -> str:
     """Build ``{node_id}_iter_{i0}_iter_{i1}...`` (empty indices → canvas ID)."""
     if not indices:

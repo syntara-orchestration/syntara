@@ -50,7 +50,7 @@ WORKER_BASE_URL = https://localhost:8000/api/v1
 # ========================================================
 
 .PHONY: install
-install: _deps-install-dev _deps-install-pre-commit ## Complete setup from scratch
+install: _deps-install-dev _deps-install-pre-commit _check-libmagic ## Complete setup from scratch
 	@echo ""
 	@echo "🎉 Syntara setup complete!"
 	@echo ""
@@ -85,7 +85,23 @@ _check-uv:
 		exit 1; \
 	fi
 
-_check-dependency-binaries: _check-uv
+# python-magic is a thin wrapper around the libmagic C library, which uv
+# cannot install. Fail early with install hints instead of crashing at API startup.
+# Skips when python-magic itself is not installed; _check-dependency-binaries and
+# `make install` report that case.
+.PHONY: _check-libmagic
+_check-libmagic: _check-uv
+	@if ! uv run --no-sync python -c "import importlib.util as u; u.find_spec('magic') is None or __import__('magic')" >/dev/null 2>&1; then \
+		echo "❌ libmagic not found (required by python-magic for file type detection)."; \
+		echo "   Install it, then re-run this command:"; \
+		echo "     macOS:         brew install libmagic"; \
+		echo "     Fedora/RHEL:   sudo dnf install file-libs"; \
+		echo "     Debian/Ubuntu: sudo apt install libmagic1"; \
+		echo "     Windows:       see docs/windows-setup-guide.md"; \
+		exit 1; \
+	fi
+
+_check-dependency-binaries: _check-uv _check-libmagic
 	@if ! uv run python -c "import src" 2>/dev/null; then \
 		echo "❌ syntara package not installed. Run 'make install' first"; \
 		exit 1; \

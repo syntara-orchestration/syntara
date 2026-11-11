@@ -1055,7 +1055,7 @@ describe('Executions Component', () => {
     it('sets the browser tab title', () => {
       mockExecutionsQuery(mockExecutions)
       render(<Executions />, { wrapper: TestWrapper })
-      expectPageTitle(['Workflow Runs'])
+      expectPageTitle('Workflow Runs | Syntara')
     })
   })
 })

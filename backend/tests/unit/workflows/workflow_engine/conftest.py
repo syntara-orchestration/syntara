@@ -17,5 +17,9 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     """
     wf._runtime_settings = make_workflow_runtime_settings()
     wf._has_unhandled_failure = False
+    if not hasattr(wf, "activity_input_history"):
+        wf.activity_input_history = {}
+    if not hasattr(wf, "activity_output_history"):
+        wf.activity_output_history = {}
     if not hasattr(wf, "_cof_failed_nodes"):
         wf._cof_failed_nodes = set()

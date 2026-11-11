@@ -265,7 +265,7 @@ describe('Workflows Component', () => {
 
     it('sets the browser tab title', () => {
       render(<Workflows />, { wrapper })
-      expectPageTitle(['Workflows'])
+      expectPageTitle('Workflows | Syntara')
     })
 
     it('renders Import workflow button before Create workflow in toolbar', () => {
@@ -508,10 +508,15 @@ describe('Workflows Component', () => {
       const runButton = await screen.findByRole('button', { name: /^Run now$/i })
       await user.click(runButton)
 
-      // Verify error alert is shown
+      // Verify error alert is shown without exposing raw API detail
       await waitFor(() => {
         expect(screen.getByText('Failed to run workflow')).toBeInTheDocument()
-        expect(screen.getByText(/Failed to start workflow "Important Project Workflow"/)).toBeInTheDocument()
+        expect(
+          screen.getByText(
+            'Could not start workflow "Important Project Workflow". Try again, or contact your administrator if this continues.'
+          )
+        ).toBeInTheDocument()
+        expect(screen.queryByText(/Network error/)).not.toBeInTheDocument()
       })
     })
 
@@ -552,7 +557,9 @@ describe('Workflows Component', () => {
       await waitFor(() => {
         expect(screen.getByText('Failed to run workflow')).toBeInTheDocument()
         expect(
-          screen.getByText(/Failed to start workflow "Important Project Workflow": An unexpected error occurred/)
+          screen.getByText(
+            'Could not start workflow "Important Project Workflow". Try again, or contact your administrator if this continues.'
+          )
         ).toBeInTheDocument()
       })
     })
@@ -1028,7 +1035,7 @@ describe('Workflows Component', () => {
         expect(screen.getByText('Delete workflow?')).toBeInTheDocument()
         expect(
           screen.getByText(
-            /will be deleted and any in-progress runs will stop immediately. This action cannot be undone/
+            /will be deleted and any in-progress runs will stop immediately\. Its run history will also be permanently deleted\. This action cannot be undone/
           )
         ).toBeInTheDocument()
       })

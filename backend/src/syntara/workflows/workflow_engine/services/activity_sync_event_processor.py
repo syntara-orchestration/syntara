@@ -12,6 +12,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import Activit
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     innermost_iteration_index,
+    iteration_indices,
     strip_loop_iteration_suffixes,
 )
 from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
@@ -34,7 +35,22 @@ class ActivitySyncEventProcessorMixin:
         else:
             base_activity_id = attrs.activity_id
             has_iter_suffix = False
-        is_loop_iteration = has_iter_suffix or base_activity_id in metadata.terminal_activity_ids
+        is_loop_iteration = (
+            has_iter_suffix
+            or base_activity_id in metadata.terminal_activity_ids
+            or base_activity_id in metadata.loop_body_activity_ids
+        )
+        # Most loop-body activities reuse the canvas ID, so only later
+        # schedules can be identified as iterations through terminal activity
+        # tracking. Assign the next logical iteration number before querying
+        # workflow I/O; otherwise every repeated schedule queries the current
+        # (latest) namespace.
+        if is_loop_iteration and iteration_number is None:
+            iteration_number = (
+                metadata.iteration_counters.get(base_activity_id, 0) + 1
+                if base_activity_id in metadata.terminal_activity_ids
+                else 0
+            )
         # Loop *control* nodes use `{loop_id}_iter_{n}` (or
         # `{loop_id}_iter_{outer}_iter_{inner}` when nested). Body nodes inside
         # a loop (e.g. approval) reuse that suffix for uniqueness; they must
@@ -66,6 +82,7 @@ class ActivitySyncEventProcessorMixin:
             "error_details": None,
             "retry_count": 0,
             "iteration": iteration_number,
+            "_history_activity_id": attrs.activity_id if iteration_indices(attrs.activity_id) else None,
             "scheduled_at": ensure_timezone_aware(event.event_time),
             "configured_timeout_seconds": configured_timeout_seconds,
         }

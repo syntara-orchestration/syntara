@@ -83,6 +83,11 @@ _search_attr_available: bool | None = None
 
 _CONNECTION_ERRORS = frozenset({RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED})
 
+# Temporal acknowledges AddSearchAttributes before the new mapping can be resolved
+# by requests that use it, so the first schedule after registration can be rejected.
+_SEARCH_ATTR_PROPAGATION_TIMEOUT_SECONDS = 15.0
+_SEARCH_ATTR_PROPAGATION_POLL_SECONDS = 0.25
+
 
 async def _abort_schedule_delete(
     should_abort: Callable[[], Awaitable[bool]] | None,
@@ -107,6 +112,34 @@ async def _abort_schedule_delete(
             remaining=remaining,
         )
     return True
+
+
+def _is_search_attribute_unmapped(error: RPCError) -> bool:
+    """Return True when Temporal rejected a request because the attribute has no mapping yet."""
+    return (
+        error.status == RPCStatusCode.INVALID_ARGUMENT
+        and "no mapping defined" in error.message
+        and SA_ORCHESTRATOR_WORKFLOW_ID.name in error.message
+    )
+
+
+async def _create_schedule_with_retry(
+    client: Client,
+    schedule_id: str,
+    schedule: Schedule,
+    search_attributes: TypedSearchAttributes | None = None,
+) -> None:
+    """Create a Temporal Schedule, retrying while a new search attribute propagates."""
+    deadline = time.monotonic() + _SEARCH_ATTR_PROPAGATION_TIMEOUT_SECONDS
+    while True:
+        try:
+            await client.create_schedule(schedule_id, schedule, search_attributes=search_attributes)
+            return
+        except RPCError as e:
+            if not _is_search_attribute_unmapped(e) or time.monotonic() >= deadline:
+                raise
+            logger.debug("Waiting for search attribute mapping to propagate", schedule_id=schedule_id)
+            await asyncio.sleep(_SEARCH_ATTR_PROPAGATION_POLL_SECONDS)
 
 
 async def _update_schedule_with_retry(
@@ -598,7 +631,7 @@ class ScheduledTriggerService:
             )
 
         try:
-            await client.create_schedule(schedule_id, schedule, search_attributes=search_attrs)
+            await _create_schedule_with_retry(client, schedule_id, schedule, search_attrs)
             logger.info(
                 "Created Temporal Schedule",
                 schedule_id=schedule_id,

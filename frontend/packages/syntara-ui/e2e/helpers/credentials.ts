@@ -1,5 +1,6 @@
 import { type Locator, type Response } from '@playwright/test'
 
+import { regExpPrefixMatch } from '../../src/utils/escapeRegExp'
 import { expect, type Page, toAppUrl } from '../fixtures'
 import {
   apiRequest,
@@ -10,6 +11,11 @@ import {
 } from '../utils/api'
 
 import { buildUniqueName, selectFirstProject } from './workflows'
+
+/** PatternFly SelectOption descriptions are included in the option accessible name. */
+export function credentialTypeOptionName(typeName: string): RegExp {
+  return regExpPrefixMatch(typeName)
+}
 
 /**
  * Select a credential type from the PF6 Select dropdown.
@@ -23,7 +29,7 @@ import { buildUniqueName, selectFirstProject } from './workflows'
 export async function selectCredentialType(container: Locator, typeName: string): Promise<void> {
   const page = container.page()
   await container.getByRole('button', { name: 'Credential type', exact: true }).click()
-  const option = page.getByRole('option', { name: typeName, exact: true })
+  const option = page.getByRole('option', { name: credentialTypeOptionName(typeName) })
   await option.waitFor({ state: 'visible', timeout: 10_000 })
   await option.click()
 }
