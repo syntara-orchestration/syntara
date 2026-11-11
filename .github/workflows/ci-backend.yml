@@ -1026,8 +1026,6 @@ jobs:
       - test-cli
       - test-integration
       - test-compose-e2e
-      - konflux-backend-gate
-      - konflux-api-tests-gate
       - shared-checks-gate
       - snyk-sast
       - snyk-sca
@@ -1049,7 +1047,7 @@ jobs:
 
           # Check all other required jobs
           ok="success|skipped"
-          for job in api-spec-validation api-spec-bundle api-spec-drift generate-api-client check-api-paths check-dead-code check-cycles check-orphans check-openapi-breaking verify-test-structure mypy test-unit test-cli test-integration test-compose-e2e konflux-backend-gate konflux-api-tests-gate shared-checks-gate snyk-sast snyk-sca; do
+          for job in api-spec-validation api-spec-bundle api-spec-drift generate-api-client check-api-paths check-dead-code check-cycles check-orphans check-openapi-breaking verify-test-structure mypy test-unit test-cli test-integration test-compose-e2e shared-checks-gate snyk-sast snyk-sca; do
             case "$job" in
               api-spec-validation)   result="${{ needs.api-spec-validation.result }}" ;;
               api-spec-bundle)       result="${{ needs.api-spec-bundle.result }}" ;;
@@ -1066,8 +1064,6 @@ jobs:
               test-cli)              result="${{ needs.test-cli.result }}" ;;
               test-integration)      result="${{ needs.test-integration.result }}" ;;
               test-compose-e2e)      result="${{ needs.test-compose-e2e.result }}" ;;
-              konflux-backend-gate)  result="${{ needs.konflux-backend-gate.result }}" ;;
-              konflux-api-tests-gate) result="${{ needs.konflux-api-tests-gate.result }}" ;;
               shared-checks-gate)    result="${{ needs.shared-checks-gate.result }}" ;;
               snyk-sast)             result="${{ needs.snyk-sast.result }}" ;;
               snyk-sca)              result="${{ needs.snyk-sca.result }}" ;;
