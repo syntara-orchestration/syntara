@@ -99,6 +99,23 @@ export async function pollPendingApprovalForExecution(
   return approvalId
 }
 
+/** Resolve the pending approval display name for an execution (builder runs may differ from the typed step name until saved). */
+export async function pollApprovalNameForExecution(
+  app: Page,
+  executionId: string,
+  options?: { token?: string; timeout?: number }
+): Promise<string> {
+  const token = options?.token ?? (await getAuthToken(app)) ?? undefined
+  let approvalName = ''
+  await expect(async () => {
+    const resp = await apiRequest(app, 'get', `/approvals?execution_id=${executionId}&status=pending`, { token })
+    const body = (await resp.json()) as { resources?: Array<{ name: string }> }
+    approvalName = body.resources?.[0]?.name ?? ''
+    expect(approvalName).toBeTruthy()
+  }).toPass({ timeout: options?.timeout ?? 45_000, intervals: [1_000, 2_000] })
+  return approvalName
+}
+
 /**
  * Shape of entries in `GET /executions/{id}?include=activities` → `activities[]`.
  * This is the *stripped-down* `ActivityData` schema — only `activity_id` + `status`

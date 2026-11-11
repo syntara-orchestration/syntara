@@ -49,7 +49,7 @@ _MISSING = object()
 # Built once at import; constructing a TypeAdapter per call is expensive.
 # EmailStr validates format only - pydantic passes check_deliverability=False,
 # so there is no DNS lookup and no network I/O on the submission path.
-_EMAIL_ADAPTER = TypeAdapter(EmailStr)
+_EMAIL_ADAPTER: TypeAdapter[EmailStr] = TypeAdapter(EmailStr)
 
 
 class _FormatError(ValueError):

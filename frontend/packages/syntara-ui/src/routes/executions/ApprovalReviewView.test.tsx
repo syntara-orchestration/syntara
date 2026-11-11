@@ -7,6 +7,11 @@ import { axe } from 'vitest-axe'
 
 import { approvalsClient } from '../../client'
 
+import {
+  APPROVAL_DECISION_ALREADY_RESOLVED_MESSAGE,
+  APPROVAL_DECISION_DEFAULT_ERROR_MESSAGE,
+  APPROVAL_DECISION_SERVICE_UNAVAILABLE_MESSAGE,
+} from './approvalDecisionSubmitErrors'
 import { ApprovalReviewView } from './ApprovalReviewView'
 
 function createWrapper() {
@@ -19,6 +24,8 @@ function createWrapper() {
 const mockMutate = vi.fn()
 const mockShowAlert = vi.fn()
 const mockShowSuccess = vi.fn()
+const mockShowError = vi.fn()
+const mockShowWarning = vi.fn()
 
 vi.mock('../../client', () => ({
   approvalsClient: {
@@ -45,6 +52,8 @@ vi.mock('../../providers/alerts', () => ({
   useAlerts: () => ({
     showAlert: mockShowAlert,
     showSuccess: mockShowSuccess,
+    showError: mockShowError,
+    showWarning: mockShowWarning,
   }),
 }))
 
@@ -227,6 +236,61 @@ describe('ApprovalReviewView', () => {
 
     await user.click(screen.getByRole('button', { name: 'Approve' }))
     expect(screen.getByRole('button', { name: 'Approve' })).toHaveClass('pf-m-selected')
+  })
+
+  it('shows friendly error when mutation fails with 409', async () => {
+    const user = userEvent.setup()
+    mockMutate.mockImplementation((_data: unknown, callbacks: { onError: (error: unknown) => void }) => {
+      callbacks.onError({ status: 409, detail: 'Approval already decided' })
+    })
+
+    render(<ApprovalReviewView {...defaultProps} />, { wrapper: createWrapper() })
+
+    await user.click(screen.getByRole('button', { name: 'Submit decision' }))
+
+    expect(mockShowError).toHaveBeenCalledWith({ title: APPROVAL_DECISION_ALREADY_RESOLVED_MESSAGE })
+    expect(mockShowWarning).not.toHaveBeenCalled()
+  })
+
+  it('shows warning when mutation fails with 503', async () => {
+    const user = userEvent.setup()
+    mockMutate.mockImplementation((_data: unknown, callbacks: { onError: (error: unknown) => void }) => {
+      callbacks.onError({ status: 503, detail: 'Service unavailable' })
+    })
+
+    render(<ApprovalReviewView {...defaultProps} />, { wrapper: createWrapper() })
+
+    await user.click(screen.getByRole('button', { name: 'Submit decision' }))
+
+    expect(mockShowWarning).toHaveBeenCalledWith({ title: APPROVAL_DECISION_SERVICE_UNAVAILABLE_MESSAGE })
+    expect(mockShowError).not.toHaveBeenCalled()
+  })
+
+  it('shows warning when mutation fails with temporal unavailable error code', async () => {
+    const user = userEvent.setup()
+    mockMutate.mockImplementation((_data: unknown, callbacks: { onError: (error: unknown) => void }) => {
+      callbacks.onError({ code: 'TEMPORAL_UNAVAILABLE', detail: 'Temporal worker unreachable' })
+    })
+
+    render(<ApprovalReviewView {...defaultProps} />, { wrapper: createWrapper() })
+
+    await user.click(screen.getByRole('button', { name: 'Submit decision' }))
+
+    expect(mockShowWarning).toHaveBeenCalledWith({ title: APPROVAL_DECISION_SERVICE_UNAVAILABLE_MESSAGE })
+    expect(mockShowError).not.toHaveBeenCalled()
+  })
+
+  it('shows default friendly error for unknown failures', async () => {
+    const user = userEvent.setup()
+    mockMutate.mockImplementation((_data: unknown, callbacks: { onError: (error: unknown) => void }) => {
+      callbacks.onError({ status: 500, detail: 'Internal server error' })
+    })
+
+    render(<ApprovalReviewView {...defaultProps} />, { wrapper: createWrapper() })
+
+    await user.click(screen.getByRole('button', { name: 'Submit decision' }))
+
+    expect(mockShowError).toHaveBeenCalledWith({ title: APPROVAL_DECISION_DEFAULT_ERROR_MESSAGE })
   })
 
   it('calls onClose on successful mutation', async () => {

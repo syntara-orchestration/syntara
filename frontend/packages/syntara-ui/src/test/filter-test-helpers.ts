@@ -24,7 +24,7 @@ import type { Mock } from 'vitest'
 /**
  * Gets the most recent URLSearchParams from a mocked setSearchParams function
  *
- * @param mockSetSearchParams - Vitest mock of the setSearchParams function from wouter
+ * @param mockSetSearchParams - Vitest mock of the setSearchParams function from the useSearchParams hook
  * @returns The URLSearchParams from the most recent call, or undefined if never called
  *
  * @example

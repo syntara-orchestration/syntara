@@ -52,8 +52,8 @@ type BuilderToolbarContentProps = Readonly<{
   onPendingImport: (data: PendingImportData) => void
   triggers?: { id: string; name?: string }[]
   isBuiltin: boolean
-  isAddNodePanelOpen: boolean
-  hasNoWorkflowNodes: boolean
+  isAddStepPanelOpen: boolean
+  hasNoWorkflowSteps: boolean
   workflowName: string
   workflowDescription: string
   builderPermissions: BuilderPermissions
@@ -62,9 +62,7 @@ type BuilderToolbarContentProps = Readonly<{
   onExitVersionView?: () => void
   onRestoreVersion?: () => void
   onToggleVersionHistory?: () => void
-  isNodeEditorOpen?: boolean
-  beforeVerify?: () => Promise<boolean>
-  bannerBlockingValidationErrorCount?: number
+  isStepEditorOpen?: boolean
 }>
 
 /**
@@ -103,8 +101,8 @@ function BuilderToolbarContent({
   onDuplicate,
   onPendingImport,
   triggers,
-  isAddNodePanelOpen,
-  hasNoWorkflowNodes,
+  isAddStepPanelOpen,
+  hasNoWorkflowSteps,
   workflowName,
   workflowDescription,
   builderPermissions,
@@ -113,9 +111,7 @@ function BuilderToolbarContent({
   onExitVersionView,
   onRestoreVersion,
   onToggleVersionHistory,
-  isNodeEditorOpen,
-  beforeVerify,
-  bannerBlockingValidationErrorCount,
+  isStepEditorOpen,
 }: BuilderToolbarContentProps) {
   if (isViewingVersion && onExitVersionView) {
     return (
@@ -204,12 +200,10 @@ function BuilderToolbarContent({
       onDuplicate={onDuplicate}
       onPendingImport={onPendingImport}
       triggers={triggers}
-      isAddNodePanelOpen={isAddNodePanelOpen}
-      hasNoWorkflowNodes={hasNoWorkflowNodes}
+      isAddStepPanelOpen={isAddStepPanelOpen}
+      hasNoWorkflowSteps={hasNoWorkflowSteps}
       builderPermissions={builderPermissions}
-      isNodeEditorOpen={isNodeEditorOpen}
-      beforeVerify={beforeVerify}
-      bannerBlockingValidationErrorCount={bannerBlockingValidationErrorCount}
+      isStepEditorOpen={isStepEditorOpen}
     />
   )
 }
@@ -318,8 +312,8 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   isApprovalPanelOpen?: boolean
   onReviewApproval?: () => void
   triggers?: { id: string; name?: string }[]
-  isAddNodePanelOpen: boolean
-  hasNoWorkflowNodes: boolean
+  isAddStepPanelOpen: boolean
+  hasNoWorkflowSteps: boolean
   isBuiltin: boolean
   builderPermissions: BuilderPermissions
   ProjectSelector: ReactNode
@@ -339,9 +333,7 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   onExitVersionView?: () => void
   onRestoreVersion?: () => void
   onPendingImport: (data: PendingImportData) => void
-  isNodeEditorOpen?: boolean
-  beforeVerify?: () => Promise<boolean>
-  bannerBlockingValidationErrorCount?: number
+  isStepEditorOpen?: boolean
 }>
 
 /**
@@ -369,8 +361,8 @@ export function BuilderWorkflowPageHeader({
   isApprovalPanelOpen,
   onReviewApproval,
   triggers,
-  isAddNodePanelOpen,
-  hasNoWorkflowNodes,
+  isAddStepPanelOpen,
+  hasNoWorkflowSteps,
   isBuiltin,
   builderPermissions,
   ProjectSelector,
@@ -390,9 +382,7 @@ export function BuilderWorkflowPageHeader({
   onExitVersionView,
   onRestoreVersion,
   onPendingImport,
-  isNodeEditorOpen,
-  beforeVerify,
-  bannerBlockingValidationErrorCount,
+  isStepEditorOpen,
 }: BuilderWorkflowPageHeaderProps) {
   const builderDocLink = useDocLink('builder')
   const publishDialog = useDialogState<true>()
@@ -428,8 +418,8 @@ export function BuilderWorkflowPageHeader({
       onDuplicate={onDuplicate}
       onPendingImport={onPendingImport}
       triggers={triggers}
-      isAddNodePanelOpen={isAddNodePanelOpen}
-      hasNoWorkflowNodes={hasNoWorkflowNodes}
+      isAddStepPanelOpen={isAddStepPanelOpen}
+      hasNoWorkflowSteps={hasNoWorkflowSteps}
       workflowName={workflowName}
       workflowDescription={workflowDescription}
       builderPermissions={builderPermissions}
@@ -438,9 +428,7 @@ export function BuilderWorkflowPageHeader({
       onExitVersionView={onExitVersionView}
       onRestoreVersion={onRestoreVersion}
       onToggleVersionHistory={handleToggleVersionHistory}
-      isNodeEditorOpen={isNodeEditorOpen}
-      beforeVerify={beforeVerify}
-      bannerBlockingValidationErrorCount={bannerBlockingValidationErrorCount}
+      isStepEditorOpen={isStepEditorOpen}
     />
   )
 

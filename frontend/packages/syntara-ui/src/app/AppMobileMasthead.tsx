@@ -1,19 +1,20 @@
 import {
-  Button,
+  Brand,
   Masthead,
   MastheadBrand,
   MastheadContent,
   MastheadLogo,
   MastheadMain,
   MastheadToggle,
+  PageToggleButton,
   Toolbar,
   ToolbarContent,
 } from '@patternfly/react-core'
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- MastheadLogo needs a plain anchor; SynLink adds PF Button styling
 import { Link } from '@tanstack/react-router'
 
 import { useBrand } from '../providers/brand'
 
-import styles from './AppMobileMasthead.module.css'
 import { useDockState } from './useDockState'
 
 /**
@@ -32,23 +33,19 @@ export function AppMobileMasthead() {
     <Masthead display={{ default: 'inline' }} id="mobile-masthead">
       <MastheadMain>
         <MastheadToggle>
-          <Button
-            ref={mobileToggleRef}
+          <PageToggleButton
+            innerRef={mobileToggleRef}
+            id="mobile-masthead-toggle"
             variant="plain"
             aria-label="Global navigation"
-            isHamburger
-            isExpanded={isDockExpanded}
-            onClick={onMobileToggle}
+            isHamburgerButton
+            isSidebarOpen={isDockExpanded}
+            onSidebarToggle={onMobileToggle}
           />
         </MastheadToggle>
         <MastheadBrand>
           <MastheadLogo component={(props) => <Link {...props} to="/" />} aria-label="Home">
-            <img
-              src={brand.logoCollapsed}
-              alt={brand.appTitle}
-              className={styles.collapsedLogo}
-              data-testid="brand-logo"
-            />
+            <Brand src={brand.logoCollapsed} alt={brand.appTitle} data-testid="brand-logo" />
           </MastheadLogo>
         </MastheadBrand>
       </MastheadMain>

@@ -49,6 +49,7 @@ export {
   pollApprovalStatusForExecution,
   pollApprovalStatusById,
   pollPendingApprovalForExecution,
+  pollApprovalNameForExecution,
   pollExecutionTerminalAfterReject,
   pollFormPromptVisible,
   cancelExecutionViaApi,

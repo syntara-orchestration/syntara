@@ -14,10 +14,10 @@ import {
   clickAddConnectedStep,
   selectProjectIfRequired,
   selectFirstProject,
-  closeNodeEditorPanel,
+  closeStepEditorPanel,
   startWorkflowWithTrigger,
   saveWorkflow,
-  verifyNodeVisible,
+  verifyStepVisible,
   waitForUIReady,
 } from './helpers/workflows'
 import { ensureProject } from './utils/api'
@@ -192,8 +192,8 @@ test.describe('Workflow Import/Export', () => {
       await app.getByLabel('Workflow actions').click()
       await app.getByRole('menuitem', { name: 'Import workflow' }).click()
 
-      await verifyNodeVisible(app, 'Imported Trigger')
-      await verifyNodeVisible(app, 'Imported Script')
+      await verifyStepVisible(app, 'Imported Trigger')
+      await verifyStepVisible(app, 'Imported Script')
 
       await saveWorkflow(app, workflowName)
     } finally {
@@ -246,8 +246,8 @@ test.describe('Workflow Import/Export', () => {
       await app.getByLabel('Workflow actions').click()
       await app.getByRole('menuitem', { name: 'Import workflow' }).click()
 
-      await verifyNodeVisible(app, 'Manual trigger')
-      await verifyNodeVisible(app, 'Positioned Script')
+      await verifyStepVisible(app, 'Manual trigger')
+      await verifyStepVisible(app, 'Positioned Script')
 
       const exportedDef = await downloadAndParseWorkflow(app, async () => {
         await app.getByLabel('Workflow actions').click()
@@ -296,7 +296,7 @@ test.describe('Workflow Import/Export', () => {
       await expect(credToggle).toContainText(credName)
 
       await app.getByRole('button', { name: 'Create' }).click()
-      await closeNodeEditorPanel(app)
+      await closeStepEditorPanel(app)
       await saveWorkflow(app, workflowName)
 
       const exportedDef = await exportFromWorkflowsList(app, workflowName)

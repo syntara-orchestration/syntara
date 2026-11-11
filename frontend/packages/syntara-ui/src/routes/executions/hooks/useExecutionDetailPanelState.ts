@@ -8,10 +8,10 @@ import { useApprovalNavigation } from './useApprovalNavigation'
 import { useExecutionApprovalPanel } from './useExecutionApprovalPanel'
 import { useExecutionDetailInteractions } from './useExecutionDetailInteractions'
 import { useExecutionFormPromptPanel } from './useExecutionFormPromptPanel'
-import type { useExecutionNodeClick } from './useExecutionNodeClick'
+import type { useExecutionStepClick } from './useExecutionStepClick'
 
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
-type NodeClick = ReturnType<typeof useExecutionNodeClick>
+type NodeClick = ReturnType<typeof useExecutionStepClick>
 
 type ExecutionWorkflow = {
   version: { workflow_definition: WorkflowDefShape | null }

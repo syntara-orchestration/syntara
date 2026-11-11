@@ -5,6 +5,7 @@ import { create } from 'zustand'
 import type { Mutate, StoreApi } from 'zustand'
 import type { UseBoundStore } from 'zustand/react'
 
+/* eslint-disable max-lines -- workflow store aggregates triggers, activities, and graph edits */
 import { buildTriggerIndexRemappping, remapTriggerIdsInEdges } from '../routes/builder/utils/triggerIndexRemapping'
 import { generateActivityId } from '../utils/generateUUID'
 

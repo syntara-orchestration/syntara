@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 
 import { useUnsavedChanges } from '../../app/useUnsavedChanges'
 import { executionsClient, workflowClient } from '../../client'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPage } from '../../components/layout/SynPage'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
@@ -16,6 +17,7 @@ import { useSearchParams } from '../../hooks/routing/useSearchParams'
 import { useCursorPagination } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useAlerts } from '../../providers/alerts'
+import { useFeatureFlag } from '../../providers/use-feature-flag'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
@@ -30,10 +32,9 @@ import { BuilderWorkflowPageHeader } from './BuilderWorkflowPageHeader'
 import { BuilderDialogs } from './components/BuilderDialogs'
 import { BuilderSidePanels } from './components/BuilderSidePanels'
 import { ExecutionDetailsPanelWrapper } from './components/ExecutionDetailsPanelWrapper'
-import { NodeEditorOverlay } from './components/NodeEditorOverlay'
+import { StepEditorOverlay } from './components/StepEditorOverlay'
 import { UnsavedStepEditorDialog } from './components/UnsavedStepEditorDialog'
 import { VersionHistorySidePanel } from './components/VersionHistorySidePanel'
-import { resolveStepEditorBeforeVerify } from './hooks/resolveStepEditorBeforeVerify'
 import { useBuilderApproval } from './hooks/useBuilderApproval'
 import { useBuilderConflict } from './hooks/useBuilderConflict'
 import { useBuilderContentQueries } from './hooks/useBuilderContentQueries'
@@ -43,26 +44,25 @@ import { useBuilderFlowInteractionHandlers } from './hooks/useBuilderFlowInterac
 import { useBuilderLiveRunPanel } from './hooks/useBuilderLiveRunPanel'
 import { useBuilderSaveWorkflow } from './hooks/useBuilderSaveWorkflow'
 import { useBuilderToolbarHandlers } from './hooks/useBuilderToolbarHandlers'
+import { useBuilderValidation } from './hooks/useBuilderValidation'
 import { useBuilderVersionPanel } from './hooks/useBuilderVersionPanel'
 import { useBuilderWindowEffects } from './hooks/useBuilderWindowEffects'
 import { useBuilderWorkflowLifecycle } from './hooks/useBuilderWorkflowLifecycle'
 import { useExecutionCopyToEditor } from './hooks/useExecutionCopyToEditor'
 import { useGuardedSaveWorkflow } from './hooks/useGuardedSaveWorkflow'
-import { NodeEditorAutoSubmitContext, useNodeEditorAutoSubmitRef } from './hooks/useNodeEditorAutoSubmit'
-import { useNodePanelNavigation } from './hooks/useNodePanelNavigation'
 import { usePublishWorkflow, useUnpublishWorkflow } from './hooks/usePublishWorkflow'
 import { useRunStepDialog } from './hooks/useRunStepDialog'
+import { StepEditorAutoSubmitContext, useStepEditorAutoSubmitRef } from './hooks/useStepEditorAutoSubmit'
+import { useStepPanelNavigation } from './hooks/useStepPanelNavigation'
 import { useUndoRedoKeyboard } from './hooks/useUndoRedoKeyboard'
 import { useWorkflowMetadata } from './hooks/useWorkflowMetadata'
-import { NodeActionsContext } from './NodeActionsContext'
 import { SaveBeforeViewDialog } from './SaveBeforeViewDialog'
+import { StepActionsContext } from './StepActionsContext'
 import type { BuilderContentProps } from './types/builderContent'
 import { useBuilderPermissions } from './useBuilderPermissions'
-import { useWorkflowVerification } from './useWorkflowVerification'
 import { clearNodeValidationErrorsIfFormDefinitionValid } from './utils/clearNodeValidationErrors'
 import { createAddStepHandler } from './utils/panelActions'
-import { countBlockingValidationErrors } from './utils/validation/mapFrontendValidationErrorsToBanner'
-import { buildWorkflowDefinition, transformNodeParameters } from './utils/workflowDefinitionBuilder'
+import { buildWorkflowDefinition, transformStepParameters } from './utils/workflowDefinitionBuilder'
 import { ValidationBanner } from './ValidationBanner'
 import { VersionInfoCard } from './VersionInfoCard'
 import { VersionViewProvider } from './VersionViewProvider'
@@ -72,6 +72,7 @@ type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 // eslint-disable-next-line max-lines-per-function, complexity
 export function BuilderContent(props: BuilderContentProps) {
   const { workflow, isNew, workflowId, executionCopy, initialViewVersion } = props
+  const isWorkflowBuilderQolEnabled = useFeatureFlag('workflow_builder_qol')
   const navigate = useNavigate()
   const setLocation = useCallback(
     (to: string) => {
@@ -107,7 +108,7 @@ export function BuilderContent(props: BuilderContentProps) {
   } = useWorkflowStore()
   const { registerSaveHandler, unregisterSaveHandler, requestNavigation } = useUnsavedChanges()
   const handleExecutionNavigate = useCallback(
-    (id: string) => requestNavigation(`/executions/${id}`),
+    (id: string) => requestNavigation(`/executions/${id}?history=open`),
     [requestNavigation]
   )
 
@@ -125,7 +126,7 @@ export function BuilderContent(props: BuilderContentProps) {
     defaultSort: { field: 'created_at', direction: 'desc' as const },
   })
   const [state, dispatch] = useReducer(builderReducer, getInitialBuilderState())
-  const autoSubmitRef = useNodeEditorAutoSubmitRef()
+  const autoSubmitRef = useStepEditorAutoSubmitRef()
   const {
     confirmDialogOpen,
     deleteDialogOpen,
@@ -133,10 +134,10 @@ export function BuilderContent(props: BuilderContentProps) {
     detailsOpen,
     historyCardOpen,
     isKebabOpen,
-    addNodePanelOpen,
-    nodeEditorMode,
-    nodeEditorNodeTypeId,
-    nodeEditorNodeSubtypeId,
+    addStepPanelOpen,
+    stepEditorMode,
+    stepEditorStepTypeId,
+    stepEditorStepSubtypeId,
     selectedNode,
     sourceNodeId,
     targetNodeId,
@@ -155,13 +156,13 @@ export function BuilderContent(props: BuilderContentProps) {
   } = state
 
   const [expandAllEvent, collapseAllEvent] = useMemo(() => [new EventTarget(), new EventTarget()], [])
-  const { hasNoWorkflowNodes, isAddNodePanelOpen, isNodeEditorOpen } = useBuilderDerivedUiFlags(
+  const { hasNoWorkflowSteps, isAddStepPanelOpen, isStepEditorOpen } = useBuilderDerivedUiFlags(
     currentWorkflow,
-    addNodePanelOpen,
-    nodeEditorMode
+    addStepPanelOpen,
+    stepEditorMode
   )
 
-  useUndoRedoKeyboard({ disabled: isNodeEditorOpen || viewingVersion !== null })
+  useUndoRedoKeyboard({ disabled: isStepEditorOpen || viewingVersion !== null })
   useEffect(() => () => useWorkflowStore.temporal.getState().clear(), [])
   const { executionsQuery, mostRecentExecutionQuery, workflowsListQuery } = useBuilderContentQueries({
     workflowId,
@@ -201,20 +202,8 @@ export function BuilderContent(props: BuilderContentProps) {
       })
     }
   }, [initialViewVersion, dispatch, clearExecutionFilters])
-  const beforeVerify = useCallback(
-    () =>
-      resolveStepEditorBeforeVerify({
-        isNodeEditorOpen,
-        nodeEditorMode,
-        autoSubmitRef,
-        dispatch,
-      }),
-    [autoSubmitRef, dispatch, isNodeEditorOpen, nodeEditorMode]
-  )
-
-  const { handleVerifySilent } = useWorkflowVerification({
+  const { handleVerifySilent } = useBuilderValidation({
     dispatch,
-    beforeVerify,
   })
   const { mutate: createWorkflow, isPending: isCreating } = workflowClient.useMutation('post', '/workflows')
   const { mutate: updateWorkflow, isPending: isUpdating } = workflowClient.useMutation(
@@ -270,15 +259,15 @@ export function BuilderContent(props: BuilderContentProps) {
         return
       }
       dispatch({ type: 'SET_VALIDATION_ERRORS', payload: errors, source: 'save' })
-      useWorkflowStore.getState().setValidationErrorCount(countBlockingValidationErrors(errors))
+      useWorkflowStore.getState().setValidationErrorCount(errors.length)
     },
     createWorkflow: createWorkflow,
     updateWorkflow,
   })
   const guardedSaveWorkflow = useGuardedSaveWorkflow({
     handleSaveWorkflow,
-    isNodeEditorOpen,
-    nodeEditorMode,
+    isStepEditorOpen,
+    stepEditorMode,
     autoSubmitRef,
     dispatch,
   })
@@ -314,8 +303,8 @@ export function BuilderContent(props: BuilderContentProps) {
   })
 
   const { runStepDialog, lastRunStepNodeIdRef, pinnedMockDataForDialog, handleRunStep, suppressPanelCloseRef } =
-    useRunStepDialog(guardedSaveWorkflow, isTerminalStatus, isNodeEditorOpen)
-  const handleCloseNodeEditor = useCallback(() => {
+    useRunStepDialog(guardedSaveWorkflow, isTerminalStatus, isStepEditorOpen)
+  const handleCloseStepEditor = useCallback(() => {
     if (suppressPanelCloseRef.current) return
     dispatch({ type: 'CLOSE_NODE_EDITOR' })
   }, [dispatch, suppressPanelCloseRef])
@@ -415,7 +404,7 @@ export function BuilderContent(props: BuilderContentProps) {
         nodes: nodes?.map((node) => {
           const parameters = node.parameters as Record<string, unknown> | undefined
           if (parameters && typeof node.type === 'string') {
-            return { ...node, parameters: transformNodeParameters(node.type, parameters) }
+            return { ...node, parameters: transformStepParameters(node.type, parameters) }
           }
           return node
         }),
@@ -554,7 +543,7 @@ export function BuilderContent(props: BuilderContentProps) {
     handleAddNodeFromEdge,
     handleConnectFromPanel,
     handleNodesDeleted,
-    nodeActionsValue,
+    stepActionsValue,
   } = useBuilderFlowInteractionHandlers({
     reactFlowInstance,
     dispatch,
@@ -565,7 +554,7 @@ export function BuilderContent(props: BuilderContentProps) {
     targetHandle,
     onRunStep: handleRunStep,
   })
-  const handleNavigateToNode = useNodePanelNavigation(reactFlowInstance, dispatch)
+  const handleNavigateToStep = useStepPanelNavigation(reactFlowInstance, dispatch)
   const handleAddStepFromPanel = useMemo(() => createAddStepHandler(dispatch), [dispatch])
   useBuilderWindowEffects(nodesInitialized, reactFlowInstance)
   const {
@@ -584,7 +573,7 @@ export function BuilderContent(props: BuilderContentProps) {
     handleNodeClick,
     isLiveRunActive,
   })
-  // UUID only — NodeDetailsPanel / CredentialSelector / integrations filter by project_id.
+  // UUID only — StepDetailsPanel / CredentialSelector / integrations filter by project_id.
   // can_i also accepts UUID (backend resolves to project name).
   const builderProjectId = workflow?.project_id ?? selectedProject?.id ?? stableProjectId
   const builderPermissions = useBuilderPermissions(isNew, currentWorkflow?.is_builtin === true, builderProjectId)
@@ -614,7 +603,7 @@ export function BuilderContent(props: BuilderContentProps) {
     pinnedMockDataForDialog,
   })
   return (
-    <NodeActionsContext.Provider value={nodeActionsValue}>
+    <StepActionsContext.Provider value={stepActionsValue}>
       <SynStepExpandedAllContext.Provider value={nodeExpandedAllContextValue}>
         <VersionViewProvider value={versionPanel.isViewingVersion}>
           <SynPage>
@@ -653,8 +642,8 @@ export function BuilderContent(props: BuilderContentProps) {
                   isApprovalPanelOpen={approvalViewOpen}
                   onReviewApproval={openApprovalView}
                   triggers={triggers}
-                  isAddNodePanelOpen={isAddNodePanelOpen}
-                  hasNoWorkflowNodes={hasNoWorkflowNodes}
+                  isAddStepPanelOpen={isAddStepPanelOpen}
+                  hasNoWorkflowSteps={hasNoWorkflowSteps}
                   isBuiltin={currentWorkflow?.is_builtin === true}
                   builderPermissions={builderPermissions}
                   isViewingVersion={versionPanel.isViewingVersion}
@@ -663,11 +652,18 @@ export function BuilderContent(props: BuilderContentProps) {
                   viewedVersionStatus={versionPanel.viewedVersionStatus}
                   onExitVersionView={versionPanel.handleExitVersionView}
                   onRestoreVersion={versionPanel.openRestoreDialogForCurrentVersion}
-                  isNodeEditorOpen={isNodeEditorOpen}
-                  beforeVerify={beforeVerify}
-                  bannerBlockingValidationErrorCount={countBlockingValidationErrors(state.validationErrors)}
+                  isStepEditorOpen={isStepEditorOpen}
                 />
               </StackItem>
+              {/*
+                Temporary proof of concept. Remove this marker and flag once
+                workflow-builder improvements ship and no code depends on it.
+              */}
+              {isWorkflowBuilderQolEnabled && (
+                <StackItem>
+                  <SynLabel status="info">workflow_builder_qol is enabled (test proof of concept)</SynLabel>
+                </StackItem>
+              )}
               <BuilderReadOnlyBanner
                 canEdit={builderPermissions.canEdit}
                 isLoading={builderPermissions.isLoading}
@@ -678,7 +674,7 @@ export function BuilderContent(props: BuilderContentProps) {
                 dismissed={state.validationBannerDismissed}
                 source={state.validationSource ?? 'verify'}
                 dispatch={dispatch}
-                onNavigateToNode={handleNavigateToNode}
+                onNavigateToStep={handleNavigateToStep}
               />
               <StackItem isFilled className={styles.filledMinHeight}>
                 <Flex
@@ -689,7 +685,7 @@ export function BuilderContent(props: BuilderContentProps) {
                 >
                   <FlexItem
                     className={styles.canvasFlexItem}
-                    style={{ pointerEvents: isNodeEditorOpen && !versionPanel.isViewingVersion ? 'none' : 'auto' }}
+                    style={{ pointerEvents: isStepEditorOpen && !versionPanel.isViewingVersion ? 'none' : 'auto' }}
                   >
                     <SynPanelStack>
                       <SynPanelStackItem isFilled>
@@ -705,14 +701,14 @@ export function BuilderContent(props: BuilderContentProps) {
                             workflowId={workflowId}
                             readOnly={versionPanel.isViewingVersion}
                             canEdit={builderPermissions.canEdit}
-                            panelOpen={isAddNodePanelOpen || !!selectedNode}
-                            activeEdgeButtonNodeId={isAddNodePanelOpen ? sourceNodeId : null}
-                            activeEdgeButtonHandle={isAddNodePanelOpen ? sourceHandle : null}
-                            activeEdgeId={isAddNodePanelOpen ? edgeIdToReplace : null}
+                            panelOpen={isAddStepPanelOpen || !!selectedNode}
+                            activeEdgeButtonNodeId={isAddStepPanelOpen ? sourceNodeId : null}
+                            activeEdgeButtonHandle={isAddStepPanelOpen ? sourceHandle : null}
+                            activeEdgeId={isAddStepPanelOpen ? edgeIdToReplace : null}
                             executionStatus={canvasExecutionStatus}
                             copiedRunActivityIds={copiedRunActivityIds}
-                            disableDeleteKey={isNodeEditorOpen}
-                            disableSpacePanning={isNodeEditorOpen || confirmDialogOpen}
+                            disableDeleteKey={isStepEditorOpen}
+                            disableSpacePanning={isStepEditorOpen || confirmDialogOpen}
                             onNodeClick={wrappedHandleNodeClick}
                             onAddNodeFromEdge={handleAddNodeFromEdge}
                             onNodesDeleted={handleNodesDeleted}
@@ -738,12 +734,12 @@ export function BuilderContent(props: BuilderContentProps) {
                     </SynPanelStack>
                   </FlexItem>
                   <BuilderSidePanels
-                    isAddNodePanelOpen={isAddNodePanelOpen}
-                    isNodeEditorOpen={isNodeEditorOpen}
+                    isAddStepPanelOpen={isAddStepPanelOpen}
+                    isStepEditorOpen={isStepEditorOpen}
                     canEdit={builderPermissions.canEdit}
                     sourceNodeId={sourceNodeId}
                     replacementNodeId={replacementNodeId}
-                    hasNoWorkflowNodes={hasNoWorkflowNodes}
+                    hasNoWorkflowSteps={hasNoWorkflowSteps}
                     dispatch={dispatch}
                     historyCardOpen={historyCardOpen}
                     isNew={isNew}
@@ -759,7 +755,7 @@ export function BuilderContent(props: BuilderContentProps) {
                     markDirty={markDirty}
                   />
 
-                  {!isNodeEditorOpen && approvalViewOpen && pendingApproval && (
+                  {!isStepEditorOpen && approvalViewOpen && pendingApproval && (
                     <FlexItem className={styles.approvalPanelSlot}>
                       <ApprovalSidePanel
                         approval={pendingApproval}
@@ -773,27 +769,27 @@ export function BuilderContent(props: BuilderContentProps) {
 
                   <VersionHistorySidePanel
                     sidePanel={versionPanel.versionSidePanel}
-                    isNodeEditorOpen={isNodeEditorOpen}
+                    isStepEditorOpen={isStepEditorOpen}
                     editPermission={{
                       canEdit: builderPermissions.canEdit,
                       tooltip: builderPermissions.tooltips.edit,
                     }}
                   />
 
-                  <NodeEditorAutoSubmitContext.Provider value={autoSubmitRef}>
-                    <NodeEditorOverlay
-                      isOpen={isNodeEditorOpen}
-                      mode={nodeEditorMode}
+                  <StepEditorAutoSubmitContext.Provider value={autoSubmitRef}>
+                    <StepEditorOverlay
+                      isOpen={isStepEditorOpen}
+                      mode={stepEditorMode}
                       selectedNode={selectedNode}
-                      nodeTypeId={nodeEditorNodeTypeId}
-                      nodeSubtypeId={nodeEditorNodeSubtypeId}
+                      stepTypeId={stepEditorStepTypeId}
+                      stepSubtypeId={stepEditorStepSubtypeId}
                       sourceNodeId={sourceNodeId}
                       replacementNodeId={replacementNodeId}
                       executionId={mostRecentExecutionId}
                       workflowId={workflowId}
                       onConnect={handleConnectFromPanel}
-                      onClose={handleCloseNodeEditor}
-                      onNavigateToNode={handleNavigateToNode}
+                      onClose={handleCloseStepEditor}
+                      onNavigateToStep={handleNavigateToStep}
                       onAddStep={handleAddStepFromPanel}
                       projectId={builderProjectId}
                       workflowMetadata={workflowMetadata}
@@ -801,7 +797,7 @@ export function BuilderContent(props: BuilderContentProps) {
                       validationErrors={state.validationErrors}
                       onFormDefinitionCommitted={handleFormDefinitionCommitted}
                     />
-                  </NodeEditorAutoSubmitContext.Provider>
+                  </StepEditorAutoSubmitContext.Provider>
                 </Flex>
               </StackItem>
             </SynReactFlowViewportGuard>
@@ -828,6 +824,6 @@ export function BuilderContent(props: BuilderContentProps) {
           </SynPage>
         </VersionViewProvider>
       </SynStepExpandedAllContext.Provider>
-    </NodeActionsContext.Provider>
+    </StepActionsContext.Provider>
   )
 }

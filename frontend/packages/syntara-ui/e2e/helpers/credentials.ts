@@ -107,7 +107,8 @@ export async function goToCredentialsList(app: Page, options?: { ensureCreateEna
   }
 
   await app.goto(toAppUrl('/configuration/credentials'))
-  await expect(app.getByText('Credentials', { exact: true }).first()).toBeVisible({ timeout: 20_000 })
+  // Page title — not the dock nav child link (hidden when Configuration is collapsed).
+  await expect(app.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible({ timeout: 20_000 })
 
   if (!options?.ensureCreateEnabled) return
 

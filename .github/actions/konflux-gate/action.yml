@@ -36,7 +36,9 @@ runs:
       with:
         script: |
           const sha = context.payload.pull_request.head.sha;
-          const baseBranch = context.payload.pull_request.base.ref;
+          const rawBranch = context.payload.pull_request.base.ref;
+          // Feature branches reuse the devel test pipelines — normalize to "devel".
+          const baseBranch = /^(feature|feat)\//.test(rawBranch) ? 'devel' : rawBranch;
           const checkName = process.env.GK_CHECK_NAME.replace(/{branch}/g, baseBranch);
           const pipelineCheckName = (process.env.GK_PIPELINE_CHECK_NAME || '').replace(/{branch}/g, baseBranch);
 
