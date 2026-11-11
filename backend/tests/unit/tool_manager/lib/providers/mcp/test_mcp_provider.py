@@ -443,6 +443,26 @@ class TestMCPProvider:
 
         assert len(tools) == 1
         assert tools[0].name == "calculate_sum"
+        assert mock_client_class.call_count == 2
+
+    @pytest.mark.asyncio
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    async def test_refresh_tools_retries_grouped_timeout(self, mock_client_class: Mock) -> None:
+        """A timeout member in a nested exception group triggers a retry."""
+        mock_tool = self._create_mock_langchain_tool("calculate_sum", "Calculate sum of two numbers")
+        mock_client = AsyncMock()
+        grouped_timeout = ExceptionGroup(
+            "MCP request failed", [ExceptionGroup("nested", [TimeoutError(), RuntimeError("transient failure")])]
+        )
+        mock_client.get_tools.side_effect = [grouped_timeout, [mock_tool]]
+        mock_client_class.return_value = mock_client
+
+        provider = MCPProvider(base_url="http://localhost:8765/mcp", api_key="test-key")
+
+        tools = await provider.refresh_tools()
+
+        assert [tool.name for tool in tools] == ["calculate_sum"]
+        assert mock_client.get_tools.call_count == 2
 
     @pytest.mark.asyncio
     @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")

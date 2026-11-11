@@ -277,7 +277,10 @@ class MCPServerAdapter:
             ca_certificate=self._config.ca_certificate,
         )
         try:
-            tools_metadata = await asyncio.wait_for(adapter.refresh_tools(), timeout=timeout_seconds)
+            tools_metadata = await asyncio.wait_for(
+                adapter.refresh_tools(timeout_seconds=timeout_seconds),
+                timeout=timeout_seconds,
+            )
 
             discovered = [_tool_to_discovered(t) for t in tools_metadata]
 

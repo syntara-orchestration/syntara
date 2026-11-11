@@ -6,6 +6,7 @@ spec-compliant JSON-RPC 2.0 ping with session handling and response parsing.
 
 from __future__ import annotations
 
+import asyncio
 import ssl
 from typing import Any, Literal
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -367,6 +368,36 @@ class TestMCPServerDiscoverSuccess:
     """Tests for successful MCPServerAdapter.discover() calls."""
 
     @pytest.mark.asyncio
+    async def test_transient_timeout_retries_within_discover_timeout(self, mcp_config: MCPServerConfiguration) -> None:
+        """A retry can succeed before the Test Connection deadline."""
+        mock_client = AsyncMock()
+        attempt_count = 0
+
+        async def get_tools() -> list[Any]:
+            nonlocal attempt_count
+            attempt_count += 1
+            if attempt_count == 1:
+                await asyncio.sleep(0.4)
+            return []
+
+        mock_client.get_tools.side_effect = get_tools
+        adapter = MCPServerAdapter(mcp_config)
+
+        with patch(
+            "syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient",
+            return_value=mock_client,
+        ) as mock_client_cls:
+            result = await adapter.discover(
+                resolved_credential={"bearer_token": "test-key"},
+                timeout_seconds=1,
+            )
+
+        assert result.success is True
+        assert result.discovered_tools == []
+        assert mock_client.get_tools.call_count == 2
+        assert mock_client_cls.call_count == 2
+
+    @pytest.mark.asyncio
     async def test_returns_discovered_tools(self, mcp_config: MCPServerConfiguration) -> None:
         """Successful discover returns tool names and descriptions."""
         from syntara.tool_manager.models.tool import Tool
@@ -381,7 +412,8 @@ class TestMCPServerDiscoverSuccess:
         with patch(
             "syntara.integrations.adapters.mcp_server.MCPProvider",
         ) as mock_provider_cls:
-            mock_provider_cls.return_value = _mock_mcp_provider(tools=[mock_tool])
+            mock_provider = _mock_mcp_provider(tools=[mock_tool])
+            mock_provider_cls.return_value = mock_provider
 
             result = await adapter.discover(
                 resolved_credential={"bearer_token": "test-key"},
@@ -394,6 +426,7 @@ class TestMCPServerDiscoverSuccess:
         assert result.discovered_tools[0].name == "search"
         assert result.discovered_tools[0].description == "Search the web"
         assert result.error is None
+        mock_provider.refresh_tools.assert_awaited_once_with(timeout_seconds=10)
 
     @pytest.mark.asyncio
     async def test_empty_tools_list(self, mcp_config: MCPServerConfiguration) -> None:
