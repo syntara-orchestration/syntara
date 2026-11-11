@@ -253,7 +253,11 @@ class MCPProvider(ToolProviderAdapter):
             timeout=timed_out,
         )
 
-    async def get_base_tools(self, *, timeout_seconds: float | None = None) -> list[BaseTool]:
+    async def get_base_tools(self) -> list[BaseTool]:
+        """Get LangChain tools using the default retrieval timeout."""
+        return await self._get_base_tools()
+
+    async def _get_base_tools(self, *, timeout_seconds: float | None = None) -> list[BaseTool]:
         """Get LangChain BaseTools from provider without conversion.
 
         Returns raw BaseTools for use in Agent Orchestrator without
@@ -330,7 +334,15 @@ class MCPProvider(ToolProviderAdapter):
         )
         raise TimeoutError(msg) from last_timeout_error
 
-    async def refresh_tools(self, *, timeout_seconds: float | None = None) -> list[Tool]:
+    async def refresh_tools(self) -> list[Tool]:
+        """Refresh and discover tools using the default retrieval timeout."""
+        return await self._refresh_tools()
+
+    async def refresh_tools_with_timeout(self, timeout_seconds: float) -> list[Tool]:
+        """Refresh and discover tools within the supplied total timeout budget."""
+        return await self._refresh_tools(timeout_seconds=timeout_seconds)
+
+    async def _refresh_tools(self, *, timeout_seconds: float | None = None) -> list[Tool]:
         """Refresh and discover tools from the MCP server.
 
         Args:
@@ -349,10 +361,7 @@ class MCPProvider(ToolProviderAdapter):
             logger.info("Refreshing tools from MCP provider", integration_name=self.integration_name)
 
             # Use get_base_tools to retrieve raw tools
-            if timeout_seconds is None:
-                langchain_tools = await self.get_base_tools()
-            else:
-                langchain_tools = await self.get_base_tools(timeout_seconds=timeout_seconds)
+            langchain_tools = await self._get_base_tools(timeout_seconds=timeout_seconds)
 
             tools = []
             self._tools_cache.clear()

@@ -38,9 +38,9 @@ def _mock_mcp_provider(side_effect: Exception | None = None, tools: list[Any] | 
     provider = MagicMock()
     provider.close = AsyncMock()
     if side_effect:
-        provider.refresh_tools = AsyncMock(side_effect=side_effect)
+        provider.refresh_tools_with_timeout = AsyncMock(side_effect=side_effect)
     else:
-        provider.refresh_tools = AsyncMock(return_value=tools or [])
+        provider.refresh_tools_with_timeout = AsyncMock(return_value=tools or [])
     return provider
 
 
@@ -426,7 +426,7 @@ class TestMCPServerDiscoverSuccess:
         assert result.discovered_tools[0].name == "search"
         assert result.discovered_tools[0].description == "Search the web"
         assert result.error is None
-        mock_provider.refresh_tools.assert_awaited_once_with(timeout_seconds=10)
+        mock_provider.refresh_tools_with_timeout.assert_awaited_once_with(10)
 
     @pytest.mark.asyncio
     async def test_empty_tools_list(self, mcp_config: MCPServerConfiguration) -> None:

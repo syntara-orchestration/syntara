@@ -278,7 +278,7 @@ class MCPServerAdapter:
         )
         try:
             tools_metadata = await asyncio.wait_for(
-                adapter.refresh_tools(timeout_seconds=timeout_seconds),
+                adapter.refresh_tools_with_timeout(timeout_seconds),
                 timeout=timeout_seconds,
             )
 
