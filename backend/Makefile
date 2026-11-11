@@ -38,10 +38,15 @@ COMPOSE_CMD ?= uv run podman-compose
 COMPOSE_ARGS ?= -p $(PODMAN_PROJECT) -f ../podman-compose.yml
 COMPOSE_FINAL_CMD := $(COMPOSE_CMD) $(COMPOSE_ARGS)
 
-# Services started by `make services-run`. The same list is passed to
-# tools/wait_for_services.py, which waits until each one is healthy.
-SERVICES_RUN_SERVICES := database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
+# `make services-run` starts every service podman-compose.yml enables without a
+# profile or with SERVICES_RUN_PROFILE, except SERVICES_RUN_EXCLUDE (the API and
+# UI, which `make dev` runs locally). The list is read from the compose file when
+# the target runs, so adding a service there needs no change here. The same list
+# is passed to tools/wait_for_services.py, which waits until each one is healthy.
+SERVICES_RUN_PROFILE := mcp-scenarios
+SERVICES_RUN_EXCLUDE := syntara syntara-ui
 SERVICES_WAIT_TIMEOUT ?= 300
+WAIT_FOR_SERVICES ?= uv run python tools/wait_for_services.py
 
 # S2S mTLS configuration for local development
 S2S_TLS_VARS = \
@@ -490,8 +495,11 @@ services-run: _ensure-secrets _ensure-certs ## Start all services (database + ca
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
 	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
 	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
-	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d $(SERVICES_RUN_SERVICES)
-	@uv run python tools/wait_for_services.py --project $(PODMAN_PROJECT) --timeout $(SERVICES_WAIT_TIMEOUT) $(SERVICES_RUN_SERVICES)
+	@services="$$($(WAIT_FOR_SERVICES) --print-services --compose-file ../podman-compose.yml \
+		--profile $(SERVICES_RUN_PROFILE) $(addprefix --exclude ,$(SERVICES_RUN_EXCLUDE)))" || exit 1; \
+	echo "📦 Services: $$services"; \
+	$(COMPOSE_FINAL_CMD) --profile $(SERVICES_RUN_PROFILE) up --build --force-recreate -d $$services && \
+	$(WAIT_FOR_SERVICES) --project $(PODMAN_PROJECT) --timeout $(SERVICES_WAIT_TIMEOUT) $$services
 	@echo "✅ All services started in background and healthy"
 	@echo "   Use 'make services-logs' to view logs"
 	@echo "   Use 'make services-stop' to stop services"

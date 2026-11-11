@@ -4,8 +4,10 @@ Three layers:
 
 * Hermetic tests drive ``wait_for_services`` with a scripted fake engine and a
   fake clock, so every readiness rule and failure path runs without containers.
-* A Makefile wiring test dry-runs ``make services-run`` and checks that the wait
-  step runs after ``up`` with exactly the same services.
+* Makefile wiring tests run the ``make services-run`` recipe with stubbed
+  ``podman-compose`` and wait commands. They check that the services come from
+  ``podman-compose.yml`` and that the wait step runs after ``up`` with exactly
+  the same services.
 * Real-podman tests start throwaway compose projects and run the tool as a
   subprocess. They are opt-in (``SYNTARA_TEST_WITH_PODMAN=1``) because they
   need a podman machine and pull a small image.
@@ -30,12 +32,17 @@ import pytest
 import yaml
 
 from tools.wait_for_services import (
+    MIN_COMMAND_TIMEOUT_SECONDS,
     PROJECT_LABEL,
     SERVICE_LABEL,
+    ComposeFileError,
     Engine,
     EngineError,
+    EngineTimeoutError,
     Readiness,
+    _run,
     classify_container,
+    compose_services,
     main,
     parse_args,
     wait_for_services,
@@ -83,22 +90,40 @@ class FakeEngine(Engine):
     next scripted poll; the last poll repeats forever.
     """
 
-    def __init__(self, script: Mapping[str, Sequence[Poll]], binary: str = "podman") -> None:
-        """Serve ``script``; the fake never runs real engine commands."""
+    def __init__(
+        self,
+        script: Mapping[str, Sequence[Poll]],
+        binary: str = "podman",
+        *,
+        stalled: Sequence[tuple[str, str]] = (),
+    ) -> None:
+        """Serve ``script``; the fake never runs real engine commands.
+
+        ``stalled`` lists ``(subcommand, container)`` pairs (``inspect`` or
+        ``healthcheck``) that time out instead of answering.
+        """
         super().__init__(binary=binary, runner=self._unexpected_runner)
         self._script = {service: list(polls) for service, polls in script.items()}
         self._current: dict[str, dict[str, Any]] = {}
+        self._stalled = set(stalled)
         self.queried: list[str] = []
         self.triggered: list[str] = []
+        self.timeouts: list[float | None] = []
 
     @staticmethod
-    def _unexpected_runner(cmd: Sequence[str]) -> subprocess.CompletedProcess[str]:
-        message = f"unexpected engine command: {cmd}"
+    def _unexpected_runner(cmd: Sequence[str], timeout: float | None) -> subprocess.CompletedProcess[str]:
+        message = f"unexpected engine command: {cmd} (timeout {timeout})"
         raise AssertionError(message)
 
-    def find_containers(self, project: str, service: str) -> list[str]:
+    def _maybe_stall(self, subcommand: str, container: str, timeout: float | None) -> None:
+        if (subcommand, container) in self._stalled:
+            message = f"{self.binary} {subcommand} {container} timed out after {timeout:.0f}s"
+            raise EngineTimeoutError(message)
+
+    def find_containers(self, project: str, service: str, *, timeout: float | None = None) -> list[str]:
         assert project == PROJECT
         self.queried.append(service)
+        self.timeouts.append(timeout)
         polls = self._script.get(service, [{}])
         poll = polls.pop(0) if len(polls) > 1 else polls[0]
         if isinstance(poll, EngineError):
@@ -106,12 +131,16 @@ class FakeEngine(Engine):
         self._current.update(poll)
         return sorted(poll)
 
-    def inspect(self, container: str) -> dict[str, Any]:
+    def inspect(self, container: str, *, timeout: float | None = None) -> dict[str, Any]:
+        self.timeouts.append(timeout)
+        self._maybe_stall("inspect", container, timeout)
         return self._current[container]
 
-    def trigger_healthcheck(self, container: str) -> None:
+    def trigger_healthcheck(self, container: str, *, timeout: float | None = None) -> None:
+        self.timeouts.append(timeout)
         if self.supports_manual_healthcheck:
             self.triggered.append(container)
+            self._maybe_stall("healthcheck", container, timeout)
 
 
 class FakeClock:
@@ -358,6 +387,36 @@ def test_engine_error_fails_immediately() -> None:
     assert "cannot connect to Podman" in out
 
 
+def test_engine_commands_are_bounded_by_the_remaining_deadline() -> None:
+    engine = FakeEngine({"temporal": [{"temporal_1": container("running", "starting")}]})
+
+    code, _, _ = run_wait(engine, ["temporal"], timeout=60.0, interval=10.0)
+
+    assert code == 1
+    timeouts = [t for t in engine.timeouts if t is not None]
+    assert timeouts == engine.timeouts, "every engine command gets a timeout"
+    # One poll is ps, inspect and healthcheck run; the clock only moves on sleep.
+    assert timeouts[:3] == [60.0, 60.0, 60.0]
+    assert timeouts[3:6] == [50.0, 50.0, 50.0]
+    assert timeouts == sorted(timeouts, reverse=True)
+    assert min(timeouts) == MIN_COMMAND_TIMEOUT_SECONDS, "a command near the deadline still gets the floor"
+
+
+@pytest.mark.parametrize("subcommand", ["inspect", "healthcheck"])
+def test_stalled_engine_command_fails_instead_of_waiting(subcommand: str) -> None:
+    engine = FakeEngine(
+        {"temporal": [{"temporal_1": container("running", "starting")}]},
+        stalled=[(subcommand, "temporal_1")],
+    )
+
+    code, out, clock = run_wait(engine, ["temporal"], timeout=300.0)
+
+    assert code == 1
+    assert clock.sleeps == [], "a timed-out command fails the wait at once"
+    assert "temporal will not become healthy" in out
+    assert f"podman {subcommand} temporal_1 timed out after 300s" in out
+
+
 def test_scaled_service_needs_every_container_ready() -> None:
     engine = FakeEngine(
         {
@@ -457,14 +516,20 @@ def test_prints_progress_while_waiting() -> None:
 class RecordingRunner:
     """Runner that records commands and answers by engine subcommand."""
 
-    def __init__(self, responses: Mapping[str, subprocess.CompletedProcess[str]]) -> None:
+    def __init__(self, responses: Mapping[str, subprocess.CompletedProcess[str] | BaseException]) -> None:
         """Answer each subcommand (``ps``, ``inspect``, ...) with its canned result."""
         self.responses = responses
         self.calls: list[list[str]] = []
 
-    def __call__(self, cmd: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        self.timeouts: list[float | None] = []
+
+    def __call__(self, cmd: Sequence[str], timeout: float | None) -> subprocess.CompletedProcess[str]:
         self.calls.append(list(cmd))
-        return self.responses[cmd[1]]
+        self.timeouts.append(timeout)
+        response = self.responses[cmd[1]]
+        if isinstance(response, BaseException):
+            raise response
+        return response
 
 
 def completed(stdout: str = "", returncode: int = 0, stderr: str = "") -> subprocess.CompletedProcess[str]:
@@ -513,8 +578,80 @@ def test_engine_inspect_errors(response: subprocess.CompletedProcess[str], messa
         engine.inspect("c1")
 
 
+def test_engine_passes_timeout_to_runner() -> None:
+    runner = RecordingRunner({"ps": completed(""), "inspect": completed("{}"), "healthcheck": completed()})
+    engine = Engine("podman", runner)
+
+    engine.find_containers("p", "s", timeout=12.0)
+    engine.inspect("c1", timeout=7.0)
+    engine.trigger_healthcheck("c1", timeout=3.0)
+
+    assert runner.timeouts == [12.0, 7.0, 3.0]
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda e: e.find_containers("p", "s", timeout=4.0),
+        lambda e: e.inspect("c1", timeout=4.0),
+        lambda e: e.trigger_healthcheck("c1", timeout=4.0),
+    ],
+    ids=["ps", "inspect", "healthcheck"],
+)
+def test_engine_raises_timeout_error_when_command_times_out(call: Callable[[Engine], object]) -> None:
+    stalled = subprocess.TimeoutExpired(cmd="podman", timeout=4.0)
+    engine = Engine("podman", RecordingRunner(dict.fromkeys(("ps", "inspect", "healthcheck"), stalled)))
+
+    with pytest.raises(EngineTimeoutError, match="timed out after 4s"):
+        call(engine)
+
+
+def test_engine_trigger_healthcheck_ignores_other_errors() -> None:
+    def runner(cmd: Sequence[str], timeout: float | None) -> subprocess.CompletedProcess[str]:
+        raise FileNotFoundError(cmd[0])
+
+    Engine("podman", runner).trigger_healthcheck("c1", timeout=1.0)
+
+
+def test_run_kills_command_and_its_children_on_timeout(tmp_path: Path) -> None:
+    # The child sleep inherits the output pipes. Killing only the shell would
+    # leave them open and reading the output would block for the full minute.
+    stalled = tmp_path / "stalled-engine"
+    stalled.write_text("#!/bin/sh\nsleep 60\necho never\n")
+    stalled.chmod(0o755)
+
+    start = time.monotonic()
+    with pytest.raises(subprocess.TimeoutExpired):
+        _run([str(stalled)], 0.5)
+    elapsed = time.monotonic() - start
+
+    # Well under the grace period _run allows for reading output after a kill,
+    # so this fails if the child sleep survives and keeps the pipes open.
+    assert elapsed < 3, f"took {elapsed:.1f}s"
+
+
+def test_run_captures_output_and_exit_code() -> None:
+    result = _run([sys.executable, "-c", "import sys; print('out'); print('err', file=sys.stderr); sys.exit(3)"], 30)
+
+    assert (result.returncode, result.stdout, result.stderr) == (3, "out\n", "err\n")
+
+
+def test_main_fails_within_timeout_when_engine_stalls(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    stalled = tmp_path / "stalled-engine"
+    stalled.write_text("#!/bin/sh\nexec sleep 60\n")
+    stalled.chmod(0o755)
+
+    start = time.monotonic()
+    code = main(["--engine", str(stalled), "--project", "p", "--timeout", "1", "db"])
+    elapsed = time.monotonic() - start
+
+    assert code == 1
+    assert elapsed < MIN_COMMAND_TIMEOUT_SECONDS + 5, f"took {elapsed:.1f}s"
+    assert "timed out after" in capsys.readouterr().out
+
+
 def test_engine_reports_missing_binary() -> None:
-    def runner(cmd: Sequence[str]) -> subprocess.CompletedProcess[str]:
+    def runner(cmd: Sequence[str], timeout: float | None) -> subprocess.CompletedProcess[str]:
         raise FileNotFoundError(cmd[0])
 
     with pytest.raises(EngineError, match="could not run podman ps"):
@@ -546,7 +683,18 @@ def test_parse_args_defaults() -> None:
     assert args.interval == 3.0
 
 
-@pytest.mark.parametrize("argv", [["--project", "p"], ["db"], ["--project", "p", "--timeout", "0", "db"]])
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--project", "p"],
+        ["db"],
+        ["--project", "p", "--timeout", "0", "db"],
+        ["--print-services"],
+        ["--print-services", "--compose-file", "c.yml", "db"],
+        ["--project", "p", "--compose-file", "c.yml", "db"],
+        ["--project", "p", "--exclude", "x", "db"],
+    ],
+)
 def test_parse_args_rejects_invalid_input(argv: list[str]) -> None:
     with pytest.raises(SystemExit) as exc_info:
         parse_args(argv)
@@ -561,24 +709,128 @@ def test_main_exits_nonzero_when_engine_is_missing(capsys: pytest.CaptureFixture
 
 
 # ---------------------------------------------------------------------------
+# compose_services
+# ---------------------------------------------------------------------------
+
+COMPOSE_FIXTURE = {
+    "services": {
+        "database": {"image": "db"},
+        "api": {"image": "api"},
+        "scenarios": {"image": "s", "profiles": ["scenarios"]},
+        "telemetry": {"image": "t", "profiles": ["telemetry"]},
+        "worker": {"image": "w"},
+    }
+}
+
+
+@pytest.fixture
+def compose_file(tmp_path: Path) -> Path:
+    path = tmp_path / "compose.yml"
+    path.write_text(yaml.safe_dump(COMPOSE_FIXTURE, sort_keys=False))
+    return path
+
+
+@pytest.mark.parametrize(
+    ("profiles", "exclude", "expected"),
+    [
+        ((), (), ["database", "api", "worker"]),
+        (["scenarios"], (), ["database", "api", "scenarios", "worker"]),
+        (["scenarios", "telemetry"], ["api"], ["database", "scenarios", "telemetry", "worker"]),
+        ((), ["api", "database"], ["worker"]),
+    ],
+)
+def test_compose_services_filters_by_profile_and_exclude(
+    compose_file: Path, profiles: Sequence[str], exclude: Sequence[str], expected: list[str]
+) -> None:
+    assert compose_services(compose_file, profiles=profiles, exclude=exclude) == expected
+
+
+@pytest.mark.parametrize(
+    ("content", "exclude", "message"),
+    [
+        (None, (), "excluded services are not defined in .*: apii"),
+        ("services: {}\n", (), "defines no services"),
+        ("volumes: {}\n", (), "defines no services"),
+        ("services: [unclosed\n", (), "cannot read"),
+        ("services:\n  api: {}\n", ["api"], "no services .* are left to start"),
+    ],
+)
+def test_compose_services_rejects_bad_input(
+    compose_file: Path, content: str | None, exclude: Sequence[str], message: str
+) -> None:
+    if content is not None:
+        compose_file.write_text(content)
+
+    with pytest.raises(ComposeFileError, match=message):
+        compose_services(compose_file, exclude=exclude or ["apii"])
+
+
+def test_compose_services_reports_missing_file(tmp_path: Path) -> None:
+    with pytest.raises(ComposeFileError, match="cannot read"):
+        compose_services(tmp_path / "missing.yml")
+
+
+def test_main_prints_services(compose_file: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["--print-services", "--compose-file", str(compose_file), "--profile", "scenarios", "--exclude", "api"])
+
+    assert code == 0
+    assert capsys.readouterr().out == "database scenarios worker\n"
+
+
+def test_main_print_services_fails_on_bad_compose_file(compose_file: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    code = main(["--print-services", "--compose-file", str(compose_file), "--exclude", "nope"])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert captured.out == "", "nothing is printed for make to start"
+    assert "nope" in captured.err
+
+
+# ---------------------------------------------------------------------------
 # Makefile wiring
 # ---------------------------------------------------------------------------
 
+# Stands in for tools/wait_for_services.py: --print-services runs the real
+# tool, anything else (the wait) is printed instead of run.
+WAIT_STUB = """\
+import os, subprocess, sys
+if "--print-services" in sys.argv:
+    if os.environ.get("STUB_LIST_FAILS") == "1":
+        sys.exit(1)
+    sys.exit(subprocess.call([sys.executable, {script!r}, *sys.argv[1:]]))
+print("WAIT", *sys.argv[1:])
+"""
 
-def _dry_run_services_run() -> list[list[str]]:
+
+def _run_services_run(tmp_path: Path, **env: str) -> subprocess.CompletedProcess[str]:
     make = shutil.which("make")
     if make is None:
         pytest.skip("make is not installed")
-    result = subprocess.run(  # noqa: S603
-        # -o keeps make from generating secrets/certs just to print the recipe.
-        [make, "--no-print-directory", "-n", "-o", "_ensure-secrets", "-o", "_ensure-certs", "services-run"],
+    stub = tmp_path / "wait_stub.py"
+    stub.write_text(WAIT_STUB.format(script=str(SCRIPT)))
+    return subprocess.run(  # noqa: S603
+        [
+            make,
+            "--no-print-directory",
+            # -o keeps make from generating secrets/certs for a stubbed run.
+            "-o",
+            "_ensure-secrets",
+            "-o",
+            "_ensure-certs",
+            "services-run",
+            "COMPOSE_CMD=echo COMPOSE",
+            f"WAIT_FOR_SERVICES={sys.executable} {stub}",
+        ],
         cwd=BACKEND_DIR,
         capture_output=True,
         text=True,
-        check=True,
-        env={**os.environ, "PODMAN_PROJECT": "wiring-test", "SERVICES_WAIT_TIMEOUT": "123"},
+        check=False,
+        env={**os.environ, "PODMAN_PROJECT": "wiring-test", "SERVICES_WAIT_TIMEOUT": "123", **env},
     )
-    return [shlex.split(line) for line in result.stdout.splitlines() if line.strip()]
+
+
+def _commands(result: subprocess.CompletedProcess[str], prefix: str) -> list[list[str]]:
+    return [shlex.split(line)[1:] for line in result.stdout.splitlines() if line.startswith(f"{prefix} ")]
 
 
 def _services_after(command: list[str], marker: str, *, skip_options_with_values: Sequence[str] = ()) -> list[str]:
@@ -595,40 +847,57 @@ def _services_after(command: list[str], marker: str, *, skip_options_with_values
     return services
 
 
-def test_services_run_waits_for_the_same_services_it_starts() -> None:
-    commands = _dry_run_services_run()
-    up_index = next(i for i, c in enumerate(commands) if "up" in c and "podman-compose" in " ".join(c))
-    wait_index = next(i for i, c in enumerate(commands) if any(t.endswith("wait_for_services.py") for t in c))
-    up, wait = commands[up_index], commands[wait_index]
+def _expected_services(profiles: set[str], exclude: set[str]) -> list[str]:
+    """Services ``podman-compose --profile`` would enable, computed independently."""
+    services = yaml.safe_load((REPO_ROOT / "podman-compose.yml").read_text())["services"]
+    return [
+        name
+        for name, definition in services.items()
+        if name not in exclude and (not definition.get("profiles") or set(definition["profiles"]) & profiles)
+    ]
+
+
+def test_services_run_waits_for_the_same_services_it_starts(tmp_path: Path) -> None:
+    result = _run_services_run(tmp_path)
+    assert result.returncode == 0, result.stdout + result.stderr
+    [up] = _commands(result, "COMPOSE")
+    [wait] = _commands(result, "WAIT")
+    prefixes = [line.split(" ", 1)[0] for line in result.stdout.splitlines()]
 
     started = _services_after(up, "-d")
-    waited = _services_after(
-        wait,
-        next(t for t in wait if t.endswith("wait_for_services.py")),
-        skip_options_with_values=("--project", "--timeout", "--interval", "--engine"),
-    )
+    waited = _services_after(wait, "--timeout")[1:]  # drop the timeout value
 
-    assert wait_index > up_index, "the wait must run after the services are started"
+    assert prefixes.index("WAIT") > prefixes.index("COMPOSE"), "the wait must run after the services are started"
     assert started, "services-run must name the services it starts"
     assert waited == started
     assert wait[wait.index("--project") + 1] == "wiring-test", "waits on the same compose project"
     assert wait[wait.index("--timeout") + 1] == "123", "SERVICES_WAIT_TIMEOUT is honored"
-    assert "-p" in up
     assert up[up.index("-p") + 1] == "wiring-test"
 
 
-def test_services_run_starts_only_services_defined_in_compose_file() -> None:
-    commands = _dry_run_services_run()
-    up = next(c for c in commands if "up" in c and "podman-compose" in " ".join(c))
-    compose = yaml.safe_load((REPO_ROOT / "podman-compose.yml").read_text())
+def test_services_run_starts_services_from_the_compose_file(tmp_path: Path) -> None:
+    result = _run_services_run(tmp_path)
+    assert result.returncode == 0, result.stdout + result.stderr
+    [up] = _commands(result, "COMPOSE")
     enabled_profiles = {up[i + 1] for i, arg in enumerate(up) if arg == "--profile"}
 
-    for service in _services_after(up, "-d"):
-        assert service in compose["services"], f"{service} is not defined in podman-compose.yml"
-        profiles = set(compose["services"][service].get("profiles") or [])
-        assert not profiles or profiles & enabled_profiles, (
-            f"{service} needs one of profiles {sorted(profiles)} enabled"
-        )
+    started = _services_after(up, "-d", skip_options_with_values=("-p", "-f", "--profile"))
+
+    assert started == _expected_services(enabled_profiles, {"syntara", "syntara-ui"})
+    # Spot-check against the compose file as it is today.
+    assert {"database", "redis", "temporal", "temporal-worker", "moto", "mcp-server-scenarios"} <= set(started)
+    assert not {"syntara", "syntara-ui"} & set(started), "make dev runs the API and UI locally"
+    assert "mock-segment" not in started, "services behind other profiles stay off"
+
+
+def test_services_run_does_not_start_anything_when_the_list_fails(tmp_path: Path) -> None:
+    # An empty list would make `up -d` start every service, API and UI included.
+    result = _run_services_run(tmp_path, STUB_LIST_FAILS="1")
+
+    assert result.returncode != 0
+    assert _commands(result, "COMPOSE") == []
+    assert _commands(result, "WAIT") == []
+    assert "All services started" not in result.stdout
 
 
 def test_root_services_up_delegates_to_services_run() -> None:
