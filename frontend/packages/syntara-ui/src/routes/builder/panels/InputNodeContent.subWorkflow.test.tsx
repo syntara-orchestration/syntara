@@ -101,9 +101,21 @@ describe('InputNodeContent for Sub-workflow steps', () => {
 
     const { container } = renderInputNodeContent()
 
+    // Aggregate fields should be visible
     expect(screen.getByText('T child_workflow_id')).toBeInTheDocument()
-    expect(screen.getByText('T stdout')).toBeInTheDocument()
     expect(screen.getByRole('tree', { name: 'Schema preview' })).toBeInTheDocument()
+
+    // Child step group should be present (collapsed by default for scannability)
+    // Groups have type prefix: {} for objects
+    expect(screen.getByText('{} Deploy application')).toBeInTheDocument()
+
+    // Expand the child step group to access its fields
+    const childStepToggle = screen.getByRole('button', { name: /Deploy application/i })
+    const user = userEvent.setup()
+    await user.click(childStepToggle)
+
+    // Now the child fields should be visible
+    expect(screen.getByText('T stdout')).toBeInTheDocument()
 
     const dragCalls: Array<[string, string]> = []
     fireEvent.dragStart(screen.getByText('T stdout'), {
@@ -137,8 +149,15 @@ describe('InputNodeContent for Sub-workflow steps', () => {
 
     renderInputNodeContent()
 
-    expect(screen.getAllByText('T stdout')).toHaveLength(64)
-    expect(screen.getAllByRole('treeitem').length).toBeGreaterThan(64)
+    // Child step groups are collapsed by default for scannability
+    // Tree should render with groups (child steps are collapsed so their fields aren't in DOM yet)
+    const tree = screen.getByRole('tree', { name: 'Schema preview' })
+    expect(tree).toBeInTheDocument()
+
+    // Verify tree items are rendered (collapsed groups + top-level aggregate fields)
+    const treeItems = screen.getAllByRole('treeitem')
+    // Should have Result, child_execution_id, child_workflow_id, child_workflow_name, child_workflow_version, child_status, outputs, and 64 child step groups
+    expect(treeItems.length).toBeGreaterThan(64)
   })
 
   it('shows aggregate fields only and an access message after a 403', () => {
