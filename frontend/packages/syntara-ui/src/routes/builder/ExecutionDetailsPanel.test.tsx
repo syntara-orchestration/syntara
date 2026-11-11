@@ -249,6 +249,20 @@ describe('ExecutionDetailsPanel', () => {
     })
   })
 
+  describe('panel expand control', () => {
+    it('renders the expand control in the header when provided', () => {
+      render(
+        <ExecutionDetailsPanel
+          executionId="exec-123"
+          workflowDefinition={WORKFLOW_DEF}
+          panelExpandControl={{ isExpanded: false, onToggle: vi.fn() }}
+        />
+      )
+
+      expect(screen.getByRole('button', { name: 'Expand panel' })).toBeInTheDocument()
+    })
+  })
+
   describe('headerLabel and close button', () => {
     it('renders default title when headerLabel is not provided', () => {
       renderPanel(WORKFLOW_DEF)

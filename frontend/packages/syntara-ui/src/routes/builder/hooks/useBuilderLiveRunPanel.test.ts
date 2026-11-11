@@ -25,6 +25,11 @@ vi.mock('../../workflows/stores/useExecutionStore', () => ({
 }))
 
 const mockInvalidateQueries = vi.fn()
+const mockUseFeatureFlag = vi.fn(() => false)
+vi.mock('../../../providers/use-feature-flag', () => ({
+  useFeatureFlag: (flag: string) => mockUseFeatureFlag(flag),
+}))
+
 vi.mock('@tanstack/react-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-query')>()
   return {
@@ -64,6 +69,7 @@ let queryClient: QueryClient
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockUseFeatureFlag.mockReturnValue(false)
   mockUseExecutionWebSocket.mockReturnValue({})
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 })
@@ -356,6 +362,38 @@ describe('useBuilderLiveRunPanel', () => {
       )
 
       expect(mockUseExecutionWebSocket).toHaveBeenCalledWith('', expect.objectContaining({ enabled: false }))
+    })
+  })
+
+  describe('run details panel expand', () => {
+    it('collapses when the live run panel closes while expanded', () => {
+      mockUseFeatureFlag.mockReturnValue(true)
+
+      const { result, rerender } = renderHook(({ params }: { params: HookParams }) => useBuilderLiveRunPanel(params), {
+        initialProps: {
+          params: defaultParams({
+            mostRecentRunPanelOpen: true,
+            mostRecentExecutionId: 'exec-1',
+            isViewingExecution: false,
+          }),
+        },
+        wrapper: makeWrapper(queryClient),
+      })
+
+      act(() => {
+        result.current.panelExpandControl?.onToggle()
+      })
+      expect(result.current.isPanelExpanded).toBe(true)
+
+      rerender({
+        params: defaultParams({
+          mostRecentRunPanelOpen: false,
+          mostRecentExecutionId: 'exec-1',
+          isViewingExecution: false,
+        }),
+      })
+
+      expect(result.current.isPanelExpanded).toBe(false)
     })
   })
 
