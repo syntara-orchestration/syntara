@@ -9,6 +9,7 @@
 
 import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
 import { test, expect } from '../fixtures'
+import { selectHumanTaskStep } from '../helpers/v2-steps'
 import {
   buildUniqueName,
   deleteWorkflow,
@@ -39,7 +40,7 @@ test('catalog panel shows available step types organized by category', async ({ 
 
     await expect(panel.getByRole('button', { name: 'Action', exact: true })).toBeVisible()
     await expect(panel.getByRole('button', { name: 'AAP Execution', exact: true })).toBeVisible()
-    await expect(panel.getByRole('button', { name: 'Approval', exact: true })).toBeVisible()
+    await expect(panel.getByRole('button', { name: 'Human tasks', exact: true })).toBeVisible()
     await expect(panel.getByRole('button', { name: 'Logic', exact: true })).toBeVisible()
   } finally {
     await deleteWorkflow(app, workflowName)
@@ -93,12 +94,8 @@ test('user can add an Approval step to the canvas', async ({ app }) => {
     await closeStepEditorPanel(app)
     await expect(app.getByText('Manual trigger')).toBeVisible()
 
-    const panel = await clickAddConnectedStep(app)
-
-    const approvalButton = panel.getByRole('button', { name: /Approval/i, exact: true })
-    await expect(approvalButton).toBeVisible()
-
-    await approvalButton.click()
+    await clickAddConnectedStep(app)
+    await selectHumanTaskStep(app, 'Approval')
 
     await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Approval Node')
@@ -237,18 +234,9 @@ test('multiple steps can be added sequentially', async ({ app }) => {
     // Wait for UI to stabilize after first node
     await waitForUIReady(app)
 
-    // Add second node - Approval
+    // Add second node - Approval (Human tasks category)
     let panel = await clickAddConnectedStep(app)
-
-    // Wait for Approval button to be stable before clicking
-    await expect(async () => {
-      const approvalBtn = panel.getByRole('button', { name: 'Approval', exact: true })
-      await expect(approvalBtn).toBeVisible()
-      await expect(approvalBtn).toBeEnabled()
-    }).toPass({ timeout: 15000, intervals: [500, 1000] })
-
-    const approvalBtn = panel.getByRole('button', { name: 'Approval', exact: true })
-    await approvalBtn.click()
+    await selectHumanTaskStep(app, 'Approval')
 
     // Wait for form to be stable
     await expect(async () => {
@@ -300,8 +288,7 @@ test('multiple steps can be added sequentially', async ({ app }) => {
     await expect(saveBtn).toBeEnabled({ timeout: 20000 })
     await saveBtn.click()
 
-    // Wait for panel to close
-    await expect(panel).toHaveCount(0, { timeout: 15000 })
+    await closeStepEditorPanel(app)
 
     // Wait for canvas to render the new step
     await expect(

@@ -8,7 +8,7 @@ import { scrollFormFieldBuilderIntoView, setFormFieldLabel } from './formFieldBu
 import { addScriptOnHandle, openFormPromptCreateForm } from './v2-steps'
 import { closeStepEditorPanel, triggerLayout } from './workflows'
 
-export const FORM_PROMPT_NODE_FORM_TEST_ID = 'form-prompt-node-form'
+export const FORM_PROMPT_NODE_FORM_TEST_ID = 'form-prompt-step-form'
 
 export function formPromptNodeFormScope(page: Page) {
   return page.getByTestId(FORM_PROMPT_NODE_FORM_TEST_ID)

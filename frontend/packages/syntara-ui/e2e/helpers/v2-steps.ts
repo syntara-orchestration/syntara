@@ -285,7 +285,7 @@ export async function addAapStep(page: Page, name: string) {
 /** Add an approval step (v2 type: "approval") without completing branches. */
 export async function addApprovalStep(page: Page, name: string) {
   await openAddStepPanel(page)
-  await selectDirectStepType(page, 'Approval')
+  await selectHumanTaskStep(page, 'Approval')
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await nameInput.fill(name)
