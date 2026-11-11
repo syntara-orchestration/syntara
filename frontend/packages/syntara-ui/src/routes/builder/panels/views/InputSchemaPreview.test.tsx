@@ -140,4 +140,77 @@ describe('InputSchemaPreview', () => {
 
     expect(container.innerHTML).toBe('')
   })
+
+  it('filters fields by name when searchTerm is provided', () => {
+    render(<InputSchemaPreview fields={sampleFields} nodeId="step-1" searchTerm="stdout" />)
+
+    // Tree should have exactly 2 items (stdout and stdout_json)
+    const treeItems = screen.getAllByRole('treeitem')
+    expect(treeItems).toHaveLength(2)
+
+    // Check that "exit_code" and "active" are not in the rendered tree
+    expect(screen.queryByText(/exit_code/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/\bactive\b/i)).not.toBeInTheDocument()
+  })
+
+  it('filters fields by description when searchTerm is provided', () => {
+    render(<InputSchemaPreview fields={sampleFields} nodeId="step-1" searchTerm="success" />)
+
+    // Field with "success" in description ("Process exit code (0 = success)") should be visible
+    expect(screen.getByText(/exit_code/i)).toBeInTheDocument()
+    // Fields without "success" in description or name should not be visible
+    expect(screen.queryByText(/\bactive\b/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/items/i)).not.toBeInTheDocument()
+  })
+
+  it('keeps ancestor groups visible when a descendant field matches', () => {
+    const nestedFields: OutputFieldDef[] = [
+      {
+        name: 'Result',
+        type: 'object',
+        description: 'Result object',
+        children: [
+          { name: 'status', type: 'string', description: 'Status message' },
+          { name: 'data', type: 'string', description: 'Data payload' },
+        ],
+      },
+    ]
+
+    render(<InputSchemaPreview fields={nestedFields} nodeId="step-1" searchTerm="status" />)
+
+    // Parent group should be visible
+    expect(screen.getByText(/Result/)).toBeInTheDocument()
+    // Matching child should be visible
+    expect(screen.getByText(/status/)).toBeInTheDocument()
+    // Non-matching child should not be visible
+    expect(screen.queryByText(/data/)).not.toBeInTheDocument()
+  })
+
+  it('highlights matching text in field names and descriptions', () => {
+    render(<InputSchemaPreview fields={sampleFields} nodeId="step-1" searchTerm="exit" />)
+
+    // Check that highlighted text exists (highlightText wraps matches in <mark>)
+    const marks = screen.getAllByText('exit')
+    expect(marks.length).toBeGreaterThan(0)
+  })
+
+  it('shows all fields when searchTerm is empty', () => {
+    render(<InputSchemaPreview fields={sampleFields} nodeId="step-1" searchTerm="" />)
+
+    expect(screen.getByText('T stdout')).toBeInTheDocument()
+    expect(screen.getByText('# exit_code')).toBeInTheDocument()
+    expect(screen.getByText('✓ active')).toBeInTheDocument()
+  })
+
+  it('renders tree when filtering', () => {
+    render(<InputSchemaPreview fields={sampleFields} nodeId="step-1" searchTerm="stdout" />)
+
+    // Tree should render
+    const tree = screen.queryByRole('tree')
+    expect(tree).toBeInTheDocument()
+
+    // Should have at least one tree item
+    const treeItems = screen.getAllByRole('treeitem')
+    expect(treeItems.length).toBeGreaterThan(0)
+  })
 })

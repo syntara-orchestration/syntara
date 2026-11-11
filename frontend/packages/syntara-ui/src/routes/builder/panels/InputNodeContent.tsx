@@ -36,7 +36,7 @@ export type InputNodeContentProps = {
 
 type ChildWorkflowOutputContentProps = Pick<
   InputNodeContentProps,
-  'upstreamNode' | 'onRunPreviousSteps' | 'workflowId'
+  'upstreamNode' | 'onRunPreviousSteps' | 'workflowId' | 'searchTerm'
 > & {
   expressionNodeId: string
 }
@@ -145,6 +145,7 @@ function ChildWorkflowOutputContent({
   expressionNodeId,
   onRunPreviousSteps,
   workflowId,
+  searchTerm,
 }: Readonly<ChildWorkflowOutputContentProps>) {
   const childSchema = useChildWorkflowSchema({
     workflowId: upstreamNode.childWorkflowId ?? null,
@@ -171,7 +172,7 @@ function ChildWorkflowOutputContent({
         <ChildWorkflowOutputStatus childWorkflowId={upstreamNode.childWorkflowId} schema={childSchema} />
       </StackItem>
       <StackItem>
-        <InputSchemaPreview tree={outputTree} nodeId={expressionNodeId} />
+        <InputSchemaPreview tree={outputTree} nodeId={expressionNodeId} searchTerm={searchTerm} />
       </StackItem>
     </Stack>
   )
@@ -198,6 +199,7 @@ export function InputNodeContent({
           expressionNodeId={expressionNodeId}
           onRunPreviousSteps={onRunPreviousSteps}
           workflowId={workflowId}
+          searchTerm={searchTerm}
         />
       )
     }
@@ -225,7 +227,7 @@ export function InputNodeContent({
           </StackItem>
         )}
         <StackItem>
-          <InputSchemaPreview fields={effectiveSchema} nodeId={expressionNodeId} />
+          <InputSchemaPreview fields={effectiveSchema} nodeId={expressionNodeId} searchTerm={searchTerm} />
         </StackItem>
       </Stack>
     )
