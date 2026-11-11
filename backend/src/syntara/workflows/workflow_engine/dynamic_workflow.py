@@ -981,8 +981,13 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             self.loop_body_map[successor_id] = completed_node_id
         elif completed_node_id in self.loop_body_map:
             parent_loop_id = self.loop_body_map[completed_node_id]
-            self.loop_body_map[successor_id] = parent_loop_id
-            workflow.logger.info(f"Node {successor_id} transitively marked as loop body of {parent_loop_id}")
+            # A loop body's feedback edge points back to its controller. Keep
+            # that controller's existing parent when it is itself nested; replacing
+            # it with itself loses the outer iteration from retry paths. Root loops
+            # still get the self-entry used to guard their pending controller task.
+            if successor_id != parent_loop_id or successor_id not in self.loop_body_map:
+                self.loop_body_map[successor_id] = parent_loop_id
+                workflow.logger.info(f"Node {successor_id} transitively marked as loop body of {parent_loop_id}")
 
     def _should_skip_successor(
         self,
@@ -1329,7 +1334,10 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # Find all loop body nodes
         loop_body_nodes = [node_id for node_id, parent in self.loop_body_map.items() if parent == loop_id]
 
-        return any(node_id in pending_tasks for node_id in loop_body_nodes)
+        # The feedback edge schedules the controller itself. For a nested loop,
+        # its parent mapping must remain intact, so it is not necessarily present
+        # among its own body nodes while that task is pending.
+        return loop_id in pending_tasks or any(node_id in pending_tasks for node_id in loop_body_nodes)
 
     def _clear_loop_body(self, loop_id: str) -> None:
         """Clear loop body nodes from tracking to allow re-execution.
