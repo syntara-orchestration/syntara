@@ -595,6 +595,18 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         if history_activity_id and history_activity_id != node_id:
             self.activity_output_history.setdefault(history_activity_id, []).append(copy.deepcopy(namespace_entry))
 
+    def _record_input_history(self, node: ActivityNode, resolved_parameters: dict[str, Any]) -> None:
+        """Keep resolved inputs available to iteration-specific sync queries."""
+        self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
+        self.activity_input_history.setdefault(node.id, []).append(copy.deepcopy(resolved_parameters))
+        if node.type == NodeType.APPROVAL:
+            history_activity_id = self._approval_activity_id(node.id)
+            if history_activity_id != node.id:
+                self.activity_input_history.setdefault(history_activity_id, []).append(
+                    copy.deepcopy(resolved_parameters)
+                )
+        self._record_occurrence_aliases(node.id, inputs=self.node_inputs[node.id])
+
     def _route_failure_after_recording(
         self,
         node_id: str,
@@ -2055,15 +2067,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             self._apply_input_overrides(node, resolved_parameters)
 
         timeout_seconds = resolve_timeout(node, self._runtime_settings)
-        self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
-        self.activity_input_history.setdefault(node.id, []).append(copy.deepcopy(resolved_parameters))
-        if node.type == NodeType.APPROVAL:
-            history_activity_id = self._approval_activity_id(node.id)
-            if history_activity_id != node.id:
-                self.activity_input_history.setdefault(history_activity_id, []).append(
-                    copy.deepcopy(resolved_parameters)
-                )
-        self._record_occurrence_aliases(node.id, inputs=self.node_inputs[node.id])
+        self._record_input_history(node, resolved_parameters)
 
         result = await self._dispatch_node(node, resolved_parameters, graph, timeout_seconds)
         return self._process_node_result(node, result)
