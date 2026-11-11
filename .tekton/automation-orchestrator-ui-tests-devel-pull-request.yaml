@@ -38,15 +38,20 @@ spec:
       value: '{{revision}}'
     - name: pipeline-github-pr-number
       value: '{{pull_request_number}}'
-    # Pin aap-dev on ANSTRAT-1803's feature branch
-    - name: aap-dev-revision
-      value: AAP-90779-ep-from-source
+    - name: ep-git-url
+      value: https://github.com/syntara-orchestration/syntara-execution-plane.git
+    - name: ep-revision
+      value: devel
+    - name: ao-operator-git-url
+      value: https://github.com/automation-nexus/automation-orchestrator-operator.git
+    - name: ao-operator-revision
+      value: feat/ANSTRAT-1803
   pipelineRef:
     params:
       - name: name
         value: ao-ui-tests
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-ui-tests:0.1@sha256:40a4df7bd569259e108f1c75d9976d43a7aee598ad100d05a80aa6049fad957f
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-ui-tests:0.1@sha256:1420e627fe1a2c743f480b11e4fd2f98f7284ccbfe565b75fb3efcaa988543d1
       - name: kind
         value: pipeline
       - name: secret
