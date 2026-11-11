@@ -226,6 +226,8 @@ export interface NodeSettings {
   continue_on_failure?: boolean
   /** Timeout in seconds. Meaning varies by node type. Falls back to the global catalog default when absent. */
   timeout?: number
+  /** Advisory duration in seconds before showing Running long. Does not stop execution. */
+  expected_duration?: number
   /** Per-node retry policy. Absent = use all global catalog defaults. */
   retry_policy?: RetryPolicyConfig
 }

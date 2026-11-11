@@ -2,6 +2,7 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildKafkaPublishDraft,
   buildKafkaPublishParameters,
   kafkaPublishFormSchema,
   kafkaPublishInitialFields,
@@ -178,5 +179,43 @@ describe('Kafka Publish form contract', () => {
     ).toBe(false)
     expect(kafkaPublishParametersSchema.safeParse({ ...parameters, headers: { x: 'value' } }).success).toBe(false)
     expect(kafkaPublishParametersSchema.safeParse({ ...parameters, headers: [{ name: 'x' }] }).success).toBe(false)
+  })
+})
+
+describe('Kafka Publish advisory drafts', () => {
+  it.each(['', '   ', '{"result":', '1e400'])(
+    'preserves unfinished payload text through serialization and reopening: %s',
+    (payload) => {
+      const data = { ...kafkaPublishFormSchema.parse(valid), integration_id: '', credential_id: '', topic: '', payload }
+      const draft = buildKafkaPublishDraft(data)
+      const serialized: unknown = JSON.parse(JSON.stringify(draft.parameters))
+      const reopened = kafkaPublishParametersSchema.parse(serialized)
+      expect(serialized).not.toHaveProperty('payload')
+      expect(kafkaPublishInitialFields(reopened, draft.metadata)).toMatchObject({
+        integration_id: '',
+        credential_id: '',
+        topic: '',
+        payload,
+      })
+    }
+  )
+
+  it('removes unfinished text after correction and preserves other metadata', () => {
+    const draft = buildKafkaPublishDraft(kafkaPublishFormSchema.parse(valid), {
+      __kafkaPublishPayloadDraft: '{"result":',
+      __customMessage: 'Keep this',
+    })
+    expect(draft.parameters.payload).toBeNull()
+    expect(draft.metadata).toEqual({ __customMessage: 'Keep this' })
+  })
+
+  it('opens omitted or null resource references and payloads as empty fields', () => {
+    const parameters = kafkaPublishParametersSchema.parse({ integration_id: null, credential_id: null })
+    expect(kafkaPublishInitialFields(parameters)).toMatchObject({
+      integration_id: '',
+      credential_id: '',
+      topic: '',
+      payload: '',
+    })
   })
 })

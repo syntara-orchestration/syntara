@@ -111,10 +111,10 @@ function ContinueOnFailureSection({
   }
 
   return (
-    <FormSection title="On failure">
+    <FormSection>
       <Stack hasGutter>
         <StackItem>
-          <FormGroup label="On failure behavior" labelHelp={nodeHelp.onFailureBehavior} fieldId="node-settings-cof">
+          <FormGroup label="On failure" labelHelp={nodeHelp.onFailureBehavior} fieldId="node-settings-cof">
             <SynSelect
               id="node-settings-cof"
               isOpen={isOpen}
@@ -203,7 +203,7 @@ function TimeoutSection({ timeoutFormat, timeoutDefault, timeoutPlaceholder, isD
   }
 
   return (
-    <FormSection title="Timeout (seconds)">
+    <FormSection>
       <SynTextField
         name="settings.timeout"
         label="Timeout (seconds)"
@@ -295,6 +295,30 @@ function getCofDefaultLabel(cofDefault: boolean | null): string {
   return ' (system default: stop on failure)'
 }
 
+function ExpectedDurationField({
+  defaults,
+  isDisabled,
+}: Readonly<{
+  defaults: { expectedDurationSeconds?: number | null } | null
+  isDisabled: boolean
+}>) {
+  return (
+    <SynTextField
+      name="settings.expected_duration"
+      label="Expected duration (seconds)"
+      labelHelp={nodeHelp.expectedDuration}
+      fieldId="node-settings-expected-duration"
+      type="number"
+      min={1}
+      placeholder={retryPlaceholder(defaults?.expectedDurationSeconds, 'System default')}
+      hint={
+        'Show a "Running long" warning after this duration. Does not stop the run. Falls back to system default if not set.'
+      }
+      isDisabled={isDisabled}
+    />
+  )
+}
+
 export function NodeSettingsForm({
   timeoutFormat = 'seconds',
   supportsTimeout = true,
@@ -354,6 +378,10 @@ export function NodeSettingsForm({
           />
         </StackItem>
       )}
+
+      <StackItem>
+        <ExpectedDurationField defaults={defaults} isDisabled={isVersionView} />
+      </StackItem>
 
       {supportsRetryPolicy && (
         <StackItem>

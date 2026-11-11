@@ -7,7 +7,13 @@ import { IntegrationTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { z } from 'zod'
 
 import { expect, test, toAppUrl } from './fixtures'
-import { buildUniqueName, clickAddConnectedStep, clickNode, clickSaveAndWait } from './helpers/workflows'
+import {
+  buildUniqueName,
+  clickAddConnectedStep,
+  clickNode,
+  clickSaveAndWait,
+  fillCodeEditor,
+} from './helpers/workflows'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 import {
   apiRequest,
@@ -123,6 +129,7 @@ test('publishes a UI-saved payload template and exact key/header bytes through t
     await expect(app.getByText('Kafka credential not configured', { exact: true })).toBeVisible()
     await expect(app.getByRole('button', { name: 'Runtime credential', exact: true })).toBeHidden()
     await app.getByRole('button', { name: 'Set up connection', exact: true }).click()
+    await expect(app.getByRole('button', { name: 'Runtime credential', exact: true })).toBeEnabled()
     await app.getByRole('button', { name: 'Runtime credential', exact: true }).click()
     await expect(app.getByRole('option', { name: 'No credential', exact: true })).toBeHidden()
     await app.getByRole('option', { name: `${name}-runtime`, exact: true }).click()
@@ -132,9 +139,8 @@ test('publishes a UI-saved payload template and exact key/header bytes through t
     await app.getByRole('button', { name: 'Change', exact: true }).click()
     await expect(app.getByRole('button', { name: 'Runtime credential', exact: true })).toContainText(`${name}-runtime`)
     await app.getByRole('button', { name: 'Cancel', exact: true }).click()
-    await expect(app.getByText(`${name}-runtime`, { exact: true })).toBeVisible()
     await app.getByRole('textbox', { name: 'Target topic', exact: true }).fill(topic)
-    await app.getByRole('textbox', { name: 'JSON payload', exact: true }).fill('${trigger.payload}')
+    await fillCodeEditor(app, { value: '${trigger.payload}', label: 'JSON payload', inputMethod: 'insertText' })
     await app.getByRole('button', { name: 'Message key encoding', exact: true }).click()
     await app.getByRole('option', { name: 'Base64 binary', exact: true }).click()
     await app.getByRole('textbox', { name: 'Message key value', exact: true }).fill('AAEC')

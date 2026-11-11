@@ -62,29 +62,45 @@ describe('Kafka Publish registration', () => {
     expect(onError).not.toHaveBeenCalled()
   })
 
-  it('does not expose message data from unexpected serialization failures', () => {
-    registerKafkaPublishNode()
-    const onError = vi.fn()
-    const onSuccess = vi.fn()
-    NodeRegistry.get(ActivityTypeEnum.KAFKA_PUBLISH)?.onSubmit(
-      {
-        name: 'Publish outcome',
-        integration_id: '11111111-1111-4111-8111-111111111111',
-        credential_id: '22222222-2222-4222-8222-222222222222',
-        connection_ready: true,
-        topic: 'outcomes',
-        payload: 'sensitive-message-data is not JSON',
-        key: { encoding: 'null', value: '' },
-        headers_mode: 'entries',
-        headers: [],
-        headers_template: '',
-        settings: {},
-      },
-      onSuccess,
-      onError
-    )
-    expect(onError).toHaveBeenCalledWith('Failed to add Kafka Publish. Check the action configuration.')
-    expect(onSuccess).not.toHaveBeenCalled()
-    expect(addActivity).not.toHaveBeenCalled()
-  })
+  it.each([false, true])(
+    'persists an unfinished JSON draft or sanitizes a persistence error: %s',
+    (persistenceFails) => {
+      registerKafkaPublishNode()
+      const onError = vi.fn()
+      const onSuccess = vi.fn()
+      if (persistenceFails)
+        addActivity.mockImplementationOnce(() => {
+          throw new Error('sensitive diagnostic')
+        })
+      NodeRegistry.get(ActivityTypeEnum.KAFKA_PUBLISH)?.onSubmit(
+        {
+          name: 'Publish outcome',
+          integration_id: '11111111-1111-4111-8111-111111111111',
+          credential_id: '22222222-2222-4222-8222-222222222222',
+          connection_ready: true,
+          topic: 'outcomes',
+          payload: 'sensitive-message-data is not JSON',
+          key: { encoding: 'null', value: '' },
+          headers_mode: 'entries',
+          headers: [],
+          headers_template: '',
+          settings: {},
+        },
+        onSuccess,
+        onError
+      )
+      if (persistenceFails) {
+        expect(onError).toHaveBeenCalledWith('Failed to add Kafka Publish. Check the action configuration.')
+        expect(onSuccess).not.toHaveBeenCalled()
+        return
+      }
+      const draft: unknown = addActivity.mock.calls[0]?.[0]
+      expect(draft).toMatchObject({
+        parameters: { payload: undefined },
+        metadata: { __kafkaPublishPayloadDraft: 'sensitive-message-data is not JSON' },
+      })
+      expect(onSuccess).toHaveBeenCalledOnce()
+      expect(onError).not.toHaveBeenCalled()
+    }
+  )
 })

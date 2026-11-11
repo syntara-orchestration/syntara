@@ -1,4 +1,4 @@
-import { Button, Content, Flex, Skeleton, Stack, StackItem } from '@patternfly/react-core'
+import { Button, Content, Flex, FlexItem, Skeleton, Stack, StackItem } from '@patternfly/react-core'
 import { RhUiCheckCircleIcon, RhUiWarningFillIcon } from '@patternfly/react-icons'
 import { useCallback, useId, useState, type ReactElement, type ReactNode } from 'react'
 
@@ -7,7 +7,32 @@ import { IconLabel } from '../../../components/IconLabel'
 
 import styles from './KafkaCredentialConnection.module.css'
 
-/** Staged credential setup; configured credentials do not imply verified broker access. */
+function CredentialStatus({
+  isPending,
+  icon,
+  label,
+}: Readonly<{ isPending: boolean; icon?: ReactElement; label?: string }>) {
+  return isPending ? (
+    <Skeleton fontSize="sm" screenreaderText="Loading Kafka runtime credential" />
+  ) : (
+    <IconLabel icon={icon}>
+      <Content component="small">{label}</Content>
+    </IconLabel>
+  )
+}
+
+type KafkaCredentialConnectionProps = Readonly<{
+  credentialName?: string
+  isPending: boolean
+  errorMessage?: string
+  isDisabled: boolean
+  isRequired?: boolean
+  isCompact?: boolean
+  credentialLabel?: string
+  children: (onSelected: () => void) => ReactNode
+}>
+
+/** Compact credential setup; configured credentials do not imply verified broker access. */
 export function KafkaCredentialConnection({
   credentialName,
   isPending,
@@ -17,16 +42,7 @@ export function KafkaCredentialConnection({
   isCompact = false,
   credentialLabel = 'Kafka runtime credential',
   children,
-}: Readonly<{
-  credentialName?: string
-  isPending: boolean
-  errorMessage?: string
-  isDisabled: boolean
-  isRequired?: boolean
-  isCompact?: boolean
-  credentialLabel?: string
-  children: (onSelected: () => void) => ReactNode
-}>) {
+}: KafkaCredentialConnectionProps) {
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const errorId = useId()
   const [restoreFocus, setRestoreFocus] = useState(false)
@@ -39,8 +55,9 @@ export function KafkaCredentialConnection({
     },
     [restoreFocus, isPending]
   )
-  const configured = Boolean(credentialName && !errorMessage)
-  const needsCredential = isRequired || Boolean(errorMessage)
+  const visibleError = isPending ? undefined : errorMessage
+  const configured = Boolean(credentialName && !visibleError)
+  const needsCredential = isRequired || Boolean(visibleError)
   const missingCredentialText = `${credentialLabel} ${needsCredential ? 'not configured' : 'optional'}`
   let statusIcon: ReactElement | undefined
   if (configured) {
@@ -58,31 +75,38 @@ export function KafkaCredentialConnection({
   return (
     <Stack hasGutter={!isCompact} className={isCompact ? styles.compactStatusContainer : styles.statusContainer}>
       <StackItem>
-        <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
-          {isPending ? (
-            <Skeleton screenreaderText="Loading Kafka runtime credential" />
-          ) : (
-            <IconLabel icon={statusIcon}>
-              <Content component="small">{configured ? credentialName : missingCredentialText}</Content>
-            </IconLabel>
-          )}
+        <Flex
+          className={styles.statusRow}
+          justifyContent={{ default: 'justifyContentSpaceBetween' }}
+          alignItems={{ default: 'alignItemsCenter' }}
+          flexWrap={{ default: 'nowrap' }}
+        >
+          <FlexItem grow={{ default: 'grow' }} className={styles.statusLabel}>
+            <CredentialStatus
+              isPending={isPending}
+              icon={statusIcon}
+              label={configured ? credentialName : missingCredentialText}
+            />
+          </FlexItem>
           {!isDisabled && (
-            <Button
-              variant="link"
-              size="sm"
-              isDisabled={isPending}
-              aria-describedby={!isPickerOpen && errorMessage ? errorId : undefined}
-              ref={actionRef}
-              onClick={() => (isPickerOpen ? closePicker() : setIsPickerOpen(true))}
-            >
-              {isPickerOpen ? 'Cancel' : setupLabel}
-            </Button>
+            <FlexItem flex={{ default: 'flexNone' }}>
+              <Button
+                variant="link"
+                size="sm"
+                isDisabled={isPending}
+                aria-describedby={!isPickerOpen && visibleError ? errorId : undefined}
+                ref={actionRef}
+                onClick={() => (isPickerOpen ? closePicker() : setIsPickerOpen(true))}
+              >
+                {isPickerOpen ? 'Cancel' : setupLabel}
+              </Button>
+            </FlexItem>
           )}
         </Flex>
       </StackItem>
-      {!isPickerOpen && errorMessage && (
+      {!isPickerOpen && visibleError && (
         <StackItem>
-          <FormFieldError id={errorId} message={errorMessage} />
+          <FormFieldError id={errorId} message={visibleError} />
         </StackItem>
       )}
       {isPickerOpen && <StackItem>{children(closePicker)}</StackItem>}

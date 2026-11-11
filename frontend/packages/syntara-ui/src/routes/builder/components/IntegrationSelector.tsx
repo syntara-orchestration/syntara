@@ -91,13 +91,14 @@ function IntegrationMenuToggle(
       isFullWidth
       status={isError ? 'danger' : undefined}
       aria-label={ariaLabel}
+      aria-busy={isPending || undefined}
     >
-      {isPending ? (
+      {displayText}
+      {isPending && (
         <>
-          <Spinner size="sm" aria-hidden /> Loading integrations...
+          {' '}
+          <Spinner size="sm" aria-hidden />
         </>
-      ) : (
-        displayText
       )}
     </MenuToggle>
   )
@@ -125,16 +126,20 @@ export function IntegrationSelector({
   const isKafka = integrationType === IntegrationTypeEnum.KAFKA
   const emptyLabel = isKafka ? 'No Kafka integrations available' : 'No MCP server integrations available'
   const { data, isPending, isError, refetch } = useAllIntegrations(integrationType, projectId)
+  const hasLoadedOptions = data !== undefined
+  const isInitialPending = isPending && !hasLoadedOptions
+  const isInitialError = isError && !hasLoadedOptions
 
   const integrations: IntegrationRead[] = useMemo(() => data ?? [], [data])
 
   const selectedIntegration = useMemo(() => integrations.find((i) => i.id === value), [integrations, value])
 
   const toggleLabel = useMemo(() => {
-    if (isPending) return 'Loading integrations...'
-    if (isError) return 'Error loading integrations'
-    return selectedIntegration?.name ?? (value ? 'Selected integration is unavailable' : placeholder)
-  }, [isPending, isError, selectedIntegration?.name, placeholder, value])
+    if (isInitialError) return 'Error loading integrations'
+    return (
+      selectedIntegration?.name ?? (value && hasLoadedOptions ? 'Selected integration is unavailable' : placeholder)
+    )
+  }, [isInitialError, hasLoadedOptions, selectedIntegration?.name, placeholder, value])
 
   const handleSelect = useCallback(
     (_event: React.MouseEvent | undefined, selectedValue: string | number | undefined) => {
@@ -152,12 +157,12 @@ export function IntegrationSelector({
         displayText={toggleLabel}
         isOpen={isOpen}
         isDisabled={isDisabled}
-        isPending={isPending}
+        isPending={isInitialPending}
         isError={isError}
         onClick={() => setIsOpen((prev) => !prev)}
       />
     ),
-    [label, toggleLabel, isOpen, isDisabled, isPending, isError]
+    [label, toggleLabel, isOpen, isDisabled, isInitialPending, isError]
   )
 
   const resolvedLabelHelp = resolveFormGroupLabelHelp(label, labelHelp, helpText)
@@ -188,9 +193,9 @@ export function IntegrationSelector({
               {integration.validation_status && <StatusBadge status={integration.validation_status} />}
             </SelectOption>
           ))}
-          {integrations.length === 0 && !isPending && (
+          {integrations.length === 0 && !isInitialPending && (
             <SelectOption isDisabled value="__empty__">
-              {isError ? 'Failed to load integrations' : emptyLabel}
+              {isInitialError ? 'Failed to load integrations' : emptyLabel}
             </SelectOption>
           )}
         </SelectList>

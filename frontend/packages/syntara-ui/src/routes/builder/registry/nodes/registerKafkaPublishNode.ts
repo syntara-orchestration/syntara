@@ -3,7 +3,7 @@ import { ActivityTypeEnum } from '@syntara/contracts'
 import KafkaIcon from '../../../../assets/kafka.svg?react'
 import { RegistryNodeId } from '../../../../constants'
 import { useWorkflowStore } from '../../../../stores/useWorkflowStore'
-import { buildKafkaPublishParameters, type KafkaPublishFormData } from '../../node-forms/kafkaPublishFormSchema'
+import { buildKafkaPublishDraft, type KafkaPublishFormData } from '../../node-forms/kafkaPublishFormSchema'
 import { KafkaPublishNodeForm } from '../../node-forms/KafkaPublishNodeForm'
 import { buildNamedActivity } from '../../utils/nodeCreationHelpers'
 import { NodeRegistry } from '../NodeRegistry'
@@ -26,7 +26,7 @@ export default function registerKafkaPublishNode() {
           id,
           name,
           type: ActivityTypeEnum.KAFKA_PUBLISH,
-          parameters: buildKafkaPublishParameters(data),
+          ...buildKafkaPublishDraft(data),
           settings: data.settings,
         }))
         useWorkflowStore.getState().addActivity(activity)

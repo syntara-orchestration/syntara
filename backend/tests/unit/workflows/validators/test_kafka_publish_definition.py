@@ -87,3 +87,37 @@ def test_api_schema_requires_non_null_runtime_credential(*, omit: bool) -> None:
         parameters["credential_id"] = None
     with pytest.raises(SafeValueError):
         WorkflowValidator().validate_workflow_definition(_definition(parameters))
+
+
+@pytest.mark.parametrize("parameters", [{}, {"integration_id": "", "credential_id": None, "topic": ""}])
+def test_incomplete_publish_is_reported_as_safe_workflow_findings(parameters: dict[str, Any]) -> None:
+    definition = _definition(parameters)
+    definition["nodes"][0]["metadata"] = {"__kafkaPublishPayloadDraft": '{"sensitive":'}
+    result = WorkflowValidator().collect_findings(definition)
+    assert not result.is_valid
+    fields = {finding.field_path for finding in result.findings if finding.node_id == "publish"}
+    assert {"parameters.integration_id", "parameters.credential_id", "parameters.topic", "parameters.payload"} <= fields
+    assert "sensitive" not in result.model_dump_json()
+    with pytest.raises(SafeValueError):
+        WorkflowValidator().validate_workflow_definition(definition)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("key", {"encoding": "base64", "value": "invalid"}), ("headers", [{"name": "x", "value": None}] * 129)],
+)
+def test_invalid_message_bytes_and_header_limits_gate_execution(field: str, value: object) -> None:
+    definition = _definition(
+        {
+            "integration_id": "11111111-1111-4111-8111-111111111111",
+            "credential_id": "22222222-2222-4222-8222-222222222222",
+            "topic": "outcomes",
+            "payload": None,
+            field: value,
+        }
+    )
+    result = WorkflowValidator().collect_findings(definition)
+    assert not result.is_valid
+    assert any(
+        f.node_id == "publish" and (f.field_path or "").startswith(f"parameters.{field}") for f in result.findings
+    )

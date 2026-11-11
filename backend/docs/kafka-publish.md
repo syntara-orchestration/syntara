@@ -13,7 +13,10 @@ template** accepts a template that resolves to the complete ordered header list.
 Define referenced trigger inputs in the trigger's input schema before publishing.
 
 Runtime credential selection becomes available once the chosen integration's
-connection settings have loaded. Every mode requires a compatible runtime Kafka
+connection settings have loaded. A compact warning row offers **Set up connection**;
+after selection, it shows the credential name with **Change**. The picker is only
+visible during setup, and **Cancel** preserves the existing selection.
+Every mode requires a compatible runtime Kafka
 credential. SASL_SSL requires username and password; SSL and opted-in PLAINTEXT
 do not require SASL fields. Omitted or null credential references are invalid. Changing the integration
 clears the previous runtime credential. The integration's management credential
@@ -89,6 +92,13 @@ retransmission remains enabled. Each attempt defaults to 30 seconds. One
 180-second invocation deadline also bounds snapshot preparation, queueing,
 attempts and retry delays; not every configured attempt is guaranteed to fit.
 
+The shared `settings.expected_duration` is a separate advisory duration in seconds.
+The execution UI shows **Running long** when an active step reaches this threshold;
+it does not fail, cancel, or republish the message. An omitted override inherits
+`workflow_engine.expected_duration_seconds` (default 60 seconds). This display uses
+the current administrator default; it is not a new execution deadline or delivery
+guarantee. Completed, failed, cancelled, skipped, and pending steps do not show it.
+
 Temporary transport, metadata/leader and in-sync-replica failures may retry.
 Invalid inputs, confirmed missing topics, oversized messages, authentication or
 authorization failures, revoked resources and changed connection settings fail
@@ -140,8 +150,15 @@ mode requires a selected runtime Kafka credential. For SSL or explicitly opted-i
 PLAINTEXT, a Kafka credential with empty inputs (`{}`) is valid; unused SASL fields
 are not decrypted or passed to the producer.
 
-Saving a workflow checks Integration visibility, runtime credential compatibility
-and enabled state, and the credential contents required by the connection mode. Preparation reads the revision and credential within one database
+Draft saves can preserve missing connection/message fields and partially typed JSON.
+The builder keeps unfinished JSON text in `metadata.__kafkaPublishPayloadDraft` and
+omits the executable `payload` until the text is valid JSON or a full-value template.
+Workflow validation reports unfinished fields; Run and Publish remain blocked.
+A valid JSON string or explicit `null` remains a normal payload.
+
+Saving a workflow still checks supplied Integration/credential references for visibility,
+project scope, use permission, compatibility and enabled state. When both are selected,
+it also checks credential contents required by the connection mode. Preparation reads the revision and credential within one database
 snapshot so concurrent rotation cannot associate a secret with the wrong
 producer revision. Preparation also heartbeats for cancellation and receives the
 original invocation deadline on every retry, including after queueing.
@@ -243,3 +260,13 @@ reachable by both the worker and test runner. Advertised broker addresses must
 also be reachable, allowed by each process's existing integration allowlist, and
 covered by the broker's TLS certificate. The test does not start or reconfigure
 the broker or application services.
+
+With those services running and the UI connected to the real backend, run from
+the repository root (adjust the UI URL if needed):
+
+```bash
+SYNTARA_E2E_SKIP_WEB_SERVER=1 \
+SYNTARA_E2E_BASE_URL=http://localhost:5173 \
+SYNTARA_E2E_KAFKA_PUBLISH_LIVE=1 \
+npm --prefix frontend/packages/syntara-ui run e2e -- e2e/kafka-publish-live.spec.ts
+```

@@ -1,6 +1,8 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { z } from 'zod'
 
+import type { ActivityMetadata } from '../../../stores/workflowStoreTypes'
+
 import { nodeSettingsSchema } from './shared/nodeSettingsSchema'
 
 export const KAFKA_MAX_HEADERS = 128
@@ -12,33 +14,49 @@ const encodedValue = z.strictObject({ encoding: z.enum(['utf-8', 'base64']), val
 const header = z.strictObject({ name: z.string(), value: encodedValue.nullable() })
 
 /** Check saved value structures against the generated contract, allowing incomplete draft destinations to be edited. */
-export const kafkaPublishParametersSchema = z.strictObject({
-  integration_id: z.string().default(''),
-  // Older incomplete drafts can be repaired in the editor; submission requires a UUID.
-  credential_id: z
-    .string()
-    .nullish()
-    .transform((value) => value ?? ''),
-  topic: z.string().default(''),
-  payload: z.unknown(),
-  key: encodedValue.nullable().optional(),
-  headers: z.union([z.array(header), z.string()]).optional(),
-}) satisfies z.ZodType<WorkflowAPI.components['schemas']['KafkaPublishParameters']>
+export const kafkaPublishParametersSchema = z
+  .strictObject({
+    integration_id: z
+      .string()
+      .nullish()
+      .transform((value) => value ?? ''),
+    // Drafts can omit a selection; executable workflow validation still requires a UUID.
+    credential_id: z
+      .string()
+      .nullish()
+      .transform((value) => value ?? ''),
+    topic: z.string().default(''),
+    payload: z.unknown().optional(),
+    key: encodedValue.nullable().optional(),
+    headers: z.union([z.array(header), z.string()]).optional(),
+  })
+  .transform((parameters) => ({ ...parameters, payload: parameters.payload })) satisfies z.ZodType<
+  WorkflowAPI.components['schemas']['KafkaPublishParameters']
+>
 
 const byteFields = z.object({ encoding: z.enum(['null', 'utf-8', 'base64']), value: z.string() })
 
+export function isKafkaPublishPayloadTemplate(text: string): boolean {
+  return fullTemplate.test(text.trim())
+}
+
 function parseJsonOrTemplate(text: string): unknown {
   const trimmed = text.trim()
-  if (fullTemplate.test(trimmed)) return trimmed
+  if (isKafkaPublishPayloadTemplate(trimmed)) return trimmed
   return JSON.parse(trimmed) as unknown
 }
 
-function validJson(text: string): boolean {
+function parseDraftPayload(text: string): unknown {
   try {
-    return z.json().safeParse(parseJsonOrTemplate(text)).success
+    const payload = parseJsonOrTemplate(text)
+    return z.json().safeParse(payload).success ? payload : undefined
   } catch {
-    return false
+    return undefined
   }
+}
+
+function validJson(text: string): boolean {
+  return parseDraftPayload(text) !== undefined
 }
 
 function validBytes(value: z.infer<typeof byteFields>): boolean {
@@ -121,7 +139,7 @@ export function buildKafkaPublishParameters(
     integration_id: data.integration_id,
     credential_id: data.credential_id,
     topic: data.topic,
-    payload: parseJsonOrTemplate(data.payload),
+    payload: parseDraftPayload(data.payload),
     key: buildBytes(data.key),
     headers:
       data.headers_mode === 'template'
@@ -130,17 +148,28 @@ export function buildKafkaPublishParameters(
   }
 }
 
+/** Preserve invalid editor text without turning it into an executable JSON string. */
+export function buildKafkaPublishDraft(data: KafkaPublishFormData, previousMetadata?: ActivityMetadata) {
+  const parameters = buildKafkaPublishParameters(data)
+  const metadata = { ...previousMetadata }
+  delete metadata.__kafkaPublishPayloadDraft
+  if (parameters.payload === undefined) metadata.__kafkaPublishPayloadDraft = data.payload
+  return { parameters, metadata: Object.keys(metadata).length ? metadata : undefined }
+}
+
 export function kafkaPublishInitialFields(
-  parameters: WorkflowAPI.components['schemas']['KafkaPublishParameters']
+  parameters: WorkflowAPI.components['schemas']['KafkaPublishParameters'],
+  metadata?: ActivityMetadata
 ): Partial<KafkaPublishFormData> {
   return {
     integration_id: parameters.integration_id,
     credential_id: parameters.credential_id ?? '',
     topic: parameters.topic,
     payload:
-      typeof parameters.payload === 'string' && fullTemplate.test(parameters.payload)
+      metadata?.__kafkaPublishPayloadDraft ??
+      (typeof parameters.payload === 'string' && fullTemplate.test(parameters.payload)
         ? parameters.payload
-        : (JSON.stringify(parameters.payload, null, 2) ?? ''),
+        : (JSON.stringify(parameters.payload, null, 2) ?? '')),
     key: parameters.key ?? { encoding: 'null', value: '' },
     headers_mode: typeof parameters.headers === 'string' ? 'template' : 'entries',
     headers_template: typeof parameters.headers === 'string' ? parameters.headers : '',

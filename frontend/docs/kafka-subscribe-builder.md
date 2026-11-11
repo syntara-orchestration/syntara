@@ -103,21 +103,33 @@ contract. Supplied references must remain literal, visible, enabled and usable;
 an unavailable Integration or incompatible saved credential blocks form submission
 and runtime preflight until corrected or cleared.
 
-Credential setup is hidden until an Integration is selected. **Set up connection**
-opens the searchable runtime credential picker. Selecting a credential shows its
-configured name with **Change**; this does not imply verified broker access.
-Changing the Integration clears the credential and returns to setup. Keyboard
-selection returns focus to the selector input, or to **Change** when the staged
-picker closes.
+After selecting an Integration, the compact runtime credential row shows a
+warning and **Set up connection** until a credential is selected. The picker opens
+on demand, then collapses to the credential name and **Change**. **Cancel** closes
+the picker without changing the saved selection. Keyboard selection returns focus
+to **Change**. Changing the Integration clears the credential. A runtime credential
+is still required. Published versions show a read-only credential summary; this
+does not imply verified broker access.
 
 The Integration and runtime credential selectors support search and clearing.
 Credential creation is available when permitted. Loading supporting credential
 types is not displayed as an empty result. Selector and bootstrap-server errors
 are programmatically associated with their controls. The builder does not display
-a persistent Integration health line. Credential setup uses AAP-style warning and
-check icons for missing and configured credentials; configured does not mean
-runtime access has been verified. Sanitized preflight error codes are displayed
+a persistent Integration health line. Read-only credential summaries use AAP-style
+warning and check icons for missing and configured credentials; configured does
+not mean runtime access has been verified. Sanitized preflight error codes are displayed
 for diagnosis.
+
+Initial resource loading keeps the form controls and credential status row in
+place. Loading placeholders do not appear as validation errors or incomplete
+preflight guidance. Runtime access testing stays disabled until lookups finish;
+unavailable resources and lookup failures still produce actionable feedback.
+
+The delayed-response layout regression can be run with:
+
+```bash
+npm --prefix frontend/packages/syntara-ui run e2e -- e2e/kafka-subscribe-loading.spec.ts
+```
 
 Delivery defaults are available under **Show message delivery details**; preflight
 scope is available in contextual help. Trigger output references use the Kafka

@@ -312,9 +312,17 @@ class NodeSettingsBase(BaseModel):
 
 
 class NodeSettingsCof(NodeSettingsBase):
-    """Settings with continue_on_failure only (converge, loop)."""
+    """Settings with failure behavior and an advisory expected duration."""
 
     continue_on_failure: bool | None = None
+    expected_duration: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "Expected duration in seconds for an advisory Running long warning. "
+            "Does not stop execution. Inherits the system default when omitted."
+        ),
+    )
 
 
 class NodeSettingsCofDisabled(NodeSettingsCof):

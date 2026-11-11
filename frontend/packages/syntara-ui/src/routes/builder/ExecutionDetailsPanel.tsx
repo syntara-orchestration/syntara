@@ -22,6 +22,7 @@ import {
 
 import { ACTIVITY_FILTER_DEFINITIONS } from './activityFilterDefinitions'
 import { CompactActivityList } from './CompactActivityList'
+import { ExpectedDurationProvider } from './components/ExpectedDurationProvider'
 import { ExecutionActivityTable } from './ExecutionActivityTable'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 import styles from './ExecutionDetailsPanel.module.css'
@@ -299,7 +300,15 @@ function SinglePanelLayout({
   )
 }
 
-export function ExecutionDetailsPanel({
+export function ExecutionDetailsPanel(props: Readonly<ExecutionDetailsPanelProps>) {
+  return (
+    <ExpectedDurationProvider>
+      <ExecutionDetailsPanelBody {...props} />
+    </ExpectedDurationProvider>
+  )
+}
+
+function ExecutionDetailsPanelBody({
   executionId,
   workflowDefinition,
   selectedNodeId,

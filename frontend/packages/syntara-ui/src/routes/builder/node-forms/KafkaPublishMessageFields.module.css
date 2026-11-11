@@ -1,0 +1,49 @@
+.dragHandle {
+  cursor: grab;
+  touch-action: none;
+  color: var(--pf-t--global--icon--color--regular);
+}
+
+.deliveryAlert :global(.pf-v6-c-alert__icon) {
+  align-self: center;
+  scale: 1;
+}
+
+.deliveryAlert :global(.pf-v6-c-alert__title) {
+  align-self: center;
+}
+
+.deliveryToggle {
+  padding: 0;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.headerCard {
+  min-inline-size: 0;
+  padding: var(--pf-t--global--spacer--md);
+  border: var(--pf-t--global--border--width--regular) solid var(--pf-t--global--border--color--default);
+}
+
+.toggleIcon {
+  transition: transform var(--pf-t--global--motion--duration--icon--default)
+    var(--pf-t--global--motion--timing-function--default);
+}
+
+.toggleButton[aria-expanded='true'] .toggleIcon {
+  transform: rotate(-180deg);
+}
+
+.dragging {
+  opacity: 0.5;
+}
+
+.dragOverlay {
+  padding: var(--pf-t--global--spacer--sm) var(--pf-t--global--spacer--md);
+  background-color: var(--pf-t--global--background--color--floating--default);
+  border-radius: var(--pf-t--global--border-radius--default);
+  box-shadow: var(--pf-t--global--box-shadow--lg);
+  opacity: 0.9;
+}

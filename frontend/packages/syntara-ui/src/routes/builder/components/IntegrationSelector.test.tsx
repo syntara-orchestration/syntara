@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { IntegrationSelector } from './IntegrationSelector'
+import { IntegrationSelector, type IntegrationSelectorProps } from './IntegrationSelector'
 
 const { integrationsQuery } = vi.hoisted(() => ({ integrationsQuery: vi.fn() }))
 vi.mock('./useAllIntegrations', () => ({ useAllIntegrations: integrationsQuery }))
@@ -134,7 +134,68 @@ describe('IntegrationSelector', () => {
     mockQueryLoading()
     renderSelector()
     expect(screen.getByRole('button')).toBeDisabled()
-    expect(screen.getByText('Loading integrations...')).toBeInTheDocument()
+    expect(screen.getByRole('button')).toHaveTextContent('Select an MCP server integration...')
+    expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.queryByText('Loading integrations...')).not.toBeInTheDocument()
+  })
+
+  it('keeps the Kafka prompt stable through initial loading and cached refreshes', async () => {
+    const option = {
+      id: 'kafka-id',
+      name: 'Orders Kafka',
+      integration_type: IntegrationTypeEnum.KAFKA,
+      enabled: true,
+      configuration: { integration_type: IntegrationTypeEnum.KAFKA, bootstrap_servers: ['broker.example.com:9093'] },
+    } satisfies IntegrationsAPI.components['schemas']['KafkaIntegrationRead']
+    const onChange = vi.fn()
+    const props: IntegrationSelectorProps = {
+      integrationType: IntegrationTypeEnum.KAFKA,
+      label: 'Integration',
+      placeholder: 'Select a Kafka integration',
+      onChange,
+    }
+    mockQueryLoading()
+    const { rerender } = render(<IntegrationSelector {...props} />, { wrapper })
+    const toggle = screen.getByRole('button', { name: 'Integration' })
+    expect(toggle).toHaveTextContent('Select a Kafka integration')
+    expect(toggle).toHaveAttribute('aria-busy', 'true')
+    expect(toggle).toBeDisabled()
+
+    integrationsQuery.mockReturnValue({ data: [option], isPending: false, isError: false })
+    rerender(<IntegrationSelector {...props} />)
+    expect(toggle).toHaveTextContent('Select a Kafka integration')
+    expect(toggle).not.toHaveAttribute('aria-busy', 'true')
+    const user = userEvent.setup()
+    await user.click(toggle)
+    expect(screen.getByRole('option', { name: 'Orders Kafka' })).toBeInTheDocument()
+
+    integrationsQuery.mockReturnValue({ data: [option], isPending: false, isFetching: true, isError: false })
+    rerender(<IntegrationSelector {...props} />)
+    expect(toggle).toBeEnabled()
+    expect(toggle).toHaveTextContent('Select a Kafka integration')
+    expect(toggle).not.toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('option', { name: 'Orders Kafka' })).toBeInTheDocument()
+
+    integrationsQuery.mockReturnValue({ data: [option], isPending: false, isError: true, refetch: vi.fn() })
+    rerender(<IntegrationSelector {...props} value={option.id} />)
+    expect(toggle).toHaveTextContent('Orders Kafka')
+    expect(screen.getByRole('option', { name: 'Orders Kafka' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry loading integrations' })).toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('preserves a completed empty Kafka list during a refresh', async () => {
+    integrationsQuery.mockReturnValue({ data: [], isPending: false, isFetching: true, isError: false })
+    renderSelector({
+      integrationType: IntegrationTypeEnum.KAFKA,
+      label: 'Integration',
+      placeholder: 'Select a Kafka integration',
+    })
+    const toggle = screen.getByRole('button', { name: 'Integration' })
+    expect(toggle).toBeEnabled()
+    expect(toggle).not.toHaveAttribute('aria-busy', 'true')
+    await userEvent.setup().click(toggle)
+    expect(screen.getByRole('option', { name: 'No Kafka integrations available' })).toBeInTheDocument()
   })
 
   it('shows integrations in dropdown when opened', async () => {
