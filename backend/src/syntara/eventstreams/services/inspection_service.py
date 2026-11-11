@@ -1,13 +1,15 @@
 """Preflight unsaved Kafka Subscribe bindings without activating consumption."""
 
+import asyncio
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
 from syntara.core.exceptions import SafeValueError
 from syntara.core.services import BaseService
-from syntara.credentials.lib.kafka_connection import KafkaSecurityProtocol, resolve_listener_kafka_login
+from syntara.credentials.lib.kafka_connection import resolve_listener_kafka_login
 from syntara.eventstreams.adapters.kafka_parameters import KafkaSubscribeParameters
-from syntara.eventstreams.adapters.kafka_preflight import test_kafka_connection
+from syntara.eventstreams.adapters.kafka_preflight import PREFLIGHT_TIMEOUT_SECONDS, test_kafka_connection
 from syntara.eventstreams.models.responses import EventSubscriptionTestResponse
 from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
 from syntara.integrations.models.integration import Integration
@@ -60,17 +62,21 @@ class EventSubscriptionInspectionService(BaseService):
         if integration is None or not isinstance(integration.configuration, KafkaConfiguration):
             msg = "Selected Kafka Integration is unavailable"
             raise SafeValueError(msg)
-        # Recheck stored broker addresses before resolving secrets: DNS may have
-        # changed since the Integration was created or last validated.
         try:
-            validate_integration_configuration_no_ssrf(integration.configuration)
-        except ValueError as exc:
-            msg = "bootstrap_servers must not resolve to a private, reserved, or cloud metadata address."
-            raise SafeValueError(msg) from exc
-        credential = await resolve_listener_kafka_login(
-            self.session,
-            self.secret_service,
-            runtime_credential_id=parameters.credential_id,
-            security_protocol=KafkaSecurityProtocol.SASL_SSL,
-        )
-        return await test_kafka_connection(integration.configuration, credential or {}, parameters.topic)
+            async with asyncio.timeout(PREFLIGHT_TIMEOUT_SECONDS):
+                # Preserve the pre-secret address check without blocking the API
+                # loop. Socket creation rechecks and pins DNS under this deadline.
+                try:
+                    await asyncio.to_thread(validate_integration_configuration_no_ssrf, integration.configuration)
+                except ValueError as exc:
+                    msg = "bootstrap_servers must not resolve to a private, reserved, or cloud metadata address."
+                    raise SafeValueError(msg) from exc
+                credential = await resolve_listener_kafka_login(
+                    self.session,
+                    self.secret_service,
+                    runtime_credential_id=parameters.credential_id,
+                    security_protocol=integration.configuration.security_protocol,
+                )
+                return await test_kafka_connection(integration.configuration, credential or {}, parameters.topic)
+        except TimeoutError:
+            return EventSubscriptionTestResponse(success=False, checked_at=datetime.now(UTC), error_code="timeout")

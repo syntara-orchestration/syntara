@@ -1,132 +1,82 @@
-# Kafka record runner recovery
+# Kafka record processing and recovery
 
-The single-subscription runner uses explicit resolution-only Kafka commits.
-Validation-only inspection never grants workflow admission or commit permission.
-It may read back an already delivered, uninspected offset window while a recovery
-fence closes normal admission. Kafka ownership and the assignment epoch are still
-required for every seek, fetch and commit. This is not a general replay interface.
+The runner commits only offsets resolved in Kafka delivery order. A matching
+record is resolved after Temporal acceptance is verified and the normal
+PostgreSQL Execution is committed. Workflow completion is not required.
 
-## Duplicate lookup and shared gates
+## Scheduling and redelivery
 
-Inject the completed `TerminalDeliveryCache` lookup and the same
-`RecordProcessingGate` instance into the runner and any injected processing
-service. The process composition owns the shared provider, lifecycle/dependency
-reconciliation and placement lease trust. This runner owns their enforcement;
-it does not create a Redis pool, lease store or process manager. Without an
-injected shared gate, the runner retains database reconciliation and does not
-use the cached duplicate path.
+For each received record:
 
-Before the first record, reconcile pending delivery evidence, complete verified
-partition initialization and verify lifecycle/resource eligibility. Reconcile
-again at most every existing transient-probe interval (currently 60 seconds),
-and invalidate that local state after blocked work, a cursor reload, an ownership
-change or an administrative recovery fence. Only bounded per-assigned-partition
-state is retained; there is no local map of terminal outcomes.
+1. Derive the stable Execution UUID and Temporal workflow ID from the deployment,
+   integration, source generation, workflow, subscription and Kafka coordinates.
+2. Reuse a matching confirmed normal Execution when one exists.
+3. Otherwise look up the stable Temporal workflow ID and verify its signed
+   start arguments. Recover an accepted run using its original version, input,
+   principal and timestamps.
+4. Only confirmed absence permits current lifecycle, credential, payload and
+   capacity checks, followed by preparation in memory.
+5. Start Temporal outside a database transaction. After acceptance, persist the
+   normal Execution and scheduling confirmation in a short transaction.
+6. Advance the resolved prefix only after that transaction commits.
 
-Within that interval, an admitted head uses the cache-aside lookup before
-decoding or schema evaluation. A validated scheduling proof preserves its
-original terminal outcome with no per-record PostgreSQL session, Temporal call,
-claim or preparation. A miss/error must inspect PostgreSQL; absence is never
-inferred from Redis. Frozen unresolved deliveries recover their saved context.
-Cancellation outcomes stay on the database path. Rejected outcomes remain held
-while the required author-accessible activity log is unavailable.
+A failed or ambiguous start creates no pre-start Execution. A failed database
+write retries the same accepted arguments in a fresh transaction, without
+cancelling or starting another workflow. Existing Execution status is preserved.
 
-Gate reads must be local, bounded and fail closed for unknown or stale evidence.
-`admission_open(snapshot)` requires current lifecycle/resources and a trusted,
-unexpired placement lease. `resolution_open(snapshot)` must reject known database
-outages, failed required durable writes, source-incarnation uncertainty and
-administrative recovery blocks. Required durable failures observed by processing
-or initialization call `dependency_failed(snapshot)`. Discovered lifecycle/source
-evidence failures also invalidate that shared trust. A known recovery fence calls
-`recovery_started(snapshot)` instead: new intake and record commits remain closed,
-while `transport_open(snapshot)` keeps the owned Kafka client and recovery control
-tasks available. Prepared-delivery repair retains database trust. Only a fresh
-authoritative process reconciliation may reopen intake after the hold is resolved;
-a reconciliation started before the fence cannot reopen it. Source correction/restore still
-requires the completed cache provider's external epoch coordination.
+There is no delivery ledger, delivery capacity table, terminal proof cache,
+cleanup worker or independent handoff-recovery scanner. Interrupted handoffs
+remain uncommitted in Kafka. Repair waits until that same source is consumed
+again. Duplicate protection lasts while the normal Execution or Temporal
+evidence remains available; deleting both can permit a new start on redelivery.
 
-The runner also checks local content/unknown-content gates, initialized partition
-state, assignment and epoch before using a cached proof for a new head. A later
-permanent-content, pending-inspection or unknown-content hold does not invalidate
-an earlier durably resolved prefix. Expiry of the local admission reconciliation
-also leaves that prefix intact. Its commit still requires current ownership,
-initialized partition state, an open shared resolution gate, no administrative
-fence, and time remaining in any drain deadline. These rules apply with and
-without an injected gate. The held record itself remains non-committable.
+## Ownership and shared gates
 
-Commit candidates come only from received heads
-resolved in delivery order; numeric Kafka offset gaps are valid. A proof grants
-neither partition ownership nor an initial/group checkpoint. Cache population
-after durable scheduling is owned by the completed admission service; optional
-cache write failures do not undo scheduling or eligible commits.
+Each subscription is leased to one worker. Kafka assignment and a local
+assignment epoch separately guard every seek, fetch and commit. A resolved
+Execution does not establish partition ownership or a group checkpoint.
 
-## Placement loss and partition readiness
+Known database failures close the shared scheduling/commit gate until fresh
+database reconciliation. An uncertain source fences only that source until
+Kafka identity is verified again. Recovery tokens fence only their partition.
+Redis carries reconciliation hints only; losing a hint does not change the
+database source of truth.
 
-`RecordRunnerControl.close_admission()` starts a full runner drain by setting
-`_closing=True`, pausing fetching and applying the existing shutdown deadline.
-Reopening intake requires a new runner instance. A closed/expired placement gate
-also triggers this path from the run loop. No new head is admitted, but an already admitted
-handoff may finish with its valid delivery claim. Resolution can commit during
-drain only while still Kafka-assigned, under the same local epoch, before the
-deadline, and with the resolution/dependency gate open. Unfinished frozen
-handoffs remain available to independent database/Temporal recovery, which does
-not require placement or Kafka ownership.
+The runner reads current subscription eligibility on every processing advance.
+It does not reuse an eligibility result for a timed interval.
 
-The completed initialization service preserves its immutable initial partition
-set: first-activation members start at the read-committed visible end; added
-partitions start at retained beginning. Saved boundaries and verified group
-commits retain their existing precedence. Adding a partition initializes only
-that partition, without resetting ready partitions or creating an administrative
-recovery fence. `ready_partitions` reports the initialized subset of the current
-assignment, including during partial startup; client startup alone is not proof
-that all partitions are ready. Ordinary partition-local broker initialization
-failures hold that partition independently; explicit source/database evidence
-failures close the shared resolution gate.
+Placement loss closes fetching and starts a bounded drain. Already admitted
+handoffs may finish persisting accepted runs. Their resolved offsets may commit
+only while still Kafka-assigned, under the same epoch and before the drain
+deadline. Assignment loss always forbids that commit.
 
-## Content inspection evidence
+## Queues and content holds
 
-For normal processing, retained outcomes are checked first. New records are
-decoded and validated before acquiring a delivery claim. Valid records then use
-one transaction to acquire the claim and freeze the prepared Execution. A failure
-before preparation leaves the Kafka offset uncommitted for redelivery.
+Queue count, byte, per-partition and processing bounds limit local work. Overflow
+rewinds the unqueued tail rather than skipping records. Numeric offset gaps are
+valid; later received records cannot advance past an unresolved earlier head.
+If admission closes during a fetch, its unqueued records are also rewound.
+Each partition task drains queued heads in order, with one handoff at a time,
+releasing the shared processing slot between records.
 
-Validation-only recovery inspection still commits an ordinary delivery row with
-`last_error_code=content_inspection_pending` before decoding. This records unknown
-content status without storing the source body. Existing pending inspection rows
-also retain this token-fenced recovery path. Successful validation-only inspection
-replaces the marker with `content_validated`; normal redelivery of an existing
-pending row keeps its marker until durable Execution preparation is frozen.
+Invalid content stays uncommitted while the required author-visible activity
+logging is unavailable. Local holds do not create per-message database rows.
+A restart reads the uncommitted record again. Validation-only inspection during
+position recovery never starts a workflow or creates a commit candidate.
+A new publication revalidates held content using its new schema. A hold retained
+after partition revocation does not block healthy sibling partitions.
 
-A permanent decoding/schema error is persisted with its safe error code and
-remains unresolved until the required activity log exists. Failed inspection
-finalization retains the pending marker. Dependency, permission, quota and
-capacity failures do not become permanent content decisions.
+## Initial positions and automatic recovery
 
-Gap reconciliation, boundary confirmation and retention verification all respect
-pending inspection evidence. Missing source records or unavailable evidence must
-leave the gate closed. Shutdown and revocation use their existing drain deadline;
-they cannot turn unresolved inspection into acknowledgement permission.
+The saved first topic partition set starts at the read-committed visible end.
+Partitions added later start at retained beginning. Saved boundaries survive
+retries; ready partitions may continue while an added partition initializes.
 
-The implementation reuses the existing delivery schema and requires no DDL
-migration. Unit tests use isolated storage and transport adapters; they do not
-establish live database durability, broker connectivity or cross-process behavior.
+Valid group commits govern normal resumption. Missing or out-of-range offsets
+recover automatically from retained beginning. A partition token and revision
+keep the selected boundary stable across interruptions. Local tasks must drain,
+and source identity and assignment must remain verified.
 
-## Safe code rollback
-
-Do not roll recovery/cleanup code back to a version that ignores
-`content_inspection_pending` while such rows remain. Stop new intake and use the
-current inspection and recovery services to reconcile every pending inspection
-first. Preserve permanent error rows and frozen/ambiguous Execution evidence.
-
-If a pending inspection cannot be completed, retain the marker and keep the
-compatible recovery/cleanup code deployed. Lease expiry, row deletion, clearing
-the marker, or advancing Kafka offsets are not safe substitutes for evidence.
-
-Queue, concurrency and drain defaults are configured through the documented
-`APP_EVENT_*` settings in `.env.example`. Changes apply on runner restart.
-
-See [Kafka Subscribe connection testing](event-subscription-controls.md) for the
-builder's non-consuming connection test and its existing workflow permissions.
-
-See [Kafka worker operations](kafka-worker-operations.md) for runtime defaults,
-local compose configuration, sizing and recovery/rollout ordering.
+See [initialization](eventstreams/kafka-initialization.md),
+[connection testing](event-subscription-controls.md) and
+[worker operations](kafka-worker-operations.md).

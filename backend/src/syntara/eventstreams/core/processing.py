@@ -12,9 +12,6 @@ from syntara.filtering.models.result import FilterErrorCode
 if TYPE_CHECKING:
     from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 
-CONTENT_INSPECTION_PENDING = "content_inspection_pending"
-CONTENT_VALIDATED = "content_validated"
-
 
 class RecordProcessingGate(Protocol):
     """Shared reconciled lifecycle/dependency state, supplied by process composition.
@@ -41,13 +38,17 @@ class RecordProcessingGate(Protocol):
     def dependency_failed(self, snapshot: "SubscriptionSnapshot") -> None:
         """Invalidate shared dependency/lifecycle trust until authoritative reconciliation.
 
-        Use recovery_started for a known recovery hold that preserves database
-        trust. Neither callback revokes already frozen delivery claims.
+        Neither callback cancels already accepted workflows. Partition recovery
+        is fenced locally by its runner and persisted position token.
         """
         ...
 
-    def recovery_started(self, snapshot: "SubscriptionSnapshot") -> None:
-        """Fence intake and commits without treating a known recovery as a DB failure."""
+    def source_failed(self, snapshot: "SubscriptionSnapshot") -> None:
+        """Fence an uncertain source without invalidating shared database trust."""
+        ...
+
+    def source_verified(self, snapshot: "SubscriptionSnapshot") -> None:
+        """Reopen a source after a successful current Kafka identity check."""
         ...
 
 
@@ -55,7 +56,7 @@ class RecordRunnerControl(Protocol):
     """Local placement-loss control; owns no lease storage or placement policy."""
 
     async def close_admission(self) -> None:
-        """Pause fetching and bound drain, preserving completed records and frozen handoffs."""
+        """Pause fetching and bound drain, preserving accepted handoffs."""
         ...
 
 

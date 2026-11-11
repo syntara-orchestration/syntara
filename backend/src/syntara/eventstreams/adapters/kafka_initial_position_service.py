@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from syntara.core.constants import EventDeliveryDefaults, EventSchedulingDefaults, FieldLimits
+from syntara.core.constants import EventSchedulingDefaults, EventStreamLimits
 from syntara.eventstreams.adapters.kafka_initial_position import (
     AUTOMATIC_RECOVERY_REASONS,
     AutomaticRecoveryRequest,
@@ -22,7 +22,6 @@ from syntara.eventstreams.adapters.kafka_initial_position import (
 from syntara.eventstreams.adapters.kafka_position_control import (
     AssignedPartitionClient,
     PartitionRecoveryControl,
-    RecoveryCacheCoordination,
 )
 from syntara.eventstreams.adapters.kafka_position_store import (
     KafkaInitialPositionStore,
@@ -31,20 +30,19 @@ from syntara.eventstreams.adapters.kafka_position_store import (
 )
 from syntara.eventstreams.core.consumer import CommittedPositionResult, SourceIdentityObservation
 from syntara.eventstreams.core.consumer import PositionStatus as BrokerPositionStatus
-from syntara.eventstreams.core.handler import ResolvedDelivery
 from syntara.eventstreams.exceptions import (
     ConsumerNotRunningError,
+    KafkaSourceIdentityError,
     KafkaTransportError,
     OwnershipRevokedError,
     StaleEpochError,
 )
-from syntara.eventstreams.services.admission_service import EventAdmissionService
 
 _DEPENDENCY_ERRORS = (SQLAlchemyError, OSError, TimeoutError, KafkaTransportError)
 
 
 class KafkaInitialPositionService:
-    """Finite operations; callers supply assignment-local control and upstream repair.
+    """Finite operations; callers supply assignment-local drain and fence control.
 
     A READY result is bound to its assignment epoch, source generation and
     configuration revision. Callers must retain their fence and recheck those
@@ -55,17 +53,12 @@ class KafkaInitialPositionService:
         self,
         store: KafkaInitialPositionStore,
         client: AssignedPartitionClient,
-        admission: EventAdmissionService,
         control: PartitionRecoveryControl,
-        *,
-        cache_coordination: RecoveryCacheCoordination | None = None,
     ) -> None:
-        """Inject the completed store/transport/repair services and the caller's control port."""
+        """Inject the store, transport and caller's assignment-local control port."""
         self._store = store
         self._client = client
-        self._admission = admission
         self._control = control
-        self._cache_coordination = cache_coordination
         self._operations: set[asyncio.Task[PositionResult]] = set()
 
     def _assigned(self, request: PositionRequest) -> None:
@@ -86,17 +79,17 @@ class KafkaInitialPositionService:
         """Initialize one new partition or resume its valid committed group position."""
         return await self._run(request, recover=False)
 
-    async def recover(self, request: RecoveryRequest, *, owner_worker_id: str) -> PositionResult:
+    async def recover(self, request: RecoveryRequest) -> PositionResult:
         """Run a caller-authorized decision; retries retain the original selected boundary."""
-        return await self._run(request, recover=True, owner_worker_id=owner_worker_id)
+        return await self._run(request, recover=True)
 
-    async def recover_automatically(self, request: PositionRequest, *, owner_worker_id: str) -> PositionResult:
+    async def recover_automatically(self, request: PositionRequest) -> PositionResult:
         """Reset an offset gap to retained beginning without a manual decision."""
-        return await self._run(request, recover=True, automatic=True, owner_worker_id=owner_worker_id)
+        return await self._run(request, recover=True, automatic=True)
 
-    async def replace_recovery(self, request: RecoveryReplacementRequest, *, owner_worker_id: str) -> PositionResult:
+    async def replace_recovery(self, request: RecoveryReplacementRequest) -> PositionResult:
         """Explicitly replace an expired decision; retries cannot select a new boundary."""
-        return await self._run(request, recover=True, replacement=True, owner_worker_id=owner_worker_id)
+        return await self._run(request, recover=True, replacement=True)
 
     async def _run(
         self,
@@ -105,14 +98,11 @@ class KafkaInitialPositionService:
         recover: bool,
         replacement: bool = False,
         automatic: bool = False,
-        owner_worker_id: str = "",
     ) -> PositionResult:
         # A caller timeout/cancellation must not release the partition gate while
         # its broker request can still complete. Retain the operation until done.
         task = asyncio.create_task(
-            self._exclusive(
-                request, recover=recover, replacement=replacement, automatic=automatic, owner_worker_id=owner_worker_id
-            )
+            self._exclusive(request, recover=recover, replacement=replacement, automatic=automatic)
         )
         self._operations.add(task)
         task.add_done_callback(self._settled)
@@ -131,7 +121,7 @@ class KafkaInitialPositionService:
         return not pending
 
     async def _exclusive(
-        self, request: PositionRequest, *, recover: bool, replacement: bool, automatic: bool, owner_worker_id: str
+        self, request: PositionRequest, *, recover: bool, replacement: bool, automatic: bool
     ) -> PositionResult:
         try:
             with self._client.position_operation(
@@ -144,22 +134,21 @@ class KafkaInitialPositionService:
                     recover=recover,
                     replacement=replacement,
                     automatic=automatic,
-                    owner_worker_id=owner_worker_id,
                 )
         except (OwnershipRevokedError, StaleEpochError, ConsumerNotRunningError):
             return self._result(request, PositionStatus.OWNERSHIP_LOST, reason="assignment_lost")
 
     async def _run_checked(
-        self, request: PositionRequest, *, recover: bool, replacement: bool, automatic: bool, owner_worker_id: str
+        self, request: PositionRequest, *, recover: bool, replacement: bool, automatic: bool
     ) -> PositionResult:
         try:
             self._assigned(request)
             if automatic:
-                return await self._recover_automatically(request, owner_worker_id)
+                return await self._recover_automatically(request)
             if replacement and isinstance(request, RecoveryReplacementRequest):
-                return await self._replace_recovery(request, owner_worker_id)
+                return await self._replace_recovery(request)
             if recover and isinstance(request, RecoveryRequest):
-                return await self._recover(request, owner_worker_id)
+                return await self._recover(request)
             return await self._initialize(request)
         except KafkaPositionError as exc:
             status, reason = exc.status, exc.reason
@@ -172,20 +161,24 @@ class KafkaInitialPositionService:
                     status, reason = PositionStatus.BLOCKED, "storage_unavailable"
         except (OwnershipRevokedError, StaleEpochError, ConsumerNotRunningError):
             status, reason = PositionStatus.OWNERSHIP_LOST, "assignment_lost"
-        except _DEPENDENCY_ERRORS:
-            status, reason = PositionStatus.BLOCKED, "dependency_unavailable"
+        except _DEPENDENCY_ERRORS as exc:
+            status = PositionStatus.BLOCKED
+            reason = "storage_unavailable" if isinstance(exc, SQLAlchemyError) else "dependency_unavailable"
         return self._result(request, status, reason=reason)
 
     async def _fenced(self, request: PositionRequest, *, token: UUID) -> bool:
         self._assigned(request)
-        async with asyncio.timeout(EventDeliveryDefaults.COMMITTED_POSITION_TIMEOUT_SECONDS):
+        async with asyncio.timeout(EventStreamLimits.COMMITTED_POSITION_TIMEOUT_SECONDS):
             fenced = await self._control.is_fenced(request, token=token)
         self._assigned(request)
         return fenced
 
     async def _observe_identity(self, request: PositionRequest) -> SourceIdentityObservation:
         self._assigned(request)
-        observation = await self._client.observe_source_identity(expected_epoch=request.assignment_epoch)
+        try:
+            observation = await self._client.observe_source_identity(expected_epoch=request.assignment_epoch)
+        except KafkaSourceIdentityError as exc:
+            raise KafkaPositionError(GapReason.SOURCE_RECREATED.value, PositionStatus.RECOVERY_GAP) from exc
         self._assigned(request)
         if observation.assignment_epoch != request.assignment_epoch:
             msg = "assignment_lost"
@@ -418,30 +411,7 @@ class KafkaInitialPositionService:
             msg = "duplicate_risk_acknowledgement_required"
             raise KafkaPositionError(msg)
 
-    async def _cache_coordinated(
-        self, request: RecoveryRequest, row: KafkaPartitionInitialPosition, token: UUID, boundary: int
-    ) -> None:
-        # An ordinary offset reset preserves every retained terminal outcome.
-        # Existing authenticated proofs remain valid for their original lifetime.
-        if isinstance(request, AutomaticRecoveryRequest):
-            return
-        lower = row.authorized_lower_boundary
-        if lower is not None and boundary >= lower:
-            return  # Forward recovery preserves the retained terminal outcomes.
-        if self._cache_coordination is None:
-            msg = "cache_epoch_coordination_required"
-            raise KafkaPositionError(msg)
-        self._assigned(request)
-        async with asyncio.timeout(EventSchedulingDefaults.RPC_TIMEOUT_SECONDS):
-            coordinated = await self._cache_coordination.is_coordinated(
-                request, token=token, recovery_revision=row.recovery_revision, boundary=boundary
-            )
-        self._assigned(request)
-        if coordinated is not True:
-            msg = "cache_epoch_coordination_required"
-            raise KafkaPositionError(msg)
-
-    async def _recover_automatically(self, request: PositionRequest, owner_worker_id: str) -> PositionResult:
+    async def _recover_automatically(self, request: PositionRequest) -> PositionResult:
         context = await self._store.read(request)
         self._source(context)
         if not context.active:
@@ -477,9 +447,9 @@ class KafkaInitialPositionService:
                 )
                 row = await self._store.replace_recovery(replacement, bounds[0])
                 recovery = recovery.model_copy(update={"expected_recovery_revision": row.recovery_revision})
-        return await self._recover(recovery, owner_worker_id)
+        return await self._recover(recovery)
 
-    async def _recover(self, request: RecoveryRequest, owner_worker_id: str) -> PositionResult:
+    async def _recover(self, request: RecoveryRequest) -> PositionResult:
         context = await self._store.read(request)
         self._source(context)
         row = context.position
@@ -512,26 +482,14 @@ class KafkaInitialPositionService:
             raise KafkaPositionError(msg)
         self._within_bounds(boundary, bounds)
         await self._drain(request, token, boundary)
-        await self._cache_coordinated(request, row, token, boundary)
-        for _ in range(FieldLimits.MAX_ITEMS_PER_PAGE):
-            claims = await self._store.reconcile_claims(request, token, owner_worker_id)
-            if not claims:
-                break
-            # Claim the next delivery only after this one's repair finishes.
-            result = await self._admission.recover_claim(claims[0])
-            if not isinstance(result, ResolvedDelivery):
-                msg = "ambiguous_start_unresolved"
-                raise KafkaPositionError(msg)
-        # Verify repair before changing positions; the selection is already
-        # durable even if drain/repair failed during an earlier invocation.
         row = await self._store.stage_recovery(request, token, boundary)
         boundary = row.pending_boundary
         if boundary is None:
             msg = "recovery_boundary_unavailable"
             raise KafkaPositionError(msg)
-        return await self._finish_recovery(request, row, token, boundary)
+        return await self._finish_recovery(request, token, boundary)
 
-    async def _replace_recovery(self, request: RecoveryReplacementRequest, owner_worker_id: str) -> PositionResult:
+    async def _replace_recovery(self, request: RecoveryReplacementRequest) -> PositionResult:
         context = await self._store.read(request)
         self._source(context)
         row = context.position
@@ -556,14 +514,11 @@ class KafkaInitialPositionService:
             raise KafkaPositionError(msg)
         boundary = bounds[0] if request.policy == RecoveryPolicy.RETAINED_BEGINNING else bounds[1]
         await self._store.replace_recovery(request, boundary)
-        return await self._recover(request, owner_worker_id)
+        return await self._recover(request)
 
-    async def _finish_recovery(
-        self, request: RecoveryRequest, row: KafkaPartitionInitialPosition, token: UUID, boundary: int
-    ) -> PositionResult:
+    async def _finish_recovery(self, request: RecoveryRequest, token: UUID, boundary: int) -> PositionResult:
         await self._observe_identity(request)
         self._within_bounds(boundary, await self._bounds(request))
-        await self._cache_coordinated(request, row, token, boundary)
         committed = await self._committed(request)
         if committed.status == BrokerPositionStatus.VERIFIED and committed.offset == boundary:
             if not await self._fenced(request, token=token):
@@ -577,6 +532,5 @@ class KafkaInitialPositionService:
         if not await self._fenced(request, token=token):
             msg = "recovery_fence_lost"
             raise KafkaPositionError(msg)
-        await self._cache_coordinated(request, row, token, boundary)
         await self._store.confirm_recovery(request, token, boundary)
         return await self._ready(request, boundary)

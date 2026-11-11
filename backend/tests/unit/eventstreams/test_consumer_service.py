@@ -41,7 +41,6 @@ async def manager_context(monkeypatch):
     snapshot = connection_context().snapshot
     reader = AsyncMock(spec=EventSubscriptionReader)
     reader.read.return_value = [snapshot]
-    reader.recovery_holds.return_value = set()
     pool = IsolatedPlacementPool(snapshot.deployment_id, [snapshot.subscription_id])
     pool.candidates = lambda: (binding.subscription_id for binding in reader.read.return_value)
     placement = IsolatedPlacementService(pool, worker_id=UUID(int=1))
@@ -150,7 +149,7 @@ async def test_overlapping_starts_share_one_worker_pool_and_loop(manager_context
 
 
 @pytest.mark.parametrize("timeout_in_factory", [False, True])
-async def test_startup_timeouts_preserve_backoff_and_open_circuit(manager_context, monkeypatch, timeout_in_factory):
+async def test_startup_timeouts_keep_retrying_with_capped_backoff(manager_context, monkeypatch, timeout_in_factory):
     context = manager_context
     monkeypatch.setattr(EventWorkerDefaults, "STARTUP_TIMEOUT_SECONDS", 0.01)
     now = datetime.now(UTC)
@@ -169,24 +168,23 @@ async def test_startup_timeouts_preserve_backoff_and_open_circuit(manager_contex
     await context.manager.start()
     await eventually(lambda: bool(context.manager.subscription_ids))
     supervisor = context.manager._supervisors[context.snapshot.subscription_id]
-    for attempt in range(1, EventSchedulingDefaults.IMMEDIATE_ATTEMPTS + 1):
+    for attempt in range(1, 9):
         await eventually(
             lambda attempt=attempt: supervisor.status.failure_count == attempt and not context.manager._busy
         )
         status = supervisor.status
         assert status.reason == RuntimeFailureCode.CONNECTION_UNAVAILABLE.value
-        assert status.state == (
-            RuntimeState.BLOCKED if attempt == EventSchedulingDefaults.IMMEDIATE_ATTEMPTS else RuntimeState.BACKOFF
-        )
+        assert status.state == RuntimeState.BACKOFF
         assert status.retry_at > now
+        assert status.retry_at <= now + timedelta(seconds=30)
         assert all(runner.stopped for runner in context.runners)
         await context.manager.reconcile()
         await eventually(lambda: not context.manager._pending and not context.manager._busy)
         assert context.factory.await_count == attempt
-        if attempt < EventSchedulingDefaults.IMMEDIATE_ATTEMPTS:
+        if attempt < 8:
             now = status.retry_at + timedelta(seconds=1)
             await context.manager.reconcile()
-    assert supervisor.status.circuit_open
+    assert not supervisor.status.circuit_open
     assert context.manager._supervisors[context.snapshot.subscription_id] is supervisor
 
 
@@ -214,14 +212,13 @@ async def test_partial_kafka_start_is_closed_on_timeout_or_shutdown(manager_cont
             sessions,
             MagicMock(),
             MagicMock(),
-            owner_worker_id="worker",
         )
         runners.append(runner)
         return runner
 
     monkeypatch.setattr("syntara.eventstreams.adapters.kafka_consumer.AIOKafkaConsumer", client)
     monkeypatch.setattr(
-        "syntara.eventstreams.adapters.kafka_consumer.KafkaPolicyClient", lambda **_kwargs: clients[-1]._client
+        "syntara.eventstreams.adapters.kafka_consumer._ResetAwareKafkaClient", lambda **_kwargs: clients[-1]._client
     )
     context.factory.side_effect = construct
     await context.manager.start()
@@ -556,7 +553,6 @@ async def test_missing_self_membership_closes_shared_gate_without_new_claims(man
         await context.manager.reconcile()
     assert not context.manager.ready
     assert not context.resources.scheduling_open
-    assert not context.resources.gate.cache_trusted()
     assert not context.placement.authority(context.snapshot.subscription_id).is_current()
     assert context.placement.claim_limits == [1]
     context.factory.assert_awaited_once()
@@ -765,19 +761,17 @@ async def test_release_failure_leaves_database_lease_to_expire(manager_context):
     assert context.manager.membership_task.done()
 
 
-async def test_held_source_starts_one_owned_transport_with_record_intake_closed(manager_context):
+async def test_partition_recovery_does_not_add_a_source_wide_manager_gate(manager_context):
     context = manager_context
-    context.reader.recovery_holds.return_value = {context.snapshot.source_id}
     await context.manager.start()
     await eventually(lambda: bool(context.runners) and context.runners[0].started)
     assert context.manager.ready
     assert context.manager.owned_subscription_ids == {context.snapshot.subscription_id}
     assert context.resources.gate.transport_open(context.snapshot)
-    assert not context.resources.gate.admission_open(context.snapshot)
-    assert not context.resources.gate.resolution_open(context.snapshot)
+    assert context.resources.gate.admission_open(context.snapshot)
+    assert context.resources.gate.resolution_open(context.snapshot)
     await context.manager.reconcile()
     context.factory.assert_awaited_once()
-    context.reader.recovery_holds.return_value = set()
     await context.manager.reconcile()
     assert context.resources.gate.admission_open(context.snapshot)
     context.factory.assert_awaited_once()
@@ -849,67 +843,3 @@ async def test_cancelled_shutdown_retains_and_fences_slow_drain_children(manager
         await eventually(lambda: not context.manager._drain_tasks)
     assert context.runners[0].stopped
     assert ("release", key) not in context.pool.trace
-
-
-async def test_consumer_registration_fences_startup_before_factory_runs(manager_context):
-    from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
-
-    context = manager_context
-    controls = AsyncMock(spec=EventRuntimeControlService)
-    controls.register.return_value = False
-    context.manager._controls = controls
-    await context.manager.start()
-    await eventually(lambda: controls.register.await_count > 0)
-    context.factory.assert_not_awaited()
-    controls.acknowledge.assert_not_awaited()
-
-
-async def test_consumer_acknowledges_pause_only_after_verified_stop(manager_context):
-    from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
-
-    context = manager_context
-    controls = AsyncMock(spec=EventRuntimeControlService)
-    controls.register.return_value = True
-    context.manager._controls = controls
-    await context.manager.start()
-    await eventually(lambda: bool(context.runners) and context.runners[0].started)
-    context.reader.read.return_value = []
-    await context.manager.reconcile()
-    await eventually(lambda: context.runners[0].stopped)
-    await eventually(
-        lambda: any(call.args[1].state == RuntimeState.STOPPED for call in controls.acknowledge.await_args_list)
-    )
-    assert controls.register.await_count == 1
-    assert controls.register.call_args.args[0] == context.snapshot
-    assert controls.register.call_args.args[1].owner == context.placement.worker
-
-
-async def test_source_replacement_acknowledges_old_runtime_before_registering_new_placement(manager_context):
-    from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
-
-    context = manager_context
-    controls = AsyncMock(spec=EventRuntimeControlService)
-    events = []
-
-    async def register(snapshot: SubscriptionSnapshot, _lease) -> bool:
-        events.append(("register", snapshot.source_id))
-        return True
-
-    async def acknowledge(snapshot: SubscriptionSnapshot, status: SubscriptionRuntimeStatus, *, lease=None) -> None:
-        if status.state == RuntimeState.STOPPED:
-            events.append(("stopped", snapshot.source_id))
-
-    controls.register.side_effect = register
-    controls.acknowledge.side_effect = acknowledge
-    context.manager._controls = controls
-    await context.manager.start()
-    await eventually(lambda: bool(context.runners) and context.runners[0].started)
-    replacement = context.snapshot.model_copy(
-        update={"source_id": uuid4(), "source_generation": 2, "configuration_revision": 2}
-    )
-    context.reader.read.return_value = [replacement]
-    await context.manager.reconcile()
-    await eventually(lambda: len(context.runners) == 2 and context.runners[1].started)
-    assert context.runners[0].stopped
-    assert context.runners[1].snapshot.source_id == replacement.source_id
-    assert events.index(("stopped", context.snapshot.source_id)) < events.index(("register", replacement.source_id))

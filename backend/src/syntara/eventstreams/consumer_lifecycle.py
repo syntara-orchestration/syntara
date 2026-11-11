@@ -9,8 +9,6 @@ import structlog
 from syntara.core.config.base import get_settings
 from syntara.core.constants import EventWorkerDefaults
 from syntara.eventstreams.consumer_service import EventWorkerManager
-from syntara.eventstreams.services.delivery_cleanup_worker import EventDeliveryCleanupWorker
-from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
 from syntara.eventstreams.services.subscription_hints import SubscriptionHintListener
 from syntara.eventstreams.services.worker_resources import EventWorkerResources
 
@@ -67,10 +65,8 @@ async def _monitor(
 
 async def _drain_worker(
     manager: EventWorkerManager,
-    recovery: EventDeliveryRecoveryWorker,
     resources: EventWorkerResources,
     lifecycle_tasks: tuple[asyncio.Task[None] | None, asyncio.Task[bool] | None],
-    cleanup: EventDeliveryCleanupWorker | None = None,
 ) -> None:
     """Share one deadline and finish manager cleanup before stopping maintenance."""
     loop = asyncio.get_running_loop()
@@ -81,9 +77,7 @@ async def _drain_worker(
     except Exception:  # noqa: BLE001 - failed membership marking must not skip bounded cleanup
         resources.database_failed()
         logger.warning("event_worker_draining_membership_unavailable")
-    tasks: set[asyncio.Task[Any]] = {asyncio.create_task(recovery.stop())}
-    if cleanup is not None:
-        tasks.add(asyncio.create_task(cleanup.stop()))
+    tasks: set[asyncio.Task[Any]] = set()
     for task in lifecycle_tasks:
         if task is not None:
             if not task.done():
@@ -100,14 +94,12 @@ async def _drain_worker(
 
 async def run_event_worker(
     manager: EventWorkerManager,
-    recovery: EventDeliveryRecoveryWorker,
     resources: EventWorkerResources,
     hints: SubscriptionHintListener,
     *,
     shutdown_event: asyncio.Event | None = None,
-    cleanup: EventDeliveryCleanupWorker | None = None,
 ) -> None:
-    """Run independent reconciliation/recovery and delegate transport-owned drain.
+    """Run membership/reconciliation and delegate transport-owned drain.
 
     The optional event supports embedding and isolated tests. Readiness is exposed
     by manager.ready; no operational HTTP routes or packaging are installed here.
@@ -120,9 +112,6 @@ async def run_event_worker(
 
     def close_admission() -> None:
         manager.close_reconciliation()
-        recovery.close_claims()
-        if cleanup is not None:
-            cleanup.close_batches()
         resources.close_admission()
 
     def request_shutdown() -> None:
@@ -135,9 +124,6 @@ async def run_event_worker(
             installed.append(sig)
         if shutdown.is_set():
             return
-        recovery.start()
-        if cleanup is not None:
-            cleanup.start()
         hints.start()
         startup = asyncio.create_task(manager.start(), name="event-worker-startup")
         stopping = asyncio.create_task(shutdown.wait(), name="event-worker-shutdown")
@@ -145,7 +131,7 @@ async def run_event_worker(
     finally:
         close_admission()
         try:
-            await _drain_worker(manager, recovery, resources, (startup, stopping), cleanup)
+            await _drain_worker(manager, resources, (startup, stopping))
         finally:
             try:
                 await hints.stop()

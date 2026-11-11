@@ -1,5 +1,6 @@
 """Preflight authorization and destination checks before resolving secrets."""
 
+import asyncio
 from types import SimpleNamespace
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -38,6 +39,27 @@ async def test_denied_reference_never_decrypts_or_connects(service: EventSubscri
     ):
         await service.test_unsaved(uuid4(), params)
     resolve.assert_not_called()
+    probe.assert_not_called()
+
+
+async def test_slow_dns_is_bounded_before_secret_resolution(service, monkeypatch) -> None:
+    params = KafkaSubscribeParameters(topic="alerts", integration_id=uuid4(), credential_id=uuid4())
+    config = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"])
+    cast("AsyncMock", service.session).get.return_value = SimpleNamespace(configuration=config)
+    monkeypatch.setattr(f"{MODULE}.PREFLIGHT_TIMEOUT_SECONDS", 0.01)
+
+    async def stalled(*_args: object) -> None:
+        await asyncio.Event().wait()
+
+    with (
+        patch(f"{MODULE}.asyncio.to_thread", side_effect=stalled) as lookup,
+        patch(f"{MODULE}.resolve_listener_kafka_login", new_callable=AsyncMock) as resolve,
+        patch(f"{MODULE}.test_kafka_connection") as probe,
+    ):
+        result = await service.test_unsaved(uuid4(), params)
+    assert result.error_code == "timeout"
+    lookup.assert_awaited_once()
+    resolve.assert_not_awaited()
     probe.assert_not_called()
 
 

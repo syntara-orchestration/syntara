@@ -10,7 +10,7 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
-from syntara.core.constants import EventDeliveryDefaults, EventSchedulingDefaults
+from syntara.core.constants import EventSchedulingDefaults, EventStreamLimits
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
 from syntara.eventstreams.adapters.kafka_initial_position import (
     AutomaticRecoveryRequest,
@@ -29,7 +29,6 @@ from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaIn
 from syntara.eventstreams.adapters.kafka_position_control import (
     DrainEvidence,
     PartitionRecoveryControl,
-    RecoveryCacheCoordination,
 )
 from syntara.eventstreams.adapters.kafka_position_store import (
     KafkaInitialPositionStore,
@@ -45,11 +44,22 @@ from syntara.eventstreams.core.consumer import (
     PartitionSetStatus,
     SourceIdentityObservation,
 )
-from syntara.eventstreams.core.deduplication import ClaimLost, DeliveryClaim
-from syntara.eventstreams.core.handler import ResolvedDelivery
-from syntara.eventstreams.services.admission_service import EventAdmissionService
+from syntara.eventstreams.exceptions import KafkaSourceIdentityError
 
 NOW = datetime(2026, 10, 21, tzinfo=UTC)
+
+
+async def test_client_source_recreation_signal_is_persisted_before_retry() -> None:
+    h = Harness(position=row(), committed=50)
+    msg = "Kafka source identity changed"
+    h.client.observe_source_identity.side_effect = KafkaSourceIdentityError(msg)
+    result = await h.service.initialize(request())
+    assert result.status == PositionStatus.RECOVERY_GAP
+    assert result.reason == GapReason.SOURCE_RECREATED.value
+    assert h.position is not None
+    assert h.position.gap_reason == GapReason.SOURCE_RECREATED.value
+    h.client.seek.assert_not_awaited()
+    h.client.commit.assert_not_awaited()
 
 
 def request(partition: int = 0) -> PositionRequest:
@@ -85,9 +95,7 @@ class Harness:
     trace: list[str] = field(default_factory=list)
     client: MagicMock = field(default_factory=lambda: MagicMock(spec=KafkaPartitionConsumer))
     store: MagicMock = field(default_factory=lambda: MagicMock(spec=KafkaInitialPositionStore))
-    admission: MagicMock = field(default_factory=lambda: MagicMock(spec=EventAdmissionService))
     control: MagicMock = field(default_factory=lambda: MagicMock(spec=PartitionRecoveryControl))
-    cache_coordination: MagicMock = field(default_factory=lambda: MagicMock(spec=RecoveryCacheCoordination))
 
     def __post_init__(self) -> None:
         """Connect isolated clients to the in-memory test evidence."""
@@ -122,20 +130,16 @@ class Harness:
         self.store.begin_recovery.side_effect = self.begin_recovery
         self.store.replace_recovery.side_effect = self.replace_recovery
         self.store.select_recovery_boundary.side_effect = self.select_boundary
-        self.store.reconcile_claims.return_value = []
         self.store.stage_recovery.side_effect = self.stage
         self.store.confirm_recovery.side_effect = self.confirm_recovery
         self.control.close_and_drain.return_value = DrainEvidence(
             quiescent=True, retained_evidence_complete=True, permanent_content_error=False
         )
         self.control.is_fenced.return_value = True
-        self.cache_coordination.is_coordinated.return_value = True
 
     @property
     def service(self) -> KafkaInitialPositionService:
-        return KafkaInitialPositionService(
-            self.store, self.client, self.admission, self.control, cache_coordination=self.cache_coordination
-        )
+        return KafkaInitialPositionService(self.store, self.client, self.control)
 
     async def read(self, _request: PositionRequest) -> PositionContext:
         return PositionContext(
@@ -405,9 +409,9 @@ async def test_offset_gaps_recover_automatically_from_retained_beginning(committ
     h.control.close_and_drain.return_value = DrainEvidence(
         quiescent=True, retained_evidence_complete=False, permanent_content_error=False
     )
-    service = KafkaInitialPositionService(h.store, h.client, h.admission, h.control)
+    service = KafkaInitialPositionService(h.store, h.client, h.control)
     assert (await service.initialize(request())).status == PositionStatus.RECOVERY_GAP
-    result = await service.recover_automatically(request(), owner_worker_id="worker")
+    result = await service.recover_automatically(request())
     assert result.status == PositionStatus.READY
     assert result.next_offset == beginning
     selected = h.store.begin_recovery.await_args.args[0]
@@ -427,14 +431,14 @@ async def test_offset_gaps_recover_automatically_from_retained_beginning(committ
 async def test_interrupted_automatic_recovery_reuses_or_replaces_saved_boundary(*, expired) -> None:
     h = Harness(position=row(gap=True))
     h.control.close_and_drain.side_effect = TimeoutError()
-    assert (await h.service.recover_automatically(request(), owner_worker_id="first")).status == PositionStatus.BLOCKED
+    assert (await h.service.recover_automatically(request())).status == PositionStatus.BLOCKED
     assert h.position is not None
     assert h.position.pending_boundary == 20
     assert h.held
     h.control.close_and_drain.side_effect = None
     h.end = 150
     h.beginning = 30 if expired else 20
-    result = await h.service.recover_automatically(request(), owner_worker_id="replacement")
+    result = await h.service.recover_automatically(request())
     assert result.status == PositionStatus.READY
     assert result.next_offset == (30 if expired else 20)
     assert h.store.replace_recovery.await_count == int(expired)
@@ -451,9 +455,9 @@ async def test_automatic_recovery_reconciles_lost_confirmation_without_rewinding
         raise SQLAlchemyError(message)
 
     h.store.confirm_recovery.side_effect = committed_then_lost
-    assert (await h.service.recover_automatically(request(), owner_worker_id="first")).status == PositionStatus.BLOCKED
+    assert (await h.service.recover_automatically(request())).status == PositionStatus.BLOCKED
     h.committed = 75
-    result = await h.service.recover_automatically(request(), owner_worker_id="replacement")
+    result = await h.service.recover_automatically(request())
     assert result.status == PositionStatus.READY
     assert result.next_offset == 75
     h.client.commit.assert_awaited_once_with({0: 20}, expected_epoch=7)
@@ -479,7 +483,7 @@ async def test_automatic_recovery_does_not_bypass_protective_gates(gate) -> None
         }
     else:
         h.client.beginning_offsets.side_effect = OSError("broker unavailable")
-    result = await h.service.recover_automatically(request(), owner_worker_id="worker")
+    result = await h.service.recover_automatically(request())
     assert result.status != PositionStatus.READY
     h.client.commit.assert_not_awaited()
     h.client.seek.assert_not_awaited()
@@ -504,7 +508,7 @@ async def test_source_recreation_blocks_without_changing_positions() -> None:
 
 async def test_recovery_below_first_boundary_becomes_the_effective_lower_bound() -> None:
     h = Harness(position=row(gap=True))
-    result = await h.service.recover(recovery(), owner_worker_id="recovery")
+    result = await h.service.recover(recovery())
     assert result.status == PositionStatus.READY
     assert result.next_offset == 20
     assert h.position is not None
@@ -525,7 +529,7 @@ async def test_missing_retained_evidence_requires_explicit_duplicate_risk_acknow
     h.control.close_and_drain.return_value = DrainEvidence(
         quiescent=True, retained_evidence_complete=False, permanent_content_error=False
     )
-    result = await h.service.recover(recovery(acknowledge=acknowledge), owner_worker_id="recovery")
+    result = await h.service.recover(recovery(acknowledge=acknowledge))
     assert result.status == (PositionStatus.READY if acknowledge else PositionStatus.BLOCKED)
     if not acknowledge:
         assert result.reason == "duplicate_risk_acknowledgement_required"
@@ -539,60 +543,11 @@ async def test_duplicate_acknowledgement_cannot_bypass_permanent_content_gate(po
     h.control.close_and_drain.return_value = DrainEvidence(
         quiescent=True, retained_evidence_complete=False, permanent_content_error=True
     )
-    result = await h.service.recover(recovery(acknowledge=True, policy=policy), owner_worker_id="recovery")
+    result = await h.service.recover(recovery(acknowledge=True, policy=policy))
     assert result.reason == "permanent_content_error"
     assert h.held
-    h.store.reconcile_claims.assert_not_awaited()
+
     h.client.commit.assert_not_awaited()
-
-
-async def test_recovery_calls_upstream_ambiguity_repair_and_preserves_unresolved_work() -> None:
-    from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
-    from tests.unit.eventstreams.test_deduplication_store import delivery
-
-    h = Harness(position=row(gap=True))
-    claim = EventDeliveryStore._claim(delivery())
-    h.store.reconcile_claims.return_value = [claim]
-    h.admission.recover_claim.return_value = ClaimLost()
-    result = await h.service.recover(recovery(), owner_worker_id="recovery")
-    assert result.reason == "ambiguous_start_unresolved"
-    h.admission.recover_claim.assert_awaited_once_with(claim)
-    h.store.stage_recovery.assert_not_awaited()
-    h.client.commit.assert_not_awaited()
-    assert h.held
-
-
-async def test_gap_recovery_claims_each_delivery_only_after_the_previous_repair() -> None:
-    from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
-    from tests.unit.eventstreams.test_deduplication_store import delivery
-    from tests.unit.eventstreams.test_delivery_identity import identity
-    from tests.unit.eventstreams.test_record_processing_service import terminal
-
-    h = Harness(position=row(gap=True))
-    original = EventDeliveryStore._claim(delivery())
-    claims = [original, original.model_copy(update={"identity": identity(offset=1)})]
-    issued: list[DeliveryClaim] = []
-    repaired: list[DeliveryClaim] = []
-
-    async def reconcile(*_args: object) -> list[DeliveryClaim]:
-        assert len(issued) == len(repaired), "A waiting delivery was claimed before the prior repair finished"
-        if len(issued) == len(claims):
-            return []
-        claim = claims[len(issued)]
-        issued.append(claim)
-        return [claim]
-
-    async def repair(claim: DeliveryClaim) -> ResolvedDelivery:
-        assert issued[-1] == claim
-        repaired.append(claim)
-        return terminal(claim.identity)
-
-    h.store.reconcile_claims.side_effect = reconcile
-    h.admission.recover_claim.side_effect = repair
-    result = await h.service.recover(recovery(), owner_worker_id="recovery")
-    assert result.status == PositionStatus.READY
-    assert repaired == claims
-    assert h.store.reconcile_claims.await_count == 3
 
 
 @pytest.mark.parametrize("phase", ["drain", "commit"])
@@ -611,7 +566,7 @@ async def test_ownership_loss_keeps_recovery_unconfirmed(phase: str) -> None:
         h.control.close_and_drain.side_effect = lost_drain
     else:
         h.client.commit.side_effect = lost_commit
-    result = await h.service.recover(recovery(), owner_worker_id="recovery")
+    result = await h.service.recover(recovery())
     assert result.status == PositionStatus.OWNERSHIP_LOST
     h.store.confirm_recovery.assert_not_awaited()
     assert h.held
@@ -620,23 +575,19 @@ async def test_ownership_loss_keeps_recovery_unconfirmed(phase: str) -> None:
 async def test_interrupted_recovery_confirmation_reconciles_saved_boundary_without_recommitting() -> None:
     h = Harness(position=row(gap=True))
     h.store.confirm_recovery.side_effect = SQLAlchemyError("unavailable")
-    assert (
-        await h.service.recover(recovery(policy=RecoveryPolicy.CURRENT_END), owner_worker_id="recovery")
-    ).status == PositionStatus.BLOCKED
+    assert (await h.service.recover(recovery(policy=RecoveryPolicy.CURRENT_END))).status == PositionStatus.BLOCKED
     assert h.position is not None
     assert h.position.pending_boundary == 100
     assert h.held
     h.end = 150
     h.store.confirm_recovery.side_effect = h.confirm_recovery
-    result = await h.service.recover(recovery(policy=RecoveryPolicy.CURRENT_END), owner_worker_id="recovery")
+    result = await h.service.recover(recovery(policy=RecoveryPolicy.CURRENT_END))
     assert result.status == PositionStatus.READY
     assert result.next_offset == 100
     assert h.client.commit.await_count == 1
     # Retrying a confirmed operation follows current progress, never rewinds it.
     h.committed = 125
-    assert (
-        await h.service.recover(recovery(policy=RecoveryPolicy.CURRENT_END), owner_worker_id="recovery")
-    ).next_offset == 125
+    assert (await h.service.recover(recovery(policy=RecoveryPolicy.CURRENT_END))).next_offset == 125
     assert h.client.commit.await_count == 1
 
 
@@ -689,13 +640,13 @@ async def test_interrupted_recovery_commit_reuses_the_recorded_boundary() -> Non
     h = Harness(position=row(gap=True))
     h.client.commit.side_effect = TimeoutError()
     value = recovery(policy=RecoveryPolicy.CURRENT_END)
-    assert (await h.service.recover(value, owner_worker_id="recovery")).status == PositionStatus.BLOCKED
+    assert (await h.service.recover(value)).status == PositionStatus.BLOCKED
     assert h.position is not None
     assert h.position.pending_boundary == 100
     assert h.held
     h.end = 200
     h.client.commit.side_effect = h.commit
-    result = await h.service.recover(value, owner_worker_id="recovery")
+    result = await h.service.recover(value)
     assert result.next_offset == 100
     assert h.client.commit.call_args.args[0] == {0: 100}
 
@@ -707,10 +658,10 @@ async def test_failed_drain_or_fence_cannot_reconcile_or_commit(*, fenced: bool)
         quiescent=not fenced, retained_evidence_complete=True, permanent_content_error=False
     )
     h.control.is_fenced.return_value = fenced
-    result = await h.service.recover(recovery(), owner_worker_id="recovery")
+    result = await h.service.recover(recovery())
     assert result.status == PositionStatus.BLOCKED
     assert result.reason == "conflicting_work_not_drained"
-    h.store.reconcile_claims.assert_not_awaited()
+
     h.client.commit.assert_not_awaited()
 
 
@@ -727,9 +678,9 @@ async def test_control_timeout_keeps_recovery_blocked_with_its_hold(
         monkeypatch.setattr(EventSchedulingDefaults, "RPC_TIMEOUT_SECONDS", 0)
         h.control.close_and_drain.side_effect = pending
     else:
-        monkeypatch.setattr(EventDeliveryDefaults, "COMMITTED_POSITION_TIMEOUT_SECONDS", 0)
+        monkeypatch.setattr(EventStreamLimits, "COMMITTED_POSITION_TIMEOUT_SECONDS", 0)
         h.control.is_fenced.side_effect = pending
-    result = await h.service.recover(recovery(), owner_worker_id="recovery")
+    result = await h.service.recover(recovery())
     assert result.status == PositionStatus.BLOCKED
     assert result.recovery_revision is None
     assert h.held
@@ -750,17 +701,11 @@ async def test_overlapping_services_cannot_return_ready_while_a_position_commit_
 
     h.client.commit.side_effect = delayed_commit
     service = h.service
-    first = asyncio.create_task(
-        service.recover(recovery(), owner_worker_id="first") if recover else service.initialize(request())
-    )
+    first = asyncio.create_task(service.recover(recovery()) if recover else service.initialize(request()))
     try:
         await asyncio.wait_for(entered.wait(), timeout=5)
         # A distinct service instance must share the client's position gate.
-        competing = (
-            await h.service.recover(recovery(), owner_worker_id="second")
-            if recover
-            else await h.service.initialize(request())
-        )
+        competing = await h.service.recover(recovery()) if recover else await h.service.initialize(request())
         assert competing.status == PositionStatus.BLOCKED
         assert competing.reason == "position_operation_busy"
         assert h.client.commit.await_count == 1
@@ -785,9 +730,7 @@ async def test_caller_cancellation_keeps_position_exclusive_until_commit_settles
 
     h.client.commit.side_effect = delayed_commit
     service = h.service
-    caller = asyncio.create_task(
-        service.recover(recovery(), owner_worker_id="first") if recover else service.initialize(request())
-    )
+    caller = asyncio.create_task(service.recover(recovery()) if recover else service.initialize(request()))
     try:
         await asyncio.wait_for(entered.wait(), timeout=5)
         caller.cancel()
@@ -804,32 +747,6 @@ async def test_caller_cancellation_keeps_position_exclusive_until_commit_settles
     assert h.client.commit.await_count == 1
 
 
-@pytest.mark.parametrize("phase", ["drain", "repair"])
-async def test_interruption_before_reconciliation_preserves_first_recovery_selection(phase: str) -> None:
-    h = Harness(position=row(gap=True))
-    if phase == "drain":
-        h.control.close_and_drain.return_value = DrainEvidence(
-            quiescent=False, retained_evidence_complete=True, permanent_content_error=False
-        )
-    else:
-        h.store.reconcile_claims.return_value = [MagicMock()]
-        h.admission.recover_claim.return_value = ClaimLost()
-    value = recovery(policy=RecoveryPolicy.CURRENT_END)
-    assert (await h.service.recover(value, owner_worker_id="recovery")).status == PositionStatus.BLOCKED
-    assert h.position is not None
-    assert h.position.pending_boundary == 100
-    assert h.held
-    h.client.commit.assert_not_awaited()
-    h.end = 200
-    h.control.close_and_drain.return_value = DrainEvidence(
-        quiescent=True, retained_evidence_complete=True, permanent_content_error=False
-    )
-    h.store.reconcile_claims.return_value = []
-    retried = await h.service.recover(value, owner_worker_id="recovery")
-    assert retried.next_offset == 100
-    assert h.control.close_and_drain.call_args.kwargs["boundary"] == 100
-
-
 async def test_missing_initial_metadata_is_persisted_before_gap_and_explicitly_recoverable() -> None:
     h = Harness(committed=75)
     detected = await h.service.initialize(request())
@@ -841,7 +758,7 @@ async def test_missing_initial_metadata_is_persisted_before_gap_and_explicitly_r
     assert h.position.initial_next_offset is None
     assert h.position.authorized_lower_boundary is None
     h.client.commit.assert_not_awaited()
-    recovered = await h.service.recover(recovery(), owner_worker_id="recovery")
+    recovered = await h.service.recover(recovery())
     assert recovered.status == PositionStatus.READY
     assert recovered.next_offset == 20
     assert h.position.initial_next_offset is None
@@ -880,7 +797,7 @@ async def test_replacement_is_explicit_and_only_for_an_expired_pending_boundary(
     h.control.close_and_drain.return_value = DrainEvidence(
         quiescent=False, retained_evidence_complete=True, permanent_content_error=False
     )
-    assert (await h.service.recover(recovery(), owner_worker_id="recovery")).status == PositionStatus.BLOCKED
+    assert (await h.service.recover(recovery())).status == PositionStatus.BLOCKED
     h.beginning = 30 if expired else 20
     h.control.close_and_drain.return_value = DrainEvidence(
         quiescent=True, retained_evidence_complete=True, permanent_content_error=False
@@ -890,7 +807,7 @@ async def test_replacement_is_explicit_and_only_for_an_expired_pending_boundary(
         expected_recovery_revision=1,
         expected_pending_boundary=20,
     )
-    replaced = await h.service.replace_recovery(value, owner_worker_id="recovery")
+    replaced = await h.service.replace_recovery(value)
     if expired:
         assert replaced.status == PositionStatus.READY
         assert replaced.next_offset == 30
@@ -990,38 +907,6 @@ async def test_legacy_boundary_without_original_membership_is_not_reclassified()
     h.client.commit.assert_not_awaited()
 
 
-async def test_backward_recovery_without_cache_coordination_remains_closed() -> None:
-    h = Harness(position=row(gap=True))
-    service = KafkaInitialPositionService(h.store, h.client, h.admission, h.control)
-    result = await service.recover(recovery(), owner_worker_id="repair")
-    assert result.reason == "cache_epoch_coordination_required"
-    assert h.held
-    h.store.reconcile_claims.assert_not_awaited()
-    h.store.confirm_recovery.assert_not_awaited()
-    h.client.commit.assert_not_awaited()
-
-
-async def test_forward_recovery_preserves_outcomes_without_cache_epoch_rotation() -> None:
-    h = Harness(position=row(gap=True))
-    h.cache_coordination.is_coordinated.return_value = False
-    result = await h.service.recover(recovery(policy=RecoveryPolicy.CURRENT_END), owner_worker_id="repair")
-    assert result.status == PositionStatus.READY
-    h.cache_coordination.is_coordinated.assert_not_awaited()
-
-
-async def test_cache_coordination_loss_after_kafka_commit_keeps_recovery_unconfirmed() -> None:
-    h = Harness(position=row(gap=True))
-    h.cache_coordination.is_coordinated.side_effect = [True, True, False]
-    result = await h.service.recover(recovery(), owner_worker_id="repair")
-    assert result.reason == "cache_epoch_coordination_required"
-    assert h.committed == 20
-    assert h.held
-    h.store.confirm_recovery.assert_not_awaited()
-    h.cache_coordination.is_coordinated.assert_awaited_with(
-        recovery(), token=UUID(int=42), recovery_revision=1, boundary=20
-    )
-
-
 @pytest.mark.parametrize("kind", [None, *InitializationKind])
 def test_read_schema_preserves_known_and_legacy_initialization_kinds(kind: InitializationKind | None) -> None:
     position = row(boundary=2**63 - 1)
@@ -1042,14 +927,3 @@ def test_read_schema_rejects_unrecognized_kind_and_table_preserves_legacy_nullab
     assert table.c.initialization_kind.nullable
     checks = {constraint.name for constraint in table.constraints}
     assert {"ck_kafka_initial_kind", "ck_kafka_initial_kind_evidence"} <= checks
-
-
-async def test_unknown_history_requires_coordination_even_for_current_end_recovery() -> None:
-    h = Harness()
-    await h.record_missing_initial(request(), 75)
-    h.cache_coordination.is_coordinated.return_value = False
-    result = await h.service.recover(recovery(policy=RecoveryPolicy.CURRENT_END), owner_worker_id="repair")
-    assert result.reason == "cache_epoch_coordination_required"
-    assert h.held
-    h.store.reconcile_claims.assert_not_awaited()
-    h.client.commit.assert_not_awaited()

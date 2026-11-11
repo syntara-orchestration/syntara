@@ -13,7 +13,7 @@ from aiokafka import AIOKafkaConsumer
 from aiokafka.client import ConnectionGroup
 from aiokafka.errors import KafkaConnectionError
 from aiokafka.protocol.admin import ApiVersionResponse_v0
-from aiokafka.protocol.metadata import MetadataResponse_v0
+from aiokafka.protocol.metadata import MetadataRequest_v0, MetadataRequest_v4, MetadataResponse_v0
 
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
@@ -179,3 +179,23 @@ async def test_failed_metadata_shutdown_still_closes_owned_sockets() -> None:
     connection.close.assert_called_once()
     assert not client._conns
     assert client._sync_task is None
+
+
+async def test_background_topic_metadata_cannot_create_a_missing_topic() -> None:
+    client = KafkaPolicyClient()
+    response = MetadataResponse_v0([(1, "broker.example.com", 9093)], [])
+    client.cluster.update_metadata(response)
+    connection = MagicMock()
+    connection.send = AsyncMock(return_value=response)
+    try:
+        with patch.object(client, "_get_conn", new_callable=AsyncMock, return_value=connection):
+            assert await client._metadata_update(client.cluster, {"missing-topic"})
+        request = connection.send.await_args.args[0]
+        modern = request.build(MetadataRequest_v4)
+        assert modern.topics == ["missing-topic"]
+        assert modern.allow_auto_topic_creation is False
+        # Old protocols cannot disable creation of named topics. Request the
+        # existing topic list instead, then let subscription lookup fail closed.
+        assert request.build(MetadataRequest_v0).topics == []
+    finally:
+        await client.close()

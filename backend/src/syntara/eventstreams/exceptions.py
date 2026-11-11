@@ -84,3 +84,7 @@ class ConsumerNotRunningError(EventStreamError):
 
 class KafkaTransportError(EventStreamError):
     """Sanitized wrapper around an aiokafka error; credentials are never included."""
+
+
+class KafkaSourceIdentityError(KafkaTransportError):
+    """The topic changed, or a suspected recreation cannot be disproved."""

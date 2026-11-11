@@ -1917,6 +1917,10 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if workflow.is_builtin:
             raise BuiltinWorkflowDeleteError(workflow.name)
 
+        # Accepted Kafka handoffs use this same lifecycle lock when saving their
+        # Execution. Count only after taking it, so a concurrent save cannot slip
+        # between the active-execution check and deletion.
+        await self.session.exec(select(Workflow.id).where(Workflow.id == workflow_id).with_for_update())
         non_terminal_count = await self.session.scalar(
             select(func.count())
             .select_from(Execution)

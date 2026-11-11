@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from syntara.core.exceptions import SafeValueError
 from syntara.core.lib.encryption import SecretEncryptor
+from syntara.credentials.lib.kafka_connection import KafkaSecurityProtocol
 from syntara.eventstreams.adapters import runner_factory as module
 from syntara.eventstreams.core.runtime import SubscriptionRuntimeError
 from syntara.eventstreams.services.worker_resources import EventWorkerResources
@@ -17,22 +18,32 @@ from tests.unit.eventstreams.test_connection_provider import connection_context
 
 
 @pytest.mark.parametrize("skip_verification", [False, True])
-@pytest.mark.parametrize("external_coordination", [False, True])
-async def test_factory_reuses_existing_authentication_and_tls(monkeypatch, *, skip_verification, external_coordination):
+@pytest.mark.parametrize("protocol", list(KafkaSecurityProtocol))
+async def test_factory_reuses_existing_authentication_and_tls(monkeypatch, protocol, *, skip_verification):
     context = connection_context()
     context.session.__aenter__.return_value = context.session
     context.integration.configuration.insecure_skip_tls_verify = skip_verification
+    context.integration.configuration.security_protocol = protocol
+    context.integration.configuration.allow_plaintext = protocol == KafkaSecurityProtocol.PLAINTEXT
     monkeypatch.setattr(module, "SecretService", lambda *_args: context.secrets)
     monkeypatch.setattr(module, "EventConnectionProvider", lambda *_args, **_kwargs: context.provider)
     clients = []
 
     def client(connection, source, **kwargs: object) -> MagicMock:
         context.session.__aexit__.assert_awaited_once()
-        assert connection.security_protocol == "SASL_SSL"
-        assert connection.sasl_plain_username == SecretStr("PRIVATE_USER")
-        assert connection.sasl_plain_password == SecretStr("PRIVATE_PASSWORD")
-        assert connection.sasl_mechanism == context.integration.configuration.sasl_mechanism
-        assert connection.ssl_context.verify_mode == (ssl.CERT_NONE if skip_verification else ssl.CERT_REQUIRED)
+        assert connection.security_protocol == protocol
+        if protocol == KafkaSecurityProtocol.SASL_SSL:
+            assert connection.sasl_plain_username == SecretStr("PRIVATE_USER")
+            assert connection.sasl_plain_password == SecretStr("PRIVATE_PASSWORD")
+            assert connection.sasl_mechanism == context.integration.configuration.sasl_mechanism
+        else:
+            assert connection.sasl_plain_username is None
+            assert connection.sasl_plain_password is None
+            assert connection.sasl_mechanism is None
+        if protocol == KafkaSecurityProtocol.PLAINTEXT:
+            assert connection.ssl_context is None
+        else:
+            assert connection.ssl_context.verify_mode == (ssl.CERT_NONE if skip_verification else ssl.CERT_REQUIRED)
         assert source == context.snapshot.configuration
         assert kwargs["client_id"] == "test-worker"
         transport = MagicMock()
@@ -46,8 +57,6 @@ async def test_factory_reuses_existing_authentication_and_tls(monkeypatch, *, sk
     sessions = MagicMock(return_value=context.session)
     resources = EventWorkerResources()
     resources.gate = MagicMock()
-    lookup = MagicMock()
-    coordination = MagicMock() if external_coordination else None
     preparation, admission = MagicMock(), MagicMock()
     factory = module.ManagedRunnerFactory(
         sessions,
@@ -56,17 +65,13 @@ async def test_factory_reuses_existing_authentication_and_tls(monkeypatch, *, sk
         resources,
         SecretEncryptor(b"a" * 32),
         owner_worker_id="test-worker",
-        lookup=lookup,
-        cache_coordination=coordination,
     )
     assert await factory(context.snapshot) is runner
     assert len(clients) == 1
     clients[0].start.assert_not_called()
     assert build_runner.call_args.args == (context.snapshot, clients[0], sessions, preparation, admission)
     assert build_runner.call_args.kwargs["work_semaphore"] is resources.processing
-    assert build_runner.call_args.kwargs["lookup"] is lookup
     assert build_runner.call_args.kwargs["gate"] is resources.gate
-    assert build_runner.call_args.kwargs["cache_coordination"] is coordination
 
 
 async def test_unavailable_binding_creates_no_transport_client(monkeypatch):

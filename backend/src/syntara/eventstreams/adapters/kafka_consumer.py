@@ -12,19 +12,22 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from aiokafka import AIOKafkaConsumer, TopicPartition
 from aiokafka.abc import ConsumerRebalanceListener
+from aiokafka.client import ConnectionGroup
 from aiokafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
 from aiokafka.errors import (
     IncompatibleBrokerVersion,
     KafkaError,
     KafkaTimeoutError,
+    OffsetOutOfRangeError,
     UnknownTopicOrPartitionError,
     UnsupportedVersionError,
 )
+from aiokafka.protocol.fetch import FetchRequest_v0, FetchResponse_v0
 from aiokafka.structs import OffsetAndMetadata
 
 from syntara.core.config.base import get_settings
@@ -43,6 +46,7 @@ from syntara.eventstreams.core.consumer import (
 from syntara.eventstreams.core.envelope import RawEvent, RawEventHeader
 from syntara.eventstreams.exceptions import (
     ConsumerNotRunningError,
+    KafkaSourceIdentityError,
     KafkaTransportError,
     OwnershipRevokedError,
     StaleEpochError,
@@ -51,6 +55,9 @@ from syntara.integrations.lib.kafka_client import KafkaPolicyClient
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine, Iterable, Iterator
+
+    from aiokafka.cluster import ClusterMetadata
+    from aiokafka.protocol.api import Request, Response
 
     from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
     from syntara.eventstreams.core.connection import ResolvedKafkaConnection
@@ -67,6 +74,57 @@ _CREDENTIAL_SCRUB = re.compile(
 def _sanitize(message: str) -> str:
     """Remove credential fragments from an error message."""
     return _CREDENTIAL_SCRUB.sub(r"\1=***", message)
+
+
+class _ResetAwareKafkaClient(KafkaPolicyClient):
+    """Observe offset errors before aiokafka silently applies its earliest fallback."""
+
+    def __init__(
+        self,
+        *,
+        topic: str,
+        assignment_epoch: Callable[[], int],
+        on_reset: Callable[[int, int], None],
+        on_metadata_changed: Callable[[], None] | None = None,
+        on_topic_missing: Callable[[], None] | None = None,
+        **kwargs: object,
+    ) -> None:
+        """Keep reset signals scoped to this consumer and its assignment epoch."""
+        super().__init__(**kwargs)
+        self._reset_topic = topic
+        self._assignment_epoch = assignment_epoch
+        self._on_reset = on_reset
+        self._on_metadata_changed = on_metadata_changed
+        self._on_topic_missing = on_topic_missing
+
+    async def _metadata_update(self, cluster_metadata: ClusterMetadata, topics: Iterable[str] | None) -> bool:
+        """Require source verification when the SDK refreshes topic/broker metadata."""
+        if self._on_metadata_changed is not None:
+            self._on_metadata_changed()
+        return await super()._metadata_update(cluster_metadata, topics)
+
+    async def send(
+        self, node_id: int | str, request: Request[Any], *, group: ConnectionGroup = ConnectionGroup.DEFAULT
+    ) -> Response | None:
+        """Preserve the response while reporting affected partitions to the adapter."""
+        epoch = self._assignment_epoch()
+        response = await super().send(node_id, request, group=group)
+        if response is not None and request.API_KEY == FetchRequest_v0.API_KEY:
+            # Every installed FetchResponse version starts each partition tuple
+            # with partition/error_code. Remaining fields differ by version.
+            for topic, partitions in cast("FetchResponse_v0", response).topics or ():
+                if topic != self._reset_topic:
+                    continue
+                for partition in partitions:
+                    if partition[1] == OffsetOutOfRangeError.errno:
+                        self._on_reset(partition[0], epoch)
+                    elif (
+                        partition[1] == UnknownTopicOrPartitionError.errno
+                        and epoch == self._assignment_epoch()
+                        and self._on_topic_missing is not None
+                    ):
+                        self._on_topic_missing()
+        return response
 
 
 class _RebalanceListener(ConsumerRebalanceListener):
@@ -96,7 +154,7 @@ class KafkaPartitionConsumer:
     Constructed with resolved connection parameters and a source
     configuration.  Client construction uses the story-mandated settings:
     ``RoundRobinPartitionAssignor``, ``enable_auto_commit=False``,
-    ``isolation_level="read_committed"``, ``auto_offset_reset="none"``.
+    ``isolation_level="read_committed"``, ``auto_offset_reset="earliest"``.
     """
 
     def __init__(
@@ -119,6 +177,12 @@ class KafkaPartitionConsumer:
         self._running: bool = False
         self._stop_task: asyncio.Task[None] | None = None
         self._position_operations: set[int] = set()
+        self._offset_resets: set[int] = set()
+        self._metadata_revision = 0
+        self._verified_metadata_revision = 0
+        self._last_source_identity: SourceIdentityObservation | None = None
+        self._topic_missing = False
+        self._identity_lock = asyncio.Lock()
 
     @property
     def assignment(self) -> frozenset[int]:
@@ -151,6 +215,15 @@ class KafkaPartitionConsumer:
             msg = "Rebalance callbacks must be bound before startup"
             raise ValueError(msg)
         self._rebalance_callback = callback
+
+    def _note_offset_reset(self, partition: int, epoch: int) -> None:
+        if epoch == self._epoch and partition in self._assignment:
+            self._offset_resets.add(partition)
+
+    def _check_offset_resets(self, partitions: Iterable[int]) -> None:
+        if self._offset_resets.intersection(partitions):
+            msg = "Kafka offset reset requires position reconciliation"
+            raise KafkaTransportError(msg)
 
     @contextlib.contextmanager
     def position_operation(self, partition: int, *, expected_epoch: int) -> Iterator[bool]:
@@ -197,7 +270,7 @@ class KafkaPartitionConsumer:
             **connection_options,
             group_id=self._source_config.group_id,
             enable_auto_commit=False,
-            auto_offset_reset="none",
+            auto_offset_reset="earliest",
             isolation_level="read_committed",
             partition_assignment_strategy=(RoundRobinPartitionAssignor,),
             max_poll_records=settings.event_fetch_max_records,
@@ -207,7 +280,14 @@ class KafkaPartitionConsumer:
         # aiokafka 0.14 has no public client/factory injection. Its constructor
         # has not opened sockets or started tasks yet. Replace the internal
         # client before startup so coordinator and metadata paths use policy too.
-        consumer._client = KafkaPolicyClient(**connection_options)  # noqa: SLF001 - aiokafka has no client injection API
+        consumer._client = _ResetAwareKafkaClient(  # noqa: SLF001 - aiokafka has no client injection API
+            **connection_options,
+            topic=self.topic,
+            assignment_epoch=lambda: self._epoch,
+            on_reset=self._note_offset_reset,
+            on_metadata_changed=self._metadata_changed,
+            on_topic_missing=self._note_topic_missing,
+        )
 
         # Startup can be cancelled by a deadline or shutdown; retain ownership
         # so the runner's cleanup can close a partially started client.
@@ -250,6 +330,8 @@ class KafkaPartitionConsumer:
         requested = tuple(dict.fromkeys(partitions))
         for partition in requested:
             self._check_ownership(partition)
+        self._check_offset_resets(requested)
+        await self._verify_metadata_identity(expected_epoch)
         if not requested:
             consumer.pause(*(self._tp(partition) for partition in self._assignment))
         try:
@@ -262,6 +344,8 @@ class KafkaPartitionConsumer:
             raise KafkaTransportError(_sanitize(str(exc))) from None
         self._require_running()
         self._check_epoch(expected_epoch)
+        self._check_offset_resets(requested)
+        await self._verify_metadata_identity(expected_epoch)
         result: dict[int, list[RawEvent]] = {}
         for tp, records in batches.items():
             self._check_ownership(tp.partition)
@@ -319,6 +403,7 @@ class KafkaPartitionConsumer:
                 self._epoch += 1
             self._running = False
             self._assignment = frozenset()
+            self._offset_resets.clear()
 
     @staticmethod
     def _stop_settled(task: asyncio.Task[None]) -> None:
@@ -334,6 +419,7 @@ class KafkaPartitionConsumer:
             consumer.seek(self._tp(partition), offset)
         except KafkaError as exc:
             raise KafkaTransportError(_sanitize(str(exc))) from exc
+        self._offset_resets.discard(partition)
 
     async def commit(self, offsets: dict[int, int], *, expected_epoch: int) -> None:
         """Commit explicit partition-to-next-offset map.
@@ -344,6 +430,8 @@ class KafkaPartitionConsumer:
         self._check_epoch(expected_epoch)
         for partition in offsets:
             self._check_ownership(partition)
+        self._check_offset_resets(offsets)
+        await self._verify_metadata_identity(expected_epoch)
 
         offset_map = {self._tp(p): OffsetAndMetadata(o, "") for p, o in offsets.items()}
         try:
@@ -452,6 +540,7 @@ class KafkaPartitionConsumer:
         compares saved IDs nor decides initialization or gap-recovery policy.
         """
         consumer = self._require_observation_epoch(expected_epoch, timeout_ms)
+        metadata_revision = self._metadata_revision
         try:
             async with asyncio.timeout(timeout_ms / 1000):
                 # aiokafka has no public consumer API for cluster/topic UUIDs.
@@ -485,7 +574,60 @@ class KafkaPartitionConsumer:
         except (AttributeError, IndexError, KeyError, TypeError, ValueError):
             result = self._identity_failure(expected_epoch, IdentityStatus.UNCERTAIN, "invalid metadata response")
         self._require_observation_epoch(expected_epoch, timeout_ms)
+        if result.topic_id.status == IdentityStatus.UNKNOWN_TOPIC:
+            self._note_topic_missing()
+        self._remember_source_identity(result, metadata_revision)
         return result
+
+    def _metadata_changed(self) -> None:
+        self._metadata_revision += 1
+
+    def _note_topic_missing(self) -> None:
+        self._topic_missing |= (
+            self._last_source_identity is not None or self._source_config.initial_partition_ids is not None
+        )
+        self._metadata_changed()
+
+    def _remember_source_identity(self, observation: SourceIdentityObservation, revision: int) -> None:
+        previous = self._last_source_identity
+        if self._topic_missing and (previous is None or previous.topic_id.status != IdentityStatus.VERIFIED):
+            msg = "Suspected Kafka topic recreation requires source replacement"
+            raise KafkaSourceIdentityError(msg)
+        for name in ("cluster_id", "topic_id"):
+            current = getattr(observation, name)
+            saved = getattr(previous, name) if previous is not None else None
+            if current.status not in {IdentityStatus.VERIFIED, IdentityStatus.UNSUPPORTED}:
+                return
+            if (
+                saved is not None
+                and saved.status == IdentityStatus.VERIFIED
+                and current.status == IdentityStatus.VERIFIED
+                and current.value != saved.value
+            ):
+                msg = "Kafka source identity changed; source replacement is required"
+                raise KafkaSourceIdentityError(msg)
+            if (
+                saved is not None
+                and saved.status == IdentityStatus.VERIFIED
+                and current.status != IdentityStatus.VERIFIED
+            ):
+                return
+        if observation.partitions.status != PartitionSetStatus.VERIFIED:
+            return
+        self._last_source_identity = observation
+        self._topic_missing = False
+        self._verified_metadata_revision = revision
+
+    async def _verify_metadata_identity(self, expected_epoch: int) -> None:
+        if self._verified_metadata_revision == self._metadata_revision:
+            return
+        async with self._identity_lock:
+            if self._verified_metadata_revision != self._metadata_revision:
+                await self.observe_source_identity(expected_epoch=expected_epoch)
+                if self._verified_metadata_revision != self._metadata_revision:
+                    msg = "Kafka source identity requires position reconciliation"
+                    raise KafkaTransportError(msg)
+        self._check_epoch(expected_epoch)
 
     async def _read_boundary(
         self,
@@ -601,6 +743,7 @@ class KafkaPartitionConsumer:
                 await self._rebalance_callback.on_partitions_revoked(revoked_partitions, epoch)
         finally:
             self._assignment -= revoked_partitions
+            self._offset_resets.difference_update(revoked_partitions)
             self._epoch += 1
             logger.debug(
                 "Partitions revoked",
@@ -613,6 +756,7 @@ class KafkaPartitionConsumer:
         assigned_partitions = frozenset(tp.partition for tp in assigned)
         self._epoch += 1
         self._assignment = assigned_partitions
+        self._offset_resets.intersection_update(assigned_partitions)
         epoch = self._epoch
 
         logger.debug(

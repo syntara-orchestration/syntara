@@ -1,18 +1,17 @@
-"""Database fixtures for delivery repository and retained-evidence integration tests."""
+"""Published Kafka resources and normal Execution integration fixtures."""
 
 from collections.abc import AsyncIterator, Generator
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from unittest.mock import PropertyMock, patch
 from uuid import UUID, uuid4
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import func, update
+from sqlalchemy import func
 from sqlalchemy.engine import URL
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
-from sqlmodel import col, select
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.config.base import Settings, get_settings
@@ -22,21 +21,11 @@ from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition
 from syntara.eventstreams.adapters.kafka_record_identity import KafkaRecordIdentity
-from syntara.eventstreams.core.deduplication import (
-    DeliveryClaim,
-    DeliveryExpectation,
-    DeliveryIdentity,
-    DeliveryRepository,
-    FrozenDeliveryBinding,
-    input_fingerprint,
-)
-from syntara.eventstreams.models.delivery import EventDelivery
+from syntara.eventstreams.core.deduplication import DeliveryIdentity
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
-from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
 from syntara.eventstreams.services.subscription_service import EventSubscriptionService, lock_source_lifecycle
 from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
-from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 
@@ -46,14 +35,6 @@ def _delivery_service_identity() -> Generator[None, None, None]:
     """Match workflow integration tests that run without S2S TLS certificates."""
     with patch.object(Settings, "service_identity", new_callable=PropertyMock, return_value="backend.ao.svc"):
         yield
-
-
-class AvailableCapacity:
-    """Test double isolating claims from the separately tested capacity measurement."""
-
-    async def permits_new_delivery(self) -> bool:
-        """Allow small fixture datasets without changing production thresholds."""
-        return True
 
 
 @dataclass
@@ -76,71 +57,6 @@ class DeliveryContext:
             record=KafkaRecordIdentity(topic=self.snapshot.configuration.topic, partition=0, offset=offset),
         )
 
-    def expectation(self) -> DeliveryExpectation:
-        """Return the immutable upstream publication expectation."""
-        return DeliveryExpectation(
-            published_version_id=self.snapshot.published_version_id,
-            configuration_revision=self.snapshot.configuration_revision,
-        )
-
-    def store(self, session: AsyncSession) -> DeliveryRepository[Execution]:
-        """Use the real repository and platform principal with only capacity isolated."""
-        return EventDeliveryStore(session, capacity_check=AvailableCapacity())
-
-    async def claim(self, offset: int = 0, *, owner: str = "first", prepare: bool = False) -> DeliveryClaim:
-        """Commit a claim and optional Execution preparation together."""
-        identity = self.identity(offset)
-        async with self.session_factory() as session, session.begin():
-            store = self.store(session)
-            result = await store.acquire(identity, self.expectation(), owner)
-            if not isinstance(result, DeliveryClaim):
-                msg = f"Fixture claim was not acquired: {type(result).__name__}"
-                raise TypeError(msg)
-            if not prepare:
-                return result
-            now: datetime = (await session.exec(select(func.clock_timestamp()))).one()
-            input_data = {"payload": {"offset": str(offset)}}
-            context = {"workflow_context": {"created_by": "workflow-author"}}
-            binding = FrozenDeliveryBinding(
-                workflow_version_id=self.snapshot.published_version_id,
-                configuration_revision=self.snapshot.configuration_revision,
-                runtime_credential_id=self.snapshot.runtime_credential_id,
-                connection_revision="connection-1",
-                execution_principal_id=self.principal_id,
-                enabled_by=self.snapshot.enabled_by,
-                received_at=now,
-                prepared_at=now,
-                input_fingerprint=input_fingerprint(input_data, context),
-            )
-            execution = Execution(
-                id=identity.execution_id,
-                workflow_id=identity.workflow_id,
-                workflow_version_id=binding.workflow_version_id,
-                project_id=self.snapshot.project_id,
-                trigger_node_id=self.snapshot.trigger_node_id,
-                temporal_workflow_id=identity.temporal_workflow_id,
-                input_data=input_data,
-                execution_metadata=context,
-                created_by=self.principal_id,
-                updated_by=self.principal_id,
-                created_at=now,
-                updated_at=now,
-            )
-            frozen = await store.freeze(result, binding, execution)
-            if not isinstance(frozen, DeliveryClaim):
-                msg = f"Fixture preparation failed: {type(frozen).__name__}"
-                raise TypeError(msg)
-            return frozen
-
-    async def expire(self, claim: DeliveryClaim) -> None:
-        """Advance only the test lease to exercise takeover without sleeping."""
-        async with self.session_factory() as session, session.begin():
-            await session.execute(
-                update(EventDelivery)
-                .where(col(EventDelivery.identity_digest) == claim.identity.digest)
-                .values(lease_until=func.clock_timestamp() - timedelta(seconds=1))
-            )
-
 
 async def hold_partition_recovery(context: DeliveryContext, partition: int = 0) -> UUID:
     """Arrange a committed partition fence for integration tests without broker I/O."""
@@ -162,7 +78,6 @@ async def hold_partition_recovery(context: DeliveryContext, partition: int = 0) 
         row.pending_boundary = 0
         row.pending_policy = "retained_beginning"
         row.pending_reason = "missing_commit"
-        source.delivery_evidence_revision += 1
     return token
 
 
@@ -187,7 +102,6 @@ async def finish_partition_recovery(context: DeliveryContext, partition: int, to
         row.pending_duplicate_risk_acknowledged = False
         row.gap_detected_at = None
         row.gap_reason = None
-        source.delivery_evidence_revision += 1
     return True
 
 
@@ -198,7 +112,7 @@ async def delivery_context(
     test_user: User,
     test_project_id: UUID,
 ) -> DeliveryContext:
-    """Project a published trigger before testing delivery storage."""
+    """Project a published trigger before testing event handoff."""
     integration = Integration(
         name=f"delivery-kafka-{uuid4().hex[:8]}",
         integration_type=IntegrationType.KAFKA,

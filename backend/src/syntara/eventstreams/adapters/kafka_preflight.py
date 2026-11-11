@@ -22,7 +22,7 @@ from syntara.integrations.adapters.kafka import KafkaAdapter, KafkaAuthenticatio
 from syntara.integrations.lib.kafka_connection import create_kafka_connection as create_conn
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
-_PREFLIGHT_TIMEOUT_SECONDS = 10
+PREFLIGHT_TIMEOUT_SECONDS = 10
 _CLOSE_TIMEOUT_SECONDS = 1
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -85,8 +85,8 @@ async def test_kafka_connection(
     result = EventSubscriptionTestResponse(success=False, checked_at=datetime.now(UTC))
     connection = None
     try:
-        options = KafkaAdapter(config).connection_options(credential, _PREFLIGHT_TIMEOUT_SECONDS)
-        async with asyncio.timeout(_PREFLIGHT_TIMEOUT_SECONDS):
+        options = KafkaAdapter(config).connection_options(credential, PREFLIGHT_TIMEOUT_SECONDS)
+        async with asyncio.timeout(PREFLIGHT_TIMEOUT_SECONDS):
             connection = await _connect(config, options)
             if connection is None:
                 result.connection = "failed"

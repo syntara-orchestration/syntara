@@ -9,12 +9,11 @@ from syntara.core.lib.encryption import SecretEncryptor
 from syntara.core.services.secret_service import SecretService
 from syntara.core.services.storage_backend import DatabaseBackend
 from syntara.credentials.lib.injector_resolver import InjectorResolver
+from syntara.credentials.lib.kafka_connection import kafka_credential_required
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
-from syntara.eventstreams.adapters.kafka_position_control import RecoveryCacheCoordination
 from syntara.eventstreams.adapters.kafka_record_runner import KafkaRecordRunner
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
 from syntara.eventstreams.core.connection import ResolvedKafkaConnection
-from syntara.eventstreams.core.deduplication import TerminalDeliveryCache
 from syntara.eventstreams.core.runtime import RuntimeFailureCode, SubscriptionRunner, SubscriptionRuntimeError
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.eventstreams.services.admission_service import EventAdmissionService
@@ -40,8 +39,6 @@ class ManagedRunnerFactory:
         encryptor: SecretEncryptor,
         *,
         owner_worker_id: str,
-        lookup: TerminalDeliveryCache | None = None,
-        cache_coordination: RecoveryCacheCoordination | None = None,
     ) -> None:
         """Receive process-scoped dependencies; no request or shared session is retained."""
         self._session_factory = session_factory
@@ -50,8 +47,6 @@ class ManagedRunnerFactory:
         self._resources = resources
         self._encryptor = encryptor
         self._owner = owner_worker_id
-        self._lookup = lookup
-        self._cache_coordination = cache_coordination
 
     async def __call__(self, snapshot: SubscriptionSnapshot) -> SubscriptionRunner:
         """Return one unstarted transport runner for the exact immutable binding."""
@@ -71,11 +66,8 @@ class ManagedRunnerFactory:
             self._session_factory,
             self._preparation,
             self._admission,
-            owner_worker_id=self._owner,
             work_semaphore=self._resources.processing,
-            lookup=self._lookup,
             gate=self._resources.gate,
-            cache_coordination=self._cache_coordination,
         )
 
     async def connection_revision(self, snapshot: SubscriptionSnapshot) -> str:
@@ -102,14 +94,18 @@ class ManagedRunnerFactory:
             credential, credential_type = await fetch_credential_with_type(session, snapshot.runtime_credential_id)
             decrypted = await secrets.retrieve_secret(credential.secret_id)  # type: ignore[arg-type]
             resolved = InjectorResolver.resolve(credential_type.injectors or {}, decrypted)
-            username, password = resolve_kafka_authentication(resolved.extra_vars)
             config = integration.configuration
+            username = password = None
+            if kafka_credential_required(config.security_protocol):
+                username, password = resolve_kafka_authentication(resolved.extra_vars)
             connection = ResolvedKafkaConnection(
                 bootstrap_servers=list(config.bootstrap_servers),
-                security_protocol="SASL_SSL",
-                sasl_mechanism=config.sasl_mechanism,
+                security_protocol=config.security_protocol,
+                sasl_mechanism=config.sasl_mechanism if username is not None else None,
                 sasl_plain_username=username,
                 sasl_plain_password=password,
-                ssl_context=KafkaAdapter(config)._ssl_context(),  # noqa: SLF001 - reuse Integration TLS semantics
+                ssl_context=KafkaAdapter(config)._ssl_context()  # noqa: SLF001 - reuse Integration TLS semantics
+                if config.security_protocol != "PLAINTEXT"
+                else None,
             )
         return connection  # noqa: RET504 - session must close before client construction

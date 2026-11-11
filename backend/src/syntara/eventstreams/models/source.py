@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import ClassVar
 from uuid import UUID
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, Index, text
+from sqlalchemy import CheckConstraint, DateTime, Index, text
 from sqlmodel import Field
 
 from syntara.core.models.base import BaseResource
@@ -104,19 +104,7 @@ class EventSubscriptionSource(BaseResource, table=True):
         description="When this source was retired; retirement never deletes the row",
     )
 
-    retirement_completed_at: datetime | None = Field(default=None, sa_type=DateTime(timezone=True))  # type: ignore[call-overload]
-    retirement_reason: str | None = Field(default=None, max_length=100)
-    retirement_authorized_by: UUID | None = Field(default=None, foreign_key="principals.id", ondelete="RESTRICT")
-
-    delivery_evidence_revision: int = Field(
-        default=0,
-        sa_type=BigInteger,
-        sa_column_kwargs={"server_default": text("0")},
-        description="Recovery evidence fence; changed under lifecycle locks before boundary changes",
-    )
-
     __table_args__ = (
-        CheckConstraint("delivery_evidence_revision >= 0", name="ck_event_sources_delivery_evidence_revision"),
         CheckConstraint("generation > 0", name="ck_event_subscription_sources_generation_positive"),
         # NOTE: When adding a new transport, also update this check in a migration.
         CheckConstraint(

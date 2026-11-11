@@ -25,6 +25,7 @@ class EventWorkerGate:
         self._membership_until = 0.0
         self._desired: dict[UUID, RuntimeRevision] = {}
         self._blocked: set[UUID] = set()
+        self._source_failures: set[UUID] = set()
 
     @property
     def generation(self) -> int:
@@ -33,11 +34,11 @@ class EventWorkerGate:
 
     @property
     def scheduling_open(self) -> bool:
-        """Prepared recovery requires database trust, independently of placement."""
+        """Require database trust before scheduling a new workflow."""
         return self._healthy
 
     def database_failed(self) -> None:
-        """Close every local cached-hit commit and new scheduling attempt."""
+        """Close local offset commits and new scheduling attempts."""
         self._healthy = False
         self._generation += 1
 
@@ -46,12 +47,13 @@ class EventWorkerGate:
         self._blocked.add(snapshot.source_id)
         self.database_failed()
 
-    def recovery_started(self, snapshot: SubscriptionSnapshot) -> None:
-        """Keep transport/repair available; only fresh reconciliation may reopen intake."""
-        self._blocked.add(snapshot.source_id)
-        # A new partition fence must reject older reads even if another partition
-        # already blocked this source. Callers suppress repeated observations.
-        self._generation += 1
+    def source_failed(self, snapshot: SubscriptionSnapshot) -> None:
+        """Fence one uncertain source without stopping unrelated subscriptions."""
+        self._source_failures.add(snapshot.source_id)
+
+    def source_verified(self, snapshot: SubscriptionSnapshot) -> None:
+        """Clear a source fault only after Kafka identity verification succeeds."""
+        self._source_failures.discard(snapshot.source_id)
 
     def membership_confirmed(self, deadline: float, *, generation: int) -> None:
         """Record a committed heartbeat write without clearing a newer failure."""
@@ -71,13 +73,14 @@ class EventWorkerGate:
         if generation != self._generation or self._write_generation != generation:
             return False
         self._desired = {snapshot.source_id: RuntimeRevision.from_snapshot(snapshot) for snapshot in snapshots}
+        self._source_failures.intersection_update(self._desired)
         self._blocked = blocked_sources
         self._until = started + EventWorkerDefaults.RECONCILE_INTERVAL_SECONDS * 2
         self._healthy = True
         return True
 
     def admission_open(self, snapshot: SubscriptionSnapshot) -> bool:
-        """Recovery holds fence new intake even while its owned transport repairs."""
+        """Require current transport authority and trusted source/dependency state."""
         return self.transport_open(snapshot) and self.resolution_open(snapshot)
 
     def transport_open(self, snapshot: SubscriptionSnapshot) -> bool:
@@ -91,12 +94,12 @@ class EventWorkerGate:
         )
 
     def resolution_open(self, snapshot: SubscriptionSnapshot) -> bool:
-        """Block record advancement under recovery holds; frozen repair is independent."""
-        return self._healthy and snapshot.source_id not in self._blocked
-
-    def cache_trusted(self) -> bool:
-        """Report database trust; let the cache provider enforce external epoch/skew assumptions."""
-        return self._healthy
+        """Fence source faults independently; partition recovery stays local."""
+        return (
+            self._healthy
+            and snapshot.source_id not in self._blocked
+            and snapshot.source_id not in self._source_failures
+        )
 
     def close_admission(self) -> None:
         """Close intake while preserving completed records and admitted handoffs during drain."""

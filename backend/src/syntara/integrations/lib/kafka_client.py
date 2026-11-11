@@ -1,8 +1,8 @@
 """Consumer client with the existing Integration policy on every Kafka socket.
 
-aiokafka 0.14 has no connection-factory hook. These two connection-management
-methods follow aiokafka.client.AIOKafkaClient (Apache-2.0), substituting only our
-socket factory. Protocol, authentication, metadata refresh and group coordination
+aiokafka 0.14 has no connection-factory hook. These connection-management
+methods follow aiokafka.client.AIOKafkaClient (Apache-2.0), substituting our socket
+factory and non-creating metadata requests. Authentication and group coordination
 remain upstream. Keep the installed-library regression tests when upgrading it.
 No process-wide aiokafka or event-loop state is patched.
 """
@@ -10,17 +10,35 @@ No process-wide aiokafka or event-loop state is patched.
 from __future__ import annotations
 
 import asyncio
+import secrets
 from typing import TYPE_CHECKING, Any, cast
 
 from aiokafka.client import AIOKafkaClient, ConnectionGroup
 from aiokafka.conn import AIOKafkaConnection, CloseReason
 from aiokafka.errors import KafkaConnectionError, KafkaError, StaleMetadata
-from aiokafka.protocol.metadata import MetadataRequest
+from aiokafka.protocol.metadata import MetadataRequest, MetadataRequest_v4
 
 from syntara.integrations.lib.kafka_connection import create_kafka_connection
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from aiokafka.cluster import ClusterMetadata
     from aiokafka.protocol.api import Request, Response
+
+
+class NonCreatingMetadataRequest(MetadataRequest):
+    """Disable topic creation, including protocols without an explicit flag."""
+
+    def __init__(self, topics: list[str] | None = None) -> None:
+        """Select existing topics without granting creation permission."""
+        super().__init__(topics, allow_auto_topic_creation=False)
+
+    def build(self, request_struct_class: Any) -> Any:  # noqa: ANN401 - upstream versioned protocol boundary
+        """Request all existing topics when the negotiated version cannot disable creation."""
+        if request_struct_class.API_VERSION < MetadataRequest_v4.API_VERSION:
+            return request_struct_class([] if request_struct_class.API_VERSION == 0 else None)
+        return super().build(request_struct_class)
 
 
 class KafkaPolicyClient(AIOKafkaClient):
@@ -87,7 +105,7 @@ class KafkaPolicyClient(AIOKafkaClient):
             except (OSError, KafkaError, TimeoutError):
                 continue
             try:
-                metadata = await connection.send(MetadataRequest([]))
+                metadata = await connection.send(NonCreatingMetadataRequest([]))
             except (KafkaError, TimeoutError):
                 connection.close()
                 continue
@@ -105,6 +123,31 @@ class KafkaPolicyClient(AIOKafkaClient):
             raise KafkaConnectionError(msg)
         if self._sync_task is None:
             self._sync_task = asyncio.create_task(self._md_synchronizer())  # type: ignore[no-untyped-call]
+
+    async def _metadata_update(self, cluster_metadata: ClusterMetadata, topics: Iterable[str] | None) -> bool:
+        """Keep upstream refresh behavior while refusing implicit topic creation."""
+        request = NonCreatingMetadataRequest(list(topics) if topics else None)
+        nodes: list[int | str] = [broker.nodeId for broker in self.cluster.brokers()]
+        bootstrap = ("bootstrap", ConnectionGroup.DEFAULT)
+        if bootstrap in self._conns:
+            nodes.append("bootstrap")
+        secrets.SystemRandom().shuffle(nodes)
+        for node in nodes:
+            connection = await self._get_conn(node)
+            if connection is None:
+                continue
+            try:
+                metadata = await connection.send(request)
+            except (KafkaError, TimeoutError):
+                continue
+            if not metadata.brokers:
+                return False
+            cluster_metadata.update_metadata(metadata)
+            if bootstrap in self._conns and self.cluster.brokers():
+                self._conns.pop(bootstrap).close()
+            return True
+        cluster_metadata.failed_update(None)
+        return False
 
     async def _get_conn(
         self,

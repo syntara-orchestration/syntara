@@ -34,8 +34,6 @@ async def test_recovery_table_removal_preserves_parallel_partition_tokens(
         inspector = sa.inspect(connection)
         assert not inspector.has_table("event_subscription_recoveries")
         assert not inspector.has_table("event_delivery_recovery_holds")
-        assert inspector.has_table("event_subscription_runtimes")
-        assert inspector.has_table("event_delivery_capacity")
         assert all(
             key["constrained_columns"] != ["recovery_token"]
             for key in inspector.get_foreign_keys("kafka_partition_initial_positions")

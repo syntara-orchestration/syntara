@@ -1,5 +1,6 @@
 """Transport-neutral local runtime contracts, without scheduling authority."""
 
+import random
 from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
@@ -8,9 +9,19 @@ from uuid import UUID
 
 from pydantic import Field
 
+from syntara.core.constants import EventSchedulingDefaults
 from syntara.core.exceptions import SyntaraError
 from syntara.eventstreams.core.deduplication import DeliveryValue
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
+
+
+def connection_retry_delay(failure_count: int) -> float:
+    """Return jittered exponential backoff for a positive connection failure count."""
+    # Retries have no attempt limit; bound the exponent before computing it.
+    exponent = min(failure_count - 1, EventSchedulingDefaults.MAX_BACKOFF_SECONDS.bit_length())
+    return float(
+        min(2**exponent, EventSchedulingDefaults.MAX_BACKOFF_SECONDS) * random.uniform(0.5, 1.0)  # noqa: S311 - connection retry jitter, not security
+    )
 
 
 class RuntimeState(StrEnum):
@@ -36,7 +47,7 @@ class RuntimeFailureCode(StrEnum):
 
 
 class SubscriptionRuntimeError(SyntaraError):
-    """Factory/adapter classification; only explicitly transient errors are retried."""
+    """Factory/adapter failure classified by the supervisor's retry policy."""
 
     def __init__(self, code: RuntimeFailureCode, *, transient: bool = False) -> None:
         """Expose a fixed reason and retry classification without customer data."""

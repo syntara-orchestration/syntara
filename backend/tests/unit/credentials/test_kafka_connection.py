@@ -44,6 +44,12 @@ class TestKafkaCredentialRequirement:
             is None
         )
 
+    @pytest.mark.parametrize("protocol", ["PLAINTEXT", "SSL"])
+    def test_non_sasl_modes_do_not_require_login_fields_on_a_selected_credential(self, protocol: str) -> None:
+        assert (
+            resolve_supplied_kafka_login(credential_id=uuid4(), decrypted_inputs={}, security_protocol=protocol) is None
+        )
+
     def test_sasl_ssl_requires_a_credential(self) -> None:
         with pytest.raises(CredentialValidationError, match="SASL_SSL requires a Kafka credential"):
             resolve_supplied_kafka_login(

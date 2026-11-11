@@ -1,7 +1,6 @@
 """Apply persisted desired state to one local runner, independently of recovery."""
 
 import asyncio
-import random
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -20,6 +19,7 @@ from syntara.eventstreams.core.runtime import (
     SubscriptionRunnerFactory,
     SubscriptionRuntimeError,
     SubscriptionRuntimeStatus,
+    connection_retry_delay,
 )
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 
@@ -35,7 +35,7 @@ class SubscriptionSupervisor:
 
     The injected factory composes real clients and completed services. This class
     owns neither a worker manager nor process-level prepared-delivery recovery.
-    A stopped consumer is not durable resolution: no claim, frozen Execution,
+    A stopped consumer is not durable resolution: no accepted Execution,
     source identity, group position, or permanent-content evidence is changed.
     """
 
@@ -48,7 +48,7 @@ class SubscriptionSupervisor:
         startup_timeout_seconds: float | None = None,
         connection_revision: Callable[[SubscriptionSnapshot], Awaitable[str]] | None = None,
     ) -> None:
-        """Keep retry/circuit state local and reuse the existing drain deadline."""
+        """Keep retry state local and reuse the existing drain deadline."""
         if placement.subscription_id != subscription_id:
             msg = "Placement belongs to a different subscription"
             raise ValueError(msg)
@@ -89,11 +89,6 @@ class SubscriptionSupervisor:
     def status(self) -> SubscriptionRuntimeStatus:
         """Distinguish requested state, applied binding, and unfinished convergence."""
         state, reason, permanent = RuntimeState.STOPPED, None, self._retained_content_gate
-        circuit = (
-            self._failure is not None
-            and self._failure.transient
-            and (self._failure_count >= EventSchedulingDefaults.IMMEDIATE_ATTEMPTS)
-        )
         if self._draining or (self._closed and self._runner is not None):
             state = RuntimeState.DRAINING
             reason = RuntimeFailureCode.STOP_INCOMPLETE.value if self._stop_retry_at is not None else None
@@ -110,7 +105,7 @@ class SubscriptionSupervisor:
                 state = RuntimeState.BLOCKED
                 reason = RuntimeFailureCode.CONFIGURATION_UNAVAILABLE.value
             elif self._failure is not None:
-                state = RuntimeState.BACKOFF if self._failure.transient and not circuit else RuntimeState.BLOCKED
+                state = RuntimeState.BACKOFF if self._failure.transient else RuntimeState.BLOCKED
                 reason = self._failure.code.value
             elif self._starting:
                 state = RuntimeState.STARTING
@@ -131,11 +126,10 @@ class SubscriptionSupervisor:
             permanent_content_error=permanent,
             failure_count=self._failure_count,
             retry_at=self._stop_retry_at if self._draining else self._retry_at,
-            circuit_open=circuit,
         )
 
     async def apply(self, snapshot: SubscriptionSnapshot) -> SubscriptionRuntimeStatus:
-        """Reconcile desire; unchanged publication/connection revisions keep retry budgets."""
+        """Reconcile desire; unchanged publication/connection revisions keep retry backoff."""
         if snapshot.subscription_id != self._subscription_id:
             msg = "Snapshot belongs to a different subscription"
             raise ValueError(msg)
@@ -216,17 +210,17 @@ class SubscriptionSupervisor:
                 else RuntimeFailureCode.RUNNER_FAILED
             )
             failure = SubscriptionRuntimeError(code)
+        if failure.code in {
+            RuntimeFailureCode.CONNECTION_UNAVAILABLE,
+            RuntimeFailureCode.CONFIGURATION_UNAVAILABLE,
+        }:
+            # Remote access can recover without a local configuration revision.
+            failure = SubscriptionRuntimeError(failure.code, transient=True)
         self._failure = failure
         self._failure_count += 1
         self._retry_at = None
         if failure.transient:
-            delay = (
-                EventSchedulingDefaults.TRANSIENT_PROBE_SECONDS
-                if self._failure_count >= EventSchedulingDefaults.IMMEDIATE_ATTEMPTS
-                else min(2 ** (self._failure_count - 1), EventSchedulingDefaults.MAX_BACKOFF_SECONDS)
-                * random.uniform(0.5, 1.0)  # noqa: S311 - dependency retry jitter, not security
-            )
-            self._retry_at = _utc_now() + timedelta(seconds=delay)
+            self._retry_at = _utc_now() + timedelta(seconds=connection_retry_delay(self._failure_count))
         logger.warning(
             "event_subscription_runtime_unavailable",
             subscription_id=str(self._subscription_id),
@@ -257,7 +251,7 @@ class SubscriptionSupervisor:
                     and not self._draining
                 ):
                     return
-                if not await self._stop_current(deadline=deadline):
+                if not await self._stop_for_revision(revision, deadline=deadline):
                     return
                 continue
             if (
@@ -272,6 +266,14 @@ class SubscriptionSupervisor:
             await self._start_runner(snapshot, revision, connection_revision)
             if self._desired == snapshot or self._draining:
                 return
+
+    async def _stop_for_revision(self, revision: RuntimeRevision, *, deadline: float | None) -> bool:
+        """Stop the old runner before revalidating held content under a changed publication."""
+        revision_changed = self._runner_revision != revision
+        stopped = await self._stop_current(deadline=deadline)
+        if stopped and revision_changed:
+            self._retained_content_gate = False
+        return stopped
 
     async def _refresh_target(
         self, snapshot: SubscriptionSnapshot, revision: RuntimeRevision, *, active: bool
@@ -294,6 +296,8 @@ class SubscriptionSupervisor:
         active = active and available
         target = (revision, active, connection_revision)
         if target != self._target:
+            if self._target is not None and self._target[0] != revision and self._runner is None:
+                self._retained_content_gate = False
             self._target = target
             self._clear_failure()
         return active, connection_revision
@@ -338,7 +342,7 @@ class SubscriptionSupervisor:
             self._runner, self._runner_revision = runner, revision
             self._runner_connection_revision = connection_revision
             if runner.snapshot != snapshot:
-                raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE)
+                raise SubscriptionRuntimeError(RuntimeFailureCode.RUNNER_FAILED)
             runner.bind_placement(self._placement.is_current)
             if self._closed or self._desired != snapshot or not self._placement.is_current():
                 return

@@ -4,8 +4,6 @@ This module centralizes all magic numbers and limits used throughout the codebas
 to improve maintainability and consistency.
 """
 
-from datetime import UTC, datetime
-
 NAME_PATTERN = r"^[a-zA-Z0-9]([a-zA-Z0-9:_-]*[a-zA-Z0-9])?$"
 """Name pattern for projects, policies, and roles.
 
@@ -75,6 +73,7 @@ class EventStreamLimits:
     DEFAULT_MAX_ENVELOPE_BYTES = 1024 * 1024
     DEFAULT_MAX_HEADERS = 128
     HEADER_JSON_OVERHEAD_BYTES = len('{"name":"","value_base64":""}')
+    COMMITTED_POSITION_TIMEOUT_SECONDS = 5
 
 
 class EventRunnerDefaults:
@@ -90,7 +89,7 @@ class EventRunnerDefaults:
 
 
 class EventPlacementDefaults:
-    """Unvalidated placement tuning; independent of delivery claim leases."""
+    """Unvalidated tuning for subscription placement."""
 
     HEARTBEAT_INTERVAL_SECONDS = 20
     WORKER_LIVENESS_SECONDS = 60
@@ -113,39 +112,9 @@ class EventWorkerDefaults:
     HINT_CHANNEL = "syntara:eventstreams:subscription_changes"
 
 
-class EventDeliveryDefaults:
-    """Delivery ownership and minimum evidence retention; independent lifetimes."""
-
-    CLAIM_LEASE_SECONDS = 60
-    CLAIM_RENEWAL_INTERVAL_SECONDS = 20
-    # asyncpg maps datetime.max to PostgreSQL infinity, which loses tzinfo on read.
-    NO_AUTOMATIC_RETRY_AT = datetime(9999, 12, 30, tzinfo=UTC)
-    RETENTION_SECONDS = 3600
-    CAPACITY_PAUSE_ROWS = 3_000_000
-    CAPACITY_RESUME_ROWS = 2_500_000
-    CAPACITY_CHECK_INTERVAL_SECONDS = 30
-    COMMITTED_POSITION_TIMEOUT_SECONDS = 5
-    CLEANUP_BATCH_LIMIT = 100
-    CLEANUP_BATCH_TIMEOUT_SECONDS = 10
-    CLEANUP_IDLE_SECONDS = 30
-    CLEANUP_BATCH_YIELD_SECONDS = 0.05
-    CLEANUP_CLOSE_TIMEOUT_SECONDS = 1
-    TERMINAL_CACHE_TIMEOUT_SECONDS = 1
-    TERMINAL_CACHE_TTL_SECONDS = 60
-    # Candidate cache safety/availability bounds; not release-validated tuning.
-    TERMINAL_CACHE_CLOCK_SKEW_SECONDS = 1
-    TERMINAL_CACHE_MAX_ENTRY_BYTES = 4096
-    TERMINAL_CACHE_FAILURE_THRESHOLD = 3
-    TERMINAL_CACHE_PROBE_INITIAL_SECONDS = 1
-    TERMINAL_CACHE_PROBE_MAX_SECONDS = 60
-
-
 class EventSchedulingDefaults:
-    """Fixed scheduling budgets, independent of delivery-row retention."""
+    """Fixed event scheduling, retry and dependency-probe timing."""
 
-    HISTORY_RETENTION_SECONDS = 86400
-    HISTORY_SAFETY_MARGIN_SECONDS = 300
-    IMMEDIATE_ATTEMPTS = 5
     MAX_BACKOFF_SECONDS = 30
     TRANSIENT_PROBE_SECONDS = 60
     RPC_TIMEOUT_SECONDS = 10

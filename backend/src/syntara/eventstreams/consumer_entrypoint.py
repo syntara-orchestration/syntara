@@ -10,20 +10,13 @@ from syntara.core.constants import EventWorkerDefaults
 from syntara.core.database.session import AsyncSessionLocal, engine
 from syntara.core.lib.encryption import SecretEncryptor, key_from_string
 from syntara.core.logging.lifecycle import start_loggers, stop_loggers
-from syntara.eventstreams.adapters.kafka_retention_verifier import KafkaRetentionVerifier
 from syntara.eventstreams.adapters.runner_factory import ManagedRunnerFactory
 from syntara.eventstreams.consumer_lifecycle import run_event_worker, settle_worker_tasks
 from syntara.eventstreams.consumer_service import EventWorkerManager
 from syntara.eventstreams.handlers.workflow_launcher import TemporalWorkflowLauncher
 from syntara.eventstreams.services.admission_service import EventAdmissionService
-from syntara.eventstreams.services.delivery_cache import EventDeliveryTerminalLookup
-from syntara.eventstreams.services.delivery_cache_policy import DeliveryEvidencePolicy
-from syntara.eventstreams.services.delivery_cleanup_worker import EventDeliveryCleanupWorker
-from syntara.eventstreams.services.delivery_retention_service import EventDeliveryRetentionService
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.placement_service import SubscriptionPlacementService
-from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
-from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
 from syntara.eventstreams.services.subscription_hints import SubscriptionHintListener
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
 from syntara.eventstreams.services.worker_gate import EventWorkerGate
@@ -50,39 +43,22 @@ async def _run_connected(
     gate = EventWorkerGate(placement)
     resources.gate = gate
     redis = EventWorkerRedisClient()
-    cache = EventDeliveryTerminalLookup(
-        AsyncSessionLocal, cache=redis, policy=DeliveryEvidencePolicy.from_settings(), clock_is_safe=gate.cache_trusted
-    )
     launcher = TemporalWorkflowLauncher(temporal)
     preparation = EventExecutionPreparationService(AsyncSessionLocal, resources=resources)
-    admission = EventAdmissionService(AsyncSessionLocal, launcher, resources=resources, cache=cache)
+    admission = EventAdmissionService(AsyncSessionLocal, launcher, resources=resources)
     factory = ManagedRunnerFactory(
-        AsyncSessionLocal, preparation, admission, resources, encryptor, owner_worker_id=owner, lookup=cache
+        AsyncSessionLocal, preparation, admission, resources, encryptor, owner_worker_id=owner
     )
     manager = EventWorkerManager(
         EventSubscriptionReader(AsyncSessionLocal, deployment_id=placement.worker.deployment_id),
         factory,
         placement,
         resources,
-        controls=EventRuntimeControlService(AsyncSessionLocal, placement.worker),
         connection_revision=factory.connection_revision,
     )
-    recovery = EventDeliveryRecoveryWorker(
-        AsyncSessionLocal, launcher, worker_id=owner, admission=admission, resources=resources
-    )
     hints = SubscriptionHintListener(manager.request_reconcile, redis)
-    verifier = KafkaRetentionVerifier(
-        AsyncSessionLocal, factory.resolve_connection, deployment_id=placement.worker.deployment_id
-    )
-    retention = EventDeliveryRetentionService(
-        AsyncSessionLocal,
-        verifier=verifier,
-        deployment_id=placement.worker.deployment_id,
-        permits_cleanup=lambda: resources.accepting and resources.scheduling_open,
-    )
-    cleanup = EventDeliveryCleanupWorker(retention, verifier, resources)
     try:
-        await run_event_worker(manager, recovery, resources, hints, shutdown_event=shutdown, cleanup=cleanup)
+        await run_event_worker(manager, resources, hints, shutdown_event=shutdown)
     finally:
         try:
             async with asyncio.timeout(EventWorkerDefaults.HINT_TIMEOUT_SECONDS):

@@ -5,8 +5,13 @@ from enum import StrEnum
 from typing import Protocol
 
 from syntara.core.exceptions import SyntaraError
-from syntara.eventstreams.core.deduplication import DeliveryValue, TemporalAcceptance, TerminalDelivery
-from syntara.eventstreams.core.preparation import PreparedExecution
+from syntara.eventstreams.core.deduplication import (
+    DeliveryIdentity,
+    DeliveryValue,
+    TemporalAcceptance,
+    TerminalDelivery,
+)
+from syntara.eventstreams.core.preparation import AcceptedWorkflow, PreparedExecution
 
 
 class SchedulingFailureCode(StrEnum):
@@ -33,7 +38,7 @@ class EventLaunchError(SyntaraError):
 
 
 class RetryDelivery(DeliveryValue):
-    """Unresolved scheduling with a durably persisted retry time."""
+    """Unresolved scheduling with a local retry time; Kafka retains the record."""
 
     error_code: SchedulingFailureCode
     next_attempt_at: datetime
@@ -55,14 +60,10 @@ class ResolvedDelivery(DeliveryValue):
 class WorkflowLauncher(Protocol):
     """Finite Temporal operations over the frozen upstream preparation contract."""
 
-    async def history_retention_seconds(self) -> int:
-        """Read the namespace retention; uncertainty must raise EventLaunchError."""
+    async def lookup(self, identity: DeliveryIdentity, *, run_id: str | None = None) -> AcceptedWorkflow:
+        """Recover original signed arguments; only confirmed absence permits a new start."""
         ...
 
     async def start(self, prepared: PreparedExecution) -> TemporalAcceptance:
         """Start the stable identity or verify matching already-started evidence."""
-        ...
-
-    async def describe(self, prepared: PreparedExecution) -> TemporalAcceptance:
-        """Verify the same identity and complete frozen arguments."""
         ...

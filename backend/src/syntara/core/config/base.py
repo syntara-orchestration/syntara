@@ -23,13 +23,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Self
 from urllib.parse import urlparse
-from uuid import UUID
 
 from pydantic import (
     Field,
     HttpUrl,
     SecretStr,
-    ValidatorFunctionWrapHandler,
     computed_field,
     field_validator,
     model_validator,
@@ -37,15 +35,9 @@ from pydantic import (
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL, make_url
 
-from syntara.core.config.event_delivery import (
-    parse_delivery_cache_trust_input,
-    validate_delivery_cache_trust_inputs,
-)
 from syntara.core.constants import (
-    EventDeliveryDefaults,
     EventPlacementDefaults,
     EventRunnerDefaults,
-    EventSchedulingDefaults,
     EventStreamLimits,
     RequestLimits,
     RetrieverServiceDefaults,
@@ -1511,7 +1503,7 @@ class EventStreamSettings(BaseSettings):
     event_subscription_lease_seconds: int = Field(
         default=EventPlacementDefaults.SUBSCRIPTION_LEASE_SECONDS,
         gt=0,
-        description="Unvalidated placement lifetime; independent of delivery claim leases",
+        description="Unvalidated subscription placement lifetime",
     )
 
     @model_validator(mode="after")
@@ -1575,71 +1567,6 @@ class EventStreamSettings(BaseSettings):
         gt=0,
         description="Candidate event header count limit pending release validation",
     )
-    event_delivery_retention_seconds: int = Field(
-        default=EventDeliveryDefaults.RETENTION_SECONDS,
-        gt=0,
-        description="Minimum terminal delivery retention from resolved_at; never expires unresolved evidence",
-    )
-    event_temporal_history_retention_seconds: int = Field(
-        default=EventSchedulingDefaults.HISTORY_RETENTION_SECONDS,
-        gt=EventSchedulingDefaults.HISTORY_SAFETY_MARGIN_SECONDS,
-        description=(
-            "Deployment-guaranteed minimum Temporal history retention; verified against the namespace before "
-            "new starts. Does not configure Temporal or extend existing ambiguous retry deadlines."
-        ),
-    )
-    event_delivery_cache_enabled: bool = Field(
-        default=False, description="Enable terminal proofs only with trusted external epoch and bounded clocks"
-    )
-    event_delivery_cache_epoch: UUID | None = Field(
-        default=None,
-        description="Deployment-managed recovery UUID held outside the restored database; never auto-generated",
-    )
-    event_delivery_cache_ttl_seconds: int = Field(
-        default=EventDeliveryDefaults.TERMINAL_CACHE_TTL_SECONDS,
-        gt=0,
-        description="Terminal proof lifetime measured from original resolved_at, capped by durable retention",
-    )
-    event_delivery_cache_timeout_seconds: float = Field(
-        default=EventDeliveryDefaults.TERMINAL_CACHE_TIMEOUT_SECONDS,
-        gt=0,
-        allow_inf_nan=False,
-        description="Total cache operation deadline including pool acquisition and retries",
-    )
-    event_delivery_cache_skew_seconds: float = Field(
-        default=EventDeliveryDefaults.TERMINAL_CACHE_CLOCK_SKEW_SECONDS,
-        gt=0,
-        allow_inf_nan=False,
-        description="Unvalidated candidate clock-skew safety margin; changes require close/drain and epoch rotation",
-    )
-    event_delivery_cache_clock_error_bound_seconds: float | None = Field(
-        default=None,
-        ge=0,
-        allow_inf_nan=False,
-        description=(
-            "Deployment-attested maximum pairwise worker/Redis/PostgreSQL clock error; not measured here. "
-            "The skew margin must exceed this bound; no assumed default"
-        ),
-    )
-
-    @field_validator("event_delivery_cache_epoch", "event_delivery_cache_clock_error_bound_seconds", mode="wrap")
-    @classmethod
-    def parse_delivery_cache_trust(cls, value: object, handler: ValidatorFunctionWrapHandler) -> object:
-        """Unusable cache trust inputs disable the optimization, not processing."""
-        return parse_delivery_cache_trust_input(value, handler)
-
-    @model_validator(mode="after")
-    def validate_delivery_cache_trust(self) -> Self:
-        """Disable proof caching without trust while retaining expiry validation."""
-        self.event_delivery_cache_enabled = validate_delivery_cache_trust_inputs(
-            enabled=self.event_delivery_cache_enabled,
-            cache_epoch=self.event_delivery_cache_epoch,
-            clock_error_bound_seconds=self.event_delivery_cache_clock_error_bound_seconds,
-            skew_seconds=self.event_delivery_cache_skew_seconds,
-            ttl_seconds=self.event_delivery_cache_ttl_seconds,
-            retention_seconds=self.event_delivery_retention_seconds,
-        )
-        return self
 
 
 class WorkflowEngineSettings(BaseSettings):

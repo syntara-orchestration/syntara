@@ -25,16 +25,11 @@ from syntara.eventstreams.core.consumer import (
     PartitionSetStatus,
     SourceIdentityObservation,
 )
-from syntara.eventstreams.core.deduplication import ClaimLost, DeliveryExpectation, DeliveryState, RevisionChanged
-from syntara.eventstreams.core.processing import CONTENT_INSPECTION_PENDING
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
-from syntara.eventstreams.services import deduplication_store
-from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
-from tests.unit.eventstreams.test_deduplication_store import NOW, PRINCIPAL, binding, delivery, store
+from tests.helpers.eventstream_sessions import session_factory
 from tests.unit.eventstreams.test_delivery_identity import identity
-from tests.unit.eventstreams.test_delivery_retention import session_factory
-from tests.unit.eventstreams.test_kafka_initial_positions import row
+from tests.unit.eventstreams.test_kafka_initial_positions import NOW, row
 
 
 def lifecycle() -> tuple[EventSubscription, EventSubscriptionSource]:
@@ -47,7 +42,7 @@ def lifecycle() -> tuple[EventSubscription, EventSubscriptionSource]:
         published_version_id=UUID(int=7),
         active_source_generation=1,
         configuration_revision=2,
-        created_by=PRINCIPAL,
+        created_by=UUID(int=90),
     )
     source = EventSubscriptionSource(
         id=value.source_id,
@@ -154,244 +149,11 @@ async def test_confirmation_rejects_stale_partition_fences(monkeypatch, stale) -
         reason="out_of_range" if stale == "reason" else "missing_commit",
     )
     monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, position)))
-    deliveries = AsyncMock(return_value=[])
-    monkeypatch.setattr(repository, "_deliveries", deliveries)
     with pytest.raises(KafkaPositionError, match="recovery_revision_changed"):
         await repository.confirm_recovery(request, UUID(int=43) if stale == "token" else token, 20)
     assert position.recovery_token == token
     assert position.pending_boundary == 20
     assert position.recovery_confirmed_at is None
-    assert source.delivery_evidence_revision == 0
-    deliveries.assert_not_awaited()
-
-
-@pytest.mark.parametrize("prepared", [False, True])
-async def test_recovery_hold_blocks_unprepared_takeover_but_allows_frozen_repair(
-    monkeypatch: pytest.MonkeyPatch, *, prepared: bool
-) -> None:
-    subscription, source = lifecycle()
-    pending = delivery()
-    if prepared:
-        pending.frozen_binding = binding()
-    repository = store()
-    monkeypatch.setattr(deduplication_store, "lock_source_lifecycle", AsyncMock(return_value=(subscription, source)))
-    monkeypatch.setattr(repository, "_delivery", AsyncMock(return_value=pending))
-    held = AsyncMock(return_value=True)
-    takeover = AsyncMock(return_value=EventDeliveryStore._claim(pending))
-    monkeypatch.setattr(repository, "_recovery_held", held)
-    monkeypatch.setattr(repository, "_takeover", takeover)
-    result = await repository.acquire(
-        identity(), DeliveryExpectation(published_version_id=UUID(int=7), configuration_revision=2), "repair"
-    )
-    if prepared:
-        assert result == EventDeliveryStore._claim(pending)
-        takeover.assert_awaited_once()
-        held.assert_not_awaited()
-    else:
-        assert isinstance(result, RevisionChanged)
-        takeover.assert_not_awaited()
-
-
-async def test_recovery_hold_blocks_new_execution_preparation_and_no_trigger_resolution(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    pending = delivery()
-    claim = EventDeliveryStore._claim(pending)
-    repository = store()
-    monkeypatch.setattr(repository, "_current", AsyncMock(return_value=pending))
-    monkeypatch.setattr(repository, "_recovery_held", AsyncMock(return_value=True))
-    change = AsyncMock()
-    monkeypatch.setattr(repository, "_change", change)
-    assert isinstance(await repository.freeze(claim, binding(), MagicMock()), RevisionChanged)
-    assert isinstance(await repository.finalize_without_execution(claim, DeliveryState.CANCELLED), RevisionChanged)
-    change.assert_not_awaited()
-
-
-@pytest.mark.parametrize("error", ["invalid_json", "schema_mismatch"])
-def test_known_permanent_content_errors_block_even_unprepared_expired_work(error: str) -> None:
-    pending = delivery()
-    pending.lease_until = NOW
-    pending.last_error_code = error
-    with pytest.raises(KafkaPositionError, match="permanent_content_error"):
-        KafkaInitialPositionStore._content_gate([pending])
-
-
-@pytest.mark.parametrize("operation", ["reconcile", "stage", "confirm"])
-async def test_pending_inspection_cannot_be_cancelled_by_gap_recovery_after_lease_expiry(
-    monkeypatch, operation
-) -> None:
-    factory, _ = session_factory()
-    repository = KafkaInitialPositionStore(factory)
-    subscription, source = lifecycle()
-    position = row(gap=True)
-    token = UUID(int=42)
-    position.recovery_revision = 1
-    position.recovery_token = token
-    position.pending_boundary = 20
-    position.pending_policy = RecoveryPolicy.CURRENT_END.value
-    position.pending_reason = "offset_expired"
-    pending = delivery()
-    pending.lease_until = NOW
-    pending.last_error_code = CONTENT_INSPECTION_PENDING
-    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, position)))
-    monkeypatch.setattr(repository, "_deliveries", AsyncMock(return_value=[pending]))
-    request = RecoveryRequest(
-        **position_request().model_dump(),
-        expected_recovery_revision=0,
-        policy=RecoveryPolicy.CURRENT_END,
-        reason="offset_expired",
-    )
-    with pytest.raises(KafkaPositionError, match="content_inspection_pending"):
-        if operation == "reconcile":
-            await repository.reconcile_claims(request, token, "repair")
-        elif operation == "stage":
-            await repository.stage_recovery(request, token, 20)
-        else:
-            await repository.confirm_recovery(request, token, 20)
-    assert pending.state == DeliveryState.IN_PROGRESS
-    assert pending.last_error_code == CONTENT_INSPECTION_PENDING
-    assert pending.resolved_at is None
-
-
-async def test_expired_prepared_work_never_becomes_cancelled_when_repair_cannot_claim(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    factory, sessions = session_factory()
-    repository = KafkaInitialPositionStore(factory)
-    subscription, source = lifecycle()
-    position = row(gap=True)
-    position.recovery_revision = 1
-    position.recovery_token = UUID(int=42)
-    position.pending_policy = RecoveryPolicy.CURRENT_END.value
-    position.pending_reason = "offset_expired"
-    position.pending_boundary = 20
-    pending = delivery()
-    pending.lease_until = NOW
-    pending.frozen_binding = binding()
-    pending.execution_id = pending.execution_identity
-    pending.attempt_count = 1
-    pending.first_start_attempt_at = NOW
-    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, position)))
-    monkeypatch.setattr(repository, "_deliveries", AsyncMock(return_value=[pending]))
-    upstream = MagicMock()
-    upstream.request_scheduling_retry = AsyncMock(return_value=True)
-    upstream.acquire = AsyncMock(return_value=ClaimLost())
-    monkeypatch.setattr(kafka_position_store, "EventDeliveryStore", MagicMock(return_value=upstream))
-
-    # The SQL clock is the only value this branch reads from the isolated session.
-    def create_session() -> MagicMock:
-        session = MagicMock(spec=AsyncSession)
-        session.__aenter__.return_value = session
-        result = MagicMock()
-        result.one.return_value = NOW
-        session.exec.return_value = result
-        session.get.return_value = None
-        sessions.append(session)
-        return session
-
-    factory.side_effect = create_session
-    value = RecoveryRequest(
-        **position_request().model_dump(),
-        expected_recovery_revision=0,
-        policy=RecoveryPolicy.CURRENT_END,
-        reason="offset_expired",
-    )
-    with pytest.raises(KafkaPositionError, match="conflicting_claim_busy"):
-        await repository.reconcile_claims(value, UUID(int=42), "repair")
-    assert pending.state == DeliveryState.IN_PROGRESS
-    assert pending.frozen_binding is not None
-    assert pending.attempt_count == 1
-
-
-@pytest.mark.parametrize("offset", [19, 20, 21, 2**63 - 1])
-async def test_unprepared_reconciliation_preserves_records_at_or_above_recovery_boundary(
-    offset: int, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    session = MagicMock(spec=AsyncSession)
-    session.__aenter__.return_value = session
-    clock = MagicMock()
-    clock.one.return_value = NOW
-    session.exec.return_value = clock
-    session.get.return_value = None
-    repository = KafkaInitialPositionStore(MagicMock(return_value=session))
-    subscription, source = lifecycle()
-    position = row(gap=True)
-    position.recovery_revision = 1
-    position.recovery_token = UUID(int=42)
-    position.pending_policy = RecoveryPolicy.RETAINED_BEGINNING.value
-    position.pending_reason = "offset_expired"
-    position.pending_boundary = 20
-    pending = delivery()
-    pending.record_identity = identity(offset=offset).record
-    pending.lease_until = NOW
-    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, position)))
-    monkeypatch.setattr(repository, "_deliveries", AsyncMock(return_value=[pending]))
-    value = RecoveryRequest(
-        **position_request().model_dump(),
-        expected_recovery_revision=0,
-        policy=RecoveryPolicy.RETAINED_BEGINNING,
-        reason="offset_expired",
-        allow_unscheduled_disposition=True,
-    )
-    assert await repository.reconcile_claims(value, UUID(int=42), "repair") == []
-    assert pending.claim_token is None
-    assert pending.owner_worker_id is None
-    assert pending.model_dump()["lease_until"] is None
-    if offset < 20:
-        assert pending.state == DeliveryState.CANCELLED
-        assert pending.resolved_at == NOW
-    else:
-        assert pending.state == DeliveryState.IN_PROGRESS
-        assert pending.resolved_at is None
-        assert pending.last_error_code == "fenced_by_gap_recovery"
-
-
-async def test_reconciliation_claims_only_the_next_prepared_delivery(monkeypatch: pytest.MonkeyPatch) -> None:
-    session = MagicMock(spec=AsyncSession)
-    session.__aenter__.return_value = session
-    clock = MagicMock()
-    clock.one.return_value = NOW
-    session.exec.return_value = clock
-    repository = KafkaInitialPositionStore(MagicMock(return_value=session))
-    subscription, source = lifecycle()
-    position = row(gap=True)
-    position.recovery_revision = 1
-    position.recovery_token = UUID(int=42)
-    position.pending_policy = RecoveryPolicy.RETAINED_BEGINNING.value
-    position.pending_reason = "offset_expired"
-    position.pending_boundary = 0
-    prepared = [delivery(), delivery()]
-    for offset, pending in enumerate(prepared):
-        coordinates = identity(offset=offset)
-        pending.record_identity = coordinates.record
-        pending.identity_digest = coordinates.digest
-        pending.execution_identity = coordinates.execution_id
-        pending.temporal_workflow_id = coordinates.temporal_workflow_id
-        pending.lease_until = NOW
-        pending.frozen_binding = binding()
-        pending.execution_id = coordinates.execution_id
-    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, position)))
-    monkeypatch.setattr(repository, "_deliveries", AsyncMock(return_value=prepared))
-    store = MagicMock(spec=EventDeliveryStore)
-    store.acquire.side_effect = [EventDeliveryStore._claim(pending) for pending in prepared]
-    monkeypatch.setattr(kafka_position_store, "EventDeliveryStore", lambda _session: store)
-    value = RecoveryRequest(
-        **position_request().model_dump(),
-        expected_recovery_revision=0,
-        policy=RecoveryPolicy.RETAINED_BEGINNING,
-        reason="offset_expired",
-    )
-
-    first = await repository.reconcile_claims(value, UUID(int=42), "repair")
-    assert len(first) == 1
-    store.acquire.assert_awaited_once()
-    assert store.acquire.await_args.args[0] == prepared[0].delivery_identity()
-    prepared[0].state = DeliveryState.SCHEDULED
-    prepared[0].resolved_at = NOW
-    second = await repository.reconcile_claims(value, UUID(int=42), "repair")
-    assert len(second) == 1
-    assert store.acquire.await_count == 2
-    assert store.acquire.await_args.args[0] == prepared[1].delivery_identity()
 
 
 async def test_recovery_selection_reloads_first_winner(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -413,29 +175,6 @@ async def test_recovery_selection_reloads_first_winner(monkeypatch: pytest.Monke
     first = await repository.select_recovery_boundary(value, UUID(int=42), 100)
     winner = await repository.select_recovery_boundary(value, UUID(int=42), 200)
     assert first.pending_boundary == winner.pending_boundary == 100
-
-
-async def test_reconciliation_requires_a_recorded_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
-    factory, _ = session_factory()
-    repository = KafkaInitialPositionStore(factory)
-    subscription, source = lifecycle()
-    position = row(gap=True)
-    position.recovery_revision = 1
-    position.recovery_token = UUID(int=42)
-    position.pending_policy = RecoveryPolicy.CURRENT_END.value
-    position.pending_reason = "offset_expired"
-    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, position)))
-    deliveries = AsyncMock()
-    monkeypatch.setattr(repository, "_deliveries", deliveries)
-    value = RecoveryRequest(
-        **position_request().model_dump(),
-        expected_recovery_revision=0,
-        policy=RecoveryPolicy.CURRENT_END,
-        reason="offset_expired",
-    )
-    with pytest.raises(KafkaPositionError, match="recovery_boundary_unavailable"):
-        await repository.reconcile_claims(value, UUID(int=42), "repair")
-    deliveries.assert_not_awaited()
 
 
 @pytest.mark.parametrize("stale", ["revision", "boundary"])
@@ -571,13 +310,13 @@ async def test_kind_mismatch_is_rejected_before_boundary_insert(monkeypatch: pyt
     session.execute.assert_not_awaited()
 
 
-async def test_retained_delivery_without_position_refuses_initial_boundary_insert(
+async def test_retained_execution_without_position_refuses_initial_boundary_insert(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session = MagicMock(spec=AsyncSession)
     session.__aenter__.return_value = session
     retained = MagicMock()
-    retained.first.return_value = delivery().identity_digest
+    retained.first.return_value = identity().execution_id
     session.exec.return_value = retained
     repository = KafkaInitialPositionStore(MagicMock(return_value=session))
     subscription, source = lifecycle()
@@ -656,22 +395,3 @@ async def test_source_initialization_waits_for_all_first_members_and_survives_an
     await repository.confirm_initial(position_request(), boundary=7)
     assert added.initial_commit_confirmed_at == NOW
     assert source.initialized_at == NOW
-
-
-async def test_legacy_revision_fence_blocks_capture_even_without_surviving_rows(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    session = MagicMock(spec=AsyncSession)
-    session.__aenter__.return_value = session
-    repository = KafkaInitialPositionStore(MagicMock(return_value=session))
-    subscription, source = lifecycle()
-    subscription.desired_enabled = True
-    source.delivery_evidence_revision = 1
-    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, None)))
-    monkeypatch.setattr(repository, "_held", AsyncMock(return_value=False))
-    with pytest.raises(KafkaPositionError, match=GapReason.INITIALIZATION_HISTORY_UNAVAILABLE.value) as failure:
-        await repository.capture_initial_partitions(position_request(), observation())
-    assert failure.value.status == PositionStatus.BLOCKED
-    assert source.configuration.initial_partition_ids is None
-    session.exec.assert_not_awaited()
-    session.execute.assert_not_awaited()

@@ -26,12 +26,10 @@ Publishing a subscription with a legacy pause flag clears that flag and advances
 its configuration revision. Existing paused subscriptions remain stopped until
 their workflows are republished; the upgrade does not resume them automatically.
 
-The worker retains its internal placement, stop acknowledgements, delivery
-claims, partition recovery fences and retirement safeguards. Offset gaps recover
-automatically from retained beginning under the existing source, ownership and
-delivery-evidence checks. Removing public operational controls does not remove
-those safety boundaries or authorize deletion of unresolved work.
+The worker retains subscription placement leases, partition recovery fences and
+bounded local draining. Matching records commit only after verified Temporal
+acceptance and normal Execution persistence. Offset gaps recover automatically
+from retained beginning under source and assignment checks.
 
 See [worker operations](kafka-worker-operations.md) and
-[record runner recovery](kafka-record-runner.md) for runtime behavior and
-retained-inspection safeguards.
+[record processing](kafka-record-runner.md) for runtime behavior.
