@@ -12,7 +12,7 @@ from uuid import UUID
 
 import structlog
 from pydantic import TypeAdapter, ValidationError
-from sqlalchemy import Integer, Select, cast, func
+from sqlalchemy import ColumnElement, Integer, Select, cast, func
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlmodel.sql._expression_select_cls import SelectOfScalar
@@ -440,6 +440,7 @@ class BaseService:
         model: type[TModel],
         special_field_handlers: dict[str, Any] | None = None,
         allowed_projects: AllowedProjectsResult | None = None,
+        extra_predicates: list[ColumnElement[bool]] | None = None,
     ) -> bool:
         """Check if any items exist before the given item (toward first page).
 
@@ -463,6 +464,7 @@ class BaseService:
             model: BaseResource class to query
             special_field_handlers: Dict mapping field names to custom handler functions
             allowed_projects: Optional project scope filter result
+            extra_predicates: Optional SQLAlchemy boolean expressions ANDed onto the check query
 
         Returns:
             True if items exist before first_item (not on first page)
@@ -490,6 +492,7 @@ class BaseService:
         check_query, _ = self._apply_label_filters(check_query, query_params, model)
         if special_field_handlers:
             check_query = self._apply_special_filters(check_query, filters, model, special_field_handlers)
+        check_query = self._apply_extra_predicates(check_query, extra_predicates)
 
         # Check if any items exist before first_item using the sort column keyset.
         sort_field_name, original_sort_direction = parse_sort(sort or "-created_at", model.__sortable_fields__)
@@ -535,6 +538,7 @@ class BaseService:
         label_filters: dict[str, str] | None = None,
         allowed_projects: AllowedProjectsResult | None = None,
         id_restriction: list[UUID] | None = None,
+        extra_predicates: list[ColumnElement[bool]] | None = None,
     ) -> int:
         """Get total count of resources matching filters.
 
@@ -545,6 +549,7 @@ class BaseService:
             label_filters: Dict of label filters to apply
             allowed_projects: Optional project scope filter result
             id_restriction: Optional list of allowed resource IDs
+            extra_predicates: Optional SQLAlchemy boolean expressions ANDed onto the count query
 
         Returns:
             Total count of matching resources
@@ -568,6 +573,8 @@ class BaseService:
             if not id_restriction:
                 return 0
             count_query = count_query.filter(model.id.in_(id_restriction))  # type: ignore[attr-defined]
+
+        count_query = self._apply_extra_predicates(count_query, extra_predicates)  # type: ignore[type-var, assignment]
 
         # Apply regular filters
         regular_filters = [f for f in filters if not special_field_handlers or f.field not in special_field_handlers]
@@ -651,6 +658,7 @@ class BaseService:
         include_total: bool = False,
         allowed_projects: AllowedProjectsResult | None = None,
         id_restriction: list[UUID] | None = None,
+        extra_predicates: list[ColumnElement[bool]] | None = None,
     ) -> TResponse:
         """List resources with unified filtering, sorting, and cursor-based pagination.
 
@@ -708,6 +716,8 @@ class BaseService:
             id_restriction: Optional list of allowed resource IDs. When provided, filters
                 resources to only those whose ID is in the list. If the list is empty,
                 returns an empty result immediately. If None, no ID filtering is applied.
+            extra_predicates: Optional SQLAlchemy boolean expressions ANDed onto the page
+                and COUNT queries (e.g. a JSONB equality). None applies no extra filtering.
 
         Returns:
             Typed response object containing:
@@ -761,6 +771,7 @@ class BaseService:
                 include_total=include_total,
                 allowed_projects=allowed_projects,
                 id_restriction=id_restriction,
+                extra_predicates=extra_predicates,
             )
         except Exception:
             elapsed_ms = round((time.monotonic() - start) * 1000, 2)
@@ -799,6 +810,7 @@ class BaseService:
         include_total: bool,
         allowed_projects: AllowedProjectsResult | None,
         id_restriction: list[UUID] | None = None,
+        extra_predicates: list[ColumnElement[bool]] | None = None,
     ) -> TResponse:
         """Execute the list query with filtering, sorting, pagination, and conversion."""
         self._validate_query_params(query_params, model)
@@ -812,6 +824,7 @@ class BaseService:
             special_field_handlers,
             allowed_projects,
             id_restriction=id_restriction,
+            extra_predicates=extra_predicates,
         )
         if built is None:
             return response_type(resources=[], next=None, prev=None, total=0 if include_total else None)
@@ -831,6 +844,7 @@ class BaseService:
             special_field_handlers=special_field_handlers,
             allowed_projects=allowed_projects,
             id_restriction=id_restriction,
+            extra_predicates=extra_predicates,
             sort_context=(sort_field_name, sort_dir),
         )
 
@@ -879,6 +893,17 @@ class BaseService:
 
         return query
 
+    @staticmethod
+    def _apply_extra_predicates(
+        query: Select[tuple[TModel]] | SelectOfScalar[tuple[TModel]],
+        extra_predicates: list[ColumnElement[bool]] | None,
+    ) -> Select[tuple[TModel]] | SelectOfScalar[tuple[TModel]]:
+        """AND caller-supplied SQL predicates onto a page or count query (no-op when None)."""
+        if extra_predicates:
+            for predicate in extra_predicates:
+                query = query.where(predicate)
+        return query
+
     def _build_list_query(
         self,
         model: type[TModel],
@@ -890,6 +915,7 @@ class BaseService:
         allowed_projects: AllowedProjectsResult | None,
         *,
         id_restriction: list[UUID] | None = None,
+        extra_predicates: list[ColumnElement[bool]] | None = None,
     ) -> (
         tuple[
             Select[tuple[TModel]] | SelectOfScalar[tuple[TModel]],
@@ -910,6 +936,8 @@ class BaseService:
         if result is None:
             return None
         query = result
+
+        query = self._apply_extra_predicates(query, extra_predicates)
 
         query, filters = self._apply_standard_filters(query, query_params, model, special_field_handlers)
         query, label_filters = self._apply_label_filters(query, query_params, model)
@@ -960,6 +988,7 @@ class BaseService:
         special_field_handlers: dict[str, Any] | None,
         allowed_projects: AllowedProjectsResult | None,
         id_restriction: list[UUID] | None = None,
+        extra_predicates: list[ColumnElement[bool]] | None = None,
         sort_context: tuple[str, SortDirection] = ("created_at", SortDirection.DESC),
     ) -> tuple[list[TModel], PaginationResult]:
         """Execute query, apply N+1 pagination, and return trimmed resources with metadata."""
@@ -980,6 +1009,7 @@ class BaseService:
                 label_filters,
                 allowed_projects,
                 id_restriction=id_restriction,
+                extra_predicates=extra_predicates,
             )
 
         is_first_page = False
@@ -992,6 +1022,7 @@ class BaseService:
                 model=model,
                 special_field_handlers=special_field_handlers,
                 allowed_projects=allowed_projects,
+                extra_predicates=extra_predicates,
             )
             is_first_page = not has_items_before
 

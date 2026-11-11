@@ -17,7 +17,12 @@ from syntara.authz.models.project import Project
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
-from syntara.workflows.models import ActivitySignalPayload, ExecutionListParams, SignalResponse
+from syntara.workflows.models import (
+    ActivitySignalPayload,
+    ChildExecutionListParams,
+    ExecutionListParams,
+    SignalResponse,
+)
 from syntara.workflows.models.activity_execution import ActivityExecutionListResponse
 from syntara.workflows.models.execution import (
     Execution,
@@ -341,6 +346,39 @@ async def list_execution_activities(
         sort=params.sort,
         query_params_items=request.query_params.items(),
         include_total=params.include_total,
+    )
+
+
+@router.get(
+    "/{execution_id}/children",
+    operation_id="list_child_executions",
+    summary="List child executions",
+    description="Retrieve child (sub-workflow) executions spawned by a parent execution.",
+    dependencies=[Depends(_exec_perm_read)],
+)
+async def list_child_executions(
+    execution_id: UUID,
+    service: Annotated[ExecutionService, Depends(get_execution_service)],
+    visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("execution", "read"))],
+    params: Annotated[ChildExecutionListParams, Query()],
+) -> ExecutionListResponse:
+    """List child (sub-workflow) executions for a parent execution.
+
+    Access requires read permission on the parent execution (``_exec_perm_read``);
+    returned children are additionally scoped to the caller's visible projects.
+    Optional ``node_id`` scopes results to a single parent Sub-workflow node
+    (a ``for_each`` node spawns one child execution per iteration). Uses the
+    standard execution-list pagination; ordering is deterministic (created_at
+    with an id tiebreaker).
+    """
+    return await service.list_child_executions(
+        execution_id,
+        node_id=params.node_id,
+        limit=params.limit,
+        cursor=params.cursor,
+        sort=params.sort,
+        include_total=params.include_total,
+        allowed_projects=visibility.to_allowed_projects(),
     )
 
 

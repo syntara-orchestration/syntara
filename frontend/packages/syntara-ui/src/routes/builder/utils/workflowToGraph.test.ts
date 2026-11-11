@@ -96,6 +96,13 @@ describe('workflowToGraph', () => {
       expect(getTriggerDisplayData(trigger)).toEqual({ name: 'Trigger', details: 'Manual' })
     })
 
+    it('labels a subworkflow_trigger as a Workflow trigger', () => {
+      const trigger: Trigger = {
+        type: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
+      }
+      expect(getTriggerDisplayData(trigger)).toEqual({ name: 'Trigger', details: 'Workflow trigger' })
+    })
+
     it('uses trigger name when provided', () => {
       const trigger: Trigger = {
         type: TriggerTypeEnum.MANUAL_TRIGGER,

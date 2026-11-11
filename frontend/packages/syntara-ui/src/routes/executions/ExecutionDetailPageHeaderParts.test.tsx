@@ -1,12 +1,22 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { executionsClient } from '../../client'
 import { useCanI } from '../../hooks/useCanI'
 
-import { ExecutionDetailHeaderToolbar, ExecutionDetailTitleRowAddons } from './ExecutionDetailPageHeaderParts'
-import { executionDetailHasTitleRowExtras, executionDetailPageHeading } from './executionDetailPageHeaderTitle'
+import {
+  ExecutionDetailHeaderToolbar,
+  ExecutionDetailParentRunLink,
+  ExecutionDetailTitleRowAddons,
+} from './ExecutionDetailPageHeaderParts'
+import {
+  executionDetailHasTitleRowExtras,
+  executionDetailPageHeading,
+  executionHasParentRun,
+} from './executionDetailPageHeaderTitle'
 
 vi.mock('../../hooks/useCanI', () => ({
   useCanI: vi.fn(() => ({ allowed: true, isChecking: false, isError: false })),
@@ -16,6 +26,7 @@ vi.mock('../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
   interfaceTagMiddleware: { onRequest: vi.fn() },
   executionsClient: {
+    useQuery: vi.fn(() => ({ data: undefined, isLoading: false, isError: false })),
     useMutation: vi.fn(() => ({
       mutate: vi.fn(),
       isPending: false,
@@ -36,6 +47,19 @@ vi.mock('../../providers/alerts/AlertContext', () => ({
     showError: vi.fn(),
   }),
 }))
+
+vi.mock('@tanstack/react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-router')>()
+  return {
+    ...actual,
+    Link: ({ to, children, ...rest }: { to: string; children?: ReactNode } & Record<string, unknown>) => (
+      <a href={to} {...rest}>
+        {children}
+      </a>
+    ),
+    useNavigate: () => vi.fn(),
+  }
+})
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -75,6 +99,14 @@ describe('executionDetailPageHeaderTitle', () => {
 
   it('detects when title row extras should render', () => {
     expect(executionDetailHasTitleRowExtras(undefined)).toBe(false)
+  })
+
+  it('detects when an execution has a parent run', () => {
+    expect(executionHasParentRun(undefined)).toBe(false)
+    expect(executionHasParentRun({} as never)).toBe(false)
+    expect(executionHasParentRun({ execution_metadata: { parent_execution_id: 'exec-parent-001' } } as never)).toBe(
+      true
+    )
   })
 })
 
@@ -198,6 +230,38 @@ describe('ExecutionDetailPageHeaderParts', () => {
     } as never
     render(<ExecutionDetailTitleRowAddons execution={execution} />)
     expect(screen.getByText(/Viewing run:/)).toBeInTheDocument()
+  })
+
+  it('renders a View parent run link when the execution has a parent', () => {
+    const execution = {
+      status: 'completed' as const,
+      execution_metadata: { parent_execution_id: 'exec-parent-001' },
+    } as never
+    render(<ExecutionDetailParentRunLink execution={execution} />)
+    expect(screen.getByTestId('view-parent-run')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'View parent run' })).toBeInTheDocument()
+  })
+
+  it('includes the parent workflow name when it resolves', () => {
+    vi.mocked(executionsClient.useQuery).mockReturnValueOnce({
+      data: { workflow_name: 'Parent Flow' },
+      isLoading: false,
+      isError: false,
+    })
+    const execution = {
+      status: 'completed' as const,
+      execution_metadata: { parent_execution_id: 'exec-parent-001' },
+    } as never
+    render(<ExecutionDetailParentRunLink execution={execution} />)
+    expect(screen.getByRole('link', { name: 'View parent run: Parent Flow' })).toBeInTheDocument()
+  })
+
+  it('does not render a View parent run link for a top-level execution', () => {
+    const execution = {
+      status: 'completed' as const,
+    } as never
+    render(<ExecutionDetailParentRunLink execution={execution} />)
+    expect(screen.queryByTestId('view-parent-run')).not.toBeInTheDocument()
   })
 
   it('renders approval action buttons when showApprovalActionStrip is true', () => {

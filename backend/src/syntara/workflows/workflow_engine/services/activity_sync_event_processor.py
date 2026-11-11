@@ -1,5 +1,6 @@
 """Translate Temporal activity events into pending database updates."""
 
+import json
 from typing import Any
 
 import structlog
@@ -8,8 +9,10 @@ from temporalio.api.history.v1 import HistoryEvent
 from syntara.telemetry.events.workflow_error import RETRY_REASON_MAX_LENGTH
 from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.datetime import ensure_timezone_aware
+from syntara.workflows.workflow_engine.codecs.credential_codec import CredentialPayloadCodec
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
+from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     innermost_iteration_index,
     strip_loop_iteration_suffixes,
@@ -22,9 +25,18 @@ logger = structlog.stdlib.get_logger(__name__)
 class ActivitySyncEventProcessorMixin:
     """Handlers for Temporal activity task history events."""
 
+    # Provided by the composed ActivitySyncService; declared here for type-checkers
+    # (mirrors the stub on the monitor mixin) so self.temporal_client resolves.
+    temporal_client: Any
+
+    _SUBWORKFLOW_SETUP_PREFIX = "__internal__setup_sub_workflow_"
+
     def _process_activity_scheduled(self, event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
         """Process ACTIVITY_TASK_SCHEDULED event."""
         attrs = event.activity_task_scheduled_event_attributes
+        if attrs.activity_id.startswith(self._SUBWORKFLOW_SETUP_PREFIX):
+            self._process_subworkflow_setup_scheduled(event, attrs.activity_id, metadata)
+            return
         if attrs.activity_id.startswith("__internal__"):
             return
         iteration_number = innermost_iteration_index(attrs.activity_id)
@@ -62,6 +74,44 @@ class ActivitySyncEventProcessorMixin:
             "iteration": iteration_number,
             "scheduled_at": ensure_timezone_aware(event.event_time),
             "configured_timeout_seconds": configured_timeout_seconds,
+        }
+        metadata.pending_sync_event_ids.add(event.event_id)
+
+    def _process_subworkflow_setup_scheduled(
+        self, event: HistoryEvent, activity_id: str, metadata: ExecutionMonitorMetadata
+    ) -> None:
+        """Register the sub-workflow setup activity against its canvas node.
+
+        The sub-workflow node runs through an ``__internal__setup_sub_workflow_*``
+        activity whose id encodes the canvas node and (for ``for_each``) the
+        iteration: ``__internal__setup_sub_workflow_{node.id}`` or
+        ``..._{node.id}_iter_{n}``. The node's aggregate ActivityExecution row is
+        already created upfront, so this only registers a pending update keyed to
+        the canvas node: the activity's STARTED event drives RUNNING and its
+        COMPLETED event populates runtime_metadata (non-iterated nodes only).
+        Terminal status stays owned by the finalizer (see
+        ``_process_subworkflow_setup_completed``).
+        """
+        invocation_node_id = activity_id[len(self._SUBWORKFLOW_SETUP_PREFIX) :]
+        iteration_number = innermost_iteration_index(invocation_node_id)
+        canvas_node_id = (
+            strip_loop_iteration_suffixes(invocation_node_id) if iteration_number is not None else invocation_node_id
+        )
+        metadata.pending_activity_updates[event.event_id] = {
+            "activity_id": canvas_node_id,
+            "activity_name": canvas_node_id,
+            "_is_loop_iteration": False,
+            "_is_loop_control": False,
+            "_subworkflow_setup": True,
+            "_subworkflow_iteration": iteration_number,
+            "status": ActivityStatus.PENDING,
+            "started_at": None,
+            "completed_at": None,
+            "error_details": None,
+            "retry_count": 0,
+            "iteration": None,
+            "scheduled_at": ensure_timezone_aware(event.event_time),
+            "configured_timeout_seconds": None,
         }
         metadata.pending_sync_event_ids.add(event.event_id)
 
@@ -154,10 +204,113 @@ class ActivitySyncEventProcessorMixin:
         scheduled_id = attrs.scheduled_event_id
         if scheduled_id in metadata.pending_activity_updates:
             update = metadata.pending_activity_updates[scheduled_id]
+            if update.get("_subworkflow_setup"):
+                self._process_subworkflow_setup_completed(attrs, update, scheduled_id, metadata)
+                return
             update["status"] = ActivityStatus.COMPLETED
             update["completed_at"] = ensure_timezone_aware(event.event_time)
             metadata.pending_sync_event_ids.add(scheduled_id)
             metadata.terminal_activity_ids.add(update["activity_id"])
+
+    def _process_subworkflow_setup_completed(
+        self,
+        attrs: Any,  # noqa: ANN401 - ActivityTaskCompletedEventAttributes
+        update: dict[str, Any],
+        scheduled_id: int,
+        metadata: ExecutionMonitorMetadata,
+    ) -> None:
+        """Handle completion of the sub-workflow setup activity.
+
+        Setup completion is NOT node completion: the child workflow has only just
+        been dispatched. The node is kept RUNNING and deliberately not added to
+        ``terminal_activity_ids`` — the finalizer owns the node's terminal status
+        until a reliable logical-node completion signal exists (C3).
+
+        The node's ``input_data``/``output_data`` summaries are reconstructed from
+        the setup result payload and persisted via the shared writer (C3: ASS owns
+        this, replacing the activity-side direct writer). For a non-iterated node
+        the child's identifying metadata is also surfaced as ``runtime_metadata``;
+        for a ``for_each`` node (N setups -> one aggregate row) ``runtime_metadata``
+        stays unset (deferred), while I/O follows the last iteration's setup result
+        (preserving prior behaviour).
+        """
+        update["status"] = ActivityStatus.RUNNING
+        update["completed_at"] = None
+        setup_result = self._decode_setup_result(attrs, self.temporal_client.data_converter.payload_codec)
+        if setup_result is not None:
+            update["_subworkflow_io"] = self._build_subworkflow_io(setup_result)
+            if update.get("_subworkflow_iteration") is None:
+                child_metadata = self._child_runtime_metadata(setup_result)
+                if child_metadata is not None:
+                    update["runtime_metadata"] = child_metadata
+        metadata.pending_sync_event_ids.add(scheduled_id)
+
+    @staticmethod
+    def _decode_setup_result(
+        attrs: Any,  # noqa: ANN401
+        codec: CredentialPayloadCodec | None = None,
+    ) -> dict[str, Any] | None:
+        """Decode the sub-workflow setup activity's JSON result payload.
+
+        When a credential payload codec is provided, the payload is decrypted
+        first: credential-bearing setup results are stored ``binary/encrypted``
+        in history, so a raw ``json.loads`` would throw and silently drop the
+        child link and I/O summary. Non-encrypted payloads pass through
+        unchanged. Returns the parsed dict, or ``None`` when the payload is
+        absent or unparseable (defensive: the summaries are best-effort UI data).
+        """
+        if not attrs.result or not attrs.result.payloads:
+            return None
+        payload = attrs.result.payloads[0]
+        try:
+            if isinstance(codec, CredentialPayloadCodec):
+                payload = codec.decode_payload(payload)
+            result_data = json.loads(payload.data)
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to decode/parse sub-workflow setup result", exc_info=True)
+            return None
+        return result_data if isinstance(result_data, dict) else None
+
+    @staticmethod
+    def _child_runtime_metadata(setup_result: dict[str, Any]) -> dict[str, Any] | None:
+        """UI-relevant child identifiers for ``runtime_metadata``.
+
+        Only the identifiers are surfaced; the child workflow definition carried in
+        the setup result is never stored. Returns ``None`` when none are present.
+        """
+        child_metadata = {
+            "child_execution_id": setup_result.get("execution_id"),
+            "child_workflow_id": setup_result.get("child_workflow_id"),
+            "child_workflow_name": setup_result.get("child_workflow_name"),
+            "child_workflow_version": setup_result.get("child_workflow_version"),
+        }
+        if all(value is None for value in child_metadata.values()):
+            return None
+        return child_metadata
+
+    @staticmethod
+    def _build_subworkflow_io(setup_result: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        """Reconstruct the node's ``input_data``/``output_data`` summaries.
+
+        Byte-for-byte the shapes the setup activity used to persist directly: the
+        reference-mode invocation summary and the four-field child summary (same
+        field names, ``.get()`` null behaviour, and ``or {}`` default). The large
+        workflow definition in the result is deliberately not included.
+        """
+        input_data = {
+            "execution_mode": "reference",
+            "workflow_id": setup_result.get("child_workflow_id"),
+            "workflow_name": setup_result.get("child_workflow_name"),
+            "trigger_node_id": setup_result.get("trigger_node_id"),
+            "input_parameters": scrub_credentials(setup_result.get("input_data") or {}),
+        }
+        output_data = {
+            "workflow_id": setup_result.get("child_workflow_id"),
+            "workflow_name": setup_result.get("child_workflow_name"),
+            "child_workflow_version": setup_result.get("child_workflow_version"),
+            "child_execution_id": setup_result.get("execution_id"),
+        }
+        return {"input": input_data, "output": output_data}
 
     def _process_activity_failed(self, event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
         """Process ACTIVITY_TASK_FAILED event."""
@@ -165,6 +318,10 @@ class ActivitySyncEventProcessorMixin:
         scheduled_id = attrs.scheduled_event_id
         if scheduled_id in metadata.pending_activity_updates:
             update = metadata.pending_activity_updates[scheduled_id]
+            if update.get("_subworkflow_setup"):
+                # Terminal status for the sub-workflow node is owned by the
+                # finalizer in C2; a setup failure must not terminalize the node.
+                return
             is_cancelled = bool(
                 attrs.failure
                 and attrs.failure.application_failure_info
@@ -183,6 +340,10 @@ class ActivitySyncEventProcessorMixin:
         scheduled_id = attrs.scheduled_event_id
         if scheduled_id in metadata.pending_activity_updates:
             update = metadata.pending_activity_updates[scheduled_id]
+            if update.get("_subworkflow_setup"):
+                # Terminal status for the sub-workflow node is owned by the
+                # finalizer in C2; a setup timeout must not terminalize the node.
+                return
             update["status"] = ActivityStatus.FAILED
             timed_out_at = ensure_timezone_aware(event.event_time)
             update["completed_at"] = timed_out_at
@@ -208,6 +369,10 @@ class ActivitySyncEventProcessorMixin:
         scheduled_id = attrs.scheduled_event_id
         if scheduled_id in metadata.pending_activity_updates:
             update = metadata.pending_activity_updates[scheduled_id]
+            if update.get("_subworkflow_setup"):
+                # Terminal status for the sub-workflow node is owned by the
+                # finalizer in C2; a setup cancel must not terminalize the node.
+                return
             update["status"] = ActivityStatus.CANCELLED
             update["completed_at"] = ensure_timezone_aware(event.event_time)
             update["error_details"] = "Activity was canceled"

@@ -5,6 +5,7 @@ import type { ActivityState } from '../workflows/execution/types'
 
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 import {
+  isTriggerActivityType,
   resolveNodeName,
   sortActivityOrder,
   useActivityNameMap,
@@ -316,6 +317,51 @@ describe('useActivityNameMap', () => {
       expect(result.current.nameMap.get('task-1')).toBeUndefined()
       expect(result.current.nameMap.get('task-2')).toBeUndefined()
     })
+
+    it('populates trigger node types from the separate def.triggers array', () => {
+      vi.mocked(useActivities).mockReturnValue(undefined)
+      vi.mocked(useTriggers).mockReturnValue(undefined)
+
+      const wfDef: WorkflowDefShape = {
+        nodes: [{ id: 'task-1', name: 'Script Node', type: 'script' }],
+        triggers: [{ id: 'start', type: 'manual_trigger', name: 'Start' }],
+      }
+      const states = new Map<string, ActivityState>([
+        ['start', { activityId: 'start', status: 'completed' }],
+        ['task-1', { activityId: 'task-1', status: 'completed' }],
+      ])
+
+      const { result } = renderHook(() => useActivityNameMap(wfDef, states))
+
+      const startItem = result.current.activityOrder.find((a) => a.id === 'start')
+      const taskItem = result.current.activityOrder.find((a) => a.id === 'task-1')
+      // Triggers live outside nodes[]; their type must still reach activityOrder
+      // so the executable-only list can exclude them.
+      expect(startItem?.type).toBe('manual_trigger')
+      expect(isTriggerActivityType(startItem?.type)).toBe(true)
+      expect(taskItem?.type).toBe('script')
+      expect(isTriggerActivityType(taskItem?.type)).toBe(false)
+    })
+  })
+})
+
+describe('isTriggerActivityType', () => {
+  it('returns true for every trigger node type (mirrors backend _trigger suffix)', () => {
+    for (const type of [
+      'manual_trigger',
+      'scheduled_trigger',
+      'webhook_trigger',
+      'eda_trigger',
+      'subworkflow_trigger',
+    ]) {
+      expect(isTriggerActivityType(type)).toBe(true)
+    }
+  })
+
+  it('returns false for executable node types and nullish values', () => {
+    for (const type of ['script', 'sub_workflow', 'http_request', 'approval', 'condition', undefined, null]) {
+      expect(isTriggerActivityType(type)).toBe(false)
+    }
   })
 })
 

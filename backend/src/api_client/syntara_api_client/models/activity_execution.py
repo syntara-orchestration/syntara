@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ..models.activity_execution_input_data import ActivityExecutionInputData
     from ..models.activity_execution_labels import ActivityExecutionLabels
     from ..models.activity_execution_output_data_type_0 import ActivityExecutionOutputDataType0
+    from ..models.activity_execution_runtime_metadata_type_0 import ActivityExecutionRuntimeMetadataType0
 
 
 T = TypeVar("T", bound="ActivityExecution")
@@ -52,6 +53,8 @@ class ActivityExecution:
             completed_at (datetime.datetime | None | Unset): When activity completed/failed
             input_data (ActivityExecutionInputData | Unset): Runtime input parameters
             output_data (ActivityExecutionOutputDataType0 | None | Unset): Activity results (if completed)
+            runtime_metadata (ActivityExecutionRuntimeMetadataType0 | None | Unset): Intermediate, UI-relevant execution
+                metadata available before the final output
             error_details (None | str | Unset): Error information if failed
             retry_count (int | Unset): Number of retry attempts Default: 0.
             iteration (int | None | Unset): Iteration number if activity is within a loop (0-indexed)
@@ -70,12 +73,14 @@ class ActivityExecution:
     completed_at: datetime.datetime | None | Unset = UNSET
     input_data: ActivityExecutionInputData | Unset = UNSET
     output_data: ActivityExecutionOutputDataType0 | None | Unset = UNSET
+    runtime_metadata: ActivityExecutionRuntimeMetadataType0 | None | Unset = UNSET
     error_details: None | str | Unset = UNSET
     retry_count: int | Unset = 0
     iteration: int | None | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.activity_execution_output_data_type_0 import ActivityExecutionOutputDataType0
+        from ..models.activity_execution_runtime_metadata_type_0 import ActivityExecutionRuntimeMetadataType0
 
         execution_id = str(self.execution_id)
 
@@ -131,6 +136,14 @@ class ActivityExecution:
         else:
             output_data = self.output_data
 
+        runtime_metadata: dict[str, Any] | None | Unset
+        if isinstance(self.runtime_metadata, Unset):
+            runtime_metadata = UNSET
+        elif isinstance(self.runtime_metadata, ActivityExecutionRuntimeMetadataType0):
+            runtime_metadata = self.runtime_metadata.to_dict()
+        else:
+            runtime_metadata = self.runtime_metadata
+
         error_details: None | str | Unset
         if isinstance(self.error_details, Unset):
             error_details = UNSET
@@ -172,6 +185,8 @@ class ActivityExecution:
             field_dict["input_data"] = input_data
         if output_data is not UNSET:
             field_dict["output_data"] = output_data
+        if runtime_metadata is not UNSET:
+            field_dict["runtime_metadata"] = runtime_metadata
         if error_details is not UNSET:
             field_dict["error_details"] = error_details
         if retry_count is not UNSET:
@@ -186,6 +201,7 @@ class ActivityExecution:
         from ..models.activity_execution_input_data import ActivityExecutionInputData
         from ..models.activity_execution_labels import ActivityExecutionLabels
         from ..models.activity_execution_output_data_type_0 import ActivityExecutionOutputDataType0
+        from ..models.activity_execution_runtime_metadata_type_0 import ActivityExecutionRuntimeMetadataType0
 
         d = dict(src_dict)
         execution_id = UUID(d.pop("execution_id"))
@@ -284,6 +300,23 @@ class ActivityExecution:
 
         output_data = _parse_output_data(d.pop("output_data", UNSET))
 
+        def _parse_runtime_metadata(data: object) -> ActivityExecutionRuntimeMetadataType0 | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                runtime_metadata_type_0 = ActivityExecutionRuntimeMetadataType0.from_dict(data)
+
+                return runtime_metadata_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(ActivityExecutionRuntimeMetadataType0 | None | Unset, data)
+
+        runtime_metadata = _parse_runtime_metadata(d.pop("runtime_metadata", UNSET))
+
         def _parse_error_details(data: object) -> None | str | Unset:
             if data is None:
                 return data
@@ -318,6 +351,7 @@ class ActivityExecution:
             completed_at=completed_at,
             input_data=input_data,
             output_data=output_data,
+            runtime_metadata=runtime_metadata,
             error_details=error_details,
             retry_count=retry_count,
             iteration=iteration,

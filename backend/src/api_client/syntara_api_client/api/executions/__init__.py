@@ -72,6 +72,14 @@ class ExecutionsApi:
         endpoint_module = self._load_endpoint_module("list_execution_activities")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
 
+    def list_child(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_child_executions")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_list_child(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_child_executions")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
     def signal_activity(self, **kwargs: Any) -> Response[Any]:
         endpoint_module = self._load_endpoint_module("signal_activity")
         return endpoint_module.sync_detailed(client=self._client, **kwargs)

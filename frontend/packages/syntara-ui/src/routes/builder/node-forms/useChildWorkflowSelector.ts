@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 
 import { workflowClient } from '../../../client'
+import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import { accessFetchClient } from '../../access/accessClient'
 import {
@@ -35,9 +36,17 @@ type SchemaQueryResult = {
   isPending: boolean
 }
 
-function workflowLabel(workflow: Workflow): string {
-  const version = workflow.published_version_number
-  return version == null ? workflow.name : `${workflow.name} (v${version})`
+/**
+ * Description text for a child-workflow option: the published version's name, or the
+ * version creation date when it has no name — the same identity shown in the child
+ * execution view, so the picker no longer surfaces a bare ordinal like "v1".
+ */
+function versionDescription(
+  schema: Pick<InvocationSchema, 'published_version_name' | 'published_version_created_at'>
+): string | undefined {
+  if (schema.published_version_name) return `Version: ${schema.published_version_name}`
+  if (schema.published_version_created_at) return `Version: ${formatDateTime(schema.published_version_created_at)}`
+  return undefined
 }
 
 function buildWorkflowOptions(
@@ -51,8 +60,8 @@ function buildWorkflowOptions(
     return [
       {
         value: workflow.id,
-        label: `${workflow.name} (v${invocationSchema.published_version})`,
-        description: workflow.description ?? undefined,
+        label: workflow.name,
+        description: versionDescription(invocationSchema) ?? workflow.description ?? undefined,
         triggers: invocationSchema.triggers ?? [],
       },
     ]
@@ -78,7 +87,7 @@ function selectedWorkflowOption({
   return {
     value: workflowId,
     label: label ?? workflow.name,
-    description: workflow.description ?? undefined,
+    description: versionDescription(schema) ?? workflow.description ?? undefined,
     triggers: schema.triggers ?? [],
   }
 }
@@ -228,7 +237,7 @@ export function useChildWorkflowSelector({
   const selectedOption = options.find((option) => option.value === selectedWorkflowId)
   const selectedSchemaQuery = selectedWorkflowId ? schemasByWorkflowId.get(selectedWorkflowId) : undefined
   const selectedWorkflow = selectedWorkflowFromList ?? selectedWorkflowQuery.data
-  const selectedWorkflowLabel = selectedWorkflow ? workflowLabel(selectedWorkflow) : undefined
+  const selectedWorkflowLabel = selectedWorkflow?.name
   const selectedSchema = selectedSchemaQuery?.data
   const resolvedSelectedOption = selectedWorkflowOption({
     existingOption: selectedOption,
@@ -278,6 +287,7 @@ export function useChildWorkflowSelector({
     retryFailedLookups,
     searchTerm,
     setSearchTerm,
+    hasProject: projectId !== null,
   }
 }
 

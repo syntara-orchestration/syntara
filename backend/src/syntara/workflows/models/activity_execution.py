@@ -164,6 +164,11 @@ class ActivityExecution(BaseResource, table=True):
     output_data: dict[str, Any] | None = Field(
         default=None, sa_column=Column(JSONB), description="Activity results (if completed)"
     )
+    runtime_metadata: dict[str, Any] | None = Field(
+        default=None,
+        sa_column=Column(JSONB),
+        description="Intermediate, UI-relevant execution metadata available before the final output",
+    )
     error_details: str | None = Field(
         None,
         sa_type=Text(),  # type: ignore[call-overload]

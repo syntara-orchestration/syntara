@@ -86,6 +86,9 @@ function applyFieldUpdate(activity: ActivityState, field: string, value: unknown
     case 'output_data':
       updated.outputData = value as Record<string, unknown> | null
       break
+    case 'runtime_metadata':
+      updated.runtimeMetadata = value as Record<string, unknown> | null
+      break
     case 'iteration':
       updated.iteration = value as number | null
       break

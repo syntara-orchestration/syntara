@@ -65,6 +65,7 @@ def _make_workflow(
     wf._converge_branch_nodes = {}
     wf._has_unhandled_failure = False
     wf._cancelled_node = None
+    wf._cancelled_step_nodes = set()
     init_workflow_runtime(wf)
     wf.pre_resolved_outputs = {}
     wf.stop_after_nodes = set()
@@ -1503,6 +1504,17 @@ class TestBuildResultStatus:
         result = wf._build_result("exec-1", include_node_results=False)
         assert result["status"] == "cancelled"
         assert "node_a" not in result["failed_activities"]
+
+    def test_cancelled_step_excluded_from_failed_and_in_cancelled_activities(self) -> None:
+        """P2-2: a cancelled sub-workflow step is reported under cancelled_activities, not failed_activities."""
+        wf = _make_workflow(failed_nodes={"node_a": "boom", "node_b": "Sub-workflow cancelled"})
+        wf._cancelled_step_nodes = {"node_b"}
+        wf._has_unhandled_failure = True
+        wf.resolver.set_namespace("trigger", {})
+        result = wf._build_result("exec-1", include_node_results=False)
+        assert result["failed_activities"] == {"node_a": "boom"}
+        assert result["cancelled_activities"] == {"node_b": "Sub-workflow cancelled"}
+        assert "node_b" not in result["failed_activities"]
 
 
 class TestHandleNodeFailureCancellation:

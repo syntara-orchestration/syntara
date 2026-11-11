@@ -223,6 +223,50 @@ describe('applyOperation', () => {
       expect(activities.get('task')?.completedAt).toBe('2025-12-10T15:00:25Z')
     })
 
+    it('updates runtime_metadata', () => {
+      const activities = new Map<string, ActivityState>([['task', { activityId: 'task', status: 'running' }]])
+      const operation: JsonPatchOperation = {
+        op: 'replace',
+        path: '/activities/task/runtime_metadata',
+        value: { child_execution_id: 'c-1', child_workflow_version: 3 },
+      }
+
+      applyOperation(activities, operation)
+
+      expect(activities.get('task')?.runtimeMetadata).toEqual({ child_execution_id: 'c-1', child_workflow_version: 3 })
+    })
+
+    it('clears runtime_metadata when patched with null', () => {
+      const activities = new Map<string, ActivityState>([
+        ['task', { activityId: 'task', status: 'running', runtimeMetadata: { child_execution_id: 'c-1' } }],
+      ])
+      const operation: JsonPatchOperation = {
+        op: 'replace',
+        path: '/activities/task/runtime_metadata',
+        value: null,
+      }
+
+      applyOperation(activities, operation)
+
+      expect(activities.get('task')?.runtimeMetadata).toBeNull()
+    })
+
+    it('preserves runtimeMetadata when another field is patched', () => {
+      const activities = new Map<string, ActivityState>([
+        ['task', { activityId: 'task', status: 'running', runtimeMetadata: { child_execution_id: 'c-1' } }],
+      ])
+      const operation: JsonPatchOperation = {
+        op: 'replace',
+        path: '/activities/task/status',
+        value: 'completed',
+      }
+
+      applyOperation(activities, operation)
+
+      expect(activities.get('task')?.status).toBe('completed')
+      expect(activities.get('task')?.runtimeMetadata).toEqual({ child_execution_id: 'c-1' })
+    })
+
     it('throws error if value is missing', () => {
       const activities = new Map<string, ActivityState>([['task', { activityId: 'task', status: 'running' }]])
       const operation: JsonPatchOperation = {
