@@ -64,23 +64,26 @@ def responder_env(
     assign_project_role_to_user: AssignProjectRoleFactory,
     syntara_base_url: str,
 ) -> dict[str, Any]:
-    """Project, two groups, and four users with distinct form-prompt access."""
+    """Project, two groups, and five users with distinct form-prompt access."""
     project_id, _ = create_project(admin_api, "form-prompt-rbac")
 
     submitter_role = create_project_role(admin_api, project_id, "fp-submitter", _SUBMIT_POLICIES)
     reader_role = create_project_role(admin_api, project_id, "fp-reader", _READ_ONLY_POLICIES)
 
     # group_names=[] keeps users out of the seeded `users` group, which carries
-    # project-user (and therefore form_prompt:submit) on the default project.
+    # project-user on the default project. This keeps their role assignments
+    # scoped to the projects created for these tests.
     user_a_id, user_a_name, user_a_pass = create_user(admin_api, "fp-allowed", group_names=[])
     user_b_id, user_b_name, user_b_pass = create_user(admin_api, "fp-outsider", group_names=[])
     user_c_id, user_c_name, user_c_pass = create_user(admin_api, "fp-nosubmit", group_names=[])
     user_d_id, user_d_name, user_d_pass = create_user(admin_api, "fp-neither", group_names=[])
+    user_e_id, user_e_name, user_e_pass = create_user(admin_api, "fp-project-user", group_names=[])
 
     assign_project_role_to_user(admin_api, project_id, user_a_id, submitter_role)
     assign_project_role_to_user(admin_api, project_id, user_b_id, submitter_role)
     assign_project_role_to_user(admin_api, project_id, user_c_id, reader_role)
     assign_project_role_to_user(admin_api, project_id, user_d_id, submitter_role)
+    assign_project_role_to_user(admin_api, project_id, user_e_id, "project-user")
 
     other_project_id, _ = create_project(admin_api, "form-prompt-other-project")
     other_project_submitter_role = create_project_role(
@@ -107,6 +110,7 @@ def responder_env(
         "user_b_api": api_for(syntara_base_url, user_b_name, user_b_pass),
         "user_c_api": api_for(syntara_base_url, user_c_name, user_c_pass),
         "user_d_api": api_for(syntara_base_url, user_d_name, user_d_pass),
+        "user_e_api": api_for(syntara_base_url, user_e_name, user_e_pass),
         "group_x_name": group_x_name,
         "group_y_name": group_y_name,
     }
@@ -545,6 +549,29 @@ class TestEmptyResponderLists:
             prefix="empty-responders-no-permission",
         )
         response = submit_form_prompt(responder_env["user_c_api"], prompt_id, _RESPONSE)
+        assert_forbidden(response, expected_code="AUTHORIZATION_DENIED")
+        assert_prompt_not_consumed(syntara_api, exec_id, prompt_id)
+
+        response = submit_form_prompt(responder_env["user_a_api"], prompt_id, _RESPONSE)
+        assert response.status_code == HTTPStatus.OK
+        assert_consumer_completed(syntara_api, exec_id)
+
+    def test_builtin_project_user_cannot_submit_without_explicit_permission(
+        self,
+        syntara_api: SyntaraApiRegistry,
+        workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+        responder_env: dict[str, Any],
+        form_execution_cleanup: Callable[[UUID], None],
+    ) -> None:
+        """The built-in project-user role alone does not grant form submission."""
+        exec_id, prompt_id = _start(
+            syntara_api,
+            workflow_factory,
+            responder_env,
+            form_execution_cleanup,
+            prefix="empty-responders-project-user",
+        )
+        response = submit_form_prompt(responder_env["user_e_api"], prompt_id, _RESPONSE)
         assert_forbidden(response, expected_code="AUTHORIZATION_DENIED")
         assert_prompt_not_consumed(syntara_api, exec_id, prompt_id)
 

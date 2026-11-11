@@ -202,7 +202,7 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("approval", "decide", scope="project", roles=("project-admin", "project-user")),
     PolicyInfo("approval", "delete", scope="project", roles=("project-admin",)),
     PolicyInfo("form_prompt", "read", scope="project", roles=("project-admin", "project-user", "project-auditor")),
-    PolicyInfo("form_prompt", "submit", scope="project", roles=("project-admin", "project-user")),
+    PolicyInfo("form_prompt", "submit", scope="project", roles=("project-admin",)),
     PolicyInfo("project", "read", scope="project", roles=("project-admin", "project-user", "project-auditor")),
     PolicyInfo("project", "update", scope="project", roles=("project-admin",)),
     PolicyInfo("project", "delete", scope="project", roles=("project-admin",)),

@@ -232,7 +232,7 @@ a list request, the API returns only prompts from projects the caller is allowed
 |---|---|---|
 | `form_prompt:create` | admin | — (service-to-service only) |
 | `form_prompt:read` | admin, auditor | project-admin, project-user, project-auditor |
-| `form_prompt:submit` | admin | project-admin, project-user |
+| `form_prompt:submit` | admin | project-admin |
 
 **Tier 2 — the responder list**, checked inside the service where the relationships are
 loaded. Naming responders **narrows** tier 1, never widens it: a listed user still needs
