@@ -109,6 +109,29 @@ describe('useExecutionTargetTestConnection', () => {
     expect(await screen.findByText('TLS handshake timed out')).toBeInTheDocument()
   })
 
+  it('shows a warning toast when the health request is skipped', async () => {
+    mockProbeMutate.mockImplementation((_params: unknown, callbacks?: ProbeCallbacks) => {
+      callbacks?.onSuccess?.({
+        healthy: true,
+        message: 'Target is still registering',
+        skipped: true,
+      })
+      callbacks?.onSettled?.()
+    })
+
+    const { result } = renderHook(() => useExecutionTargetTestConnection(), {
+      wrapper: createWrapper(),
+    })
+
+    act(() => {
+      result.current.testConnection(target)
+    })
+
+    expect(await screen.findByText('Health check not available')).toBeInTheDocument()
+    expect(await screen.findByText('Target is still registering')).toBeInTheDocument()
+    expect(screen.queryByText('Connection failed')).not.toBeInTheDocument()
+  })
+
   it('shows a danger toast when the health request errors', async () => {
     mockProbeMutate.mockImplementation((_params: unknown, callbacks?: ProbeCallbacks) => {
       callbacks?.onError?.({ status: 409, detail: 'Cluster not ready' })

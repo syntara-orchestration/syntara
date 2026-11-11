@@ -42,7 +42,18 @@ export function useExecutionTargetTestConnection() {
         { params: { path: { target_id: target.id } } },
         {
           onSuccess: (result: ExecutionTargetHealthResult) => {
-            if (result.healthy && !result.skipped) {
+            if (result.skipped) {
+              showAlert({
+                title: 'Health check not available',
+                description:
+                  result.message?.trim() || `Health check was skipped for execution target "${target.name}".`,
+                variant: 'warning',
+                autoDismiss: true,
+              })
+              return
+            }
+
+            if (result.healthy) {
               showAlert({
                 title: 'Connection successful',
                 description: `Successfully connected to execution target "${target.name}".`,
