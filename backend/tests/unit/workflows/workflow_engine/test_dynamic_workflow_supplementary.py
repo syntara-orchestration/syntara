@@ -38,7 +38,13 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeType,
 )
 from syntara.workflows.workflow_engine.node_settings_resolver import get_default_timeout
-from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
+from tests.unit.workflows.workflow_engine.conftest import complete_supplied_node, init_workflow_runtime
+
+_NESTED_LOOP_BODY_MAP = {"inner_loop": "outer_loop", "node_a": "inner_loop"}
+_NESTED_LOOP_CONTROL_DATA = {
+    "outer_loop": {"current_index": 1},
+    "inner_loop": {"current_index": 2},
+}
 
 
 @pytest.fixture(autouse=True)
@@ -1332,10 +1338,31 @@ class TestExtractFailureOutput:
         assert isinstance(result, dict)
         assert "response_code" not in result
 
-    def test_failed_loop_body_output_is_available_by_iteration(self) -> None:
-        """A failed loop-body node keeps its structured output in iteration history."""
+    @pytest.mark.parametrize(
+        ("loop_body_map", "control_data", "activity_id", "iteration"),
+        [
+            pytest.param({"node_a": "loop_node"}, {"loop_node": {"current_index": 0}}, "node_a", 0, id="base-history"),
+            pytest.param(
+                _NESTED_LOOP_BODY_MAP,
+                _NESTED_LOOP_CONTROL_DATA,
+                "node_a_iter_1_iter_2",
+                None,
+                id="nested-temporal-id",
+            ),
+        ],
+    )
+    def test_failed_loop_body_output_is_queryable_for_its_occurrence(
+        self,
+        loop_body_map: dict[str, str],
+        control_data: dict[str, dict[str, int]],
+        activity_id: str,
+        iteration: int | None,
+    ) -> None:
+        """Failed output is queryable through both base and exact Temporal IDs."""
         wf = _make_workflow()
         graph = _build_chain_graph()
+        wf.loop_body_map = dict(loop_body_map)
+        wf.node_control_data = dict(control_data)
         app_error = ApplicationError(
             "boom",
             {"output": {"response_code": 500, "body": "err"}},
@@ -1344,12 +1371,32 @@ class TestExtractFailureOutput:
 
         wf._handle_node_failure("node_a", app_error, graph, pending_tasks={}, continue_on_failure=True)
 
-        assert wf.get_activity_output("node_a", 0) == {
+        assert wf.get_activity_output(activity_id, iteration) == {
             "response_code": 500,
             "body": "err",
             "status": "failed",
             "error": "boom",
         }
+
+
+@pytest.mark.asyncio
+async def test_restored_nested_loop_node_records_io_by_temporal_id() -> None:
+    """Retry-restored I/O is queryable by the same full ID used for replay."""
+    wf = _make_workflow()
+    graph = _build_chain_graph()
+    wf.loop_body_map = dict(_NESTED_LOOP_BODY_MAP)
+    wf.node_control_data = dict(_NESTED_LOOP_CONTROL_DATA)
+
+    await complete_supplied_node(
+        wf,
+        graph.get_node("node_a"),
+        {"output": {"stdout": "item-2\n"}},
+        graph,
+    )
+
+    temporal_id = "node_a_iter_1_iter_2"
+    assert wf.get_activity_input(temporal_id) == {"__pre_resolved": True}
+    assert wf.get_activity_output(temporal_id) == {"stdout": "item-2\n", "status": "completed"}
 
 
 class TestEvaluatePredecessor:

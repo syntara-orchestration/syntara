@@ -202,8 +202,8 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         self.node_inputs: dict[str, dict[str, Any]] = {}
         # Keep historical I/O for nodes that execute repeatedly in a loop. The
         # current namespace is intentionally overwritten on every iteration for
-        # expression evaluation, but activity synchronization needs the value
-        # belonging to the specific iteration it is persisting.
+        # expression evaluation. Base-node histories support legacy activity IDs;
+        # Temporal-ID histories identify exact occurrences, including nested loops.
         self.activity_input_history: dict[str, list[dict[str, Any]]] = {}
         self.activity_output_history: dict[str, list[dict[str, Any]]] = {}
         self.node_control_data: dict[str, dict[str, Any]] = {}
@@ -381,16 +381,14 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             return
 
         self.resolver.set_namespace(completed_node_id, {**output, "status": "completed"})
-        self.activity_output_history.setdefault(completed_node_id, []).append(
-            copy.deepcopy({**output, "status": "completed"})
-        )
         completed_node = graph.get_node(completed_node_id)
-        if completed_node.type == NodeType.APPROVAL:
-            history_activity_id = self._approval_activity_id(completed_node_id)
-            if history_activity_id != completed_node_id:
-                self.activity_output_history.setdefault(history_activity_id, []).append(
-                    copy.deepcopy({**output, "status": "completed"})
-                )
+        history_activity_id = self._source_temporal_activity_id(completed_node)
+        self._append_activity_history(
+            self.activity_output_history,
+            completed_node_id,
+            history_activity_id,
+            {**output, "status": "completed"},
+        )
         workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
         await self._schedule_successors(completed_node_id=completed_node_id, graph=graph, pending_tasks=pending_tasks)
         self._cancel_skipped_pending_tasks(pending_tasks)
@@ -582,7 +580,6 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         graph: WorkflowGraph,
     ) -> None:
         """Keep failed output available to iteration-specific sync queries."""
-        self.activity_output_history.setdefault(node_id, []).append(copy.deepcopy(namespace_entry))
         failed_node = graph.get_node(node_id)
         history_activity_id: str | None = None
         if failed_node.type == NodeType.LOOP:
@@ -591,10 +588,26 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             history_activity_id = loop_control_activity_id(
                 node_id, current_index, self.loop_body_map, self.node_control_data
             )
-        elif failed_node.type == NodeType.APPROVAL:
-            history_activity_id = self._approval_activity_id(node_id)
-        if history_activity_id and history_activity_id != node_id:
-            self.activity_output_history.setdefault(history_activity_id, []).append(copy.deepcopy(namespace_entry))
+        else:
+            history_activity_id = self._source_temporal_activity_id(failed_node)
+        self._append_activity_history(
+            self.activity_output_history,
+            node_id,
+            history_activity_id or node_id,
+            namespace_entry,
+        )
+
+    @staticmethod
+    def _append_activity_history(
+        history: dict[str, list[dict[str, Any]]],
+        activity_id: str,
+        temporal_activity_id: str,
+        data: dict[str, Any],
+    ) -> None:
+        """Record I/O by logical node and, when distinct, exact Temporal occurrence."""
+        history.setdefault(activity_id, []).append(copy.deepcopy(data))
+        if temporal_activity_id != activity_id:
+            history.setdefault(temporal_activity_id, []).append(copy.deepcopy(data))
 
     def _route_failure_after_recording(
         self,
@@ -2057,13 +2070,8 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
 
         timeout_seconds = resolve_timeout(node, self._runtime_settings)
         self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
-        self.activity_input_history.setdefault(node.id, []).append(copy.deepcopy(resolved_parameters))
-        if node.type == NodeType.APPROVAL:
-            history_activity_id = self._approval_activity_id(node.id)
-            if history_activity_id != node.id:
-                self.activity_input_history.setdefault(history_activity_id, []).append(
-                    copy.deepcopy(resolved_parameters)
-                )
+        history_activity_id = self._source_temporal_activity_id(node)
+        self._append_activity_history(self.activity_input_history, node.id, history_activity_id, resolved_parameters)
 
         result = await self._dispatch_node(node, resolved_parameters, graph, timeout_seconds)
         return self._process_node_result(node, result)
@@ -2271,7 +2279,9 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # overwriting it with the marker would blank the input that
         # get_activity_input serves to drill-down. Single-step mocks reach this
         # with no recorded input, so the marker still marks them.
-        self.node_inputs.setdefault(node.id, {PRE_RESOLVED_MARKER: True})
+        input_data = self.node_inputs.setdefault(node.id, {PRE_RESOLVED_MARKER: True})
+        history_activity_id = self._source_temporal_activity_id(node)
+        self._append_activity_history(self.activity_input_history, node.id, history_activity_id, input_data)
         if node.type == NodeType.LOOP and node.id not in self.loop_state:
             loop_type = node.parameters.get("type", LoopType.FOR_EACH)
             self.loop_state[node.id] = self._create_loop_state_for_type(loop_type, node)
