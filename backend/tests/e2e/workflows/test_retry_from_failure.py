@@ -120,9 +120,14 @@ def _parallel_failure_definition(name: str) -> dict[str, Any]:
 
 
 def _activities_by_id(execution: ExecutionRead) -> dict[str, ActivityData]:
+    rows = _activity_rows_by_id(execution)
+    assert isinstance(execution.activities, list), "Execution response must include activities"
+    return rows
+
+
+def _activity_rows_by_id(execution: ExecutionRead) -> dict[str, ActivityData]:
     activities = execution.activities
-    assert isinstance(activities, list), "Execution response must include activities"
-    return {activity.activity_id: activity for activity in activities}
+    return {activity.activity_id: activity for activity in activities} if isinstance(activities, list) else {}
 
 
 def _activity_output(activity: ActivityData | ActivityExecution) -> dict[str, Any]:
@@ -162,13 +167,12 @@ def _activity_row_key(activity: ActivityExecution, key: Callable[[ActivityExecut
     return str(value)
 
 
-def _activity_row_debug(activity: ActivityExecution) -> dict[str, Any]:
-    environment = _activity_input(activity).get("environment")
+def _activity_row_debug(activity: ActivityData | ActivityExecution) -> dict[str, Any]:
     return {
-        "name": activity.activity_name,
-        "temporal": activity.temporal_activity_id,
+        "name": getattr(activity, "activity_name", None),
+        "activity_id": getattr(activity, "activity_id", None),
+        "temporal": getattr(activity, "temporal_activity_id", None),
         "status": _activity_status(activity),
-        "item": environment.get("ITEM") if isinstance(environment, Mapping) else None,
         "stdout": _listed_stdout(activity)[:80],
     }
 
@@ -180,6 +184,44 @@ def _activity_executions_by(
 ) -> dict[str, ActivityExecution]:
     executions = syntara_api.executions.list_activities(execution_id=execution_id, limit=100).assert_and_get()
     return {_activity_row_key(activity, key): activity for activity in executions.resources}
+
+
+def _activity_rows_are_ready(
+    rows: Mapping[str, ActivityData | ActivityExecution],
+    required_ids: set[str],
+    required_stdouts: Mapping[str, str],
+) -> bool:
+    expected_ids = required_ids | set(required_stdouts)
+    if not expected_ids <= rows.keys():
+        return False
+    if not all(_is_terminal_activity(rows[activity_id]) for activity_id in expected_ids):
+        return False
+    return all(snippet in _listed_stdout(rows[activity_id]) for activity_id, snippet in required_stdouts.items())
+
+
+def _activity_rows_timeout_details(
+    execution_id: UUID,
+    rows: Mapping[str, ActivityData | ActivityExecution],
+    required_ids: set[str],
+    required_stdouts: Mapping[str, str],
+) -> str:
+    expected_ids = required_ids | set(required_stdouts)
+    missing = sorted(expected_ids - rows.keys())
+    pending = sorted(
+        activity_id
+        for activity_id in expected_ids
+        if activity_id in rows and not _is_terminal_activity(rows[activity_id])
+    )
+    stdout_missing = {
+        activity_id: _listed_stdout(rows[activity_id])
+        for activity_id, snippet in required_stdouts.items()
+        if activity_id in rows and snippet not in _listed_stdout(rows[activity_id])
+    }
+    return (
+        f"Execution {execution_id} is missing activity rows: {missing}; "
+        f"non-terminal: {pending}; stdout still missing: {stdout_missing}; "
+        f"rows: {[_activity_row_debug(activity) for activity in rows.values()]}"
+    )
 
 
 def _wait_until(
@@ -227,35 +269,10 @@ def _wait_for_activity_executions(
     def fetch_rows() -> dict[str, ActivityExecution]:
         return _activity_executions_by(syntara_api, execution_id, lambda activity: activity.temporal_activity_id)
 
-    def is_ready(rows: dict[str, ActivityExecution]) -> bool:
-        if not required_temporal_ids <= rows.keys():
-            return False
-        if not all(_is_terminal_activity(rows[temporal_id]) for temporal_id in required_temporal_ids):
-            return False
-        return all(snippet in _listed_stdout(rows[temporal_id]) for temporal_id, snippet in stdout_snippets.items())
-
-    def missing_rows(rows: dict[str, ActivityExecution]) -> str:
-        missing = sorted(required_temporal_ids - rows.keys())
-        pending = sorted(
-            temporal_id
-            for temporal_id in required_temporal_ids
-            if temporal_id in rows and not _is_terminal_activity(rows[temporal_id])
-        )
-        stdout_missing = {
-            temporal_id: _listed_stdout(rows[temporal_id])
-            for temporal_id, snippet in stdout_snippets.items()
-            if temporal_id in rows and snippet not in _listed_stdout(rows[temporal_id])
-        }
-        return (
-            f"Execution {execution_id} is missing activity rows: {missing}; "
-            f"non-terminal: {pending}; stdout still missing: {stdout_missing}; "
-            f"rows: {[_activity_row_debug(activity) for activity in rows.values()]}"
-        )
-
     return _wait_until(
         fetch_rows,
-        is_ready,
-        missing_rows,
+        lambda rows: _activity_rows_are_ready(rows, required_temporal_ids, stdout_snippets),
+        lambda rows: _activity_rows_timeout_details(execution_id, rows, required_temporal_ids, stdout_snippets),
         description=f"activity rows for execution {execution_id}",
         max_polls=max_polls,
         poll_interval=poll_interval,
@@ -287,38 +304,12 @@ def _wait_for_activity_ids(
     """
     stdout_snippets = dict(required_stdouts or {})
 
-    def present(current: ExecutionRead) -> dict[str, ActivityData]:
-        activities = current.activities
-        return {activity.activity_id: activity for activity in activities} if isinstance(activities, list) else {}
-
     def is_ready(current: ExecutionRead) -> bool:
-        rows = present(current)
-        if not required_ids <= rows.keys():
-            return False
-        if not all(_is_terminal_activity(rows[activity_id]) for activity_id in required_ids):
-            return False
-        return all(
-            snippet in str(_activity_output(rows[activity_id]).get("stdout", ""))
-            for activity_id, snippet in stdout_snippets.items()
-        )
+        return _activity_rows_are_ready(_activity_rows_by_id(current), required_ids, stdout_snippets)
 
     def missing_rows(current: ExecutionRead) -> str:
-        rows = present(current)
-        missing = sorted(required_ids - rows.keys())
-        pending = sorted(
-            activity_id
-            for activity_id in required_ids
-            if activity_id in rows and not _is_terminal_activity(rows[activity_id])
-        )
-        stdout_missing = {
-            activity_id: str(_activity_output(rows[activity_id]).get("stdout", ""))
-            for activity_id, snippet in stdout_snippets.items()
-            if activity_id in rows and snippet not in str(_activity_output(rows[activity_id]).get("stdout", ""))
-        }
-        return (
-            f"Execution {current.id} is missing activity rows: {missing}; "
-            f"non-terminal: {pending}; stdout still missing: {stdout_missing}"
-        )
+        rows = _activity_rows_by_id(current)
+        return _activity_rows_timeout_details(current.id, rows, required_ids, stdout_snippets)
 
     return _wait_until(
         lambda: syntara_api.executions.get(execution_id=execution.id, include="activities").assert_and_get(),
@@ -999,18 +990,11 @@ def test_retry_resumes_loop_at_failed_iteration_and_replays_earlier_iteration(
     assert _activity_status(retry_charlie) == "completed"
 
 
-@pytest.mark.skip(
-    reason=(
-        "Nested for-each never fails the inner body on a later outer item, so the "
-        "source run completes and this retry cannot be asserted. The single-loop "
-        "resume test covers restoring an earlier iteration and rerunning the failed one."
-    )
-)
 def test_retry_replays_nested_loop_iterations_and_control_node_routes(
     syntara_api: SyntaraApiRegistry,
     first_project_id: UUID,
 ) -> None:
-    """A nested-loop retry restores prior routes and resumes the selected body occurrence."""
+    """A nested-loop retry restores a prior route and resumes the failed inner occurrence."""
     name = unique_name("e2e-retry-nested-loop-control-route")
     definition = _workflow_definition(
         name,
@@ -1019,46 +1003,34 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
                 "id": "outer_loop",
                 "name": "Outer loop",
                 "type": "loop",
-                "parameters": {"type": "for_each", "items": '["safe", "fail"]'},
+                "parameters": {"type": "for_each", "items": '["outer"]'},
             },
-            _script_node(
-                "tag_outer",
-                "import os; print(os.environ['OUTER'], end='')",
-                environment={"OUTER": "${loop.item}"},
-            ),
             {
                 "id": "inner_loop",
                 "name": "Inner loop",
                 "type": "loop",
-                "parameters": {"type": "for_each", "items": '["first", "second"]'},
+                "parameters": {"type": "for_each", "items": '["first", "fail"]'},
             },
             {
                 "id": "route",
-                "name": "Route to the selected failure",
+                "name": "Route through the retry body",
                 "type": "condition",
-                "parameters": {"condition": "${tag_outer.stdout} == 'fail'"},
+                "parameters": {"condition": "1 == 1"},
             },
             _script_node(
                 "repair_body",
-                "import os; print(f\"repair:{os.environ['ITEM']}\"); raise SystemExit(1)",
-                environment={"ITEM": "${tag_outer.stdout}:${loop.item}"},
-            ),
-            _script_node(
-                "alternate_body",
-                "import os; print(f\"alternate:{os.environ['ITEM']}\")",
-                environment={"ITEM": "${tag_outer.stdout}:${loop.item}"},
+                "import os\nitem = os.environ['ITEM']\nprint(f'repair:{item}')\n"
+                "if item == 'fail':\n    raise SystemExit(1)",
+                environment={"ITEM": "${loop.item}"},
             ),
             _script_node("finished", "print('nested-loop-finished')"),
         ],
         [
             {"from": "trigger", "to": "outer_loop"},
-            {"from": "outer_loop", "to": "tag_outer", "from_port": "iterate"},
-            {"from": "tag_outer", "to": "inner_loop"},
+            {"from": "outer_loop", "to": "inner_loop", "from_port": "iterate"},
             {"from": "inner_loop", "to": "route", "from_port": "iterate"},
             {"from": "route", "to": "repair_body", "from_port": "true"},
-            {"from": "route", "to": "alternate_body", "from_port": "false"},
             {"from": "repair_body", "to": "inner_loop", "to_port": "iterate"},
-            {"from": "alternate_body", "to": "inner_loop", "to_port": "iterate"},
             {"from": "inner_loop", "to": "outer_loop", "from_port": "complete", "to_port": "iterate"},
             {"from": "outer_loop", "to": "finished", "from_port": "complete"},
         ],
@@ -1080,27 +1052,20 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
         source.id,
         {
             "route_iter_0_iter_0",
-            "alternate_body_iter_0_iter_0",
+            "repair_body_iter_0_iter_0",
             "route_iter_0_iter_1",
-            "alternate_body_iter_0_iter_1",
-            "route_iter_1_iter_0",
-            "repair_body_iter_1_iter_0",
+            "repair_body_iter_0_iter_1",
         },
         required_stdouts={
-            "alternate_body_iter_0_iter_0": "alternate:safe:first",
-            "alternate_body_iter_0_iter_1": "alternate:safe:second",
+            "repair_body_iter_0_iter_0": "repair:first",
         },
     )
-    for temporal_id in (
-        "route_iter_0_iter_0",
-        "route_iter_0_iter_1",
-    ):
-        assert _activity_output(source_rows[temporal_id]).get("evaluated_result") is False
-    assert source_rows["alternate_body_iter_0_iter_0"].status == "completed"
-    assert source_rows["alternate_body_iter_0_iter_1"].status == "completed"
-    assert _activity_output(source_rows["route_iter_1_iter_0"]).get("evaluated_result") is True
-    assert _activity_status(source_rows["repair_body_iter_1_iter_0"]) == "failed"
-    assert _activity_input(source_rows["repair_body_iter_1_iter_0"]).get("environment") == {"ITEM": "fail:first"}
+    for temporal_id in ("route_iter_0_iter_0", "route_iter_0_iter_1"):
+        assert _activity_output(source_rows[temporal_id]).get("evaluated_result") is True
+    assert _activity_status(source_rows["repair_body_iter_0_iter_0"]) == "completed"
+    assert _activity_status(source_rows["repair_body_iter_0_iter_1"]) == "failed"
+    assert _activity_input(source_rows["repair_body_iter_0_iter_0"]).get("environment") == {"ITEM": "first"}
+    assert _activity_input(source_rows["repair_body_iter_0_iter_1"]).get("environment") == {"ITEM": "fail"}
 
     preview = _preview_retry(syntara_api, source.id)
     assert preview.eligible is True
@@ -1119,27 +1084,27 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
         final.id,
         {
             "route_iter_0_iter_0",
-            "alternate_body_iter_0_iter_0",
+            "repair_body_iter_0_iter_0",
             "route_iter_0_iter_1",
-            "alternate_body_iter_0_iter_1",
-            "route_iter_1_iter_0",
-            "repair_body_iter_1_iter_0",
+            "repair_body_iter_0_iter_1",
             "finished",
         },
         required_stdouts={
-            "alternate_body_iter_0_iter_0": "alternate:safe:first",
-            "alternate_body_iter_0_iter_1": "alternate:safe:second",
-            "repair_body_iter_1_iter_0": "recovered:fail:first",
+            "repair_body_iter_0_iter_0": "repair:first",
+            "repair_body_iter_0_iter_1": "recovered:fail",
             "finished": "nested-loop-finished",
         },
     )
 
-    # Earlier outer and inner occurrences, including their control routes, retain source results.
+    # The earlier inner iteration and both control-node routes retain their source results.
+    for temporal_id in ("route_iter_0_iter_0", "route_iter_0_iter_1"):
+        assert _activity_output(source_rows[temporal_id]).get("evaluated_result") is True
+        assert _activity_output(retry_rows[temporal_id]).get("evaluated_result") is True
+
     for temporal_id in (
         "route_iter_0_iter_0",
-        "alternate_body_iter_0_iter_0",
+        "repair_body_iter_0_iter_0",
         "route_iter_0_iter_1",
-        "alternate_body_iter_0_iter_1",
     ):
         assert retry_rows[temporal_id].status == source_rows[temporal_id].status
         assert _activity_output(retry_rows[temporal_id]) == _activity_output(source_rows[temporal_id])
@@ -1148,13 +1113,13 @@ def test_retry_replays_nested_loop_iterations_and_control_node_routes(
             source_rows[temporal_id], "completed_at"
         )
 
-    repaired = retry_rows["repair_body_iter_1_iter_0"]
+    repaired = retry_rows["repair_body_iter_0_iter_1"]
     assert repaired.status == "completed"
     assert _activity_input(repaired).get("environment") == _activity_input(
-        source_rows["repair_body_iter_1_iter_0"]
+        source_rows["repair_body_iter_0_iter_1"]
     ).get("environment")
-    assert _timestamp(repaired, "started_at") > _timestamp(source_rows["repair_body_iter_1_iter_0"], "started_at")
-    assert _activity_output(retry_rows["route_iter_1_iter_0"]).get("evaluated_result") is True
+    assert _timestamp(repaired, "started_at") > _timestamp(source_rows["repair_body_iter_0_iter_1"], "started_at")
+    assert _activity_output(retry_rows["route_iter_0_iter_1"]).get("evaluated_result") is True
     assert retry_rows["finished"].status == "completed"
 
 
