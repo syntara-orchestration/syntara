@@ -82,6 +82,15 @@ export function dateIncludesFromField(field: FormField): Record<DateComponentNam
   }
 }
 
+/** Date and timezone without time cannot be saved; used for show-in-form validation in the builder. */
+export function isDateFieldDateAndTimezoneWithoutTime(field: FormField): boolean {
+  if (field.type !== 'date') {
+    return false
+  }
+  const includes = dateIncludesFromField(field)
+  return includes.date && includes.timezone && !includes.time
+}
+
 function countIncludedDateComponents(includes: Record<DateComponentName, boolean>): number {
   return DATE_COMPONENT_NAMES.filter((name) => includes[name]).length
 }
