@@ -166,7 +166,7 @@ describe('Kafka Publish builder', () => {
     const help = screen.getByRole('button', { name: 'More info for JSON payload' })
     help.focus()
     await user.keyboard('{Enter}')
-    expect(await screen.findByRole('dialog', { name: 'Field help' })).toBeVisible()
+    expect(await screen.findByRole('dialog', { name: 'JSON payload' })).toBeVisible()
     expect(screen.getByText(/Templates can replace the full payload or appear inside JSON strings/)).toHaveTextContent(
       'Templates can replace the full payload or appear inside JSON strings. Example: {"order_id":"${trigger.payload.order_id}"}. Arrays are sent as one Kafka record.'
     )
@@ -175,7 +175,7 @@ describe('Kafka Publish builder', () => {
     )
     expect(await axe(container)).toHaveNoViolations()
     await user.keyboard('{Escape}')
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Field help' })).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'JSON payload' })).not.toBeInTheDocument())
     expect(help).toHaveFocus()
   })
 

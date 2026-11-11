@@ -16,6 +16,7 @@ const wrapper = ({ children }: Readonly<{ children: ReactNode }>) => (
 describe('builder integration options', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    getIntegrations.mockReset()
     queryClient.clear()
   })
 
@@ -63,6 +64,12 @@ describe('builder integration options', () => {
 
   it('keeps loaded options available during a same-scope background refresh', async () => {
     getIntegrations.mockResolvedValueOnce({ data: { resources: [{ id: 'cached', name: 'Cached Kafka' }] } })
+    const { result } = renderHook(() => useAllIntegrations(IntegrationTypeEnum.KAFKA, 'project-a'), { wrapper })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.[0]?.id).toBe('cached')
+    // Track fetching before refetch so React Query notifies the hook about its changes.
+    expect(result.current.isFetching).toBe(false)
+
     let completeRefresh: (() => void) | undefined
     getIntegrations.mockImplementationOnce(
       () =>
@@ -70,8 +77,6 @@ describe('builder integration options', () => {
           completeRefresh = () => resolve({ data: { resources: [{ id: 'fresh', name: 'Fresh Kafka' }] } })
         })
     )
-    const { result } = renderHook(() => useAllIntegrations(IntegrationTypeEnum.KAFKA, 'project-a'), { wrapper })
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
     const pending: { refresh?: Promise<unknown> } = {}
     act(() => {
       pending.refresh = result.current.refetch()
@@ -79,6 +84,7 @@ describe('builder integration options', () => {
     await waitFor(() => expect(result.current.isFetching).toBe(true))
     expect(result.current.isPending).toBe(false)
     expect(result.current.data?.[0]?.id).toBe('cached')
+    expect(getIntegrations).toHaveBeenCalledTimes(2)
     const refresh = pending.refresh
     if (!refresh) throw new Error('Integration refresh did not start')
     await act(async () => {
