@@ -296,9 +296,12 @@ describe('SynCodeBlock', () => {
       const user = userEvent.setup()
       const source = '{\n  "status": "failed"\n}'
       const { baseElement } = render(
-        <SynCodeBlock language="json" searchTerm="FAILED" enableCopy enableExpand expandTitle="Output JSON">
-          {source}
-        </SynCodeBlock>
+        <main>
+          <h1>Code output</h1>
+          <SynCodeBlock language="json" searchTerm="FAILED" enableCopy enableExpand expandTitle="Output JSON">
+            {source}
+          </SynCodeBlock>
+        </main>
       )
 
       await waitFor(() => expect(screen.getByRole('mark')).toHaveTextContent('failed'))
