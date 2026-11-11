@@ -4,7 +4,6 @@ import { Tbody, Td, Tr } from '@patternfly/react-table'
 import { ExecutionTimeRange } from '../../components/table/ExecutionTimestamp'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import type { ActivityState } from '../workflows/execution/types'
-import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
 import styles from './CompactActivityList.module.css'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
@@ -30,9 +29,8 @@ export function CompactActivityList({
         {activityOrder.map(({ id, name, type }) => {
           const state = activityStates.get(id)
           const hasTimeRange = Boolean(state?.startedAt)
-          const { baseId } = parseCompositeKey(id)
           const displayName = name ?? id
-          const isSelected = baseId === selectedNodeId
+          const isSelected = id === selectedNodeId
 
           return (
             <Tr

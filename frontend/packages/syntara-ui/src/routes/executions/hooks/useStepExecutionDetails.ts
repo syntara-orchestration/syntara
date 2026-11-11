@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { executionsClient } from '../../../client'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { ActivityStatus } from '../../workflows/execution/types'
+import { parseCompositeKey } from '../../workflows/execution/utils/activityState'
 
 type StepExecutionDetails = {
   /** Resolved config values passed to the activity at runtime */
@@ -26,15 +27,20 @@ type StepExecutionDetails = {
 export function useStepExecutionDetails(
   stepId: string,
   executionId: string | null | undefined,
-  activityStatus?: ActivityStatus
+  activityStatus?: ActivityStatus,
+  iteration?: number | null
 ): StepExecutionDetails {
+  const { baseId, iteration: keyIteration } = parseCompositeKey(stepId)
+  const effectiveIteration = iteration ?? keyIteration
+  const activityName =
+    effectiveIteration != null && effectiveIteration > 0 ? `${baseId}#iter-${effectiveIteration}` : baseId
   const queryResult = executionsClient.useQuery(
     'get',
     '/executions/{execution_id}/activities',
     {
       params: {
         path: { execution_id: executionId ?? '' },
-        query: { activity_name: stepId, limit: 1 },
+        query: { activity_name: activityName, limit: 1 },
       },
     },
     { enabled: !!executionId && !!stepId }
