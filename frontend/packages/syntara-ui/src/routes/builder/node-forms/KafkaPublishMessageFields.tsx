@@ -28,7 +28,7 @@ import {
   StackItem,
 } from '@patternfly/react-core'
 import { RhUiCaretDownIcon, RhUiAddIcon, RhUiGripVerticalFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
 
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
@@ -166,8 +166,9 @@ export function KafkaPublishMessageFields() {
   const source = useWatch({ control, name: 'headers_mode' })
   const readOnly = useIsVersionView()
   const addButtonRef = useRef<HTMLButtonElement>(null)
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const activeIndex = fields.findIndex((field) => field.id === activeId)
+  const pendingFocusRef = useRef<HTMLElement | null>(null)
+  const [activeDrag, setActiveDrag] = useState<{ id: string; keyboard: boolean } | null>(null)
+  const activeIndex = fields.findIndex((field) => field.id === activeDrag?.id)
   const headerError = errors.headers?.root?.message ?? errors.headers?.message
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -185,18 +186,30 @@ export function KafkaPublishMessageFields() {
     onDragCancel: () => 'Header reorder cancelled.',
   }
 
+  // Moving a keyed DOM node can drop browser focus. Restore it after the move commits.
+  useLayoutEffect(() => {
+    const target = pendingFocusRef.current
+    pendingFocusRef.current = null
+    if (target?.isConnected) target.focus()
+  }, [fields])
+
   function removeHeader(index: number) {
     if (fields.length === 1) addButtonRef.current?.focus()
     else setFocus(`headers.${index === 0 ? 1 : index - 1}.name`)
     remove(index)
   }
 
-  function handleDragEnd({ active, over }: DragEndEvent) {
-    setActiveId(null)
+  function handleDragEnd({ active, over, activatorEvent }: DragEndEvent) {
+    setActiveDrag(null)
     if (readOnly || !over || active.id === over.id) return
     const from = fields.findIndex((field) => field.id === active.id)
     const to = fields.findIndex((field) => field.id === over.id)
-    if (from !== -1 && to !== -1) move(from, to)
+    if (from !== -1 && to !== -1) {
+      if (activatorEvent instanceof KeyboardEvent && activatorEvent.target instanceof HTMLElement) {
+        pendingFocusRef.current = activatorEvent.target
+      }
+      move(from, to)
+    }
   }
 
   return (
@@ -245,9 +258,11 @@ export function KafkaPublishMessageFields() {
                     collisionDetection={closestCenter}
                     modifiers={[restrictToVerticalAxis]}
                     accessibility={{ announcements, screenReaderInstructions: HEADER_SORT_INSTRUCTIONS }}
-                    onDragStart={({ active }) => setActiveId(String(active.id))}
+                    onDragStart={({ active, activatorEvent }) =>
+                      setActiveDrag({ id: String(active.id), keyboard: activatorEvent instanceof KeyboardEvent })
+                    }
                     onDragEnd={handleDragEnd}
-                    onDragCancel={() => setActiveId(null)}
+                    onDragCancel={() => setActiveDrag(null)}
                   >
                     <SortableContext items={fields.map((field) => field.id)} strategy={verticalListSortingStrategy}>
                       <Stack hasGutter>
@@ -263,8 +278,9 @@ export function KafkaPublishMessageFields() {
                         ))}
                       </Stack>
                     </SortableContext>
+                    {/* Keyboard collision detection needs the original card's full bounds. */}
                     <DragOverlay dropAnimation={null}>
-                      {activeIndex !== -1 && (
+                      {activeIndex !== -1 && !activeDrag?.keyboard && (
                         <div className={styles.dragOverlay} aria-hidden>
                           <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
                             <FlexItem>

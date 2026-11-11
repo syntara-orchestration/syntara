@@ -42,13 +42,15 @@ test('Kafka Subscribe keeps the form stationary while saved resources load', asy
       },
     })
     expect(created.ok()).toBeTruthy()
+    workflowId = z.object({ id: z.string() }).parse(await created.json()).id
+    const saved = await apiRequest(app, 'get', `/workflows/${workflowId}`, { token })
+    expect(saved.ok()).toBeTruthy()
     const workflow = z
       .looseObject({
         id: z.string(),
         version: z.looseObject({ workflow_definition: z.record(z.string(), z.unknown()) }),
       })
-      .parse(await created.json())
-    workflowId = workflow.id
+      .parse(await saved.json())
     await app.route(new RegExp(`/api/v1/workflows/${workflow.id}(?:\\?.*)?$`), (route) =>
       route.fulfill({
         json: {
