@@ -337,7 +337,31 @@ class WorkflowRetryMixin:
         for node_id in must_run:
             downstream |= self._walk_downstream(node_id, graph)
 
-        restorable = {node.id for node in graph.get_all_nodes()} - must_run - triggers - downstream
+        # A loop's body feedback edge is removed from the graph, so the normal
+        # downstream walk from a selected body failure cannot reach nodes after
+        # the loop. If the source run failed inside that loop, those completion
+        # successors may have been marked SKIPPED only because the loop never
+        # finished. Let them execute after the retried body succeeds, while
+        # preserving completed successors to avoid repeating their side effects.
+        skipped_loop_completion_nodes: set[str] = set()
+        for loop_id, body_nodes in self._loop_bodies.items():
+            if not (must_run & body_nodes):
+                continue
+            for successor in graph.get_next_activities_by_port(loop_id, "complete"):
+                skipped_loop_completion_nodes.update(self._walk_downstream(successor.id, graph))
+        skipped_loop_completion_nodes = {
+            node_id
+            for node_id in skipped_loop_completion_nodes
+            if self._retry_source_statuses.get(node_id) == ActivityStatus.SKIPPED.value
+        }
+
+        restorable = (
+            {node.id for node in graph.get_all_nodes()}
+            - must_run
+            - triggers
+            - downstream
+            - skipped_loop_completion_nodes
+        )
         self._retry_restorable_cache = restorable
         return restorable
 
