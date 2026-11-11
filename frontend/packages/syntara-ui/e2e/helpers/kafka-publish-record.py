@@ -1,4 +1,8 @@
-"""Provision and inspect records in the opt-in disposable Kafka fixture."""
+"""Support the opt-in Playwright test in kafka-publish-live.spec.ts.
+
+The frontend E2E test invokes this helper to create and delete its disposable
+Kafka test topic and read back the record published by the workflow for verification.
+"""
 
 import asyncio
 import base64

@@ -13,8 +13,10 @@ export function useAllIntegrations(
   integrationType: typeof IntegrationTypeEnum.MCP_SERVER | typeof IntegrationTypeEnum.KAFKA,
   projectId?: string
 ) {
+  // Empty and absent project IDs produce the same request and must share a cache entry.
+  const projectScope = projectId || undefined
   return useQuery({
-    queryKey: ['builder-integrations', integrationType, projectId],
+    queryKey: ['builder-integrations', integrationType, projectScope],
     queryFn: () =>
       fetchAllPages<IntegrationOption>((cursor) =>
         integrationsFetchClient.GET(
@@ -26,7 +28,7 @@ export function useAllIntegrations(
                   ? {}
                   : { integration_type: IntegrationTypeEnum.MCP_SERVER }),
                 enabled: true,
-                ...projectIdParam(projectId),
+                ...projectIdParam(projectScope),
                 limit: MAX_PAGE_SIZE,
                 cursor,
               },

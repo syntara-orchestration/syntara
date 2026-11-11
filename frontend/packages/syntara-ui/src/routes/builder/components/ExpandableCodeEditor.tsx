@@ -64,6 +64,8 @@ export type ExpandableCodeEditorProps = {
   modalTitle?: string
   /** Whether the editor is read-only */
   isReadOnly?: boolean
+  /** Announce the editor as a required field to assistive technology. */
+  isRequired?: boolean
   /** Accessible label for the editor */
   ariaLabel?: string
   /** Whether to show line numbers (default: true) */
@@ -91,6 +93,7 @@ export function ExpandableCodeEditor({
   modalHeight = '500px',
   modalTitle = 'Edit script',
   isReadOnly = false,
+  isRequired = false,
   ariaLabel = 'Code editor',
   isLineNumbersVisible = true,
   isDarkTheme,
@@ -189,7 +192,7 @@ export function ExpandableCodeEditor({
             </>
           }
           aria-label={ariaLabel}
-          options={{ ariaLabel }}
+          options={{ ariaLabel, ariaRequired: isRequired, domReadOnly: isReadOnly }}
         />
       </div>
 
@@ -218,7 +221,7 @@ export function ExpandableCodeEditor({
               isLineNumbersVisible={isLineNumbersVisible}
               isDarkTheme={effectiveTheme}
               aria-label={`${ariaLabel} expanded`}
-              options={{ ariaLabel: `${ariaLabel} expanded` }}
+              options={{ ariaLabel: `${ariaLabel} expanded`, ariaRequired: isRequired, domReadOnly: isReadOnly }}
             />
           </div>
         </ModalBody>

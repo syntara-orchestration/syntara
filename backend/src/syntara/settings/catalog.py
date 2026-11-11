@@ -661,6 +661,21 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         validation_schema={"min": 1},
     ),
     SettingDefinition(
+        key="workflow_engine.expected_duration_seconds",
+        name="Expected step duration (seconds)",
+        category=SettingCategory.WORKFLOW_EXECUTION,
+        value_type=SettingValueType.INTEGER,
+        default_value=60,
+        description=(
+            "Default elapsed duration before the execution UI shows a Running long warning "
+            "for an active step. A step can override this in its settings. "
+            "This is advisory and does not stop execution or change timeout/retry behavior."
+        ),
+        helper_text="Minimum 1 second. Default: 60. Does not stop the run.",
+        group=WorkflowEngineGroup.EXECUTION,
+        validation_schema={"min": 1},
+    ),
+    SettingDefinition(
         key="workflow_engine.script_timeout_seconds",
         name="Script timeout (seconds)",
         category=SettingCategory.WORKFLOW_EXECUTION,

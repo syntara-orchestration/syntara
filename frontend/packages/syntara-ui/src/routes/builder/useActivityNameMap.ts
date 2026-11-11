@@ -10,6 +10,7 @@ type ActivityLike = {
   id?: string
   name?: string | null
   type?: string
+  settings?: { expected_duration?: number | null }
   branches?: (ActivityLike[] | ActivityLike | string)[]
   steps?: ActivityLike[]
   then?: ActivityLike[]
@@ -277,6 +278,8 @@ export function useActivityNameMap(
   }, [storeActivities, storeTriggers, workflowDefinition])
 
   const activityOrder = useMemo<ActivityOrderItem[]>(() => {
+    const nodes = workflowDefinition?.nodes ?? workflowDefinition?.workflow?.activities ?? storeActivities
+    const durations = new Map(nodes?.map((node) => [node.id, node.settings?.expected_duration]))
     const unsorted = Array.from(activityStates.keys()).map((id) => {
       const { baseId, iteration } = parseCompositeKey(id)
       const baseName = nameMap.get(baseId)
@@ -287,11 +290,17 @@ export function useActivityNameMap(
       } else {
         name = nameMap.get(id)
       }
-      return { id, name, type: typeMap.get(baseId) ?? typeMap.get(id) }
+      const expectedDuration = durations.get(baseId)
+      return {
+        id,
+        name,
+        type: typeMap.get(baseId) ?? typeMap.get(id),
+        ...(expectedDuration != null && { expectedDuration }),
+      }
     })
 
     return sortActivityOrder(unsorted, workflowDefinition?.edges, activityStates)
-  }, [activityStates, nameMap, typeMap, workflowDefinition])
+  }, [activityStates, nameMap, typeMap, workflowDefinition, storeActivities])
 
   return { nameMap, activityOrder }
 }

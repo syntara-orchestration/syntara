@@ -25,8 +25,8 @@ export function KafkaPublishConnectionFields({ projectId }: Readonly<{ projectId
   } = useFormContext<KafkaPublishFormData>()
   const integrationId = useWatch({ control, name: 'integration_id' })
   const credentialId = useWatch({ control, name: 'credential_id' })
-  const { name: credentialName, isPending: isCredentialPending } = useCredentialName(credentialId || undefined)
   const readOnly = useIsVersionView()
+  const { name: credentialName, isPending: isCredentialPending } = useCredentialName(credentialId || undefined)
   const { data, isError, error, refetch } = integrationsClient.useQuery(
     'get',
     '/kafka_integrations/{integration_id}',
@@ -112,7 +112,7 @@ export function KafkaPublishConnectionFields({ projectId }: Readonly<{ projectId
                       field.onChange(value ?? '')
                       onSelected()
                     }}
-                    errorMessage={fieldState.error?.message}
+                    errorMessage={connectionReady ? fieldState.error?.message : undefined}
                     isRequired
                     isDisabled={readOnly || !connectionReady}
                   />

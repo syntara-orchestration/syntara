@@ -43,13 +43,21 @@
         "continue_on_failure": {
           "type": "boolean",
           "description": "When true, downstream nodes continue executing even if this node fails. Inherits from global settings when absent."
+        },
+        "expected_duration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted."
         }
       },
       "additionalProperties": false
     },
     "nodeSettingsNoRetry": {
       "type": "object",
-      "description": "Settings with disabled, continue_on_failure, and timeout (script, agentic, approval). No retry_policy — retry is either not applicable or handled internally by the node's client.",
+      "description": "Settings with disabled, continue_on_failure, and timeout (script, agentic, approval). No retry_policy \u2014 retry is either not applicable or handled internally by the node's client.",
       "properties": {
         "disabled": {
           "type": "boolean",
@@ -63,6 +71,14 @@
           "type": "integer",
           "minimum": 1,
           "description": "Timeout in seconds."
+        },
+        "expected_duration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted."
         }
       },
       "additionalProperties": false
@@ -86,6 +102,14 @@
         },
         "retry_policy": {
           "$ref": "#/$defs/retry_policy"
+        },
+        "expected_duration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "description": "Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted."
         }
       },
       "additionalProperties": false

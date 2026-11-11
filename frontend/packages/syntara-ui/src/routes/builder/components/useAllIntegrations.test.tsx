@@ -1,6 +1,6 @@
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -43,6 +43,75 @@ describe('builder integration options', () => {
       params: {
         query: { integration_type: IntegrationTypeEnum.MCP_SERVER, enabled: true, limit: 100, cursor: undefined },
       },
+    })
+  })
+
+  it('shares the unscoped query for empty and absent project IDs', async () => {
+    getIntegrations.mockResolvedValue({ data: { resources: [{ id: 'global', name: 'Global Kafka' }] } })
+    const initialProps: { projectId?: string } = {}
+    const { result, rerender } = renderHook(
+      ({ projectId }) => useAllIntegrations(IntegrationTypeEnum.KAFKA, projectId),
+      { wrapper, initialProps }
+    )
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    rerender({ projectId: '' })
+    expect(result.current.isPending).toBe(false)
+    expect(result.current.data?.[0]?.id).toBe('global')
+    rerender({})
+    expect(getIntegrations).toHaveBeenCalledOnce()
+  })
+
+  it('keeps loaded options available during a same-scope background refresh', async () => {
+    getIntegrations.mockResolvedValueOnce({ data: { resources: [{ id: 'cached', name: 'Cached Kafka' }] } })
+    let completeRefresh: (() => void) | undefined
+    getIntegrations.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          completeRefresh = () => resolve({ data: { resources: [{ id: 'fresh', name: 'Fresh Kafka' }] } })
+        })
+    )
+    const { result } = renderHook(() => useAllIntegrations(IntegrationTypeEnum.KAFKA, 'project-a'), { wrapper })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    const pending: { refresh?: Promise<unknown> } = {}
+    act(() => {
+      pending.refresh = result.current.refetch()
+    })
+    await waitFor(() => expect(result.current.isFetching).toBe(true))
+    expect(result.current.isPending).toBe(false)
+    expect(result.current.data?.[0]?.id).toBe('cached')
+    const refresh = pending.refresh
+    if (!refresh) throw new Error('Integration refresh did not start')
+    await act(async () => {
+      completeRefresh?.()
+      await refresh
+    })
+    await waitFor(() => expect(result.current.data?.[0]?.id).toBe('fresh'))
+  })
+
+  it('does not carry options into a different project scope', async () => {
+    getIntegrations.mockResolvedValueOnce({ data: { resources: [{ id: 'a', name: 'Project A Kafka' }] } })
+    let completeProject: (() => void) | undefined
+    getIntegrations.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          completeProject = () => resolve({ data: { resources: [{ id: 'b', name: 'Project B Kafka' }] } })
+        })
+    )
+    const { result, rerender } = renderHook(
+      ({ projectId }) => useAllIntegrations(IntegrationTypeEnum.KAFKA, projectId),
+      { wrapper, initialProps: { projectId: 'project-a' } }
+    )
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    rerender({ projectId: 'project-b' })
+    expect(result.current.isPending).toBe(true)
+    expect(result.current.data).toBeUndefined()
+    await act(async () => {
+      completeProject?.()
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(result.current.data?.[0]?.id).toBe('b'))
+    expect(getIntegrations).toHaveBeenLastCalledWith('/kafka_integrations', {
+      params: { query: { enabled: true, project_id: 'project-b', limit: 100, cursor: undefined } },
     })
   })
 

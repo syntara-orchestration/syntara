@@ -3,6 +3,7 @@ import type { Ref } from 'react'
 
 export type SynSelectFieldToggleState = {
   fieldId?: string
+  ariaLabel?: string
   displayLabel: string
   isOpen: boolean
   onToggle: () => void
@@ -18,6 +19,7 @@ type SynSelectFieldToggleProps = SynSelectFieldToggleState & {
 export function SynSelectFieldToggle({
   toggleRef,
   fieldId,
+  ariaLabel,
   displayLabel,
   isOpen,
   onToggle,
@@ -29,6 +31,7 @@ export function SynSelectFieldToggle({
     <MenuToggle
       ref={toggleRef}
       id={fieldId}
+      aria-label={ariaLabel}
       onClick={onToggle}
       onBlur={onBlur}
       isExpanded={isOpen}

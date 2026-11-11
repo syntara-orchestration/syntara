@@ -193,7 +193,7 @@ function renderSelector(props: Partial<CredentialSelectorProps> = {}) {
   return render(<CredentialSelector {...defaultProps} />, { wrapper })
 }
 
-function StagedCredentialSelector() {
+function RequiredCredentialSelector() {
   const [value, setValue] = useState<string>()
   return (
     <KafkaCredentialConnection
@@ -268,15 +268,18 @@ describe('CredentialSelector', () => {
     expect(input).toHaveFocus()
   })
 
-  it('restores focus to Change when Enter selection closes the staged picker', async () => {
+  it('collapses required Kafka setup and focuses Change after keyboard selection', async () => {
     mockUseQuery()
     const user = userEvent.setup()
-    render(<StagedCredentialSelector />, { wrapper })
+    render(<RequiredCredentialSelector />, { wrapper })
+    expect(screen.queryByRole('textbox', { name: 'Credential' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Set up connection' }))
-    await user.click(screen.getByRole('textbox', { name: 'Credential' }))
-    await user.type(screen.getByRole('textbox', { name: 'Credential' }), 'Production')
+    const input = screen.getByRole('textbox', { name: 'Credential' })
+    await user.click(input)
+    await user.type(input, 'Production')
     await user.keyboard('{ArrowDown}{Enter}')
     expect(screen.queryByRole('textbox', { name: 'Credential' })).not.toBeInTheDocument()
+    expect(screen.getByText('Production API Key')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Change' })).toHaveFocus()
   })
 

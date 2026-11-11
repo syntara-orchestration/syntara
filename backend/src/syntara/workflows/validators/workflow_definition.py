@@ -30,6 +30,7 @@ from syntara.workflows.models.validation_finding import (
     ValidationResult,
     ValidationSeverity,
 )
+from syntara.workflows.validators.kafka_publish import collect_kafka_publish_findings
 from syntara.workflows.validators.template_expressions import check_template_expressions
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
@@ -557,6 +558,9 @@ class WorkflowValidator:
         self._validate_schema_version(workflow_definition)
         self._validate_required_fields(workflow_definition)
         self._validate_definition_limits(workflow_definition)
+        publish_findings = collect_kafka_publish_findings(workflow_definition)
+        if publish_findings:
+            raise SafeValueError(publish_findings[0].message)
         self._validate_against_schema(workflow_definition)
         node_ids = _extract_node_ids(workflow_definition)
         self._validate_graph_structure(workflow_definition, node_ids)
@@ -714,6 +718,7 @@ class WorkflowValidator:
 
         findings.extend(collect_scheduled_trigger_config_findings(workflow_definition))
         findings.extend(collect_event_subscribe_config_findings(workflow_definition))
+        findings.extend(collect_kafka_publish_findings(workflow_definition))
 
         return findings
 
@@ -747,7 +752,17 @@ class WorkflowValidator:
                         field_path=field_path,
                     )
                 )
-        return findings
+        nodes = workflow_definition.get("nodes")
+        publish_ids = {
+            node.get("id")
+            for node in (nodes if isinstance(nodes, list) else [])
+            if isinstance(node, dict) and node.get("type") == "kafka_publish" and isinstance(node.get("id"), str)
+        }
+        return [
+            finding
+            for finding in findings
+            if not (finding.node_id in publish_ids and (finding.field_path or "").startswith("parameters"))
+        ]
 
     def collect_findings(
         self,

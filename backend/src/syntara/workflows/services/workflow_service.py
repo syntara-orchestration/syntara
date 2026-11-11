@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 import structlog
-from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -85,8 +84,8 @@ from syntara.workflows.validators import (
     validate_workflow_references,
     workflow_validator,
 )
+from syntara.workflows.validators.kafka_publish import publish_bindings
 from syntara.workflows.validators.workflow_definition import collect_event_subscribe_config_findings
-from syntara.workflows.workflow_engine.models.kafka_publish import KafkaPublishParameters
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 if TYPE_CHECKING:
@@ -453,6 +452,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         previous_credential_ids: set[str] | None = None,
         *,
         allow_incomplete_subscriptions: bool = False,
+        allow_incomplete_publish: bool = False,
     ) -> None:
         """Validate credential references: project scope and credential:use authorization.
 
@@ -464,7 +464,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         Args:
             workflow_definition: The workflow definition containing node parameters.
             project_id: The project the workflow belongs to.
-            allow_incomplete_subscriptions: Permit omitted fields only on advisory draft saves.
+            allow_incomplete_subscriptions: Permit omitted Subscribe fields on advisory draft saves.
+            allow_incomplete_publish: Permit unfinished Publish messages on advisory draft saves.
             previous_credential_ids: Credential IDs from the previous version
                 (None for new workflows — all credentials treated as new).
 
@@ -478,6 +479,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         )
         if findings:
             raise SafeValueError(findings[0].message)
+        if allow_incomplete_publish:
+            publish_bindings(workflow_definition, allow_incomplete=True)
         credential_ids = self._extract_credential_ids(workflow_definition)
 
         if credential_ids:
@@ -504,40 +507,43 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         await self._validate_event_subscribe_bindings(
             workflow_definition, allow_incomplete=allow_incomplete_subscriptions
         )
-        await self._validate_kafka_publish_bindings(workflow_definition)
+        if allow_incomplete_publish:
+            await self._validate_kafka_publish_bindings(workflow_definition, allow_incomplete=True)
+        else:
+            await self._validate_kafka_publish_bindings(workflow_definition)
 
-    async def _validate_kafka_publish_bindings(self, workflow_definition: dict[str, Any]) -> None:
-        """Apply shared visibility and credential rules before binding a Publish node."""
-        try:
-            configs = [
-                KafkaPublishParameters.model_validate(node.get("parameters", {}))
-                for node in workflow_definition.get("nodes", [])
-                if node.get("type") == NodeType.KAFKA_PUBLISH
-            ]
-        except ValidationError as exc:
-            if any(error["loc"] == ("credential_id",) for error in exc.errors(include_input=False)):
-                msg = "Select a runtime Kafka credential using a literal resource UUID for every connection mode"
-            else:
-                msg = "Invalid Kafka Publish configuration"
-            raise SafeValueError(msg) from None
+    async def _validate_kafka_publish_bindings(
+        self, workflow_definition: dict[str, Any], *, allow_incomplete: bool = False
+    ) -> None:
+        """Check supplied resource bindings even when draft message fields are unfinished."""
+        configs = publish_bindings(workflow_definition, allow_incomplete=allow_incomplete)
         if not configs:
             return
-        visible_ids = None if self.is_cert_authenticated else await self._resolve_visible_integration_ids()
+        needs_visibility = any(config.integration_id is not None for config in configs)
+        visible_ids = (
+            await self._resolve_visible_integration_ids()
+            if needs_visibility and not self.is_cert_authenticated
+            else None
+        )
         integration_service = IntegrationService(self.session, self.user)
         for config in configs:
-            integration_id = UUID(config.integration_id)
-            if visible_ids is not None and integration_id not in visible_ids:
-                msg = "One or more selected Integrations are not visible to the current user"
-                raise SafeValueError(msg)
-            integration = await self.session.get(Integration, integration_id)
-            if (
-                integration is None
-                or not integration.enabled
-                or integration.integration_type != IntegrationType.KAFKA
-                or not isinstance(integration.configuration, KafkaConfiguration)
-            ):
-                msg = "One or more Kafka Publish resource references are unavailable"
-                raise SafeValueError(msg)
+            integration = None
+            if config.integration_id is not None:
+                integration_id = UUID(config.integration_id)
+                if visible_ids is not None and integration_id not in visible_ids:
+                    msg = "One or more selected Integrations are not visible to the current user"
+                    raise SafeValueError(msg)
+                integration = await self.session.get(Integration, integration_id)
+                if (
+                    integration is None
+                    or not integration.enabled
+                    or integration.integration_type != IntegrationType.KAFKA
+                    or not isinstance(integration.configuration, KafkaConfiguration)
+                ):
+                    msg = "One or more Kafka Publish resource references are unavailable"
+                    raise SafeValueError(msg)
+            if config.credential_id is None:
+                continue
             credential_id = UUID(config.credential_id)
             credential = await self.session.get(Credential, credential_id)
             if credential is None or not credential.enabled:
@@ -546,19 +552,20 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             await integration_service._validate_credential_type(  # noqa: SLF001 -- reuse shared compatibility rules
                 IntegrationType.KAFKA, credential_id
             )
-            try:
-                await resolve_publish_kafka_login(
-                    self.session,
-                    create_secret_service(self.session),
-                    runtime_credential_id=credential_id,
-                    security_protocol=integration.configuration.security_protocol,
-                )
-            except CredentialError:
-                msg = (
-                    "The selected runtime Kafka credential is unavailable "
-                    "or missing fields required by the connection mode"
-                )
-                raise SafeValueError(msg) from None
+            if integration is not None and isinstance(integration.configuration, KafkaConfiguration):
+                try:
+                    await resolve_publish_kafka_login(
+                        self.session,
+                        create_secret_service(self.session),
+                        runtime_credential_id=credential_id,
+                        security_protocol=integration.configuration.security_protocol,
+                    )
+                except CredentialError:
+                    msg = (
+                        "The selected runtime Kafka credential is unavailable "
+                        "or missing fields required by the connection mode"
+                    )
+                    raise SafeValueError(msg) from None
 
     async def _validate_event_subscribe_bindings(
         self, workflow_definition: dict[str, Any], *, allow_incomplete: bool = False
@@ -857,7 +864,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             raise BuiltinProtectionError(msg)
 
         await self._validate_credential_project_scope(
-            workflow_definition, project_id, allow_incomplete_subscriptions=True
+            workflow_definition, project_id, allow_incomplete_subscriptions=True, allow_incomplete_publish=True
         )
         await self._validate_no_secret_url_conflicts(workflow_definition)
         ref_findings = await validate_workflow_references(
@@ -1434,7 +1441,11 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 if prev_version and prev_version.workflow_definition:
                     previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
             await self._validate_credential_project_scope(
-                workflow_definition, workflow.project_id, previous_cred_ids, allow_incomplete_subscriptions=True
+                workflow_definition,
+                workflow.project_id,
+                previous_cred_ids,
+                allow_incomplete_subscriptions=True,
+                allow_incomplete_publish=True,
             )
             await self._validate_no_secret_url_conflicts(workflow_definition)
             ref_findings = await validate_workflow_references(

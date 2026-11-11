@@ -208,7 +208,52 @@ async def test_malformed_configuration_does_not_expose_payload(
     service: WorkflowService, definition: dict[str, Any]
 ) -> None:
     definition["nodes"][0]["parameters"].update(topic="${trigger.topic}", payload="sensitive payload")
-    with pytest.raises(SafeValueError, match="Invalid Kafka Publish configuration") as error:
+    with pytest.raises(SafeValueError, match="literal Kafka topic") as error:
         await service._validate_kafka_publish_bindings(definition)
     assert "sensitive payload" not in str(error.value)
     assert error.value.__suppress_context__
+
+
+@pytest.mark.parametrize("parameters", [{}, {"integration_id": "", "credential_id": None, "topic": ""}])
+async def test_draft_can_omit_connection_and_message_fields(
+    service: WorkflowService, parameters: dict[str, Any]
+) -> None:
+    definition = {"nodes": [{"type": "kafka_publish", "parameters": parameters}]}
+    await service._validate_kafka_publish_bindings(definition, allow_incomplete=True)
+    assert isinstance(service.session, AsyncMock)
+    service.session.get.assert_not_awaited()
+
+
+async def test_draft_with_selected_integration_still_requires_visibility(service: WorkflowService) -> None:
+    definition = {"nodes": [{"type": "kafka_publish", "parameters": {"integration_id": str(uuid4())}}]}
+    with patch.object(service, "_resolve_visible_integration_ids", return_value=[]):
+        with pytest.raises(SafeValueError, match="not visible"):
+            await service._validate_kafka_publish_bindings(definition, allow_incomplete=True)
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+async def test_draft_with_only_credential_checks_availability_and_type(
+    service: WorkflowService, *, enabled: bool
+) -> None:
+    definition = {"nodes": [{"type": "kafka_publish", "parameters": {"credential_id": str(uuid4())}}]}
+    assert isinstance(service.session, AsyncMock)
+    service.session.get.return_value = SimpleNamespace(enabled=enabled)
+    with patch(
+        "syntara.workflows.services.workflow_service.IntegrationService._validate_credential_type",
+        new_callable=AsyncMock,
+    ) as compatibility:
+        if enabled:
+            await service._validate_kafka_publish_bindings(definition, allow_incomplete=True)
+            compatibility.assert_awaited_once()
+        else:
+            with pytest.raises(SafeValueError, match="unavailable"):
+                await service._validate_kafka_publish_bindings(definition, allow_incomplete=True)
+            compatibility.assert_not_awaited()
+
+
+async def test_malformed_draft_resource_reference_rejected_before_query(service: WorkflowService) -> None:
+    definition = {"nodes": [{"type": "kafka_publish", "parameters": {"credential_id": "${trigger.credential}"}}]}
+    with pytest.raises(SafeValueError, match="literal resource UUID"):
+        await service._validate_credential_project_scope(definition, uuid4(), allow_incomplete_publish=True)
+    assert isinstance(service.session, AsyncMock)
+    service.session.exec.assert_not_awaited()

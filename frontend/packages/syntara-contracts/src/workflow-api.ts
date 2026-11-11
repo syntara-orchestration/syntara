@@ -2360,9 +2360,14 @@ export interface components {
     NodeSettingsBase: Record<string, never>
     /**
      * NodeSettingsCof
-     * @description Settings with continue_on_failure only (converge, loop).
+     * @description Settings with failure behavior and an advisory expected duration.
      */
     NodeSettingsCof: {
+      /**
+       * Expected Duration
+       * @description Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted.
+       */
+      expected_duration?: number | null
       /** Continue On Failure */
       continue_on_failure?: boolean | null
     }
@@ -2371,6 +2376,11 @@ export interface components {
      * @description Settings with disabled and continue_on_failure (wait).
      */
     NodeSettingsCofDisabled: {
+      /**
+       * Expected Duration
+       * @description Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted.
+       */
+      expected_duration?: number | null
       /** Continue On Failure */
       continue_on_failure?: boolean | null
       /** Disabled */
@@ -2381,6 +2391,11 @@ export interface components {
      * @description Settings with disabled, continue_on_failure, and timeout (script, agentic, approval).
      */
     NodeSettingsNoRetry: {
+      /**
+       * Expected Duration
+       * @description Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted.
+       */
+      expected_duration?: number | null
       /** Continue On Failure */
       continue_on_failure?: boolean | null
       /** Disabled */
@@ -2393,6 +2408,11 @@ export interface components {
      * @description Full settings with retry_policy (http_request, aap_job_template, aap_workflow_job_template).
      */
     NodeSettingsFull: {
+      /**
+       * Expected Duration
+       * @description Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted.
+       */
+      expected_duration?: number | null
       /** Continue On Failure */
       continue_on_failure?: boolean | null
       /** Disabled */

@@ -8,6 +8,7 @@ type RuntimeSettingRead = SettingsAPI.components['schemas']['RuntimeSettingRead'
 
 export type WorkflowEngineDefaults = {
   continueOnFailure: boolean | null
+  expectedDurationSeconds?: number | null
   timeoutSeconds: {
     script: number | null
     agentic: number | null
@@ -51,6 +52,7 @@ async function fetchWorkflowEngineDefaults(): Promise<WorkflowEngineDefaults> {
 
   return {
     continueOnFailure: bool('workflow_engine.continue_on_failure'),
+    expectedDurationSeconds: num('workflow_engine.expected_duration_seconds'),
     timeoutSeconds: {
       script: num('workflow_engine.script_timeout_seconds'),
       agentic: num('workflow_engine.agentic_timeout_seconds'),

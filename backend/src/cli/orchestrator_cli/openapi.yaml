@@ -39604,6 +39604,13 @@ components:
       description: Base node settings — no user-configurable fields.
     NodeSettingsCof:
       properties:
+        expected_duration:
+          anyOf:
+            - type: integer
+              minimum: 1.0
+            - type: 'null'
+          title: Expected Duration
+          description: Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted.
         continue_on_failure:
           anyOf:
             - type: boolean
@@ -39612,9 +39619,16 @@ components:
       additionalProperties: false
       type: object
       title: NodeSettingsCof
-      description: Settings with continue_on_failure only (converge, loop).
+      description: Settings with failure behavior and an advisory expected duration.
     NodeSettingsCofDisabled:
       properties:
+        expected_duration:
+          anyOf:
+            - type: integer
+              minimum: 1.0
+            - type: 'null'
+          title: Expected Duration
+          description: Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted.
         continue_on_failure:
           anyOf:
             - type: boolean
@@ -39631,6 +39645,13 @@ components:
       description: Settings with disabled and continue_on_failure (wait).
     NodeSettingsNoRetry:
       properties:
+        expected_duration:
+          anyOf:
+            - type: integer
+              minimum: 1.0
+            - type: 'null'
+          title: Expected Duration
+          description: Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted.
         continue_on_failure:
           anyOf:
             - type: boolean
@@ -39653,6 +39674,13 @@ components:
       description: Settings with disabled, continue_on_failure, and timeout (script, agentic, approval).
     NodeSettingsFull:
       properties:
+        expected_duration:
+          anyOf:
+            - type: integer
+              minimum: 1.0
+            - type: 'null'
+          title: Expected Duration
+          description: Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted.
         continue_on_failure:
           anyOf:
             - type: boolean

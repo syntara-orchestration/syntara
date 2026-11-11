@@ -2,9 +2,9 @@ import { ActivityTypeEnum, type Activity } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
 import { SynErrorState } from '../../../components/states/SynErrorState'
-import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
+import { getActivityMetadata, useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import {
-  buildKafkaPublishParameters,
+  buildKafkaPublishDraft,
   kafkaPublishInitialFields,
   kafkaPublishParametersSchema,
 } from '../node-forms/kafkaPublishFormSchema'
@@ -38,7 +38,7 @@ export function KafkaPublishNodeDetails({
       onHeaderContentChange={onHeaderContentChange}
       initialData={{
         name: taskData.name ?? '',
-        ...kafkaPublishInitialFields(parameters.data),
+        ...kafkaPublishInitialFields(parameters.data, getActivityMetadata(taskData)),
         settings: taskData.settings ?? {},
       }}
       onSubmit={(data) => {
@@ -46,8 +46,11 @@ export function KafkaPublishNodeDetails({
           ...taskData,
           type: ActivityTypeEnum.KAFKA_PUBLISH,
           name: data.name,
-          parameters: buildKafkaPublishParameters(data),
-          settings: data.settings,
+          ...buildKafkaPublishDraft(data, getActivityMetadata(taskData)),
+          settings: {
+            ...data.settings,
+            ...(taskData.settings?.disabled !== undefined && { disabled: taskData.settings.disabled }),
+          },
         })
         onClose()
       }}

@@ -11,6 +11,7 @@ const retryPolicySchema = z.object({
 export const nodeSettingsSchema = z.object({
   continue_on_failure: z.boolean().optional(),
   timeout: z.number().int().positive().optional(),
+  expected_duration: z.number().int().positive().optional(),
   retry_policy: retryPolicySchema.optional(),
 })
 

@@ -1,4 +1,7 @@
+import { Content, ContentVariants } from '@patternfly/react-core'
+
 import { createFieldHelp } from '../../../../components/createFieldHelp'
+import { FieldHelpPopover } from '../../../../components/FieldHelpPopover'
 import { APPROVER_GROUPS_LABEL, APPROVER_USERS_LABEL } from '../approverConstants'
 
 import * as T from './nodeFieldHelpText'
@@ -8,6 +11,7 @@ export const nodeHelp = {
   // Settings
   onFailureBehavior: createFieldHelp('On failure behavior', T.SETTINGS_CONTINUE_ON_FAILURE_HELP),
   timeout: createFieldHelp('Timeout', T.SETTINGS_TIMEOUT_HELP),
+  expectedDuration: createFieldHelp('Expected duration', T.SETTINGS_EXPECTED_DURATION_HELP),
   retryToggle: createFieldHelp('Override retry policy', T.SETTINGS_RETRY_TOGGLE_HELP),
   maxRetries: createFieldHelp('Max retries', T.SETTINGS_MAX_RETRIES_HELP),
   initialInterval: createFieldHelp('Initial interval', T.SETTINGS_INITIAL_INTERVAL_HELP),
@@ -22,6 +26,26 @@ export const nodeHelp = {
   httpUrl: createFieldHelp('URL', T.HTTP_URL_HELP),
   httpHeaders: createFieldHelp('Headers', T.HTTP_HEADERS_HELP),
   httpBody: createFieldHelp('Body', T.HTTP_BODY_HELP),
+
+  // Kafka Publish
+  kafkaPublishPayload: createFieldHelp('JSON payload', T.KAFKA_PUBLISH_PAYLOAD_HELP),
+  kafkaPublishKeyEncoding: createFieldHelp('Message key encoding', T.KAFKA_PUBLISH_KEY_ENCODING_HELP),
+  kafkaPublishHeaders: createFieldHelp('Message headers', T.KAFKA_PUBLISH_HEADERS_HELP),
+  kafkaPublishHeaderSource: (
+    <FieldHelpPopover
+      headerContent="Header source"
+      helpText={
+        <Content>
+          <Content component={ContentVariants.p}>
+            <strong>Ordered entries:</strong> {T.KAFKA_PUBLISH_HEADER_SOURCE_ENTRIES_HELP}
+          </Content>
+          <Content component={ContentVariants.p}>
+            <strong>Full-value template:</strong> {T.KAFKA_PUBLISH_HEADER_SOURCE_TEMPLATE_HELP}
+          </Content>
+        </Content>
+      }
+    />
+  ),
 
   // AI agent
   aiModel: createFieldHelp('Model', T.AI_MODEL_HELP),

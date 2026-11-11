@@ -40,6 +40,18 @@ describe('resolveNodeName', () => {
 })
 
 describe('useActivityNameMap', () => {
+  it('uses the execution definition expected duration instead of an edited store value', () => {
+    vi.mocked(useActivities).mockReturnValue([
+      { id: 'task-1', type: 'script', parameters: {}, settings: { expected_duration: 99 } },
+    ])
+    vi.mocked(useTriggers).mockReturnValue(undefined)
+    const states = new Map<string, ActivityState>([['task-1', { activityId: 'task-1', status: 'running' }]])
+    const definition: WorkflowDefShape = {
+      nodes: [{ id: 'task-1', type: 'script', settings: { expected_duration: 2 } }],
+    }
+    const { result } = renderHook(() => useActivityNameMap(definition, states))
+    expect(result.current.activityOrder[0]?.expectedDuration).toBe(2)
+  })
   const activityStates = new Map<string, ActivityState>([
     ['task-1', { activityId: 'task-1', status: 'completed' }],
     ['task-2', { activityId: 'task-2', status: 'pending' }],
