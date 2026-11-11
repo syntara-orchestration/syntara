@@ -19,6 +19,7 @@ from syntara.workflows.models.activity_execution import ActivityExecution, Activ
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
+from syntara.workflows.workflow_engine.services.activity_execution_sync import ActivityExecutionSyncMixin
 from syntara.workflows.workflow_engine.services.activity_execution_synchronizer import (
     ActivityExecutionSynchronizer,
 )
@@ -7120,3 +7121,25 @@ class TestInitializeMonitoringSetsRetryFlag:
         await service._initialize_monitoring(uuid4())
 
         handle.query.assert_awaited_once_with("is_retry_from_failure")
+
+
+class TestOccurrenceQueryId:
+    """Loop body I/O must be loaded from the Temporal ID, not the live canvas slot."""
+
+    def test_loop_body_uses_temporal_id(self) -> None:
+        assert (
+            ActivityExecutionSyncMixin._occurrence_query_id(
+                {"activity_id": "body", "temporal_activity_id": "body_iter_0"},
+                is_body_iteration=True,
+            )
+            == "body_iter_0"
+        )
+
+    def test_non_body_keeps_canvas_id(self) -> None:
+        assert (
+            ActivityExecutionSyncMixin._occurrence_query_id(
+                {"activity_id": "loop", "temporal_activity_id": "loop_iter_0"},
+                is_body_iteration=False,
+            )
+            == "loop"
+        )

@@ -650,11 +650,12 @@ class ActivityExecutionSyncMixin:
         if existing.status in TERMINAL_ACTIVITY_STATUSES and not loop_control_iterating and not is_new:
             return None
 
-        input_data, output_data = await self._resolve_activity_io(handle, activity_id, activity_data, existing)
+        query_id = self._occurrence_query_id(activity_data, is_body_iteration=is_body_iteration)
+        input_data, output_data = await self._resolve_activity_io(handle, query_id, activity_data, existing)
         control_data = (
             await self._resolve_activity_control(
                 handle,
-                activity_id,
+                query_id,
                 activity_data,
                 existing,
             )
@@ -714,6 +715,22 @@ class ActivityExecutionSyncMixin:
         else:
             output_data = existing.output_data
         return input_data, output_data
+
+    @staticmethod
+    def _occurrence_query_id(activity_data: dict[str, Any], *, is_body_iteration: bool) -> str:
+        """Return the workflow-state key for this activity event.
+
+        Loop body occurrences share a canvas ID whose live slot is overwritten
+        on the next turn. Query the Temporal activity ID so delayed history
+        sync still loads that occurrence's input, output, and control data.
+        """
+        activity_id = str(activity_data["activity_id"])
+        if not is_body_iteration:
+            return activity_id
+        temporal_id = activity_data.get("temporal_activity_id")
+        if isinstance(temporal_id, str) and temporal_id:
+            return temporal_id
+        return activity_id
 
     async def _resolve_activity_io(
         self,
