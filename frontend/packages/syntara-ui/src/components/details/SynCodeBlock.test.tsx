@@ -1,6 +1,7 @@
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { axe } from 'vitest-axe'
 
 import type { ShikiLanguage, ShikiTokenLines } from './shiki-service'
 import { SynCodeBlock } from './SynCodeBlock'
@@ -287,6 +288,25 @@ describe('SynCodeBlock', () => {
           .map((mark) => mark.textContent)
           .join('')
       ).toBe('   ')
+    })
+  })
+
+  describe('accessibility', () => {
+    it('has no accessibility violations for highlighted JSON with search', async () => {
+      const user = userEvent.setup()
+      const source = '{\n  "status": "failed"\n}'
+      const { baseElement } = render(
+        <SynCodeBlock language="json" searchTerm="FAILED" enableCopy enableExpand expandTitle="Output JSON">
+          {source}
+        </SynCodeBlock>
+      )
+
+      await waitFor(() => expect(screen.getByRole('mark')).toHaveTextContent('failed'))
+      expect(await axe(baseElement)).toHaveNoViolations()
+
+      await user.click(screen.getByRole('button', { name: 'Expand code' }))
+      expect(screen.getByRole('dialog', { name: 'Output JSON' })).toBeInTheDocument()
+      expect(await axe(baseElement)).toHaveNoViolations()
     })
   })
 
