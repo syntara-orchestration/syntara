@@ -5,6 +5,7 @@ re-deriving the loop's decision. That is what makes it correct under
 ``continue_on_failure``, where a failed body node does not mean the loop exited.
 """
 
+import asyncio
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -286,16 +287,22 @@ def test_root_loop_feedback_keeps_controller_entry(patched_workflow) -> None:
     assert wf.loop_body_map["loop"] == "loop"
 
 
-def test_pending_nested_controller_prevents_duplicate_loop_schedule(patched_workflow) -> None:
+@pytest.mark.asyncio
+async def test_pending_nested_controller_prevents_duplicate_loop_schedule(patched_workflow) -> None:
     wf = _wf(retry_points=["body_a"], bodies={"inner": {"body_a"}})
     wf.loop_body_map = {"body_a": "inner"}
     wf.resolver.set_namespace("body_a", {"status": "completed"})
     graph = MagicMock()
-    pending_tasks = {"inner": MagicMock()}
+    pending_controller = asyncio.create_task(asyncio.Event().wait())
 
-    wf._check_loop_body_completion("body_a", graph, pending_tasks)
+    try:
+        wf._check_loop_body_completion("body_a", graph, {"inner": pending_controller})
 
-    graph.get_node.assert_not_called()
+        graph.get_node.assert_not_called()
+    finally:
+        pending_controller.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await pending_controller
 
 
 @pytest.mark.asyncio
