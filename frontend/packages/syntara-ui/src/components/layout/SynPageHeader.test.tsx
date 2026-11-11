@@ -99,6 +99,13 @@ describe('SynPageHeader', () => {
     expect(screen.queryByRole('link', { name: /View documentation/i })).not.toBeInTheDocument()
   })
 
+  it('renders titleSubRow content beneath the title', () => {
+    render(<SynPageHeader title="Run 123" titleSubRow={<a href="/executions/parent-1">View parent run</a>} />)
+
+    expect(screen.getByRole('heading', { name: 'Run 123' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'View parent run' })).toHaveAttribute('href', '/executions/parent-1')
+  })
+
   it('keeps toolbar actions visible when the title is long', () => {
     const longTitle = 'Production MCP integration with an intentionally long name that should wrap in the header'
 

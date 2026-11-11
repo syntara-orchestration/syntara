@@ -109,6 +109,10 @@ export function formatDateTime(isoString?: string | null): string {
  */
 export function formatElapsedTime(elapsedMs: number): string {
   const totalMs = Math.max(0, Math.floor(elapsedMs))
+  // A positive sub-second duration would otherwise floor to "0s"; show
+  // millisecond precision instead (e.g. "650ms") so brief activities read as
+  // non-zero. Exactly 0 keeps the "0s" form (no measurable duration).
+  if (totalMs > 0 && totalMs < 1000) return `${totalMs}ms`
   const duration = intervalToDuration({ start: new Date(0), end: new Date(totalMs) })
   const totalHours = (duration.days ?? 0) * 24 + (duration.hours ?? 0)
   const minutes = duration.minutes ?? 0

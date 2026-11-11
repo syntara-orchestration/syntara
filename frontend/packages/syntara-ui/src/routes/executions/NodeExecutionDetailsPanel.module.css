@@ -70,3 +70,12 @@
   min-width: 0;
   overflow: hidden;
 }
+
+.nodeTitle {
+  margin: 0;
+}
+
+.nodeContentRegion {
+  min-height: 0;
+  overflow: hidden;
+}

@@ -57,7 +57,17 @@ class ActivityExecutionSynchronizer:
                 updated_activities: list[tuple[ActivityExecution, dict[str, Any]]] = []
                 new_iteration_activities: list[ActivityExecution] = []
 
-                for scheduled_event_id in metadata.pending_sync_event_ids:
+                # Apply pending updates in ascending Temporal history-event-id order.
+                # pending_sync_event_ids is a set, whose iteration order is not event
+                # order; for a for_each sub-workflow node every iteration maps to the
+                # same aggregate row, so unordered application made the winning
+                # input_data/output_data (and the emitted WebSocket state) depend on set
+                # order. Sorting makes the single-row result deterministic: the
+                # iteration with the highest scheduled event id (latest-scheduled)
+                # wins. Batches are monotonic
+                # (history is streamed forward and already-synced events are skipped via
+                # last_processed_event_id), so per-batch sorting is sufficient.
+                for scheduled_event_id in sorted(metadata.pending_sync_event_ids):
                     activity_data = metadata.pending_activity_updates.get(scheduled_event_id)
                     if not activity_data:
                         continue

@@ -6,6 +6,7 @@ import {
   createEventTrigger,
   createManualTrigger,
   createScheduledTrigger,
+  createSubworkflowTrigger,
   createWebhookTrigger,
 } from './triggerFactories'
 
@@ -29,6 +30,29 @@ describe('triggerFactories', () => {
     it('includes input_schema when provided', () => {
       const schema = { type: 'object', properties: { x: { type: 'number' } } }
       const trigger = createManualTrigger('t1', undefined, undefined, schema)
+      expect(trigger.parameters).toEqual({ input_schema: schema })
+    })
+  })
+
+  describe('createSubworkflowTrigger', () => {
+    it('creates a sub-workflow trigger with defaults', () => {
+      const trigger = createSubworkflowTrigger('t1')
+      expect(trigger).toEqual({
+        id: 't1',
+        type: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
+        name: 'Workflow Trigger',
+        parameters: {},
+      })
+    })
+
+    it('uses provided name', () => {
+      const trigger = createSubworkflowTrigger('t1', undefined, 'My Child')
+      expect(trigger.name).toBe('My Child')
+    })
+
+    it('includes input_schema when provided', () => {
+      const schema = { type: 'object', properties: { greeting: { type: 'string' } } }
+      const trigger = createSubworkflowTrigger('t1', schema)
       expect(trigger.parameters).toEqual({ input_schema: schema })
     })
   })

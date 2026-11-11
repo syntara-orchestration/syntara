@@ -34,6 +34,7 @@ from .execution import (
 )
 from .query_params import (
     ActivityListParams,
+    ChildExecutionListParams,
     ExecutionIncludeParams,
     ExecutionListParams,
     ExecutionStreamingQueryParams,
@@ -90,6 +91,7 @@ __all__ = [
     "ActivityPatchMessage",
     "ActivitySignalPayload",
     "ActivityStatus",
+    "ChildExecutionListParams",
     "DetailedValidationProblemDetail",
     "Execution",
     "ExecutionInclude",

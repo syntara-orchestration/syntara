@@ -32,6 +32,7 @@ class ActivitySyncPublisherMixin:
             ("completed_at", activity.completed_at.isoformat() if activity.completed_at else None),
             ("error_details", activity.error_details),
             ("output_data", activity.output_data),
+            ("runtime_metadata", activity.runtime_metadata),
             ("iteration", activity.iteration),
         ]
 

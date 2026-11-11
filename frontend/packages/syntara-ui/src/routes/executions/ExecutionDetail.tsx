@@ -33,8 +33,16 @@ import { ConnectionBanner } from './ConnectionBanner'
 import { CopyToEditorDialog } from './CopyToEditorDialog'
 import { isExecutionCancellable } from './executionCancellable'
 import styles from './ExecutionDetail.module.css'
-import { ExecutionDetailHeaderToolbar, ExecutionDetailTitleRowAddons } from './ExecutionDetailPageHeaderParts'
-import { executionDetailHasTitleRowExtras, executionDetailPageHeading } from './executionDetailPageHeaderTitle'
+import {
+  ExecutionDetailHeaderToolbar,
+  ExecutionDetailParentRunLink,
+  ExecutionDetailTitleRowAddons,
+} from './ExecutionDetailPageHeaderParts'
+import {
+  executionDetailHasTitleRowExtras,
+  executionDetailPageHeading,
+  executionHasParentRun,
+} from './executionDetailPageHeaderTitle'
 import { executionRefetchInterval } from './executionPolling'
 import { useApprovalNavigation } from './hooks/useApprovalNavigation'
 import { useExecutionApprovalPanel } from './hooks/useExecutionApprovalPanel'
@@ -367,6 +375,9 @@ export default function ExecutionDetail() {
             executionDetailHasTitleRowExtras(execution) ? (
               <ExecutionDetailTitleRowAddons execution={execution} />
             ) : undefined
+          }
+          titleSubRow={
+            executionHasParentRun(execution) ? <ExecutionDetailParentRunLink execution={execution} /> : undefined
           }
           toolbar={
             <ExecutionDetailHeaderToolbar

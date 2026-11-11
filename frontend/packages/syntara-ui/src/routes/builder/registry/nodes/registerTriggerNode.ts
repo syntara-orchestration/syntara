@@ -1,4 +1,4 @@
-import { RhUiCalendarIcon, RhUiLanguageIcon, RhUiPlayIcon } from '@patternfly/react-icons'
+import { RhUiCalendarIcon, RhUiLanguageIcon, RhUiNetworkIcon, RhUiPlayIcon } from '@patternfly/react-icons'
 import { type ScheduleType, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
 
 import EdaIcon from '../../../../assets/eda.svg?react'
@@ -8,6 +8,7 @@ import {
   createScheduledTrigger,
   createEdaTrigger,
   createWebhookTrigger,
+  createSubworkflowTrigger,
   useWorkflowStore,
 } from '../../../../stores/useWorkflowStore'
 import { parseJsonSchema } from '../../../../utils/jsonSafeParse'
@@ -31,7 +32,20 @@ export default function registerTriggerNode() {
         icon: RhUiPlayIcon,
         category: 'trigger',
         description: 'Start workflow execution with manual, scheduled, or event triggers',
-        keywords: ['start', 'begin', 'manual', 'schedule', 'event', 'webhook', 'api', 'http', 'eda'],
+        keywords: [
+          'start',
+          'begin',
+          'manual',
+          'schedule',
+          'event',
+          'webhook',
+          'api',
+          'http',
+          'eda',
+          'sub-workflow',
+          'child',
+          'invoke',
+        ],
         order: 100,
         selectionTitle: 'Select a trigger node',
         subtypes: [
@@ -67,6 +81,14 @@ export default function registerTriggerNode() {
             formTitle: 'Configure EDA Trigger',
             initialData: { triggerType: TriggerTypeEnum.EDA_TRIGGER },
           },
+          {
+            id: RegistryNodeId.TRIGGER_SUBWORKFLOW,
+            label: 'Workflow trigger',
+            icon: RhUiNetworkIcon,
+            description: 'Workflow will start when invoked by another workflow.',
+            formTitle: 'Configure Workflow Trigger',
+            initialData: { triggerType: TriggerTypeEnum.SUBWORKFLOW_TRIGGER },
+          },
         ],
         formComponent: TriggerNodeForm,
       },
@@ -90,6 +112,10 @@ export default function registerTriggerNode() {
                 },
                 name
               )
+            }
+            if (data.triggerType === TriggerTypeEnum.SUBWORKFLOW_TRIGGER) {
+              const inputSchema = parseJsonSchema(data.inputSchema)
+              return createSubworkflowTrigger(triggerId, inputSchema, name)
             }
             if (WEBHOOK_TRIGGER_TYPES.has(data.triggerType)) {
               const inputSchema = parseJsonSchema(data.inputSchema)

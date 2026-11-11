@@ -5,6 +5,7 @@ import { RegistryNodeId } from '../../../../constants'
 import {
   createEdaTrigger,
   createScheduledTrigger,
+  createSubworkflowTrigger,
   createWebhookTrigger,
   useWorkflowStore,
 } from '../../../../stores/useWorkflowStore'
@@ -34,6 +35,10 @@ vi.mock('../../../../stores/useWorkflowStore', () => ({
   createEdaTrigger: vi.fn(({ id }: { id: string }) => ({
     id,
     type: TriggerTypeEnum.EDA_TRIGGER,
+  })),
+  createSubworkflowTrigger: vi.fn((id: string) => ({
+    id,
+    type: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
   })),
 }))
 
@@ -76,11 +81,11 @@ describe('registerTriggerNode', () => {
     expect(registration?.keywords).toEqual(expect.arrayContaining(['start', 'manual', 'schedule', 'event', 'webhook']))
   })
 
-  it('includes four subtypes: manual, scheduled, webhook, and EDA', () => {
+  it('includes five subtypes: manual, scheduled, webhook, EDA, and sub-workflow', () => {
     registerTriggerNode()
 
     const registration = NodeRegistry.get(RegistryNodeId.TRIGGER)
-    expect(registration?.subtypes).toHaveLength(4)
+    expect(registration?.subtypes).toHaveLength(5)
 
     const manual = registration?.subtypes?.find((s) => s.id === RegistryNodeId.TRIGGER_MANUAL)
     expect(manual).toBeDefined()
@@ -100,6 +105,43 @@ describe('registerTriggerNode', () => {
     expect(eda).toBeDefined()
     expect(eda?.label).toBe('Event-Driven Ansible trigger')
     expect(eda?.initialData).toEqual({ triggerType: TriggerTypeEnum.EDA_TRIGGER })
+
+    const subworkflow = registration?.subtypes?.find((s) => s.id === RegistryNodeId.TRIGGER_SUBWORKFLOW)
+    expect(subworkflow).toBeDefined()
+    expect(subworkflow?.label).toBe('Workflow trigger')
+    expect(subworkflow?.description).toBe('Workflow will start when invoked by another workflow.')
+    expect(subworkflow?.initialData).toEqual({ triggerType: TriggerTypeEnum.SUBWORKFLOW_TRIGGER })
+  })
+
+  it('onSubmit creates a sub-workflow trigger with its input schema and calls onSuccess', () => {
+    const mockAddTrigger = vi.fn()
+    vi.mocked(useWorkflowStore.getState).mockReturnValue({
+      addTrigger: mockAddTrigger,
+    } as never)
+
+    registerTriggerNode()
+    const registration = NodeRegistry.get(RegistryNodeId.TRIGGER)
+    const onSuccess = vi.fn()
+    const onError = vi.fn()
+
+    registration?.onSubmit(
+      {
+        name: 'Child entry',
+        triggerType: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
+        inputSchema: '{"type":"object"}',
+      },
+      onSuccess,
+      onError
+    )
+
+    expect(vi.mocked(createSubworkflowTrigger)).toHaveBeenCalledWith(
+      expect.any(String),
+      { type: 'object' },
+      expect.any(String)
+    )
+    expect(mockAddTrigger).toHaveBeenCalled()
+    expect(onSuccess).toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
   })
 
   it('onSubmit creates a manual trigger and calls onSuccess', () => {

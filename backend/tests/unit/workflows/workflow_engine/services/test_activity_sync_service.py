@@ -2505,6 +2505,44 @@ class TestExtractFailedActivityErrors:
         assert result == "One or more workflow activities failed"
 
 
+class TestExtractCancelledActivitiesFromEvent:
+    """Test _extract_cancelled_activities_from_event static method (P2-2 fallback)."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(
+            temporal_client=AsyncMock(),
+            session_factory=AsyncMock(),
+        )
+
+    def _make_completed_event(self, result_data: dict[str, object]) -> Mock:
+        import json
+
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+        payload = Mock()
+        payload.data = json.dumps(result_data).encode()
+        event.workflow_execution_completed_event_attributes.result.payloads = [payload]
+        return event
+
+    def test_extracts_cancelled_activities(self) -> None:
+        event = self._make_completed_event(
+            {"status": "completed_with_errors", "cancelled_activities": {"sub-1": "Sub-workflow cancelled"}}
+        )
+        result = self.service._extract_cancelled_activities_from_event(event)
+        assert result == {"sub-1": "Sub-workflow cancelled"}
+
+    def test_returns_empty_without_cancelled_activities(self) -> None:
+        event = self._make_completed_event({"status": "completed", "failed_activities": {}})
+        result = self.service._extract_cancelled_activities_from_event(event)
+        assert result == {}
+
+    def test_returns_empty_for_non_completed_event(self) -> None:
+        event = Mock()
+        event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED
+        result = self.service._extract_cancelled_activities_from_event(event)
+        assert result == {}
+
+
 class TestExtractFailedActivitiesFromEvent:
     """Test _extract_failed_activities_from_event static method."""
 
@@ -2848,6 +2886,58 @@ class TestSyncNodesToTerminalStatus:
         handle.query = AsyncMock(side_effect=RuntimeError("workflow not reachable"))
 
         await self.service._sync_detached_nodes(metadata, handle)
+
+    # -- _sync_cancelled_step_nodes tests --
+
+    @pytest.mark.asyncio
+    async def test_cancelled_step_node_marked_as_cancelled(self) -> None:
+        """A cancelled sub-workflow step is persisted CANCELLED (not FAILED), with its message."""
+        activity = self._create_mock_activity_execution("sub-node", status=ActivityStatus.RUNNING)
+        self._mock_session([activity])
+        metadata = self._create_metadata(activity_index_map={"sub-node": 3})
+
+        handle = AsyncMock()
+        handle.query = AsyncMock(return_value={"sub-node": "Sub-workflow cancelled"})
+
+        await self.service._sync_cancelled_step_nodes(metadata, handle)
+
+        handle.query.assert_awaited_once_with("get_cancelled_step_nodes")
+        assert activity.status == ActivityStatus.CANCELLED
+        assert activity.error_details == "Sub-workflow cancelled"
+
+    @pytest.mark.asyncio
+    async def test_cancelled_step_sync_does_not_overwrite_terminal_status(self) -> None:
+        """An already-terminal row is left untouched (CANCELLED cannot clobber a terminal state)."""
+        activity = self._create_mock_activity_execution("sub-node", status=ActivityStatus.COMPLETED)
+        self._mock_session([activity])
+        metadata = self._create_metadata(activity_index_map={"sub-node": 3})
+
+        handle = AsyncMock()
+        handle.query = AsyncMock(return_value={"sub-node": "Sub-workflow cancelled"})
+
+        await self.service._sync_cancelled_step_nodes(metadata, handle)
+
+        assert activity.status == ActivityStatus.COMPLETED
+
+    @pytest.mark.asyncio
+    async def test_cancelled_step_sync_noop_when_none(self) -> None:
+        """_sync_cancelled_step_nodes is a no-op when the workflow has no cancelled steps."""
+        metadata = self._create_metadata()
+        handle = AsyncMock()
+        handle.query = AsyncMock(return_value={})
+
+        await self.service._sync_cancelled_step_nodes(metadata, handle)
+
+        self.mock_session_factory.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cancelled_step_sync_query_error_does_not_propagate(self) -> None:
+        """Errors during cancelled step sync should be logged, not raised."""
+        metadata = self._create_metadata()
+        handle = AsyncMock()
+        handle.query = AsyncMock(side_effect=RuntimeError("workflow not reachable"))
+
+        await self.service._sync_cancelled_step_nodes(metadata, handle)
 
     # -- _ensure_activity_records_exist tests --
 
@@ -3743,6 +3833,50 @@ class TestProcessHistoryEvent:
         assert passed_failed_map == fallback_map
 
     @pytest.mark.asyncio
+    async def test_query_completed_nodes_none_falls_back_to_event_extraction(self) -> None:
+        """When _query_completed_nodes returns None, _extract_completed_nodes_from_event is used."""
+        event = self._create_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED, event_id=21)
+        fallback_completed = {"sub_wf_node"}
+
+        with (
+            patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value={}),
+            patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_query_completed_nodes", new_callable=AsyncMock, return_value=None),
+            patch.object(
+                self.service, "_extract_completed_nodes_from_event", return_value=fallback_completed
+            ) as mock_extract,
+            patch.object(self.service, "_update_execution_status_from_event", new_callable=AsyncMock) as mock_update,
+        ):
+            result = await self.service._process_history_event(
+                event, self.metadata, self.mock_handle, self.queue, self.probe_tasks
+            )
+
+        assert result is True
+        mock_extract.assert_called_once_with(event)
+        assert mock_update.call_args[0][3] == fallback_completed
+
+    @pytest.mark.asyncio
+    async def test_query_completed_nodes_success_skips_event_extraction(self) -> None:
+        """When the completion query succeeds, the payload fallback is NOT used."""
+        event = self._create_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED, event_id=22)
+
+        with (
+            patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value={}),
+            patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_query_completed_nodes", new_callable=AsyncMock, return_value={"sub_wf_node"}),
+            patch.object(self.service, "_extract_completed_nodes_from_event") as mock_extract,
+            patch.object(self.service, "_update_execution_status_from_event", new_callable=AsyncMock) as mock_update,
+        ):
+            await self.service._process_history_event(
+                event, self.metadata, self.mock_handle, self.queue, self.probe_tasks
+            )
+
+        mock_extract.assert_not_called()
+        assert mock_update.call_args[0][3] == {"sub_wf_node"}
+
+    @pytest.mark.asyncio
     async def test_processes_activity_events(self) -> None:
         """Test that activity events are processed and post-processed."""
         event = self._create_event(EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED, event_id=5)
@@ -4195,6 +4329,8 @@ class TestRunMonitorLoop:
             patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value={}),
             patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
             patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
+            patch.object(self.service, "_sync_cancelled_step_nodes", new_callable=AsyncMock, return_value={}),
+            patch.object(self.service, "_query_completed_nodes", new_callable=AsyncMock, return_value=set()),
         ):
             result = await self.service._run_monitor_loop(self.handle, self.metadata, self.execution_id)
 

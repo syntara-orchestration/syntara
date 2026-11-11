@@ -490,6 +490,7 @@ async def test_invocation_schema_uses_published_version_and_filters_trigger_type
         version=1,
         schema_version="2.0.0",
         workflow_definition=published_definition,
+        name="Release 1",
         created_by=test_user.id,
     )
     draft_version = WorkflowVersion(
@@ -519,6 +520,8 @@ async def test_invocation_schema_uses_published_version_and_filters_trigger_type
     assert result.workflow_id == workflow.id
     assert result.published_version_id == published_version.id
     assert result.published_version == 1
+    assert result.published_version_name == "Release 1"
+    assert result.published_version_created_at == published_version.created_at
     assert result.is_eligible is True
     assert [trigger.trigger_node_id for trigger in result.triggers] == ["child_entry", "child_entry_empty"]
     assert result.triggers[0].input_schema == {

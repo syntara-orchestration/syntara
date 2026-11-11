@@ -22,6 +22,23 @@ export function createManualTrigger(
 }
 
 /**
+ * Create a sub-workflow trigger (v2).
+ * The entry point that lets this workflow be invoked as a child by a
+ * Sub-workflow step in another workflow. Carries an optional input schema
+ * describing the data the parent must supply.
+ */
+export function createSubworkflowTrigger(id: string, inputSchema?: Record<string, unknown>, name?: string): Activity {
+  return {
+    id,
+    type: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
+    name: name ?? 'Workflow Trigger',
+    parameters: {
+      ...(inputSchema && { input_schema: inputSchema }),
+    },
+  }
+}
+
+/**
  * Create a scheduled trigger (v2).
  * @note This trigger type is not yet in the v2 backend schema
  */

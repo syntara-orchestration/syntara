@@ -158,7 +158,19 @@ class TemporalWorkerService:
                 session_factory=AsyncSessionLocal,
                 task_queue=self.task_queue,
             )
-            activities: list[Callable[..., Any]] = [*self._activity_registry.values(), scheduled_launcher.run]
+            from syntara.workflows.workflow_engine.activities.sub_workflow_setup_activity import (  # noqa: PLC0415
+                SubWorkflowSetupActivity,
+            )
+
+            sub_workflow_setup = SubWorkflowSetupActivity(
+                session_factory=AsyncSessionLocal,
+                task_queue=self.task_queue,
+            )
+            activities: list[Callable[..., Any]] = [
+                *self._activity_registry.values(),
+                scheduled_launcher.run,
+                sub_workflow_setup.run,
+            ]
 
             # Create worker with workflows, activities, and interceptors
             logger.debug("creating_temporal_worker", task_queue=self.task_queue)

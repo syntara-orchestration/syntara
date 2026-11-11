@@ -38,6 +38,7 @@ import { ActivityNameField } from './shared/ActivityNameField'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
 import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
+import { SubWorkflowTriggerFields } from './SubWorkflowTriggerFields'
 import { normalizeWebhookPath, triggerFormSchema, type TriggerFormData } from './triggerFormSchema'
 import { WebhookFields } from './WebhookTriggerFields'
 
@@ -420,6 +421,12 @@ function TriggerFormFields({
           </Stack>
         </fieldset>
       )}
+
+      {triggerType === TriggerTypeEnum.SUBWORKFLOW_TRIGGER && (
+        <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
+          <SubWorkflowTriggerFields errors={errors} />
+        </fieldset>
+      )}
     </Stack>
   )
 
@@ -442,11 +449,12 @@ export function TriggerNodeForm(props: TriggerNodeFormProps) {
     const isManual = data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER
     const isScheduled = data.triggerType === TriggerTypeEnum.SCHEDULED
     const isWebhookStyle = WEBHOOK_TRIGGER_TYPES.has(data.triggerType)
+    const isSubworkflow = data.triggerType === TriggerTypeEnum.SUBWORKFLOW_TRIGGER
 
     const cleanedData: TriggerFormData = {
       name: data.name,
       triggerType: data.triggerType,
-      inputSchema: isManual || isWebhookStyle ? data.inputSchema : undefined,
+      inputSchema: isManual || isWebhookStyle || isSubworkflow ? data.inputSchema : undefined,
       scheduleType: isScheduled ? data.scheduleType : undefined,
       interval: isScheduled && data.scheduleType === ScheduleTypeEnum.INTERVAL ? data.interval : undefined,
       cron: isScheduled && data.scheduleType === ScheduleTypeEnum.CRON ? data.cron : undefined,

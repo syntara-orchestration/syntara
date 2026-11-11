@@ -52,6 +52,16 @@ class CredentialPayloadCodec(PayloadCodec):
         """Decrypt previously encrypted payloads for worker/workflow consumption."""
         return [self._decrypt_if_encrypted(p) for p in payloads]
 
+    def decode_payload(self, payload: Payload) -> Payload:
+        """Decrypt a single payload synchronously.
+
+        The codec's work is local AES-GCM with no awaitable I/O, so a caller that
+        already holds one payload (e.g. the history-sync monitor reading raw event
+        bytes) can decrypt inline without an async round-trip. Non-encrypted
+        payloads pass through unchanged.
+        """
+        return self._decrypt_if_encrypted(payload)
+
     def _encrypt_if_sensitive(self, payload: Payload) -> Payload:
         """Encrypt a payload if it contains credential keys."""
         encoding = payload.metadata.get("encoding", b"")

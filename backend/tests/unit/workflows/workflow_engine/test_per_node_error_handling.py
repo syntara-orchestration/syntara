@@ -476,3 +476,134 @@ class TestContinueOnFailureApproval:
         await wf._handle_continued_failure("script_1", node, graph, {})
 
         assert "script_1" not in wf.node_control_data
+
+
+class TestSubWorkflowCancelledStepRouting:
+    """A cancelled sub-workflow child is a cancelled *step* (PR #971, KB-perByte review).
+
+    It stays in failed_nodes for all flow-control (continue_on_failure, downstream skip,
+    run-status) but is surfaced CANCELLED rather than FAILED (excluded from
+    get_failed_nodes, reported by get_cancelled_step_nodes), and it must NOT set
+    self._cancelled_node (which would cancel the whole parent run).
+    """
+
+    @staticmethod
+    def _wf() -> OrchestratorWorkflow:
+        wf = _make_workflow()
+        wf._cof_failed_nodes = set()
+        wf._has_unhandled_failure = False
+        wf._cancelled_node = None
+        wf._cancelled_step_nodes = set()
+        wf._secret_values = set()
+        wf._runtime_settings = {}
+        return wf
+
+    @staticmethod
+    def _cancelled_error() -> ApplicationError:
+        return ApplicationError(
+            "Sub-workflow cancelled",
+            type="SubWorkflowCancelledError",
+            non_retryable=True,
+        )
+
+    def test_cancelled_step_surfaces_cancelled_not_failed(self) -> None:
+        """continue_on_failure=False: step CANCELLED, downstream skipped, run fails, not run-cancelled."""
+        wf = self._wf()
+        graph = _make_linear_graph()  # trigger -> A -> B -> C
+
+        wf._handle_node_failure("A", self._cancelled_error(), graph, continue_on_failure=False)
+
+        # Flow-control identical to a failure: in failed_nodes, downstream skipped, unhandled.
+        assert "A" in wf.failed_nodes
+        assert "B" in wf.skipped_nodes
+        assert wf._has_unhandled_failure is True
+        # Surfaced as cancelled, not failed.
+        assert wf.resolver.get_namespace("A")["status"] == "cancelled"
+        assert "A" in wf._cancelled_step_nodes
+        # Query split: excluded from failed, present in cancelled.
+        assert "A" not in wf.get_failed_nodes()
+        assert "A" in wf.get_cancelled_step_nodes()
+        # Parent run is NOT cancelled.
+        assert wf._cancelled_node is None
+        # Run-level status: an unhandled cancelled step fails the parent execution.
+        assert wf._build_result("exec-1", include_node_results=False)["status"] == "failed"
+
+    def test_cancelled_step_honors_continue_on_failure(self) -> None:
+        """continue_on_failure=True: step CANCELLED, successors not skipped, no unhandled failure."""
+        wf = self._wf()
+        graph = _make_linear_graph()
+
+        wf._handle_node_failure("A", self._cancelled_error(), graph, continue_on_failure=True)
+
+        assert "A" in wf.failed_nodes
+        assert "A" in wf._cof_failed_nodes
+        assert wf._has_unhandled_failure is False
+        assert "B" not in wf.skipped_nodes
+        assert wf.resolver.get_namespace("A")["status"] == "cancelled"
+        assert "A" in wf.get_cancelled_step_nodes()
+        assert "A" not in wf.get_failed_nodes()
+        assert wf._cancelled_node is None
+        # Run-level status: a continue_on_failure-absorbed cancelled step completes with errors.
+        assert wf._build_result("exec-1", include_node_results=False)["status"] == "completed_with_errors"
+
+    def test_ordinary_failure_unchanged(self) -> None:
+        """A non-cancel SubWorkflowFailedError stays FAILED and in get_failed_nodes."""
+        wf = self._wf()
+        graph = _make_linear_graph()
+        error = ApplicationError("boom", type="SubWorkflowFailedError", non_retryable=True)
+
+        wf._handle_node_failure("A", error, graph, continue_on_failure=False)
+
+        assert wf.resolver.get_namespace("A")["status"] == "failed"
+        assert "A" in wf.get_failed_nodes()
+        assert "A" not in wf.get_cancelled_step_nodes()
+        assert "A" not in wf._cancelled_step_nodes
+        assert wf._cancelled_node is None
+
+    def test_parent_cancellation_unchanged(self) -> None:
+        """A real InvocationCancelledError still cancels the whole run (unchanged path)."""
+        wf = self._wf()
+        graph = _make_linear_graph()
+        error = ApplicationError("cancel", type="InvocationCancelledError", non_retryable=True)
+
+        wf._handle_node_failure("A", error, graph, continue_on_failure=False)
+
+        assert wf._cancelled_node == "A"
+        assert wf.resolver.get_namespace("A")["status"] == "cancelled"
+        # A whole-run cancellation is neither a failed node nor a cancelled *step*.
+        assert "A" not in wf._cancelled_step_nodes
+        assert "A" not in wf.failed_nodes
+        assert "A" not in wf.get_failed_nodes()
+        assert "A" not in wf.get_cancelled_step_nodes()
+
+    def test_cancelled_loop_body_iteration_preserves_loop_flow(self) -> None:
+        """A cancelled loop-body (for_each) child shows CANCELLED.
+
+        It fails the parent loop like any failed body, and is never COMPLETED or SKIPPED.
+        """
+        wf = self._wf()
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("L", {"id": "L", "type": "loop", "parameters": {}})
+        backend.add_node("body", {"id": "body", "type": "sub_workflow", "parameters": {}})
+        backend.add_edge("trigger", "L", None)
+        backend.add_edge("L", "body", None)
+        graph = WorkflowGraph(backend)
+        wf.loop_body_map = {"body": "L"}
+
+        wf._handle_node_failure("body", self._cancelled_error(), graph, continue_on_failure=False)
+
+        # The cancelled iteration is surfaced CANCELLED, not FAILED/COMPLETED/SKIPPED.
+        assert wf.resolver.get_namespace("body")["status"] == "cancelled"
+        assert "body" in wf._cancelled_step_nodes
+        assert "body" in wf.get_cancelled_step_nodes()
+        assert "body" not in wf.get_failed_nodes()
+        assert "body" not in wf._completed_node_ids()
+        assert "body" not in wf.skipped_nodes
+        # Loop flow-control preserved: it stays in failed_nodes and fails the parent loop,
+        # exactly as a failed body iteration would.
+        assert "body" in wf.failed_nodes
+        assert "L" in wf.failed_nodes
+        assert wf._has_unhandled_failure is True
+        # The parent run is not cancelled by a cancelled iteration.
+        assert wf._cancelled_node is None
