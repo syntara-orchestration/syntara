@@ -151,6 +151,18 @@ main() {
         generate_key_pair "jwt-backup"
     fi
 
+    # Generate encryption key file before the admin password: the password
+    # complexity check imports syntara, which loads Settings, and Settings
+    # requires the encryption key file to exist.
+    if [[ -f "$SECRETS_DIR/encryption-key" ]] && [[ "$force" != true ]]; then
+        info "Encryption key already exists, skipping (use --force to regenerate)"
+    else
+        info "Generating encryption key..."
+        openssl rand -hex 32 > "$SECRETS_DIR/encryption-key"
+        chmod 600 "$SECRETS_DIR/encryption-key"
+        info "  Encryption key: $SECRETS_DIR/encryption-key"
+    fi
+
     # Generate admin password file
     if [[ -f "$SECRETS_DIR/admin-password" ]] && [[ "$force" != true ]]; then
         info "Admin password file already exists, skipping (use --force to regenerate)"
@@ -160,21 +172,15 @@ main() {
             echo -n "$APP_ADMIN_PASSWORD" > "$SECRETS_DIR/admin-password"
             info "  Using password from APP_ADMIN_PASSWORD env var"
         else
-            generate_admin_password > "$SECRETS_DIR/admin-password"
+            # Write to a temp file first so a failure doesn't leave an empty
+            # admin-password file that later runs would skip over.
+            trap 'rm -f "$SECRETS_DIR/admin-password.tmp"' EXIT
+            generate_admin_password > "$SECRETS_DIR/admin-password.tmp"
+            mv "$SECRETS_DIR/admin-password.tmp" "$SECRETS_DIR/admin-password"
             info "  Generated random password"
         fi
         chmod 600 "$SECRETS_DIR/admin-password"
         info "  Password file: $SECRETS_DIR/admin-password"
-    fi
-
-    # Generate encryption key file
-    if [[ -f "$SECRETS_DIR/encryption-key" ]] && [[ "$force" != true ]]; then
-        info "Encryption key already exists, skipping (use --force to regenerate)"
-    else
-        info "Generating encryption key..."
-        openssl rand -hex 32 > "$SECRETS_DIR/encryption-key"
-        chmod 600 "$SECRETS_DIR/encryption-key"
-        info "  Encryption key: $SECRETS_DIR/encryption-key"
     fi
 
     # Prevent permissions issues once secrets are mounted to syntara containers
