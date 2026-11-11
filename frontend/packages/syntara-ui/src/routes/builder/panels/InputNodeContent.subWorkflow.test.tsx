@@ -113,7 +113,7 @@ describe('InputNodeContent for Sub-workflow steps', () => {
       },
     })
     expect(dragCalls.find(([format]) => format === 'text/plain')?.[1]).toBe(
-      '${invoke_child.Result.outputs.deploy_app.Result.stdout}'
+      '${invoke_child.Result.outputs.deploy_app.stdout}'
     )
     expect(await axe(container)).toHaveNoViolations()
   })

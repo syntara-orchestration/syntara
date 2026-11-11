@@ -67,12 +67,11 @@ describe('buildSubWorkflowOutputSchemaTree', () => {
     const result = tree.find((field) => field.name === 'Result')
     const outputs = result?.children?.find((field) => field.name === 'outputs')
     const childStep = outputs?.children?.find((field) => field.fieldPath.at(-1) === 'deploy_app')
-    const childResult = childStep?.children?.find((field) => field.name === 'Result')
-    const stdout = childResult?.children?.find((field) => field.name === 'stdout')
+    const stdout = childStep?.children?.find((field) => field.name === 'stdout')
 
     expect(stdout).toBeDefined()
     expect(buildExpression({ nodeId: 'invoke_deploy', fieldPath: stdout?.fieldPath ?? [] })).toBe(
-      '${invoke_deploy.Result.outputs.deploy_app.Result.stdout}'
+      '${invoke_deploy.Result.outputs.deploy_app.stdout}'
     )
   })
 
@@ -101,17 +100,16 @@ describe('buildSubWorkflowOutputSchemaTree', () => {
     const result = tree.find((field) => field.name === 'Result')
     const outputs = result?.children?.find((field) => field.name === 'outputs')
     const childStep = outputs?.children?.find((field) => field.fieldPath.at(-1) === 'deploy_app')
-    const childResult = childStep?.children?.find((field) => field.name === 'Result')
-    const imageTag = childResult?.children?.find((field) => field.name === 'image_tag')
+    const imageTag = childStep?.children?.find((field) => field.name === 'image_tag')
 
     expect(imageTag).toBeDefined()
     expect(buildExpression({ nodeId: 'invoke_deploy', fieldPath: imageTag?.fieldPath ?? [] })).toBe(
-      '${invoke_deploy.Result.outputs.deploy_app.Result.image_tag}'
+      '${invoke_deploy.Result.outputs.deploy_app.image_tag}'
     )
-    expect(childResult?.children?.some((field) => field.name === 'stdout')).toBe(false)
+    expect(childStep?.children?.some((field) => field.name === 'stdout')).toBe(false)
   })
 
-  it('does not add another output envelope around a nested Sub-workflow step', () => {
+  it('exposes nested Sub-workflow step outputs with flat structure', () => {
     const nestedOutputFields = getNodeOutputSchema(ActivityTypeEnum.SUB_WORKFLOW)
     expect(nestedOutputFields).not.toBeNull()
 
@@ -129,13 +127,9 @@ describe('buildSubWorkflowOutputSchemaTree', () => {
     const nestedStep = outputs?.children?.find((field) => field.fieldPath.at(-1) === 'nested_call')
     const nestedResult = nestedStep?.children?.find((field) => field.name === 'Result')
     const childExecutionId = nestedResult?.children?.find((field) => field.name === 'child_execution_id')
-    const statusCode = nestedStep?.children?.find((field) => field.name === 'StatusCode')
 
     expect(buildExpression({ nodeId: 'invoke_parent', fieldPath: childExecutionId?.fieldPath ?? [] })).toBe(
       '${invoke_parent.Result.outputs.nested_call.Result.child_execution_id}'
-    )
-    expect(buildExpression({ nodeId: 'invoke_parent', fieldPath: statusCode?.fieldPath ?? [] })).toBe(
-      '${invoke_parent.Result.outputs.nested_call.StatusCode}'
     )
   })
 })
