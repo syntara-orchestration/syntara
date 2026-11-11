@@ -133,11 +133,9 @@ make run-all
 # Install dependencies and setup project
 make install
 
-# Start PostgreSQL, Redis, Temporal (server, UI, and workers), moto, and the MCP servers in the background
+# Start PostgreSQL, Redis, Temporal (server, UI, and workers), moto, and the MCP servers in the background.
+# Returns once PostgreSQL, Redis, Temporal, and moto are healthy.
 make services-run
-
-# Repeat until the database and temporal containers show (healthy)
-podman ps --format '{{.Names}}\t{{.Status}}'
 
 # Start the development server (runs migrations and seeders first)
 make dev
