@@ -11,7 +11,7 @@ import { useReactFlow } from '@xyflow/react'
 import { createElement, useCallback, type ReactNode } from 'react'
 
 import { type StepMenuCategoryUnion, StepMenuCategory } from '../../../../../constants'
-import { useAlerts } from '../../../../../providers/alerts'
+import { useAlerts } from '../../../../../providers/alerts/AlertContext'
 import type { NodeActionsContextValue } from '../../../../../routes/builder/NodeActionsContext'
 import { useStepActions } from '../../../../../routes/builder/StepActionsContext'
 import { getErrorMessage } from '../../../../../utils/apiErrors'

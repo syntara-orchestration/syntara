@@ -2,14 +2,14 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback, useState } from 'react'
 
 import { workflowFetchClient } from '../../client'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../utils/apiErrors'
 
 import type { BuilderAction, ValidationError, ValidationSeverity } from './builderReducer'
-import { validateWorkflow } from './utils/validation'
 import { formatValidationFindingMessage } from './utils/validation/formatValidationFindingMessage'
 import { validateMinimumWorkflow } from './utils/validation/rules/validateMinimumWorkflow'
+import { validateWorkflow } from './utils/validation/validateWorkflow'
 import { buildWorkflowDefinition } from './utils/workflowDefinitionBuilder'
 
 type ValidationFinding = { message: string; node_id?: string | null; severity?: string; field_path?: string | null }

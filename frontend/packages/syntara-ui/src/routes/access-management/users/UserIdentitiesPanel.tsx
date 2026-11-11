@@ -25,7 +25,7 @@ import { SynScrollableTableContainer } from '../../../components/table/SynScroll
 import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useTableSort } from '../../../hooks/useTableSort'
-import { useAlerts, type AlertConfig } from '../../../providers/alerts'
+import { useAlerts, type AlertConfig } from '../../../providers/alerts/AlertContext'
 import type { FilterConfig, FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
 import { detachPromise } from '../../../utils/detachPromise'

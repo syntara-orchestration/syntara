@@ -19,7 +19,7 @@ vi.mock('@xyflow/react', () => ({
 // Mock alerts
 const mockShowInfo = vi.fn()
 const mockShowError = vi.fn()
-vi.mock('../../../../../providers/alerts', () => ({
+vi.mock('../../../../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({
     showInfo: mockShowInfo,
     showSuccess: vi.fn(),

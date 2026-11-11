@@ -17,7 +17,7 @@ vi.mock('../../../stores/useWorkflowStore', () => ({
   useWorkflowStore: () => ({ isDirty: mockIsDirty }),
 }))
 
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
 }))
 

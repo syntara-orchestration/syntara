@@ -14,6 +14,7 @@ out
 
 # Logs
 *.log
+packages/syntara-ui/.tmp-xfail-int-*/
 
 # OS files
 .DS_Store

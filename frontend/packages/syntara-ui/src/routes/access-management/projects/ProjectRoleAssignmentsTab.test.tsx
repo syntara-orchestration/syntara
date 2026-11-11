@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { AlertProvider } from '../../../providers/alerts'
+import { AlertProvider } from '../../../providers/alerts/AlertProvider'
 import { searchParamsMock } from '../../../test/searchParamsMock'
 import { accessClient } from '../../access/accessClient'
 import type { RoleAssignmentRead } from '../../access/types'

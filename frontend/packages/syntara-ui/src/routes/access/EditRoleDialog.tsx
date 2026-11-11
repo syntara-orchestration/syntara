@@ -6,7 +6,7 @@ import { SynFormField } from '../../components/forms/SynFormField'
 import { SynTextField } from '../../components/forms/SynTextField'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useSynForm } from '../../hooks/useSynForm'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 
 import { accessClient } from './accessClient'
 import { accessControlHelp } from './accessControlFieldHelp'

@@ -2,7 +2,7 @@ import { useEffect, useRef, type Dispatch } from 'react'
 
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { BuilderAction } from '../builderReducer'
-import { collectCopiedRunActivityIds } from '../utils/executionState'
+import { collectCopiedRunActivityIds } from '../utils/executionState/collectCopiedRunActivityIds'
 import { parseImportedDefinition } from '../utils/parseImportedDefinition'
 
 export type ExecutionCopyData = {

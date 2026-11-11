@@ -9,7 +9,7 @@ import {
   useFileStorageStatus,
 } from '../../../hooks/useFileStorageStatus'
 import { useFileUploadWithProgress } from '../../../hooks/useFileUploadWithProgress'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { downloadFileById } from '../../../utils/downloadFile'
 import type { UploadedFile } from '../components/file-upload'
 
@@ -25,7 +25,7 @@ vi.mock('../../../hooks/useFileUploadWithProgress', () => ({
   useFileUploadWithProgress: vi.fn(),
 }))
 
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: vi.fn(),
 }))
 

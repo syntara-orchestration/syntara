@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import { useAlerts } from '../providers/alerts'
+import { useAlerts } from '../providers/alerts/AlertContext'
 import {
   getErrorMessage,
   getErrorTitle,

@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { AlertProvider } from '../providers/alerts'
-import { BrandProvider } from '../providers/brand'
+import { AlertProvider } from '../providers/alerts/AlertProvider'
+import { BrandProvider } from '../providers/brand/BrandProvider'
 import { ColorSchemeContext, type ColorSchemeContextValue } from '../providers/theme/colorSchemeReactContext'
 import { AuthError } from '../stores/useAuthStore'
 

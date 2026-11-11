@@ -79,6 +79,7 @@ export default tseslint.config(
       'playwright.config.ts',
       'test-results/**',
       'playwright-report/**',
+      '.tmp-xfail-int-*/**',
       'scripts/**',
       'eslint-plugin-syntara/**',
     ],
@@ -413,11 +414,10 @@ export default tseslint.config(
     // tree-shaking, circular deps) actually apply. Test-only helper directories (e.g. e2e/) are
     // out of scope, since code there never ships to users and grouped re-exports can be a
     // reasonable convenience. See https://tkdodo.eu/blog/please-stop-using-barrel-files
-    // `warn` (not `error`) so existing barrel files are not a hard build break; new ones in src/
-    // are blocked by the Zero New Warnings Policy in review.
+    // Barrel files in production code fail lint so new ones cannot be added.
     files: ['src/**/*.{ts,tsx}'],
     rules: {
-      'barrel-files/avoid-barrel-files': 'warn',
+      'barrel-files/avoid-barrel-files': 'error',
     },
   },
   {

@@ -30,7 +30,7 @@ vi.mock('./useExecutionStateEnrichment', () => ({ useExecutionStateEnrichment: v
 vi.mock('./useValidationEnrichment', () => ({ useValidationEnrichment: vi.fn() }))
 vi.mock('./useEdgeExecutionStatus', () => ({ useEdgeExecutionStatus: vi.fn() }))
 
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showError: vi.fn() }),
 }))
 

@@ -24,7 +24,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { RETURN_TO_KEY, SESSION_EXPIRED_KEY } from '../components/session/sessionTimeoutConstants'
 import { SynLoadingState } from '../components/states/SynLoadingState'
-import { useBrand } from '../providers/brand'
+import { useBrand } from '../providers/brand/useBrand'
 import { useColorScheme } from '../providers/theme/useColorScheme'
 import { AuthError, useAuthStore, selectIsAuthenticated, selectIsRefreshing } from '../stores/useAuthStore'
 

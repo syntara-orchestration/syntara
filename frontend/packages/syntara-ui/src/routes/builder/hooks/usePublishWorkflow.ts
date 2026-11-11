@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
 import { workflowClient } from '../../../client'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'

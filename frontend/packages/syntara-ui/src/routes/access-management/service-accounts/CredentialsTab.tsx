@@ -15,7 +15,7 @@ import { useCursorPagination, useCursorReset } from '../../../hooks/useCursorPag
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useTableSort } from '../../../hooks/useTableSort'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
 import { formatExpirationDate } from '../../../utils/dateUtils'

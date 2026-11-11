@@ -3,7 +3,7 @@ import { startTransition, useCallback, useMemo, useOptimistic, useState } from '
 
 import { useActiveAdminCount } from '../../hooks/useActiveAdminCount'
 import { useMutationErrorHandler } from '../../hooks/useMutationErrorHandler'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { getUserIdFromToken } from '../../utils/jwtUtils'
 import { accessClient } from '../access/accessClient'

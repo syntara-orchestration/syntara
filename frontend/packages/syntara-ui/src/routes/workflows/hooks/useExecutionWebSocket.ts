@@ -8,8 +8,8 @@
 
 import { useEffect, useCallback, useState, useMemo } from 'react'
 
-import { useWebSocket } from '../../../lib/websocket'
 import { buildExecutionChannelPath } from '../../../lib/websocket/channels'
+import { useWebSocket } from '../../../lib/websocket/hooks'
 import type { WebSocketMessage } from '../execution/types'
 import { useExecutionStore } from '../stores/useExecutionStore'
 

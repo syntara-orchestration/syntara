@@ -2,7 +2,7 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback } from 'react'
 
 import { executionsFetchClient, workflowClient } from '../../client'
-import type { useAlerts } from '../../providers/alerts'
+import type { useAlerts } from '../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../utils/apiErrors'
 
 import { resolveWorkflowRunTrigger } from './resolveWorkflowRunTrigger'

@@ -8,7 +8,7 @@ import type { ActivityState } from '../../workflows/execution/types'
 import type { OnAddNodeFromEdge } from '../types'
 import type { EdgeConnection } from '../types/edge'
 import { detectLoopBackNodes } from '../utils/detectLoopBackNodes'
-import { ExecutionStateEnricher, type ActivityWithMetadata } from '../utils/executionState'
+import { ExecutionStateEnricher, type ActivityWithMetadata } from '../utils/executionState/ExecutionStateEnricher'
 import {
   extractTaskActivities,
   getTriggerDisplayData,

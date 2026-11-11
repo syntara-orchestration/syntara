@@ -13,7 +13,7 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- MastheadLogo needs a plain anchor; SynLink adds PF Button styling
 import { Link } from '@tanstack/react-router'
 
-import { useBrand } from '../providers/brand'
+import { useBrand } from '../providers/brand/useBrand'
 
 import { useDockState } from './useDockState'
 

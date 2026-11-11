@@ -13,7 +13,7 @@ vi.mock('./useFetchPendingApprovals', () => ({
   useFetchPendingApprovals: vi.fn(),
 }))
 
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: vi.fn(() => ({
     showInfo: vi.fn(),
     showError: vi.fn(),
@@ -226,7 +226,7 @@ describe('useExecutionApprovals', () => {
     const mockShowError = vi.fn()
     const mockFetchApprovals = vi.fn().mockRejectedValue(new Error('Network error'))
 
-    const { useAlerts } = await import('../../../providers/alerts')
+    const { useAlerts } = await import('../../../providers/alerts/AlertContext')
     vi.mocked(useAlerts).mockReturnValue({
       showInfo: vi.fn(),
       showError: mockShowError,
@@ -286,7 +286,7 @@ describe('useExecutionApprovals', () => {
     const mockFetchApprovals = vi.fn().mockRejectedValue(rejection)
     const mockShowError = vi.fn()
 
-    const { useAlerts } = await import('../../../providers/alerts')
+    const { useAlerts } = await import('../../../providers/alerts/AlertContext')
     vi.mocked(useAlerts).mockReturnValue({
       showInfo: vi.fn(),
       showError: mockShowError,
@@ -391,7 +391,7 @@ describe('useExecutionApprovals', () => {
     const mockShowInfo = vi.fn()
     const mockFetchApprovals = vi.fn().mockResolvedValue([mockApproval])
 
-    const { useAlerts } = await import('../../../providers/alerts')
+    const { useAlerts } = await import('../../../providers/alerts/AlertContext')
     vi.mocked(useAlerts).mockReturnValue({
       showInfo: mockShowInfo,
       showError: vi.fn(),
@@ -441,7 +441,7 @@ describe('useExecutionApprovals', () => {
       return Promise.resolve([mockApproval])
     })
 
-    const { useAlerts } = await import('../../../providers/alerts')
+    const { useAlerts } = await import('../../../providers/alerts/AlertContext')
     vi.mocked(useAlerts).mockReturnValue({
       showInfo: vi.fn(),
       showError: mockShowError,
@@ -508,7 +508,7 @@ describe('useExecutionApprovals', () => {
         })
     )
 
-    const { useAlerts } = await import('../../../providers/alerts')
+    const { useAlerts } = await import('../../../providers/alerts/AlertContext')
     vi.mocked(useAlerts).mockReturnValue({
       showInfo: vi.fn(),
       showError: mockShowError,
@@ -565,7 +565,7 @@ describe('useExecutionApprovals', () => {
         })
     )
 
-    const { useAlerts } = await import('../../../providers/alerts')
+    const { useAlerts } = await import('../../../providers/alerts/AlertContext')
     vi.mocked(useAlerts).mockReturnValue({
       showInfo: vi.fn(),
       showError: mockShowError,
@@ -625,7 +625,7 @@ describe('useExecutionApprovals', () => {
     const mockShowError = vi.fn()
     const mockFetchApprovals = vi.fn().mockRejectedValue(new Error('Network error'))
 
-    const { useAlerts } = await import('../../../providers/alerts')
+    const { useAlerts } = await import('../../../providers/alerts/AlertContext')
     vi.mocked(useAlerts).mockReturnValue({
       showInfo: vi.fn(),
       showError: mockShowError,
@@ -681,7 +681,7 @@ describe('useExecutionApprovals', () => {
     const mockShowError = vi.fn()
     const mockFetchApprovals = vi.fn().mockRejectedValue(new Error('Network error'))
 
-    const { useAlerts } = await import('../../../providers/alerts')
+    const { useAlerts } = await import('../../../providers/alerts/AlertContext')
     vi.mocked(useAlerts).mockReturnValue({
       showInfo: vi.fn(),
       showError: mockShowError,

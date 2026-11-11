@@ -3,7 +3,7 @@ import { RhUiAddIcon } from '@patternfly/react-icons'
 
 import { SynForm } from '../../../components/forms/SynForm'
 import { useSynForm } from '../../../hooks/useSynForm'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { accessClient } from '../../access/accessClient'
 import { ProjectRoleSynFormFields } from '../../access/RoleFormFields'
 

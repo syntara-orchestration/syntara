@@ -2,7 +2,7 @@ import type { Approval } from '@syntara/contracts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { FlowNodeType } from '../../../constants'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { detachPromise } from '../../../utils/detachPromise'
 import { getApprovalLoadErrorAlert } from '../../approvals/approvalLoadErrors'
 import { findApprovalIndexForCanvasNode } from '../../approvals/approvalNodeId'

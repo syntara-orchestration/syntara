@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 
 import { workflowClient } from '../../../client'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../../utils/apiErrors'
 
 type UseForkWorkflowOptions = {

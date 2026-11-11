@@ -14,7 +14,7 @@ import { useState } from 'react'
 
 import { SynStepMenu } from '../../components/steps/SynStepMenu'
 import { FlowNodeType, RegistryStepId } from '../../constants'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import {
   useWorkflowStore,
   useWorkflowStoreActions,
@@ -33,16 +33,14 @@ import type { NodeType } from '../workflows/canvas/nodes/NodeType'
 import { renderStepIcon } from '../workflows/canvas/nodes/renderStepIcon'
 
 import { StepRegistry } from './registry/StepRegistry'
-import {
-  ApprovalStepDetails,
-  ConditionStepDetails,
-  ConvergeStepDetails,
-  LoopStepDetails,
-  SwitchStepDetails,
-  TaskStepDetails,
-  TriggerStepDetails,
-  WaitStepDetails,
-} from './step-details'
+import { ApprovalStepDetails } from './step-details/ApprovalStepDetails'
+import { ConditionStepDetails } from './step-details/ConditionStepDetails'
+import { ConvergeStepDetails } from './step-details/ConvergeStepDetails'
+import { LoopStepDetails } from './step-details/LoopStepDetails'
+import { SwitchStepDetails } from './step-details/SwitchStepDetails'
+import { TaskStepDetails } from './step-details/TaskStepDetails'
+import { TriggerStepDetails } from './step-details/TriggerStepDetails'
+import { WaitStepDetails } from './step-details/WaitStepDetails'
 import { StepEditorLayout } from './StepEditorLayout'
 import { StepRawDataView } from './StepRawDataView'
 import type { WorkflowMetadata } from './types/workflowMetadata'

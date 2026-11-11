@@ -2,7 +2,7 @@ import type React from 'react'
 import { useCallback, useRef, useState } from 'react'
 
 import { useFileUploadWithProgress } from '../../../hooks/useFileUploadWithProgress'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { deleteFileById } from '../../../utils/deleteFile'
 import { detachPromise } from '../../../utils/detachPromise'
 import { generateUUID } from '../../../utils/generateUUID'

@@ -6,7 +6,7 @@ import { AppRoute } from '../../../../app/AppRoute'
 import { tanstackRouter } from '../../../../app/tanstackRouter'
 import { integrationsClient } from '../../../../client'
 import type { useFormMutationErrorHandler } from '../../../../hooks/useFormMutationErrorHandler'
-import { useAlerts } from '../../../../providers/alerts'
+import { useAlerts } from '../../../../providers/alerts/AlertContext'
 import { detachPromise } from '../../../../utils/detachPromise'
 import { useProjectAssignmentSync } from '../useProjectAssignmentSync'
 

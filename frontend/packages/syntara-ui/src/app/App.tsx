@@ -1,8 +1,8 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from '@tanstack/react-router'
 
-import { AlertProvider } from '../providers/alerts'
-import { BrandProvider } from '../providers/brand'
+import { AlertProvider } from '../providers/alerts/AlertProvider'
+import { BrandProvider } from '../providers/brand/BrandProvider'
 import { FeatureFlagsProvider } from '../providers/feature-flags-provider'
 import { ColorSchemeProvider } from '../providers/theme/ColorSchemeProvider'
 import { useFeatureFlags } from '../providers/use-feature-flag'

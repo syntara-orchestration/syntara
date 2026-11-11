@@ -13,7 +13,7 @@ import { SynEmptyStateNoData } from '../../../components/states/SynEmptyStateNoD
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { SynScrollableTableContainer } from '../../../components/table/SynScrollableTableContainer'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import type { FilterConfig, FilterFieldDefinition } from '../../../types/filters'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { formatTimeAgo } from '../../../utils/dateUtils'

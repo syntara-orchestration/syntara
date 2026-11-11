@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useFileUploadWithProgress } from '../../../hooks/useFileUploadWithProgress'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { deleteFileById } from '../../../utils/deleteFile'
 import type { UploadedFile } from '../components/file-upload'
 
@@ -12,7 +12,7 @@ vi.mock('../../../hooks/useFileUploadWithProgress', () => ({
   useFileUploadWithProgress: vi.fn(),
 }))
 
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: vi.fn(),
 }))
 

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { accessClient } from '../access/accessClient'
 
 import { GROUP_NAME_HELP } from './groupFieldHelpText'

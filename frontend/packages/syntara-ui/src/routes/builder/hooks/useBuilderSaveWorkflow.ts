@@ -2,7 +2,7 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import type { Query, QueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
-import type { AlertMessage } from '../../../providers/alerts'
+import type { AlertMessage } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'

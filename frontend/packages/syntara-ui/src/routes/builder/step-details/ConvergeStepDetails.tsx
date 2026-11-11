@@ -1,7 +1,7 @@
 import type { ConvergeActivity } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import type { ConvergeFormData } from '../step-forms/ConvergeStepForm'
 import { ConvergeStepForm } from '../step-forms/ConvergeStepForm'
