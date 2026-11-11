@@ -10,7 +10,7 @@ import {
   StackItem,
   Title,
 } from '@patternfly/react-core'
-import { RhUiConnectedIcon, WrenchIcon } from '@patternfly/react-icons'
+import { RhUiBuildIcon, RhUiConnectedIcon } from '@patternfly/react-icons'
 import { Tbody, Th, Thead, Tr } from '@patternfly/react-table'
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { useCallback, useMemo, useState } from 'react'
@@ -138,7 +138,7 @@ function EnableModelsStep({
 
   if (!testResult) {
     return (
-      <EmptyState headingLevel="h2" icon={WrenchIcon} titleText="No models discovered yet" isFullHeight>
+      <EmptyState headingLevel="h2" icon={RhUiBuildIcon} titleText="No models discovered yet" isFullHeight>
         <EmptyStateBody>
           Test the connection in the previous step to discover available models, or test it from here.
         </EmptyStateBody>

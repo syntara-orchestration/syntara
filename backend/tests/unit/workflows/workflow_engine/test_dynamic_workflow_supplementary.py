@@ -1289,6 +1289,25 @@ class TestExtractFailureOutput:
         assert isinstance(result, dict)
         assert "response_code" not in result
 
+    def test_failed_loop_body_output_is_available_by_iteration(self) -> None:
+        """A failed loop-body node keeps its structured output in iteration history."""
+        wf = _make_workflow()
+        graph = _build_chain_graph()
+        app_error = ApplicationError(
+            "boom",
+            {"output": {"response_code": 500, "body": "err"}},
+            type="TaskError",
+        )
+
+        wf._handle_node_failure("node_a", app_error, graph, pending_tasks={}, continue_on_failure=True)
+
+        assert wf.get_activity_output("node_a", 0) == {
+            "response_code": 500,
+            "body": "err",
+            "status": "failed",
+            "error": "boom",
+        }
+
 
 class TestEvaluatePredecessor:
     """Tests for _evaluate_predecessor — all return paths."""

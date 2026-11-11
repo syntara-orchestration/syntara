@@ -13,4 +13,8 @@ export const credentialHelp = {
     'Project',
     'The project this credential belongs to. Credentials are scoped to a single project and can only be used by workflows within that project.'
   ),
+  credentialType: createFieldHelp(
+    'Credential type',
+    'Choose how this credential authenticates. Open the list to compare types; each option includes a short description.'
+  ),
 }

@@ -81,6 +81,21 @@
 }
 
 /*
+ * Temporary: compact + sortable headers — match body row block padding and drop PF’s
+ * negative bottom margin on the sort button. Scoped to .pf-m-compact; remove when PF adjusts.
+ */
+.table:global(.pf-v6-c-table.pf-m-compact)
+  :global(thead.pf-v6-c-table__thead tr.pf-v6-c-table__tr > th.pf-v6-c-table__th) {
+  padding-block-start: var(--pf-t--global--spacer--sm);
+  padding-block-end: var(--pf-t--global--spacer--sm);
+}
+
+.table:global(.pf-v6-c-table.pf-m-compact)
+  :global(thead.pf-v6-c-table__thead th.pf-v6-c-table__sort .pf-v6-c-table__button) {
+  margin-block-end: 0;
+}
+
+/*
  * Sticky header glass: isPlain sets thead background to transparent so rows show through
  * while scrolling. Triple-layer the glass color (~87.5% effective opacity).
  */

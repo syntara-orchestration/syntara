@@ -49,6 +49,7 @@ class ExecutionMonitorMetadata:
         execution_id: Database execution ID being monitored
         last_processed_event_id: Last event ID that was processed and synced
         activity_definitions_map: Map of activity ID to activity definition from workflow
+        loop_body_activity_ids: Activity IDs that execute inside a loop body
         activity_index_map: Map of activity names to their indices in the activities list
         pending_activity_updates: Map of event IDs to activity update data awaiting database sync
         pending_sync_event_ids: Set of event IDs that need to be synced to database
@@ -68,6 +69,7 @@ class ExecutionMonitorMetadata:
     pending_sync_event_ids: set[int] = field(default_factory=set)
     terminal_activity_ids: set[str] = field(default_factory=set)
     iteration_counters: dict[str, int] = field(default_factory=dict)
+    loop_body_activity_ids: set[str] = field(default_factory=set)
     next_activity_index: int = 0
     workflow_id: UUID | None = None
     request_id: UUID | None = None

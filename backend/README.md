@@ -72,6 +72,13 @@ This project uses `uv` for dependency management and provides a comprehensive Ma
 - Python (3.12, 3.13, or 3.14)
 - `uv` package manager
 - [Podman](https://podman.io/docs/installation) (for rootless containers)
+- `libmagic` C library (used by `python-magic` for file type detection; `uv` cannot install it):
+  - macOS: `brew install libmagic`
+  - Fedora/RHEL: `sudo dnf install file-libs`
+  - Debian/Ubuntu: `sudo apt install libmagic1`
+  - Windows: see [the Windows setup guide](../docs/windows-setup-guide.md)
+
+  `make install` and `make check-deps` fail with these hints when it is missing.
 
 ### Installation
 

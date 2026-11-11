@@ -25,7 +25,6 @@ import {
 } from '@patternfly/react-core'
 import type { MenuToggleElement } from '@patternfly/react-core'
 import { RhUiProfileFillIcon, RhUiQuestionMarkCircleIcon } from '@patternfly/react-icons'
-// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- MastheadLogo needs a plain anchor; SynLink adds PF Button styling
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
 
@@ -223,8 +222,8 @@ function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
           </DropdownItem>
         </DropdownList>
       </Dropdown>
-      {showTooltip && (
-        <Tooltip aria="none" aria-live="off" triggerRef={userMenuRef} content={username} position="right" />
+      {showTooltip && !isOpen && (
+        <Tooltip aria="none" aria-live="off" triggerRef={userMenuRef} content="Account" position="right" />
       )}
     </>
   )
