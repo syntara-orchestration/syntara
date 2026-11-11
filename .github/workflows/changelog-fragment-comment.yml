@@ -14,5 +14,5 @@ permissions:
 
 jobs:
   comment:
-    # djyasin/actions for test; production: ansible/actions@<tag>
-    uses: djyasin/actions/.github/workflows/openapi-post-changelog-comment.yml@feat/changelog-fragment-enforcement # PR #167
+    # TODO: move to ansible/actions@<release-tag> after PR #167 merges
+    uses: djyasin/actions/.github/workflows/openapi-post-changelog-comment.yml@6074497c42b7ef9e201df229dc071b9f4503ab4a # PR #167, feat/changelog-fragment-enforcement branch
