@@ -1,0 +1,199 @@
+/**
+ * Converge step helpers for v2 workflow E2E tests.
+ * Extracted from v2-steps.ts to keep file sizes within lint limits.
+ */
+
+import { expect, type Page, toAppUrl } from '../fixtures'
+
+import { addConditionStepWithBranch, addManualTrigger, openAddStepPanel, selectCategoryAndStepType } from './v2-steps'
+import { buildUniqueName, closeStepEditorPanel, triggerLayout } from './workflows'
+
+const convergeStrategySelect = (page: Page) => page.getByRole('button', { name: 'Continue when criteria', exact: true })
+
+/**
+ * Open a saved converge step for editing on the canvas.
+ *
+ * Retries layout + click while the editor hydrates. Under CI load the click can
+ * land during a React Flow viewport transform and be lost, so callers must not
+ * use a bare `getByText(stepName).click()`.
+ */
+export async function openConvergeStepForEditing(page: Page, stepName: string) {
+  await triggerLayout(page)
+  const stepElement = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
+  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(async () => {
+    await expect(stepElement).toBeVisible({ timeout: 5_000 })
+    await stepElement.click({ timeout: 5_000 })
+    await expect(nameInput).toHaveValue(stepName, { timeout: 5_000 })
+    await expect(convergeStrategySelect(page)).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
+}
+
+/** Open a saved converge step and wait for the Parameters tab (timeout fields). */
+export async function openConvergeStepParameters(page: Page, stepName: string) {
+  await openConvergeStepForEditing(page, stepName)
+  await expect(page.getByRole('tab', { name: 'Parameters' })).toBeVisible()
+}
+
+/**
+ * Navigate to a new workflow, add trigger + condition, and open the converge form.
+ * Used by validation-only tests that don't need to save the workflow.
+ */
+export async function openConvergeStepFormOnNewWorkflow(page: Page) {
+  await page.goto(toAppUrl('/workflow-builder/new'))
+  await addManualTrigger(page, 'Manual trigger')
+  await addConditionStepWithBranch(page, 'Condition', 'true')
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Logic', 'Converge')
+}
+
+/** Add a converge step (v2 type: "converge"). */
+export async function addConvergeStep(page: Page, name: string, sourceHandle?: string) {
+  await openAddStepPanel(page, sourceHandle)
+  await selectCategoryAndStepType(page, 'Logic', 'Converge')
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await closeStepEditorPanel(page)
+}
+
+/**
+ * Add a converge step with 'all' strategy (wait for all branches).
+ * V2 type: "converge", strategy: "all"
+ */
+export async function addConvergeStepWithAllStrategy(page: Page, name: string) {
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Logic', 'Converge')
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+  // Strategy defaults to 'all', so no need to change it
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await closeStepEditorPanel(page)
+}
+
+/**
+ * Add a converge step with 'any' strategy (wait for N of M branches).
+ * V2 type: "converge", strategy: "any", requiredPathCount: number
+ */
+export async function addConvergeStepWithAnyStrategy(page: Page, name: string, requiredPathCount: number) {
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Logic', 'Converge')
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+
+  // Select 'any' strategy via PF Select (click toggle, then option)
+  await page.getByRole('button', { name: 'Continue when criteria', exact: true }).click()
+  await page.getByRole('option', { name: 'Any branches reach this step' }).click()
+
+  // Fill required path count
+  const requiredPathCountInput = page.getByRole('spinbutton', {
+    name: /Required number of branches before continuing/i,
+  })
+  await expect(requiredPathCountInput).toBeVisible()
+  await requiredPathCountInput.fill(String(requiredPathCount))
+
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await closeStepEditorPanel(page)
+}
+
+/**
+ * Add a converge step with wait_duration configuration.
+ * V2 type: "converge", wait_duration stored in config (Parameters tab).
+ * The `action` param is accepted for API compatibility but ignored — on_timeout
+ * no longer exists; use the Settings tab continue_on_failure instead.
+ */
+export async function addConvergeStepWithTimeout(
+  page: Page,
+  name: string,
+  timeoutConfig: {
+    seconds?: number
+    minutes?: number
+    hours?: number
+    days?: number
+    action?: 'fail' | 'continue'
+    strategy?: 'all' | 'any'
+    requiredPathCount?: number
+  }
+) {
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Logic', 'Converge')
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
+
+  // Set strategy if provided
+  if (timeoutConfig.strategy === 'any' && timeoutConfig.requiredPathCount !== undefined) {
+    await page.getByRole('button', { name: 'Continue when criteria', exact: true }).click()
+    await page.getByRole('option', { name: 'Any branches reach this step' }).click()
+    const requiredPathCountInput = page.getByRole('spinbutton', {
+      name: /Required number of branches before continuing/i,
+    })
+    await expect(requiredPathCountInput).toBeVisible()
+    await requiredPathCountInput.fill(String(timeoutConfig.requiredPathCount))
+  }
+
+  // Fill wait_duration units — DurationInput is always visible in Parameters tab
+  if (timeoutConfig.seconds !== undefined) {
+    await page.getByLabel(/Seconds/i).fill(String(timeoutConfig.seconds))
+  }
+  if (timeoutConfig.minutes !== undefined) {
+    await page.getByLabel(/Minutes/i).fill(String(timeoutConfig.minutes))
+  }
+  if (timeoutConfig.hours !== undefined) {
+    await page.getByLabel(/Hours/i).fill(String(timeoutConfig.hours))
+  }
+  if (timeoutConfig.days !== undefined) {
+    await page.getByLabel(/Days/i).fill(String(timeoutConfig.days))
+  }
+
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await closeStepEditorPanel(page)
+}
+
+/**
+ * Create a workflow with a trigger and condition step (2 branches), ready for converge step testing.
+ * Returns the unique workflow name.
+ */
+export async function createWorkflowWithBranchesForConverge(page: Page): Promise<string> {
+  const workflowName = buildUniqueName('converge-test')
+
+  // Start on /workflow-builder/new
+  await page.goto(toAppUrl('/workflow-builder/new'))
+
+  // Add manual trigger
+  await addManualTrigger(page, 'Manual trigger')
+
+  // Add a condition step with branch (creates 2 branches: true and false)
+  await addConditionStepWithBranch(page, 'Condition', 'true')
+
+  return workflowName
+}
+
+/**
+ * Verify converge step configuration in saved V2 workflow payload.
+ * Uses snake_case field names as they appear in the API payload.
+ */
+export function expectConvergeStepConfig(
+  steps: Array<{ id: string; type: string; parameters: Record<string, unknown> }>,
+  expected: {
+    strategy: 'all' | 'any'
+    n_required?: number
+    wait_duration?: number
+    /** @deprecated on_timeout removed from schema; use Settings tab continue_on_failure */
+    on_timeout?: 'fail' | 'continue'
+    /** @deprecated timeout renamed to wait_duration */
+    timeout?: number
+  }
+) {
+  const convergeStep = steps.find((step) => step.type === 'converge')
+  expect(convergeStep).toBeDefined()
+  expect(convergeStep?.parameters.strategy).toBe(expected.strategy)
+
+  if (expected.n_required !== undefined) {
+    expect(convergeStep?.parameters.n_required).toBe(expected.n_required)
+  } else {
+    expect(convergeStep?.parameters.n_required).toBeUndefined()
+  }
+
+  const expectedDuration = expected.wait_duration ?? expected.timeout
+  if (expectedDuration !== undefined) {
+    expect(convergeStep?.parameters.wait_duration).toBe(expectedDuration)
+  } else {
+    expect(convergeStep?.parameters.wait_duration).toBeUndefined()
+  }
+}

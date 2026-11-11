@@ -45,7 +45,7 @@ describe('SynStepExpandToggle', () => {
     it('includes the node label in the accessible name when provided', () => {
       render(
         <SynStepExpandedContext.Provider value={[true, vi.fn()]}>
-          <SynStepExpandToggle nodeLabel="Disabled deployment" />
+          <SynStepExpandToggle stepLabel="Disabled deployment" />
         </SynStepExpandedContext.Provider>
       )
 

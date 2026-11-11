@@ -10,8 +10,8 @@ type AutoSubmitFn = () => Promise<boolean>
 
 function renderGuard(
   overrides: {
-    isNodeEditorOpen?: boolean
-    nodeEditorMode?: 'add' | 'edit' | null
+    isStepEditorOpen?: boolean
+    stepEditorMode?: 'add' | 'edit' | null
     autoSubmitFn?: AutoSubmitFn | null
     handleSaveWorkflow?: (options?: { expectedVersionOverride?: number }) => Promise<boolean>
   } = {}
@@ -23,8 +23,8 @@ function renderGuard(
     const autoSubmitRef = useRef<AutoSubmitFn | null>(overrides.autoSubmitFn ?? null)
     return useGuardedSaveWorkflow({
       handleSaveWorkflow,
-      isNodeEditorOpen: overrides.isNodeEditorOpen ?? false,
-      nodeEditorMode: overrides.nodeEditorMode ?? null,
+      isStepEditorOpen: overrides.isStepEditorOpen ?? false,
+      stepEditorMode: overrides.stepEditorMode ?? null,
       autoSubmitRef,
       dispatch,
     })
@@ -34,8 +34,8 @@ function renderGuard(
 }
 
 describe('useGuardedSaveWorkflow', () => {
-  it('calls handleSaveWorkflow directly when node editor is closed', async () => {
-    const { result, handleSaveWorkflow } = renderGuard({ isNodeEditorOpen: false })
+  it('calls handleSaveWorkflow directly when step editor is closed', async () => {
+    const { result, handleSaveWorkflow } = renderGuard({ isStepEditorOpen: false })
 
     await act(async () => {
       await result.current()
@@ -46,8 +46,8 @@ describe('useGuardedSaveWorkflow', () => {
 
   it('shows dialog and blocks save in add mode', async () => {
     const { result, dispatch, handleSaveWorkflow } = renderGuard({
-      isNodeEditorOpen: true,
-      nodeEditorMode: 'add',
+      isStepEditorOpen: true,
+      stepEditorMode: 'add',
     })
 
     let returned: boolean | undefined
@@ -62,8 +62,8 @@ describe('useGuardedSaveWorkflow', () => {
 
   it('shows dialog when edit mode has no auto-submit registered', async () => {
     const { result, dispatch, handleSaveWorkflow } = renderGuard({
-      isNodeEditorOpen: true,
-      nodeEditorMode: 'edit',
+      isStepEditorOpen: true,
+      stepEditorMode: 'edit',
       autoSubmitFn: null,
     })
 
@@ -80,8 +80,8 @@ describe('useGuardedSaveWorkflow', () => {
   it('auto-submits and saves when auto-submit succeeds in edit mode', async () => {
     const autoSubmitFn = vi.fn().mockResolvedValue(true)
     const { result, dispatch, handleSaveWorkflow } = renderGuard({
-      isNodeEditorOpen: true,
-      nodeEditorMode: 'edit',
+      isStepEditorOpen: true,
+      stepEditorMode: 'edit',
       autoSubmitFn,
     })
 
@@ -97,8 +97,8 @@ describe('useGuardedSaveWorkflow', () => {
   it('returns false without dialog when auto-submit validation fails in edit mode', async () => {
     const autoSubmitFn = vi.fn().mockResolvedValue(false)
     const { result, dispatch, handleSaveWorkflow } = renderGuard({
-      isNodeEditorOpen: true,
-      nodeEditorMode: 'edit',
+      isStepEditorOpen: true,
+      stepEditorMode: 'edit',
       autoSubmitFn,
     })
 

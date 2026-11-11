@@ -1,0 +1,9 @@
+/**
+ * Accent the top edge of the PatternFly panel ::before border. `variant="bordered"`
+ * keeps side/bottom edges visible in default contrast (high-contrast-only borders are
+ * otherwise invisible when glass/high-contrast theme classes are off).
+ */
+.stepTypeOption::before {
+  border-block-start-width: 4px;
+  border-block-start-color: var(--step-type-accent);
+}

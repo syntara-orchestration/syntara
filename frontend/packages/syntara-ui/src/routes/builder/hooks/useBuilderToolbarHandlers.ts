@@ -10,7 +10,7 @@ import { getErrorMessage } from '../../../utils/apiErrors'
 import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { BuilderAction } from '../builderReducer'
-import { DEFAULT_MAX_WAIT_SECONDS, fetchMaxWaitDuration } from '../node-forms/useMaxWaitDuration'
+import { DEFAULT_MAX_WAIT_SECONDS, fetchMaxWaitDuration } from '../step-forms/useMaxWaitDuration'
 import type { ValidationError as UtilsValidationError } from '../utils/validation'
 import { validateWorkflow } from '../utils/validation'
 import {
@@ -59,7 +59,6 @@ async function checkVersionConflictBeforeRun({
 }
 
 function applyRunValidationFailures(dispatch: Dispatch<BuilderAction>, errors: UtilsValidationError[]): void {
-  // Run uses validateMinimumWorkflow + validateWorkflow `errors` only (warnings are in a separate list).
   const bannerErrors = mapUtilsValidationErrorsToBanner(errors, { activityIdFallback: true })
   if (bannerErrors.length === 0) return
   dispatch({ type: 'SET_VALIDATION_ERRORS', payload: bannerErrors, source: 'verify' })

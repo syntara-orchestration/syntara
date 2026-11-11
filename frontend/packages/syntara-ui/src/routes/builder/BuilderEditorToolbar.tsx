@@ -128,8 +128,8 @@ type BuilderEditorToolbarProps = Readonly<{
   isKebabOpen: boolean
   publishedVersionId: string | null
   currentVersionId?: string | null
-  isAddNodePanelOpen: boolean
-  hasNoWorkflowNodes: boolean
+  isAddStepPanelOpen: boolean
+  hasNoWorkflowSteps: boolean
   workflowName: string
   workflowDescription: string
   dispatch: Dispatch<BuilderAction>
@@ -144,9 +144,7 @@ type BuilderEditorToolbarProps = Readonly<{
   onPendingImport: (data: PendingImportData) => void
   triggers?: { id: string; name?: string }[]
   builderPermissions: BuilderPermissions
-  isNodeEditorOpen?: boolean
-  beforeVerify?: () => Promise<boolean>
-  bannerBlockingValidationErrorCount?: number
+  isStepEditorOpen?: boolean
 }>
 
 export function BuilderEditorToolbar({
@@ -159,8 +157,8 @@ export function BuilderEditorToolbar({
   isKebabOpen,
   publishedVersionId,
   currentVersionId,
-  isAddNodePanelOpen,
-  hasNoWorkflowNodes,
+  isAddStepPanelOpen,
+  hasNoWorkflowSteps,
   workflowName,
   workflowDescription,
   dispatch,
@@ -175,9 +173,7 @@ export function BuilderEditorToolbar({
   onPendingImport,
   triggers,
   builderPermissions,
-  isNodeEditorOpen,
-  beforeVerify,
-  bannerBlockingValidationErrorCount,
+  isStepEditorOpen,
 }: BuilderEditorToolbarProps) {
   const { importFileRef, handleImportFile, handleExport, handleVerify, isVerifying, validationErrorCount } =
     useWorkflowImportExport({
@@ -187,16 +183,15 @@ export function BuilderEditorToolbar({
       workflowName,
       workflowDescription,
       onPendingImport,
-      beforeVerify,
     })
 
   const hasNoSteps = useWorkflowStore((s) => (s.currentWorkflow?.workflow?.activities?.length ?? 0) === 0)
   const hasNoChanges = publishedVersionId != null && publishedVersionId === currentVersionId && !isDirty
 
-  const showAddStep = !hasNoWorkflowNodes
+  const showAddStep = !hasNoWorkflowSteps
   const showWorkflowActions = !isNew && !!workflow?.id
 
-  if (!builderPermissions.canEdit && hasNoWorkflowNodes && isNew) {
+  if (!builderPermissions.canEdit && hasNoWorkflowSteps && isNew) {
     return null
   }
 
@@ -229,8 +224,8 @@ export function BuilderEditorToolbar({
         <DisabledWithTooltip isDisabled={!builderPermissions.canEdit} content={builderPermissions.tooltips.edit}>
           <Button
             variant="plain"
-            isClicked={isAddNodePanelOpen}
-            aria-pressed={isAddNodePanelOpen}
+            isClicked={isAddStepPanelOpen}
+            aria-pressed={isAddStepPanelOpen}
             isAriaDisabled={!builderPermissions.canEdit}
             onClick={
               builderPermissions.canEdit
@@ -259,10 +254,9 @@ export function BuilderEditorToolbar({
         triggers={triggers}
         isSaved={!!workflow?.id}
         validationErrorCount={validationErrorCount}
-        bannerBlockingValidationErrorCount={bannerBlockingValidationErrorCount}
         dispatch={dispatch}
         builderPermissions={builderPermissions}
-        isNodeEditorOpen={isNodeEditorOpen}
+        isStepEditorOpen={isStepEditorOpen}
       />
 
       <Divider orientation={{ default: 'vertical' }} />
@@ -275,7 +269,7 @@ export function BuilderEditorToolbar({
         onSave={handleSaveWorkflow}
         canEdit={builderPermissions.canEdit}
         editTooltip={builderPermissions.tooltips.save}
-        isNodeEditorOpen={isNodeEditorOpen}
+        isStepEditorOpen={isStepEditorOpen}
       />
 
       {showWorkflowActions && (
@@ -290,7 +284,7 @@ export function BuilderEditorToolbar({
             editTooltip={builderPermissions.tooltips.publish}
             handleVerify={handleVerify}
             onPublishClick={onPublishClick}
-            isNodeEditorOpen={isNodeEditorOpen}
+            isStepEditorOpen={isStepEditorOpen}
           />
         </>
       )}

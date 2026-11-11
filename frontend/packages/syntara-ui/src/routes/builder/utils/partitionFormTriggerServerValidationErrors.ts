@@ -1,6 +1,6 @@
 import type { FormDefinitionFieldServerError } from '../../../components/forms/formFieldBuilder/formDefinitionFieldServerError'
 import { humanizeFormDefinitionIssueMessage } from '../../../forms'
-import type { TriggerFormData } from '../node-forms/triggerFormSchema'
+import type { TriggerFormData } from '../step-forms/triggerFormSchema'
 
 import { mapFormTriggerValidationFieldPath } from './mapFormTriggerValidationFieldPath'
 import { parseFormTriggerFormDefinitionFieldPath } from './parseFormTriggerFormDefinitionFieldPath'

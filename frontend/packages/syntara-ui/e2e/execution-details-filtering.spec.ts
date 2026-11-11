@@ -93,7 +93,7 @@ function activityKey(activity: ActivityRecord): string {
  * Uses the project's documented partial-mock pattern (route.fetch → patch →
  * fulfill) and routeWebSocket (see frontend-playwright-e2e skill). Required
  * because CI's Approvals API is often unreachable from the worker, so the
- * approval node fails instead of staying `waiting`.
+ * approval step fails instead of staying `waiting`.
  *
  * Must be registered before navigation that loads the execution.
  */
@@ -292,7 +292,7 @@ test.describe('Execution Details — Activity Filtering', { tag: '@pr-check' }, 
       await expect(keywordChipGroup.getByText('Temperature')).toBeVisible()
     })
 
-    test('type filter narrows activities by node type', async ({ app }) => {
+    test('type filter narrows activities by step type', async ({ app }) => {
       const filterToolbar = getActivityFilterToolbar(app)
       const rows = activityDataRows(app)
 

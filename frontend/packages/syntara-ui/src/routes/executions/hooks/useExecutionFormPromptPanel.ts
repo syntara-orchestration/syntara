@@ -15,12 +15,12 @@ import {
 import { resolveCanvasNodeType, type WorkflowDefinitionLike } from '../formPrompt/resolveCanvasNodeType'
 
 import { useAutoWaitingNodeDetection } from './useAutoWaitingNodeDetection'
-import type { useExecutionNodeClick } from './useExecutionNodeClick'
+import type { useExecutionStepClick } from './useExecutionStepClick'
 import { useFetchFormPromptForUrlParam } from './useFetchFormPromptForUrlParam'
 import { useFormPromptPanelOutboundUrlSync } from './useFormPromptPanelOutboundUrlSync'
 import { useFormPromptPanelUrlSync } from './useFormPromptPanelUrlSync'
 
-type NodeClickResult = ReturnType<typeof useExecutionNodeClick>
+type NodeClickResult = ReturnType<typeof useExecutionStepClick>
 type FormPromptSummary = FormsAPI.components['schemas']['FormPromptSummary']
 
 export function useExecutionFormPromptPanel(
