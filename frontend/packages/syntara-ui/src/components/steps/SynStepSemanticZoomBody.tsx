@@ -1,26 +1,59 @@
-import { Content, ContentVariants, Stack, StackItem, Tooltip } from '@patternfly/react-core'
-import type { CSSProperties, ReactNode } from 'react'
+import { Button, Content, ContentVariants, Flex, Icon, Stack, StackItem, Tooltip } from '@patternfly/react-core'
+import { RhUiEditIcon } from '@patternfly/react-icons'
+import { useNodeId, useStore, useUpdateNodeInternals } from '@xyflow/react'
+import { useLayoutEffect, type CSSProperties, type ReactNode } from 'react'
 
+import { useIsActiveExecution } from '../../routes/builder/ActiveExecutionContext'
+import { useIsExecutionView } from '../../routes/builder/ExecutionViewContext'
+import { useIsVersionView } from '../../routes/builder/VersionViewContext'
 import { SemanticZoomBranchSourceHandles } from '../../routes/workflows/canvas/nodes/common/SemanticZoomBranchSourceHandles'
-import { SEMANTIC_ZOOM_BAR_HEIGHT_PX } from '../../routes/workflows/canvas/semanticZoom'
+import type { StepMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useStepMenuActions'
+import { SEMANTIC_ZOOM_TILE_SIZE_PX } from '../../routes/workflows/canvas/semanticZoom'
 import type { SemanticZoomBranchSource } from '../../routes/workflows/canvas/semanticZoomTypes'
 
+import { SynStepMenu } from './SynStepMenu'
 import styles from './SynStepSemanticZoomBody.module.css'
 
 export function SynStepSemanticZoomBody(props: {
   title: string
   typeLabel: string
-  backgroundColor: string
-  /** Invisible source handles on the bar right edge (branching nodes only). */
+  accentColor: string
+  icon?: ReactNode
+  menuActions?: readonly StepMenuAction[]
+  /** Invisible source handles on the tile right edge (branching nodes only). */
   branchSources?: readonly SemanticZoomBranchSource[]
   selected: boolean
   hasDashedBorder: boolean
-  /** Pass-through from node (e.g. trigger pill radii on the color bar). */
-  barStyle?: Pick<CSSProperties, 'borderRadius' | 'borderTopLeftRadius' | 'borderBottomLeftRadius'>
+  /** Pass-through from node (e.g. trigger pill radii on the tile). */
+  tileStyle?: Pick<CSSProperties, 'borderRadius' | 'borderTopLeftRadius' | 'borderBottomLeftRadius'>
 }): ReactNode {
-  /** Tooltip surface uses inverse background; Content’s default text color is for the main page and reads as white here. */
-  const tooltipTextColor = 'var(--pf-t--global--text--color--inverse)'
+  const nodeId = useNodeId()
+  const updateNodeInternals = useUpdateNodeInternals()
+  const isExecutionView = useIsExecutionView()
+  const isActiveExecution = useIsActiveExecution()
+  const nodesConnectable = useStore((s) => s.nodesConnectable)
+  const isVersionView = useIsVersionView()
 
+  const menuActions = props.menuActions ?? []
+  const showActions =
+    menuActions.length > 0 && !isExecutionView && !isActiveExecution && !isVersionView && nodesConnectable
+
+  const editAction = menuActions.find((action) => action.id === 'view-details')
+
+  useLayoutEffect(() => {
+    if (!nodeId) return
+    updateNodeInternals(nodeId)
+  }, [nodeId, updateNodeInternals, props.branchSources?.length])
+
+  const tileClassName = [
+    styles.tile,
+    props.hasDashedBorder && !props.selected ? styles.tileDashed : '',
+    props.selected ? styles.tileSelected : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  const tooltipTextColor = 'var(--pf-t--global--text--color--inverse)'
   const tooltipContent = (
     <Stack style={{ textAlign: 'center', color: tooltipTextColor }}>
       <StackItem>
@@ -50,43 +83,55 @@ export function SynStepSemanticZoomBody(props: {
     </Stack>
   )
 
-  const baseBarStyle: CSSProperties = {
-    width: '100%',
-    height: '100%',
-    minHeight: '100%',
-    backgroundColor: props.backgroundColor,
-    boxSizing: 'border-box',
-    ...props.barStyle,
-  }
-
-  if (props.hasDashedBorder && !props.selected) {
-    baseBarStyle.border = '2px dashed rgba(196, 181, 253, 0.5)'
-  } else if (props.selected) {
-    baseBarStyle.outline = '2px solid var(--pf-t--global--color--brand--default)'
-    baseBarStyle.outlineOffset = 2
-  }
-
-  const rowStyle: CSSProperties = {
-    position: 'relative',
-    width: '100%',
-    height: SEMANTIC_ZOOM_BAR_HEIGHT_PX,
-    minHeight: SEMANTIC_ZOOM_BAR_HEIGHT_PX,
-    // Click bubbles to the ReactFlow node, which selects / opens the builder detail path.
-    cursor: 'pointer',
-  }
+  const ariaLabel = `${props.title}, ${props.typeLabel}`
 
   return (
-    <div style={rowStyle}>
-      <Tooltip content={tooltipContent} position="top">
-        {/*
-          PatternFly Tooltip opens on focus; the native <button> gives keyboard
-          users a focus target and announces the node name + type to screen readers.
-        */}
-        <button type="button" aria-label={`${props.title}, ${props.typeLabel}`} className={styles.tooltipTrigger}>
-          <div style={baseBarStyle} />
-        </button>
-      </Tooltip>
-      <SemanticZoomBranchSourceHandles handles={props.branchSources ?? []} />
+    // eslint-disable-next-line syntara/prefer-pf-text-components -- layout shell; children are controls and the icon tile, not text content
+    <div
+      className={styles.root}
+      style={
+        {
+          '--syn-step-semantic-zoom-tile-size': `${SEMANTIC_ZOOM_TILE_SIZE_PX}px`,
+          '--syn-step-semantic-zoom-accent': props.accentColor,
+        } as CSSProperties
+      }
+      data-selected={props.selected ? 'true' : 'false'}
+    >
+      <div className={styles.tileRegion}>
+        <Tooltip content={tooltipContent} position="top">
+          <button type="button" aria-label={ariaLabel} className={styles.tooltipTrigger}>
+            <Flex className={tileClassName} style={props.tileStyle}>
+              {props.icon ? <Flex className={styles.iconSlot}>{props.icon}</Flex> : null}
+            </Flex>
+          </button>
+        </Tooltip>
+        {showActions ? (
+          <Flex className={`${styles.actions} nodrag nopan`} data-testid="semantic-zoom-actions">
+            {editAction ? (
+              <Button
+                variant="plain"
+                aria-label={`Edit ${props.title}`}
+                className={`${styles.actionControl} nodrag nopan`}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  editAction.onClick()
+                }}
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                <Icon size="xl">
+                  <RhUiEditIcon />
+                </Icon>
+              </Button>
+            ) : null}
+            <SynStepMenu
+              menuActions={[...menuActions]}
+              className={styles.actionControl}
+              popperProps={{ position: 'right' }}
+            />
+          </Flex>
+        ) : null}
+        <SemanticZoomBranchSourceHandles handles={props.branchSources ?? []} />
+      </div>
     </div>
   )
 }

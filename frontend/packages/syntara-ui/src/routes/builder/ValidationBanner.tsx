@@ -12,8 +12,6 @@ import {
 } from '@patternfly/react-core'
 import { useMemo } from 'react'
 
-import { useWorkflowStore } from '../../stores/useWorkflowStore'
-
 import type { BuilderAction, ValidationError, ValidationSource } from './builderReducer'
 import {
   humanizeValidationMessage,
@@ -21,7 +19,6 @@ import {
   parseValidationMessage,
   type ParsedValidationMessage,
 } from './utils/validation/parseValidationMessage'
-import styles from './ValidationBanner.module.css'
 
 type ErrorGroup = {
   displayKey: string
@@ -29,43 +26,24 @@ type ErrorGroup = {
   messages: string[]
 }
 
-function resolveActivityDisplayName(
-  nodeId: string | null,
-  activities: ReadonlyArray<{ id: string; name?: string | null }> | undefined
-): string | undefined {
-  if (!nodeId || !activities) return undefined
-  const activity = activities.find((item) => item.id === nodeId)
-  const name = activity?.name?.trim()
-  return name && name.length > 0 ? name : undefined
-}
-
-function resolveGroupDisplayKey(
-  error: ValidationError,
-  parsed: ParsedValidationMessage,
-  activityDisplayName?: string
-): string {
+function resolveGroupDisplayKey(error: ValidationError, parsed: ParsedValidationMessage): string {
   if (error.nodeName) return error.nodeName
-  if (activityDisplayName) return activityDisplayName
   if (error.nodeId && parsed.displayKey === 'Workflow') return error.nodeId
   return parsed.displayKey
 }
 
-function groupErrors(
-  errors: ValidationError[],
-  activities: ReadonlyArray<{ id: string; name?: string | null }> | undefined
-): ErrorGroup[] {
+function groupErrors(errors: ValidationError[]): ErrorGroup[] {
   const groups = new Map<string, ErrorGroup>()
   for (const error of errors) {
     const parsed = parseValidationMessage(error.message)
     const groupKey = error.nodeId ?? parsed.key
-    const activityDisplayName = resolveActivityDisplayName(error.nodeId, activities)
     const humanized = parsed.messages.map((msg) => humanizeValidationMessage(msg, error.fieldPath))
     const existing = groups.get(groupKey)
     if (existing) {
       existing.messages.push(...humanized)
     } else {
       groups.set(groupKey, {
-        displayKey: resolveGroupDisplayKey(error, parsed, activityDisplayName),
+        displayKey: resolveGroupDisplayKey(error, parsed),
         nodeId: error.nodeId,
         messages: [...humanized],
       })
@@ -93,7 +71,7 @@ type ValidationBannerProps = Readonly<{
   errors: ValidationError[]
   dismissed: boolean
   dispatch: (action: BuilderAction) => void
-  onNavigateToNode?: (nodeId: string) => void
+  onNavigateToStep?: (nodeId: string) => void
   /** Advisory save vs explicit verify. Defaults to verify. */
   source?: ValidationSource
 }>
@@ -102,11 +80,10 @@ export function ValidationBanner({
   errors,
   dismissed,
   dispatch,
-  onNavigateToNode,
+  onNavigateToStep,
   source = 'verify',
 }: ValidationBannerProps) {
-  const activities = useWorkflowStore((state) => state.currentWorkflow?.workflow.activities)
-  const groups = useMemo(() => groupErrors(errors, activities), [errors, activities])
+  const groups = useMemo(() => groupErrors(errors), [errors])
   const hasErrors = errors.some((e) => e.severity !== 'warning')
   const variant = hasErrors ? 'danger' : 'warning'
   const count = errors.length
@@ -127,22 +104,16 @@ export function ValidationBanner({
         <DescriptionList isCompact isFluid isHorizontal>
           {groups.map((group) => (
             <DescriptionListGroup key={`${group.nodeId ?? 'global'}-${group.displayKey}`}>
-              <DescriptionListTerm className={styles.term} title={group.displayKey}>
-                {group.nodeId && group.displayKey !== 'Workflow' && onNavigateToNode ? (
-                  <Button
-                    variant="link"
-                    isInline
-                    className={styles.termLink}
-                    title={group.displayKey}
-                    onClick={() => onNavigateToNode(group.nodeId ?? '')}
-                  >
+              <DescriptionListTerm>
+                {group.nodeId && group.displayKey !== 'Workflow' && onNavigateToStep ? (
+                  <Button variant="link" isInline onClick={() => onNavigateToStep(group.nodeId ?? '')}>
                     {group.displayKey}
                   </Button>
                 ) : (
                   group.displayKey
                 )}
               </DescriptionListTerm>
-              <DescriptionListDescription className={styles.description}>
+              <DescriptionListDescription>
                 {group.messages.length === 1 ? (
                   group.messages[0]
                 ) : (

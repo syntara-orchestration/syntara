@@ -44,9 +44,9 @@ describe('RunWorkflowSection', () => {
       expect(await screen.findByText('No run permission')).toBeInTheDocument()
     })
 
-    it('shows node-editor tooltip when isNodeEditorOpen is true', async () => {
+    it('shows node-editor tooltip when isStepEditorOpen is true', async () => {
       const user = userEvent.setup()
-      render(<RunWorkflowSection {...defaultProps} isNodeEditorOpen />)
+      render(<RunWorkflowSection {...defaultProps} isStepEditorOpen />)
 
       await user.hover(screen.getByRole('button', { name: /^Run$/i }))
 
@@ -58,7 +58,7 @@ describe('RunWorkflowSection', () => {
       render(
         <RunWorkflowSection
           {...defaultProps}
-          isNodeEditorOpen
+          isStepEditorOpen
           builderPermissions={{ ...defaultPermissions, canRun: false }}
         />
       )
@@ -70,7 +70,7 @@ describe('RunWorkflowSection', () => {
 
     it('shows node-editor tooltip over save-first when both editor open and unsaved', async () => {
       const user = userEvent.setup()
-      render(<RunWorkflowSection {...defaultProps} isSaved={false} isNodeEditorOpen />)
+      render(<RunWorkflowSection {...defaultProps} isSaved={false} isStepEditorOpen />)
 
       await user.hover(screen.getByRole('button', { name: /^Run$/i }))
 
@@ -185,8 +185,8 @@ describe('RunWorkflowSection', () => {
       expect(screen.getByRole('button', { name: /^Run$/i })).toHaveAttribute('aria-disabled', 'true')
     })
 
-    it('is disabled when isNodeEditorOpen is true', () => {
-      render(<RunWorkflowSection {...defaultProps} isNodeEditorOpen />)
+    it('is disabled when isStepEditorOpen is true', () => {
+      render(<RunWorkflowSection {...defaultProps} isStepEditorOpen />)
 
       expect(screen.getByRole('button', { name: /^Run$/i })).toHaveAttribute('aria-disabled', 'true')
     })

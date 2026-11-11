@@ -3,8 +3,6 @@ import { RhUiPublishIcon } from '@patternfly/react-icons'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 
-import { workflowVerificationBlockedTooltip } from './workflowVerificationBlockedTooltip'
-
 type PublishWorkflowButtonProps = Readonly<{
   canEdit: boolean
   hasNoSteps: boolean
@@ -14,7 +12,7 @@ type PublishWorkflowButtonProps = Readonly<{
   editTooltip: string
   handleVerify: (onValid?: () => void) => void
   onPublishClick: () => void
-  isNodeEditorOpen?: boolean
+  isStepEditorOpen?: boolean
 }>
 
 export function PublishWorkflowButton({
@@ -26,13 +24,14 @@ export function PublishWorkflowButton({
   editTooltip,
   handleVerify,
   onPublishClick,
-  isNodeEditorOpen,
+  isStepEditorOpen,
 }: PublishWorkflowButtonProps) {
   const hasErrors = validationErrorCount > 0
-  const canPublish = canEdit && !hasNoSteps && !hasErrors && !isVerifying && !hasNoChanges && !isNodeEditorOpen
+  const canPublish = canEdit && !hasNoSteps && !hasErrors && !isVerifying && !hasNoChanges && !isStepEditorOpen
+  const errorSuffix = validationErrorCount === 1 ? '' : 's'
 
   let tooltipContent = editTooltip
-  if (isNodeEditorOpen && canEdit) {
+  if (isStepEditorOpen && canEdit) {
     tooltipContent = 'Finish editing the current step before publishing'
   } else if (canEdit && hasNoChanges) {
     tooltipContent = 'No changes to publish'
@@ -41,7 +40,7 @@ export function PublishWorkflowButton({
   } else if (canEdit && isVerifying) {
     tooltipContent = 'Verifying workflow...'
   } else if (canEdit && hasErrors) {
-    tooltipContent = workflowVerificationBlockedTooltip('publishing', validationErrorCount)
+    tooltipContent = `Verify your workflow before publishing — ${validationErrorCount} error${errorSuffix} found`
   }
 
   return (

@@ -76,7 +76,7 @@ export function getValidSourceHandles(activityType: Activity['type']): Set<strin
       return new Set([EdgeHandleEnum.SUBMITTED, EdgeHandleEnum.FALLBACK])
     case ActivityTypeEnum.SWITCH:
       // Returns only the static DEFAULT handle. Dynamic case_N handles are
-      // managed by SwitchNodeDetails.handleSubmit during edit-mode updates.
+      // managed by SwitchStepDetails.handleSubmit during edit-mode updates.
       return new Set([EdgeHandleEnum.DEFAULT])
     default:
       // All other v2 node types (script, http_request, agentic, aap_job_template, converge)

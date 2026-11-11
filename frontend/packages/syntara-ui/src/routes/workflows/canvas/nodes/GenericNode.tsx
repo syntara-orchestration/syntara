@@ -8,11 +8,11 @@ import { SynStepBody } from '../../../../components/steps/SynStepBody'
 import { FlowNodeType } from '../../../../constants'
 import { getActivityMetadata } from '../../../../stores/useWorkflowStore'
 import type { ActivityStatus } from '../../execution/types'
-import { getNodeTypeColor } from '../nodeTypeColors'
 import { semanticZoomActivityTitle } from '../semanticZoom'
+import { getStepTypeColor } from '../stepTypeColors'
 
-import { StandardNodeHeader } from './common/StandardNodeHeader'
-import { renderNodeIcon } from './renderNodeIcon'
+import { StandardStepHeader } from './common/StandardStepHeader'
+import { renderStepIcon } from './renderStepIcon'
 
 export type GenericNode = { type: typeof FlowNodeType.GENERIC } & Node<TaskActivity>
 
@@ -21,12 +21,15 @@ export type GenericNode = { type: typeof FlowNodeType.GENERIC } & Node<TaskActiv
  * Renders a dashed border node with a plus icon
  * When clicked, allows the user to pick which step type to convert the placeholder into
  */
-export function GenericNodeComponent(props: NodeProps<GenericNode>) {
+export function GenericStepComponent(props: NodeProps<GenericNode>) {
   const metadata = getActivityMetadata(props.data)
   const customMessage = metadata?.__customMessage
-  const displayMessage = (typeof customMessage === 'string' ? customMessage : undefined) ?? 'Select a node type'
+  const displayMessage = (typeof customMessage === 'string' ? customMessage : undefined) ?? 'Select a step type'
 
   const showTitle = !customMessage
+  const iconColor = getStepTypeColor(FlowNodeType.GENERIC)
+  const iconNode = renderStepIcon(RhUiSettingsIcon, FlowNodeType.GENERIC, 'canvas', iconColor)
+  const semanticZoomIcon = renderStepIcon(RhUiSettingsIcon, FlowNodeType.GENERIC, 'semanticZoom', iconColor)
 
   const reverseHandles = typeof metadata?.__reverseHandles === 'boolean' ? metadata.__reverseHandles : undefined
 
@@ -49,17 +52,14 @@ export function GenericNodeComponent(props: NodeProps<GenericNode>) {
       rootTestId="generic-flow-node"
       executionState={executionState}
       collapsible={false}
-      topBarColor={getNodeTypeColor(FlowNodeType.GENERIC)}
+      topBarColor={getStepTypeColor(FlowNodeType.GENERIC)}
       semanticZoomSummary={{
         title: semanticZoomActivityTitle(props.data.name, displayMessage),
         typeLabel: 'Generic',
       }}
+      semanticZoomIcon={semanticZoomIcon}
     >
-      <StandardNodeHeader
-        icon={renderNodeIcon(RhUiSettingsIcon, FlowNodeType.GENERIC, 'canvas', getNodeTypeColor(FlowNodeType.GENERIC))}
-        title={showTitle ? 'Click to configure' : undefined}
-        expandable={false}
-      />
+      <StandardStepHeader icon={iconNode} title={showTitle ? 'Click to configure' : undefined} expandable={false} />
       <SynStepBody>
         <Flex alignItems={{ default: 'alignItemsCenter' }} justifyContent={{ default: 'justifyContentCenter' }}>
           <FlexItem>

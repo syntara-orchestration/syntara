@@ -16,6 +16,55 @@ export async function gotoApprovalsList(app: Page): Promise<void> {
   await expect(app.getByRole('tabpanel', { name: 'Approvals' })).toBeVisible({ timeout: 15_000 })
 }
 
+/** Project selector on Tasks (placeholder before selection, labeled textbox after). */
+export function tasksApprovalsProjectSelector(app: Page): Locator {
+  return app.getByRole('textbox', { name: 'Project' }).or(app.getByPlaceholder('All projects'))
+}
+
+/**
+ * Approvals list queries use `/projects/{id}/approvals` when a single project is selected.
+ * Poll helpers hit the global `/approvals` endpoint — switch to All projects so rows match.
+ */
+export async function selectAllProjectsOnTasksIfAvailable(app: Page): Promise<void> {
+  const projectInput = tasksApprovalsProjectSelector(app)
+  const visible = await projectInput
+    .waitFor({ state: 'visible', timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false)
+  if (!visible) return
+
+  if (
+    await app
+      .getByPlaceholder('All projects')
+      .isVisible()
+      .catch(() => false)
+  ) {
+    return
+  }
+
+  await projectInput.click()
+  const allProjects = app.getByRole('option', { name: 'All projects' })
+  await allProjects.waitFor({ state: 'visible', timeout: 10_000 })
+  await allProjects.click()
+  await expect(app.getByPlaceholder('All projects')).toBeVisible({ timeout: 10_000 })
+}
+
+/**
+ * The grid is not in the DOM while the list query returns zero rows (empty/loading states only).
+ * Call after the approvals API reports at least one pending row.
+ */
+export async function waitForApprovalsTable(app: Page, options?: { timeout?: number }): Promise<Locator> {
+  const table = app.getByRole('grid', { name: 'Approvals table' })
+  const timeout = options?.timeout ?? 45_000
+
+  await expect(async () => {
+    await selectAllProjectsOnTasksIfAvailable(app)
+    await expect(table).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout, intervals: [500, 1_000, 2_000] })
+
+  return table
+}
+
 /** Document title for the approvals list (Tasks shell, Approvals tab). */
 export async function expectApprovalsListPageTitle(app: Page): Promise<void> {
   await expect(app).toHaveTitle(`Tasks | ${APP_TITLE}`)
@@ -94,8 +143,7 @@ export async function navigateToApprovalAndOpen(app: Page, approvalName: string)
 
   await gotoApprovalsList(app)
 
-  const approvalsTable = app.getByRole('grid', { name: 'Approvals table' })
-  await expect(approvalsTable).toBeVisible({ timeout: 15_000 })
+  const approvalsTable = await waitForApprovalsTable(app)
 
   await applyApprovalNameFilter(app, approvalsTable, approvalName, { waitForRowText: approvalName })
 

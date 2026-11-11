@@ -82,8 +82,8 @@ SonarCloud analysis runs automatically on all PRs. Quality gate results are **in
 ## Contributing
 
 * [Project wide guidelines](CONTRIBUTING.md)
-* [backend/CONTRIBUTING.md](backend/CONTRIBUTING.md)
-* [frontend/CONTRIBUTING.md](frontend/CONTRIBUTING.md).
+* [Backend contributor guide](docs/backend-contributing.md)
+* [Frontend contributor guide](docs/frontend-contributing.md).
 
 ## Community
 

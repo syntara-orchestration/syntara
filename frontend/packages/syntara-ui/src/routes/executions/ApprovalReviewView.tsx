@@ -25,6 +25,7 @@ import { SynTextAreaField } from '../../components/forms/SynTextAreaField'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
+import { isServiceUnavailableError } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { lookupMapByApprovalNodeId } from '../approvals/approvalNodeId'
 import { ApprovalSummaryList } from '../approvals/ApprovalSummaryList'
@@ -36,6 +37,7 @@ import {
   APPROVAL_NOTES_MAX_LENGTH,
   type ApprovalDecisionFormData,
 } from './approvalDecisionSchema'
+import { getApprovalDecisionSubmitErrorMessage } from './approvalDecisionSubmitErrors'
 import { ApprovalReadOnlyView } from './ApprovalReadOnlyView'
 
 type NextStep = { id: string; name: string; type: string; parameters?: Record<string, unknown> }
@@ -85,7 +87,7 @@ type ApprovalReviewViewProps = {
 }
 
 export function ApprovalReviewView({ approval, activityNameMap, onClose }: ApprovalReviewViewProps) {
-  const { showSuccess } = useAlerts()
+  const { showSuccess, showError, showWarning } = useAlerts()
   const queryClient = useQueryClient()
   const decisionMutation = approvalsClient.useMutation('patch', '/approvals/{approval_id}')
 
@@ -109,7 +111,7 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
       notes: '',
     },
   })
-  const { handleSubmit, handleError } = form
+  const { handleSubmit } = form
   const approvalId = approval.id
 
   if (!approvalId) return null
@@ -133,7 +135,14 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
           })
           onClose()
         },
-        onError: handleError({ title: 'Failed to submit decision' }),
+        onError: (error) => {
+          const message = getApprovalDecisionSubmitErrorMessage(error)
+          if (isServiceUnavailableError(error)) {
+            showWarning({ title: message })
+            return
+          }
+          showError({ title: message })
+        },
       }
     )
   }

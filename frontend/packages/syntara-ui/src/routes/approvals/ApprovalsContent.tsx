@@ -1,17 +1,20 @@
 import type { ThProps } from '@patternfly/react-table'
 
-import { SynListPanelTable } from '../../components/panels/list/SynListPanel'
-import { ExpandableListTableColGroup } from '../../components/table/ExpandableListTableColGroup'
+import { SynPageBody } from '../../components/layout/SynPage'
+import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
+import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
+import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 
 import type { ApprovalWithDetails } from './Approvals'
 import { FlatApprovalsTableBody, GroupedApprovalsTableBody } from './ApprovalsTableBody'
 import { ApprovalsTableHead } from './ApprovalsTableHead'
-import { APPROVALS_TABLE_DATA_COLUMN_COUNT } from './approvalTableColumns'
 import type { useApprovalsData } from './useApprovalsData'
 
 export type ApprovalsContentProps = {
   sortedApprovals: ApprovalWithDetails[]
+  hasActiveFilters: boolean
+  handleClearAllFilters: () => void
   expandedRows: Set<string>
   onToggleRow: (approvalId: string) => void
   getSortParams: (columnField: string) => ThProps['sort']
@@ -36,6 +39,8 @@ export type ApprovalsContentProps = {
 
 export function ApprovalsContent({
   sortedApprovals,
+  hasActiveFilters,
+  handleClearAllFilters,
   expandedRows,
   onToggleRow,
   getSortParams,
@@ -57,9 +62,23 @@ export function ApprovalsContent({
   approvalPermissions,
   isLoadingPermissions,
 }: Readonly<ApprovalsContentProps>) {
+  if (sortedApprovals.length === 0) {
+    return (
+      <SynPageBody isCentered>
+        {hasActiveFilters ? (
+          <SynEmptyStateFilter clearAllFilters={handleClearAllFilters} />
+        ) : (
+          <SynEmptyStateNoData
+            title="No approvals yet"
+            description="No approvals are currently pending or available."
+          />
+        )}
+      </SynPageBody>
+    )
+  }
+
   return (
-    <SynListPanelTable caption="Approvals table" isExpandable footer={footerProps}>
-      <ExpandableListTableColGroup withSelect dataColumnCount={APPROVALS_TABLE_DATA_COLUMN_COUNT} />
+    <SynScrollableTableContainer caption="Approvals table" isExpandable footer={footerProps}>
       <ApprovalsTableHead
         getSortParams={getSortParams}
         allRowsExpanded={allRowsExpanded}
@@ -98,6 +117,6 @@ export function ApprovalsContent({
           isLoadingPermissions={isLoadingPermissions}
         />
       )}
-    </SynListPanelTable>
+    </SynScrollableTableContainer>
   )
 }

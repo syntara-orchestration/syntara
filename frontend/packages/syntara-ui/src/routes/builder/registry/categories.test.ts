@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { getCategoryMetadata, NODE_CATEGORY_DISPLAY_ORDER } from './categories'
+import { getCategoryMetadata, STEP_CATEGORY_DISPLAY_ORDER } from './categories'
 
 describe('registry categories', () => {
   it('lists human_tasks before integration in the add-step panel order', () => {
-    expect(NODE_CATEGORY_DISPLAY_ORDER.indexOf('human_tasks')).toBeLessThan(
-      NODE_CATEGORY_DISPLAY_ORDER.indexOf('integration')
+    expect(STEP_CATEGORY_DISPLAY_ORDER.indexOf('human_tasks')).toBeLessThan(
+      STEP_CATEGORY_DISPLAY_ORDER.indexOf('integration')
     )
   })
 

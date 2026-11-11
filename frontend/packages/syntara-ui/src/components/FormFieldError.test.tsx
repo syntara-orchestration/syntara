@@ -11,13 +11,23 @@ describe('FormFieldError', () => {
   })
 
   it('renders error message when message is provided', () => {
-    render(<FormFieldError message="Project is required" />)
-    expect(screen.getByText('Project is required')).toBeInTheDocument()
+    render(
+      <>
+        <input aria-label="Project name" aria-describedby="project-error" />
+        <FormFieldError id="project-error" message="Project is required" />
+      </>
+    )
+    expect(screen.getByRole('textbox', { name: 'Project name' })).toHaveAccessibleDescription(/Project is required/)
   })
 
   it('renders error message from react-hook-form FieldError', () => {
     render(<FormFieldError error={{ type: 'required', message: 'Field is required' }} />)
     expect(screen.getByText('Field is required')).toBeInTheDocument()
+  })
+
+  it('renders nothing when the field error has no message', () => {
+    const { container } = render(<FormFieldError id="project-error" error={{ type: 'manual' }} />)
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('has no accessibility violations', async () => {
@@ -28,13 +38,27 @@ describe('FormFieldError', () => {
 
 describe('FormFieldHintOrError', () => {
   it('renders hint text when no error', () => {
-    render(<FormFieldHintOrError hint="Enter a valid URL" />)
-    expect(screen.getByText('Enter a valid URL')).toBeInTheDocument()
+    render(
+      <>
+        <input aria-label="URL" aria-describedby="url-helper" />
+        <FormFieldHintOrError id="url-helper" hint="Enter a valid URL" />
+      </>
+    )
+    expect(screen.getByRole('textbox', { name: 'URL' })).toHaveAccessibleDescription('Enter a valid URL')
   })
 
   it('renders error message instead of hint when error exists', () => {
-    render(<FormFieldHintOrError hint="Enter a valid URL" error={{ type: 'pattern', message: 'Invalid URL format' }} />)
-    expect(screen.getByText('Invalid URL format')).toBeInTheDocument()
+    render(
+      <>
+        <input aria-label="URL" aria-describedby="url-helper" />
+        <FormFieldHintOrError
+          id="url-helper"
+          hint="Enter a valid URL"
+          error={{ type: 'pattern', message: 'Invalid URL format' }}
+        />
+      </>
+    )
+    expect(screen.getByRole('textbox', { name: 'URL' })).toHaveAccessibleDescription(/Invalid URL format/)
     expect(screen.queryByText('Enter a valid URL')).not.toBeInTheDocument()
   })
 

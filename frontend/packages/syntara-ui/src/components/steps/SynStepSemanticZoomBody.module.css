@@ -1,8 +1,16 @@
-/**
- * Reset native <button> chrome so the semantic zoom bar renders identically
- * to the previous <div>. Width/height fill the wrapper so the tooltip trigger
- * surface covers the full bar area.
- */
+.root {
+  position: relative;
+  width: 100%;
+  height: fit-content;
+  overflow: visible;
+}
+
+.tileRegion {
+  position: relative;
+  width: 100%;
+  height: var(--syn-step-semantic-zoom-tile-size, 224px);
+}
+
 .tooltipTrigger {
   display: block;
   width: 100%;
@@ -15,4 +23,76 @@
   font: inherit;
   color: inherit;
   text-align: inherit;
+}
+
+.tooltipTrigger:focus-visible {
+  outline: 2px solid var(--pf-t--global--color--brand--default);
+  outline-offset: 2px;
+}
+
+.tile {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--pf-t--global--border--radius--medium);
+  background-color: var(--pf-t--global--background--color--floating--default);
+  box-shadow: var(--pf-t--global--box-shadow--sm);
+  border-top: 6px solid var(--syn-step-semantic-zoom-accent, transparent);
+}
+
+.tileDashed {
+  border: 2px dashed rgba(196, 181, 253, 0.5);
+  border-top: 2px dashed rgba(196, 181, 253, 0.5);
+}
+
+.tileSelected {
+  outline: 2px solid var(--pf-t--global--color--brand--default);
+  outline-offset: 2px;
+}
+
+.iconSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.actions {
+  position: absolute;
+  top: var(--pf-t--global--spacer--md);
+  right: var(--pf-t--global--spacer--md);
+  display: flex;
+  align-items: center;
+  gap: var(--pf-t--global--spacer--md);
+  padding: var(--pf-t--global--spacer--md);
+  border-radius: var(--pf-t--global--border--radius--medium);
+  background-color: var(--pf-t--global--background--color--floating--default);
+  box-shadow: var(--pf-t--global--box-shadow--sm);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.root:hover .actions,
+.root:focus-within .actions,
+.root[data-selected='true'] .actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.actionControl :global(.pf-v6-c-button),
+.actionControl :global(.pf-v6-c-menu-toggle) {
+  min-width: 3.1625rem;
+  min-height: 3.1625rem;
+  padding: var(--pf-t--global--spacer--md);
+}
+
+.actionControl :global(svg) {
+  width: calc(var(--pf-t--global--icon--size--xl) * 1.15);
+  height: calc(var(--pf-t--global--icon--size--xl) * 1.15);
 }
