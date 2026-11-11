@@ -5,6 +5,7 @@ import type { OutputFieldDef } from '@syntara/contracts'
 import { useCallback, useMemo } from 'react'
 
 import { buildExpression, canvasNodeIdForExpression } from '../../../../utils/expressions/templateBuilder'
+import { highlightText } from '../../../../utils/highlightText'
 import { CopyExpressionAction, DraggableTreeLeaf } from '../components/DraggableTreeLeaf'
 import { DRAG_TYPE_FIELD, type FieldDragData } from '../utils/dragTypes'
 import { toTreeItemId } from '../utils/treeHelpers'
@@ -16,6 +17,7 @@ export type InputSchemaPreviewProps = {
   fields?: OutputFieldDef[]
   tree?: InputSchemaPreviewNode[]
   nodeId: string
+  searchTerm?: string
 }
 
 export type InputSchemaPreviewNode = {
@@ -33,9 +35,10 @@ type PreviewFieldProps = {
   description: string
   nodeId: string
   fieldPath: string[]
+  searchTerm?: string
 }
 
-function PreviewField({ name, type, description, nodeId, fieldPath }: Readonly<PreviewFieldProps>) {
+function PreviewField({ name, type, description, nodeId, fieldPath, searchTerm }: Readonly<PreviewFieldProps>) {
   const typeLabel = getTypeLabel(type)
   const expression = useMemo(() => buildExpression({ nodeId, fieldPath }), [nodeId, fieldPath])
 
@@ -53,7 +56,14 @@ function PreviewField({ name, type, description, nodeId, fieldPath }: Readonly<P
     [nodeId, fieldPath, expression]
   )
 
-  return <DraggableTreeLeaf label={`${typeLabel} ${name}`} secondaryText={description} onDragStart={handleDragStart} />
+  const label = `${typeLabel} ${name}`
+  return (
+    <DraggableTreeLeaf
+      label={searchTerm ? highlightText(label, searchTerm) : label}
+      secondaryText={searchTerm ? highlightText(description, searchTerm) : description}
+      onDragStart={handleDragStart}
+    />
+  )
 }
 
 function toInputSchemaPreviewNode(field: OutputFieldDef, parentPath: string[] = []): InputSchemaPreviewNode {
@@ -71,21 +81,58 @@ function toInputSchemaPreviewNode(field: OutputFieldDef, parentPath: string[] = 
   }
 }
 
-function buildTreeData(nodes: InputSchemaPreviewNode[], nodeId: string): TreeViewDataItem[] {
+/**
+ * Filter tree nodes based on search term, keeping ancestor groups visible when descendants match.
+ * Returns null if node and all descendants don't match the search.
+ */
+function filterTreeNode(node: InputSchemaPreviewNode, searchTerm: string): InputSchemaPreviewNode | null {
+  const lowerSearch = searchTerm.toLowerCase()
+  const nameMatches = node.name.toLowerCase().includes(lowerSearch)
+  const descriptionMatches = node.description?.toLowerCase().includes(lowerSearch) ?? false
+
+  // If this is a leaf node, return it only if it matches
+  if (!node.children || node.children.length === 0) {
+    return nameMatches || descriptionMatches ? node : null
+  }
+
+  // For group nodes, recursively filter children
+  const filteredChildren = node.children.map((child) => filterTreeNode(child, searchTerm)).filter(Boolean)
+
+  // Keep this group if it matches or has any matching descendants
+  if (nameMatches || descriptionMatches || filteredChildren.length > 0) {
+    return {
+      ...node,
+      children: filteredChildren as InputSchemaPreviewNode[],
+    }
+  }
+
+  return null
+}
+
+/**
+ * Filter tree nodes array based on search term.
+ */
+function filterTree(nodes: InputSchemaPreviewNode[], searchTerm: string): InputSchemaPreviewNode[] {
+  if (!searchTerm.trim()) return nodes
+  return nodes.map((node) => filterTreeNode(node, searchTerm)).filter(Boolean) as InputSchemaPreviewNode[]
+}
+
+function buildTreeData(nodes: InputSchemaPreviewNode[], nodeId: string, searchTerm?: string): TreeViewDataItem[] {
   return nodes.map((node) => {
     const id = toTreeItemId([nodeId, ...node.fieldPath])
     const hasChildren = Boolean(node.children?.length)
     if (node.isGroup || hasChildren) {
+      const groupLabel = `${getTypeLabel(node.type)} ${node.name}`
       return {
         id,
         name: (
           <Label isCompact color="grey">
-            {getTypeLabel(node.type)} {node.name}
+            {searchTerm ? highlightText(groupLabel, searchTerm) : groupLabel}
           </Label>
         ),
         defaultExpanded: true,
         hasBadge: false,
-        children: buildTreeData(node.children ?? [], nodeId),
+        children: buildTreeData(node.children ?? [], nodeId, searchTerm),
       }
     }
 
@@ -99,6 +146,7 @@ function buildTreeData(nodes: InputSchemaPreviewNode[], nodeId: string): TreeVie
           description={node.description ?? ''}
           nodeId={nodeId}
           fieldPath={node.fieldPath}
+          searchTerm={searchTerm}
         />
       ),
       action: <CopyExpressionAction expressionText={expression} />,
@@ -107,12 +155,16 @@ function buildTreeData(nodes: InputSchemaPreviewNode[], nodeId: string): TreeVie
   })
 }
 
-export function InputSchemaPreview({ fields = [], tree, nodeId }: Readonly<InputSchemaPreviewProps>) {
+export function InputSchemaPreview({ fields = [], tree, nodeId, searchTerm }: Readonly<InputSchemaPreviewProps>) {
   const expressionNodeId = canvasNodeIdForExpression(nodeId)
   const treeNodes = tree ?? fields.map((field) => toInputSchemaPreviewNode(field))
+  const filteredNodes = useMemo(
+    () => (searchTerm ? filterTree(treeNodes, searchTerm) : treeNodes),
+    [treeNodes, searchTerm]
+  )
   const treeData: TreeViewDataItem[] = useMemo(
-    () => buildTreeData(treeNodes, expressionNodeId),
-    [treeNodes, expressionNodeId]
+    () => buildTreeData(filteredNodes, expressionNodeId, searchTerm),
+    [filteredNodes, expressionNodeId, searchTerm]
   )
 
   if (treeData.length === 0) {

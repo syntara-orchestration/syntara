@@ -359,21 +359,21 @@ export function InputPanel({
                 Input
               </Title>
             </FlexItem>
+            {hasUpstream && (
+              <FlexItem flex={{ default: 'flex_1' }}>
+                <SearchInput
+                  placeholder="Search fields"
+                  value={searchTerm}
+                  onChange={(_event, value) => setSearchTerm(value)}
+                  onClear={() => setSearchTerm('')}
+                  aria-label="Search input fields"
+                />
+              </FlexItem>
+            )}
             {hasData && (
-              <>
-                <FlexItem flex={{ default: 'flex_1' }}>
-                  <SearchInput
-                    placeholder="Search fields"
-                    value={searchTerm}
-                    onChange={(_event, value) => setSearchTerm(value)}
-                    onClear={() => setSearchTerm('')}
-                    aria-label="Search input fields"
-                  />
-                </FlexItem>
-                <FlexItem>
-                  <ViewToggle activeView={activeView} onChange={setActiveView} ariaLabel="Input view selection" />
-                </FlexItem>
-              </>
+              <FlexItem>
+                <ViewToggle activeView={activeView} onChange={setActiveView} ariaLabel="Input view selection" />
+              </FlexItem>
             )}
           </Flex>
         </StackItem>
