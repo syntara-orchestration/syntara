@@ -315,6 +315,10 @@ def _coerce_number(raw: Any) -> int | float:  # noqa: ANN401
 
     # Accept: int, float
     if isinstance(raw, (int, float)):
+        # Integers are finite; math.isfinite() can overflow on large ints.
+        if isinstance(raw, float) and not math.isfinite(raw):
+            msg = "Infinite and NaN values are not accepted"
+            raise ValueError(msg)
         return raw
 
     # Accept: numeric string
