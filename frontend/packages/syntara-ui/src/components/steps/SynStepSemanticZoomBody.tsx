@@ -78,6 +78,7 @@ export function SynStepSemanticZoomBody(props: {
   const ariaLabel = `${props.title}, ${props.typeLabel}`
   const showPreview = previewOpen
 
+  // The root wrapper groups layout and controls; text is rendered in PatternFly Content.
   return (
     <div
       ref={rootRef}

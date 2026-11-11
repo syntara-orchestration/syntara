@@ -12,7 +12,7 @@
     "test:ui": "npm run test --prefix packages/syntara-ui",
     "test:mock-api": "npm run test --prefix packages/syntara-mock-api",
     "test:coverage": "npm run test:coverage --prefix packages/syntara-ui",
-    "check": "NODE_OPTIONS='--max-old-space-size=8192' concurrently --group -c auto --names 'mermaid,tsc,lint,format,knip' 'npm run lint:mermaid' 'npm run tsc' 'npm run lint' 'npm run format:check' 'npm run knip'",
+    "check": "concurrently --group -c auto --names 'mermaid,tsc,lint,format,knip' 'npm run lint:mermaid' 'npm run tsc' 'npm run lint' 'npm run format:check' 'npm run knip'",
     "e2e": "npm run e2e --prefix packages/syntara-ui",
     "e2e:ui": "npm run e2e:ui --prefix packages/syntara-ui",
     "e2e:a11y-audit": "npm run e2e:a11y-audit --prefix packages/syntara-ui",
