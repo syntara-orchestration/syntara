@@ -795,12 +795,17 @@ and failure handling. No user script runs on the Temporal worker.
 
 Create an enabled OpenShift integration with a verified HTTPS API URL, namespace
 (for example `script-step-2523`), management bearer-token credential, and
-`configuration.script_image` pointing to the rebuilt SDK script image. Configure
+`configuration.script_image` pointing to a rebuilt language-specific SDK script
+image. To support both languages, use an image template such as
+`quay.io/your-org/syntara-node-script-{language}:your-tag`; the worker substitutes
+`python` or `bash` before creating the pod. A fixed image reference also works
+for workflows using only that image's language. Configure
 the Temporal worker with:
 
 ```dotenv
 APP_SCRIPT_NODES_ENABLED=true
 APP_SCRIPT_OPENSHIFT_INTEGRATION_ID=<integration UUID>
+APP_SCRIPT_OPENSHIFT_PORT_FORWARD=false
 ```
 
 The credential needs create/get/delete access to pods in that namespace. Workers
@@ -816,7 +821,10 @@ Route, or pod-log permission is needed. The current image serves plaintext gRPC;
 keep it on the trusted workload network and restrict access with network policies.
 
 Operators must configure an approved image implementing `syntara.container/v1alpha1`
-and advertising `syntara.script.script`; there is no built-in image default.
+and advertising `syntara.script-python.script-python` for Python or
+`syntara.script-bash.script-bash` for Bash; there is no built-in image default.
+AO and the images use `syntara-plugin-contracts==0.1.0a2`. The workflow's language
+selects the image and step identity; it is not sent as a plugin input.
 The activity preserves the image entrypoint, negotiates Health with the published
 SDK and consumes the Execute stream. Inputs travel through gRPC, not environment
 variables. SDK operations run in threads while the activity heartbeats for Temporal
@@ -831,7 +839,58 @@ serialized result must fit the SDK's 1 MiB inline limit. Unsupported settings fa
 explicitly. Successful results preserve script-node fields. Failed terminal Results
 with output preserve exit code and logs. Completed subprocesses with nonzero exit
 codes return a business result; the activity marks them as script failures.
-Older images send REMOTE_REJECTED without
-output; these surface as ScriptContainerError. Preserving failure logs requires an
-image that returns them in Result. No absent fields are fabricated. There is no
-fallback to local execution.
+SDK 0.1.0a2 subprocess failures carry `return_code`, `stdout`, and `stderr` in
+Result's structured `error_result`; the activity preserves these as script failure
+output. A structured timeout sends Cancel before pod deletion. Transport and
+protocol Failure events without script diagnostics surface as
+`ScriptContainerError`. No absent fields are fabricated. There is no fallback to
+local execution.
+
+#### Verify direct in-cluster execution
+
+Deploy the branch's backend image for both the API and Temporal worker, together
+with Temporal, PostgreSQL, and Redis in OpenShift. Build workload images for the
+cluster architecture (script pods currently select amd64). Build these images on a
+native x86_64 Linux builder. On an ARM Mac, do not use QEMU emulation with
+`--platform linux/amd64`: the backend's dependency installation can crash under
+QEMU. Use a native x86_64 CI runner or an OpenShift binary build instead.
+
+```bash
+# From the syntara backend/ directory:
+podman build -f containers/syntara/Containerfile \
+  -t quay.io/your-org/syntara-backend:your-tag .
+podman push quay.io/your-org/syntara-backend:your-tag
+
+# From the syntara-step-types repository root:
+podman build -f script-python/Containerfile \
+  -t quay.io/your-org/syntara-node-script-python:your-tag .
+podman build -f script-bash/Containerfile \
+  -t quay.io/your-org/syntara-node-script-bash:your-tag .
+podman push quay.io/your-org/syntara-node-script-python:your-tag
+podman push quay.io/your-org/syntara-node-script-bash:your-tag
+```
+
+Set the integration namespace to the script workload namespace and use its image
+template above. For an internal API URL such as `https://kubernetes.default.svc`,
+configure `APP_INTEGRATION_URL_ALLOWED_HOSTS=["kubernetes.default.svc"]` on both API
+and worker and supply the cluster CA in the integration. Store the namespace-scoped
+create/get/delete pod token in the integration's management credential. Script pods
+do not receive that token. Private workload images require a pull secret linked
+to the namespace's default service account, since the script pod does not specify
+its own image pull secret.
+
+Verify `APP_SCRIPT_NODES_ENABLED=true` and
+`APP_SCRIPT_OPENSHIFT_PORT_FORWARD=false` in the running worker. Allow worker
+access to the cluster API on TCP 443 and script pod IPs on TCP 50051.
+
+```bash
+oc get pods -n "$AO_NS" -o wide
+oc get pods -n "$AO_NS" -l app.kubernetes.io/name=syntara-script -o wide --watch
+```
+
+Run manual-trigger workflows for both languages. Check successful output, a
+nonzero exit with captured stdout/stderr, timeout, and workflow cancellation.
+Use a short sleep in the script to observe the transient pod; it must be deleted
+after each outcome. Record the backend and worker image references, script pod
+image/IP, workflow results, and cleanup as E2E evidence. Run these workflows in
+the deployed AO instance rather than a laptop's development server.

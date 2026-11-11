@@ -22,7 +22,7 @@ from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.models.integration_configuration import OpenShiftConfiguration
 
 from .common import HEARTBEAT_STOP_MONITOR
-from .script_grpc import SCRIPT_STEP_ID, invoke_script
+from .script_grpc import SCRIPT_STEP_IDS, invoke_script
 from .script_port_forward import script_port_forward
 
 MAX_SCRIPT_TIMEOUT_SECONDS = 600
@@ -110,6 +110,17 @@ async def _invoke_pod(config: OpenShiftConfiguration, pod_ip: str, invocation: C
     return await invoke_script(f"{host}:50051", invocation)
 
 
+def _script_image(config: OpenShiftConfiguration, language: str) -> str:
+    if language not in SCRIPT_STEP_IDS:
+        msg = "Unsupported script language"
+        raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+    image = config.script_image
+    if not image:
+        msg = "Configure script_image on the OpenShift integration"
+        raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+    return image.replace("{language}", language)
+
+
 async def execute_openshift_script(  # noqa: C901
     language: str,
     code: str,
@@ -123,10 +134,7 @@ async def execute_openshift_script(  # noqa: C901
     identity = f"{info.workflow_id}/{info.workflow_run_id}/{info.activity_id}/{info.attempt}"
     name = "syntara-script-" + hashlib.sha256(identity.encode()).hexdigest()[:40]
     path = f"/api/v1/namespaces/{config.namespace}/pods"
-    image = config.script_image
-    if not image:
-        msg = "Configure script_image on the OpenShift integration"
-        raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+    image = _script_image(config, language)
     if not 1 <= timeout_seconds <= MAX_SCRIPT_TIMEOUT_SECONDS or not 1 <= max_output_bytes <= MAX_SCRIPT_OUTPUT_BYTES:
         msg = "Script container supports timeouts up to 600 seconds and output limits up to 1024 KB"
         raise ApplicationError(msg, type="ConfigError", non_retryable=True)
@@ -136,8 +144,8 @@ async def execute_openshift_script(  # noqa: C901
     invocation = ContainerInvocation(
         invocation_id=name,
         workflow_run_id=info.workflow_run_id,
-        step_revision_id=SCRIPT_STEP_ID,
-        inputs={"language": language, "code": code, "environment": environment, "max_output_bytes": max_output_bytes},
+        step_revision_id=SCRIPT_STEP_IDS[language],
+        inputs={"code": code, "environment": environment, "max_output_bytes": max_output_bytes},
         credential_file_paths={},
         timeout_seconds=timeout_seconds,
     )

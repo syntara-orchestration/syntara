@@ -72,7 +72,7 @@ dependencies = [
     "uuid-utils>=0.9.0",
     "pypdf>=6.19.0",
     "nh3>=0.2.21",
-    "syntara-plugin-contracts==0.1.0a1",
+    "syntara-plugin-contracts==0.1.0a2",
     "grpcio>=1.78.0",
 ]
 

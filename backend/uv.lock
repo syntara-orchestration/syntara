@@ -4541,7 +4541,7 @@ requires-dist = [
     { name = "sqlmodel", specifier = ">=0.0.14,<0.0.28" },
     { name = "structlog", specifier = ">=25.5.0,<26.0.0" },
     { name = "syntara-api-client", marker = "extra == 'dev'", editable = "src/api_client" },
-    { name = "syntara-plugin-contracts", specifier = "==0.1.0a1" },
+    { name = "syntara-plugin-contracts", specifier = "==0.1.0a2" },
     { name = "temporalio", specifier = ">=1.5.0" },
     { name = "testcontainers", extras = ["postgres", "redis"], marker = "extra == 'dev'", specifier = ">=4.14.0" },
     { name = "tiktoken", specifier = ">=0.5.0" },
@@ -4590,7 +4590,7 @@ requires-dist = [
 
 [[package]]
 name = "syntara-plugin-contracts"
-version = "0.1.0a1"
+version = "0.1.0a2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "grpcio" },
@@ -4599,9 +4599,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "referencing" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/94/05/dfaade0098bf00adb83fe4a249f7a129cf8a506e3b656ff86a8ec80a4900/syntara_plugin_contracts-0.1.0a1.tar.gz", hash = "sha256:cbe0af7b4146bd33a678c5017003a08d4387340b3e0093ae81dfea5eb4bb1450", size = 68800, upload-time = "2026-10-26T16:24:14.009Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d2/61/f7e37d0fc8a737facad3d89abb2421e9eb7728d1c782ca105f5947ba0e61/syntara_plugin_contracts-0.1.0a2.tar.gz", hash = "sha256:e3aaabf4ddef6bf730ce8f3c2c212f4b0e0f8bc6a75a7d9291153f0084c49373", size = 82059, upload-time = "2026-11-02T21:09:35.23Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/eb/9a/10f51af2fb36ebcb12e209cb78fe87cd2271acb73dca0dc7150cc3928afb/syntara_plugin_contracts-0.1.0a1-py3-none-any.whl", hash = "sha256:7fbdd3b6b471e6d0467fbf79e0c56f6df0fc46a417821c7030b2a6b01436fe03", size = 101446, upload-time = "2026-10-26T16:24:12.622Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/f1/03eb0dd67c7eece62d48716e178f1072a571e22f7a82290abfb462efc0ff/syntara_plugin_contracts-0.1.0a2-py3-none-any.whl", hash = "sha256:a6436506323fac6d96ef40b95504e9e9f1be2977aa52124756c46633de64dcf6", size = 121678, upload-time = "2026-11-02T21:09:33.943Z" },
 ]
 
 [[package]]

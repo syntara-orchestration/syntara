@@ -12,7 +12,7 @@ from syntara_plugin.runtime.protocol import container_pb2 as pb
 from syntara_plugin.runtime.protocol import container_pb2_grpc as rpc
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine.activities.script_grpc import SCRIPT_STEP_ID, invoke_script
+from syntara.workflows.workflow_engine.activities.script_grpc import SCRIPT_STEP_IDS, invoke_script
 
 
 @pytest.mark.asyncio
@@ -21,6 +21,9 @@ from syntara.workflows.workflow_engine.activities.script_grpc import SCRIPT_STEP
     [
         "success",
         "nonzero",
+        "structured_nonzero",
+        "structured_timeout",
+        "structured_invalid",
         "failure",
         "bad_abi",
         "bad_identity",
@@ -41,7 +44,7 @@ async def test_script_protocol(scenario):  # noqa: C901 -- shared real server ex
             return pb.HealthResponse(
                 ready=True,
                 runtime_abi="wrong" if scenario == "bad_abi" else "syntara.container/v1alpha1",
-                step_revision_ids=["other.step"] if scenario == "wrong_step" else [SCRIPT_STEP_ID],
+                step_revision_ids=["other.step"] if scenario == "wrong_step" else [SCRIPT_STEP_IDS["python"]],
             )
 
         async def Execute(self, request: pb.ExecuteRequest, context: object) -> AsyncIterator[pb.ExecutionEvent]:  # noqa: N802
@@ -58,6 +61,29 @@ async def test_script_protocol(scenario):  # noqa: C901 -- shared real server ex
                         code="REMOTE_REJECTED",
                         retryable=False,
                         outcome="not_completed",
+                    ),
+                )
+                return
+            if scenario.startswith("structured_"):
+                error = {
+                    "message": "Script failed",
+                    "code": "TIMEOUT" if scenario == "structured_timeout" else "REMOTE_REJECTED",
+                    "category": "timeout" if scenario == "structured_timeout" else "business",
+                    "retryable": False,
+                    "return_code": 7,
+                    "stdout": "hello",
+                    "stderr": "error",
+                }
+                if scenario == "structured_invalid":
+                    del error["return_code"]
+                yield pb.ExecutionEvent(
+                    invocation_id=request.invocation_id,
+                    result=pb.Result(
+                        output_schema_digest="sha256:" + "a" * 64,
+                        status_code=1,
+                        status_message="Script failed",
+                        error_schema_digest="sha256:" + "b" * 64,
+                        error_result_json=json.dumps(error).encode(),
                     ),
                 )
                 return
@@ -82,8 +108,8 @@ async def test_script_protocol(scenario):  # noqa: C901 -- shared real server ex
     invocation = ContainerInvocation(
         invocation_id="script-test",
         workflow_run_id="run-test",
-        step_revision_id=SCRIPT_STEP_ID,
-        inputs={"language": "python", "code": "print(1)", "environment": {"LARGE_VALUE": "x" * 150_000}},
+        step_revision_id=SCRIPT_STEP_IDS["python"],
+        inputs={"code": "print(1)", "environment": {"LARGE_VALUE": "x" * 150_000}},
         credential_file_paths={},
         timeout_seconds=1 if scenario == "timeout" else 5,
     )
@@ -96,16 +122,24 @@ async def test_script_protocol(scenario):  # noqa: C901 -- shared real server ex
                 with pytest.raises(asyncio.CancelledError):
                     await task
                 assert cancelled.is_set()
-            elif scenario == "timeout":
+            elif scenario in {"timeout", "structured_timeout"}:
                 with pytest.raises(TimeoutError):
                     await task
                 assert cancelled.is_set()
-            elif scenario in {"failure", "bad_abi", "bad_identity", "no_result", "wrong_step", "duplicate_result"}:
+            elif scenario in {
+                "failure",
+                "bad_abi",
+                "bad_identity",
+                "no_result",
+                "wrong_step",
+                "duplicate_result",
+                "structured_invalid",
+            }:
                 with pytest.raises(ApplicationError):
                     await task
             else:
                 output = await task
-                assert output["return_code"] == (7 if scenario == "nonzero" else 0)
+                assert output["return_code"] == (7 if scenario in {"nonzero", "structured_nonzero"} else 0)
                 assert output["stdout"] == "hello"
                 assert observed[0].timeout_seconds == 5
                 assert json.loads(observed[0].inputs_json) == invocation.inputs

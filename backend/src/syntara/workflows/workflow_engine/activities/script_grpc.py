@@ -16,7 +16,10 @@ from temporalio.exceptions import ApplicationError
 
 from .common import HEARTBEAT_STOP_MONITOR
 
-SCRIPT_STEP_ID = "syntara.script.script"
+SCRIPT_STEP_IDS = {
+    "python": "syntara.script-python.script-python",
+    "bash": "syntara.script-bash.script-bash",
+}
 
 
 async def invoke_script(target: str, invocation: ContainerInvocation) -> dict[str, Any]:
@@ -34,7 +37,7 @@ async def invoke_script(target: str, invocation: ContainerInvocation) -> dict[st
     execute_task: asyncio.Task[Any] | None = None
     cancel_requested = False
     try:
-        await _wait_for_health(client)
+        await _wait_for_health(client, invocation.step_revision_id)
 
         execute_task = asyncio.create_task(asyncio.to_thread(_execute_stream, client, invocation))
         async with asyncio.timeout(invocation.timeout_seconds):
@@ -65,7 +68,7 @@ async def invoke_script(target: str, invocation: ContainerInvocation) -> dict[st
             await asyncio.gather(execute_task, return_exceptions=True)
 
 
-async def _wait_for_health(client: ContainerClient) -> None:
+async def _wait_for_health(client: ContainerClient, step_revision_id: str) -> None:
     """Wait for startup and verify the required ABI and step identity."""
     async with asyncio.timeout(30):
         while True:
@@ -77,17 +80,36 @@ async def _wait_for_health(client: ContainerClient) -> None:
                 if error.source != "transport" or not error.retryable:
                     raise
                 await asyncio.sleep(1)
-    if SCRIPT_STEP_ID not in revisions:
+    if step_revision_id not in revisions:
         msg = "Script container does not advertise the required step identity"
         raise ApplicationError(msg, type="ScriptContainerProtocolError", non_retryable=True)
 
 
 def _script_output(result: ContainerResult) -> dict[str, Any]:
     """Validate the script-specific business output after SDK envelope validation."""
+    if result.status_code and result.error_result is not None:
+        error = dict(result.error_result)
+        if error.get("code") == FailureCode.TIMEOUT.value:
+            raise TimeoutError
+        if error.get("code") == FailureCode.REMOTE_REJECTED.value:
+            output = _validate_script_output(error)
+            if output["return_code"] == 0:
+                msg = "Script container returned inconsistent failure status"
+                raise ApplicationError(msg, type="ScriptContainerProtocolError", non_retryable=True)
+            return output
+        msg = f"Script container failed ({error.get('code', 'unknown')})"
+        raise ApplicationError(msg, type="ScriptContainerError", non_retryable=not bool(error.get("retryable", False)))
     if result.output is None or result.object_reference:
         msg = "Script container must return inline script output"
         raise ApplicationError(msg, type="ScriptContainerProtocolError", non_retryable=True)
-    output = dict(result.output)
+    output = _validate_script_output(dict(result.output))
+    if result.status_code and output["return_code"] == 0:
+        msg = "Script container returned inconsistent failure status"
+        raise ApplicationError(msg, type="ScriptContainerProtocolError", non_retryable=True)
+    return output
+
+
+def _validate_script_output(output: dict[str, Any]) -> dict[str, Any]:
     if (
         not isinstance(output.get("return_code"), int)
         or isinstance(output.get("return_code"), bool)
@@ -95,10 +117,7 @@ def _script_output(result: ContainerResult) -> dict[str, Any]:
     ):
         msg = "Invalid script container output"
         raise ApplicationError(msg, type="ScriptContainerProtocolError", non_retryable=True)
-    if result.status_code and output["return_code"] == 0:
-        msg = "Script container returned inconsistent failure status"
-        raise ApplicationError(msg, type="ScriptContainerProtocolError", non_retryable=True)
-    return output
+    return {key: output[key] for key in ("return_code", "stdout", "stderr")}
 
 
 def _execute_stream(client: ContainerClient, invocation: ContainerInvocation) -> ContainerResult:

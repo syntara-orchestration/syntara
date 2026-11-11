@@ -106,7 +106,10 @@ async def test_remote_lifecycle(scenario):
     if scenario in {"success", "port_forward"}:
         expected = "127.0.0.1:43210" if scenario == "port_forward" else "10.0.0.2:50051"
         assert invoke.await_args.args[0] == expected
-        assert invoke.await_args.args[1].inputs["code"] == "echo hello"
+        invocation = invoke.await_args.args[1]
+        assert invocation.inputs["code"] == "echo hello"
+        assert "language" not in invocation.inputs
+        assert invocation.step_revision_id == "syntara.script-bash.script-bash"
     if scenario == "port_forward":
         assert port_forward.call_args.args[:2] == (config.base_url, config.namespace)
         forward.__aexit__.assert_awaited_once()
@@ -173,3 +176,50 @@ async def test_container_failure_keeps_output_fields_without_fabricating_logs():
         output = error.value.details[0]["output"]
         for field in ("return_code", "stdout", "stderr", "stdout_json"):
             assert output[field] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language", ["python", "bash"])
+async def test_language_selects_image_and_contract(language):
+    config = OpenShiftConfiguration(
+        base_url="https://cluster.example.com",
+        namespace="scripts",
+        script_image="quay.io/example/syntara-node-script-{language}:test",
+    )
+    requests = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"status": {"phase": "Running", "podIP": "10.0.0.2"}})
+
+    client = httpx.AsyncClient(base_url=config.base_url, transport=httpx.MockTransport(handler))
+    with (
+        patch.object(remote, "_connection", new=AsyncMock(return_value=(config, "secret"))),
+        patch.object(remote.httpx, "AsyncClient", return_value=client),
+        patch.object(remote.activity, "info", return_value=MagicMock()),
+        patch.object(remote.activity, "heartbeat"),
+        patch.object(remote, "get_settings") as settings,
+        patch.object(remote, "invoke_script", new=AsyncMock(return_value={})) as invoke,
+    ):
+        settings.return_value.script_openshift_port_forward = False
+        await remote.execute_openshift_script(language, "code", {"KEY": "value"}, 5, 1000)
+    import json
+
+    pod = json.loads(requests[0].content)
+    assert pod["spec"]["containers"][0]["image"] == f"quay.io/example/syntara-node-script-{language}:test"
+    invocation = invoke.await_args.args[1]
+    assert invocation.step_revision_id == f"syntara.script-{language}.script-{language}"
+    assert invocation.inputs == {"code": "code", "environment": {"KEY": "value"}, "max_output_bytes": 1000}
+
+
+@pytest.mark.asyncio
+async def test_unsupported_language_fails_before_pod_creation():
+    config = OpenShiftConfiguration(base_url="https://cluster.example.com", namespace="scripts", script_image="image")
+    with (
+        patch.object(remote, "_connection", new=AsyncMock(return_value=(config, "secret"))),
+        patch.object(remote.activity, "info", return_value=MagicMock()),
+        patch.object(remote.httpx, "AsyncClient") as client,
+    ):
+        with pytest.raises(ApplicationError, match="Unsupported script language"):
+            await remote.execute_openshift_script("ruby", "puts 1", {}, 5, 1000)
+        client.assert_not_called()

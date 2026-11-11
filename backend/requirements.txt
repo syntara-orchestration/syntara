@@ -906,9 +906,9 @@ structlog==25.5.0 \
     --hash=sha256:098522a3bebed9153d4570c6d0288abf80a031dfdb2048d59a49e9dc2190fc98 \
     --hash=sha256:a8453e9b9e636ec59bd9e79bbd4a72f025981b3ba0f5837aebf48f02f37a7f9f
     # via syntara
-syntara-plugin-contracts==0.1.0a1 \
-    --hash=sha256:7fbdd3b6b471e6d0467fbf79e0c56f6df0fc46a417821c7030b2a6b01436fe03 \
-    --hash=sha256:cbe0af7b4146bd33a678c5017003a08d4387340b3e0093ae81dfea5eb4bb1450
+syntara-plugin-contracts==0.1.0a2 \
+    --hash=sha256:a6436506323fac6d96ef40b95504e9e9f1be2977aa52124756c46633de64dcf6 \
+    --hash=sha256:e3aaabf4ddef6bf730ce8f3c2c212f4b0e0f8bc6a75a7d9291153f0084c49373
     # via syntara
 temporalio==1.34.0 \
     --hash=sha256:540761f738bdfe5cb5bd7240b659e116a0b5094b94282aef09b8d8c2d66e9c52 \
