@@ -38,6 +38,11 @@ COMPOSE_CMD ?= uv run podman-compose
 COMPOSE_ARGS ?= -p $(PODMAN_PROJECT) -f ../podman-compose.yml
 COMPOSE_FINAL_CMD := $(COMPOSE_CMD) $(COMPOSE_ARGS)
 
+# Services started by `make services-run`. The same list is passed to
+# tools/wait_for_services.py, which waits until each one is healthy.
+SERVICES_RUN_SERVICES := database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
+SERVICES_WAIT_TIMEOUT ?= 300
+
 # S2S mTLS configuration for local development
 S2S_TLS_VARS = \
 	APP_S2S_TLS_ENABLED=true \
@@ -478,15 +483,16 @@ run-all: _ensure-secrets _ensure-certs ## Start all services (foreground, Ctrl+C
 	$(COMPOSE_FINAL_CMD) up --build --force-recreate
 
 .PHONY: services-run
-services-run: _ensure-secrets _ensure-certs ## Start all services (database + cache + temporal + UI + worker + background-worker + MCP) in background
+services-run: _ensure-secrets _ensure-certs ## Start all services (database + cache + temporal + UI + worker + background-worker + MCP) in background and wait until healthy
 	@echo "🚀 Starting all services (database + cache + temporal + UI + worker + background-worker + MCP)..."
 	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/syntara_api"
 	@echo "📍 Cache: cache://localhost:$${APP_CACHE_PORT:-6379}"
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
 	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
 	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
-	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
-	@echo "✅ All services started in background"
+	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d $(SERVICES_RUN_SERVICES)
+	@uv run python tools/wait_for_services.py --project $(PODMAN_PROJECT) --timeout $(SERVICES_WAIT_TIMEOUT) $(SERVICES_RUN_SERVICES)
+	@echo "✅ All services started in background and healthy"
 	@echo "   Use 'make services-logs' to view logs"
 	@echo "   Use 'make services-stop' to stop services"
 
