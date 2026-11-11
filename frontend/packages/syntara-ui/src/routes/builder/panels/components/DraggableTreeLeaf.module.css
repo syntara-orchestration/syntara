@@ -1,11 +1,16 @@
 .dragContainer {
   display: flex;
-  align-items: center;
-  gap: var(--pf-t--global--spacer--sm);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--pf-t--global--spacer--xs);
   cursor: grab;
+  max-width: 100%;
 }
 
 .secondaryText {
   color: var(--pf-t--global--color--200);
   font-size: var(--pf-t--global--font--size--sm);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
