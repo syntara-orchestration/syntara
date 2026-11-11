@@ -127,7 +127,7 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     await expect(app.getByRole('button', { name: 'Set up connection', exact: true })).toBeFocused()
     await app.getByRole('textbox', { name: 'Target topic', exact: true }).fill('automation.outcomes')
     await fillCodeEditor(app, { value: 'null', label: 'JSON payload', inputMethod: 'insertText' })
-    await expect(app.getByTestId('inline-code-editor').locator('.monaco-editor')).toHaveAttribute(
+    await expect(app.getByTestId('inline-code-editor').locator('[data-mode-id]')).toHaveAttribute(
       'data-mode-id',
       'json'
     )
@@ -209,14 +209,18 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     const binaryGrip = app.getByRole('button', { name: 'Reorder header 3', exact: true })
     await binaryGrip.scrollIntoViewIfNeeded()
     await binaryGrip.focus()
-    await binaryGrip.press('Space')
+    // dnd-kit attaches its keyboard listener after pickup; let that setup finish before the next key.
+    await binaryGrip.press('Space', { delay: 100 })
     await expect(binaryGrip).toHaveAttribute('aria-pressed', 'true')
-    await app.keyboard.press('ArrowUp')
+    await expect(app.getByText('Header 3 is over position 3 of 3.', { exact: true })).toHaveCount(1)
+    await binaryGrip.press('ArrowUp')
     await expect(app.getByText('Header 3 is over position 2 of 3.', { exact: true })).toHaveCount(1)
-    await app.keyboard.press('Space')
-    await expect(secondGrip).toBeFocused()
+    await binaryGrip.press('Space')
+    await expect(app.getByText('Header 3 dropped at position 2 of 3.', { exact: true })).toHaveCount(1)
     await expect(app.getByRole('textbox', { name: 'Header 2 name', exact: true })).toHaveValue('binary')
     await expect(app.getByRole('textbox', { name: 'Header 2 value', exact: true })).toHaveValue('AAEC')
+    await expect(secondGrip).not.toHaveAttribute('aria-pressed', 'true')
+    await expect(secondGrip).toBeFocused()
     await app.getByRole('textbox', { name: 'Target topic', exact: true }).fill('automation.outcomes.updated')
     await app.getByRole('button', { name: 'Update', exact: true }).click()
     await clickSaveAndWait(app)
@@ -260,7 +264,7 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     await expect(app.getByRole('textbox', { name: 'Header 2 value', exact: true })).toHaveValue('AAEC')
     await expect(app.getByRole('button', { name: 'Header 3 encoding', exact: true })).toContainText('Null')
     await fillCodeEditor(app, { value: '${trigger.payload}', label: 'JSON payload', inputMethod: 'insertText' })
-    await expect(app.getByTestId('inline-code-editor').locator('.monaco-editor')).toHaveAttribute(
+    await expect(app.getByTestId('inline-code-editor').locator('[data-mode-id]')).toHaveAttribute(
       'data-mode-id',
       'plaintext'
     )

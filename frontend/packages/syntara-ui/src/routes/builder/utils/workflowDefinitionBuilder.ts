@@ -1,5 +1,6 @@
 import { ActivityTypeEnum, type Activity } from '@syntara/contracts'
 
+import { getActivityMetadata } from '../../../stores/workflowStoreTypes'
 import { parseExpression } from '../../../utils/expressions/parser'
 import { serializeExpression } from '../../../utils/expressions/serializer'
 import { parseTriggerIndex } from '../../../utils/triggerNodeIds'
@@ -287,6 +288,8 @@ export function buildWorkflowDefinition(params: {
       const inputs = hasInputs(a) ? a.inputs : undefined
 
       const parameters = transformNodeParameters(a.type, a.parameters ?? {})
+      const payloadDraft =
+        a.type === ActivityTypeEnum.KAFKA_PUBLISH ? getActivityMetadata(a)?.__kafkaPublishPayloadDraft : undefined
 
       return {
         id: a.id,
@@ -296,6 +299,7 @@ export function buildWorkflowDefinition(params: {
         ...(a.settings && { settings: a.settings }),
         ...(inputs && { inputs }),
         ...(a.outputs && { outputs: a.outputs }),
+        ...(payloadDraft !== undefined && { metadata: { __kafkaPublishPayloadDraft: payloadDraft } }),
         ...(nodePositions[a.id] ? { position: nodePositions[a.id] } : {}),
       }
     }),
