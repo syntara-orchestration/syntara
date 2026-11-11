@@ -176,6 +176,22 @@ class TestExtractCredentialIds:
         )
         assert WorkflowService._extract_credential_ids(wf) == {"direct-cred", "conn-cred"}
 
+    def test_script_credential_bindings(self) -> None:
+        wf = self._wf(
+            [
+                {
+                    "id": "n1",
+                    "parameters": {
+                        "credential_bindings": [
+                            {"credential_recipe_id": "acme.echo.api-token", "credential_ref": "bound-cred-1"},
+                            {"credential_recipe_id": "acme.echo.workspace-token", "credential_ref": "bound-cred-2"},
+                        ]
+                    },
+                }
+            ]
+        )
+        assert WorkflowService._extract_credential_ids(wf) == {"bound-cred-1", "bound-cred-2"}
+
     def test_node_without_parameters_skipped(self) -> None:
         wf = self._wf([{"id": "n1"}])
         assert WorkflowService._extract_credential_ids(wf) == set()

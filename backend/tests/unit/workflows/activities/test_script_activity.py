@@ -162,6 +162,7 @@ class TestScriptActivityDispatch:
             "step_revision_id": "script.v1",
             "inputs": {"language": "bash", "code": ":"},
             "runtime_context": {},
+            "credential_bindings": [],
             "timeout_seconds": 300,
         }
 

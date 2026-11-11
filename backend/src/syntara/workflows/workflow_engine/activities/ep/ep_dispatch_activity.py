@@ -46,6 +46,7 @@ _STEP_REVISION_ID = "script.v1"
 _DEFAULT_TIMEOUT_SECONDS = 300
 _EXECUTION_PROFILE_FIELD = "execution_profile"
 _EXECUTION_TARGET_SELECTOR_FIELD = "_execution_target_id"
+_CREDENTIAL_BINDINGS_FIELD = "credential_bindings"
 
 
 def _build_invocation(input_config: dict[str, Any], info: Any) -> dict[str, Any]:  # noqa: ANN401
@@ -56,9 +57,10 @@ def _build_invocation(input_config: dict[str, Any], info: Any) -> dict[str, Any]
         "inputs": {
             key: value
             for key, value in input_config.items()
-            if not key.startswith("_") and key != _EXECUTION_PROFILE_FIELD
+            if not key.startswith("_") and key not in {_EXECUTION_PROFILE_FIELD, _CREDENTIAL_BINDINGS_FIELD}
         },
         "runtime_context": {},
+        "credential_bindings": input_config.get(_CREDENTIAL_BINDINGS_FIELD, []),
         "timeout_seconds": int(
             input_config.get(
                 ENGINE_TIMEOUT_SECONDS_KEY,

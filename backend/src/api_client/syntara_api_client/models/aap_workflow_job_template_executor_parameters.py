@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from ..models.aap_workflow_job_template_executor_parameters_extra_vars import (
         AAPWorkflowJobTemplateExecutorParametersExtraVars,
     )
+    from ..models.credential_binding import CredentialBinding
 
 
 T = TypeVar("T", bound="AAPWorkflowJobTemplateExecutorParameters")
@@ -27,6 +28,8 @@ class AAPWorkflowJobTemplateExecutorParameters:
         Attributes:
             credential_id (None | str | Unset): Syntara credential UUID for Ansible Automation Platform API authentication.
                 Separate from legacy credentials list.
+            credential_bindings (list[CredentialBinding] | Unset): Host-side recipe-to-credential bindings for Execution
+                Plane dispatch.
             integration_id (None | str | Unset): UUID of the Ansible Automation Platform Gateway integration for connection
                 URL resolution.
             organization_id (int | None | Unset): Ansible Automation Platform organization ID (takes precedence over
@@ -50,6 +53,7 @@ class AAPWorkflowJobTemplateExecutorParameters:
     """
 
     credential_id: None | str | Unset = UNSET
+    credential_bindings: list[CredentialBinding] | Unset = UNSET
     integration_id: None | str | Unset = UNSET
     organization_id: int | None | Unset = UNSET
     organization_name: None | str | Unset = UNSET
@@ -71,6 +75,13 @@ class AAPWorkflowJobTemplateExecutorParameters:
             credential_id = UNSET
         else:
             credential_id = self.credential_id
+
+        credential_bindings: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.credential_bindings, Unset):
+            credential_bindings = []
+            for credential_bindings_item_data in self.credential_bindings:
+                credential_bindings_item = credential_bindings_item_data.to_dict()
+                credential_bindings.append(credential_bindings_item)
 
         integration_id: None | str | Unset
         if isinstance(self.integration_id, Unset):
@@ -156,6 +167,8 @@ class AAPWorkflowJobTemplateExecutorParameters:
         field_dict.update({})
         if credential_id is not UNSET:
             field_dict["credential_id"] = credential_id
+        if credential_bindings is not UNSET:
+            field_dict["credential_bindings"] = credential_bindings
         if integration_id is not UNSET:
             field_dict["integration_id"] = integration_id
         if organization_id is not UNSET:
@@ -190,6 +203,7 @@ class AAPWorkflowJobTemplateExecutorParameters:
         from ..models.aap_workflow_job_template_executor_parameters_extra_vars import (
             AAPWorkflowJobTemplateExecutorParametersExtraVars,
         )
+        from ..models.credential_binding import CredentialBinding
 
         d = dict(src_dict)
 
@@ -201,6 +215,15 @@ class AAPWorkflowJobTemplateExecutorParameters:
             return cast(None | str | Unset, data)
 
         credential_id = _parse_credential_id(d.pop("credential_id", UNSET))
+
+        _credential_bindings = d.pop("credential_bindings", UNSET)
+        credential_bindings: list[CredentialBinding] | Unset = UNSET
+        if _credential_bindings is not UNSET:
+            credential_bindings = []
+            for credential_bindings_item_data in _credential_bindings:
+                credential_bindings_item = CredentialBinding.from_dict(credential_bindings_item_data)
+
+                credential_bindings.append(credential_bindings_item)
 
         def _parse_integration_id(data: object) -> None | str | Unset:
             if data is None:
@@ -327,6 +350,7 @@ class AAPWorkflowJobTemplateExecutorParameters:
 
         aap_workflow_job_template_executor_parameters = cls(
             credential_id=credential_id,
+            credential_bindings=credential_bindings,
             integration_id=integration_id,
             organization_id=organization_id,
             organization_name=organization_name,

@@ -97,6 +97,7 @@ __all__ = (
     "ConvergeNodeOutputsType0",
     "ConvergeNodeParameters",
     "ConvergeStrategy",
+    "CredentialBinding",
     "CredentialCreate",
     "CredentialCreateInputs",
     "CredentialCreateLabels",

@@ -610,6 +610,23 @@ export interface components {
       y: number
     }
     /**
+     * CredentialBinding
+     * @description Recipe-to-credential mapping for a workflow node.
+     */
+    CredentialBinding: {
+      /**
+       * Credential Recipe Id
+       * @description Qualified credential recipe identifier requested by the workload.
+       */
+      credential_recipe_id: string
+      /**
+       * Credential Ref
+       * Format: uuid
+       * @description Syntara credential selected for the credential recipe.
+       */
+      credential_ref: string
+    }
+    /**
      * AAPVerbosity
      * @description Ansible Automation Platform job verbosity levels (0-5).
      * @enum {integer}
@@ -634,6 +651,11 @@ export interface components {
        * @description Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
        */
       credential_id?: string | null
+      /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
       /**
        * Integration Id
        * @description UUID of the Ansible Automation Platform Gateway integration for connection URL resolution.
@@ -843,6 +865,11 @@ export interface components {
        */
       credential_id?: string | null
       /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
+      /**
        * Integration Id
        * @description UUID of the Ansible Automation Platform Gateway integration for connection URL resolution.
        */
@@ -995,6 +1022,11 @@ export interface components {
        */
       credential_id?: string | null
       /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
+      /**
        * File Ids
        * @description File IDs for agent context
        */
@@ -1086,6 +1118,11 @@ export interface components {
        * @description Syntara credential UUID
        */
       credential_id?: string | null
+      /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
       /**
        * Approver Users
        * @description Usernames who can approve
@@ -1315,6 +1352,11 @@ export interface components {
        * @description Syntara credential UUID for authentication or Secret URL.
        */
       credential_id?: string | null
+      /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
     }
     /**
      * HTTPRequestNode
@@ -1483,6 +1525,11 @@ export interface components {
       environment?: {
         [key: string]: string
       }
+      /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
     }
     /**
      * ScriptNode

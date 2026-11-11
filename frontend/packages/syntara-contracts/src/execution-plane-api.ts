@@ -201,7 +201,7 @@ export interface components {
     }
     /**
      * ExecutionTargetCreate
-     * @description A Kubernetes target on the single cluster provisioned at installation.
+     * @description A Kubernetes target on the single cluster registered at installation.
      */
     ExecutionTargetCreate: {
       /** Name */

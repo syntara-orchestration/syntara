@@ -380,6 +380,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         Extracts from:
         - node.parameters.credential_id (HTTP request, AAP, etc.)
         - node.parameters.integration_connections[].credential_id (Task Agent)
+        - node.parameters.credential_bindings[].credential_ref
         """
         cred_ids: set[str] = set()
         for node in workflow_definition.get("nodes", []):
@@ -389,6 +390,9 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             for conn in params.get("integration_connections") or []:
                 if cred_id := conn.get("credential_id"):
                     cred_ids.add(cred_id)
+            for binding in params.get("credential_bindings") or []:
+                if cred_id := binding.get("credential_ref"):
+                    cred_ids.add(str(cred_id))
         return cred_ids
 
     async def _validate_credential_project_scope(

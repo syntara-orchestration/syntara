@@ -12,9 +12,11 @@ from uuid import UUID, uuid4, uuid5
 
 import pytest
 from execution_plane_client.commands.control import CompletionStatus
+from execution_plane_client.commands.work import WorkExecute
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from temporalio.exceptions import ApplicationError
 
 from syntara.execution_plane import cancellation
 from syntara.execution_plane.commands.completion import CompletionCommandHandler
@@ -147,6 +149,63 @@ async def test_monitor_updates_row_created_after_dispatch(
         assert row is not None
         assert row.status == ActivityStatus.COMPLETED
         assert row.output_data == {"output": {"stdout": "ok"}}
+
+
+@pytest.mark.asyncio
+async def test_dispatch_moves_credential_bindings_out_of_inputs(
+    test_execution: Execution,
+    ep_submission: AsyncMock,
+) -> None:
+    first = uuid4()
+    second = uuid4()
+    input_config = {
+        "language": "bash",
+        "code": "echo ok",
+        "credential_bindings": [
+            {"credential_recipe_id": "acme.echo.api-token", "credential_ref": first},
+            {"credential_recipe_id": "acme.echo.workspace-token", "credential_ref": second},
+        ],
+    }
+
+    await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None)
+
+    first_message = ep_submission.call_args.args[1]
+    payload = WorkExecute.model_validate(first_message.command.payload)
+    assert payload.invocation.inputs == {"language": "bash", "code": "echo ok"}
+    assert payload.invocation.runtime_context == {}
+    assert [
+        (binding.credential_recipe_id, binding.credential_ref) for binding in payload.invocation.credential_bindings
+    ] == [
+        ("acme.echo.api-token", first),
+        ("acme.echo.workspace-token", second),
+    ]
+
+    await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None)
+    second_message = ep_submission.call_args.args[1]
+    assert second_message.command_id == first_message.command_id
+    assert second_message.command.payload == first_message.command.payload
+
+
+@pytest.mark.asyncio
+async def test_dispatch_rejects_unresolved_credential_binding_templates(
+    test_execution: Execution,
+    ep_submission: AsyncMock,
+) -> None:
+    input_config = {
+        "language": "bash",
+        "code": "echo ok",
+        "credential_bindings": [
+            {
+                "credential_recipe_id": "acme.echo.api-token",
+                "credential_ref": "${trigger.credential}",
+            }
+        ],
+    }
+
+    with pytest.raises(ApplicationError, match="invalid for the Execution Plane command protocol"):
+        await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None)
+
+    ep_submission.assert_not_called()
 
 
 @pytest.mark.asyncio
