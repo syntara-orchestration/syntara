@@ -88,9 +88,11 @@ class ActivitySyncEventProcessorMixin:
         ``..._{node.id}_iter_{n}``. The node's aggregate ActivityExecution row is
         already created upfront, so this only registers a pending update keyed to
         the canvas node: the activity's STARTED event drives RUNNING and its
-        COMPLETED event populates runtime_metadata (non-iterated nodes only).
-        Terminal status stays owned by the finalizer (see
-        ``_process_subworkflow_setup_completed``).
+        COMPLETED event populates runtime_metadata. For a ``for_each`` node the
+        ``_subworkflow_iteration`` index is carried through so the sync layer can
+        materialise one run-details row per iteration, each linking to that
+        iteration's child execution (AAP-101640). Terminal status stays owned by
+        the finalizer (see ``_process_subworkflow_setup_completed``).
         """
         invocation_node_id = activity_id[len(self._SUBWORKFLOW_SETUP_PREFIX) :]
         iteration_number = innermost_iteration_index(invocation_node_id)
@@ -239,10 +241,14 @@ class ActivitySyncEventProcessorMixin:
         setup_result = self._decode_setup_result(attrs, self.temporal_client.data_converter.payload_codec)
         if setup_result is not None:
             update["_subworkflow_io"] = self._build_subworkflow_io(setup_result)
-            if update.get("_subworkflow_iteration") is None:
-                child_metadata = self._child_runtime_metadata(setup_result)
-                if child_metadata is not None:
-                    update["runtime_metadata"] = child_metadata
+            # Surface the child link on every row: the single aggregate row for a
+            # non-looped node, and one row per iteration for a for_each. Each
+            # iteration's setup result carries its own child execution id, so the
+            # per-iteration rows resolve to distinct child runs (AAP-101640). The
+            # sync layer routes this to the matching per-iteration row.
+            child_metadata = self._child_runtime_metadata(setup_result)
+            if child_metadata is not None:
+                update["runtime_metadata"] = child_metadata
         metadata.pending_sync_event_ids.add(scheduled_id)
 
     @staticmethod
