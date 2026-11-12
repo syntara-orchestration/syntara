@@ -14,6 +14,7 @@ import { SynReactFlowViewportGuard } from '../../components/layout/SynReactFlowV
 import { SynStepExpandedAllContext } from '../../components/steps/SynStepExpandedAllContext'
 import { useSearchParams } from '../../hooks/routing/useSearchParams'
 import { useCursorPagination } from '../../hooks/useCursorPagination'
+import { useNodeKindsQuery } from '../../hooks/useNodeKindsQuery'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useAlerts } from '../../providers/alerts'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
@@ -56,8 +57,10 @@ import { useUndoRedoKeyboard } from './hooks/useUndoRedoKeyboard'
 import { useWorkflowMetadata } from './hooks/useWorkflowMetadata'
 import { SaveBeforeViewDialog } from './SaveBeforeViewDialog'
 import { StepActionsContext } from './StepActionsContext'
+import { STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP, stepTypeBlockedMessage } from './stepTypePaletteGating'
 import type { BuilderContentProps } from './types/builderContent'
 import { useBuilderPermissions } from './useBuilderPermissions'
+import type { PendingImportData } from './useWorkflowImportExport'
 import { createAddStepHandler } from './utils/panelActions'
 import { buildWorkflowDefinition, transformStepParameters } from './utils/workflowDefinitionBuilder'
 import { ValidationBanner } from './ValidationBanner'
@@ -304,7 +307,7 @@ export function BuilderContent(props: BuilderContentProps) {
     if (suppressPanelCloseRef.current) return
     dispatch({ type: 'CLOSE_NODE_EDITOR' })
   }, [dispatch, suppressPanelCloseRef])
-  const [pendingImport, setPendingImport] = useState<import('./useWorkflowImportExport').PendingImportData | null>(null)
+  const [pendingImport, setPendingImport] = useState<PendingImportData | null>(null)
   const {
     handleRunWorkflow,
     handleDeleteWorkflow,
@@ -515,6 +518,60 @@ export function BuilderContent(props: BuilderContentProps) {
     onVersionUpdated,
   })
 
+  const builderProjectId = workflow?.project_id ?? selectedProject?.id ?? stableProjectId
+  const builderPermissions = useBuilderPermissions(isNew, currentWorkflow?.is_builtin === true, builderProjectId)
+  // Step-type verdicts for this project: one cached request shared with the
+  // add-step panel. Drives the duplicate and import-paste guards below.
+  const { nodeKindByKind: stepTypeVerdicts, isUnavailable: stepTypePermissionsUnavailable } =
+    useNodeKindsQuery(builderProjectId)
+
+  // Refuse duplicating or pasting a blocked step type on the canvas, with the
+  // same message the palette tooltip shows. The server still rejects the save.
+  const blockedStepTypeMessage = useCallback(
+    (kind: string): string | null => {
+      if (stepTypePermissionsUnavailable) return STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP
+      const verdict = stepTypeVerdicts.get(kind)
+      if (!verdict || verdict.can_write) return null
+      return verdict.blocked_by ? stepTypeBlockedMessage(verdict.blocked_by) : STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP
+    },
+    [stepTypeVerdicts, stepTypePermissionsUnavailable]
+  )
+
+  const handleDuplicateStep = useCallback(
+    (nodeId: string) => {
+      const activities = currentWorkflow?.workflow.activities ?? []
+      const activity = activities.find((a) => a.id === nodeId)
+      const kind = activity?.type
+      if (kind) {
+        const refusal = blockedStepTypeMessage(kind)
+        if (refusal) {
+          showError({ title: 'Cannot duplicate step', description: refusal })
+          return
+        }
+      }
+      duplicateActivity(nodeId)
+    },
+    [currentWorkflow, blockedStepTypeMessage, duplicateActivity, showError]
+  )
+
+  const getImportRefusal = useCallback(
+    (data: PendingImportData): string | null => {
+      if (stepTypePermissionsUnavailable) return STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP
+      const kinds = new Set<string>()
+      for (const activity of data.workflowDef.workflow.activities ?? []) {
+        if (activity.type) kinds.add(activity.type)
+      }
+      for (const trigger of data.workflowDef.triggers ?? []) {
+        if (trigger.type) kinds.add(trigger.type)
+      }
+      for (const kind of kinds) {
+        const refusal = blockedStepTypeMessage(kind)
+        if (refusal) return refusal
+      }
+      return null
+    },
+    [stepTypePermissionsUnavailable, blockedStepTypeMessage]
+  )
   const {
     handleNodeClick,
     handleClearDesiredPosition,
@@ -525,7 +582,7 @@ export function BuilderContent(props: BuilderContentProps) {
   } = useBuilderFlowInteractionHandlers({
     reactFlowInstance,
     dispatch,
-    duplicateActivity,
+    duplicateActivity: handleDuplicateStep,
     edgeIdToReplace,
     targetNodeId,
     sourceHandle,
@@ -551,10 +608,7 @@ export function BuilderContent(props: BuilderContentProps) {
     handleNodeClick,
     isLiveRunActive,
   })
-  // UUID only — StepDetailsPanel / CredentialSelector / integrations filter by project_id.
-  // can_i also accepts UUID (backend resolves to project name).
-  const builderProjectId = workflow?.project_id ?? selectedProject?.id ?? stableProjectId
-  const builderPermissions = useBuilderPermissions(isNew, currentWorkflow?.is_builtin === true, builderProjectId)
+
   const triggers = currentWorkflow?.triggers ?? []
   const nodeExpandedAllContextValue = useMemo(
     () => ({ expandAllEvent, collapseAllEvent }),
@@ -579,6 +633,7 @@ export function BuilderContent(props: BuilderContentProps) {
     createWorkflow: createWorkflow,
     setLocation,
     pinnedMockDataForDialog,
+    getImportRefusal,
   })
   return (
     <StepActionsContext.Provider value={stepActionsValue}>
@@ -709,6 +764,7 @@ export function BuilderContent(props: BuilderContentProps) {
                     sourceNodeId={sourceNodeId}
                     replacementNodeId={replacementNodeId}
                     hasNoWorkflowSteps={hasNoWorkflowSteps}
+                    projectId={builderProjectId}
                     dispatch={dispatch}
                     historyCardOpen={historyCardOpen}
                     isNew={isNew}

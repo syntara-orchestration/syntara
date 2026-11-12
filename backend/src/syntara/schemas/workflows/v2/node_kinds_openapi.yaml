@@ -1,0 +1,183 @@
+---
+openapi: 3.1.0
+info:
+  title: Workflow Node Kinds API
+  description: |
+    Project-scoped step-type permissions for the workflow builder.
+
+    ## Step types
+
+    A step type (node kind) is the `type` of a node inside a workflow
+    definition. Kinds are grouped into three categories:
+
+    - **trigger** — entry points that start a run (manual, scheduled, webhook, EDA)
+    - **flow_control** — routing nodes (condition, converge, loop, switch, wait)
+    - **action** — units of work (script, HTTP request, agentic, approval,
+      Ansible Automation Platform job templates)
+
+    ## Verdicts, not switches
+
+    `GET /node_kinds?project_id=<uuid>` reports, for the calling principal in
+    one project, every registered step type with its `step_type:write` verdict
+    (`can_write`) and, when blocked, the policy that blocks it (`blocked_by`).
+    The caller's own verdicts only — the endpoint never mutates anything, so
+    it has no kill-switch write route. Restricting a step type is a deny-effect
+    policy on `step_type:write`; the endpoint is read-only and reflects the
+    same authorization evaluation the workflow save path enforces.
+  version: 1.0.0
+  contact:
+    name: Orchestrator Team
+
+servers:
+  - url: /api/v1
+    description: API server (relative path)
+
+tags:
+  - name: Node Kinds
+    description: Step-type registry with the caller's per-project write verdicts
+
+paths:
+  /node_kinds:
+    get:
+      summary: List step types with the caller's write verdicts
+      description: |
+        List every registered step type with the caller's own write verdicts.
+
+        Requires authentication but no specific permission: the response is scoped
+        to the caller and describes reference data plus the caller's own verdicts
+        in the requested project. One request evaluates every step type, so the
+        add-step panel never needs per-kind ``can_i`` calls.
+      operationId: list_node_kinds
+      tags:
+        - Node Kinds
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: null
+        action: null
+      parameters:
+        - name: project_id
+          in: query
+          required: true
+          description: Project the verdicts are evaluated in
+          schema:
+            type: string
+            format: uuid
+            description: Project the verdicts are evaluated in
+            title: Project Id
+      responses:
+        '200':
+          description: Step type registry with the caller's write verdicts in the project
+          content:
+            application/json:
+              schema:
+                type: array
+                title: Response List Node Kinds
+                items:
+                  $ref: '#/components/schemas/StepTypePermissionRead'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        '429':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError'
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    StepTypeBlockedBy:
+      type: object
+      title: StepTypeBlockedBy
+      description: |
+        Why the caller may not author one step type (the P2 Blocked step type shape).
+
+        Attributes:
+            kind: The step type identifier.
+            label: Human-readable step type label.
+            reason: ``explicit_deny`` when a deny policy matched, ``no_matching_allow``
+                when no allow covers the kind.
+            policy: Originating policy display name, or ``None`` for a missing allow.
+            scope: Scope of the matching effective deny statement (``any`` or
+                ``project``), or ``None`` for a missing allow.
+            project: Project name for a project-scoped deny, ``None`` for a global
+                deny (and for a missing allow, where the evaluated project name is
+                reported instead).
+      properties:
+        kind:
+          type: string
+          title: Kind
+        label:
+          type: string
+          title: Label
+        reason:
+          type: string
+          title: Reason
+        policy:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Policy
+        scope:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Scope
+        project:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Project
+      required:
+        - kind
+        - label
+        - reason
+
+    StepTypePermissionRead:
+      type: object
+      title: StepTypePermissionRead
+      description: |
+        One step type as the calling principal sees it in one project.
+
+        Attributes:
+            kind: The step type identifier (a ``NodeType`` value).
+            category: Registry grouping (trigger, flow_control or action).
+            can_write: The caller's own ``step_type:write`` verdict for this kind
+                in the requested project.
+            blocked_by: Why the kind is blocked, or ``None`` when it is not.
+      properties:
+        kind:
+          type: string
+          title: Kind
+        category:
+          type: string
+          title: Category
+        can_write:
+          type: boolean
+          title: Can Write
+        blocked_by:
+          anyOf:
+            - $ref: '#/components/schemas/StepTypeBlockedBy'
+            - type: 'null'
+      required:
+        - kind
+        - category
+        - can_write
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token authentication
+
+security:
+  - bearerAuth: []

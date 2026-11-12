@@ -3,9 +3,11 @@ import { RhUiCloseIcon, RhUiArrowLeftIcon, RhUiAddSquareIcon } from '@patternfly
 import { useMemo, useState, type ReactNode } from 'react'
 
 import { SynPanel } from '../../components/layout/SynPanel'
+import { useNodeKindsQuery } from '../../hooks/useNodeKindsQuery'
 
 import { StepRegistry } from './registry/StepRegistry'
 import { StepTypeOptionsList } from './StepTypeOptionsList'
+import { gatePaletteEntries } from './stepTypePaletteGating'
 
 type AddStepPanelHeaderProps = {
   panelTitle: string
@@ -78,15 +80,18 @@ type AddStepPanelProps = {
   hasNoWorkflowSteps?: boolean
   /** React Flow node ID to replace (generic placeholder → real step). */
   replacementNodeId?: string | null
+  /** Project whose step-type denies the palette reflects (R18). */
+  projectId?: string | null
 }
 
 export function AddStepPanel(props: AddStepPanelProps) {
   const [selectedStepType, setSelectedStepType] = useState<string | null>(null)
+  const { nodeKindByKind, isUnavailable } = useNodeKindsQuery(props.projectId)
 
   // Registered step types from StepRegistry
   // Omit triggers when adding from an edge (sourceNodeId) or replacing a generic step (replacementNodeId)
   // because triggers cannot be connection targets
-  const stepTypes = useMemo(() => {
+  const registeredStepTypes = useMemo(() => {
     const allSteps = StepRegistry.getAll()
     if (props.hasNoWorkflowSteps) {
       return allSteps.filter((step) => step.category === 'trigger')
@@ -96,6 +101,15 @@ export function AddStepPanel(props: AddStepPanelProps) {
     }
     return allSteps
   }, [props.replacementNodeId, props.hasNoWorkflowSteps, props.sourceNodeId])
+
+  // Step types the caller may not author stay listed but inert, with a tooltip
+  // naming the blocking policy. Steps already on the canvas are unaffected.
+  // When the permissions endpoint fails the gate fails closed: the panel never
+  // claims everything is allowed.
+  const stepTypes = useMemo(
+    () => gatePaletteEntries(registeredStepTypes, nodeKindByKind, isUnavailable),
+    [registeredStepTypes, nodeKindByKind, isUnavailable]
+  )
 
   const handleStepClick = (stepTypeId: string) => {
     const stepDefinition = StepRegistry.get(stepTypeId)
@@ -111,6 +125,16 @@ export function AddStepPanel(props: AddStepPanelProps) {
   const enforcedSelectedStepType = props.hasNoWorkflowSteps ? 'trigger' : selectedStepType
   const selectedStep = enforcedSelectedStepType ? StepRegistry.get(enforcedSelectedStepType) : null
   const isShowingSubtypeList = !!selectedStep?.subtypes?.length
+  const gatedSubtypes = selectedStep?.subtypes?.length
+    ? gatePaletteEntries(
+        selectedStep.subtypes
+          .map((subtype, index) => ({ subtype, index }))
+          .sort((a, b) => (a.subtype.order ?? a.index) - (b.subtype.order ?? b.index))
+          .map(({ subtype }) => subtype),
+        nodeKindByKind,
+        isUnavailable
+      )
+    : []
 
   const panelTitle =
     isShowingSubtypeList && selectedStep ? (selectedStep.selectionTitle ?? 'Select a step') : 'Add step'
@@ -151,10 +175,7 @@ export function AddStepPanel(props: AddStepPanelProps) {
           <Stack hasGutter>
             {selectedStep?.subtypes?.length ? (
               <StepTypeOptionsList
-                stepTypes={selectedStep.subtypes
-                  .map((subtype, index) => ({ subtype, index }))
-                  .sort((a, b) => (a.subtype.order ?? a.index) - (b.subtype.order ?? b.index))
-                  .map(({ subtype }) => subtype)}
+                stepTypes={gatedSubtypes}
                 onSelect={(subtypeId) => {
                   props.onSelectStep(selectedStep.id, subtypeId)
                   setSelectedStepType(null)

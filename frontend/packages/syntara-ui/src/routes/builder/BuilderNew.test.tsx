@@ -17,6 +17,17 @@ vi.mock('../../client', () => ({
   },
 }))
 
+// The builder reads step-type verdicts; gating itself is covered by
+// AddStepPanel.stepTypeGating.test.tsx.
+vi.mock('../../hooks/useNodeKindsQuery', () => ({
+  useNodeKindsQuery: () => ({
+    query: { isPending: false },
+    nodeKinds: [],
+    nodeKindByKind: new Map(),
+    isUnavailable: false,
+  }),
+}))
+
 vi.mock('./BuilderContent', () => ({
   BuilderContent: () => <div data-testid="builder-content" />,
 }))

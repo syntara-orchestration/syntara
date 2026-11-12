@@ -18,6 +18,17 @@ vi.mock('./registry/StepRegistry', () => ({
   },
 }))
 
+// Step-type gating is covered by AddStepPanel.stepTypeGating.test.tsx; keep the
+// registry empty here so every palette entry stays ungated.
+vi.mock('../../hooks/useNodeKindsQuery', () => ({
+  useNodeKindsQuery: () => ({
+    query: { isPending: false },
+    nodeKinds: [],
+    nodeKindByKind: new Map(),
+    isUnavailable: false,
+  }),
+}))
+
 const mockStepTypes = [
   {
     id: 'action',
