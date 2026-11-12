@@ -169,9 +169,9 @@ class EventDeliveryTerminalLookup:
         return await self._operation(read, self._read_circuit)
 
     async def _populate_terminal(self, terminal: TerminalDelivery) -> None:
-        # No-trigger discard safeguards and author-accessible rejection logging
-        # are not available in M1. Internal rejected rows never become proofs.
-        if terminal.state != DeliveryState.SCHEDULED:
+        # CEL skips have no durable proof. Content rejections are cacheable only
+        # after this provider has verified their committed database evidence.
+        if terminal.state not in {DeliveryState.SCHEDULED, DeliveryState.REJECTED}:
             return
 
         async def write() -> None:
@@ -187,11 +187,15 @@ class EventDeliveryTerminalLookup:
                     cache_epoch=self.policy.cache_epoch,
                     identity=terminal.identity,
                     identity_digest=terminal.identity.digest,
-                    outcome=DeliveryState.SCHEDULED,
+                    outcome=(
+                        DeliveryState.SCHEDULED if terminal.state == DeliveryState.SCHEDULED else DeliveryState.REJECTED
+                    ),
                     resolved_at=terminal.resolved_at,
                     valid_until=deadline,
                     execution_id=terminal.execution_id,
-                    temporal_workflow_id=terminal.identity.temporal_workflow_id,
+                    temporal_workflow_id=(
+                        terminal.identity.temporal_workflow_id if terminal.state == DeliveryState.SCHEDULED else None
+                    ),
                     temporal_run_id=terminal.temporal_run_id,
                     execution_confirmed_at=terminal.execution_confirmed_at,
                 )
@@ -216,9 +220,8 @@ class EventDeliveryTerminalLookup:
             if terminal.identity != identity:
                 msg = "Committed terminal evidence does not match the requested identity"
                 raise ValueError(msg)
-            if terminal.state in {DeliveryState.FILTERED, DeliveryState.REJECTED}:
-                # Existing internal rows are not evidence that the deferred
-                # discard safeguards have been met. Preserve them, fail closed.
+            if terminal.state == DeliveryState.FILTERED:
+                # CEL skips are assignment-local completions, not cache proofs.
                 return None
             await self._populate_terminal(terminal)
         return terminal
@@ -231,6 +234,10 @@ class EventDeliveryTerminalLookup:
         """
         terminal = await self._read_proof(identity)
         return terminal if terminal is not None else await self._committed_terminal(identity)
+
+    async def lookup_cached(self, identity: DeliveryIdentity) -> TerminalDelivery | None:
+        """Read a trusted proof without turning a miss into per-record database work."""
+        return await self._read_proof(identity)
 
     async def populate(self, identity: DeliveryIdentity) -> None:
         """Post-commit scheduling hook: independently read committed evidence.

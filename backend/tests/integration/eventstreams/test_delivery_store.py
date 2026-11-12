@@ -11,6 +11,7 @@ from sqlalchemy import func, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 
+from syntara.eventstreams.adapters.kafka_delivery_reader import KafkaDeliveryReader
 from syntara.eventstreams.core.deduplication import (
     ClaimBusy,
     ClaimLost,
@@ -84,13 +85,20 @@ async def test_inspection_claim_keeps_aware_timestamps_after_persistence(
         assert row.last_error_code == CONTENT_INSPECTION_PENDING
         assert row.next_attempt_at.tzinfo is not None
         failure = EventDecodeFailure(code=EventFailureCode.invalid_json) if invalid_payload else None
-        assert await EventDeliveryStore(session).finish_inspection(claim, failure) is None
+        finished = await EventDeliveryStore(session).finish_inspection(claim, failure, expected=context.expectation())
+        if invalid_payload:
+            assert isinstance(finished, TerminalDelivery)
+            assert finished.state == DeliveryState.REJECTED
+        else:
+            assert finished is None
 
     async with context.session_factory() as session:
         row = await session.get(EventDelivery, identity.digest)
         assert row is not None
         assert row.next_attempt_at.tzinfo is not None
         assert row.last_error_code == (EventFailureCode.invalid_json.value if invalid_payload else CONTENT_VALIDATED)
+        assert row.state == (DeliveryState.REJECTED if invalid_payload else DeliveryState.IN_PROGRESS)
+        assert (row.resolved_at is not None) is invalid_payload
 
 
 async def test_preparation_freezes_real_platform_execution(delivery_context: DeliveryContext) -> None:
@@ -109,6 +117,34 @@ async def test_preparation_freezes_real_platform_execution(delivery_context: Del
         assert row.resolved_at is None
         assert row.frozen_binding == claim.binding
         assert "input_data" not in row.model_dump()
+
+
+async def test_rolled_back_content_rejection_is_not_terminal(delivery_context: DeliveryContext) -> None:
+    context = delivery_context
+    async with context.session_factory() as session, session.begin():
+        claim = await EventDeliveryStore(session).acquire_inspection(
+            context.identity(), context.expectation(), "worker"
+        )
+        assert isinstance(claim, DeliveryClaim)
+    with pytest.raises(RuntimeError, match="rollback rejection"):
+        async with context.session_factory() as session, session.begin():
+            proof = await EventDeliveryStore(session).finish_inspection(
+                claim,
+                EventDecodeFailure(code=EventFailureCode.invalid_json),
+                expected=context.expectation(),
+            )
+            assert isinstance(proof, TerminalDelivery)
+            message = "rollback rejection"
+            raise RuntimeError(message)
+    async with context.session_factory() as session:
+        row = await session.get(EventDelivery, context.identity().digest)
+        assert row is not None
+        assert row.state == DeliveryState.IN_PROGRESS
+        assert row.resolved_at is None
+        assert row.last_error_code == CONTENT_INSPECTION_PENDING
+    reader = KafkaDeliveryReader(context.session_factory)
+    assert await reader.first_pending(context.snapshot, 0) == context.identity()
+    assert await reader.has_content_gate(context.snapshot, 0)
 
 
 async def test_first_attempt_and_counter_persist(delivery_context: DeliveryContext) -> None:

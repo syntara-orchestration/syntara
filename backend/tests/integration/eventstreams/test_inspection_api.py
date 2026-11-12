@@ -91,6 +91,8 @@ async def _publish(
     credential: Credential,
     topics: dict[str, str],
     version_number: int,
+    *,
+    filter_configuration: dict[str, object] | None = None,
 ) -> dict[str, EventSubscription]:
     version = WorkflowVersion(
         workflow_id=workflow.id,
@@ -110,6 +112,7 @@ async def _publish(
                         "integration_id": str(integration.id),
                         "credential_id": str(credential.id),
                         "topic": topic,
+                        **({"filter": filter_configuration} if filter_configuration is not None else {}),
                     },
                 }
                 for node, topic in topics.items()
@@ -285,6 +288,44 @@ def _connection() -> MagicMock:
     )
     connection.close = AsyncMock()
     return connection
+
+
+@pytest.mark.parametrize("read_route", ["list", "detail"])
+@pytest.mark.parametrize(
+    "filter_configuration",
+    [
+        None,
+        {
+            "expression": "input.payload.value.severity == 'critical'",
+        },
+    ],
+    ids=["unfiltered", "filtered"],
+)
+async def test_read_routes_return_persisted_published_filter(
+    scenario: InspectionScenario, read_route: str, filter_configuration: dict[str, object] | None
+) -> None:
+    subscriptions = await _publish(
+        scenario.session,
+        scenario.user,
+        scenario.workflow,
+        scenario.integration,
+        scenario.runtime,
+        {"incoming": "alerts.incoming"},
+        1,
+        filter_configuration=filter_configuration,
+    )
+    subscription = subscriptions["incoming"]
+    subscription_id = subscription.id
+    await scenario.session.commit()
+    scenario.session.expunge(subscription)
+
+    url = scenario.url if read_route == "list" else f"{scenario.url}/{subscription_id}"
+    response = await scenario.client.get(url)
+
+    assert response.status_code == 200, response.text
+    resource = response.json()["resources"][0] if read_route == "list" else response.json()
+    assert resource["id"] == str(subscription_id)
+    assert resource["filter"] == filter_configuration
 
 
 @pytest.mark.usefixtures("published_subscriptions")

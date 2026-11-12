@@ -249,6 +249,10 @@ class TerminalDeliveryCache(Protocol):
         """
         ...
 
+    async def lookup_cached(self, identity: DeliveryIdentity) -> TerminalDelivery | None:
+        """Read only a validated cache proof; a miss performs no database lookup."""
+        ...
+
     async def populate(self, identity: DeliveryIdentity) -> None:
         """After scheduling commit, read committed evidence before best-effort caching."""
         ...

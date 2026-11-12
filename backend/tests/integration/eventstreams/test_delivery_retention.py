@@ -218,23 +218,30 @@ async def test_cleanup_batch_is_bounded(delivery_context: DeliveryContext) -> No
         assert (await session.exec(select(func.count()).select_from(EventDelivery))).one() == 1
 
 
-async def test_invalid_proof_falls_back_without_caching_internal_rejection(delivery_context: DeliveryContext) -> None:
+@pytest.mark.parametrize("age", [0, 7200], ids=["fresh", "expired"])
+async def test_invalid_proof_falls_back_to_committed_rejection(delivery_context: DeliveryContext, age: int) -> None:
+    """Keep durable rejection evidence usable when cached proof is invalid or unavailable."""
     context = delivery_context
     cache = AsyncMock()
     cache.get.return_value = context.identity().digest
     policy = DeliveryEvidencePolicy(enabled=True, cache_epoch=uuid4(), clock_error_bound_seconds=0.25)
     lookup = EventDeliveryTerminalLookup(context.session_factory, cache=cache, policy=policy)
     assert await lookup.lookup(context.identity()) is None
-    await terminal(context)
+    await terminal(context, age=age)
     cache.put.side_effect = TimeoutError()
     result = await lookup.lookup(context.identity())
-    assert result is None
+    assert isinstance(result, TerminalDelivery)
+    assert result.identity == context.identity()
+    assert result.state == DeliveryState.REJECTED
     async with context.session_factory() as session, session.begin():
         row = await session.get(EventDelivery, context.identity().digest)
         assert row is not None
         assert row.state == DeliveryState.REJECTED
     assert cache.get.await_count == 2
-    cache.put.assert_not_awaited()
+    if age == 0:
+        cache.put.assert_awaited_once()
+    else:
+        cache.put.assert_not_awaited()
 
 
 async def test_downgrade_refuses_retained_evidence(delivery_context: DeliveryContext) -> None:

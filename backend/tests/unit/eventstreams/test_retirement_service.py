@@ -76,15 +76,25 @@ async def test_cancel_rejects_every_uncertain_or_accepted_prior_start(uncertaint
     session.commit.assert_not_awaited()
 
 
-@pytest.mark.parametrize("code", [CONTENT_INSPECTION_PENDING, "invalid_json", "activity_log_unavailable"])
+@pytest.mark.parametrize("code", [CONTENT_INSPECTION_PENDING, "invalid_json"])
 async def test_known_content_errors_cannot_be_discarded(code):
     row = delivery()
     row.last_error_code = code
-    if code == "activity_log_unavailable":
-        row.state = DeliveryState.REJECTED
     session = MagicMock(spec=AsyncSession)
-    with pytest.raises(EventSubscriptionControlConflictError, match="activity_log"):
+    with pytest.raises(EventSubscriptionControlConflictError, match="content_resolution_pending"):
         await cancel_unstarted(session, row, NOW)
+    session.get.assert_not_awaited()
+
+
+async def test_committed_content_rejection_needs_no_activity_log_and_is_preserved():
+    row = delivery()
+    row.state = DeliveryState.REJECTED
+    row.resolved_at = NOW
+    row.last_error_code = "invalid_json"
+    original = row.model_dump()
+    session = MagicMock(spec=AsyncSession)
+    await cancel_unstarted(session, row, NOW)
+    assert row.model_dump() == original
     session.get.assert_not_awaited()
 
 

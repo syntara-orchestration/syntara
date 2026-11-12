@@ -38,6 +38,7 @@ def test_valid_parameters(parameters: dict[str, Any]) -> None:
     assert config.credential_id == UUID(parameters["credential_id"])
     assert config.topic == parameters["topic"]
     assert config.input_schema is None
+    assert config.filter is None
 
 
 def test_structural_pass_is_transport_neutral(parameters: dict[str, Any]) -> None:
@@ -67,7 +68,6 @@ def test_required_fields(parameters: dict[str, Any], field: str) -> None:
         "execution_service_account_id",
         "selected_account_id",
         "authorized_service_account_ids",
-        "filter",
         "bootstrap_servers",
     ],
 )
@@ -126,6 +126,7 @@ def test_base_schema_fields() -> None:
         "credential_id",
         "topic",
         "input_schema",
+        "filter",
     }
 
 

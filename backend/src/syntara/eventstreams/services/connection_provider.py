@@ -56,7 +56,7 @@ class EventConnectionProvider:
         ):
             msg = "Frozen event runtime references are unavailable"
             raise SafeValueError(msg)
-        snapshot = SubscriptionSnapshot.from_models(subscription, source).model_copy(
+        snapshot = SubscriptionSnapshot.from_models(subscription, source, prepare_filter=False).model_copy(
             update={
                 "runtime_credential_id": claim.binding.runtime_credential_id,
             }

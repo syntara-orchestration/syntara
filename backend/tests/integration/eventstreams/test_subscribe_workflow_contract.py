@@ -12,7 +12,10 @@ from syntara.core.exceptions import SafeValueError
 from syntara.eventstreams.adapters.kafka_metadata import KafkaSourceMetadata
 from syntara.eventstreams.adapters.subscribe_parameters import validate_event_subscribe_parameters
 from syntara.eventstreams.core.envelope import RawEvent, RawEventHeader
+from syntara.eventstreams.core.filter_input import EventFilterInput
+from syntara.eventstreams.core.filtering import PreparedSubscriptionFilter
 from syntara.eventstreams.core.serialization import EventDecodeSuccess, JsonEventDecoder, encode_envelope
+from syntara.filtering.models.result import FilterOutcome
 from syntara.workflows.validators.workflow_definition import WorkflowValidator
 from syntara.workflows.workflow_engine.activities.event_subscribe_trigger import event_subscribe_trigger
 
@@ -44,7 +47,20 @@ def definition() -> dict[str, Any]:
     }
 
 
-async def test_definition_to_envelope_output_mapping(definition: dict[str, Any]) -> None:
+@pytest.mark.parametrize(
+    "filter_configuration",
+    [
+        None,
+        {
+            "expression": "input.payload.value.count == 2",
+        },
+    ],
+)
+async def test_definition_to_envelope_output_mapping(
+    definition: dict[str, Any], filter_configuration: dict[str, Any] | None
+) -> None:
+    if filter_configuration is not None:
+        definition["triggers"][0]["parameters"]["filter"] = filter_configuration
     WorkflowValidator().validate_workflow_definition(definition)
     assert WorkflowValidator().collect_findings(definition).error_count == 0
     config = validate_event_subscribe_parameters(definition["triggers"][0]["parameters"])
@@ -63,8 +79,15 @@ async def test_definition_to_envelope_output_mapping(definition: dict[str, Any])
         ),
     )
     before = source.model_copy(deep=True)
+    prepared = PreparedSubscriptionFilter(config.filter) if config.filter is not None else None
+    if prepared is not None:
+        assert prepared.precheck(EventFilterInput.from_event(source)).outcome == FilterOutcome.MATCH
     decoded = JsonEventDecoder().decode(source, schema=config.input_schema)
     assert isinstance(decoded, EventDecodeSuccess)
+    decoded_before = decoded.envelope.model_copy(deep=True)
+    if prepared is not None:
+        assert prepared.evaluate(EventFilterInput.from_event(source, decoded)).outcome == FilterOutcome.MATCH
+    assert decoded.envelope == decoded_before
     envelope = json.loads(encode_envelope(decoded.envelope))
     frozen = copy.deepcopy(envelope)
     assert await event_subscribe_trigger(envelope, None) == {"output": frozen}
@@ -96,6 +119,13 @@ async def test_definition_to_envelope_output_mapping(definition: dict[str, Any])
         ("input_schema", {"$ref": "https://example.com/schema"}),
         ("input_schema", {"type": "invalid"}),
         ("input_schema", {"type": "string", "pattern": "(a+)+"}),
+        ("filter", {"format_version": 2}),
+        ("filter", {"key": {"pattern": r"invalid\q"}}),
+        ("filter", {"key": {"pattern": "trailing\\"}}),
+        ("filter", {"headers": {"operator": "and", "children": []}}),
+        ("filter", {"expression": "input =="}),
+        ("filter", {"expression": "unknown(input)"}),
+        ("filter", {"expression": "message.payload"}),
     ],
 )
 def test_definition_boundaries_reject_invalid_parameters(
@@ -214,3 +244,12 @@ async def test_cloudevents_definition_to_envelope_output_mapping(definition: dic
     ]
     assert envelope == frozen
     assert source == before
+
+
+def test_expression_is_not_subject_to_the_old_filter_length_limit(definition: dict[str, Any]) -> None:
+    expression = " " * 9000 + "true"
+    definition["triggers"][0]["parameters"]["filter"] = {"expression": expression}
+    WorkflowValidator().validate_workflow_definition(definition)
+    config = validate_event_subscribe_parameters(definition["triggers"][0]["parameters"])
+    assert config.filter is not None
+    assert config.filter.expression == expression

@@ -1,8 +1,10 @@
 """Compose durable record processing without transport or process ownership."""
 
 from collections.abc import Callable
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 
+import structlog
 from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -10,19 +12,20 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.core.config.base import get_settings
 from syntara.core.constants import EventSchedulingDefaults
 from syntara.core.exceptions import SyntaraError
+from syntara.eventstreams.adapters.record_identity import record_matches_metadata
 from syntara.eventstreams.core.deduplication import (
     ClaimBusy,
     ClaimLost,
     DeliveryClaim,
     DeliveryExpectation,
     DeliveryIdentity,
-    DeliveryState,
     RevisionChanged,
     StorageBackpressure,
     TerminalDelivery,
     TerminalDeliveryCache,
 )
 from syntara.eventstreams.core.envelope import RawEvent, WorkflowEventEnvelope
+from syntara.eventstreams.core.filter_input import EventFilterInput, FilterPayload
 from syntara.eventstreams.core.handler import ResolvedDelivery, RetryDelivery, SchedulingFailureCode
 from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.core.processing import (
@@ -30,6 +33,7 @@ from syntara.eventstreams.core.processing import (
     HeldRecord,
     InspectedRecord,
     RecordProcessingGate,
+    SkippedRecord,
 )
 from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCode
 from syntara.eventstreams.core.serialization import EventDecodeSuccess, JsonEventDecoder
@@ -40,9 +44,11 @@ from syntara.eventstreams.services.connection_provider import EventConnectionPro
 from syntara.eventstreams.services.deduplication_store import EventDeliveryStore
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.subscription_service import lock_source_lifecycle
+from syntara.filtering.models.result import FilterOutcome, FilterResult
 from syntara.workflows.models.workflow import Workflow
 
-type RecordResult = ResolvedDelivery | HeldRecord
+type RecordResult = ResolvedDelivery | HeldRecord | SkippedRecord
+logger = structlog.stdlib.get_logger(__name__)
 _CONTENT_CODES = frozenset(code.value for code in EventFailureCode)
 
 
@@ -84,10 +90,7 @@ class EventRecordProcessingService:
         )
 
     @staticmethod
-    def _terminal(terminal: TerminalDelivery) -> RecordResult:
-        if terminal.state == DeliveryState.REJECTED:
-            # A ledger marker is not the required author-accessible activity log.
-            return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+    def _terminal(terminal: TerminalDelivery) -> ResolvedDelivery:
         return ResolvedDelivery(terminal=terminal)
 
     def _dependency_failed(self, snapshot: SubscriptionSnapshot) -> None:
@@ -111,7 +114,7 @@ class EventRecordProcessingService:
                     self._dependency_failed(snapshot)
                     return False
                 subscription, source = lifecycle
-                current = SubscriptionSnapshot.from_models(subscription, source)
+                current = SubscriptionSnapshot.from_models(subscription, source, prepare_filter=False)
                 workflow = await session.get(Workflow, snapshot.workflow_id)
                 if (
                     current.subscription_id != snapshot.subscription_id
@@ -168,6 +171,7 @@ class EventRecordProcessingService:
         owner_worker_id: str,
         *,
         cache_admitted: bool = False,
+        recovery_checked: bool = False,
         admission_guard: Callable[[], bool] | None = None,
     ) -> RecordResult:
         """Inspect evidence before reevaluation; recovery may omit the source event."""
@@ -178,6 +182,15 @@ class EventRecordProcessingService:
                 or self._gate.admission_open(snapshot) is not True
             ):
                 return self._hold("admission_closed")
+            if recovery_checked and event is not None:
+                return await self._process_reconciled(
+                    snapshot,
+                    identity,
+                    event,
+                    owner_worker_id,
+                    cache_admitted=cache_admitted,
+                    admission_guard=admission_guard,
+                )
             existing = await self._existing(identity, cache_admitted=cache_admitted)
             return await self._process_existing(
                 snapshot,
@@ -212,7 +225,13 @@ class EventRecordProcessingService:
         if existing is not None and existing.frozen_binding is not None:
             return await self._prepare_and_schedule(snapshot, identity, None, owner_worker_id)
         if existing is not None and existing.last_error_code in _CONTENT_CODES:
-            return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+            return await self._block_content(
+                snapshot,
+                identity,
+                EventDecodeFailure(code=EventFailureCode(existing.last_error_code)),
+                owner_worker_id,
+                admission_guard=admission_guard,
+            )
         if existing is not None and existing.last_error_code == CONTENT_INSPECTION_PENDING and event is None:
             return self._hold(CONTENT_INSPECTION_PENDING)
         return await self._process_new(snapshot, identity, event, owner_worker_id, admission_guard=admission_guard)
@@ -225,7 +244,7 @@ class EventRecordProcessingService:
         owner_worker_id: str,
         *,
         admission_guard: Callable[[], bool] | None = None,
-    ) -> RecordResult:
+    ) -> ResolvedDelivery | HeldRecord:
         """Persist a bounded content error when its source bytes cannot be queued.
 
         The adapter supplies only a proven size/header failure and its identity.
@@ -238,7 +257,13 @@ class EventRecordProcessingService:
             if existing is not None and existing.frozen_binding is not None:
                 return await self._prepare_and_schedule(snapshot, identity, None, owner_worker_id)
             if existing is not None and existing.last_error_code in _CONTENT_CODES:
-                return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+                return await self._block_content(
+                    snapshot,
+                    identity,
+                    EventDecodeFailure(code=EventFailureCode(existing.last_error_code)),
+                    owner_worker_id,
+                    admission_guard=admission_guard,
+                )
             if not await self.admission_eligible(snapshot) or not self._admission_open(snapshot, admission_guard):
                 return self._hold("admission_closed")
             return await self._block_content(
@@ -260,20 +285,110 @@ class EventRecordProcessingService:
     ) -> RecordResult:
         if event is None:
             return self._hold("delivery_evidence_unavailable")
+        if not self._event_matches(snapshot, identity, event):
+            return self._hold("delivery_evidence_mismatch")
         if (
             not self._admission_open(snapshot, admission_guard)
             or not await self.admission_eligible(snapshot)
             or not self._admission_open(snapshot, admission_guard)
         ):
             return self._hold("admission_closed")
-        decoded = await self._inspect_content(
-            snapshot, identity, event, owner_worker_id, keep_pending=True, admission_guard=admission_guard
+        decoded = (
+            await self._inspect_content(
+                snapshot, identity, event, owner_worker_id, keep_pending=True, admission_guard=admission_guard
+            )
+            if snapshot.filter is None
+            else self.evaluate_filter(snapshot, identity, event)
         )
-        if not isinstance(decoded, EventDecodeSuccess):
+        return await self._finish_decoded(snapshot, identity, decoded, owner_worker_id, admission_guard=admission_guard)
+
+    async def _finish_decoded(
+        self,
+        snapshot: SubscriptionSnapshot,
+        identity: DeliveryIdentity,
+        decoded: EventDecodeSuccess | EventDecodeFailure | RecordResult,
+        owner_worker_id: str,
+        *,
+        admission_guard: Callable[[], bool] | None,
+    ) -> RecordResult:
+        """Keep local skips outside persistence and route content failures to durable rejection."""
+        if isinstance(decoded, SkippedRecord):
+            return decoded if self._admission_open(snapshot, admission_guard) else self._hold("admission_closed")
+        if isinstance(decoded, (ResolvedDelivery, HeldRecord)):
             return decoded
+        if isinstance(decoded, EventDecodeFailure):
+            return await self._block_content(
+                snapshot, identity, decoded, owner_worker_id, admission_guard=admission_guard
+            )
         return await self._prepare_and_schedule(
             snapshot, identity, decoded.envelope, owner_worker_id, admission_guard=admission_guard
         )
+
+    async def _process_reconciled(
+        self,
+        snapshot: SubscriptionSnapshot,
+        identity: DeliveryIdentity,
+        event: RawEvent,
+        owner_worker_id: str,
+        *,
+        cache_admitted: bool,
+        admission_guard: Callable[[], bool] | None,
+    ) -> RecordResult:
+        """Filter new intake only after the runner has recovered this partition.
+
+        Lifecycle/resource queries belong to partition reconciliation. CEL skips
+        perform no delivery lookup, claim, transaction, audit or cache write.
+        Existing prepared work is recovered before the runner enters this path.
+        """
+        if not self._admission_open(snapshot, admission_guard):
+            return self._hold("admission_closed")
+        if not self._event_matches(snapshot, identity, event):
+            return self._hold("delivery_evidence_mismatch")
+        if cache_admitted and self._lookup is not None:
+            cached = await self._cached_terminal(identity)
+            if cached is not None:
+                return self._terminal(cached)
+        decoded = self.evaluate_filter(snapshot, identity, event)
+        if isinstance(decoded, SkippedRecord):
+            return decoded if self._admission_open(snapshot, admission_guard) else self._hold("admission_closed")
+        return await self._process_decoded_existing(
+            snapshot, identity, decoded, owner_worker_id, admission_guard=admission_guard
+        )
+
+    async def _cached_terminal(self, identity: DeliveryIdentity) -> TerminalDelivery | None:
+        """Treat unavailable or mismatched cache proofs as misses without reading PostgreSQL."""
+        if self._lookup is None:
+            return None
+        try:
+            cached = await self._lookup.lookup_cached(identity)
+        except (RedisError, OSError, TimeoutError, ValueError):
+            return None
+        return cached if cached is not None and cached.identity == identity else None
+
+    async def _process_decoded_existing(
+        self,
+        snapshot: SubscriptionSnapshot,
+        identity: DeliveryIdentity,
+        decoded: EventDecodeSuccess | EventDecodeFailure,
+        owner_worker_id: str,
+        *,
+        admission_guard: Callable[[], bool] | None,
+    ) -> RecordResult:
+        """Check durable evidence only for matching records or content failures."""
+        existing = await self._existing(identity)
+        if isinstance(existing, TerminalDelivery):
+            return self._terminal(existing)
+        if existing is not None and existing.frozen_binding is not None:
+            return await self._prepare_and_schedule(snapshot, identity, None, owner_worker_id)
+        if existing is not None and existing.last_error_code in _CONTENT_CODES:
+            return await self._block_content(
+                snapshot,
+                identity,
+                EventDecodeFailure(code=EventFailureCode(existing.last_error_code)),
+                owner_worker_id,
+                admission_guard=admission_guard,
+            )
+        return await self._finish_decoded(snapshot, identity, decoded, owner_worker_id, admission_guard=admission_guard)
 
     async def inspect_only(
         self,
@@ -283,7 +398,7 @@ class EventRecordProcessingService:
         owner_worker_id: str,
         *,
         admission_guard: Callable[[], bool] | None = None,
-    ) -> RecordResult | InspectedRecord:
+    ) -> ResolvedDelivery | HeldRecord | InspectedRecord:
         """Inspect delivered content behind a fence without new workflow admission."""
         try:
             existing = await self._existing(identity)
@@ -292,7 +407,13 @@ class EventRecordProcessingService:
             if existing is not None and existing.frozen_binding is not None:
                 return await self._prepare_and_schedule(snapshot, identity, None, owner_worker_id)
             if existing is not None and existing.last_error_code in _CONTENT_CODES:
-                return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+                return await self._block_content(
+                    snapshot,
+                    identity,
+                    EventDecodeFailure(code=EventFailureCode(existing.last_error_code)),
+                    owner_worker_id,
+                    admission_guard=admission_guard,
+                )
             result = await self._inspect_content(
                 snapshot, identity, event, owner_worker_id, admission_guard=admission_guard
             )
@@ -306,7 +427,7 @@ class EventRecordProcessingService:
     @classmethod
     def _inspection_hold(
         cls, result: ClaimBusy | ClaimLost | TerminalDelivery | RevisionChanged | StorageBackpressure | HeldRecord
-    ) -> RecordResult:
+    ) -> ResolvedDelivery | HeldRecord:
         if isinstance(result, TerminalDelivery):
             return cls._terminal(result)
         if isinstance(result, HeldRecord):
@@ -324,7 +445,9 @@ class EventRecordProcessingService:
         *,
         keep_pending: bool = False,
         admission_guard: Callable[[], bool] | None = None,
-    ) -> EventDecodeSuccess | RecordResult:
+    ) -> EventDecodeSuccess | ResolvedDelivery | HeldRecord:
+        if isinstance(event, RawEvent) and not self._event_matches(snapshot, identity, event):
+            return self._hold("delivery_evidence_mismatch")
         async with self._session_factory() as session, session.begin():
             if admission_guard is not None and admission_guard() is not True:
                 return self._hold("admission_closed")
@@ -346,12 +469,105 @@ class EventRecordProcessingService:
         )
         failure = decoded if isinstance(decoded, EventDecodeFailure) else None
         async with self._session_factory() as session, session.begin():
-            lost = await EventDeliveryStore(session).finish_inspection(acquired, failure, keep_pending=keep_pending)
-        if lost is not None:
-            return self._hold("inspection_claim_lost")
-        if isinstance(decoded, EventDecodeFailure):
-            return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+            finished = await EventDeliveryStore(session).finish_inspection(
+                acquired,
+                failure,
+                keep_pending=keep_pending,
+                expected=DeliveryExpectation(
+                    published_version_id=snapshot.published_version_id,
+                    configuration_revision=snapshot.configuration_revision,
+                ),
+            )
+        if isinstance(finished, TerminalDelivery):
+            if failure is not None:
+                self._log_content_rejection(snapshot, identity, failure)
+            return self._terminal(finished)
+        if finished is not None:
+            return self._hold("inspection_claim_lost" if isinstance(finished, ClaimLost) else finished.reason)
+        return decoded if isinstance(decoded, EventDecodeSuccess) else self._hold("inspection_evidence_mismatch")
+
+    @staticmethod
+    def _log_content_rejection(
+        snapshot: SubscriptionSnapshot,
+        identity: DeliveryIdentity,
+        failure: EventDecodeFailure,
+    ) -> None:
+        """Report only committed rejection identity and a safe code, best effort."""
+        with suppress(Exception):  # System logging is best effort after the rejection commits.
+            logger.error(
+                "event_subscription_content_rejected",
+                error_code=failure.code.value,
+                subscription_id=str(identity.subscription_id),
+                source_id=str(identity.source_id),
+                source_generation=identity.source_generation,
+                configuration_revision=snapshot.configuration_revision,
+                **identity.record.model_dump(mode="json"),
+            )
+
+    @staticmethod
+    def _event_matches(snapshot: SubscriptionSnapshot, identity: DeliveryIdentity, event: RawEvent) -> bool:
+        """Apply the same trusted-coordinate checks used by Execution preparation."""
+        metadata = event.source_metadata
+        return (
+            identity.subscription_id == snapshot.subscription_id
+            and identity.workflow_id == snapshot.workflow_id
+            and identity.source_id == snapshot.source_id
+            and identity.source_generation == snapshot.source_generation
+            and identity.integration_identity == snapshot.integration_identity
+            and identity.deployment_id == snapshot.deployment_id
+            and metadata.integration_id == identity.integration_identity
+            and metadata.subscription_id == identity.subscription_id
+            and metadata.source_generation == identity.source_generation
+            and record_matches_metadata(identity.record, metadata)
+        )
+
+    def evaluate_filter(
+        self,
+        snapshot: SubscriptionSnapshot,
+        identity: DeliveryIdentity,
+        event: RawEvent,
+    ) -> EventDecodeSuccess | EventDecodeFailure | SkippedRecord:
+        """Evaluate the same native expression before/after ordinary payload decoding."""
+        if not self._event_matches(snapshot, identity, event):
+            message = "Delivered event does not match the trusted filter identity"
+            raise ValueError(message)
+        prepared = snapshot.prepared_filter
+        view = EventFilterInput.from_event(event) if prepared is not None else None
+        if prepared is not None and view is not None:
+            result = prepared.precheck(view)
+            if result.outcome != FilterOutcome.MATCH:
+                return self._skip_filter(snapshot, identity, result)
+        decoded = self._decoder.decode(event, schema=snapshot.model_dump(mode="json")["input_schema"])
+        if isinstance(decoded, EventDecodeSuccess) and prepared is not None and view is not None:
+            view.payload = FilterPayload(state="decoded", value=decoded.envelope.payload)
+            result = prepared.evaluate(view)
+            if result.outcome != FilterOutcome.MATCH:
+                return self._skip_filter(snapshot, identity, result)
         return decoded
+
+    @staticmethod
+    def _skip_filter(snapshot: SubscriptionSnapshot, identity: DeliveryIdentity, result: FilterResult) -> SkippedRecord:
+        """Best-effort system logs carry identity and safe codes, never message content."""
+        fields = {
+            "subscription_id": str(identity.subscription_id),
+            "source_id": str(identity.source_id),
+            "source_generation": identity.source_generation,
+            "configuration_revision": snapshot.configuration_revision,
+            **identity.record.model_dump(mode="json"),
+        }
+        try:
+            if result.outcome == FilterOutcome.EVALUATION_ERROR:
+                logger.error("event_subscription_filter_error", error_code=result.error_code, **fields)
+            else:
+                logger.info("event_subscription_filter_no_match", **fields)
+        except Exception:  # noqa: BLE001, S110 - best-effort logs never gate CEL skip completion
+            pass
+        return SkippedRecord(
+            identity=identity,
+            configuration_revision=snapshot.configuration_revision,
+            outcome="evaluation_error" if result.outcome == FilterOutcome.EVALUATION_ERROR else "no_match",
+            error_code=result.error_code,
+        )
 
     async def _prepare_and_schedule(
         self,
@@ -361,7 +577,7 @@ class EventRecordProcessingService:
         owner_worker_id: str,
         *,
         admission_guard: Callable[[], bool] | None = None,
-    ) -> RecordResult:
+    ) -> ResolvedDelivery | HeldRecord:
         if envelope is not None and not self._admission_open(snapshot, admission_guard):
             return self._hold("admission_closed")
         prepared = await self._preparation.prepare_delivery(snapshot, identity, envelope, owner_worker_id)
@@ -383,7 +599,7 @@ class EventRecordProcessingService:
             self._dependency_failed(snapshot)
         return self._scheduled(scheduled)
 
-    def _scheduled(self, scheduled: SchedulingResult) -> RecordResult:
+    def _scheduled(self, scheduled: SchedulingResult) -> ResolvedDelivery | HeldRecord:
         if isinstance(scheduled, ResolvedDelivery):
             return self._terminal(scheduled.terminal)
         if isinstance(scheduled, RetryDelivery):
@@ -398,8 +614,8 @@ class EventRecordProcessingService:
         owner_worker_id: str,
         *,
         admission_guard: Callable[[], bool] | None = None,
-    ) -> RecordResult:
-        """Commit safe unresolved evidence, never an internal rejection shortcut."""
+    ) -> ResolvedDelivery | HeldRecord:
+        """Return rejection evidence only after its token-fenced transaction commits."""
         result = await self._inspect_content(
             snapshot, identity, failure, owner_worker_id, admission_guard=admission_guard
         )

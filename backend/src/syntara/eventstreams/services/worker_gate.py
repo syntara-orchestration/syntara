@@ -92,5 +92,5 @@ class EventWorkerGate:
         return self._healthy
 
     def close_admission(self) -> None:
-        """Close intake while preserving resolution of admitted handoffs during drain."""
+        """Close intake while preserving completed records and admitted handoffs during drain."""
         self._accepting = False

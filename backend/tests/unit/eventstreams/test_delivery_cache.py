@@ -190,7 +190,7 @@ async def test_cache_write_failure_preserves_committed_resolution(
     assert await service.lookup(identity()) == terminal()
 
 
-@pytest.mark.parametrize("state", [DeliveryState.FILTERED, DeliveryState.REJECTED, DeliveryState.CANCELLED])
+@pytest.mark.parametrize("state", [DeliveryState.FILTERED, DeliveryState.CANCELLED])
 async def test_internal_no_trigger_and_lifecycle_rows_are_never_cached(
     state: DeliveryState, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -234,10 +234,8 @@ async def test_unavailable_signing_key_preserves_database_resolution(monkeypatch
     cache.put.assert_not_awaited()
 
 
-@pytest.mark.parametrize("state", [DeliveryState.FILTERED, DeliveryState.REJECTED])
-async def test_future_no_trigger_proofs_are_not_usable_in_m1(
-    state: DeliveryState, monkeypatch: pytest.MonkeyPatch
-) -> None:
+@pytest.mark.parametrize("state", [DeliveryState.FILTERED])
+async def test_filter_skip_proofs_are_not_usable(state: DeliveryState, monkeypatch: pytest.MonkeyPatch) -> None:
     service, cache, repository, _, _ = lookup_service(monkeypatch)
     data = proof().model_dump(mode="json")
     data.update(
@@ -249,11 +247,40 @@ async def test_future_no_trigger_proofs_are_not_usable_in_m1(
     cache.put.assert_not_awaited()
 
 
+async def test_committed_rejection_is_cached_and_reused_without_database(monkeypatch: pytest.MonkeyPatch) -> None:
+    value = TerminalDelivery(identity=identity(), state=DeliveryState.REJECTED, resolved_at=proof().resolved_at)
+    service, cache, repository, factory, _ = lookup_service(monkeypatch, value)
+    assert await service.lookup(identity()) == value
+    cache.put.assert_awaited_once()
+    encoded = cache.put.call_args.args[1]
+    cached = AuthenticatedTerminalProof.model_validate_json(encoded)
+    assert cached.outcome == DeliveryState.REJECTED
+    assert cached.execution_id is None
+    assert cached.temporal_workflow_id is None
+    assert verify_terminal_proof(cached)
+    cache.get.return_value = encoded
+    factory.reset_mock()
+    repository.lookup_terminal.reset_mock()
+    assert await service.lookup(identity()) == value
+    factory.assert_not_called()
+    repository.lookup_terminal.assert_not_awaited()
+
+
 @pytest.mark.parametrize("failure_at", ["read", "commit", "session_exit"])
+@pytest.mark.parametrize("state", [DeliveryState.SCHEDULED, DeliveryState.REJECTED])
 async def test_failed_or_uncertain_transaction_never_populates(
-    failure_at: str, monkeypatch: pytest.MonkeyPatch
+    failure_at: str, state: DeliveryState, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    service, cache, repository, factory, _ = lookup_service(monkeypatch, terminal())
+    value = (
+        terminal()
+        if state == DeliveryState.SCHEDULED
+        else TerminalDelivery(
+            identity=identity(),
+            state=state,
+            resolved_at=NOW,
+        )
+    )
+    service, cache, repository, factory, _ = lookup_service(monkeypatch, value)
     session = MagicMock()
     session.__aenter__.return_value = session
     factory.side_effect = None

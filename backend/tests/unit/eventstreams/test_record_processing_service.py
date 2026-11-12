@@ -4,7 +4,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
@@ -30,6 +30,7 @@ from syntara.eventstreams.core.processing import (
 from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCode
 from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.models.source import EventSubscriptionSource
+from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.eventstreams.services import record_processing_service as module
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
@@ -76,7 +77,19 @@ def processing_context(monkeypatch: pytest.MonkeyPatch):
         context.rows[EventDelivery] = retained(identity, last_error_code=CONTENT_INSPECTION_PENDING)
         return context.claim
 
-    async def finish_inspection(claim, failure, *, keep_pending=False) -> ClaimLost | None:
+    async def finish_inspection(claim, failure, *, expected, keep_pending=False) -> TerminalDelivery | ClaimLost | None:
+        assert expected.configuration_revision == context.snapshot.configuration_revision
+        if failure is not None:
+            proof = terminal(claim.identity, DeliveryState.REJECTED).terminal
+            context.events.append("reject")
+            context.rows[EventDelivery] = retained(
+                claim.identity,
+                state=DeliveryState.REJECTED,
+                resolved_at=proof.resolved_at,
+                last_error_code=failure.code.value,
+            )
+            context.store.lookup_terminal.return_value = proof
+            return proof
         code = (
             failure.code.value
             if failure is not None
@@ -252,42 +265,109 @@ async def test_frozen_recovery_ignores_new_admission_eligibility(monkeypatch, fl
 
 
 @pytest.mark.parametrize("value", [b"not-json", None, b"\x00\x00\x00\x00\x01"])
-async def test_content_failure_is_committed_as_unresolved_evidence(monkeypatch, value) -> None:
+async def test_content_failure_is_committed_as_rejection(monkeypatch, value) -> None:
     context, service, admission, event = processing_context(monkeypatch)
     result = await service.process(
         context.snapshot, context.identity, event.model_copy(update={"value": value}), "worker"
     )
-    assert isinstance(result, HeldRecord)
-    assert result.permanent_content_error
-    assert result.retry_at is None
+    assert isinstance(result, ResolvedDelivery)
+    assert result.terminal.state == DeliveryState.REJECTED
     assert context.events[-1] == "commit"
-    claim = context.store.defer.call_args.args[0]
-    assert claim.binding is None
-    assert context.store.defer.call_args.kwargs["error_code"] in {code.value for code in EventFailureCode}
+    assert context.rows[EventDelivery].last_error_code in {code.value for code in EventFailureCode}
+    assert context.rows[EventDelivery].frozen_binding is None
     context.store.finalize_without_execution.assert_not_awaited()
     context.store.freeze.assert_not_awaited()
     admission.schedule.assert_not_awaited()
 
 
 @pytest.mark.parametrize("code", list(EventFailureCode))
-async def test_persisted_content_gate_survives_retry_restart_and_changed_content(monkeypatch, code) -> None:
+async def test_retained_content_failure_is_rejected_and_reused_after_restart(monkeypatch, code) -> None:
     context, service, admission, event = processing_context(monkeypatch)
     context.rows[EventDelivery] = retained(context.identity, last_error_code=code.value)
     for instance in [service, EventRecordProcessingService(lambda: context.session, context.service, admission)]:
         result = await instance.process(context.snapshot, context.identity, event, "new-owner")
-        assert isinstance(result, HeldRecord)
-        assert result.permanent_content_error
-        assert result.retry_at is None
+        assert isinstance(result, ResolvedDelivery)
+        assert result.terminal.state == DeliveryState.REJECTED
+    assert context.rows[EventDelivery].last_error_code == code.value
+    assert context.store.finish_inspection.await_count == 1
     context.store.acquire.assert_not_awaited()
     admission.schedule.assert_not_awaited()
 
 
-async def test_internal_rejected_marker_does_not_bypass_activity_log_gate(monkeypatch) -> None:
+async def test_committed_rejection_resolves_without_activity_log(monkeypatch) -> None:
     context, service, admission, event = processing_context(monkeypatch)
     context.store.lookup_terminal.return_value = terminal(context.identity, DeliveryState.REJECTED).terminal
     result = await service.process(context.snapshot, context.identity, event, "worker")
+    assert isinstance(result, ResolvedDelivery)
+    assert result.terminal.state == DeliveryState.REJECTED
+    context.store.acquire_inspection.assert_not_awaited()
+    admission.schedule.assert_not_awaited()
+
+
+@pytest.mark.parametrize("log_fails", [False, True])
+async def test_content_rejection_logs_after_commit_without_exposing_content(monkeypatch, *, log_fails: bool) -> None:
+    context, service, admission, event = processing_context(monkeypatch)
+    log = Mock()
+    observed = []
+
+    def record(*_args: object, **_kwargs: object) -> None:
+        observed.append(context.events[-1])
+        if log_fails:
+            message = "Log destination unavailable"
+            raise OSError(message)
+
+    log.error.side_effect = record
+    monkeypatch.setattr(module, "logger", log)
+    result = await service.process(
+        context.snapshot, context.identity, event.model_copy(update={"value": b"private-invalid-content"}), "worker"
+    )
+    assert isinstance(result, ResolvedDelivery)
+    assert result.terminal.state == DeliveryState.REJECTED
+    log.error.assert_called_once()
+    assert observed == ["commit"]
+    assert "private-invalid-content" not in str(log.mock_calls)
+    assert log.error.call_args.kwargs["error_code"] == "invalid_json"
+    admission.schedule.assert_not_awaited()
+
+
+async def test_rejection_commit_failure_never_returns_resolution_or_success_log(monkeypatch) -> None:
+    context, service, admission, event = processing_context(monkeypatch)
+    log = Mock()
+    monkeypatch.setattr(module, "logger", log)
+
+    def exit_transaction(error, *_args: object) -> None:
+        if error is None and context.events[-1] == "reject":
+            context.events.append("rollback")
+            message = "Commit unavailable"
+            raise SQLAlchemyError(message)
+        context.events.append("rollback" if error else "commit")
+
+    context.transaction.__aexit__.side_effect = exit_transaction
+    result = await service.process(
+        context.snapshot, context.identity, event.model_copy(update={"value": b"invalid"}), "worker"
+    )
     assert isinstance(result, HeldRecord)
-    assert result.permanent_content_error
+    assert result.reason == "dependency_unavailable"
+    assert context.events[-1] == "rollback"
+    log.error.assert_not_called()
+    admission.schedule.assert_not_awaited()
+
+
+async def test_schema_mismatch_is_durably_rejected_without_starting_an_execution(monkeypatch) -> None:
+    context, service, admission, event = processing_context(monkeypatch)
+    schema = {"type": "object", "properties": {"count": {"type": "integer"}}, "required": ["count"]}
+    context.subscription.input_schema = schema
+    context.snapshot = SubscriptionSnapshot.model_validate(
+        {**context.snapshot.model_dump(mode="json"), "input_schema": schema}
+    )
+    result = await service.process(
+        context.snapshot, context.identity, event.model_copy(update={"value": b'{"count":"private"}'}), "worker"
+    )
+    assert isinstance(result, ResolvedDelivery)
+    assert result.terminal.state == DeliveryState.REJECTED
+    assert context.rows[EventDelivery].last_error_code == EventFailureCode.schema_mismatch.value
+    assert context.events[-1] == "commit"
+    context.store.freeze.assert_not_awaited()
     admission.schedule.assert_not_awaited()
 
 
@@ -338,17 +418,16 @@ async def test_busy_claim_and_temporal_retry_preserve_retry_time(monkeypatch) ->
 @pytest.mark.parametrize(
     "code", [EventFailureCode.value_too_large, EventFailureCode.envelope_too_large, EventFailureCode.too_many_headers]
 )
-async def test_unbufferable_content_persists_only_safe_unresolved_evidence(monkeypatch, code) -> None:
+async def test_unbufferable_content_commits_safe_rejection(monkeypatch, code) -> None:
     context, service, admission, _ = processing_context(monkeypatch)
     result = await service.hold_content_failure(
         context.snapshot, context.identity, EventDecodeFailure(code=code), "worker"
     )
-    assert isinstance(result, HeldRecord)
-    assert result.permanent_content_error
-    assert result.retry_at is None
+    assert isinstance(result, ResolvedDelivery)
+    assert result.terminal.state == DeliveryState.REJECTED
     assert context.events[-1] == "commit"
-    assert context.store.defer.call_args.kwargs["error_code"] == code.value
-    assert context.store.defer.call_args.args[0].binding is None
+    assert context.rows[EventDelivery].last_error_code == code.value
+    assert context.rows[EventDelivery].frozen_binding is None
     context.store.finalize_without_execution.assert_not_awaited()
     context.store.freeze.assert_not_awaited()
     admission.schedule.assert_not_awaited()
@@ -387,7 +466,7 @@ async def test_unbufferable_redelivery_repairs_frozen_work_before_eligibility(mo
 
 async def test_unbufferable_content_database_failure_stays_retryable(monkeypatch) -> None:
     context, service, admission, _ = processing_context(monkeypatch)
-    context.store.defer.side_effect = SQLAlchemyError("PRIVATE")
+    context.store.finish_inspection.side_effect = SQLAlchemyError("PRIVATE")
     result = await service.hold_content_failure(
         context.snapshot, context.identity, EventDecodeFailure(code=EventFailureCode.value_too_large), "worker"
     )
@@ -454,8 +533,10 @@ async def test_pending_inspection_identity_requests_content_without_new_admissio
         ),
     ],
 )
-async def test_structured_failure_is_held_without_scheduling_or_terminal_discard(monkeypatch, body, code) -> None:
+async def test_structured_failure_is_durably_rejected_without_scheduling(monkeypatch, body, code) -> None:
     context, service, admission, event = processing_context(monkeypatch)
+    log = Mock()
+    monkeypatch.setattr(module, "logger", log)
     event = event.model_copy(
         update={
             "value": json.dumps(body).encode(),
@@ -463,11 +544,20 @@ async def test_structured_failure_is_held_without_scheduling_or_terminal_discard
         }
     )
     result = await service.process(context.snapshot, context.identity, event, "worker")
-    assert isinstance(result, HeldRecord)
-    assert result.reason == "activity_log_unavailable"
-    assert result.permanent_content_error
-    assert context.store.defer.call_args.kwargs["error_code"] == code.value
+    assert isinstance(result, ResolvedDelivery)
+    assert result.terminal.identity == context.identity
+    assert result.terminal.state == DeliveryState.REJECTED
+    assert result.terminal.execution_id is None
+    row = context.rows[EventDelivery]
+    assert row.state == DeliveryState.REJECTED
+    assert row.last_error_code == code.value
+    assert row.resolved_at == result.terminal.resolved_at
+    assert row.frozen_binding is None
     assert context.events[-1] == "commit"
+    context.store.finish_inspection.assert_awaited_once()
+    log.error.assert_called_once()
+    assert log.error.call_args.args == ("event_subscription_content_rejected",)
+    assert log.error.call_args.kwargs["error_code"] == code.value
     context.store.finalize_without_execution.assert_not_awaited()
     context.store.freeze.assert_not_awaited()
     admission.schedule.assert_not_awaited()

@@ -14,6 +14,7 @@ from ..models.runtime_state import RuntimeState
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.event_subscription_read_filter_type_0 import EventSubscriptionReadFilterType0
     from ..models.event_subscription_read_input_schema_type_0 import EventSubscriptionReadInputSchemaType0
     from ..models.event_subscription_recovery_read import EventSubscriptionRecoveryRead
     from ..models.event_subscription_source_read import EventSubscriptionSourceRead
@@ -41,6 +42,7 @@ class EventSubscriptionRead:
         created_at (datetime.datetime):
         updated_at (datetime.datetime):
         source (EventSubscriptionSourceRead): The current source's non-secret configuration.
+        filter_ (EventSubscriptionReadFilterType0 | None | Unset): Original published CEL expression
         retired (bool | Unset):  Default: False.
         sources (list[EventSubscriptionSourceRead] | Unset):
         initialization (list[KafkaPartitionInitialPositionRead] | Unset):
@@ -63,6 +65,7 @@ class EventSubscriptionRead:
     created_at: datetime.datetime
     updated_at: datetime.datetime
     source: EventSubscriptionSourceRead
+    filter_: EventSubscriptionReadFilterType0 | None | Unset = UNSET
     retired: bool | Unset = False
     sources: list[EventSubscriptionSourceRead] | Unset = UNSET
     initialization: list[KafkaPartitionInitialPositionRead] | Unset = UNSET
@@ -73,6 +76,7 @@ class EventSubscriptionRead:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.event_subscription_read_filter_type_0 import EventSubscriptionReadFilterType0
         from ..models.event_subscription_read_input_schema_type_0 import EventSubscriptionReadInputSchemaType0
 
         id = str(self.id)
@@ -108,6 +112,14 @@ class EventSubscriptionRead:
         updated_at = self.updated_at.isoformat()
 
         source = self.source.to_dict()
+
+        filter_: dict[str, Any] | None | Unset
+        if isinstance(self.filter_, Unset):
+            filter_ = UNSET
+        elif isinstance(self.filter_, EventSubscriptionReadFilterType0):
+            filter_ = self.filter_.to_dict()
+        else:
+            filter_ = self.filter_
 
         retired = self.retired
 
@@ -169,6 +181,8 @@ class EventSubscriptionRead:
                 "source": source,
             }
         )
+        if filter_ is not UNSET:
+            field_dict["filter"] = filter_
         if retired is not UNSET:
             field_dict["retired"] = retired
         if sources is not UNSET:
@@ -188,6 +202,7 @@ class EventSubscriptionRead:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.event_subscription_read_filter_type_0 import EventSubscriptionReadFilterType0
         from ..models.event_subscription_read_input_schema_type_0 import EventSubscriptionReadInputSchemaType0
         from ..models.event_subscription_recovery_read import EventSubscriptionRecoveryRead
         from ..models.event_subscription_source_read import EventSubscriptionSourceRead
@@ -245,6 +260,23 @@ class EventSubscriptionRead:
         updated_at = isoparse(d.pop("updated_at"))
 
         source = EventSubscriptionSourceRead.from_dict(d.pop("source"))
+
+        def _parse_filter_(data: object) -> EventSubscriptionReadFilterType0 | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                filter_type_0 = EventSubscriptionReadFilterType0.from_dict(data)
+
+                return filter_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(EventSubscriptionReadFilterType0 | None | Unset, data)
+
+        filter_ = _parse_filter_(d.pop("filter", UNSET))
 
         retired = d.pop("retired", UNSET)
 
@@ -322,6 +354,7 @@ class EventSubscriptionRead:
             created_at=created_at,
             updated_at=updated_at,
             source=source,
+            filter_=filter_,
             retired=retired,
             sources=sources,
             initialization=initialization,

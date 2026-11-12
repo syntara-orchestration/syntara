@@ -160,7 +160,7 @@ class EventExecutionPreparationService:
             return acquired
         if acquired.binding is not None:
             return await self._recover(session, acquired)
-        current = SubscriptionSnapshot.from_models(*lifecycle)
+        current = SubscriptionSnapshot.from_models(*lifecycle, prepare_filter=False)
         if (
             current.subscription_id != snapshot.subscription_id
             or current.workflow_id != snapshot.workflow_id

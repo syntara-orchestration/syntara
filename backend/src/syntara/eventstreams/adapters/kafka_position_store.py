@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import cast
 from uuid import UUID, uuid4
 
-from sqlalchemy import BigInteger, and_, func, not_, or_
+from sqlalchemy import BigInteger, and_, func, not_
 from sqlalchemy import cast as sql_cast
 from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import col, select
@@ -528,11 +528,7 @@ class KafkaInitialPositionStore:
                     col(EventDelivery.transport) == "kafka",
                     col(EventDelivery.record_identity)["partition"].as_integer() == request.partition,
                     not_(fenced_for_redelivery),
-                    or_(
-                        col(EventDelivery.state) == DeliveryState.IN_PROGRESS.value,
-                        col(EventDelivery.state) == DeliveryState.REJECTED.value,
-                        col(EventDelivery.last_error_code).in_([code.value for code in EventFailureCode]),
-                    ),
+                    col(EventDelivery.state) == DeliveryState.IN_PROGRESS.value,
                 )
                 .order_by(col(EventDelivery.identity_digest))
                 .limit(FieldLimits.MAX_ITEMS_PER_PAGE + 1)
@@ -544,10 +540,12 @@ class KafkaInitialPositionStore:
     @staticmethod
     def _content_gate(rows: list[EventDelivery]) -> None:
         content_codes = {code.value for code in EventFailureCode}
-        if any(row.state == DeliveryState.REJECTED or row.last_error_code in content_codes for row in rows):
+        if any(row.state == DeliveryState.IN_PROGRESS and row.last_error_code in content_codes for row in rows):
             msg = "permanent_content_error"
             raise KafkaPositionError(msg)
-        if any(row.last_error_code == CONTENT_INSPECTION_PENDING for row in rows):
+        if any(
+            row.state == DeliveryState.IN_PROGRESS and row.last_error_code == CONTENT_INSPECTION_PENDING for row in rows
+        ):
             msg = "content_inspection_pending"
             raise KafkaPositionError(msg)
 

@@ -45,7 +45,7 @@ info:
     Available node types and their configuration schemas are defined in the
     [Node Type Catalog](./catalog/node_type_catalog.json). Individual node schemas
     (config and result) are in the `executors/`, `control-nodes/`, and `triggers/` directories.
-  version: 2.2.0
+  version: 2.3.0
   contact:
     name: Syntara Team
 servers:
@@ -2078,6 +2078,13 @@ components:
               type: object
             - type: 'null'
           title: Input Schema
+        filter:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+          title: Filter
+          description: Original published CEL expression
         desired_enabled:
           type: boolean
           title: Desired Enabled
@@ -2254,8 +2261,29 @@ components:
         ``cluster_id`` and ``topic_id`` are populated once during verified
         initialization where the broker exposes them; an identity change creates a
         new generation rather than mutating these fields.
+    FilterConfiguration:
+      type: object
+      additionalProperties: false
+      title: FilterConfiguration
+      description: |-
+        One original CEL expression, with no implicit conditions or field grouping.
+
+        Empty or whitespace-only expressions mean no filter. Publication validates
+        syntax, names and statically known boolean types; dynamic types are checked
+        during evaluation. The original non-empty expression is preserved unchanged.
+      required: [expression]
+      properties:
+        expression:
+          type: string
+          maxLength: 16384
+          description: Complete CEL expression (maximum 16,384 characters).
+          title: Expression
     KafkaSubscribeParameters:
       properties:
+        filter:
+          anyOf:
+            - $ref: '#/components/schemas/FilterConfiguration'
+            - type: 'null'
         integration_id:
           type: string
           format: uuid

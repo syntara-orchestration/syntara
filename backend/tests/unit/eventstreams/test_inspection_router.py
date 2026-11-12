@@ -51,10 +51,24 @@ def test_list_rejects_invalid_bounds(client: TestClient, service: AsyncMock, que
 
 @pytest.mark.parametrize("read_route", ["list", "detail"])
 @pytest.mark.parametrize("partition_ids", [None, [0, 2, 5]], ids=["legacy", "captured"])
-def test_read_routes_preserve_initial_partition_set(
-    client: TestClient, service: AsyncMock, read_route: str, partition_ids: list[int] | None
+@pytest.mark.parametrize(
+    "filter_configuration",
+    [
+        None,
+        {
+            "expression": "input.payload.value.severity == 'critical'",
+        },
+    ],
+    ids=["unfiltered", "filtered"],
+)
+def test_read_routes_preserve_source_and_filter_configuration(
+    client: TestClient,
+    service: AsyncMock,
+    read_route: str,
+    partition_ids: list[int] | None,
+    filter_configuration: dict[str, Any] | None,
 ) -> None:
-    """Real shaping and HTTP serialization preserve captured sets and missing legacy data."""
+    """Real shaping and HTTP serialization preserve original configuration and legacy nulls."""
     stored_configuration: dict[str, Any] = {"transport": "kafka", "topic": "alerts", "group_id": "syntara.test"}
     configuration = KafkaSourceConfiguration.model_validate(
         stored_configuration
@@ -69,6 +83,7 @@ def test_read_routes_preserve_initial_partition_set(
         active_source_generation=1,
         configuration_revision=1,
         created_by=uuid4(),
+        filter=filter_configuration,
     )
     integration_id = uuid4()
     source = EventSubscriptionSource(
@@ -95,6 +110,7 @@ def test_read_routes_preserve_initial_partition_set(
         "topic_id": None,
         "initial_partition_ids": partition_ids,
     }
+    assert resource["filter"] == filter_configuration
     assert EventSubscriptionRead.model_validate(resource) == shaped
 
 
@@ -105,7 +121,11 @@ def test_unsaved_flat_request_delegates(client: TestClient, service: AsyncMock) 
     assert response.status_code == 200
     assert response.json()["topic_read"] == response.json()["group_access"] == "unverified"
     assert service.test_unsaved.call_args.args[0] == workflow_id
-    assert service.test_unsaved.call_args.args[1].model_dump(mode="json") == {**data, "input_schema": None}
+    assert service.test_unsaved.call_args.args[1].model_dump(mode="json") == {
+        **data,
+        "input_schema": None,
+        "filter": None,
+    }
 
 
 @pytest.mark.parametrize(
