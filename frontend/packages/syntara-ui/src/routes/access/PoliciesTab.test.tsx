@@ -158,7 +158,8 @@ describe('PoliciesTab', () => {
   })
 
   it.each(['any', 'project'])('shows the built-in default allow and %s step deny', (scope) => {
-    const description = 'Write any step_type'
+    const description =
+      'Allow authoring every workflow step type. Step authoring depends on this policy: restrict step types with deny policies instead of removing it.'
     setupPoliciesQuery([
       {
         ...samplePolicies[0],
@@ -180,7 +181,7 @@ describe('PoliciesTab', () => {
 
     render(<PoliciesTab />, { wrapper })
 
-    const allowRow = screen.getByRole('row', { name: /step_type:write:any Write any step_type/ })
+    const allowRow = screen.getByRole('row', { name: /step_type:write:any Allow authoring every workflow step type/ })
     expect(within(allowRow).getByText('Built-in')).toBeInTheDocument()
     expect(within(allowRow).queryByText('Custom')).not.toBeInTheDocument()
     expect(within(allowRow).getByText('Allow')).toBeInTheDocument()
