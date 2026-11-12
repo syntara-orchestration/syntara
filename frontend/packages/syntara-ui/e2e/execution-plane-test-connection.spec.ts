@@ -2,10 +2,13 @@
  * E2E: Test connection for execution targets (list + detail)
  *
  * Covers:
- * - List kebab → success toast
- * - Detail kebab → success toast
+ * - List kebab → success toast (intercepted healthy response)
+ * - Detail kebab → success toast (intercepted healthy response)
  * - Intercepted unhealthy health response → failure reason toast
  * - Slow health request → pending (aria-disabled) until settled
+ *
+ * Health responses are intercepted so CI does not depend on a freshly created
+ * target being reachable from the live Execution Plane probe.
  *
  * Skipped when Execution Plane API is unreachable (compose CI does not start it).
  */
@@ -30,9 +33,33 @@ function isExecutionTargetHealthResponse(response: Response): boolean {
   )
 }
 
+function healthRouteFor(targetId: string): string {
+  return `**/api/execution_plane/v1/execution_targets/${targetId}/health`
+}
+
 async function filterTargetsByName(app: Page, name: string): Promise<void> {
   await app.getByPlaceholder('Filter by name').fill(name)
   await app.getByRole('button', { name: 'Apply filter' }).click()
+}
+
+async function fulfillHealth(
+  app: Page,
+  targetId: string,
+  body: { healthy: boolean; message: string | null; skipped: boolean },
+  options?: { delayMs?: number }
+): Promise<string> {
+  const route = healthRouteFor(targetId)
+  await app.route(route, async (routeHandler) => {
+    if (options?.delayMs) {
+      await new Promise((resolve) => setTimeout(resolve, options.delayMs))
+    }
+    await routeHandler.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    })
+  })
+  return route
 }
 
 test.describe('Execution Plane — test connection', { tag: '@pr-check' }, () => {
@@ -47,6 +74,7 @@ test.describe('Execution Plane — test connection', { tag: '@pr-check' }, () =>
     const name = buildUniqueName('e2e-et-health')
     const created = await createExecutionTargetViaApi(app, { name })
     const targetId = created.id
+    const healthRoute = await fulfillHealth(app, targetId, { healthy: true, message: null, skipped: false })
 
     try {
       await app.goto(toAppUrl(LIST_URL))
@@ -66,6 +94,7 @@ test.describe('Execution Plane — test connection', { tag: '@pr-check' }, () =>
       await expect(app.getByText('Connection successful')).toBeVisible()
       await expect(app.getByText(`Successfully connected to execution target "${name}".`)).toBeVisible()
     } finally {
+      await app.unroute(healthRoute)
       await deleteExecutionTargetViaApi(app, targetId)
     }
   })
@@ -74,6 +103,7 @@ test.describe('Execution Plane — test connection', { tag: '@pr-check' }, () =>
     const name = buildUniqueName('e2e-et-health-detail')
     const created = await createExecutionTargetViaApi(app, { name })
     const targetId = created.id
+    const healthRoute = await fulfillHealth(app, targetId, { healthy: true, message: null, skipped: false })
 
     try {
       await app.goto(toAppUrl(`/execution-plane/${targetId}`))
@@ -89,6 +119,7 @@ test.describe('Execution Plane — test connection', { tag: '@pr-check' }, () =>
       await expect(app.getByText('Connection successful')).toBeVisible()
       await expect(app.getByText(`Successfully connected to execution target "${name}".`)).toBeVisible()
     } finally {
+      await app.unroute(healthRoute)
       await deleteExecutionTargetViaApi(app, targetId)
     }
   })
@@ -98,17 +129,13 @@ test.describe('Execution Plane — test connection', { tag: '@pr-check' }, () =>
     const created = await createExecutionTargetViaApi(app, { name })
     const targetId = created.id
     const failureMessage = `Unable to reach execution target "${name}": connection refused`
-    const healthRoute = `**/api/execution_plane/v1/execution_targets/${targetId}/health`
+    const healthRoute = await fulfillHealth(app, targetId, {
+      healthy: false,
+      message: failureMessage,
+      skipped: false,
+    })
 
     try {
-      await app.route(healthRoute, async (route) => {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ healthy: false, message: failureMessage, skipped: false }),
-        })
-      })
-
       await app.goto(toAppUrl(LIST_URL))
       await expect(app.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
       await filterTargetsByName(app, name)
@@ -135,17 +162,14 @@ test.describe('Execution Plane — test connection', { tag: '@pr-check' }, () =>
     const name = buildUniqueName('e2e-et-health-slow')
     const created = await createExecutionTargetViaApi(app, { name })
     const targetId = created.id
+    const healthRoute = await fulfillHealth(
+      app,
+      targetId,
+      { healthy: true, message: null, skipped: false },
+      { delayMs: 1500 }
+    )
 
     try {
-      await app.route(`**/api/execution_plane/v1/execution_targets/${targetId}/health`, async (route) => {
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ healthy: true, message: null, skipped: false }),
-        })
-      })
-
       await app.goto(toAppUrl(LIST_URL))
       await expect(app.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
       await filterTargetsByName(app, name)
@@ -161,7 +185,7 @@ test.describe('Execution Plane — test connection', { tag: '@pr-check' }, () =>
 
       await expect(app.getByText('Connection successful')).toBeVisible({ timeout: HEALTH_TIMEOUT })
     } finally {
-      await app.unroute(`**/api/execution_plane/v1/execution_targets/${targetId}/health`)
+      await app.unroute(healthRoute)
       await deleteExecutionTargetViaApi(app, targetId)
     }
   })
