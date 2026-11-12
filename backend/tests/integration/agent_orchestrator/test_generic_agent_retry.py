@@ -7,7 +7,7 @@ makes LLM calls through the retry decorator.
 # ruff: noqa: ANN401, TRY003, EM101
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, Mock
@@ -26,7 +26,7 @@ from tests.fixtures.settings import FakeSettingsCache
 @pytest.fixture(autouse=True)
 def _mock_runtime_settings(
     override_runtime_settings: Callable[..., AbstractContextManager[FakeSettingsCache]],
-) -> None:
+) -> Generator[None, None, None]:
     """Auto-mock get_runtime_settings so retry tests do not depend on test order."""
     with override_runtime_settings():
         yield
