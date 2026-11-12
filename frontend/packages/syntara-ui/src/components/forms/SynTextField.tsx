@@ -134,7 +134,7 @@ export function SynTextField<
       hint={hint}
       hideFormGroupLabel={hideFormGroupLabel}
     >
-      {({ field, fieldState }) => {
+      {({ field, fieldState, describedBy }) => {
         const displayValue = isNumberInput ? numberInputDisplayValue(numberDraft, field.value) : (field.value ?? '')
 
         return (
@@ -142,6 +142,7 @@ export function SynTextField<
             id={resolvedFieldId}
             type={type}
             aria-label={ariaLabel}
+            aria-describedby={describedBy}
             aria-required={isRequired ? true : undefined}
             placeholder={placeholder}
             validated={fieldState.error ? 'error' : 'default'}

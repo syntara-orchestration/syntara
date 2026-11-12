@@ -1,14 +1,14 @@
 import { RhUiCheckClipboardIcon } from '@patternfly/react-icons'
 import type { ComponentType } from 'react'
 
-export type NodeCategory = 'trigger' | 'action' | 'logic' | 'integration' | 'human_tasks' | 'approval' | 'other'
+export type StepCategory = 'trigger' | 'action' | 'logic' | 'integration' | 'human_tasks' | 'approval' | 'other'
 
 /**
- * Metadata for a node category
+ * Metadata for a step category
  */
 export type CategoryMetadata = {
   /** Unique category identifier */
-  id: NodeCategory
+  id: StepCategory
   /** Display label for the category */
   label: string
   /** Icon component for the category */
@@ -22,7 +22,7 @@ export type CategoryMetadata = {
 }
 
 /** Display order for Add step panel category sections (lower = earlier). */
-export const NODE_CATEGORY_DISPLAY_ORDER: NodeCategory[] = [
+export const STEP_CATEGORY_DISPLAY_ORDER: StepCategory[] = [
   'trigger',
   'action',
   'logic',
@@ -39,11 +39,11 @@ const HUMAN_TASKS_CATEGORY_METADATA: CategoryMetadata = {
   order: 45,
 }
 
-const CATEGORY_METADATA_BY_ID: Partial<Record<NodeCategory, CategoryMetadata>> = {
+const CATEGORY_METADATA_BY_ID: Partial<Record<StepCategory, CategoryMetadata>> = {
   human_tasks: HUMAN_TASKS_CATEGORY_METADATA,
 }
 
-export function getCategoryMetadata(category: NodeCategory | undefined): CategoryMetadata | undefined {
+export function getCategoryMetadata(category: StepCategory | undefined): CategoryMetadata | undefined {
   if (!category) return undefined
   return CATEGORY_METADATA_BY_ID[category]
 }

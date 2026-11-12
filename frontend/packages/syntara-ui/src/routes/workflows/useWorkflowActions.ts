@@ -6,6 +6,7 @@ import type { useAlerts } from '../../providers/alerts'
 import { getErrorMessage } from '../../utils/apiErrors'
 
 import { resolveWorkflowRunTrigger } from './resolveWorkflowRunTrigger'
+import { getWorkflowRunTriggerDetailsErrorMessage } from './workflowRunTriggerDetailsError'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -54,7 +55,7 @@ export function useWorkflowActions({
         } catch (error: unknown) {
           showError({
             title: 'Cannot run workflow',
-            description: error instanceof Error ? error.message : 'Failed to load workflow trigger details',
+            description: getWorkflowRunTriggerDetailsErrorMessage(error),
           })
           return
         }

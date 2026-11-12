@@ -20,6 +20,21 @@ function isEmptyValue(value: unknown): value is '' | null | undefined | never[] 
   return value === '' || value === null || value === undefined || (Array.isArray(value) && value.length === 0)
 }
 
+const TRIM_ON_SUBMIT_FIELD_TYPES: ReadonlySet<FormField['type']> = new Set([
+  FormFieldTypeEnum.TEXT,
+  FormFieldTypeEnum.TEXTAREA,
+  FormFieldTypeEnum.MASKED_TEXT,
+  FormFieldTypeEnum.EMAIL,
+])
+
+/** Trims leading/trailing whitespace on text-like answers before empty checks and coercion. */
+function normalizeTextLikeSubmission(field: FormField, raw: unknown): unknown {
+  if (raw === MISSING || !TRIM_ON_SUBMIT_FIELD_TYPES.has(field.type) || typeof raw !== 'string') {
+    return raw
+  }
+  return raw.trim()
+}
+
 function emptyValueForField(field: FormField): FormSubmissionData[string] {
   switch (field.type) {
     case FormFieldTypeEnum.TEXT:
@@ -390,7 +405,7 @@ function resolveSubmittedRaw(field: FormField, submitted: FormSubmissionInput): 
 }
 
 function validateFieldSubmission(field: FormField, submitted: FormSubmissionInput): FieldSubmissionOutcome {
-  const raw = resolveSubmittedRaw(field, submitted)
+  const raw = normalizeTextLikeSubmission(field, resolveSubmittedRaw(field, submitted))
 
   if (raw === MISSING || isEmptyValue(raw)) {
     if (field.required) {

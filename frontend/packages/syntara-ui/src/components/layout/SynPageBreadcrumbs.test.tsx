@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -112,14 +112,82 @@ describe('SynPageBreadcrumbs', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('renders very long labels so entity names remain available in the DOM', () => {
-    const longLabel = `Project ${'x'.repeat(400)}`
-
-    render(
-      <SynPageBreadcrumbs items={[{ label: 'Access management', href: '/access-management' }, { label: longLabel }]} />
+  it('truncates the current-page label and shows the full name in a tooltip on hover and keyboard focus', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn()
+        disconnect = vi.fn()
+        unobserve = vi.fn()
+      }
     )
 
-    expect(screen.getByText(longLabel)).toBeInTheDocument()
+    const longLabel = `Project ${'x'.repeat(200)}`
+
+    render(
+      <div style={{ width: 160 }}>
+        <SynPageBreadcrumbs
+          items={[{ label: 'Access management', href: '/access-management' }, { label: longLabel }]}
+        />
+      </div>
+    )
+
+    const currentSegment = screen.getByTestId('breadcrumb-current-segment')
+    expect(currentSegment).toHaveTextContent(longLabel)
+
+    expect(currentSegment).toHaveClass('pf-v6-c-truncate')
+
+    await user.hover(currentSegment)
+
+    await waitFor(() => {
+      expect(screen.getByRole('tooltip')).toHaveTextContent(longLabel)
+    })
+
+    const parentCrumb = screen.getByRole('link', { name: 'Access management' })
+    await user.tab()
+    expect(parentCrumb).toHaveFocus()
+
+    await user.tab()
+    await user.tab()
+    expect(currentSegment).toHaveFocus()
+
+    await waitFor(() => {
+      expect(screen.getByRole('tooltip')).toHaveTextContent(longLabel)
+    })
+  })
+
+  it('truncates a long linked middle segment on a wide viewport with four crumbs', () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn()
+        disconnect = vi.fn()
+        unobserve = vi.fn()
+      }
+    )
+
+    const longProject = `alice-sandbox-${'x'.repeat(80)}`
+
+    render(
+      <div style={{ width: 480 }}>
+        <SynPageBreadcrumbs
+          items={[
+            { label: 'Access management', href: '/access-management' },
+            { label: 'Projects', href: '/access-management/projects' },
+            { label: longProject, href: '/access-management/projects/1' },
+            { label: 'Workflows' },
+          ]}
+        />
+      </div>
+    )
+
+    expect(screen.getByRole('link', { name: longProject })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Projects' })).toBeInTheDocument()
+    expect(
+      screen.getAllByTestId('breadcrumb-truncated-label').some((node) => node.textContent?.includes(longProject))
+    ).toBe(true)
+    expect(screen.getByTestId('breadcrumb-current-segment')).toHaveTextContent('Workflows')
   })
 
   it('renders a non-link middle segment in the full trail (wide viewport)', () => {

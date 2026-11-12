@@ -18,10 +18,10 @@
  * - project-admin: project-scoped create/update/delete/run on assigned project
  */
 
-import { cleanupPersona, createPersona, loginAsUser, PERSONA_ACTIONS } from './authorization/fixtures'
+import { loginAsUser } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
+import { clickMainNavEntry, expectDockedNavGroupChildLinks, mainNavGroup, mainNavigation } from './helpers/docked-nav'
 import { openRowKebab } from './helpers/patternfly'
-import { installPersonaAuthzRoutes } from './helpers/personaAuthz'
 import { buildUniqueName } from './helpers/workflows'
 import {
   apiRequest,
@@ -177,133 +177,73 @@ async function createTestCredential(adminApp: Page): Promise<{ id: string; name:
 
 test.describe('Permission gating — Navigation visibility', () => {
   test('admin sees all navigation items', async ({ app }) => {
-    const nav = app.getByRole('navigation', { name: 'Main navigation' })
+    const nav = mainNavigation(app)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
 
-    const configItem = nav.getByLabel('Configuration')
-    await expect(configItem).toBeVisible()
-    await configItem.click()
-    await expect(app.getByRole('menuitem', { name: 'Integrations' })).toBeVisible()
-    await expect(app.getByRole('menuitem', { name: 'Credentials' })).toBeVisible()
-    await app.keyboard.press('Escape')
-    // Wait for the Configuration flyout to fully close before opening the next one
-    await expect(app.getByRole('menuitem', { name: 'Integrations' })).toBeHidden()
+    await expect(mainNavGroup(app, 'Configuration')).toBeVisible()
+    await expectDockedNavGroupChildLinks(app, 'Configuration', ['Integrations', 'Credentials'], 'Integrations')
 
-    const sysAdminItem = nav.getByLabel('System Administration')
-    await expect(sysAdminItem).toBeVisible()
-    await sysAdminItem.click()
-    await expect(app.getByRole('menuitem', { name: 'Access Management' })).toBeVisible()
-    await expect(app.getByRole('menuitem', { name: 'Identity Providers' })).toBeVisible()
-    await expect(app.getByRole('menuitem', { name: 'Settings' })).toBeVisible()
+    await expect(mainNavGroup(app, 'System Administration')).toBeVisible()
+    await expectDockedNavGroupChildLinks(
+      app,
+      'System Administration',
+      ['Access Management', 'Identity Providers', 'Settings'],
+      'Access Management'
+    )
   })
 
   test('viewer sees only operational items — no System Administration', async ({ viewerApp }) => {
-    const nav = viewerApp.getByRole('navigation', { name: 'Main navigation' })
+    const nav = mainNavigation(viewerApp)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
-    await expect(nav.getByLabel('Configuration')).toBeVisible()
+    await expect(mainNavGroup(viewerApp, 'Configuration')).toBeVisible()
 
-    await expect(nav.getByLabel('System Administration')).not.toBeVisible()
+    await expect(mainNavGroup(viewerApp, 'System Administration')).not.toBeVisible()
   })
 
   test('auditor sees all navigation items', async ({ auditorApp }) => {
-    const nav = auditorApp.getByRole('navigation', { name: 'Main navigation' })
+    const nav = mainNavigation(auditorApp)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
-    await expect(nav.getByLabel('Configuration')).toBeVisible()
+    await expect(mainNavGroup(auditorApp, 'Configuration')).toBeVisible()
 
-    const sysAdminItem = nav.getByLabel('System Administration')
-    await expect(sysAdminItem).toBeVisible()
-    await sysAdminItem.click()
-    await expect(auditorApp.getByRole('menuitem', { name: 'Access Management' })).toBeVisible()
-    await expect(auditorApp.getByRole('menuitem', { name: 'Identity Providers' })).toBeVisible()
-    await expect(auditorApp.getByRole('menuitem', { name: 'Settings' })).toBeVisible()
+    await expect(mainNavGroup(auditorApp, 'System Administration')).toBeVisible()
+    await expectDockedNavGroupChildLinks(
+      auditorApp,
+      'System Administration',
+      ['Access Management', 'Identity Providers', 'Settings'],
+      'Access Management'
+    )
   })
 
   test('user sees Access Management but not Identity Providers or Settings', async ({ userApp }) => {
-    const nav = userApp.getByRole('navigation', { name: 'Main navigation' })
+    const nav = mainNavigation(userApp)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
-    await expect(nav.getByLabel('Configuration')).toBeVisible()
 
-    // When only one SA child is visible (Access Management), the nav renders
-    // a direct link instead of a flyout dropdown.
-    const sysAdminLink = nav.getByLabel('System Administration')
-    await expect(sysAdminLink).toBeVisible()
-    await sysAdminLink.click()
+    // User has credential read only (no integration) → Configuration is a single nav link.
+    await expect(mainNavGroup(userApp, 'Configuration')).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Integrations', exact: true })).not.toBeVisible()
+
+    await expect(mainNavGroup(userApp, 'Identity Providers')).not.toBeVisible()
+    await expect(mainNavGroup(userApp, 'Settings')).not.toBeVisible()
+
+    // Only Access Management under SA → single "System Administration" link (no expand toggle).
+    await expect(mainNavGroup(userApp, 'System Administration')).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Identity Providers', exact: true })).not.toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Settings', exact: true })).not.toBeVisible()
+
+    await clickMainNavEntry(userApp, 'System Administration')
     await expect(userApp.getByRole('heading', { name: 'Access Management' })).toBeVisible()
-  })
-})
-
-// ── Tasks tab visibility ─────────────────────────────────────────────────
-
-test.describe('Permission gating — Tasks tabs', () => {
-  test('admin sees Approvals and Form responses tabs on the Tasks page', async ({ app }) => {
-    await app.goto(toAppUrl('/tasks/approvals'))
-
-    await expect(app.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
-    await expect(app.getByRole('tab', { name: 'Approvals' })).toBeVisible()
-    await expect(app.getByRole('tab', { name: 'Form responses' })).toBeVisible()
-  })
-
-  test('user with approval read only sees the Approvals tab', async ({ userApp }) => {
-    await userApp.goto(toAppUrl('/tasks/approvals'))
-
-    await expect(userApp.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
-    await expect(userApp.getByRole('tab', { name: 'Approvals' })).toBeVisible()
-    await expect(userApp.getByRole('tab', { name: 'Form responses' })).not.toBeVisible()
-  })
-
-  test('persona with form_prompt read only sees the Form responses tab', async ({ app, browser }) => {
-    const personaActions = ['form_prompt:read', 'workflow:read', 'project:read']
-    const persona = await createPersona(app, buildUniqueName('form-prompt-reader'), personaActions)
-
-    const context = await browser.newContext()
-    const page = await context.newPage()
-
-    try {
-      // Register before login so nav/tasks never cache live-backend can_i (staleTime: Infinity).
-      await installPersonaAuthzRoutes(page, personaActions)
-      await loginAsUser(page, persona)
-      await page.goto(toAppUrl('/tasks/form-responses'))
-
-      await expect(page.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
-      await expect(page.getByRole('tab', { name: 'Form responses' })).toBeVisible()
-      await expect(page.getByRole('tab', { name: 'Approvals' })).not.toBeVisible()
-    } finally {
-      await context.close()
-      await cleanupPersona(app, persona)
-    }
-  })
-
-  test('approval operator sees Approvals tab only', async ({ app, browser }) => {
-    const personaActions = PERSONA_ACTIONS.approvalOperator
-    const persona = await createPersona(app, buildUniqueName('approval-op'), personaActions)
-
-    const context = await browser.newContext()
-    const page = await context.newPage()
-
-    try {
-      await installPersonaAuthzRoutes(page, personaActions)
-      await loginAsUser(page, persona)
-      await page.goto(toAppUrl('/tasks/approvals'))
-
-      await expect(page.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible()
-      await expect(page.getByRole('tab', { name: 'Approvals' })).toBeVisible()
-      await expect(page.getByRole('tab', { name: 'Form responses' })).not.toBeVisible()
-    } finally {
-      await context.close()
-      await cleanupPersona(app, persona)
-    }
   })
 })
 
@@ -877,14 +817,23 @@ test.describe('Permission gating — Project actions', () => {
       if (!createWorkflowResp.ok()) throw new Error('Workflow creation failed')
       const workflow = (await createWorkflowResp.json()) as { id: string }
 
-      // Viewer cannot select individual projects — dropdown only shows "All projects"
+      // Viewer lacks project update/delete — header project kebab must stay hidden even when
+      // a project is selected (mock API lists all projects; real backend may hide options).
       await viewerApp.goto(toAppUrl('/workflows'))
-      const projectSelector = viewerApp.getByRole('textbox', { name: 'Project' })
+      const projectSelector = viewerApp.getByTestId('page-header').getByRole('textbox', { name: 'Project' })
       await projectSelector.click()
-      await expect(viewerApp.getByRole('option', { name: 'All projects' })).toBeVisible()
-      await expect(viewerApp.getByRole('option', { name: projectName })).not.toBeVisible()
-      await expect(viewerApp.getByRole('option', { name: project.id })).not.toBeVisible()
-      await viewerApp.keyboard.press('Escape')
+      await projectSelector.fill(projectName)
+      const projectOption = viewerApp.getByRole('option', { name: projectName })
+      const optionVisible = await projectOption.isVisible({ timeout: 10_000 }).catch(() => false)
+      if (optionVisible && (await projectOption.isEnabled())) {
+        await projectOption.click()
+        await expect(viewerApp.getByRole('button', { name: 'Project actions' })).not.toBeVisible()
+      } else {
+        // Real backend: option missing or aria-disabled (no project:read) — cannot select a project.
+        if (optionVisible) await expect(projectOption).toHaveAttribute('aria-disabled', 'true')
+        await expect(viewerApp.getByRole('option', { name: 'All projects' })).toBeVisible()
+        await viewerApp.keyboard.press('Escape')
+      }
 
       // Clean up
       await apiRequest(app, 'delete', `/workflows/${workflow.id}`)

@@ -6,7 +6,7 @@ import type { EdgeConnection } from '../types/edge'
 import {
   buildWorkflowDefinition,
   transformApprovalApprovers,
-  transformNodeParameters,
+  transformStepParameters,
 } from './workflowDefinitionBuilder'
 
 /** Helper to create a minimal activity with a given ID for edge validation tests */
@@ -1313,10 +1313,10 @@ describe('transformApprovalApprovers', () => {
   })
 })
 
-describe('transformNodeParameters', () => {
+describe('transformStepParameters', () => {
   describe('condition and loop', () => {
     it('transforms UI negation syntax to backend syntax for condition nodes', () => {
-      const result = transformNodeParameters(ActivityTypeEnum.CONDITION, {
+      const result = transformStepParameters(ActivityTypeEnum.CONDITION, {
         condition: '!(${status} == "completed")',
       })
 
@@ -1324,7 +1324,7 @@ describe('transformNodeParameters', () => {
     })
 
     it('transforms UI negation syntax to backend syntax for loop nodes', () => {
-      const result = transformNodeParameters(ActivityTypeEnum.LOOP, {
+      const result = transformStepParameters(ActivityTypeEnum.LOOP, {
         type: 'while',
         condition: '!(${done} == true)',
       })
@@ -1333,7 +1333,7 @@ describe('transformNodeParameters', () => {
     })
 
     it('transforms contains to Python in with reversed operands', () => {
-      const result = transformNodeParameters(ActivityTypeEnum.CONDITION, {
+      const result = transformStepParameters(ActivityTypeEnum.CONDITION, {
         condition: '${message.text} contains "Hello"',
       })
 
@@ -1341,7 +1341,7 @@ describe('transformNodeParameters', () => {
     })
 
     it('leaves already-backend condition expressions unchanged', () => {
-      const result = transformNodeParameters(ActivityTypeEnum.CONDITION, {
+      const result = transformStepParameters(ActivityTypeEnum.CONDITION, {
         condition: 'not (${value} == "test")',
       })
 
@@ -1349,13 +1349,13 @@ describe('transformNodeParameters', () => {
     })
 
     it('leaves non-string condition values unchanged', () => {
-      const result = transformNodeParameters(ActivityTypeEnum.CONDITION, { condition: 42 })
+      const result = transformStepParameters(ActivityTypeEnum.CONDITION, { condition: 42 })
 
       expect(result.condition).toBe(42)
     })
 
     it('does not transform condition on unrelated node types', () => {
-      const result = transformNodeParameters(ActivityTypeEnum.SCRIPT, {
+      const result = transformStepParameters(ActivityTypeEnum.SCRIPT, {
         condition: '!(${status} == "completed")',
       })
 
@@ -1365,7 +1365,7 @@ describe('transformNodeParameters', () => {
 
   describe('switch', () => {
     it('transforms switch case conditions from UI to backend format', () => {
-      const result = transformNodeParameters(ActivityTypeEnum.SWITCH, {
+      const result = transformStepParameters(ActivityTypeEnum.SWITCH, {
         cases: [
           { port: 'case_0', label: 'Path 1', condition: '!(${status} == "blocked")' },
           { port: 'case_1', label: 'Path 2', condition: '${priority} > 5' },
@@ -1383,7 +1383,7 @@ describe('transformNodeParameters', () => {
 
     it('leaves cases unchanged when they are not a valid switch case array', () => {
       const cases = [{ port: 'case_0' }]
-      const result = transformNodeParameters(ActivityTypeEnum.SWITCH, { cases })
+      const result = transformStepParameters(ActivityTypeEnum.SWITCH, { cases })
 
       expect(result.cases).toEqual(cases)
     })
@@ -1391,7 +1391,7 @@ describe('transformNodeParameters', () => {
 
   describe('approval', () => {
     it('transforms approver objects to username and group name strings', () => {
-      const result = transformNodeParameters(ActivityTypeEnum.APPROVAL, {
+      const result = transformStepParameters(ActivityTypeEnum.APPROVAL, {
         approver_users: [{ id: 'user-1', username: 'alice' }],
         approver_groups: [{ id: 'group-1', name: 'admins' }],
         timeout: 300,
@@ -1405,7 +1405,7 @@ describe('transformNodeParameters', () => {
     })
 
     it('does not transform approvers for non-approval nodes', () => {
-      const result = transformNodeParameters(ActivityTypeEnum.SCRIPT, {
+      const result = transformStepParameters(ActivityTypeEnum.SCRIPT, {
         approver_users: [{ id: 'user-1', username: 'alice' }],
       })
 
@@ -1415,7 +1415,7 @@ describe('transformNodeParameters', () => {
 
   describe('converge', () => {
     it('strips branches and keeps other parameters', () => {
-      const result = transformNodeParameters(ActivityTypeEnum.CONVERGE, {
+      const result = transformStepParameters(ActivityTypeEnum.CONVERGE, {
         branches: ['a', 'b'],
         timeout: 30,
       })
@@ -1424,7 +1424,7 @@ describe('transformNodeParameters', () => {
     })
 
     it('leaves parameters unchanged when branches is absent', () => {
-      const result = transformNodeParameters(ActivityTypeEnum.CONVERGE, { timeout: 30 })
+      const result = transformStepParameters(ActivityTypeEnum.CONVERGE, { timeout: 30 })
 
       expect(result).toEqual({ timeout: 30 })
     })

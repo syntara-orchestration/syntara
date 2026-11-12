@@ -1,4 +1,4 @@
-import { useMemo, useReducer, useState } from 'react'
+import { useMemo, useReducer, useState, type ReactNode } from 'react'
 
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
@@ -52,6 +52,26 @@ type ApprovalsListPanelProps = {
   approvalsDocLink?: string | null
   tabKey?: string
   tabLabel?: string
+}
+
+function ApprovalsListPanelPage({
+  approvalsDocLink,
+  ProjectSelector,
+  listView,
+}: Readonly<{
+  approvalsDocLink?: string | null
+  ProjectSelector: ReactNode
+  listView: ReactNode
+}>) {
+  return (
+    <SynPage>
+      <SynPageTitle segments={['Approvals']} />
+      <SynPageHeader title="Approvals" docLink={approvalsDocLink ?? undefined} projectSelector={ProjectSelector} />
+      <SynPageBody>
+        <SynListPanel>{listView}</SynListPanel>
+      </SynPageBody>
+    </SynPage>
+  )
 }
 
 export function ApprovalsListPanel({
@@ -224,6 +244,8 @@ export function ApprovalsListPanel({
         body={
           <ApprovalsContent
             sortedApprovals={sortedApprovals}
+            hasActiveFilters={hasActiveFilters}
+            handleClearAllFilters={handleClearAllFilters}
             expandedRows={expandedRows}
             onToggleRow={toggleRow}
             getSortParams={getSortParams}
@@ -266,12 +288,6 @@ export function ApprovalsListPanel({
   }
 
   return (
-    <SynPage>
-      <SynPageTitle segments={['Approvals']} />
-      <SynPageHeader title="Approvals" docLink={approvalsDocLink ?? undefined} projectSelector={ProjectSelector} />
-      <SynPageBody>
-        <SynListPanel>{listView}</SynListPanel>
-      </SynPageBody>
-    </SynPage>
+    <ApprovalsListPanelPage approvalsDocLink={approvalsDocLink} ProjectSelector={ProjectSelector} listView={listView} />
   )
 }

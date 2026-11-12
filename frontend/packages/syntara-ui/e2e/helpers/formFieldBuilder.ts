@@ -6,11 +6,11 @@ import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
 import { apiRequest } from '../utils/api'
 
 import { parseFormDefinitionFieldFromApi, type FormPromptDefinitionField } from './formFieldDefinitionApi'
-import { addFormPromptNodeWithSubmittedBranch } from './v2-nodes'
+import { addFormPromptNodeWithSubmittedBranch } from './v2-steps'
 import {
   clickSaveAndWait,
-  closeNodeEditorPanel,
-  saveAndCloseNodeForm,
+  closeStepEditorPanel,
+  saveAndCloseStepForm,
   saveWorkflow,
   startWorkflowWithTrigger,
   triggerLayout,
@@ -401,8 +401,8 @@ export async function createFormPromptWorkflowWithBuilderOpen(
 }
 
 export async function saveFormPromptNodeAndWorkflow(page: Page): Promise<void> {
-  await saveAndCloseNodeForm(page, true)
-  await closeNodeEditorPanel(page)
+  await saveAndCloseStepForm(page, true)
+  await closeStepEditorPanel(page)
   await expect(page.getByRole('button', { name: 'Save workflow' })).toBeEnabled({ timeout: 15_000 })
   await clickSaveAndWait(page)
 }

@@ -1,4 +1,4 @@
-import type { TriggerFormData } from '../node-forms/triggerFormSchema'
+import type { TriggerFormData } from '../step-forms/triggerFormSchema'
 
 const PARAMETER_PREFIX = 'parameters.'
 

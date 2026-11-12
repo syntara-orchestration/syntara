@@ -47,7 +47,7 @@ _MISSING = object()
 # Built once at import; constructing a TypeAdapter per call is expensive.
 # EmailStr validates format only - pydantic passes check_deliverability=False,
 # so there is no DNS lookup and no network I/O on the submission path.
-_EMAIL_ADAPTER = TypeAdapter(EmailStr)
+_EMAIL_ADAPTER: TypeAdapter[EmailStr] = TypeAdapter(EmailStr)
 
 
 class _FormatError(ValueError):
@@ -313,6 +313,10 @@ def _coerce_number(raw: Any) -> int | float:  # noqa: ANN401
 
     # Accept: int, float
     if isinstance(raw, (int, float)):
+        # Integers are finite; math.isfinite() can overflow on large ints.
+        if isinstance(raw, float) and not math.isfinite(raw):
+            msg = "Infinite and NaN values are not accepted"
+            raise ValueError(msg)
         return raw
 
     # Accept: numeric string

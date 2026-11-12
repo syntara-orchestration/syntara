@@ -1,8 +1,8 @@
 import type { Approval } from '@syntara/contracts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { FlowNodeType } from '../../../constants'
 import { useAlerts } from '../../../providers/alerts'
+import { getApprovalLoadErrorAlert } from '../../approvals/approvalLoadErrors'
 import {
   canvasNodeIdFromApprovalNodeId,
   findApprovalForCanvasNode,
@@ -12,13 +12,12 @@ import { getApprovalPromptFromNode, getApprovalPromptFromRecord } from '../../ap
 import { ACTIVITY_STATUS, isTerminalState } from '../../builder/utils/executionState/executionHelpers'
 import { latestActivityStateForCanvasNode } from '../../workflows/execution/utils/activityState'
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
-import { resolveCanvasNodeType } from '../formPrompt/resolveCanvasNodeType'
 
-import { useAutoWaitingNodeDetection } from './useAutoWaitingNodeDetection'
-import type { useExecutionNodeClick } from './useExecutionNodeClick'
+import { useAutoApprovalDetection } from './useAutoApprovalDetection'
+import type { useExecutionStepClick } from './useExecutionStepClick'
 import { useFetchApprovalForUrlParam } from './useFetchApprovalForUrlParam'
 
-type NodeClickResult = ReturnType<typeof useExecutionNodeClick>
+type StepClickResult = ReturnType<typeof useExecutionStepClick>
 
 function isRunHistoryOpen(searchParams: string): boolean {
   return new URLSearchParams(searchParams).get('history') === 'open'
@@ -39,15 +38,15 @@ export type WorkflowDefinitionLike = {
  * - Extracting approval message/prompt from the approval record, with a
  *   workflow-definition fallback for older rows that have no persisted prompt
  *
- * Part of the approval hooks architecture. See `useExecutionNodeClick.ts` for the full layering explanation.
+ * Part of the approval hooks architecture. See `useExecutionStepClick.ts` for the full layering explanation.
  */
 export function useExecutionApprovalPanel(
   executionId: string | undefined,
   searchParams: string,
-  nodeClick: NodeClickResult,
+  stepClick: StepClickResult,
   workflowDefinition: WorkflowDefinitionLike | undefined
 ) {
-  const { clearApprovals, setApprovalsAndIndex, fetchApprovals, currentApproval, approvals } = nodeClick
+  const { clearApprovals, setApprovalsAndIndex, fetchApprovals, currentApproval, approvals } = stepClick
   const [panelOpen, setPanelOpen] = useState(false)
   const prevApprovalsLengthRef = useRef(0)
   const { showError } = useAlerts()
@@ -56,8 +55,31 @@ export function useExecutionApprovalPanel(
     return new URLSearchParams(searchParams).get('approval')
   }, [searchParams])
 
-  const urlApproval = useFetchApprovalForUrlParam(searchParams)
+  const {
+    approval: urlApproval,
+    error: urlApprovalError,
+    isPending: urlApprovalPending,
+  } = useFetchApprovalForUrlParam(searchParams)
   const [handledApprovalId, setHandledApprovalId] = useState<string | null>(null)
+  const lastUrlApprovalErrorKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    lastUrlApprovalErrorKeyRef.current = null
+  }, [approvalIdFromUrl])
+
+  useEffect(() => {
+    if (!approvalIdFromUrl || urlApprovalPending || !urlApprovalError) {
+      return
+    }
+    const alert = getApprovalLoadErrorAlert(urlApprovalError)
+    const key = `${approvalIdFromUrl}::${alert.description}`
+    if (lastUrlApprovalErrorKeyRef.current === key) {
+      return
+    }
+    lastUrlApprovalErrorKeyRef.current = key
+    showError(alert)
+  }, [approvalIdFromUrl, urlApprovalError, urlApprovalPending, showError])
+
   if (!approvalIdFromUrl && handledApprovalId !== null) {
     setHandledApprovalId(null)
   } else if (urlApproval?.id && urlApproval.id !== handledApprovalId) {
@@ -74,11 +96,8 @@ export function useExecutionApprovalPanel(
         }
         setPanelOpen(true)
       })
-      .catch(() => {
-        showError({
-          title: 'Failed to load approval',
-          description: 'Could not fetch approval details. Please try again.',
-        })
+      .catch((error: unknown) => {
+        showError(getApprovalLoadErrorAlert(error))
       })
   }
 
@@ -130,24 +149,20 @@ export function useExecutionApprovalPanel(
             setPanelOpen(true)
           }
         })
-        .catch(() => {
-          showError({
-            title: 'Failed to load approval',
-            description: 'Could not fetch approval details. Please try again.',
-          })
+        .catch((error: unknown) => {
+          showError(getApprovalLoadErrorAlert(error))
         })
     },
     [fetchApprovals, searchParams, setApprovalsAndIndex, showError]
   )
 
-  useAutoWaitingNodeDetection({
+  useAutoApprovalDetection({
     executionId,
-    shouldDetectNode: (nodeId) => resolveCanvasNodeType(nodeId, workflowDefinition) === FlowNodeType.APPROVAL,
-    fetchForNode: async (nodeId: string) => {
+    fetchForStep: async (nodeId: string) => {
       const fetchedApprovals = await fetchApprovals()
       return findApprovalForCanvasNode(fetchedApprovals, nodeId) ?? null
     },
-    onDetected: handleDetected,
+    onApprovalDetected: handleDetected,
   })
 
   // Auto-close panel when all approvals are resolved externally (e.g., via WebSocket)

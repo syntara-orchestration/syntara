@@ -13,9 +13,9 @@ import type { useExecutionApprovalPanel } from './useExecutionApprovalPanel'
 import { isWaitingApprovalNode } from './useExecutionApprovals'
 import type { useExecutionFormPromptPanel } from './useExecutionFormPromptPanel'
 import { isFormPromptNode, isWaitingFormPromptNode } from './useExecutionFormPrompts'
-import type { useExecutionNodeClick } from './useExecutionNodeClick'
+import type { useExecutionStepClick } from './useExecutionStepClick'
 
-type NodeClick = ReturnType<typeof useExecutionNodeClick>
+type NodeClick = ReturnType<typeof useExecutionStepClick>
 type ApprovalPanel = ReturnType<typeof useExecutionApprovalPanel>
 type FormPromptPanel = ReturnType<typeof useExecutionFormPromptPanel>
 

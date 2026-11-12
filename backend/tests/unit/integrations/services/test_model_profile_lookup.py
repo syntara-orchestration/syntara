@@ -44,7 +44,7 @@ CURATED_ANTHROPIC_MODELS = [
 CURATED_GOOGLE_MODELS = [
     "gemini-2.5-flash",
     "gemini-2.5-pro",
-    "gemini-2.0-flash",
+    "gemini-3.5-flash",
 ]
 
 CURATED_MODELS = CURATED_OPENAI_MODELS + CURATED_ANTHROPIC_MODELS + CURATED_GOOGLE_MODELS
@@ -74,7 +74,7 @@ def test_curated_models_have_profiles(model_id: str) -> None:
         ("anthropic/claude-sonnet-4-5", "Claude Sonnet 4.5 (latest)"),
         ("anthropic/claude-haiku-4-5", "Claude Haiku 4.5 (latest)"),
         ("google/gemini-2.5-flash", "Gemini 2.5 Flash"),
-        ("google/gemini-2.0-flash", "Gemini 2.0 Flash"),
+        ("google/gemini-3.5-flash", "Gemini 3.5 Flash"),
         ("openai/gpt-4o", "GPT-4o"),
         ("openai/gpt-5.5", "GPT-5.5"),
     ],

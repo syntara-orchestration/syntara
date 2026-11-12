@@ -1,5 +1,6 @@
 """Unit tests for form submission validation and coercion."""
 
+import json
 from datetime import datetime, tzinfo
 from typing import Any, Self, cast, get_args
 
@@ -213,19 +214,46 @@ class TestSubmissionFlow:
 class TestCoercion:
     """Per-type coercion rules."""
 
-    @pytest.mark.parametrize(("raw", "expected"), [("3.5", 3.5), (7, 7), (-2, -2), ("10", 10.0)])
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("3.5", 3.5),
+            (7, 7),
+            (-2, -2),
+            ("10", 10.0),
+            (0, 0),
+            (0.0, 0.0),
+            (-3.5, -3.5),
+            (1.7976931348623157e308, 1.7976931348623157e308),
+            (10**400, 10**400),
+        ],
+    )
     def test_number_accepted(self, raw: Any, expected: float) -> None:  # noqa: ANN401
         """Numbers and numeric strings coerce to int/float."""
         cleaned = validate_form_submission(_form(_field("number", "age")), {"age": raw})
 
         assert cleaned["age"] == expected
 
-    @pytest.mark.parametrize("raw", ["abc", "nan", "inf", "-inf", True, [1]])
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "abc",
+            "nan",
+            "inf",
+            "-inf",
+            True,
+            False,
+            [1],
+            float("nan"),
+            pytest.param(json.loads("1e400"), id="json-number-overflows-to-positive-infinity"),
+            float("-inf"),
+        ],
+    )
     def test_number_rejected(self, raw: Any) -> None:  # noqa: ANN401
         """Non-numeric strings, bools, nan/inf and lists are rejected."""
         errors = _errors(_form(_field("number", "age")), {"age": raw})
 
-        assert [e.code for e in errors] == ["type"]
+        assert [(e.field, e.code) for e in errors] == [("age", "type")]
 
     @pytest.mark.parametrize(
         ("raw", "expected"),

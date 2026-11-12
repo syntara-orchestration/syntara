@@ -336,6 +336,12 @@ export interface ApprovalActivity extends ActivityBase {
   parameters: ApprovalConfig & { [key: string]: unknown }
 }
 
+/** Form prompt node */
+export interface FormPromptActivity extends ActivityBase {
+  type: 'form_prompt'
+  parameters: FormPromptConfig & { [key: string]: unknown }
+}
+
 /** Conditional branch node */
 export interface ConditionActivity extends ActivityBase {
   type: 'condition'
@@ -401,6 +407,7 @@ export type TypedActivity =
   | AAPJobTemplateActivity
   | AAPWorkflowJobTemplateActivity
   | ApprovalActivity
+  | FormPromptActivity
   | ConditionActivity
   | LoopActivity
   | ConvergeActivity

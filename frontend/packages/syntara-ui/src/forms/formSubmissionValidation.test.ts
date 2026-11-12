@@ -131,6 +131,41 @@ describe('validateFormSubmission', () => {
     expect(cleaned).toEqual({ name: 'anon' })
   })
 
+  it('trims outer whitespace from absent text field defaults', () => {
+    const cleaned = validateFormSubmission(form(field(FormFieldTypeEnum.TEXT, 'name', { default: '  anon  ' })), {})
+    expect(cleaned).toEqual({ name: 'anon' })
+  })
+
+  it.each([
+    [FormFieldTypeEnum.TEXT, 'name'],
+    [FormFieldTypeEnum.TEXTAREA, 'notes'],
+    [FormFieldTypeEnum.MASKED_TEXT, 'secret'],
+    [FormFieldTypeEnum.EMAIL, 'contact'],
+  ] as const)('normalizes optional whitespace-only %s fields to an empty string', (fieldType, value_name) => {
+    const definition = form(field(fieldType, value_name))
+    expect(validateFormSubmission(definition, { [value_name]: '   ' })).toEqual({ [value_name]: '' })
+  })
+
+  it.each([
+    [FormFieldTypeEnum.TEXT, 'name'],
+    [FormFieldTypeEnum.TEXTAREA, 'notes'],
+    [FormFieldTypeEnum.MASKED_TEXT, 'secret'],
+    [FormFieldTypeEnum.EMAIL, 'contact'],
+  ] as const)('treats whitespace-only required %s fields as empty', (fieldType, value_name) => {
+    const definition = form(field(fieldType, value_name, { required: true }))
+    expectValidationErrors(definition, { [value_name]: '   ' }, [[value_name, 'required']])
+  })
+
+  it.each([
+    [FormFieldTypeEnum.TEXT, 'name', '  Ada  ', 'Ada'],
+    [FormFieldTypeEnum.TEXTAREA, 'notes', '  padded\nbody  ', 'padded\nbody'],
+    [FormFieldTypeEnum.MASKED_TEXT, 'secret', '  ***  ', '***'],
+    [FormFieldTypeEnum.EMAIL, 'contact', '  Bob@Example.COM  ', 'Bob@example.com'],
+  ] as const)('trims outer whitespace from %s submissions', (fieldType, value_name, submitted, expected) => {
+    const definition = form(field(fieldType, value_name))
+    expect(validateFormSubmission(definition, { [value_name]: submitted })).toEqual({ [value_name]: expected })
+  })
+
   it('reports required, type, and unknown_field errors together', () => {
     const definition = form(
       field(FormFieldTypeEnum.TEXT, 'name', { required: true }),

@@ -13,13 +13,16 @@ function toFieldPath(error: FormDefinitionFieldServerError): FieldPath<FormDefin
 
 export function useApplyServerFormFieldErrors(
   form: UseFormReturn<FormDefinition>,
-  serverFieldErrors?: ReadonlyArray<FormDefinitionFieldServerError>
+  serverFieldErrors?: ReadonlyArray<FormDefinitionFieldServerError>,
+  /** Parent `value` reset clears RHF errors — re-apply server errors in the same commit. */
+  reapplyAfterResetKey?: string
 ) {
+  const { clearErrors, setError } = form
   const previousPathsRef = useRef<FieldPath<FormDefinition>[]>([])
 
   useEffect(() => {
     for (const path of previousPathsRef.current) {
-      form.clearErrors(path)
+      clearErrors(path)
     }
     previousPathsRef.current = []
 
@@ -30,9 +33,9 @@ export function useApplyServerFormFieldErrors(
     const paths: FieldPath<FormDefinition>[] = []
     for (const err of serverFieldErrors) {
       const path = toFieldPath(err)
-      form.setError(path, { message: err.message })
+      setError(path, { message: err.message })
       paths.push(path)
     }
     previousPathsRef.current = paths
-  }, [form, serverFieldErrors])
+  }, [clearErrors, reapplyAfterResetKey, serverFieldErrors, setError])
 }

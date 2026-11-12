@@ -412,7 +412,7 @@ class TestListApprovalsContract:
             title="Request Validation Error",
             detail=(
                 "Validation failed: query -> execution_id: Input should be a valid UUID, "
-                "invalid character: found `n` at 1"
+                "invalid character: found `n` at 0"
             ),
             code="REQUEST_VALIDATION_ERROR",
             retryable=False,

@@ -1,6 +1,6 @@
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 
-import { makeUniqueName } from './nodeNaming'
+import { makeUniqueName } from './stepNaming'
 
 const DEFAULT_FORM_TRIGGER_ID = 'form'
 

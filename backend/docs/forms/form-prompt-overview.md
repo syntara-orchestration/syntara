@@ -206,7 +206,7 @@ batches. After submission, the Forms API calls the workflows-owned
 waiting activity.
 
 The API returns a creation receipt to the worker, a full prompt to the responder, and a
-compact row for task lists. See the [Forms API specification](../../src/syntara/schemas/forms/openapi.yaml)
+compact row for task lists. See the [Forms API specification](https://github.com/syntara-orchestration/syntara/blob/devel/backend/src/syntara/schemas/forms/openapi.yaml)
 and [OpenAPI Spec Management](../standards/openapi-spec-management.md).
 
 ## Authorization
@@ -233,7 +233,7 @@ a list request, the API returns only prompts from projects the caller is allowed
 |---|---|---|
 | `form_prompt:create` | admin | — (service-to-service only) |
 | `form_prompt:read` | admin, auditor | project-admin, project-user, project-auditor |
-| `form_prompt:submit` | admin | project-admin, project-user |
+| `form_prompt:submit` | admin | project-admin |
 
 **Tier 2 — the responder list**, checked inside the service where the relationships are
 loaded. Naming responders **narrows** tier 1, never widens it: a listed user still needs
@@ -311,4 +311,4 @@ For steps to add a field type or form parameter, see
 - [Expression System](../workflow-engine/expression-system.md) — the `${...}` namespace
 - [Authorization](../authorization.md) — RBAC, PermissionChecker, VisibilityFilter
 - [Audit](../audit.md) — audit event pipeline and transactional outbox
-- [Forms API Specification](../../src/syntara/schemas/forms/openapi.yaml)
+- [Forms API Specification](https://github.com/syntara-orchestration/syntara/blob/devel/backend/src/syntara/schemas/forms/openapi.yaml)
