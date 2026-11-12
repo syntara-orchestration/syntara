@@ -3,6 +3,8 @@
  *
  * Covers form field builder scenarios UI-1 through UI-3 on the form_prompt node.
  */
+import { FormFieldDisplayEnum } from '@syntara/contracts'
+
 import { test, expect } from '../fixtures'
 import {
   FORM_FIELD_TYPE_MENU_LABELS,
@@ -80,12 +82,14 @@ test.describe('Form prompt — form field builder', { tag: '@pr-check' }, () => 
       expect(stored.fields.map((field) => field.label)).toEqual(UI1_FIELD_SPECS.map((spec) => spec.label))
       expect(
         stored.fields.map((field) =>
-          field.type === 'text' ? { type: field.type, display: field.display } : { type: field.type }
+          field.type === 'text'
+            ? { type: field.type, display: field.display ?? FormFieldDisplayEnum.SINGLE_LINE }
+            : { type: field.type }
         )
       ).toEqual([
-        { type: 'text', display: 'single_line' },
-        { type: 'text', display: 'multi_line' },
-        { type: 'text', display: 'masked' },
+        { type: 'text', display: FormFieldDisplayEnum.SINGLE_LINE },
+        { type: 'text', display: FormFieldDisplayEnum.MULTI_LINE },
+        { type: 'text', display: FormFieldDisplayEnum.MASKED },
         { type: 'email' },
         { type: 'number' },
         { type: 'checkbox' },
