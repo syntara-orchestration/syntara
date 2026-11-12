@@ -19,9 +19,9 @@ from syntara.workflows.models.activity_execution import ActivityExecution, Activ
 from syntara.workflows.models.execution import Execution, ExecutionMode, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.workflow_engine.models.responses import WorkflowStartResponse
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflow_runtime.engines.models.responses import WorkflowStartResponse
+from syntara.workflow_core.models import NodeType
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from tests.helpers.user_reference import assert_user_reference
 from tests.integration.helpers.error_data import assert_error_data
 
