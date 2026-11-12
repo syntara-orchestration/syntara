@@ -66,6 +66,21 @@ TERMINAL_EXECUTION_STATUSES = frozenset(
 )
 
 
+class RetryKind(StrEnum):
+    """Classification of retry execution type.
+
+    Used for retry telemetry and metrics. Inferred from execution metadata, not persisted.
+
+    Attributes:
+        STANDARD: Complete workflow retry via retry_execution() (same inputs, trigger node).
+        FROM_FAILURE: Replay-based retry via retry_from_failure() (from failed state, optional overrides).
+
+    """
+
+    STANDARD = "standard"
+    FROM_FAILURE = "from_failure"
+
+
 class Execution(UserOwnedResource, table=True):
     """Execution model representing workflow runtime instances.
 
@@ -305,6 +320,31 @@ class Execution(UserOwnedResource, table=True):
         ),
     )
 
+    @property
+    def inferred_retry_kind(self) -> str | None:
+        """Infer retry kind from execution metadata.
+
+        Classification rules:
+        - If retried_from_execution_id is None → not a retry (returns None)
+        - If retried_from_execution_id is set AND execution_metadata has 'eligible_point_ids' → 'from_failure'
+        - If retried_from_execution_id is set AND execution_metadata lacks 'eligible_point_ids' → 'standard'
+
+        Older retry executions do not have ``eligible_point_ids`` and are
+        intentionally classified as standard retries for compatibility.
+
+        Returns:
+            Retry kind value ('standard', 'from_failure') or None if not a retry
+
+        """
+        if self.retried_from_execution_id is None:
+            return None
+
+        # Check if execution_metadata contains eligible_point_ids
+        if self.execution_metadata and "eligible_point_ids" in self.execution_metadata:
+            return RetryKind.FROM_FAILURE.value
+
+        return RetryKind.STANDARD.value
+
     def __repr__(self) -> str:
         """Return string representation of Execution.
 
@@ -463,8 +503,10 @@ class RetryFromFailureValidationResponse(SQLModel):
     )
     auto_included_node_ids: list[str] = Field(
         default_factory=list,
-        description="Sanitized nodes added as retry points on the default path. "
-        "Empty on explicit selections, which reject instead.",
+        description="Sanitized nodes added as retry points so redacted outputs can be regenerated. "
+        "Set on the default path and when an explicit sanitized replacement still has further "
+        "sanitized ancestors. Empty when that chain was already selected, or when an explicit "
+        "failed node with sanitized dependencies is rejected.",
     )
     sanitized_replacements: dict[str, list[str]] = Field(
         default_factory=dict,

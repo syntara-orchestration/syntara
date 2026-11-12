@@ -200,9 +200,10 @@ class TestListCredentials:
         resp = await auth_client.get("/api/v1/credentials")
         assert resp.status_code == 200
         body = resp.json()
-        assert len(body["resources"]) >= 2
+        resources = body["resources"]
+        assert len(resources) >= 2
         # All inputs should be masked
-        for resource in body["resources"]:
+        for resource in resources:
             if resource["inputs"]:
                 for value in resource["inputs"].values():
                     assert value == "$encrypted$"

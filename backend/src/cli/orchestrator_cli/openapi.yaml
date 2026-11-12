@@ -11,7 +11,7 @@
 openapi: 3.1.0
 info:
   title: Syntara API
-  version: 1.4.0
+  version: 1.5.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -32737,6 +32737,9 @@ components:
         - auth_failure
         - authz_duration_ms
         - opa_request_duration_ms
+        - workflow_retry_requests_total
+        - workflow_retry_completions_total
+        - workflow_retry_duration_seconds
       title: MetricType
       description: |-
         Categories of metrics recorded by Syntara.
@@ -32760,6 +32763,7 @@ components:
         - tool
         - system_wide
         - authorization
+        - retry
       title: MetricsCategoryType
       description: Metric category names used to group :class:`MetricType` members.
     MetricsRecordPage:
@@ -35427,7 +35431,7 @@ components:
           items:
             type: string
           title: Auto Included Node Ids
-          description: Sanitized nodes added as retry points on the default path. Empty on explicit selections, which reject instead.
+          description: Sanitized nodes added as retry points so redacted outputs can be regenerated. Set on the default path and when an explicit sanitized replacement still has further sanitized ancestors. Empty when that chain was already selected, or when an explicit failed node with sanitized dependencies is rejected.
         sanitized_replacements:
           type: object
           additionalProperties:

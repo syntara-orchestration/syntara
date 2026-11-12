@@ -14,7 +14,7 @@
 openapi: 3.1.0
 info:
   title: Syntara API
-  version: 1.4.0
+  version: 1.5.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -34504,7 +34504,7 @@ components:
           items:
             type: string
           title: Auto Included Node Ids
-          description: Sanitized nodes added as retry points on the default path. Empty on explicit selections, which reject instead.
+          description: Sanitized nodes added as retry points so redacted outputs can be regenerated. Set on the default path and when an explicit sanitized replacement still has further sanitized ancestors. Empty when that chain was already selected, or when an explicit failed node with sanitized dependencies is rejected.
         sanitized_replacements:
           type: object
           additionalProperties:
