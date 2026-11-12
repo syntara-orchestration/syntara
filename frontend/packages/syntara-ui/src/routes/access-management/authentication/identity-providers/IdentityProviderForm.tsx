@@ -474,7 +474,7 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
             submitLabel={submitLabel}
             isSaving={isSaving}
             onSubmit={normalizeAndSubmit}
-            onCancel={navigateBack}
+            cancelTo={AppRoute.SystemAdministration.Authentication.Root}
           />
         </SynPanel>
       </SynPageBody>
