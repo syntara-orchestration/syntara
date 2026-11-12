@@ -566,12 +566,11 @@ describe('TriggerStepForm Component', () => {
     })
 
     it('tells users to configure a job template rather than an EDA rulebook for the endpoint URL', async () => {
-      // AAP-91724: until an EDA action plugin exists, rulebooks cannot POST directly
-      // to this endpoint — only a job template invoking it can, so the help text
-      // must not instruct users to configure their EDA rulebook.
+      // Until an EDA action plugin exists, rulebooks cannot POST directly to this endpoint —
+      // only a job template invoking it can, so the help text must not mention rulebooks.
       const user = userEvent.setup()
       renderWithHeader(
-        <TriggerNodeForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
+        <TriggerStepForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
       )
 
       await user.click(screen.getByRole('button', { name: 'Endpoint URL help' }))
