@@ -30,6 +30,6 @@ describe('BuilderNew', () => {
   it('sets the browser tab title', async () => {
     const { default: BuilderNew } = await import('./BuilderNew')
     render(<BuilderNew />)
-    expectPageTitle(['New Workflow', 'Workflows'])
+    expectPageTitle('New Workflow | Workflows | Syntara')
   })
 })
