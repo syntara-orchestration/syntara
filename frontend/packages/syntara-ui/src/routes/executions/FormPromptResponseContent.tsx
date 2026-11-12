@@ -91,7 +91,7 @@ function getDisabledFieldTooltip(
     return permissions.tooltips.submit
   }
 
-  return 'You are not in the responder users or groups configured for this form.'
+  return 'You are not configured as a responder for this form. Contact your Admin to request access.'
 }
 
 function getSubmitTooltip(
