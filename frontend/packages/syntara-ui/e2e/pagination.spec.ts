@@ -33,6 +33,11 @@ import {
 } from './seeds/resources'
 import { ensureProject, getAuthToken } from './utils/api'
 
+// A single burst of 20+ creates can exhaust the API's PostgreSQL connection pool,
+// which fails every test in this file from beforeAll. Seed a few at a time instead.
+const WORKFLOW_SEED_COUNT = 22
+const WORKFLOW_SEED_CONCURRENCY = 5
+
 const seededWorkflows: SeededWorkflow[] = []
 const seededCredentials: SeededCredential[] = []
 const seededIntegrations: SeededIntegration[] = []
@@ -52,11 +57,17 @@ test.beforeAll(async ({ browser }) => {
     if (!project) throw new Error('pagination beforeAll: could not ensure project')
     const projectId = project.id
 
-    const workflowResults = await Promise.allSettled(
-      Array.from({ length: 22 }, (_, i) =>
-        createWorkflowViaApi(page, { name: `${prefix}-workflow-${i + 1}`, projectId, token })
+    const workflowResults: PromiseSettledResult<SeededWorkflow>[] = []
+    for (let start = 0; start < WORKFLOW_SEED_COUNT; start += WORKFLOW_SEED_CONCURRENCY) {
+      const batchSize = Math.min(WORKFLOW_SEED_CONCURRENCY, WORKFLOW_SEED_COUNT - start)
+      const batch = await Promise.allSettled(
+        Array.from({ length: batchSize }, (_, offset) => {
+          const index = start + offset + 1
+          return createWorkflowViaApi(page, { name: `${prefix}-workflow-${index}`, projectId, token })
+        })
       )
-    )
+      workflowResults.push(...batch)
+    }
     const workflowErrors: unknown[] = []
     for (const result of workflowResults) {
       if (result.status === 'fulfilled') seededWorkflows.push(result.value)

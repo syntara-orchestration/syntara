@@ -35,6 +35,10 @@ Recommended minimums based on connection budget analysis:
 
 Set `max_connections` with headroom above the estimated total to account for maintenance connections and monitoring tools. The memory overhead is ~5–10 MB per connection slot.
 
+The `podman-compose.yml` database service sets `POSTGRESQL_MAX_CONNECTIONS` from `APP_DB_MAX_CONNECTIONS`, which defaults to `200`. Raise both values together for larger deployments. E2E runs on the same stack lower `APP_DB_POOL_SIZE` and `APP_DB_MAX_OVERFLOW` per process instead, because Playwright seeds resources concurrently and reaches the pool limits faster than production traffic does.
+
+The image regenerates its custom config file on every container start, so restarting the `database` service is enough to apply a new `APP_DB_MAX_CONNECTIONS`.
+
 ### Session Lifecycle
 
 Use the `get_db()` dependency for **all** database access in endpoints and services:
