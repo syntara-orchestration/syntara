@@ -5,7 +5,10 @@ from execution_plane_client.registry import CommandRegistry
 
 from syntara.execution_plane.commands.completion import CompletionCommandHandler
 from syntara.execution_plane.commands.context import AOCommandContext
-from syntara.execution_plane.commands.credentials import CredentialResolveCommandHandler
+from syntara.execution_plane.commands.credentials import (
+    CredentialResolveCommandHandler,
+    CredentialResolveWorkloadCommandHandler,
+)
 
 
 def build_ao_registry() -> CommandRegistry[AOCommandContext]:
@@ -14,4 +17,8 @@ def build_ao_registry() -> CommandRegistry[AOCommandContext]:
     registry = CommandRegistry[AOCommandContext]()
     registry.register(catalog.definition("work.execute.completed", 1), CompletionCommandHandler())
     registry.register(catalog.definition("credential.resolve", 1), CredentialResolveCommandHandler())
+    registry.register(
+        catalog.definition("credential.resolve.workload", 1),
+        CredentialResolveWorkloadCommandHandler(),
+    )
     return registry
