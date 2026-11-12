@@ -10,6 +10,7 @@ from ..models.script_language import ScriptLanguage
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.credential_binding import CredentialBinding
     from ..models.execution_target_profile import ExecutionTargetProfile
     from ..models.script_executor_parameters_environment import ScriptExecutorParametersEnvironment
 
@@ -26,12 +27,15 @@ class ScriptExecutorParameters:
         code (str): Script code to execute
         execution_profile (ExecutionTargetProfile | None | Unset): Execution Plane placement profile for this workload.
         environment (ScriptExecutorParametersEnvironment | Unset): Environment variables
+        credential_bindings (list[CredentialBinding] | Unset): Host-side recipe-to-credential bindings for Execution
+            Plane dispatch.
     """
 
     language: ScriptLanguage
     code: str
     execution_profile: ExecutionTargetProfile | None | Unset = UNSET
     environment: ScriptExecutorParametersEnvironment | Unset = UNSET
+    credential_bindings: list[CredentialBinding] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -53,6 +57,13 @@ class ScriptExecutorParameters:
         if not isinstance(self.environment, Unset):
             environment = self.environment.to_dict()
 
+        credential_bindings: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.credential_bindings, Unset):
+            credential_bindings = []
+            for credential_bindings_item_data in self.credential_bindings:
+                credential_bindings_item = credential_bindings_item_data.to_dict()
+                credential_bindings.append(credential_bindings_item)
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -65,11 +76,14 @@ class ScriptExecutorParameters:
             field_dict["execution_profile"] = execution_profile
         if environment is not UNSET:
             field_dict["environment"] = environment
+        if credential_bindings is not UNSET:
+            field_dict["credential_bindings"] = credential_bindings
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.credential_binding import CredentialBinding
         from ..models.execution_target_profile import ExecutionTargetProfile
         from ..models.script_executor_parameters_environment import ScriptExecutorParametersEnvironment
 
@@ -102,11 +116,21 @@ class ScriptExecutorParameters:
         else:
             environment = ScriptExecutorParametersEnvironment.from_dict(_environment)
 
+        _credential_bindings = d.pop("credential_bindings", UNSET)
+        credential_bindings: list[CredentialBinding] | Unset = UNSET
+        if _credential_bindings is not UNSET:
+            credential_bindings = []
+            for credential_bindings_item_data in _credential_bindings:
+                credential_bindings_item = CredentialBinding.from_dict(credential_bindings_item_data)
+
+                credential_bindings.append(credential_bindings_item)
+
         script_executor_parameters = cls(
             language=language,
             code=code,
             execution_profile=execution_profile,
             environment=environment,
+            credential_bindings=credential_bindings,
         )
 
         script_executor_parameters.additional_properties = d

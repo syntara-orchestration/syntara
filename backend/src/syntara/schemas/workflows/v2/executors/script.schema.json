@@ -63,6 +63,9 @@
         "additionalProperties": {
           "type": "string"
         }
+      },
+      "credential_bindings": {
+        "$ref": "../common-definitions.schema.json#/$defs/credential_bindings"
       }
     },
     "additionalProperties": false

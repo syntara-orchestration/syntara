@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.approval_node_parameters_fallback_decision_type_0 import ApprovalNodeParametersFallbackDecisionType0
 from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.credential_binding import CredentialBinding
+
 
 T = TypeVar("T", bound="ApprovalNodeParameters")
 
@@ -18,6 +22,8 @@ class ApprovalNodeParameters:
 
     Attributes:
         credential_id (None | str | Unset): Syntara credential UUID
+        credential_bindings (list[CredentialBinding] | Unset): Host-side recipe-to-credential bindings for Execution
+            Plane dispatch.
         approver_users (list[str] | None | Unset): Usernames who can approve
         approver_groups (list[str] | None | Unset): Group names whose members can approve
         prompt (None | str | Unset): Message to display to approvers
@@ -27,6 +33,7 @@ class ApprovalNodeParameters:
     """
 
     credential_id: None | str | Unset = UNSET
+    credential_bindings: list[CredentialBinding] | Unset = UNSET
     approver_users: list[str] | None | Unset = UNSET
     approver_groups: list[str] | None | Unset = UNSET
     prompt: None | str | Unset = UNSET
@@ -40,6 +47,13 @@ class ApprovalNodeParameters:
             credential_id = UNSET
         else:
             credential_id = self.credential_id
+
+        credential_bindings: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.credential_bindings, Unset):
+            credential_bindings = []
+            for credential_bindings_item_data in self.credential_bindings:
+                credential_bindings_item = credential_bindings_item_data.to_dict()
+                credential_bindings.append(credential_bindings_item)
 
         approver_users: list[str] | None | Unset
         if isinstance(self.approver_users, Unset):
@@ -84,6 +98,8 @@ class ApprovalNodeParameters:
         field_dict.update({})
         if credential_id is not UNSET:
             field_dict["credential_id"] = credential_id
+        if credential_bindings is not UNSET:
+            field_dict["credential_bindings"] = credential_bindings
         if approver_users is not UNSET:
             field_dict["approver_users"] = approver_users
         if approver_groups is not UNSET:
@@ -99,6 +115,8 @@ class ApprovalNodeParameters:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.credential_binding import CredentialBinding
+
         d = dict(src_dict)
 
         def _parse_credential_id(data: object) -> None | str | Unset:
@@ -109,6 +127,15 @@ class ApprovalNodeParameters:
             return cast(None | str | Unset, data)
 
         credential_id = _parse_credential_id(d.pop("credential_id", UNSET))
+
+        _credential_bindings = d.pop("credential_bindings", UNSET)
+        credential_bindings: list[CredentialBinding] | Unset = UNSET
+        if _credential_bindings is not UNSET:
+            credential_bindings = []
+            for credential_bindings_item_data in _credential_bindings:
+                credential_bindings_item = CredentialBinding.from_dict(credential_bindings_item_data)
+
+                credential_bindings.append(credential_bindings_item)
 
         def _parse_approver_users(data: object) -> list[str] | None | Unset:
             if data is None:
@@ -181,6 +208,7 @@ class ApprovalNodeParameters:
 
         approval_node_parameters = cls(
             credential_id=credential_id,
+            credential_bindings=credential_bindings,
             approver_users=approver_users,
             approver_groups=approver_groups,
             prompt=prompt,

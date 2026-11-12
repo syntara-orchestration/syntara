@@ -359,7 +359,65 @@ class ExecutionPlaneMixin(BaseModel):
     )
 
 
-class ScriptExecutorParameters(ExecutionPlaneMixin, TemplateAwareBaseModel):
+class CredentialBinding(TemplateAwareBaseModel):
+    """Recipe-to-credential mapping for a workflow node."""
+
+    credential_recipe_id: str = Field(
+        min_length=1,
+        max_length=256,
+        description="Qualified credential recipe identifier requested by the workload.",
+    )
+    credential_ref: uuid.UUID = Field(
+        description="Syntara credential selected for the credential recipe.",
+    )
+
+    @field_validator("credential_recipe_id")
+    @classmethod
+    def validate_credential_recipe_id(cls, value: str) -> str:
+        """Require a qualified recipe identifier after template resolution."""
+        if TEMPLATE_PATTERN.search(value):
+            return value
+        if not re.fullmatch(r"[a-z][a-z0-9-]{0,62}(?:\.[a-z][a-z0-9-]{0,62})+", value):
+            msg = "Credential recipe ID must be a qualified lowercase identifier"
+            raise SafeValueError(msg)
+        return value
+
+
+class CredentialBindingsMixin(BaseModel):
+    """Mixin for node configs that support recipe-to-credential bindings."""
+
+    credential_bindings: list[CredentialBinding] = Field(
+        default_factory=list,
+        max_length=16,
+        description="Host-side recipe-to-credential bindings for Execution Plane dispatch.",
+    )
+
+    @field_validator("credential_bindings")
+    @classmethod
+    def validate_credential_bindings(cls, value: list[CredentialBinding]) -> list[CredentialBinding]:
+        """Reject duplicate concrete recipe identifiers before workflow storage."""
+        concrete_recipe_ids = [
+            binding.credential_recipe_id
+            for binding in value
+            if not TEMPLATE_PATTERN.search(binding.credential_recipe_id)
+        ]
+        if len(concrete_recipe_ids) != len(set(concrete_recipe_ids)):
+            msg = "Credential bindings must have unique credential recipe IDs"
+            raise SafeValueError(msg)
+        return value
+
+
+class ScriptExecutorParameters(
+    ExecutionPlaneMixin,
+    # ===============================================================================
+    # TEMPORARY: Script Steps do not support or require Credentials however the
+    # Step type was chosen to help prototype the Execution Plane and Plugin SDK.
+    # Until a concrete Step type, requring Credentials, has been implemented
+    # we continue to use Script Step for development work.
+    # ===============================================================================
+    CredentialBindingsMixin,
+    TemplateAwareBaseModel,
+):
     """Parameters for script executor."""
 
     language: ScriptLanguage
@@ -381,7 +439,7 @@ class ScriptExecutorParameters(ExecutionPlaneMixin, TemplateAwareBaseModel):
         return v
 
 
-class APIExecutorParameters(TemplateAwareBaseModel):
+class APIExecutorParameters(CredentialBindingsMixin, TemplateAwareBaseModel):
     """Parameters for API executor (http_request activity)."""
 
     method: HTTPMethod = Field(description="HTTP method")
@@ -429,7 +487,7 @@ class IntegrationConnectionConfig(BaseModel):
         return validate_uuid_or_template(v, info.field_name or "unknown")
 
 
-class AgenticExecutorParameters(TemplateAwareBaseModel, populate_by_name=True):
+class AgenticExecutorParameters(CredentialBindingsMixin, TemplateAwareBaseModel, populate_by_name=True):
     """Parameters for agentic executor."""
 
     prompt: str = Field(description="Prompt template for the agent")
@@ -554,7 +612,7 @@ class AAPVerbosity(IntEnum):
     WINRM_DEBUG = 5
 
 
-class AAPResourceReferenceMixin(BaseModel):
+class AAPResourceReferenceMixin(CredentialBindingsMixin, BaseModel):
     """Mixin for AAP executor configs with common fields and resource reference validation.
 
     Provides shared fields used by both AAP job template and workflow job template configs,
@@ -864,7 +922,7 @@ class WaitNodeParameters(BaseModel):
     duration: int = Field(ge=1, description="Wait duration in seconds")
 
 
-class ApprovalNodeParameters(BaseModel):
+class ApprovalNodeParameters(CredentialBindingsMixin, BaseModel):
     """Parameters for approval gate nodes."""
 
     credential_id: str | None = Field(default=None, description="Syntara credential UUID")

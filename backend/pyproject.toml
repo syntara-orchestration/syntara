@@ -72,7 +72,7 @@ dependencies = [
     "uuid-utils>=0.9.0",
     "pypdf>=6.19.0",
     "nh3>=0.2.21",
-    "execution-plane-client>=0.1.15,<0.2.0",
+    "execution-plane-client>=0.1.17,<0.2.0",
 ]
 
 [project.optional-dependencies]

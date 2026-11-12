@@ -14,7 +14,7 @@
 openapi: 3.1.0
 info:
   title: Syntara API
-  version: 1.7.1
+  version: 1.8.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -35568,6 +35568,13 @@ components:
             - type: 'null'
           title: Credential Id
           description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+        credential_bindings:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/CredentialBinding'
+          title: Credential Bindings
+          description: Host-side recipe-to-credential bindings for Execution Plane dispatch.
         integration_id:
           anyOf:
             - type: string
@@ -35723,6 +35730,13 @@ components:
             - type: 'null'
           title: Credential Id
           description: Syntara credential UUID for Ansible Automation Platform API authentication. Separate from legacy credentials list.
+        credential_bindings:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/CredentialBinding'
+          title: Credential Bindings
+          description: Host-side recipe-to-credential bindings for Execution Plane dispatch.
         integration_id:
           anyOf:
             - type: string
@@ -35844,6 +35858,13 @@ components:
             - type: 'null'
           title: Credential Id
           description: Syntara credential UUID for authentication or Secret URL.
+        credential_bindings:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/CredentialBinding'
+          title: Credential Bindings
+          description: Host-side recipe-to-credential bindings for Execution Plane dispatch.
       type: object
       required:
         - method
@@ -35872,6 +35893,13 @@ components:
             - type: 'null'
           title: Credential Id
           description: Syntara credential UUID for LLM provider authentication
+        credential_bindings:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/CredentialBinding'
+          title: Credential Bindings
+          description: Host-side recipe-to-credential bindings for Execution Plane dispatch.
         file_ids:
           items:
             type: string
@@ -35940,6 +35968,25 @@ components:
         is used for calls against that integration instead of the integration's
 
         management credential.
+    CredentialBinding:
+      properties:
+        credential_recipe_id:
+          type: string
+          minLength: 1
+          maxLength: 256
+          title: Credential Recipe Id
+          description: Qualified credential recipe identifier requested by the workload.
+        credential_ref:
+          type: string
+          format: uuid
+          title: Credential Ref
+          description: Syntara credential selected for the credential recipe.
+      type: object
+      required:
+        - credential_recipe_id
+        - credential_ref
+      title: CredentialBinding
+      description: Recipe-to-credential mapping for a workflow node.
     ExecutionTargetProfile:
       properties:
         type:
@@ -35983,6 +36030,13 @@ components:
           type: object
           title: Environment
           description: Environment variables
+        credential_bindings:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/CredentialBinding'
+          title: Credential Bindings
+          description: Host-side recipe-to-credential bindings for Execution Plane dispatch.
       type: object
       required:
         - language
@@ -35997,6 +36051,13 @@ components:
             - type: 'null'
           title: Credential Id
           description: Syntara credential UUID
+        credential_bindings:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/CredentialBinding'
+          title: Credential Bindings
+          description: Host-side recipe-to-credential bindings for Execution Plane dispatch.
         approver_users:
           anyOf:
             - items:

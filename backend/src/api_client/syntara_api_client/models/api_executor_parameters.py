@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from ..models.api_executor_parameters_body_type_0 import APIExecutorParametersBodyType0
     from ..models.api_executor_parameters_headers import APIExecutorParametersHeaders
     from ..models.api_executor_parameters_query_params import APIExecutorParametersQueryParams
+    from ..models.credential_binding import CredentialBinding
 
 
 T = TypeVar("T", bound="APIExecutorParameters")
@@ -29,6 +30,8 @@ class APIExecutorParameters:
         body (APIExecutorParametersBodyType0 | None | str | Unset):
         query_params (APIExecutorParametersQueryParams | Unset):
         credential_id (None | str | Unset): Syntara credential UUID for authentication or Secret URL.
+        credential_bindings (list[CredentialBinding] | Unset): Host-side recipe-to-credential bindings for Execution
+            Plane dispatch.
     """
 
     method: HTTPMethod
@@ -37,6 +40,7 @@ class APIExecutorParameters:
     body: APIExecutorParametersBodyType0 | None | str | Unset = UNSET
     query_params: APIExecutorParametersQueryParams | Unset = UNSET
     credential_id: None | str | Unset = UNSET
+    credential_bindings: list[CredentialBinding] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -72,6 +76,13 @@ class APIExecutorParameters:
         else:
             credential_id = self.credential_id
 
+        credential_bindings: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.credential_bindings, Unset):
+            credential_bindings = []
+            for credential_bindings_item_data in self.credential_bindings:
+                credential_bindings_item = credential_bindings_item_data.to_dict()
+                credential_bindings.append(credential_bindings_item)
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -89,6 +100,8 @@ class APIExecutorParameters:
             field_dict["query_params"] = query_params
         if credential_id is not UNSET:
             field_dict["credential_id"] = credential_id
+        if credential_bindings is not UNSET:
+            field_dict["credential_bindings"] = credential_bindings
 
         return field_dict
 
@@ -97,6 +110,7 @@ class APIExecutorParameters:
         from ..models.api_executor_parameters_body_type_0 import APIExecutorParametersBodyType0
         from ..models.api_executor_parameters_headers import APIExecutorParametersHeaders
         from ..models.api_executor_parameters_query_params import APIExecutorParametersQueryParams
+        from ..models.credential_binding import CredentialBinding
 
         d = dict(src_dict)
         method = HTTPMethod(d.pop("method"))
@@ -150,6 +164,15 @@ class APIExecutorParameters:
 
         credential_id = _parse_credential_id(d.pop("credential_id", UNSET))
 
+        _credential_bindings = d.pop("credential_bindings", UNSET)
+        credential_bindings: list[CredentialBinding] | Unset = UNSET
+        if _credential_bindings is not UNSET:
+            credential_bindings = []
+            for credential_bindings_item_data in _credential_bindings:
+                credential_bindings_item = CredentialBinding.from_dict(credential_bindings_item_data)
+
+                credential_bindings.append(credential_bindings_item)
+
         api_executor_parameters = cls(
             method=method,
             url=url,
@@ -157,6 +180,7 @@ class APIExecutorParameters:
             body=body,
             query_params=query_params,
             credential_id=credential_id,
+            credential_bindings=credential_bindings,
         )
 
         api_executor_parameters.additional_properties = d

@@ -9,6 +9,33 @@
       "description": "Syntara credential UUID for authentication. When provided, the credential is resolved at execution time and injected into the node config.",
       "format": "uuid"
     },
+    "credential_bindings": {
+      "type": "array",
+      "description": "Host-side recipe-to-credential bindings for Execution Plane dispatch.",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": [
+          "credential_recipe_id",
+          "credential_ref"
+        ],
+        "properties": {
+          "credential_recipe_id": {
+            "type": "string",
+            "description": "Qualified credential recipe identifier requested by the workload.",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^(?:.*\\$\\{[^}]+\\}.*|[a-z][a-z0-9-]{0,62}(\\.[a-z][a-z0-9-]{0,62})+)$"
+          },
+          "credential_ref": {
+            "type": "string",
+            "description": "Syntara credential selected for the credential recipe.",
+            "format": "uuid"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "retry_policy": {
       "type": "object",
       "description": "Retry configuration for failed node execution. Only applies to executor and approval nodes. Unset fields inherit from global settings. Set max_retries to 0 to explicitly disable retry.",
