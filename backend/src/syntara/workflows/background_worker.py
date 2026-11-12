@@ -9,6 +9,10 @@ module and update the container startup script.
 
 import asyncio
 
+from syntara.workflow_runtime.engines.temporal.services.temporal_worker import (  # noqa: F401
+    TemporalWorkerService,
+    start_worker,
+)
 from syntara.workflow_runtime.workers.background_worker import main
 
 if __name__ == "__main__":

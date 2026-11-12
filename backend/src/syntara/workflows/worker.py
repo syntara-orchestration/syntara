@@ -8,6 +8,7 @@ then remove this module and update the container startup script.
 
 import asyncio
 
+from syntara.workflow_runtime.engines.temporal.services.temporal_worker import start_worker, stop_worker  # noqa: F401
 from syntara.workflow_runtime.workers.worker import main
 
 if __name__ == "__main__":

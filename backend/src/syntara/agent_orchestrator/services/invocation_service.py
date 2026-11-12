@@ -25,7 +25,7 @@ from sqlmodel import col, select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
-    from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
+    from syntara.workflow_runtime.execution import WorkflowExecutionService
     from syntara.workflows.services.execution_service import ExecutionService
 
 from syntara.agent_orchestrator.models import (
@@ -68,7 +68,7 @@ class InvocationService(BaseService):
         session_factory: Callable[[], AsyncGenerator[AsyncSession, None]] = get_db,
         file_manager_factory: Callable[[], FileManager] = get_file_manager,
         execution_service: "ExecutionService | None" = None,
-        temporal_service: "TemporalExecutionService | None" = None,
+        temporal_service: "WorkflowExecutionService | None" = None,
     ) -> None:
         """Initialize service with database session.
 
