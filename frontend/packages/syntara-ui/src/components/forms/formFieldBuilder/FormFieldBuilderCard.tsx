@@ -6,7 +6,8 @@ import type { FormDefinition, FormField } from '@syntara/contracts'
 import { useId, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
-import { labelToValueName, slugifyLabelToValueNameBase, type FormFieldType } from '../../../forms'
+import { labelToValueName, slugifyLabelToValueNameBase } from '../../../forms'
+import type { FormFieldUiKind } from '../../../forms/formFieldUiKind'
 
 import { replaceFieldType } from './createDefaultField'
 import styles from './formFieldBuilder.module.css'
@@ -70,7 +71,7 @@ export function FormFieldBuilderCard({
     commit()
   }
 
-  const handleTypeChange = (newType: FormFieldType) => {
+  const handleTypeChange = (newType: FormFieldUiKind) => {
     const current = getValues(`fields.${index}`)
     const names = (getValues('fields') ?? []).map((f) => f.value_name)
     setValue(`fields.${index}`, replaceFieldType(current, newType, names), { shouldValidate: false })

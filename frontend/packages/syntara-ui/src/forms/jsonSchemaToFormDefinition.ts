@@ -291,10 +291,6 @@ function fieldFromProperty(valueName: string, property: JsonSchemaProperty, requ
         type: FormFieldTypeEnum.TEXT,
         ...(typeof importedDefault === 'string' ? { default: importedDefault } : {}),
       }
-    case FormFieldTypeEnum.TEXTAREA:
-      return { ...base, type: FormFieldTypeEnum.TEXTAREA }
-    case FormFieldTypeEnum.MASKED_TEXT:
-      return { ...base, type: FormFieldTypeEnum.MASKED_TEXT }
     case FormFieldTypeEnum.EMAIL:
       return {
         ...base,

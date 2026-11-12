@@ -2,6 +2,7 @@ import type { FormField } from '@syntara/contracts'
 
 import { FormFieldTypeEnum } from '../../../forms'
 import type { FormSubmissionInput } from '../../../forms'
+import { FormFieldUiKindEnum, uiKindForField } from '../../../forms/formFieldUiKind'
 import type { DynamicOptionsResolver } from '../SynDynamicForm.types'
 import { SynTextAreaField } from '../SynTextAreaField'
 import { SynTextField } from '../SynTextField'
@@ -30,9 +31,10 @@ export function SynDynamicFormField({
   const hint = field.help_text ?? undefined
   const isRequired = Boolean(field.required)
   const placeholder = field.placeholder ?? undefined
+  const uiKind = uiKindForField(field)
 
-  switch (field.type) {
-    case FormFieldTypeEnum.TEXT:
+  switch (uiKind) {
+    case FormFieldUiKindEnum.TEXT:
       return (
         <SynTextField<FormSubmissionInput>
           name={field.value_name}
@@ -44,7 +46,7 @@ export function SynDynamicFormField({
           isDisabled={isDisabled}
         />
       )
-    case FormFieldTypeEnum.EMAIL:
+    case FormFieldUiKindEnum.EMAIL:
       return (
         <SynTextField<FormSubmissionInput>
           name={field.value_name}
@@ -57,7 +59,7 @@ export function SynDynamicFormField({
           isDisabled={isDisabled}
         />
       )
-    case FormFieldTypeEnum.MASKED_TEXT:
+    case FormFieldUiKindEnum.MASKED_TEXT:
       return (
         <SynTextField<FormSubmissionInput>
           name={field.value_name}
@@ -70,7 +72,7 @@ export function SynDynamicFormField({
           isDisabled={isDisabled}
         />
       )
-    case FormFieldTypeEnum.TEXTAREA:
+    case FormFieldUiKindEnum.TEXTAREA:
       return (
         <SynTextAreaField<FormSubmissionInput>
           name={field.value_name}
@@ -83,7 +85,10 @@ export function SynDynamicFormField({
           className={textAreaControlClassName}
         />
       )
-    case FormFieldTypeEnum.NUMBER:
+    case FormFieldUiKindEnum.NUMBER:
+      if (field.type !== FormFieldTypeEnum.NUMBER) {
+        throw new Error('Number UI kind must map to a number field')
+      }
       return (
         <SynDynamicFormNumberField
           field={field}
@@ -93,7 +98,10 @@ export function SynDynamicFormField({
           isDisabled={isDisabled}
         />
       )
-    case FormFieldTypeEnum.CHECKBOX:
+    case FormFieldUiKindEnum.CHECKBOX:
+      if (field.type !== FormFieldTypeEnum.CHECKBOX) {
+        throw new Error('Checkbox UI kind must map to a checkbox field')
+      }
       return (
         <SynDynamicFormCheckboxField
           field={field}
@@ -103,7 +111,10 @@ export function SynDynamicFormField({
           isDisabled={isDisabled}
         />
       )
-    case FormFieldTypeEnum.DATE:
+    case FormFieldUiKindEnum.DATE:
+      if (field.type !== FormFieldTypeEnum.DATE) {
+        throw new Error('Date UI kind must map to a date field')
+      }
       return (
         <SynDynamicFormDateField
           field={field}
@@ -113,7 +124,10 @@ export function SynDynamicFormField({
           isDisabled={isDisabled}
         />
       )
-    case FormFieldTypeEnum.DROPDOWN:
+    case FormFieldUiKindEnum.DROPDOWN:
+      if (field.type !== FormFieldTypeEnum.DROPDOWN) {
+        throw new Error('Dropdown UI kind must map to a dropdown field')
+      }
       return (
         <SynDynamicFormOptionsField
           field={field}
@@ -125,7 +139,10 @@ export function SynDynamicFormField({
           resolveDynamicOptions={resolveDynamicOptions}
         />
       )
-    case FormFieldTypeEnum.MULTI_SELECT:
+    case FormFieldUiKindEnum.MULTI_SELECT:
+      if (field.type !== FormFieldTypeEnum.MULTI_SELECT) {
+        throw new Error('Multi-select UI kind must map to a multi-select field')
+      }
       return (
         <SynDynamicFormOptionsField
           field={field}
@@ -138,7 +155,7 @@ export function SynDynamicFormField({
         />
       )
     default: {
-      const exhaustive: never = field
+      const exhaustive: never = uiKind
       return exhaustive
     }
   }

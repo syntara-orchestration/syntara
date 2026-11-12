@@ -56,6 +56,8 @@ class TestFormPromptPersistence:
         form_definition = FormDefinition(
             fields=[
                 TextField(type="text", value_name="version", label="Version"),
+                TextField(type="text", display="multi_line", value_name="notes", label="Notes"),
+                TextField(type="text", display="masked", value_name="token", label="Token"),
                 DropdownField(
                     type="dropdown",
                     value_name="environment",
@@ -77,7 +79,10 @@ class TestFormPromptPersistence:
 
         # Verify nested structures preserved
         assert data["form_definition"] == form_definition.model_dump()
-        assert data["form_definition"]["fields"][1]["options"]["values"][0]["value"] == "prod"
+        assert data["form_definition"]["fields"][3]["options"]["values"][0]["value"] == "prod"
+        assert data["form_definition"]["fields"][0]["display"] == "single_line"
+        assert data["form_definition"]["fields"][1]["display"] == "multi_line"
+        assert data["form_definition"]["fields"][2]["display"] == "masked"
         assert data["response_data"]["deployment"]["version"] == "1.2.3"
 
         # Deserialize back

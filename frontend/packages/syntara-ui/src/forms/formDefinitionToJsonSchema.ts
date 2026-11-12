@@ -53,8 +53,6 @@ function syntaraOptionsExtension(field: FormField): SyntaraFormOptionsExtension 
 function propertySchemaForField(field: FormField): Record<string, unknown> {
   switch (field.type) {
     case FormFieldTypeEnum.TEXT:
-    case FormFieldTypeEnum.TEXTAREA:
-    case FormFieldTypeEnum.MASKED_TEXT:
       return { type: 'string' }
     case FormFieldTypeEnum.EMAIL:
       return { type: 'string', format: 'email' }

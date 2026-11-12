@@ -1,4 +1,4 @@
-import type { Execution, ExecutionsAPI } from '@syntara/contracts'
+import { FormFieldDisplayEnum, type Execution, type ExecutionsAPI } from '@syntara/contracts'
 
 import { activityExecutions, type ActivityExecutionMockSeed } from './activityExecutions'
 import { executions } from './executions'
@@ -36,7 +36,8 @@ const layoutCheckFormParameters = {
       },
       {
         value_name: 'details',
-        type: 'textarea' as const,
+        type: 'text' as const,
+        display: FormFieldDisplayEnum.MULTI_LINE,
         label: 'Details',
         required: false,
         placeholder: 'Additional context',

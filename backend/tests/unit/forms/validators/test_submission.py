@@ -20,7 +20,7 @@ _STATIC_OPTIONS: dict[str, Any] = {
 
 # Every field type that coerce_field routes through _coerce_string.
 # "email" is excluded: it adds a format check on top (see TestEmailField).
-_STRING_FIELD_TYPES = ["text", "textarea", "masked_text"]
+_STRING_FIELD_TYPES = ["text"]
 
 _DYNAMIC_OPTIONS: dict[str, Any] = {
     "source": "dynamic",
@@ -83,8 +83,6 @@ class TestSubmissionFlow:
         ("field_type", "overrides", "expected"),
         [
             ("text", {}, ""),
-            ("textarea", {}, ""),
-            ("masked_text", {}, ""),
             ("email", {}, ""),
             ("date", {}, ""),
             ("number", {}, None),
@@ -117,8 +115,8 @@ class TestSubmissionFlow:
         ("field_type", "empty", "overrides", "expected"),
         [
             ("text", "", {"default": "prefilled"}, ""),
-            ("textarea", [], {"default": "prefilled"}, ""),
-            ("masked_text", None, {"default": "prefilled"}, ""),
+            ("text", [], {"default": "prefilled", "display": "multi_line"}, ""),
+            ("text", None, {"default": "prefilled", "display": "masked"}, ""),
             ("email", "", {"default": "user@example.com"}, ""),
             ("date", "", {"default": {"date": "2026-01-05"}}, ""),
             ("number", "", {"default": 7}, None),

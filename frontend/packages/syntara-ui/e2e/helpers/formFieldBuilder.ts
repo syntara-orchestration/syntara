@@ -5,6 +5,7 @@ import { expect, type Page } from '../fixtures'
 import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
 import { apiRequest } from '../utils/api'
 
+import { parseFormDefinitionFieldFromApi, type FormPromptDefinitionField } from './formFieldDefinitionApi'
 import { addFormPromptNodeWithSubmittedBranch } from './v2-nodes'
 import {
   clickSaveAndWait,
@@ -17,6 +18,8 @@ import {
 } from './workflows'
 
 export type FormFieldBuilderHost = 'form_prompt' | 'form_trigger'
+
+export { parseFormDefinitionFieldFromApi, type FormPromptDefinitionField } from './formFieldDefinitionApi'
 
 function formFieldBuilderFieldsHeading(page: Page) {
   return page.getByRole('heading', { name: 'Form fields', exact: true })
@@ -404,33 +407,12 @@ export async function saveFormPromptNodeAndWorkflow(page: Page): Promise<void> {
   await clickSaveAndWait(page)
 }
 
-export type FormPromptDefinitionField = {
-  type: string
-  value_name: string
-  label: string
-  required?: boolean
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-function parseFormPromptField(value: unknown): FormPromptDefinitionField | null {
-  if (!isRecord(value)) {
-    return null
-  }
-  const { type, value_name, label, required } = value
-  if (typeof type !== 'string' || typeof value_name !== 'string' || typeof label !== 'string') {
-    return null
-  }
-  if (required !== undefined && typeof required !== 'boolean') {
-    return null
-  }
-  return required === undefined ? { type, value_name, label } : { type, value_name, label, required }
-}
-
 /** Shared parser for form_definition.fields in E2E API assertions. */
-export const parseFormDefinitionFieldFromApi = parseFormPromptField
+const parseFormPromptField = parseFormDefinitionFieldFromApi
 
 function isUnknownArray(value: unknown): value is unknown[] {
   return Array.isArray(value)

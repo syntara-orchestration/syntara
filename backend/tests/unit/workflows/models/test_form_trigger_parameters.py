@@ -42,10 +42,10 @@ class TestFormTriggerParameters:
 
     def test_all_shared_field_types_are_accepted(self) -> None:
         fields: list[dict[str, object]] = [
-            _text_field(),
-            {"type": "textarea", "value_name": "notes", "label": "Notes"},
+            _text_field(display="single_line"),
+            {"type": "text", "display": "multi_line", "value_name": "notes", "label": "Notes"},
             {"type": "number", "value_name": "count", "label": "Count"},
-            {"type": "masked_text", "value_name": "secret", "label": "Secret"},
+            {"type": "text", "display": "masked", "value_name": "secret", "label": "Secret"},
             {
                 "type": "dropdown",
                 "value_name": "region",
@@ -64,16 +64,16 @@ class TestFormTriggerParameters:
         ]
 
         parameters = FormTriggerParameters.model_validate(_parameters(*fields))
-        assert [field.type for field in parameters.form_definition.fields] == [
-            "text",
-            "textarea",
-            "number",
-            "masked_text",
-            "dropdown",
-            "multi_select",
-            "checkbox",
-            "date",
-            "email",
+        assert [(field.type, getattr(field, "display", None)) for field in parameters.form_definition.fields] == [
+            ("text", "single_line"),
+            ("text", "multi_line"),
+            ("number", None),
+            ("text", "masked"),
+            ("dropdown", None),
+            ("multi_select", None),
+            ("checkbox", None),
+            ("date", None),
+            ("email", None),
         ]
 
     @pytest.mark.parametrize("field_type", ["dropdown", "multi_select"])

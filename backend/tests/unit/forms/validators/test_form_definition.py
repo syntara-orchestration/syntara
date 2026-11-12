@@ -46,8 +46,6 @@ class TestValidDefinitions:
         ("field_type", "default"),
         [
             ("text", "anon"),
-            ("textarea", "notes"),
-            ("masked_text", "secret"),
             ("email", "bob@example.com"),
             ("number", 42),
             ("number", 3.5),

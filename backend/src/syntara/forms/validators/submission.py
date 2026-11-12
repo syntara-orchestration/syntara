@@ -34,12 +34,10 @@ from syntara.forms.models.form_fields import (
     EmailField,
     FormDefinition,
     FormField,
-    MaskedTextField,
     MultiSelectField,
     NumberField,
     ResolvedOptions,
     StaticOptions,
-    TextAreaField,
     TextField,
 )
 
@@ -194,7 +192,7 @@ def _is_empty(value: Any) -> bool:  # noqa: ANN401
 def _empty_value_for_field(field: FormField) -> Any:  # noqa: ANN401
     """Return the canonical empty output compatible with a form field type."""
     match field:
-        case TextField() | TextAreaField() | MaskedTextField() | EmailField() | DateField():
+        case TextField() | EmailField() | DateField():
             return ""
         case NumberField() | DropdownField():
             return None
@@ -226,7 +224,7 @@ def coerce_field(field: FormField, raw: Any) -> Any:  # noqa: ANN401
     """
     coerced: Any
     match field:
-        case TextField() | TextAreaField() | MaskedTextField():
+        case TextField():
             coerced = _coerce_string(raw)
         case EmailField():
             coerced = _coerce_email(raw)

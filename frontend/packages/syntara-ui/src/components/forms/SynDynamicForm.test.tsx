@@ -1,3 +1,4 @@
+import { FormFieldDisplayEnum } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -155,7 +156,13 @@ describe('SynDynamicForm', () => {
           default: { date: '2026-02-01' },
           required: true,
         },
-        { type: FormFieldTypeEnum.TEXTAREA, value_name: 'notes', label: 'Notes', required: true },
+        {
+          type: FormFieldTypeEnum.TEXT,
+          display: FormFieldDisplayEnum.MULTI_LINE,
+          value_name: 'notes',
+          label: 'Notes',
+          required: true,
+        },
         {
           type: FormFieldTypeEnum.DROPDOWN,
           value_name: 'priority',

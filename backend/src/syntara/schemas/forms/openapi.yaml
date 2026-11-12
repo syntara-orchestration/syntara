@@ -2,7 +2,7 @@
 openapi: 3.1.0
 info:
   title: Orchestrator Forms API
-  version: 1.2.2
+  version: 1.3.0
   description: |
     Form prompts API for the Orchestrator platform.
 
@@ -498,8 +498,6 @@ components:
           items:
             oneOf:
               - $ref: '#/components/schemas/TextField'
-              - $ref: '#/components/schemas/TextAreaField'
-              - $ref: '#/components/schemas/MaskedTextField'
               - $ref: '#/components/schemas/EmailField'
               - $ref: '#/components/schemas/NumberField'
               - $ref: '#/components/schemas/CheckboxField'
@@ -510,8 +508,6 @@ components:
               propertyName: type
               mapping:
                 text: '#/components/schemas/TextField'
-                textarea: '#/components/schemas/TextAreaField'
-                masked_text: '#/components/schemas/MaskedTextField'
                 email: '#/components/schemas/EmailField'
                 number: '#/components/schemas/NumberField'
                 checkbox: '#/components/schemas/CheckboxField'
@@ -522,7 +518,7 @@ components:
     TextField:
       type: object
       title: TextField
-      description: Text field.
+      description: Text field. The backend preserves `display` but does not interpret it.
       additionalProperties: false
       required:
         - value_name
@@ -557,94 +553,14 @@ components:
           type: string
           const: text
           title: Type
-        default:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Default
-
-    TextAreaField:
-      type: object
-      title: TextAreaField
-      description: Text area field.
-      additionalProperties: false
-      required:
-        - value_name
-        - label
-        - type
-      properties:
-        value_name:
+        display:
           type: string
-          title: Value Name
-          maxLength: 64
-          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
-        label:
-          type: string
-          title: Label
-          minLength: 1
-          maxLength: 200
-        placeholder:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Placeholder
-        help_text:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Help Text
-        required:
-          type: boolean
-          title: Required
-          default: false
-        type:
-          type: string
-          const: textarea
-          title: Type
-        default:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Default
-
-    MaskedTextField:
-      type: object
-      title: MaskedTextField
-      description: Masked text field.
-      additionalProperties: false
-      required:
-        - value_name
-        - label
-        - type
-      properties:
-        value_name:
-          type: string
-          title: Value Name
-          maxLength: 64
-          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
-        label:
-          type: string
-          title: Label
-          minLength: 1
-          maxLength: 200
-        placeholder:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Placeholder
-        help_text:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Help Text
-        required:
-          type: boolean
-          title: Required
-          default: false
-        type:
-          type: string
-          const: masked_text
-          title: Type
+          enum:
+            - single_line
+            - multi_line
+            - masked
+          title: Display
+          default: single_line
         default:
           anyOf:
             - type: string

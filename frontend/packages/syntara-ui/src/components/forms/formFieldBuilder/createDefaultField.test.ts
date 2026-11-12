@@ -1,9 +1,17 @@
 import type { FormField } from '@syntara/contracts'
+import { FormFieldDisplayEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
-import { FORM_FIELD_TYPE_VALUES, FormFieldTypeEnum } from '../../../forms'
+import { FormFieldTypeEnum } from '../../../forms'
+import { FORM_FIELD_UI_KIND_VALUES, FormFieldUiKindEnum, uiKindForField } from '../../../forms/formFieldUiKind'
 
-import { createDefaultField, defaultDynamicOptionsSource, fieldTypeLabel, replaceFieldType } from './createDefaultField'
+import {
+  createDefaultField,
+  defaultDynamicOptionsSource,
+  fieldTypeLabel,
+  FORM_FIELD_TYPE_SELECT_OPTIONS,
+  replaceFieldType,
+} from './createDefaultField'
 
 describe('createDefaultField', () => {
   it('creates dropdown fields with static options', () => {
@@ -15,10 +23,25 @@ describe('createDefaultField', () => {
   })
 
   it('creates defaults for every supported field type', () => {
-    for (const type of FORM_FIELD_TYPE_VALUES) {
+    for (const type of FORM_FIELD_UI_KIND_VALUES) {
       const field = createDefaultField(type, [])
-      expect(field.type).toBe(type)
+      expect(uiKindForField(field)).toBe(type)
     }
+  })
+
+  it('keeps all nine field choices in the builder menu', () => {
+    expect(FORM_FIELD_UI_KIND_VALUES).toHaveLength(9)
+    expect(FORM_FIELD_TYPE_SELECT_OPTIONS.map(({ label }) => label)).toEqual([
+      'Text',
+      'Text area',
+      'Masked text',
+      'Email',
+      'Number',
+      'Checkbox',
+      'Date',
+      'Dropdown',
+      'Multi-select',
+    ])
   })
 
   it('leaves required dynamic option keys empty until the author sets them', () => {
@@ -31,7 +54,7 @@ describe('createDefaultField', () => {
   })
 
   it('fieldTypeLabel returns a human label for each type', () => {
-    for (const type of FORM_FIELD_TYPE_VALUES) {
+    for (const type of FORM_FIELD_UI_KIND_VALUES) {
       expect(fieldTypeLabel(type)).not.toBe('')
     }
   })
@@ -42,7 +65,15 @@ describe('createDefaultField', () => {
       value_name: 'x',
       label: 'X',
     }
-    expect(replaceFieldType(textField, FormFieldTypeEnum.TEXT, [])).toBe(textField)
+    expect(replaceFieldType(textField, FormFieldUiKindEnum.TEXT, [])).toBe(textField)
+  })
+
+  it('switches between text display kinds even though the API type stays text', () => {
+    const textField = createDefaultField(FormFieldUiKindEnum.TEXT)
+    const textAreaField = replaceFieldType(textField, FormFieldUiKindEnum.TEXTAREA, [])
+
+    expect(textAreaField).toMatchObject({ type: FormFieldTypeEnum.TEXT, display: FormFieldDisplayEnum.MULTI_LINE })
+    expect(uiKindForField(textAreaField)).toBe(FormFieldUiKindEnum.TEXTAREA)
   })
 
   it('replaceFieldType preserves label and value_name', () => {

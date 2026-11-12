@@ -1155,7 +1155,7 @@ export interface components {
     }
     /**
      * TextField
-     * @description Text field.
+     * @description Text field. The backend preserves `display` but does not interpret it.
      */
     TextField: {
       /** Value Name */
@@ -1176,58 +1176,12 @@ export interface components {
        * @enum {string}
        */
       type: 'text'
-      /** Default */
-      default?: string | null
-    }
-    /**
-     * TextAreaField
-     * @description Text area field.
-     */
-    TextAreaField: {
-      /** Value Name */
-      value_name: string
-      /** Label */
-      label: string
-      /** Placeholder */
-      placeholder?: string | null
-      /** Help Text */
-      help_text?: string | null
       /**
-       * Required
-       * @default false
-       */
-      required?: boolean
-      /**
-       * @description discriminator enum property added by openapi-typescript
+       * Display
+       * @default single_line
        * @enum {string}
        */
-      type: 'textarea'
-      /** Default */
-      default?: string | null
-    }
-    /**
-     * MaskedTextField
-     * @description Masked text field.
-     */
-    MaskedTextField: {
-      /** Value Name */
-      value_name: string
-      /** Label */
-      label: string
-      /** Placeholder */
-      placeholder?: string | null
-      /** Help Text */
-      help_text?: string | null
-      /**
-       * Required
-       * @default false
-       */
-      required?: boolean
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: 'masked_text'
+      display?: 'single_line' | 'multi_line' | 'masked'
       /** Default */
       default?: string | null
     }
@@ -1494,8 +1448,6 @@ export interface components {
       /** Fields */
       fields: (
         | components['schemas']['TextField']
-        | components['schemas']['TextAreaField']
-        | components['schemas']['MaskedTextField']
         | components['schemas']['EmailField']
         | components['schemas']['NumberField']
         | components['schemas']['CheckboxField']

@@ -81,8 +81,6 @@ export type MissedSchedulePolicy = (typeof MissedSchedulePolicyEnum)[keyof typeo
  */
 export const FormFieldTypeEnum = {
   TEXT: 'text',
-  TEXTAREA: 'textarea',
-  MASKED_TEXT: 'masked_text',
   EMAIL: 'email',
   NUMBER: 'number',
   CHECKBOX: 'checkbox',
@@ -92,6 +90,15 @@ export const FormFieldTypeEnum = {
 } as const
 
 export type FormFieldType = (typeof FormFieldTypeEnum)[keyof typeof FormFieldTypeEnum]
+
+/** UI rendering hint for text fields. The backend preserves this value but does not interpret it. */
+export const FormFieldDisplayEnum = {
+  SINGLE_LINE: 'single_line',
+  MULTI_LINE: 'multi_line',
+  MASKED: 'masked',
+} as const
+
+export type FormFieldDisplay = (typeof FormFieldDisplayEnum)[keyof typeof FormFieldDisplayEnum]
 
 /**
  * Trigger types that share webhook-style config (webhook_path, input_schema).

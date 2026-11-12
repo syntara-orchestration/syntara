@@ -1,3 +1,4 @@
+import { FormFieldDisplayEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { parseFormDefinition } from './formDefinitionSchema'
@@ -88,8 +89,8 @@ describe('validateFormSubmission', () => {
 
   it.each([
     [FormFieldTypeEnum.TEXT, {} as const, ''],
-    [FormFieldTypeEnum.TEXTAREA, {} as const, ''],
-    [FormFieldTypeEnum.MASKED_TEXT, {} as const, ''],
+    [FormFieldTypeEnum.TEXT, { display: FormFieldDisplayEnum.MULTI_LINE } as const, ''],
+    [FormFieldTypeEnum.TEXT, { display: FormFieldDisplayEnum.MASKED } as const, ''],
     [FormFieldTypeEnum.EMAIL, {} as const, ''],
     [FormFieldTypeEnum.DATE, {} as const, ''],
     [FormFieldTypeEnum.NUMBER, {} as const, null],
@@ -103,8 +104,8 @@ describe('validateFormSubmission', () => {
 
   it.each([
     [FormFieldTypeEnum.TEXT, '', { default: 'prefilled' }, ''],
-    [FormFieldTypeEnum.TEXTAREA, [], { default: 'prefilled' }, ''],
-    [FormFieldTypeEnum.MASKED_TEXT, null, { default: 'prefilled' }, ''],
+    [FormFieldTypeEnum.TEXT, [], { default: 'prefilled', display: FormFieldDisplayEnum.MULTI_LINE }, ''],
+    [FormFieldTypeEnum.TEXT, null, { default: 'prefilled', display: FormFieldDisplayEnum.MASKED }, ''],
     [FormFieldTypeEnum.EMAIL, '', { default: 'user@example.com' }, ''],
     [FormFieldTypeEnum.DATE, '', { default: { date: '2026-01-05' } }, ''],
     [FormFieldTypeEnum.NUMBER, '', { default: 7 }, null],
@@ -220,10 +221,10 @@ describe('validateFormSubmission', () => {
     expect(cleaned).toEqual({ tags: ['a'] })
   })
 
-  it('coerces textarea, masked text, and numeric string inputs', () => {
+  it('coerces text display variants and numeric string inputs', () => {
     const definition = form(
-      field(FormFieldTypeEnum.TEXTAREA, 'notes'),
-      field(FormFieldTypeEnum.MASKED_TEXT, 'secret'),
+      field(FormFieldTypeEnum.TEXT, 'notes', { display: FormFieldDisplayEnum.MULTI_LINE }),
+      field(FormFieldTypeEnum.TEXT, 'secret', { display: FormFieldDisplayEnum.MASKED }),
       field(FormFieldTypeEnum.NUMBER, 'count')
     )
 
