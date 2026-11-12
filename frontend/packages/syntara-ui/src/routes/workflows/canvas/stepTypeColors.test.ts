@@ -101,8 +101,10 @@ describe('getAddStepPanelColor', () => {
     expect(getAddStepPanelColor(RegistryStepId.LOGIC_LOOP)).toBe(STEP_TYPE_COLORS.logic)
   })
 
-  it('returns approval color for approval', () => {
+  it('returns approval color for human tasks category and subtypes', () => {
+    expect(getAddStepPanelColor(RegistryStepId.HUMAN_TASKS)).toBe(STEP_TYPE_COLORS.approval)
     expect(getAddStepPanelColor(RegistryStepId.APPROVAL)).toBe(STEP_TYPE_COLORS.approval)
+    expect(getAddStepPanelColor(RegistryStepId.FORM_PROMPT)).toBe(STEP_TYPE_COLORS.approval)
   })
 
   it('returns actionScript color for action and action subtypes', () => {

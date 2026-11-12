@@ -52,4 +52,5 @@
   min-width: 0;
   box-sizing: border-box;
   padding-inline: var(--pf-t--global--spacer--md);
+  padding-block-end: var(--pf-t--global--spacer--lg);
 }
