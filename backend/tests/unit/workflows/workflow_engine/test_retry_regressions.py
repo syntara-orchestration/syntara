@@ -16,6 +16,7 @@ from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 # ---------------------------------------------------------------------------
 # Helpers that build realistic definitions
@@ -78,6 +79,7 @@ def _diamond_graph() -> WorkflowGraph:
 
 def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+    init_workflow_runtime(wf)
     wf.retry_context = retry_context or {}
     wf._retry_restorable_cache = None
     wf._retry_replay_candidates = set()

@@ -20,6 +20,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     ForEachLoopState,
     LoopType,
 )
+from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 
 @pytest.fixture(autouse=True)
@@ -37,6 +38,7 @@ def _make_workflow(
 ) -> OrchestratorWorkflow:
     """Create an OrchestratorWorkflow with initialized state, bypassing __init__."""
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+    init_workflow_runtime(wf)
     wf.skipped_nodes = set()
     wf.failed_nodes = {}
     wf.resolver = NamespaceResolver()

@@ -21,6 +21,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     NodeSettingsNoRetry,
 )
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import retry_loop_record_activity_id
+from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 _TEST_GRAPHS: dict[int, MagicMock] = {}
 
@@ -33,6 +34,7 @@ def _wf(
     downstream_successors: dict[str, list[ActivityNode]] | None = None,
 ) -> OrchestratorWorkflow:
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+    init_workflow_runtime(wf)
     wf.retry_context = {"retry_from_execution_id": "src-1", "eligible_point_ids": retry_points} if retry_points else {}
     wf.resolver = NamespaceResolver()
     wf.skipped_nodes = set()
