@@ -88,9 +88,11 @@ class ActivitySyncEventProcessorMixin:
         ``..._{node.id}_iter_{n}``. The node's aggregate ActivityExecution row is
         already created upfront, so this only registers a pending update keyed to
         the canvas node: the activity's STARTED event drives RUNNING and its
-        COMPLETED event populates runtime_metadata (non-iterated nodes only).
-        Terminal status stays owned by the finalizer (see
-        ``_process_subworkflow_setup_completed``).
+        COMPLETED event populates runtime_metadata. For a ``for_each`` node the
+        ``_subworkflow_iteration`` index is carried through so the sync layer can
+        materialise one run-details row per iteration, each linking to that
+        iteration's child execution. Terminal status stays owned by
+        the finalizer (see ``_process_subworkflow_setup_completed``).
         """
         invocation_node_id = activity_id[len(self._SUBWORKFLOW_SETUP_PREFIX) :]
         iteration_number = innermost_iteration_index(invocation_node_id)
@@ -228,21 +230,22 @@ class ActivitySyncEventProcessorMixin:
 
         The node's ``input_data``/``output_data`` summaries are reconstructed from
         the setup result payload and persisted via the shared writer (C3: ASS owns
-        this, replacing the activity-side direct writer). For a non-iterated node
-        the child's identifying metadata is also surfaced as ``runtime_metadata``;
-        for a ``for_each`` node (N setups -> one aggregate row) ``runtime_metadata``
-        stays unset (deferred), while I/O follows the last iteration's setup result
-        (preserving prior behaviour).
+        this, replacing the activity-side direct writer). The child's identifying
+        metadata is surfaced as ``runtime_metadata`` on every row -- the single
+        row for a non-looped node, and one row per iteration for a ``for_each``
+        node -- with each iteration's setup result routed to its own row.
         """
         update["status"] = ActivityStatus.RUNNING
         update["completed_at"] = None
         setup_result = self._decode_setup_result(attrs, self.temporal_client.data_converter.payload_codec)
         if setup_result is not None:
             update["_subworkflow_io"] = self._build_subworkflow_io(setup_result)
-            if update.get("_subworkflow_iteration") is None:
-                child_metadata = self._child_runtime_metadata(setup_result)
-                if child_metadata is not None:
-                    update["runtime_metadata"] = child_metadata
+            # Surface the child link on every row: each setup result carries its
+            # own child execution id, routed to the matching row (the single row
+            # for a non-looped node, or the per-iteration row for a for_each).
+            child_metadata = self._child_runtime_metadata(setup_result)
+            if child_metadata is not None:
+                update["runtime_metadata"] = child_metadata
         metadata.pending_sync_event_ids.add(scheduled_id)
 
     @staticmethod
