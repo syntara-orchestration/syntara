@@ -32,11 +32,13 @@ import { buildExecutionTargetDeleteAction } from './executionTargetDeleteAction'
 import { ExecutionTargetDialogs } from './ExecutionTargetDialogs'
 import { buildExecutionTargetEditAction } from './executionTargetEditAction'
 import { ExecutionTargetStatusLabel } from './ExecutionTargetStatusLabel'
+import { buildExecutionTargetTestConnectionAction } from './executionTargetTestConnectionAction'
 import { getNodeSelectors } from './getNodeSelectors'
 import { NodeSelectorsCell } from './NodeSelectorsCell'
 import { useExecutionTargetActions } from './useExecutionTargetActions'
 import { useExecutionTargetEnabledToggle } from './useExecutionTargetEnabledToggle'
 import { useExecutionTargetPermissions } from './useExecutionTargetPermissions'
+import { useExecutionTargetTestConnection } from './useExecutionTargetTestConnection'
 
 type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
 
@@ -48,6 +50,8 @@ function ExecutionPlaneTableContent({
   isPatchPending,
   permissions,
   onEdit,
+  onTestConnection,
+  isTestingTarget,
 }: Readonly<{
   rows: ExecutionTarget[]
   getSortParams: (columnField: string) => ThProps['sort']
@@ -56,6 +60,8 @@ function ExecutionPlaneTableContent({
   isPatchPending: boolean
   permissions: ReturnType<typeof useExecutionTargetPermissions>
   onEdit: (target: ExecutionTarget) => void
+  onTestConnection: (target: ExecutionTarget) => void
+  isTestingTarget: (targetId: string) => boolean
 }>) {
   const permissionBlocked = permissions.isLoading || !permissions.canUpdate
   const toggleBlocked = permissionBlocked || isPatchPending
@@ -113,6 +119,10 @@ function ExecutionPlaneTableContent({
               <SynKebabMenu
                 actions={[
                   buildExecutionTargetEditAction(target, permissions, onEdit),
+                  buildExecutionTargetTestConnectionAction(target, onTestConnection, {
+                    isDisabled: isTestingTarget(target.id),
+                  }),
+                  { key: 'sep-delete', isSeparator: true },
                   buildExecutionTargetDeleteAction(target, deleteDialog, permissions),
                 ]}
                 aria-label={`Actions for ${target.name}`}
@@ -163,6 +173,8 @@ export default function ExecutionPlane() {
   const { deleteDialog, handleDelete } = useExecutionTargetActions({
     onSuccess: () => detachPromise(onMutationSuccess()),
   })
+
+  const { testConnection, isTestingTarget } = useExecutionTargetTestConnection()
 
   const results = query.data?.resources ?? []
 
@@ -243,6 +255,8 @@ export default function ExecutionPlane() {
                   isPatchPending={isPatchPending}
                   permissions={permissions}
                   onEdit={handleEdit}
+                  onTestConnection={testConnection}
+                  isTestingTarget={isTestingTarget}
                 />
               </SynListPanelTable>
             }

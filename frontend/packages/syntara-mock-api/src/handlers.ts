@@ -18,6 +18,7 @@ import {
   executionTargets,
   MOCK_ACTIVE_WORKLOAD_COUNTS,
   MOCK_DELETE_CONFLICT_LABEL,
+  MOCK_HEALTH_FAILURE_LABEL,
   MOCK_UPDATE_CONFLICT_LABEL,
 } from './resources/executionTargets'
 import { integrations } from './resources/integrations'
@@ -615,6 +616,55 @@ export const handlers = [
     return HttpResponse.json({
       target_id: targetId,
       active_workload_count: MOCK_ACTIVE_WORKLOAD_COUNTS[targetId] ?? 0,
+    })
+  }),
+
+  /**
+   * On-demand target health / test-connection probe.
+   * Targets labeled `mock_health_failure` return healthy: false with a reason.
+   */
+  http.get('/api/execution_plane/v1/execution_targets/:target_id/health', ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (!canReadExecutionTarget(username)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:read',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const targetId = params.target_id as string
+    const target = executionTargets.find((item) => item.id === targetId)
+    if (!target) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: `Execution target ${targetId} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+
+    if (target.labels?.[MOCK_HEALTH_FAILURE_LABEL]) {
+      return HttpResponse.json({
+        healthy: false,
+        message: `Unable to reach execution target "${target.name}": connection refused`,
+        skipped: false,
+      })
+    }
+
+    return HttpResponse.json({
+      healthy: true,
+      message: null,
+      skipped: false,
     })
   }),
 

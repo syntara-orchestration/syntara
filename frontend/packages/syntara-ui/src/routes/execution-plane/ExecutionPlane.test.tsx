@@ -16,6 +16,7 @@ import { routerTestState } from '../../test/setup'
 import ExecutionPlane from './ExecutionPlane'
 
 const mockDeleteMutate = vi.fn()
+const mockHealthMutate = vi.fn()
 const mockPatchMutateAsync = vi.fn()
 
 vi.mock('../../client', () => ({
@@ -24,6 +25,9 @@ vi.mock('../../client', () => ({
     useMutation: vi.fn((method: string) => {
       if (method === 'patch') {
         return { mutateAsync: mockPatchMutateAsync, isPending: false }
+      }
+      if (method === 'get') {
+        return { mutate: mockHealthMutate, isPending: false }
       }
       return { mutate: mockDeleteMutate, isPending: false }
     }),
@@ -162,6 +166,70 @@ describe('ExecutionPlane', () => {
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText(/Staging OpenShift/)).toBeInTheDocument()
     expect(within(dialog).getByRole('checkbox', { name: /permanently deleted/i })).toBeInTheDocument()
+  })
+
+  it('tests connection from the row actions menu and shows a success toast', async () => {
+    const user = userEvent.setup()
+    mockHealthMutate.mockImplementation(
+      (_params: unknown, callbacks?: { onSuccess?: (data: unknown) => void; onSettled?: () => void }) => {
+        callbacks?.onSuccess?.({ healthy: true, message: null, skipped: false })
+        callbacks?.onSettled?.()
+      }
+    )
+
+    render(<ExecutionPlane />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Staging OpenShift' }))
+    await user.click(screen.getByRole('menuitem', { name: /Test connection/i }))
+
+    expect(mockHealthMutate).toHaveBeenCalledWith(
+      { params: { path: { target_id: 'et-002' } } },
+      expect.objectContaining({ onSuccess: expect.any(Function) as unknown as () => void })
+    )
+    expect(await screen.findByText('Connection successful')).toBeInTheDocument()
+    expect(screen.getByText('Successfully connected to execution target "Staging OpenShift".')).toBeInTheDocument()
+  })
+
+  it('shows the failure reason when test connection returns unhealthy', async () => {
+    const user = userEvent.setup()
+    mockHealthMutate.mockImplementation(
+      (_params: unknown, callbacks?: { onSuccess?: (data: unknown) => void; onSettled?: () => void }) => {
+        callbacks?.onSuccess?.({
+          healthy: false,
+          message: 'Unable to reach execution target',
+          skipped: false,
+        })
+        callbacks?.onSettled?.()
+      }
+    )
+
+    render(<ExecutionPlane />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Staging OpenShift' }))
+    await user.click(screen.getByRole('menuitem', { name: /Test connection/i }))
+
+    expect(await screen.findByText('Connection failed')).toBeInTheDocument()
+    expect(screen.getByText('Unable to reach execution target')).toBeInTheDocument()
+  })
+
+  it('disables Test connection only for the target whose request is pending', async () => {
+    const user = userEvent.setup()
+    mockHealthMutate.mockImplementation(() => {
+      // Leave pending — do not call onSettled
+    })
+
+    render(<ExecutionPlane />, { wrapper })
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Staging OpenShift' }))
+    await user.click(screen.getByRole('menuitem', { name: /Test connection/i }))
+
+    await user.click(await screen.findByRole('button', { name: 'Actions for Staging OpenShift' }))
+    expect(screen.getByRole('menuitem', { name: /Test connection/i })).toHaveAttribute('aria-disabled', 'true')
+    expect(mockHealthMutate).toHaveBeenCalledTimes(1)
+
+    await user.keyboard('{Escape}')
+    await user.click(await screen.findByRole('button', { name: 'Actions for Prod OpenShift West' }))
+    expect(screen.getByRole('menuitem', { name: /Test connection/i })).not.toHaveAttribute('aria-disabled', 'true')
   })
 
   it('disables edit and delete kebab actions when update/delete are denied', async () => {
