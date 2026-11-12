@@ -445,9 +445,14 @@ class ActivityExecutionSyncMixin:
         activity update.
         """
         activity_id = activity_data["activity_id"]
-        iteration_number = activity_data.get("_subworkflow_iteration")
+        iteration_chain = activity_data.get("_subworkflow_iteration_chain")
+        if iteration_chain is None:
+            # Defensive fallback for any update that predates the chain field:
+            # treat the innermost index as a single-level chain.
+            inner = activity_data.get("_subworkflow_iteration")
+            iteration_chain = [] if inner is None else [inner]
         existing, is_new = self._get_or_create_subworkflow_iteration_record(
-            activity_id, iteration_number, existing_activities, metadata, session
+            activity_id, iteration_chain, existing_activities, metadata, session
         )
         if existing is None:
             return None
@@ -561,22 +566,26 @@ class ActivityExecutionSyncMixin:
     @staticmethod
     def _get_or_create_subworkflow_iteration_record(
         canvas_id: str,
-        iteration_number: int | None,
+        iteration_chain: list[int],
         existing_activities: dict[str, ActivityExecution],
         metadata: ExecutionMonitorMetadata,
         session: AsyncSession,
     ) -> tuple[ActivityExecution | None, bool]:
         """Resolve the ActivityExecution row for a sub-workflow setup event.
 
-        A non-looped node (``iteration_number`` is None) and the first iteration
-        (index 0) both use the canvas node's upfront aggregate row, so the common
-        case is unchanged. Each later iteration (index >= 1) gets a deterministic
-        per-iteration row keyed ``{canvas_id}#iter-{n}`` by the Temporal-assigned
-        iteration index -- created on first sight, reused afterwards. Keying by the
-        explicit index (not a running counter) makes resolution idempotent and
-        order-independent: duplicate, retried or out-of-order setup events for the
-        same iteration always map to the same row, and no iteration can create a
-        duplicate row or overwrite another iteration's child link.
+        ``iteration_chain`` is the full loop-index chain (outermost first) for
+        this setup event: ``[]`` for a non-looped node, ``[i]`` inside a single
+        loop, ``[o, i]`` inside a nested loop. A non-looped node and the first
+        iteration (all-zero chain) both reuse the canvas node's upfront aggregate
+        row, so the common case is unchanged. Every other iteration gets a
+        deterministic per-iteration row keyed ``{canvas_id}#iter-{token}`` where
+        ``token`` joins the whole chain (``"1"``, ``"0-1"``, ``"1-0"``...). Keying
+        by the complete chain -- not the innermost index -- is what keeps distinct
+        nested iterations from colliding, while still being a pure function of the
+        Temporal activity id: duplicate, retried or out-of-order setup events for
+        the same iteration always map to the same row, and no iteration can create
+        a duplicate row or overwrite another iteration's child link. Single-loop
+        keys are unchanged (the token is the single index).
 
         Returns ``(row, is_new)``; ``row`` is None only when the upfront aggregate
         row is missing (logged, matching the previous behaviour).
@@ -590,15 +599,21 @@ class ActivityExecutionSyncMixin:
             )
             return None, False
 
-        # Non-looped, or the first iteration: the upfront aggregate row is row 0.
-        if iteration_number is None:
+        # Non-looped, or the first iteration (all-zero chain): the upfront
+        # aggregate row is row 0. This keeps single-loop iter-0 and nested
+        # [0, 0] on the canvas node's own row, exactly as before.
+        if not iteration_chain:
             return original, False
-        if iteration_number == 0:
+        if all(index == 0 for index in iteration_chain):
             if original.iteration is None:
                 original.iteration = 0
             return original, False
 
-        composite_key = f"{canvas_id}{_COMPOSITE_ITER_SEP}{iteration_number}"
+        # Later iterations: key by the full chain so nested iterations that
+        # share an innermost index (e.g. [0, 1] and [1, 1]) stay distinct.
+        iteration_token = "-".join(str(index) for index in iteration_chain)
+        iteration_number = iteration_chain[-1]
+        composite_key = f"{canvas_id}{_COMPOSITE_ITER_SEP}{iteration_token}"
         existing = existing_activities.get(composite_key)
         if existing is not None:
             return existing, False

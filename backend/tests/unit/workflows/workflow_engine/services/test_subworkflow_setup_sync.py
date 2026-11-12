@@ -136,11 +136,15 @@ class TestSetupScheduled:
         assert u0["_subworkflow_iteration"] == 0
         assert u1["_subworkflow_iteration"] == 1
 
-    def test_nested_for_each_strips_to_canvas_node(self) -> None:
+    def test_nested_for_each_captures_full_iteration_chain(self) -> None:
+        # Nested for_each: the id carries the full outer/inner chain. The canvas
+        # id strips every suffix, and the FULL chain (not just the innermost
+        # index) is carried so nested iterations get distinct rows downstream.
         self.service._process_activity_scheduled(_scheduled(13, f"{_PREFIX}node-C_iter_1_iter_0"), self.metadata)
         update = self.metadata.pending_activity_updates[13]
         assert update["activity_id"] == "node-C"
-        assert update["_subworkflow_iteration"] == 0
+        assert update["_subworkflow_iteration_chain"] == [1, 0]
+        assert update["_subworkflow_iteration"] == 0  # innermost index (display only)
 
     def test_other_internal_activities_still_skipped(self) -> None:
         self.service._process_activity_scheduled(_scheduled(14, "__internal__register_monitoring"), self.metadata)
@@ -939,8 +943,10 @@ class TestSubworkflowIterationRecordResolution:
         return {"node-A": _row("node-A", status=ActivityStatus.PENDING)}
 
     def _get(self, existing: dict[str, ActivityExecution], n: int | None) -> tuple[Any, bool]:
+        # A single-level chain reproduces the old int-based call exactly.
+        chain: list[int] = [] if n is None else [n]
         return ActivityExecutionSyncMixin._get_or_create_subworkflow_iteration_record(
-            "node-A", n, existing, self.metadata, self.session
+            "node-A", chain, existing, self.metadata, self.session
         )
 
     def test_non_looped_uses_aggregate_row(self) -> None:
@@ -1142,3 +1148,107 @@ class TestIterationAddOpIncludesRuntimeMetadata:
         }
         assert add_ops[0]["value"]["iteration"] == 1
         assert {"op": "replace", "path": "/activities/0/iteration", "value": 0} in ops
+
+
+class TestSubworkflowNestedIterationChildLinks:
+    """Regression for the nested-loop collision (PR #1276 / AAP-101640).
+
+    A sub-workflow node inside a 2x2 nested for_each schedules four setup
+    activities whose Temporal ids share innermost indices across outer indices
+    (child_iter_0_iter_1 and child_iter_1_iter_1 both end in _iter_1). Keying the
+    run-details row by the innermost index alone collapsed these to one row, so
+    the later child execution overwrote the earlier one's link / I/O. Keying by
+    the full chain keeps all four distinct.
+    """
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.metadata = create_test_metadata()
+        self.session = Mock()
+
+    def _data(self, chain: list[int], child: str) -> dict[str, Any]:
+        return {
+            "activity_id": "node-A",
+            "activity_name": "node-A",
+            "_subworkflow_setup": True,
+            "_subworkflow_iteration": chain[-1] if chain else None,
+            "_subworkflow_iteration_chain": chain,
+            "status": ActivityStatus.RUNNING,
+            "started_at": datetime.now(UTC),
+            "completed_at": None,
+            "error_details": None,
+            "retry_count": 0,
+            "iteration": None,
+            "_subworkflow_io": _EP._build_subworkflow_io(_setup_result(execution_id=child)),
+            "runtime_metadata": {"child_execution_id": child, "child_workflow_name": "demo-child"},
+        }
+
+    # outer/inner chain -> child execution id for a 2x2 loop
+    _CELLS: ClassVar[list[tuple[list[int], str]]] = [
+        ([0, 0], "child-00"),
+        ([0, 1], "child-01"),
+        ([1, 0], "child-10"),
+        ([1, 1], "child-11"),
+    ]
+
+    def _agg(self) -> dict[str, ActivityExecution]:
+        return {"node-A": _row("node-A", status=ActivityStatus.PENDING)}
+
+    def _drive(self, existing: dict[str, ActivityExecution], cells: list[tuple[list[int], str]]) -> None:
+        for chain, child in cells:
+            res = self.service._sync_subworkflow_setup(self._data(chain, child), existing, self.metadata, self.session)
+            assert res is not None
+
+    def test_four_nested_iterations_resolve_to_four_distinct_rows(self) -> None:
+        existing = self._agg()
+        self._drive(existing, self._CELLS)
+        # [0, 0] reuses the aggregate; the other three get full-chain composite keys.
+        assert set(existing) == {"node-A", "node-A#iter-0-1", "node-A#iter-1-0", "node-A#iter-1-1"}
+        links = {k: _nn(v.runtime_metadata)["child_execution_id"] for k, v in existing.items()}
+        assert links == {
+            "node-A": "child-00",
+            "node-A#iter-0-1": "child-01",
+            "node-A#iter-1-0": "child-10",
+            "node-A#iter-1-1": "child-11",
+        }
+        assert len(set(links.values())) == 4  # no child execution overwritten
+        # I/O follows the same routing as the child link.
+        assert _nn(existing["node-A"].output_data)["child_execution_id"] == "child-00"
+        assert _nn(existing["node-A#iter-1-0"].output_data)["child_execution_id"] == "child-10"
+        assert _nn(existing["node-A#iter-1-1"].output_data)["child_execution_id"] == "child-11"
+
+    def test_same_innermost_index_across_outer_indices_does_not_collide(self) -> None:
+        # The exact collision from the review: both chains end in innermost index 1.
+        existing = self._agg()
+        self._drive(existing, [([0, 1], "child-01"), ([1, 1], "child-11")])
+        assert set(existing) == {"node-A", "node-A#iter-0-1", "node-A#iter-1-1"}
+        assert _nn(existing["node-A#iter-0-1"].runtime_metadata)["child_execution_id"] == "child-01"
+        assert _nn(existing["node-A#iter-1-1"].runtime_metadata)["child_execution_id"] == "child-11"
+
+    def test_duplicate_nested_event_keeps_single_row_and_link(self) -> None:
+        existing = self._agg()
+        self._drive(existing, [([1, 1], "child-11"), ([1, 1], "child-11")])  # replay
+        assert set(existing) == {"node-A", "node-A#iter-1-1"}
+        assert _nn(existing["node-A#iter-1-1"].runtime_metadata)["child_execution_id"] == "child-11"
+
+    def test_out_of_order_nested_events_resolve_deterministically(self) -> None:
+        existing = self._agg()
+        # Deliberately reversed arrival order, plus a late duplicate.
+        self._drive(
+            existing,
+            [
+                ([1, 1], "child-11"),
+                ([1, 0], "child-10"),
+                ([0, 1], "child-01"),
+                ([0, 0], "child-00"),
+                ([1, 1], "child-11"),
+            ],
+        )
+        assert set(existing) == {"node-A", "node-A#iter-0-1", "node-A#iter-1-0", "node-A#iter-1-1"}
+        links = {k: _nn(v.runtime_metadata)["child_execution_id"] for k, v in existing.items()}
+        assert links == {
+            "node-A": "child-00",
+            "node-A#iter-0-1": "child-01",
+            "node-A#iter-1-0": "child-10",
+            "node-A#iter-1-1": "child-11",
+        }

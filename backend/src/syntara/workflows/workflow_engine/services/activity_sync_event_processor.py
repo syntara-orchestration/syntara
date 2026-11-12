@@ -15,6 +15,7 @@ from syntara.workflows.workflow_engine.services.activity_sync_types import Execu
 from syntara.workflows.workflow_engine.utils.credential_scrubber import scrub_credentials
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     innermost_iteration_index,
+    loop_iteration_indices,
     strip_loop_iteration_suffixes,
 )
 from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
@@ -95,10 +96,11 @@ class ActivitySyncEventProcessorMixin:
         the finalizer (see ``_process_subworkflow_setup_completed``).
         """
         invocation_node_id = activity_id[len(self._SUBWORKFLOW_SETUP_PREFIX) :]
-        iteration_number = innermost_iteration_index(invocation_node_id)
-        canvas_node_id = (
-            strip_loop_iteration_suffixes(invocation_node_id) if iteration_number is not None else invocation_node_id
-        )
+        # Full loop-index chain (outermost first) uniquely identifies a nested
+        # iteration; the innermost index alone collides across outer indices.
+        iteration_chain = loop_iteration_indices(invocation_node_id)
+        iteration_number = iteration_chain[-1] if iteration_chain else None
+        canvas_node_id = strip_loop_iteration_suffixes(invocation_node_id) if iteration_chain else invocation_node_id
         metadata.pending_activity_updates[event.event_id] = {
             "activity_id": canvas_node_id,
             "activity_name": canvas_node_id,
@@ -106,6 +108,7 @@ class ActivitySyncEventProcessorMixin:
             "_is_loop_control": False,
             "_subworkflow_setup": True,
             "_subworkflow_iteration": iteration_number,
+            "_subworkflow_iteration_chain": iteration_chain,
             "status": ActivityStatus.PENDING,
             "started_at": None,
             "completed_at": None,
