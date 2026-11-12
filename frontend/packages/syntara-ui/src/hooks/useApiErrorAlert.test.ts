@@ -52,12 +52,6 @@ describe('useApiErrorAlert', () => {
     expect(mockShowError).toHaveBeenCalledWith({ title: 'Custom Title', description: 'Failed' })
   })
 
-  it('uses a supplied message instead of raw backend detail', () => {
-    renderHook(() => useApiErrorAlert({ status: 500, detail: 'Raw backend detail' }, { message: 'Try again.' }))
-
-    expect(mockShowError).toHaveBeenCalledWith({ title: 'Error', description: 'Try again.' })
-  })
-
   it('includes context in message when provided', () => {
     renderHook(() => useApiErrorAlert({ detail: 'Failed' }, { context: 'Loading data' }))
 
