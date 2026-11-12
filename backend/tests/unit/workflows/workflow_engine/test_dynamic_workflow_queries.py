@@ -170,6 +170,20 @@ class TestGetActivityInputQuery:
 
         assert wf.get_activity_input("inner_iter_1_iter_0") == {"value": "outer-1-inner-0"}
 
+    def test_keeps_loop_iteration_input_snapshots(self) -> None:
+        wf = _make_workflow()
+        wf.loop_body_map = {"body": "loop"}
+        wf.node_control_data["loop"] = {"current_index": 0}
+        wf.node_inputs["body"] = {"environment": {"ITEM": "alpha"}}
+        wf._record_occurrence_aliases("body", inputs=wf.node_inputs["body"])
+        wf.node_control_data["loop"] = {"current_index": 1}
+        wf.node_inputs["body"] = {"environment": {"ITEM": "bravo"}}
+        wf._record_occurrence_aliases("body", inputs=wf.node_inputs["body"])
+
+        assert wf.get_activity_input("body") == {"environment": {"ITEM": "bravo"}}
+        assert wf.get_activity_input("body_iter_0") == {"environment": {"ITEM": "alpha"}}
+        assert wf.get_activity_input("body_iter_1") == {"environment": {"ITEM": "bravo"}}
+
 
 # ---------------------------------------------------------------------------
 # Tests: get_activity_output query
@@ -215,6 +229,20 @@ class TestGetActivityOutputQuery:
         wf.activity_output_history["inner_iter_1_iter_0"] = [{"stdout": "outer-1-inner-0\\n"}]
 
         assert wf.get_activity_output("inner_iter_1_iter_0") == {"stdout": "outer-1-inner-0\\n"}
+
+    def test_keeps_loop_iteration_output_snapshots(self) -> None:
+        wf = _make_workflow()
+        wf.loop_body_map = {"body": "loop"}
+        wf.node_control_data["loop"] = {"current_index": 0}
+        wf.resolver.set_namespace("body", {"stdout": "alpha", "status": "completed"})
+        wf._record_occurrence_aliases("body", output={"stdout": "alpha", "status": "completed"})
+        wf.node_control_data["loop"] = {"current_index": 1}
+        wf.resolver.set_namespace("body", {"stdout": "bravo", "status": "failed"})
+        wf._record_occurrence_aliases("body", output={"stdout": "bravo", "status": "failed"})
+
+        assert wf.get_activity_output("body") == {"stdout": "bravo", "status": "failed"}
+        assert wf.get_activity_output("body_iter_0") == {"stdout": "alpha", "status": "completed"}
+        assert wf.get_activity_output("body_iter_1") == {"stdout": "bravo", "status": "failed"}
 
 
 # ---------------------------------------------------------------------------

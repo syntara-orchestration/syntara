@@ -1,6 +1,7 @@
 """Retry-from-failure orchestration, sharing the normal node completion path."""
 
 import collections
+import copy
 import hashlib
 import json
 from datetime import timedelta
@@ -331,7 +332,31 @@ class WorkflowRetryMixin:
         for node_id in must_run:
             downstream |= self._walk_downstream(node_id, graph)
 
-        restorable = {node.id for node in graph.get_all_nodes()} - must_run - triggers - downstream
+        # A loop's body feedback edge is removed from the graph, so the normal
+        # downstream walk from a selected body failure cannot reach nodes after
+        # the loop. If the source run failed inside that loop, those completion
+        # successors may have been marked SKIPPED only because the loop never
+        # finished. Let them execute after the retried body succeeds, while
+        # preserving completed successors to avoid repeating their side effects.
+        skipped_loop_completion_nodes: set[str] = set()
+        for loop_id, body_nodes in self._loop_bodies.items():
+            if not (must_run & body_nodes):
+                continue
+            for successor in graph.get_next_activities_by_port(loop_id, "complete"):
+                skipped_loop_completion_nodes.update(self._walk_downstream(successor.id, graph))
+        skipped_loop_completion_nodes = {
+            node_id
+            for node_id in skipped_loop_completion_nodes
+            if self._retry_source_statuses.get(node_id) == ActivityStatus.SKIPPED.value
+        }
+
+        restorable = (
+            {node.id for node in graph.get_all_nodes()}
+            - must_run
+            - triggers
+            - downstream
+            - skipped_loop_completion_nodes
+        )
         self._retry_restorable_cache = restorable
         return restorable
 
@@ -358,6 +383,31 @@ class WorkflowRetryMixin:
         resolved = str(recorded) if recorded else self._infer_control_node_branch(node, graph)
         self._resolved_control_port_cache[cache_key] = resolved
         return resolved
+
+    def _record_occurrence_aliases(
+        self,
+        node_id: str,
+        snapshot_id: str | None = None,
+        *,
+        inputs: dict[str, Any] | None = None,
+        output: dict[str, Any] | None = None,
+        control: dict[str, Any] | None = None,
+    ) -> None:
+        """Keep per-iteration copies that later loop turns cannot overwrite.
+
+        Canvas IDs hold the live slot that templates and the current iteration
+        read. Temporal IDs are append-only, so a delayed activity-sync query can
+        still load the occurrence that actually ran.
+        """
+        alias = snapshot_id or loop_body_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
+        if not alias or alias == node_id:
+            return
+        if inputs is not None:
+            self.node_inputs[alias] = copy.deepcopy(inputs)
+        if output is not None:
+            self.resolver.set_namespace(alias, output)
+        if control is not None:
+            self.node_control_data[alias] = copy.deepcopy(control)
 
     def _source_temporal_activity_id(self, node: ActivityNode) -> str:
         """Canonical source ID for this node at the active loop iteration path."""
@@ -999,7 +1049,9 @@ class WorkflowRetryMixin:
         output = (record or {}).get("output_data") or {}
         source_status = str((record or {}).get("status") or ActivityStatus.COMPLETED.value)
         error_details = (record or {}).get("error_details")
-        self.node_inputs[node.id] = (record or {}).get("input_data") or {}
+        restored_input = (record or {}).get("input_data") or {}
+        self.node_inputs[node.id] = restored_input
+        self._record_occurrence_aliases(node.id, source_temporal_id, inputs=restored_input)
         self._restored_node_statuses[node.id] = source_status
         restored_timestamps = {
             "started_at": (record or {}).get("started_at"),
@@ -1016,6 +1068,7 @@ class WorkflowRetryMixin:
                 stored_control = (record or {}).get("control_data")
                 if isinstance(stored_control, dict):
                     self.node_control_data[node.id] = stored_control
+                    self._record_occurrence_aliases(node.id, source_temporal_id, control=stored_control)
                 if source_status != ActivityStatus.COMPLETED.value:
                     if output:
                         self._restored_node_outputs[node.id] = output
@@ -1122,6 +1175,7 @@ class WorkflowRetryMixin:
             entry = {**output, "status": "failed", "error": message}
 
         self.resolver.set_namespace(node.id, entry)
+        self._record_occurrence_aliases(node.id, output=entry)
         return {"output": entry, "control": None}
 
     def _apply_input_overrides(self, node: ActivityNode, resolved_parameters: dict[str, Any]) -> None:
