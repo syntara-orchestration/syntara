@@ -65,7 +65,7 @@ class TestCreateFormPromptActivity:
             pytest.raises(CompleteAsyncError),
         ):
             await create_form_prompt_activity(
-                _form_prompt_input(form_definition={"fields": []}),
+                _form_prompt_input({"form_definition": {"fields": []}}),
             )
 
         mock_client.create_form_prompt.assert_called_once()
