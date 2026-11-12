@@ -1469,11 +1469,13 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             msg = "Wait duration must be a positive integer (seconds)"
             raise ApplicationError(msg, type="ConfigError", non_retryable=True)
 
+        temporal_activity_id = loop_body_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
+
         # Step 1: Start wait activity (validates config + global max, calls raise_complete_async)
         wait_handle = workflow.start_activity(
             ActivityName.WAIT,
             args=[resolved_parameters, outputs],
-            activity_id=loop_body_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data),
+            activity_id=temporal_activity_id,
             start_to_close_timeout=timedelta(seconds=total_seconds + self._TEMPORAL_MARGIN),
         )
 
@@ -1484,9 +1486,9 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # Step 3: Complete the async wait activity via local activity
         await workflow.execute_local_activity(
             complete_wait,
-            args=[workflow.info().workflow_id, workflow.info().run_id, node_id],
+            args=[workflow.info().workflow_id, workflow.info().run_id, temporal_activity_id],
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
-            activity_id=f"__internal__complete_wait_{node_id}",
+            activity_id=f"__internal__complete_wait_{temporal_activity_id}",
         )
 
         # Await the handle to get the activity result

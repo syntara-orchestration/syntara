@@ -215,6 +215,55 @@ class TestExecuteExecutorNodeUnknownType:
         assert "totally_unknown" in result["output"]["reason"]
 
 
+class TestExecuteWaitNode:
+    """Loop waits must complete the exact Temporal activity they started."""
+
+    @pytest.mark.parametrize(
+        ("loop_body_map", "node_control_data", "temporal_activity_id"),
+        [
+            ({"wait_node": "loop_node"}, {"loop_node": {"current_index": 0}}, "wait_node_iter_0"),
+            ({"wait_node": "loop_node"}, {"loop_node": {"current_index": 1}}, "wait_node_iter_1"),
+            (
+                {"wait_node": "inner_loop", "inner_loop": "outer_loop"},
+                {"outer_loop": {"current_index": 2}, "inner_loop": {"current_index": 1}},
+                "wait_node_iter_2_iter_1",
+            ),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_completes_wait_using_iteration_activity_id(
+        self,
+        request: pytest.FixtureRequest,
+        loop_body_map: dict[str, str],
+        node_control_data: dict[str, dict[str, int]],
+        temporal_activity_id: str,
+    ) -> None:
+        mock_temporal_workflow = request.getfixturevalue("_mock_temporal_workflow")
+        wf = _make_workflow()
+        wf.loop_body_map = loop_body_map
+        wf.node_control_data = node_control_data
+        workflow_result = {"output": {"status": "completed"}}
+        wait_handle = asyncio.get_running_loop().create_future()
+        wait_handle.set_result(workflow_result)
+        mock_temporal_workflow.start_activity.return_value = wait_handle
+        mock_temporal_workflow.sleep = AsyncMock()
+        mock_temporal_workflow.execute_local_activity = AsyncMock()
+        mock_temporal_workflow.info.return_value = MagicMock(workflow_id="test-wf-id", run_id="test-run-id")
+
+        result = await wf._execute_wait_node("wait_node", {"duration": 1}, None)
+
+        mock_temporal_workflow.start_activity.assert_called_once()
+        assert mock_temporal_workflow.start_activity.call_args.kwargs["activity_id"] == temporal_activity_id
+        mock_temporal_workflow.execute_local_activity.assert_awaited_once()
+        completion_args = mock_temporal_workflow.execute_local_activity.await_args.kwargs["args"]
+        assert completion_args == ["test-wf-id", "test-run-id", temporal_activity_id]
+        assert (
+            mock_temporal_workflow.execute_local_activity.await_args.kwargs["activity_id"]
+            == f"__internal__complete_wait_{temporal_activity_id}"
+        )
+        assert result == workflow_result
+
+
 class TestExecuteExecutorNodeHeartbeatTimeout:
     """Internal activities must be scheduled with a heartbeat_timeout.
 
