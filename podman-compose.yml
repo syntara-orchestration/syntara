@@ -13,6 +13,11 @@ services:
       POSTGRESQL_PASSWORD: ${APP_DB_PASSWORD:-admin}
       POSTGRESQL_DATABASE: ${APP_DB_NAME:-syntara_api}
       POSTGRESQL_ADMIN_PASSWORD: ${APP_DB_PASSWORD:-admin}
+      # The image default (100) is below the combined pool budget of the API, the
+      # two Temporal workers, the audit outbox pools and the Temporal server, so
+      # parallel E2E seeding can exhaust the server. See
+      # backend/docs/standards/database.md#postgresql-server-max_connections.
+      POSTGRESQL_MAX_CONNECTIONS: ${APP_DB_MAX_CONNECTIONS:-200}
     volumes:
       - syntara_postgres_data:/var/lib/pgsql/data
     healthcheck:
@@ -137,6 +142,8 @@ services:
       - APP_DB_USER=${APP_DB_USER:-admin}
       - APP_DB_PASSWORD=${APP_DB_PASSWORD:-admin}
       - APP_DB_NAME=${APP_DB_NAME:-syntara_api}
+      - APP_DB_POOL_SIZE=${APP_DB_POOL_SIZE:-10}
+      - APP_DB_MAX_OVERFLOW=${APP_DB_MAX_OVERFLOW:-20}
 
       - APP_S3_ENDPOINT_URL=${APP_S3_ENDPOINT_URL:-http://moto:5000}
       - APP_S3_BUCKET_NAME=${APP_S3_BUCKET_NAME:-orchestrator-files}
@@ -222,6 +229,8 @@ services:
       - APP_DB_USER=${APP_DB_USER:-admin}
       - APP_DB_PASSWORD=${APP_DB_PASSWORD:-admin}
       - APP_DB_NAME=${APP_DB_NAME:-syntara_api}
+      - APP_DB_POOL_SIZE=${APP_DB_POOL_SIZE:-10}
+      - APP_DB_MAX_OVERFLOW=${APP_DB_MAX_OVERFLOW:-20}
 
       - APP_S3_ENDPOINT_URL=${APP_S3_ENDPOINT_URL:-http://moto:5000}
       - APP_S3_BUCKET_NAME=${APP_S3_BUCKET_NAME:-orchestrator-files}
@@ -310,6 +319,8 @@ services:
       - APP_DB_USER=${APP_DB_USER:-admin}
       - APP_DB_PASSWORD=${APP_DB_PASSWORD:-admin}
       - APP_DB_NAME=${APP_DB_NAME:-syntara_api}
+      - APP_DB_POOL_SIZE=${APP_DB_POOL_SIZE:-10}
+      - APP_DB_MAX_OVERFLOW=${APP_DB_MAX_OVERFLOW:-20}
 
       - APP_SERVER_SCHEME=${APP_SERVER_SCHEME:-https}
       - APP_SERVER_HOST=${APP_SERVER_HOST:-0.0.0.0}
