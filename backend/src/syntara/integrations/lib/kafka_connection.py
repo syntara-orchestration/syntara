@@ -1,4 +1,4 @@
-"""Short-lived Kafka health connections with address pinning and metadata checks.
+"""Kafka socket policy shared by health checks and long-running consumers.
 
 Only this connection's event-loop view changes. The real loop and aiokafka's
 module globals are never patched. aiokafka remains responsible for Kafka framing,
@@ -92,7 +92,7 @@ class _PinnedLoop:
 
 
 # aiokafka 0.14 leaves its connection methods untyped.
-class _PinnedKafkaConnection(AIOKafkaConnection):
+class _PolicyKafkaConnection(AIOKafkaConnection):
     """Use upstream framing/authentication with a connection-local pinned loop."""
 
     _loop: Any
@@ -109,6 +109,36 @@ class _PinnedKafkaConnection(AIOKafkaConnection):
             return cast("tuple[asyncio.StreamReader, asyncio.StreamWriter]", await AIOKafkaConnection.connect(self))
         finally:
             self._loop = original_loop
+
+    def close(self, reason: object = None, exc: BaseException | None = None) -> asyncio.Future[None] | None:
+        """Keep normal Kafka shutdown, but never await an unopened socket's close."""
+        had_socket = self._protocol is not None
+        closed = AIOKafkaConnection.close(self, reason=reason, exc=exc)
+        if not had_socket and closed is not None and not closed.done():
+            # A policy/DNS/TCP failure cannot trigger connection_lost.
+            closed.set_result(None)
+            return None
+        return cast("asyncio.Future[None] | None", closed)
+
+
+async def create_kafka_connection(host: str, port: int, **kwargs: Any) -> AIOKafkaConnection:  # noqa: ANN401 - upstream connection options
+    """Enforce the existing Integration policy for every newly opened socket."""
+    connection = _PolicyKafkaConnection(host, port, **kwargs)
+    try:
+        await connection.connect()
+    except ValueError:
+        connection.close()
+        # aiokafka retries KafkaError; never leak DNS/policy exception contents.
+        msg = "Kafka broker address is not permitted"
+        raise KafkaConnectionError(msg) from None
+    except BaseException:
+        connection.close()
+        raise
+    return connection
+
+
+class _PinnedKafkaConnection(_PolicyKafkaConnection):
+    """Short-lived health connection with bounded, immediate socket shutdown."""
 
     def close(self, reason: object = None, exc: BaseException | None = None) -> asyncio.Future[None] | None:
         """Abort a health-check socket without an unbounded TLS shutdown wait.

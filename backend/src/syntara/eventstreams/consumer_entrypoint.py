@@ -15,12 +15,8 @@ from syntara.eventstreams.consumer_lifecycle import run_event_worker, settle_wor
 from syntara.eventstreams.consumer_service import EventWorkerManager
 from syntara.eventstreams.handlers.workflow_launcher import TemporalWorkflowLauncher
 from syntara.eventstreams.services.admission_service import EventAdmissionService
-from syntara.eventstreams.services.delivery_cache import EventDeliveryTerminalLookup
-from syntara.eventstreams.services.delivery_cache_policy import DeliveryEvidencePolicy
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.placement_service import SubscriptionPlacementService
-from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
-from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
 from syntara.eventstreams.services.subscription_hints import SubscriptionHintListener
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
 from syntara.eventstreams.services.worker_gate import EventWorkerGate
@@ -47,28 +43,22 @@ async def _run_connected(
     gate = EventWorkerGate(placement)
     resources.gate = gate
     redis = EventWorkerRedisClient()
-    cache = EventDeliveryTerminalLookup(
-        AsyncSessionLocal, cache=redis, policy=DeliveryEvidencePolicy.from_settings(), clock_is_safe=gate.cache_trusted
-    )
     launcher = TemporalWorkflowLauncher(temporal)
     preparation = EventExecutionPreparationService(AsyncSessionLocal, resources=resources)
-    admission = EventAdmissionService(AsyncSessionLocal, launcher, resources=resources, cache=cache)
+    admission = EventAdmissionService(AsyncSessionLocal, launcher, resources=resources)
     factory = ManagedRunnerFactory(
-        AsyncSessionLocal, preparation, admission, resources, encryptor, owner_worker_id=owner, lookup=cache
+        AsyncSessionLocal, preparation, admission, resources, encryptor, owner_worker_id=owner
     )
     manager = EventWorkerManager(
         EventSubscriptionReader(AsyncSessionLocal, deployment_id=placement.worker.deployment_id),
         factory,
         placement,
         resources,
-        controls=EventRuntimeControlService(AsyncSessionLocal, placement.worker),
-    )
-    recovery = EventDeliveryRecoveryWorker(
-        AsyncSessionLocal, launcher, worker_id=owner, admission=admission, resources=resources
+        connection_revision=factory.connection_revision,
     )
     hints = SubscriptionHintListener(manager.request_reconcile, redis)
     try:
-        await run_event_worker(manager, recovery, resources, hints, shutdown_event=shutdown)
+        await run_event_worker(manager, resources, hints, shutdown_event=shutdown)
     finally:
         try:
             async with asyncio.timeout(EventWorkerDefaults.HINT_TIMEOUT_SECONDS):

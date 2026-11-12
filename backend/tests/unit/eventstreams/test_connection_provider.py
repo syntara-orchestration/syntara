@@ -12,6 +12,7 @@ from syntara.core.exceptions import SafeValueError
 from syntara.core.lib.encryption import EncryptionError
 from syntara.core.services.secret_service import SecretService
 from syntara.core.storage_exceptions import StorageBackendNotFoundError
+from syntara.credentials.lib.kafka_connection import KafkaSecurityProtocol
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
@@ -119,6 +120,18 @@ async def test_credential_must_belong_to_workflow_project() -> None:
     context.credential.project_id = UUID(int=99)
     with pytest.raises(SafeValueError, match="unavailable"):
         await context.provider.resolve_revision(context.snapshot)
+
+
+@pytest.mark.parametrize("protocol", [KafkaSecurityProtocol.SSL, KafkaSecurityProtocol.PLAINTEXT])
+async def test_non_sasl_protocol_does_not_require_sasl_fields(protocol: KafkaSecurityProtocol) -> None:
+    context = connection_context()
+    config = context.integration.configuration
+    assert isinstance(config, KafkaConfiguration)
+    config.security_protocol = protocol
+    config.allow_plaintext = protocol == KafkaSecurityProtocol.PLAINTEXT
+    context.credential_type.injectors = {}
+    context.secrets.retrieve_secret.return_value = {}
+    assert await context.provider.resolve_revision(context.snapshot)
 
 
 async def test_project_scoped_integration_requires_assignment() -> None:

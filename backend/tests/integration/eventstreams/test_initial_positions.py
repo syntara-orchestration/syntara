@@ -1,24 +1,18 @@
 """Kafka position services with isolated PostgreSQL and broker/Temporal test clients."""
 
 import asyncio
-import importlib
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
-from alembic.migration import MigrationContext
-from alembic.operations import Operations
 from sqlalchemy import update
-from sqlalchemy.engine import Connection
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlmodel import col, select
-from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.core.constants import FieldLimits
 from syntara.eventstreams.adapters import kafka_position_store
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
 from syntara.eventstreams.adapters.kafka_initial_position import (
+    GapReason,
     InitializationKind,
     KafkaPartitionInitialPosition,
     PositionRequest,
@@ -31,9 +25,9 @@ from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaIn
 from syntara.eventstreams.adapters.kafka_position_control import (
     DrainEvidence,
     PartitionRecoveryControl,
-    RecoveryCacheCoordination,
 )
 from syntara.eventstreams.adapters.kafka_position_store import KafkaInitialPositionStore
+from syntara.eventstreams.adapters.kafka_record_runner import KafkaRecordRunner
 from syntara.eventstreams.core.consumer import (
     CommittedPositionResult,
     IdentityObservation,
@@ -42,25 +36,9 @@ from syntara.eventstreams.core.consumer import (
     PartitionSetStatus,
     SourceIdentityObservation,
 )
-from syntara.eventstreams.core.deduplication import (
-    CleanupCandidate,
-    DeliveryClaim,
-    DeliveryIdentity,
-    DeliveryState,
-    RecoveryReservation,
-    RevisionChanged,
-    TemporalAcceptance,
-    TerminalDelivery,
-)
-from syntara.eventstreams.core.handler import ResolvedDelivery
-from syntara.eventstreams.models.delivery import EventDelivery
-from syntara.eventstreams.models.recovery_hold import EventDeliveryRecoveryHold
+from syntara.eventstreams.exceptions import KafkaTransportError
 from syntara.eventstreams.models.source import EventSubscriptionSource
-from syntara.eventstreams.services.admission_service import EventAdmissionService
-from syntara.eventstreams.services.delivery_retention_service import (
-    EventDeliveryRetentionService,
-    release_recovery_locked,
-)
+from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
 from tests.integration.eventstreams.conftest import DeliveryContext
 
 
@@ -73,9 +51,7 @@ class Scenario:
     beginnings: dict[int, int] = field(default_factory=lambda: {0: 0, 1: 0})
     ends: dict[int, int] = field(default_factory=lambda: {0: 100, 1: 120})
     client: MagicMock = field(default_factory=lambda: MagicMock(spec=KafkaPartitionConsumer))
-    admission: MagicMock = field(default_factory=lambda: MagicMock(spec=EventAdmissionService))
     control: MagicMock = field(default_factory=lambda: MagicMock(spec=PartitionRecoveryControl))
-    cache_coordination: MagicMock = field(default_factory=lambda: MagicMock(spec=RecoveryCacheCoordination))
 
     def __post_init__(self) -> None:
         """Bind controlled broker observations to the real persisted source."""
@@ -102,7 +78,6 @@ class Scenario:
             quiescent=True, retained_evidence_complete=True, permanent_content_error=False
         )
         self.control.is_fenced.return_value = True
-        self.cache_coordination.is_coordinated.return_value = True
 
     @property
     def store(self) -> KafkaInitialPositionStore:
@@ -110,9 +85,7 @@ class Scenario:
 
     @property
     def service(self) -> KafkaInitialPositionService:
-        return KafkaInitialPositionService(
-            self.store, self.client, self.admission, self.control, cache_coordination=self.cache_coordination
-        )
+        return KafkaInitialPositionService(self.store, self.client, self.control)
 
     def request(self, partition: int = 0) -> PositionRequest:
         snapshot = self.context.snapshot
@@ -161,6 +134,117 @@ class Scenario:
         assert (await self.service.initialize(self.request())).status == PositionStatus.READY
         self.commits.clear()
         assert (await self.service.initialize(self.request())).status == PositionStatus.RECOVERY_GAP
+
+
+@pytest.mark.parametrize("missing_offset", [None, 101])
+async def test_automatic_offset_recovery_preserves_other_partition_progress(
+    delivery_context: DeliveryContext, missing_offset: int | None
+) -> None:
+    scenario = Scenario(delivery_context)
+    for partition in (0, 1):
+        assert (await scenario.service.initialize(scenario.request(partition))).status == PositionStatus.READY
+    scenario.commits[1] = 115
+    if missing_offset is None:
+        scenario.commits.pop(0)
+    else:
+        scenario.commits[0] = missing_offset
+    scenario.beginnings[0] = 20
+    scenario.control.close_and_drain.return_value = DrainEvidence(
+        quiescent=True, retained_evidence_complete=False, permanent_content_error=False
+    )
+    service = KafkaInitialPositionService(scenario.store, scenario.client, scenario.control)
+    assert (await service.initialize(scenario.request())).status == PositionStatus.RECOVERY_GAP
+    result = await service.recover_automatically(scenario.request())
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == 20
+    assert scenario.commits == {0: 20, 1: 115}
+    saved = await scenario.store.read(scenario.request())
+    assert not saved.recovery_held
+    assert saved.position is not None
+    assert saved.position.initial_next_offset == 100
+    assert saved.position.recovery_revision == 1
+    assert saved.position.recovery_policy == RecoveryPolicy.RETAINED_BEGINNING.value
+    assert saved.position.recovery_reason == (
+        GapReason.MISSING_COMMIT.value if missing_offset is None else GapReason.OUT_OF_RANGE.value
+    )
+    assert not saved.position.duplicate_risk_acknowledged
+
+
+async def test_reset_signal_reaches_durable_recovery_before_consumption(delivery_context: DeliveryContext) -> None:
+    scenario = Scenario(delivery_context)
+    positions = scenario.service
+    for partition in (0, 1):
+        assert (await positions.initialize(scenario.request(partition))).status == PositionStatus.READY
+    scenario.commits.update({0: 101, 1: 125})
+    scenario.beginnings[0] = 20
+    scenario.ends[1] = 140
+    processing = MagicMock(spec=EventRecordProcessingService)
+    processing.admission_eligible.return_value = True
+    runner = KafkaRecordRunner(
+        delivery_context.snapshot,
+        scenario.client,
+        delivery_context.session_factory,
+        MagicMock(),
+        MagicMock(),
+        processing=processing,
+        positions=positions,
+    )
+    try:
+        await runner.start()
+        await runner.on_partitions_assigned(scenario.client.assignment, scenario.client.epoch)
+        for state in runner._partitions.values():
+            state.ready = state.eligible = True
+        message = "Kafka offset reset requires position reconciliation"
+        scenario.client.fetch.side_effect = KafkaTransportError(message)
+        await runner._tick()
+        await asyncio.gather(*(state.task for state in runner._partitions.values() if state.task is not None))
+        affected = runner._partitions[0]
+        assert affected.initialization is not None
+        assert affected.initialization.status == PositionStatus.RECOVERY_GAP
+        processing.process.assert_not_awaited()
+        before = await scenario.store.read(scenario.request())
+        assert before.position is not None
+        assert before.position.gap_reason == GapReason.OUT_OF_RANGE.value
+        assert before.position.recovery_confirmed_at is None
+        await runner._recover_requested(affected)
+        saved = await scenario.store.read(scenario.request())
+        assert saved.position is not None
+        assert saved.position.initial_next_offset == 100
+        assert saved.position.recovery_boundary == 20
+        assert saved.position.recovery_revision == 1
+        assert saved.position.recovery_confirmed_at is not None
+        assert saved.position.recovery_token is None
+        assert scenario.commits == {0: 20, 1: 125}
+        processing.process.assert_not_awaited()
+    finally:
+        await runner.stop()
+
+
+async def test_interrupted_automatic_recovery_replaces_expired_boundary(delivery_context: DeliveryContext) -> None:
+    scenario = Scenario(delivery_context)
+    await scenario.gap()
+    scenario.control.close_and_drain.side_effect = TimeoutError()
+    assert (await scenario.service.recover_automatically(scenario.request())).status == PositionStatus.BLOCKED
+    interrupted = await scenario.store.read(scenario.request())
+    assert interrupted.recovery_held
+    assert interrupted.position is not None
+    assert interrupted.position.pending_boundary == 0
+    old_token = interrupted.position.recovery_token
+    assert old_token is not None
+    scenario.control.close_and_drain.side_effect = None
+    scenario.beginnings[0] = 20
+    result = await scenario.service.recover_automatically(scenario.request())
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == 20
+    saved = await scenario.store.read(scenario.request())
+    assert saved.position is not None
+    assert saved.position.initial_next_offset == 100
+    assert saved.position.recovery_revision == 2
+    assert saved.position.superseded_recovery_boundary == 0
+    assert not saved.recovery_held
+    assert saved.position.recovery_token is None
+    with pytest.raises(kafka_position_store.KafkaPositionError, match="recovery_revision_changed"):
+        await scenario.store.stage_recovery(scenario.recovery(), old_token, 0)
 
 
 async def test_first_winning_boundary_is_unique_and_reused_after_interruption(
@@ -214,7 +298,7 @@ async def test_confirmed_recovery_before_first_boundary_allows_normal_resume(del
     scenario = Scenario(delivery_context)
     await scenario.gap()
     scenario.beginnings[0] = 20
-    recovered = await scenario.service.recover(scenario.recovery(), owner_worker_id="recovery")
+    recovered = await scenario.service.recover(scenario.recovery())
     assert recovered.status == PositionStatus.READY
     assert recovered.next_offset == 20
     context = await scenario.store.read(scenario.request())
@@ -232,9 +316,7 @@ async def test_interrupted_confirmation_keeps_hold_and_reconciles_recorded_bound
     scenario = Scenario(delivery_context)
     await scenario.gap()
     store = scenario.store
-    service = KafkaInitialPositionService(
-        store, scenario.client, scenario.admission, scenario.control, cache_coordination=scenario.cache_coordination
-    )
+    service = KafkaInitialPositionService(store, scenario.client, scenario.control)
     confirm = store.confirm_recovery
 
     async def unavailable(*_args: object) -> None:
@@ -242,7 +324,7 @@ async def test_interrupted_confirmation_keeps_hold_and_reconciles_recorded_bound
 
     monkeypatch.setattr(store, "confirm_recovery", unavailable)
     value = scenario.recovery(policy=RecoveryPolicy.CURRENT_END)
-    assert (await service.recover(value, owner_worker_id="recovery")).status == PositionStatus.BLOCKED
+    assert (await service.recover(value)).status == PositionStatus.BLOCKED
     pending = await store.read(scenario.request())
     assert pending.recovery_held
     assert pending.position is not None
@@ -250,78 +332,9 @@ async def test_interrupted_confirmation_keeps_hold_and_reconciles_recorded_bound
     assert pending.position.recovery_confirmed_at is None
     scenario.ends[0] = 200
     monkeypatch.setattr(store, "confirm_recovery", confirm)
-    assert (await service.recover(value, owner_worker_id="recovery")).next_offset == 100
+    assert (await service.recover(value)).next_offset == 100
     assert scenario.client.commit.await_count == 2  # initial activation plus one recovery commit
     assert not (await store.read(scenario.request())).recovery_held
-
-
-async def test_recovery_hold_closes_new_admission_until_confirmation(delivery_context: DeliveryContext) -> None:
-    scenario = Scenario(delivery_context)
-    await scenario.gap()
-    pending = await scenario.store.begin_recovery(scenario.recovery())
-    assert pending.recovery_token is not None
-    async with delivery_context.session_factory() as session, session.begin():
-        result = await delivery_context.store(session).acquire(
-            delivery_context.identity(101), delivery_context.expectation(), "late-worker"
-        )
-        assert isinstance(result, RevisionChanged)
-    async with delivery_context.session_factory() as session:
-        hold = await session.get(EventDeliveryRecoveryHold, pending.recovery_token)
-        assert hold is not None
-        assert hold.released_at is None
-
-
-async def test_recovery_serializes_with_cleanup_and_preserves_needed_evidence(
-    delivery_context: DeliveryContext,
-) -> None:
-    scenario = Scenario(delivery_context)
-    await scenario.gap()
-    # Ordinary terminal evidence, not a permanent-content rejection.
-    claim = await delivery_context.claim(50)
-    async with delivery_context.session_factory() as session, session.begin():
-        result = await delivery_context.store(session).finalize_without_execution(claim, DeliveryState.FILTERED)
-        assert isinstance(result, TerminalDelivery)
-        await session.execute(
-            update(EventDelivery)
-            .where(col(EventDelivery.identity_digest) == claim.identity.digest)
-            .values(resolved_at=datetime.now(UTC) - timedelta(hours=2))
-        )
-
-    class InterleavingVerifier:
-        async def is_committed_beyond(self, _identity: object) -> bool:
-            await scenario.store.begin_recovery(scenario.recovery())
-            return True
-
-    retention = EventDeliveryRetentionService(
-        delivery_context.session_factory, verifier=InterleavingVerifier(), retention_seconds=3600
-    )
-    assert not await retention.cleanup_one(claim.identity)
-    async with delivery_context.session_factory() as session:
-        assert await session.get(EventDelivery, claim.identity.digest) is not None
-
-
-async def test_expired_prepared_claim_stays_unresolved_when_temporal_repair_is_ambiguous(
-    delivery_context: DeliveryContext,
-) -> None:
-    from syntara.eventstreams.core.handler import BlockedDelivery, SchedulingFailureCode
-
-    scenario = Scenario(delivery_context)
-    await scenario.gap()
-    prepared = await delivery_context.claim(50, prepare=True)
-    async with delivery_context.session_factory() as session, session.begin():
-        await delivery_context.store(session).record_start_attempt(prepared)
-    await delivery_context.expire(prepared)
-    scenario.admission.recover_claim.return_value = BlockedDelivery(error_code=SchedulingFailureCode.TEMPORAL_NOT_FOUND)
-    result = await scenario.service.recover(scenario.recovery(), owner_worker_id="recovery")
-    assert result.reason == "ambiguous_start_unresolved"
-    scenario.admission.recover_claim.assert_awaited_once()
-    async with delivery_context.session_factory() as session:
-        pending = await session.get(EventDelivery, prepared.identity.digest)
-        assert pending is not None
-        assert pending.state == DeliveryState.IN_PROGRESS
-        assert pending.attempt_count == 1
-        assert pending.frozen_binding == prepared.binding
-    assert (await scenario.store.read(scenario.request())).recovery_held
 
 
 async def test_concurrent_initializers_share_one_winning_boundary(delivery_context: DeliveryContext) -> None:
@@ -368,61 +381,6 @@ async def test_database_rejects_negative_or_overflowing_offsets_and_revisions(
             )
 
 
-async def test_downgrade_refuses_retained_initialization_or_recovery_metadata(
-    delivery_context: DeliveryContext,
-) -> None:
-    scenario = Scenario(delivery_context)
-    assert (await scenario.service.initialize(scenario.request())).status == PositionStatus.READY
-    migration = importlib.import_module(
-        "syntara.core.database.migrations.versions.e73fc325e2a3_add_kafka_partition_initial_positions"
-    )
-
-    def downgrade(connection: Connection) -> None:
-        with Operations.context(MigrationContext.configure(connection)):
-            migration.downgrade()
-
-    with pytest.raises(RuntimeError, match="Unsafe downgrade"):
-        async with delivery_context.session_factory() as session, session.begin():
-            connection = await session.connection()
-            await connection.run_sync(downgrade)
-
-
-async def test_recovery_repairs_prepared_delivery_before_changing_group_position(
-    delivery_context: DeliveryContext,
-) -> None:
-    scenario = Scenario(delivery_context)
-    await scenario.gap()
-    prepared = await delivery_context.claim(50, prepare=True)
-    await delivery_context.expire(prepared)
-
-    async def accepted(claim: DeliveryClaim) -> ResolvedDelivery:
-        assert claim.binding is not None
-        async with delivery_context.session_factory() as session, session.begin():
-            attempted = await delivery_context.store(session).record_start_attempt(claim)
-            assert isinstance(attempted, DeliveryClaim)
-        acceptance = TemporalAcceptance(
-            execution_id=claim.identity.execution_id,
-            temporal_workflow_id=claim.identity.temporal_workflow_id,
-            temporal_run_id="verified-run",
-            input_fingerprint=claim.binding.input_fingerprint,
-        )
-        async with delivery_context.session_factory() as session, session.begin():
-            terminal = await delivery_context.store(session).finalize_scheduled(attempted, acceptance)
-            assert isinstance(terminal, TerminalDelivery)
-        return ResolvedDelivery(terminal=terminal)
-
-    scenario.admission.recover_claim.side_effect = accepted
-    result = await scenario.service.recover(scenario.recovery(), owner_worker_id="recovery")
-    assert result.status == PositionStatus.READY
-    scenario.admission.recover_claim.assert_awaited_once()
-    async with delivery_context.session_factory() as session:
-        scheduled = await session.get(EventDelivery, prepared.identity.digest)
-        assert scheduled is not None
-        assert scheduled.state == DeliveryState.SCHEDULED
-        assert scheduled.execution_confirmed_at is not None
-        assert scheduled.temporal_run_id == "verified-run"
-
-
 async def test_required_acknowledgement_preserves_selected_boundary_at_current_revision(
     delivery_context: DeliveryContext,
 ) -> None:
@@ -432,7 +390,7 @@ async def test_required_acknowledgement_preserves_selected_boundary_at_current_r
         quiescent=True, retained_evidence_complete=False, permanent_content_error=False
     )
     original = scenario.recovery()
-    blocked = await scenario.service.recover(original, owner_worker_id="recovery")
+    blocked = await scenario.service.recover(original)
     assert blocked.reason == "duplicate_risk_acknowledgement_required"
     pending = await scenario.store.read(scenario.request())
     assert pending.position is not None
@@ -441,75 +399,14 @@ async def test_required_acknowledgement_preserves_selected_boundary_at_current_r
     assert pending.recovery_held
     scenario.ends[0] = 200
     acknowledged = original.model_copy(update={"expected_recovery_revision": 1, "acknowledge_duplicate_risk": True})
-    assert (await scenario.service.recover(acknowledged, owner_worker_id="recovery")).status == PositionStatus.READY
+    assert (await scenario.service.recover(acknowledged)).status == PositionStatus.READY
     confirmed = await scenario.store.read(scenario.request())
     assert confirmed.position is not None
     assert confirmed.position.recovery_revision == 2
     assert confirmed.position.recovery_boundary == 0
     assert confirmed.position.duplicate_risk_acknowledged
     assert not confirmed.recovery_held
-    assert (
-        await scenario.service.recover(original, owner_worker_id="stale-request")
-    ).status == PositionStatus.REVISION_CHANGED
-
-
-@pytest.mark.parametrize("offset", [20, 150, 2**53 + 1, 2**63 - 2])
-async def test_retained_beginning_fences_unprepared_claim_without_discarding_redelivery(
-    delivery_context: DeliveryContext, offset: int
-) -> None:
-    scenario = Scenario(delivery_context)
-    await scenario.gap()
-    scenario.beginnings[0] = 20
-    scenario.ends[0] = max(200, offset + 1)
-    original = await delivery_context.claim(offset)
-    await delivery_context.expire(original)
-    recovered = await scenario.service.recover(scenario.recovery(), owner_worker_id="recovery")
-    assert recovered.status == PositionStatus.READY
-    assert recovered.next_offset == 20
-    async with delivery_context.session_factory() as session:
-        pending = await session.get(EventDelivery, original.identity.digest)
-        assert pending is not None
-        assert pending.state == DeliveryState.IN_PROGRESS
-        assert pending.resolved_at is None
-        assert pending.claim_token is None
-        assert pending.last_error_code == "fenced_by_gap_recovery"
-    async with delivery_context.session_factory() as session, session.begin():
-        replay = await delivery_context.store(session).acquire(
-            original.identity, delivery_context.expectation(), "replay"
-        )
-        assert isinstance(replay, DeliveryClaim)
-        assert replay.token != original.token
-        assert replay.binding is None
-
-
-@pytest.mark.parametrize("allow_disposition", [False, True])
-async def test_current_end_disposition_requires_authority_for_proven_unprepared_work(
-    delivery_context: DeliveryContext,
-    *,
-    allow_disposition: bool,
-) -> None:
-    scenario = Scenario(delivery_context)
-    await scenario.gap()
-    claim = await delivery_context.claim(50)
-    await delivery_context.expire(claim)
-    result = await scenario.service.recover(
-        scenario.recovery(policy=RecoveryPolicy.CURRENT_END, allow_disposition=allow_disposition),
-        owner_worker_id="recovery",
-    )
-    async with delivery_context.session_factory() as session:
-        delivery = await session.get(EventDelivery, claim.identity.digest)
-        assert delivery is not None
-        if allow_disposition:
-            assert result.status == PositionStatus.READY
-            assert result.next_offset == 100
-            assert delivery.state == DeliveryState.CANCELLED
-            assert delivery.last_error_code == "cancelled_by_gap_recovery"
-        else:
-            assert result.status == PositionStatus.BLOCKED
-            assert result.reason == "retirement_authority_required"
-            assert result.next_offset is None
-            assert delivery.state == DeliveryState.IN_PROGRESS
-            assert scenario.commits == {}
+    assert (await scenario.service.recover(original)).status == PositionStatus.REVISION_CHANGED
 
 
 @pytest.mark.parametrize("recover", [False, True], ids=["initialization", "recovery"])
@@ -529,14 +426,12 @@ async def test_overlapping_position_operations_cannot_rewind_progress_after_read
 
     scenario.client.commit.side_effect = delayed_commit
     first = asyncio.create_task(
-        scenario.service.recover(scenario.recovery(), owner_worker_id="first")
-        if recover
-        else scenario.service.initialize(scenario.request())
+        scenario.service.recover(scenario.recovery()) if recover else scenario.service.initialize(scenario.request())
     )
     try:
         await asyncio.wait_for(entered.wait(), timeout=5)
         competing = (
-            await scenario.service.recover(scenario.recovery(), owner_worker_id="second")
+            await scenario.service.recover(scenario.recovery())
             if recover
             else await scenario.service.initialize(scenario.request())
         )
@@ -555,7 +450,7 @@ async def test_overlapping_position_operations_cannot_rewind_progress_after_read
     scenario.commits[0] = 250
     commits = scenario.client.commit.await_count
     retried = (
-        await scenario.service.recover(scenario.recovery(), owner_worker_id="retry")
+        await scenario.service.recover(scenario.recovery())
         if recover
         else await scenario.service.initialize(scenario.request())
     )
@@ -571,7 +466,7 @@ async def test_drain_interruption_does_not_move_selected_current_end(delivery_co
         quiescent=False, retained_evidence_complete=True, permanent_content_error=False
     )
     value = scenario.recovery(policy=RecoveryPolicy.CURRENT_END)
-    blocked = await scenario.service.recover(value, owner_worker_id="recovery")
+    blocked = await scenario.service.recover(value)
     assert blocked.reason == "conflicting_work_not_drained"
     selected = await scenario.store.read(scenario.request())
     assert selected.position is not None
@@ -581,32 +476,9 @@ async def test_drain_interruption_does_not_move_selected_current_end(delivery_co
     scenario.control.close_and_drain.return_value = DrainEvidence(
         quiescent=True, retained_evidence_complete=True, permanent_content_error=False
     )
-    retried = await scenario.service.recover(value, owner_worker_id="recovery")
+    retried = await scenario.service.recover(value)
     assert retried.next_offset == scenario.commits[0] == 100
     assert scenario.control.close_and_drain.call_args.kwargs["boundary"] == 100
-
-
-async def test_fenced_redelivery_page_cannot_hide_unresolved_prepared_work(delivery_context: DeliveryContext) -> None:
-    from syntara.eventstreams.core.handler import BlockedDelivery, SchedulingFailureCode
-
-    scenario = Scenario(delivery_context)
-    await scenario.gap()
-    # Put the prepared record after a full page in the store's digest ordering.
-    offsets = sorted(range(FieldLimits.MAX_ITEMS_PER_PAGE + 3), key=lambda n: delivery_context.identity(n).digest)
-    for offset in offsets[:-1]:
-        claim = await delivery_context.claim(offset)
-        await delivery_context.expire(claim)
-    prepared = await delivery_context.claim(offsets[-1], prepare=True)
-    await delivery_context.expire(prepared)
-    scenario.admission.recover_claim.return_value = BlockedDelivery(error_code=SchedulingFailureCode.TEMPORAL_NOT_FOUND)
-    first = await scenario.service.recover(scenario.recovery(), owner_worker_id="recovery")
-    assert first.reason == "claims_unresolved"
-    scenario.admission.recover_claim.assert_not_awaited()
-    second = await scenario.service.recover(scenario.recovery(), owner_worker_id="recovery")
-    assert second.reason == "ambiguous_start_unresolved"
-    scenario.admission.recover_claim.assert_awaited_once()
-    assert scenario.admission.recover_claim.call_args.args[0].identity == prepared.identity
-    assert (await scenario.store.read(scenario.request())).recovery_held
 
 
 @pytest.mark.parametrize("policy", list(RecoveryPolicy))
@@ -634,7 +506,7 @@ async def test_missing_initial_metadata_persists_unknown_history_and_can_recover
         initialization_kind=InitializationKind.FIRST_ACTIVATION,
     )
     assert winner.initial_next_offset is None
-    recovered = await scenario.service.recover(scenario.recovery(policy=policy), owner_worker_id="recovery")
+    recovered = await scenario.service.recover(scenario.recovery(policy=policy))
     assert recovered.status == PositionStatus.READY
     assert recovered.next_offset == (20 if policy == RecoveryPolicy.RETAINED_BEGINNING else 100)
     scenario.commits[0], scenario.ends[0] = 150, 200
@@ -656,7 +528,7 @@ async def test_missing_metadata_storage_failure_returns_blocked_without_position
         raise SQLAlchemyError
 
     monkeypatch.setattr(store, "record_missing_initial", unavailable)
-    service = KafkaInitialPositionService(store, scenario.client, scenario.admission, scenario.control)
+    service = KafkaInitialPositionService(store, scenario.client, scenario.control)
     blocked = await service.initialize(scenario.request())
     assert blocked.status == PositionStatus.BLOCKED
     assert blocked.reason == "storage_unavailable"
@@ -691,7 +563,7 @@ async def test_missing_metadata_recording_and_initialization_keep_the_same_winne
         assert missing.observed_group_next_offset is None
 
 
-async def test_sibling_recovery_holds_converge_before_source_admission_reopens(
+async def test_sibling_partition_recovers_without_waiting_for_another_partition(
     delivery_context: DeliveryContext,
 ) -> None:
     scenario = Scenario(delivery_context)
@@ -703,36 +575,30 @@ async def test_sibling_recovery_holds_converge_before_source_admission_reopens(
     second = first.model_copy(update={"partition": 1})
     await scenario.store.begin_recovery(first)
     await scenario.store.begin_recovery(second)
-    waiting = await scenario.service.recover(first, owner_worker_id="recovery")
-    assert waiting.status == PositionStatus.BLOCKED
-    assert waiting.reason == "waiting_for_source_recovery"
+    recovered = await scenario.service.recover(first)
+    assert recovered.status == PositionStatus.READY
     context = await scenario.store.read(scenario.request())
     assert context.position is not None
     assert context.position.recovery_confirmed_at is not None
-    assert context.recovery_held
-    assert (await scenario.service.recover(first, owner_worker_id="recovery")).reason == "waiting_for_source_recovery"
-    assert (await scenario.service.recover(second, owner_worker_id="recovery")).status == PositionStatus.READY
-    assert (await scenario.service.recover(first, owner_worker_id="recovery")).status == PositionStatus.READY
+    assert not context.recovery_held
+    assert (await scenario.store.read(scenario.request(1))).recovery_held
+    assert (await scenario.service.initialize(scenario.request())).status == PositionStatus.READY
+    assert (await scenario.service.recover(second)).status == PositionStatus.READY
+    assert (await scenario.service.recover(first)).status == PositionStatus.READY
     assert not (await scenario.store.read(scenario.request())).recovery_held
 
 
-async def expired_recovery(scenario: Scenario, *, prepared: bool = False) -> DeliveryClaim | None:
-    """Leave one frozen decision outside retention, with optional ambiguous work."""
+async def expired_recovery(scenario: Scenario) -> None:
+    """Leave one selected recovery boundary outside Kafka retention."""
     await scenario.gap()
-    claim = await scenario.context.claim(50, prepare=True) if prepared else None
-    if claim is not None:
-        await scenario.context.expire(claim)
     scenario.control.close_and_drain.return_value = DrainEvidence(
         quiescent=False, retained_evidence_complete=True, permanent_content_error=False
     )
-    assert (
-        await scenario.service.recover(scenario.recovery(), owner_worker_id="recovery")
-    ).status == PositionStatus.BLOCKED
+    assert (await scenario.service.recover(scenario.recovery())).status == PositionStatus.BLOCKED
     scenario.beginnings[0], scenario.ends[0] = 20, 200
     scenario.control.close_and_drain.return_value = DrainEvidence(
         quiescent=True, retained_evidence_complete=True, permanent_content_error=False
     )
-    return claim
 
 
 def replacement(
@@ -755,10 +621,10 @@ async def test_expired_recovery_requires_explicit_replacement_and_fences_old_tok
     assert before.position is not None
     old_token = before.position.recovery_token
     assert old_token is not None
-    ordinary = await scenario.service.recover(scenario.recovery(), owner_worker_id="recovery")
+    ordinary = await scenario.service.recover(scenario.recovery())
     assert ordinary.status == PositionStatus.RECOVERY_GAP
     assert ordinary.reason == "out_of_range"
-    result = await scenario.service.replace_recovery(replacement(scenario), owner_worker_id="recovery")
+    result = await scenario.service.replace_recovery(replacement(scenario))
     assert result.status == PositionStatus.READY
     assert result.next_offset == scenario.commits[0] == 20
     after = await scenario.store.read(scenario.request())
@@ -770,10 +636,7 @@ async def test_expired_recovery_requires_explicit_replacement_and_fences_old_tok
     assert not after.recovery_held
     with pytest.raises(kafka_position_store.KafkaPositionError, match="recovery_revision_changed"):
         await scenario.store.stage_recovery(scenario.recovery(), old_token, 0)
-    async with delivery_context.session_factory() as session:
-        old_hold = await session.get(EventDeliveryRecoveryHold, old_token)
-        assert old_hold is not None
-        assert old_hold.released_at is not None
+    assert after.position.recovery_token is None
 
 
 async def test_replacement_confirmation_retry_reuses_saved_boundary_without_rewinding_progress(
@@ -788,9 +651,9 @@ async def test_replacement_confirmation_retry_reuses_saved_boundary_without_rewi
         raise SQLAlchemyError
 
     monkeypatch.setattr(store, "confirm_recovery", unavailable)
-    service = KafkaInitialPositionService(store, scenario.client, scenario.admission, scenario.control)
+    service = KafkaInitialPositionService(store, scenario.client, scenario.control)
     value = replacement(scenario, policy=RecoveryPolicy.CURRENT_END)
-    assert (await service.replace_recovery(value, owner_worker_id="recovery")).status == PositionStatus.BLOCKED
+    assert (await service.replace_recovery(value)).status == PositionStatus.BLOCKED
     pending = await store.read(scenario.request())
     assert pending.position is not None
     assert pending.position.pending_boundary == 200
@@ -798,10 +661,10 @@ async def test_replacement_confirmation_retry_reuses_saved_boundary_without_rewi
     scenario.ends[0] = 300
     monkeypatch.setattr(store, "confirm_recovery", confirm)
     commits = scenario.client.commit.await_count
-    assert (await service.replace_recovery(value, owner_worker_id="recovery")).next_offset == 200
+    assert (await service.replace_recovery(value)).next_offset == 200
     assert scenario.client.commit.await_count == commits
     scenario.commits[0] = 250
-    assert (await service.replace_recovery(value, owner_worker_id="recovery")).next_offset == 250
+    assert (await service.replace_recovery(value)).next_offset == 250
     assert scenario.client.commit.await_count == commits
 
 
@@ -823,7 +686,7 @@ async def test_replacement_cannot_bypass_recovery_gates(delivery_context: Delive
     value = replacement(scenario)
     if gate == "content":
         value = value.model_copy(update={"acknowledge_duplicate_risk": True})
-    result = await scenario.service.replace_recovery(value, owner_worker_id="recovery")
+    result = await scenario.service.replace_recovery(value)
     assert result.status == (PositionStatus.OWNERSHIP_LOST if gate == "ownership" else PositionStatus.BLOCKED)
     if gate == "content":
         assert result.reason == "permanent_content_error"
@@ -835,28 +698,6 @@ async def test_replacement_cannot_bypass_recovery_gates(delivery_context: Delive
     assert state.position.pending_boundary == 20
     assert state.position.recovery_confirmed_at is None
     scenario.client.commit.assert_not_awaited()
-
-
-async def test_replacement_preserves_ambiguous_prepared_delivery_and_calls_repair(
-    delivery_context: DeliveryContext,
-) -> None:
-    from syntara.eventstreams.core.handler import BlockedDelivery, SchedulingFailureCode
-
-    scenario = Scenario(delivery_context)
-    prepared = await expired_recovery(scenario, prepared=True)
-    assert prepared is not None
-    scenario.admission.recover_claim.return_value = BlockedDelivery(error_code=SchedulingFailureCode.TEMPORAL_NOT_FOUND)
-    scenario.client.commit.reset_mock()
-    blocked = await scenario.service.replace_recovery(replacement(scenario), owner_worker_id="recovery")
-    assert blocked.reason == "ambiguous_start_unresolved"
-    scenario.admission.recover_claim.assert_awaited_once()
-    scenario.client.commit.assert_not_awaited()
-    async with delivery_context.session_factory() as session:
-        delivery = await session.get(EventDelivery, prepared.identity.digest)
-        assert delivery is not None
-        assert delivery.state == DeliveryState.IN_PROGRESS
-        assert delivery.frozen_binding == prepared.binding
-    assert (await scenario.store.read(scenario.request())).recovery_held
 
 
 @pytest.mark.parametrize("stale", ["revision", "boundary"])
@@ -872,7 +713,7 @@ async def test_replacement_rejects_stale_request_without_changing_hold(
             "expected_pending_boundary": 10 if stale == "boundary" else 0,
         }
     )
-    result = await scenario.service.replace_recovery(value, owner_worker_id="recovery")
+    result = await scenario.service.replace_recovery(value)
     assert result.status == PositionStatus.REVISION_CHANGED
     after = await scenario.store.read(scenario.request())
     assert before.position is not None
@@ -880,96 +721,6 @@ async def test_replacement_rejects_stale_request_without_changing_hold(
     assert before.position.recovery_token == after.position.recovery_token
     assert after.position.recovery_revision == 1
     assert after.position.pending_boundary == 0
-
-
-async def test_cleanup_cannot_enter_during_replacement_hold_transfer(
-    delivery_context: DeliveryContext, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    scenario = Scenario(delivery_context, ends={0: 0, 1: 120})
-    assert (await scenario.service.initialize(scenario.request())).status == PositionStatus.READY
-    scenario.ends[0] = 100
-    claim = await delivery_context.claim(50)
-    async with delivery_context.session_factory() as session, session.begin():
-        await delivery_context.store(session).finalize_without_execution(claim, DeliveryState.FILTERED)
-        await session.execute(
-            update(EventDelivery)
-            .where(col(EventDelivery.identity_digest) == claim.identity.digest)
-            .values(resolved_at=datetime.now(UTC) - timedelta(hours=2))
-        )
-    await expired_recovery(scenario)
-    before = await scenario.store.read(scenario.request())
-    assert before.position is not None
-    old_token = before.position.recovery_token
-    released, proceed, cleanup_started = asyncio.Event(), asyncio.Event(), asyncio.Event()
-    release = release_recovery_locked
-
-    async def paused_release(
-        session: AsyncSession, source: EventSubscriptionSource, reservation: RecoveryReservation
-    ) -> bool:
-        result = await release(session, source, reservation)
-        if reservation.token == old_token:
-            released.set()
-            await proceed.wait()
-        return result
-
-    monkeypatch.setattr(kafka_position_store, "release_recovery_locked", paused_release)
-    scenario.control.close_and_drain.return_value = DrainEvidence(
-        quiescent=False, retained_evidence_complete=True, permanent_content_error=False
-    )
-    retention = EventDeliveryRetentionService(
-        delivery_context.session_factory, verifier=MagicMock(), retention_seconds=3600
-    )
-    candidate = retention._candidate
-
-    async def observed_candidate(session: AsyncSession, identity: DeliveryIdentity) -> CleanupCandidate | None:
-        cleanup_started.set()
-        return await candidate(session, identity)
-
-    monkeypatch.setattr(retention, "_candidate", observed_candidate)
-    replacing = asyncio.create_task(
-        scenario.service.replace_recovery(replacement(scenario), owner_worker_id="recovery")
-    )
-    cleaning: asyncio.Task[bool] | None = None
-    try:
-        await asyncio.wait_for(released.wait(), timeout=5)
-        cleaning = asyncio.create_task(retention.cleanup_one(claim.identity))
-        await asyncio.wait_for(cleanup_started.wait(), timeout=5)
-        assert not cleaning.done()
-    finally:
-        proceed.set()
-        await replacing
-    assert cleaning is not None
-    assert not await cleaning
-    async with delivery_context.session_factory() as session:
-        assert await session.get(EventDelivery, claim.identity.digest) is not None
-    assert (await scenario.store.read(scenario.request())).recovery_held
-
-
-@pytest.mark.parametrize("evidence", ["unknown", "replacement"])
-async def test_followup_downgrade_preserves_unknown_and_replacement_evidence(
-    delivery_context: DeliveryContext, evidence: str
-) -> None:
-    scenario = Scenario(delivery_context)
-    if evidence == "unknown":
-        scenario.commits[0] = 75
-        assert (await scenario.service.initialize(scenario.request())).status == PositionStatus.RECOVERY_GAP
-    else:
-        await expired_recovery(scenario)
-        assert (
-            await scenario.service.replace_recovery(replacement(scenario), owner_worker_id="recovery")
-        ).status == PositionStatus.READY
-    migration = importlib.import_module(
-        "syntara.core.database.migrations.versions.2b07573473d7_preserve_unknown_initial_boundaries_and_"
-    )
-
-    def downgrade(connection: Connection) -> None:
-        with Operations.context(MigrationContext.configure(connection)):
-            migration.downgrade()
-
-    with pytest.raises(RuntimeError, match="Unsafe downgrade"):
-        async with delivery_context.session_factory() as session, session.begin():
-            connection = await session.connection()
-            await connection.run_sync(downgrade)
 
 
 @pytest.mark.parametrize(
@@ -992,41 +743,6 @@ async def test_unknown_initial_state_cannot_be_fabricated_by_partial_updates(
                 .where(col(KafkaPartitionInitialPosition.source_id) == scenario.request().source_id)
                 .values(**values)
             )
-
-
-async def test_followup_migration_preserves_existing_known_boundaries(delivery_context: DeliveryContext) -> None:
-    scenario = Scenario(delivery_context)
-    assert (await scenario.service.initialize(scenario.request())).status == PositionStatus.READY
-    migration = importlib.import_module(
-        "syntara.core.database.migrations.versions.2b07573473d7_preserve_unknown_initial_boundaries_and_"
-    )
-    kinds = importlib.import_module(
-        "syntara.core.database.migrations.versions.91f4c2e8a6bd_add_kafka_partition_initialization_kind"
-    )
-
-    def roundtrip(connection: Connection) -> None:
-        with Operations.context(MigrationContext.configure(connection)):
-            kinds.downgrade()
-            migration.downgrade()
-            migration.upgrade()
-            kinds.upgrade()
-
-    async with delivery_context.session_factory() as session, session.begin():
-        # Simulate a pre-kind row; its real historical boundary must survive unchanged.
-        await session.execute(
-            update(KafkaPartitionInitialPosition)
-            .where(col(KafkaPartitionInitialPosition.source_id) == scenario.request().source_id)
-            .values(initialization_kind=None)
-        )
-        connection = await session.connection()
-        await connection.run_sync(roundtrip)
-    state = await scenario.store.read(scenario.request())
-    assert state.position is not None
-    assert state.position.initial_next_offset == 100
-    assert state.position.initial_commit_confirmed_at is not None
-    assert not state.position.initial_metadata_missing
-    assert state.position.observed_group_next_offset is None
-    assert state.position.initialization_kind is None
 
 
 async def test_first_set_exceeds_assignment_and_addition_does_not_complete_first_activation(
@@ -1089,7 +805,7 @@ async def test_capture_survives_crash_before_row_save_and_later_addition_starts_
     scenario = Scenario(delivery_context)
     store = scenario.store
     monkeypatch.setattr(store, "choose_initial", MagicMock(side_effect=SQLAlchemyError("interrupted")))
-    service = KafkaInitialPositionService(store, scenario.client, scenario.admission, scenario.control)
+    service = KafkaInitialPositionService(store, scenario.client, scenario.control)
     assert (await service.initialize(scenario.request())).status == PositionStatus.BLOCKED
     captured = await store.read(scenario.request())
     assert captured.position is None
@@ -1134,32 +850,13 @@ async def test_legacy_membership_blocks_without_rewriting_real_historical_bounda
     assert saved.position.initial_next_offset == 100
     assert saved.position.initialization_kind is None
     scenario.client.commit.reset_mock()
-    recovered = await scenario.service.recover(
-        scenario.recovery(policy=RecoveryPolicy.CURRENT_END), owner_worker_id="repair"
-    )
+    recovered = await scenario.service.recover(scenario.recovery(policy=RecoveryPolicy.CURRENT_END))
     assert recovered.next_offset == 200
     resumed = await scenario.store.read(scenario.request())
     assert resumed.configuration.initial_partition_ids is None
     assert resumed.position is not None
     assert resumed.position.initial_next_offset == 100
     assert resumed.position.initialization_kind is None
-
-
-async def test_kind_migration_refuses_to_erase_classified_boundaries(delivery_context: DeliveryContext) -> None:
-    scenario = Scenario(delivery_context)
-    await scenario.service.initialize(scenario.request())
-    migration = importlib.import_module(
-        "syntara.core.database.migrations.versions.91f4c2e8a6bd_add_kafka_partition_initialization_kind"
-    )
-
-    def downgrade(connection: Connection) -> None:
-        with Operations.context(MigrationContext.configure(connection)):
-            migration.downgrade()
-
-    with pytest.raises(RuntimeError, match="Unsafe downgrade"):
-        async with delivery_context.session_factory() as session, session.begin():
-            connection = await session.connection()
-            await connection.run_sync(downgrade)
 
 
 async def test_invalid_initialization_kind_is_rejected_by_database(delivery_context: DeliveryContext) -> None:
@@ -1172,45 +869,3 @@ async def test_invalid_initialization_kind_is_rejected_by_database(delivery_cont
                 .where(col(KafkaPartitionInitialPosition.source_id) == scenario.request().source_id)
                 .values(initialization_kind="historical_guess")
             )
-
-
-async def test_kind_migration_fences_uncaptured_legacy_sources_even_without_position_rows(
-    delivery_context: DeliveryContext,
-) -> None:
-    scenario = Scenario(delivery_context)
-    migration = importlib.import_module(
-        "syntara.core.database.migrations.versions.91f4c2e8a6bd_add_kafka_partition_initialization_kind"
-    )
-
-    def roundtrip(connection: Connection) -> None:
-        with Operations.context(MigrationContext.configure(connection)):
-            migration.downgrade()
-            migration.upgrade()
-
-    async with delivery_context.session_factory() as session, session.begin():
-        connection = await session.connection()
-        await connection.run_sync(roundtrip)
-    blocked = await scenario.service.initialize(scenario.request())
-    assert blocked.status == PositionStatus.BLOCKED
-    assert blocked.reason == "initialization_history_unavailable"
-    saved = await scenario.store.read(scenario.request())
-    assert saved.configuration.initial_partition_ids is None
-    assert saved.position is None
-    scenario.client.commit.assert_not_awaited()
-
-
-async def test_backward_recovery_keeps_its_hold_until_external_cache_coordination(
-    delivery_context: DeliveryContext,
-) -> None:
-    scenario = Scenario(delivery_context)
-    await scenario.gap()
-    scenario.client.commit.reset_mock()
-    scenario.cache_coordination.is_coordinated.return_value = False
-    blocked = await scenario.service.recover(scenario.recovery(), owner_worker_id="repair")
-    assert blocked.reason == "cache_epoch_coordination_required"
-    saved = await scenario.store.read(scenario.request())
-    assert saved.recovery_held
-    assert saved.position is not None
-    assert saved.position.pending_boundary == 0
-    assert saved.position.recovery_confirmed_at is None
-    scenario.client.commit.assert_not_awaited()

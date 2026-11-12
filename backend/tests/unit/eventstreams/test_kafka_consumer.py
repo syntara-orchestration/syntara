@@ -18,14 +18,21 @@ from aiokafka.errors import (
     KafkaConnectionError,
     KafkaError,
     KafkaTimeoutError,
+    OffsetOutOfRangeError,
     UnknownTopicOrPartitionError,
     UnsupportedVersionError,
 )
+from aiokafka.protocol.fetch import FetchRequest, FetchResponse_v4, FetchResponse_v11
 from aiokafka.protocol.metadata import MetadataResponse_v0
 from aiokafka.structs import OffsetAndMetadata
 from pydantic import SecretStr, ValidationError
 
-from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer, _RebalanceListener, _sanitize
+from syntara.eventstreams.adapters.kafka_consumer import (
+    KafkaPartitionConsumer,
+    _RebalanceListener,
+    _ResetAwareKafkaClient,
+    _sanitize,
+)
 from syntara.eventstreams.adapters.kafka_identity import MetadataResponseV10, SourceMetadataRequest
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
 from syntara.eventstreams.core.connection import ResolvedKafkaConnection
@@ -39,10 +46,12 @@ from syntara.eventstreams.core.consumer import (
 from syntara.eventstreams.core.source_metadata import EventSourceMetadata
 from syntara.eventstreams.exceptions import (
     ConsumerNotRunningError,
+    KafkaSourceIdentityError,
     KafkaTransportError,
     OwnershipRevokedError,
     StaleEpochError,
 )
+from syntara.integrations.lib.kafka_client import KafkaPolicyClient
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -157,6 +166,89 @@ async def test_fetch_failure_is_not_a_content_result(mock_aiokafka: MagicMock) -
     await adapter.stop()
 
 
+async def test_offset_reset_during_poll_blocks_returned_records_and_commits(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0, 1})
+    consumer = mock_aiokafka.return_value
+
+    async def reset(*_args: object, **_kwargs: object) -> dict[TopicPartition, list[object]]:
+        adapter._note_offset_reset(0, adapter.epoch)
+        return {TopicPartition(adapter.topic, 0): [object()]}
+
+    consumer.getmany.side_effect = reset
+    with pytest.raises(KafkaTransportError, match="position reconciliation"):
+        await adapter.fetch([0], _fetch_context(), expected_epoch=adapter.epoch, max_records=1, timeout_ms=100)
+    consumer.getmany.reset_mock()
+    with pytest.raises(KafkaTransportError, match="position reconciliation"):
+        await adapter.fetch([0], _fetch_context(), expected_epoch=adapter.epoch, max_records=1, timeout_ms=100)
+    consumer.getmany.assert_not_awaited()
+    with pytest.raises(KafkaTransportError, match="position reconciliation"):
+        await adapter.commit({0: 21}, expected_epoch=adapter.epoch)
+    consumer.commit.assert_not_awaited()
+    await adapter.commit({1: 115}, expected_epoch=adapter.epoch)
+    await adapter.seek(0, 20, expected_epoch=adapter.epoch)
+    await adapter.commit({0: 20}, expected_epoch=adapter.epoch)
+    assert [call.args[0] for call in consumer.commit.await_args_list] == [
+        {TopicPartition(adapter.topic, 1): OffsetAndMetadata(115, "")},
+        {TopicPartition(adapter.topic, 0): OffsetAndMetadata(20, "")},
+    ]
+    await adapter.stop()
+
+
+async def test_stale_or_unowned_reset_signals_do_not_block_current_assignment(mock_aiokafka: MagicMock) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    adapter._note_offset_reset(0, adapter.epoch - 1)
+    adapter._note_offset_reset(1, adapter.epoch)
+    assert not adapter._offset_resets
+    await adapter.commit({0: 42}, expected_epoch=adapter.epoch)
+    adapter._note_offset_reset(0, adapter.epoch)
+    await adapter._handle_partitions_revoked({TopicPartition(adapter.topic, 0)})
+    assert not adapter._offset_resets
+    await adapter.stop()
+
+
+@pytest.mark.parametrize("version", [4, 11])
+async def test_installed_fetch_response_reports_resets_without_changing_protocol(version: int) -> None:
+    topic = "events.test"
+    error = OffsetOutOfRangeError.errno
+    response: FetchResponse_v4 | FetchResponse_v11
+    if version == 4:
+        response = FetchResponse_v4(
+            0,
+            [
+                (topic, [(0, error, 100, 100, [], b""), (1, 0, 100, 100, [], b"")]),
+                ("other-topic", [(2, error, 100, 100, [], b"")]),
+            ],
+        )
+    else:
+        response = FetchResponse_v11(
+            0,
+            0,
+            0,
+            [
+                (topic, [(0, error, 100, 100, 0, [], -1, b""), (1, 0, 100, 100, 0, [], -1, b"")]),
+                ("other-topic", [(2, error, 100, 100, 0, [], -1, b"")]),
+            ],
+        )
+    decoded = type(response).decode(response.encode())
+    resets = MagicMock()
+    client = _ResetAwareKafkaClient(
+        topic=topic,
+        assignment_epoch=lambda: 7,
+        on_reset=resets,
+        bootstrap_servers=["broker:9092"],
+    )
+    request = FetchRequest(100, 1, 4096, 1, [(topic, [(0, 101, 4096)])])
+    try:
+        with patch.object(KafkaPolicyClient, "send", new_callable=AsyncMock, return_value=decoded):
+            result = await client.send(1, request)
+        assert result is decoded
+        resets.assert_called_once_with(0, 7)
+    finally:
+        await client.close()
+
+
 async def test_fetch_client_options_use_deployment_overrides(mock_aiokafka, override_settings) -> None:
     with override_settings(event_fetch_max_records=3, event_queue_max_bytes=4096):
         adapter = KafkaPartitionConsumer(_connection(), _source_config())
@@ -175,7 +267,11 @@ def mock_aiokafka() -> Iterator[MagicMock]:
         "syntara.eventstreams.adapters.kafka_consumer.AIOKafkaConsumer",
         return_value=_mock_consumer(),
     ) as mock_cls:
-        yield mock_cls
+        with patch(
+            "syntara.eventstreams.adapters.kafka_consumer._ResetAwareKafkaClient",
+            return_value=mock_cls.return_value._client,
+        ):
+            yield mock_cls
 
 
 async def _start_with_partitions(
@@ -208,7 +304,7 @@ async def test_client_constructed_with_mandated_config(mock_aiokafka: MagicMock)
     kwargs = mock_aiokafka.call_args.kwargs
     assert kwargs["group_id"] == cfg.group_id
     assert kwargs["enable_auto_commit"] is False
-    assert kwargs["auto_offset_reset"] == "none"
+    assert kwargs["auto_offset_reset"] == "earliest"
     assert kwargs["isolation_level"] == "read_committed"
     assert kwargs["security_protocol"] == "SASL_SSL"
     assert kwargs["sasl_mechanism"] == "SCRAM-SHA-256"
@@ -1123,6 +1219,72 @@ async def test_identity_failures_never_claim_verified_identifiers(
     await adapter.stop()
 
 
+def _identity_metadata(topic: str, topic_id: UUID) -> MetadataResponseV10:
+    return MetadataResponseV10(
+        throttle_time_ms=0,
+        brokers=[],
+        cluster_id="cluster-A",
+        controller_id=1,
+        topics=[(0, topic, topic_id, False, [(0, 0, 1, 7, [1], [1], [], {})], 0, {})],
+        cluster_authorized_operations=0,
+        tags={},
+    )
+
+
+@pytest.mark.parametrize("operation", ["fetch", "commit"])
+async def test_metadata_refresh_fences_recreated_topic_without_an_offset_error(mock_aiokafka, operation) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    consumer = mock_aiokafka.return_value
+    consumer._client.send.return_value = _identity_metadata(adapter.topic, UUID(int=1))
+    await adapter.observe_source_identity(expected_epoch=adapter.epoch)
+    adapter._metadata_changed()
+    consumer._client.send.return_value = _identity_metadata(adapter.topic, UUID(int=2))
+    try:
+        with pytest.raises(KafkaSourceIdentityError, match="source replacement"):
+            if operation == "fetch":
+                await adapter.fetch([0], _fetch_context(), expected_epoch=adapter.epoch, max_records=1, timeout_ms=1)
+            else:
+                await adapter.commit({0: 42}, expected_epoch=adapter.epoch)
+        consumer.getmany.assert_not_awaited()
+        consumer.commit.assert_not_awaited()
+    finally:
+        await adapter.stop()
+
+
+async def test_topic_loss_without_topic_ids_requires_explicit_replacement(mock_aiokafka) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    consumer = mock_aiokafka.return_value
+    consumer._client.send.return_value = MetadataResponse_v0([], [(0, adapter.topic, [(0, 0, 1, [1], [1])])])
+    await adapter.observe_source_identity(expected_epoch=adapter.epoch)
+    adapter._note_topic_missing()
+    try:
+        with pytest.raises(KafkaSourceIdentityError, match="source replacement"):
+            await adapter.commit({0: 42}, expected_epoch=adapter.epoch)
+        consumer.commit.assert_not_awaited()
+    finally:
+        await adapter.stop()
+
+
+async def test_unchanged_source_resumes_after_metadata_refresh(mock_aiokafka) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    consumer = mock_aiokafka.return_value
+    consumer._client.send.return_value = _identity_metadata(adapter.topic, UUID(int=1))
+    await adapter.observe_source_identity(expected_epoch=adapter.epoch)
+    adapter._metadata_changed()
+    try:
+        assert (
+            await adapter.fetch([0], _fetch_context(), expected_epoch=adapter.epoch, max_records=1, timeout_ms=1) == {}
+        )
+        await adapter.commit({0: 42}, expected_epoch=adapter.epoch)
+        assert consumer._client.send.await_count == 2
+        consumer.commit.assert_awaited_once()
+    finally:
+        await adapter.stop()
+
+
 @pytest.mark.anyio
 async def test_metadata_observes_full_topic_and_added_partitions(mock_aiokafka: MagicMock) -> None:
     """Membership is refreshed independently of assignment and without moving offsets."""
@@ -1256,6 +1418,7 @@ async def test_installed_aiokafka_metadata_transport_contract() -> None:
         assert isinstance(consumer, AIOKafkaConsumer)
         client = consumer._client
         assert isinstance(client, AIOKafkaClient)
+        assert isinstance(client, KafkaPolicyClient)
         response = MetadataResponse_v0(brokers=[], topics=[(0, adapter.topic, [(0, 0, 1, [1], [1])])])
         with (
             patch.object(client, "get_random_node", autospec=True, return_value=1),

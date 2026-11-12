@@ -120,7 +120,7 @@ class EventSubscription(UserOwnedResource, table=True):
 
     paused: bool = Field(
         default=False,
-        description="User-controlled operational pause; does not rewrite the workflow version",
+        description="Legacy pause flag; cleared by workflow publication",
     )
 
     retired: bool = Field(

@@ -98,15 +98,15 @@ APP_EVENTSTREAM_ENABLED=true uv run python -m syntara.eventstreams.consumer_entr
 
 Use the existing database, encryption-key, signing-key, and Temporal TLS settings
 in `.env`. Each process registers a fresh UUID and claims a fair share of active
-subscriptions through PostgreSQL placement leases. Redis hints and terminal-proof
-caching are optional; PostgreSQL remains authoritative.
+subscriptions through PostgreSQL placement leases. Redis reconciliation hints
+are optional; PostgreSQL remains authoritative. There is no delivery cache.
 
 Readiness follows registration and the first successful authoritative
 reconciliation, including when the process owns no subscriptions. Broker
-connections start independently. Prepared-delivery recovery also runs when no
-consumer is owned.
+connections start independently. Interrupted handoffs recover when the same
+source's uncommitted Kafka record is consumed again.
 
-SIGINT/SIGTERM close reconciliation, recovery claims, and admission immediately.
+SIGINT/SIGTERM close reconciliation, placement claims, and admission immediately.
 Cleanup marks membership draining and retains heartbeats and lease renewals through
 bounded consumer drain. Consumers stop before their leases are released. A failed
 draining write is retried best effort; if PostgreSQL stays unavailable, peers must

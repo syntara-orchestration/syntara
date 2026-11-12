@@ -12,9 +12,6 @@ from syntara.filtering.models.result import FilterErrorCode
 if TYPE_CHECKING:
     from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 
-CONTENT_INSPECTION_PENDING = "content_inspection_pending"
-CONTENT_VALIDATED = "content_validated"
-
 
 class RecordProcessingGate(Protocol):
     """Shared reconciled lifecycle/dependency state, supplied by process composition.
@@ -25,6 +22,10 @@ class RecordProcessingGate(Protocol):
     Closing admission or placement expiry may leave resolution open for completed
     records, including local CEL skips, and already admitted durable handoffs.
     """
+
+    def transport_open(self, snapshot: "SubscriptionSnapshot") -> bool:
+        """Permit the owned transport to repair positions while intake is fenced."""
+        ...
 
     def admission_open(self, snapshot: "SubscriptionSnapshot") -> bool:
         """Require current lifecycle/resources and a trusted, unexpired placement."""
@@ -37,9 +38,17 @@ class RecordProcessingGate(Protocol):
     def dependency_failed(self, snapshot: "SubscriptionSnapshot") -> None:
         """Invalidate shared dependency/lifecycle trust until authoritative reconciliation.
 
-        This also closes a known administrative recovery hold; it does not
-        diagnose a database outage or revoke already frozen delivery claims.
+        Neither callback cancels already accepted workflows. Partition recovery
+        is fenced locally by its runner and persisted position token.
         """
+        ...
+
+    def source_failed(self, snapshot: "SubscriptionSnapshot") -> None:
+        """Fence an uncertain source without invalidating shared database trust."""
+        ...
+
+    def source_verified(self, snapshot: "SubscriptionSnapshot") -> None:
+        """Reopen a source after a successful current Kafka identity check."""
         ...
 
 
@@ -47,7 +56,7 @@ class RecordRunnerControl(Protocol):
     """Local placement-loss control; owns no lease storage or placement policy."""
 
     async def close_admission(self) -> None:
-        """Pause fetching and bound drain, preserving completed records and frozen handoffs."""
+        """Pause fetching and bound drain, preserving accepted handoffs."""
         ...
 
 

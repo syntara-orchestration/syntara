@@ -280,6 +280,7 @@ class EventSubscriptionService(BaseService):
             or subscription.input_schema != parameters.input_schema
             or subscription.filter != filter_configuration
             or not subscription.desired_enabled
+            or subscription.paused
         )
 
         # The published-version pointer advances on every successful republish, even
@@ -292,6 +293,7 @@ class EventSubscriptionService(BaseService):
             subscription.input_schema = parameters.input_schema
             subscription.filter = filter_configuration
             subscription.desired_enabled = True
+            subscription.paused = False
             subscription.enabled_by = self.user.id
             subscription.updated_by = self.user.id
             subscription.configuration_revision += 1
@@ -485,26 +487,10 @@ class EventSubscriptionService(BaseService):
             raise EventSubscriptionInUseError(_RESOURCE_INTEGRATION, integration_name, count)
 
     async def assert_credential_not_bound(self, credential_id: UUID, credential_name: str) -> None:
-        """Protect current references and all retained frozen bindings after replacement."""
+        """Protect current subscription references to runtime credentials."""
         count = await self._count_subscriptions(col(EventSubscription.runtime_credential_id) == credential_id)
         if count:
             raise EventSubscriptionInUseError(_RESOURCE_CREDENTIAL, credential_name, count)
-        from syntara.eventstreams.models.delivery import EventDelivery  # noqa: PLC0415
-
-        frozen = (
-            await self.session.exec(
-                select(EventDelivery.source_id)
-                .where(
-                    col(EventDelivery.frozen_binding)["runtime_credential_id"].as_string() == str(credential_id),
-                )
-                .distinct()
-                .order_by(col(EventDelivery.source_id))
-            )
-        ).all()
-        for source_id in frozen:
-            await lock_source_lifecycle(self.session, source_id)
-        if frozen:
-            raise EventSubscriptionInUseError(_RESOURCE_CREDENTIAL, credential_name, len(frozen))
 
     # ------------------------------------------------------------------
     # Internals

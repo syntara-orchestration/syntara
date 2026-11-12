@@ -565,6 +565,44 @@ async def test_republish_after_unpublish_reenables_same_identity(
     assert sources[0].configuration.group_id == source_before.configuration.group_id
 
 
+@pytest.mark.parametrize("desired_enabled", [False, True])
+async def test_republish_clears_legacy_pause_and_preserves_source(
+    test_db_session: AsyncSession,
+    test_user: User,
+    workflow: Workflow,
+    kafka_integration: Integration,
+    runtime_credential: Credential,
+    *,
+    desired_enabled: bool,
+) -> None:
+    service = EventSubscriptionService(test_db_session, test_user)
+    node = _trigger_node(node_id="incoming", integration_id=kafka_integration.id, credential_id=runtime_credential.id)
+    v1 = await _make_version(test_db_session, workflow, test_user, [node], version=1)
+    await service.sync_from_published_definition(workflow, v1, enabled=True)
+    subscription = (await _subscriptions(test_db_session, workflow.id))[0]
+    source = (await _sources(test_db_session, subscription.id))[0]
+    subscription_id, source_id, group_id = subscription.id, source.id, source.configuration.group_id
+    revision = subscription.configuration_revision
+    subscription.paused = True
+    subscription.desired_enabled = desired_enabled
+    await test_db_session.flush()
+
+    v2 = await _make_version(test_db_session, workflow, test_user, [node], version=2)
+    changeset = await service.sync_from_published_definition(workflow, v2, enabled=True)
+
+    saved = (await _subscriptions(test_db_session, workflow.id))[0]
+    assert saved.id == subscription_id
+    assert saved.published_version_id == v2.id
+    assert not saved.paused
+    assert saved.desired_enabled
+    assert saved.configuration_revision == revision + 1
+    assert not changeset.updated[0].paused
+    sources = await _sources(test_db_session, saved.id)
+    assert len(sources) == 1
+    assert sources[0].id == source_id
+    assert sources[0].configuration.group_id == group_id
+
+
 async def test_trigger_removal_retires_subscription_and_preserves_rows(
     test_db_session: AsyncSession,
     test_user: User,
