@@ -34,6 +34,32 @@ class TestValidWorkflowDefinition:
     def test_valid_definition_passes(self, validator: WorkflowValidator) -> None:
         validator.validate_workflow_definition(_valid_definition())
 
+    def test_script_credential_bindings_pass(self, validator: WorkflowValidator) -> None:
+        definition = _valid_definition()
+        definition["nodes"][0]["parameters"]["credential_bindings"] = [
+            {
+                "credential_recipe_id": "acme.echo.api-token",
+                "credential_ref": "00000000-0000-0000-0000-000000000001",
+            }
+        ]
+
+        result = validator.collect_findings(definition)
+
+        assert result.error_count == 0
+
+    def test_script_template_credential_recipe_id_passes(self, validator: WorkflowValidator) -> None:
+        definition = _valid_definition()
+        definition["nodes"][0]["parameters"]["credential_bindings"] = [
+            {
+                "credential_recipe_id": "${trigger.recipeId}",
+                "credential_ref": "00000000-0000-0000-0000-000000000001",
+            }
+        ]
+
+        result = validator.collect_findings(definition)
+
+        assert result.error_count == 0
+
     def test_minimal_valid_definition(self, validator: WorkflowValidator) -> None:
         definition: dict[str, Any] = {
             "schema_version": "2.0.0",
@@ -62,6 +88,59 @@ class TestMissingSchemaVersion:
         definition: dict[str, Any] = {"schema_version": None, "triggers": [], "nodes": [], "edges": []}
         with pytest.raises(SafeValueError):
             validator.validate_workflow_definition(definition)
+
+
+class TestCredentialBindings:
+    """Credential bindings are validated by executor schemas."""
+
+    @pytest.mark.parametrize(
+        ("node_type", "parameters"),
+        [
+            ("http_request", {"method": "GET", "url": "https://example.com"}),
+            ("agentic", {"prompt": "Say hello"}),
+            ("approval", {}),
+            ("aap_job_template", {"job_template_id": 1}),
+            ("aap_workflow_job_template", {"workflow_job_template_id": 1}),
+        ],
+    )
+    def test_credential_bindings_pass(
+        self, validator: WorkflowValidator, node_type: str, parameters: dict[str, Any]
+    ) -> None:
+        definition = _valid_definition()
+        definition["nodes"][0]["type"] = node_type
+        definition["nodes"][0]["parameters"] = {
+            **parameters,
+            "credential_bindings": [
+                {
+                    "credential_recipe_id": "acme.echo.api-token",
+                    "credential_ref": "00000000-0000-0000-0000-000000000001",
+                }
+            ],
+        }
+        if node_type == "approval":
+            definition["nodes"].append(
+                {"id": "n2", "type": "script", "parameters": {"language": "python", "code": "pass"}}
+            )
+            definition["edges"] = [
+                {"from": "t1", "to": "n1"},
+                {"from": "n1", "to": "n2", "from_port": "approved"},
+            ]
+
+        result = validator.collect_findings(definition)
+
+        assert result.error_count == 0
+
+    def test_non_object_binding_is_rejected(self, validator: WorkflowValidator) -> None:
+        definition = _valid_definition()
+        definition["nodes"][0]["parameters"]["credential_bindings"] = [None]
+
+        result = validator.collect_findings(definition)
+
+        assert result.error_count > 0
+        schema_violations = [
+            finding for finding in result.findings if finding.category == ValidationCategory.schema_violation
+        ]
+        assert any(finding.field_path == "parameters.credential_bindings.0" for finding in schema_violations)
 
 
 class TestMissingRequiredFields:

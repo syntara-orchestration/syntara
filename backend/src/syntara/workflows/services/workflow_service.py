@@ -391,6 +391,13 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 if cred_id := conn.get("credential_id"):
                     cred_ids.add(cred_id)
             for binding in params.get("credential_bindings") or []:
+                if not isinstance(binding, dict):
+                    logger.warning(
+                        "Invalid credential binding shape",
+                        node_id=node.get("id"),
+                        binding_type=type(binding).__name__,
+                    )
+                    continue
                 if cred_id := binding.get("credential_ref"):
                     cred_ids.add(str(cred_id))
         return cred_ids
