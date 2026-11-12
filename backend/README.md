@@ -122,6 +122,9 @@ and [runtime operating guidance](docs/kafka-worker-operations.md).
 The AO operator's optional `spec.eventStreamWorker` requires this backend-image
 packaging before enablement and supports independent sizing. No autoscaling or
 per-subscription deployments are added.
+Operator deployments and local compose pass `--termination-grace-period-seconds`
+to the launcher so it can validate the shutdown budget before startup. Worker
+tuning uses backend defaults rather than CRD fields.
 
 ### CEL Subscription Filters and Testing
 

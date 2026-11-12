@@ -55,7 +55,7 @@ def test_process_exits_when_audit_export_would_block() -> None:
         entrypoint.EventWorkerHealth = lambda: health
         entrypoint.start_loggers = lambda: None
         entrypoint.stop_loggers = lambda: None
-        entrypoint.get_settings = lambda: SimpleNamespace(eventstream_enabled=True)
+        entrypoint.get_settings = lambda: SimpleNamespace(eventstream_enabled=True, event_drain_timeout_seconds=20)
         entrypoint.validate_encryption_key_at_startup = lambda: None
         entrypoint.get_encryption_key = lambda: SimpleNamespace(get_secret_value=lambda: "a" * 64)
         entrypoint.discover_and_register_all_handlers = lambda: None
@@ -85,6 +85,52 @@ def audit_lifecycle(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
 @pytest.fixture(autouse=True)
 def use_ephemeral_health_port(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(entrypoint, "EventWorkerHealth", lambda: EventWorkerHealth(port=0))
+
+
+@pytest.mark.parametrize(
+    ("grace", "drain", "valid"),
+    [
+        (None, 20, True),
+        (60, 20, True),
+        (27, 20, True),
+        (26, 20, False),
+        (20, 20, False),
+        (0, 20, False),
+        (-1, 20, False),
+        (42, 35, True),
+        (41, 35, False),
+    ],
+)
+def test_termination_grace_includes_actual_drain_and_cleanup(grace, drain, valid):
+    if valid:
+        entrypoint._validate_termination_grace(grace, drain)
+    else:
+        with pytest.raises(ValueError, match="drain deadline and cleanup allowance"):
+            entrypoint._validate_termination_grace(grace, drain)
+
+
+@pytest.mark.parametrize("grace", [None, 60, 90])
+def test_launcher_accepts_deployment_grace_argument(monkeypatch, grace):
+    arguments = ["consumer_entrypoint"]
+    if grace is not None:
+        arguments += ["--termination-grace-period-seconds", str(grace)]
+    monkeypatch.setattr(sys, "argv", arguments)
+    assert entrypoint._arguments().termination_grace_period_seconds == grace
+
+
+async def test_unsafe_termination_grace_fails_before_external_startup(monkeypatch, audit_lifecycle):
+    settings = get_settings().model_copy(update={"eventstream_enabled": True, "event_drain_timeout_seconds": 35})
+    connect, dispose = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(entrypoint, "get_settings", lambda: settings)
+    monkeypatch.setattr(entrypoint, "create_temporal_execution_service", connect)
+    monkeypatch.setattr(entrypoint, "engine", SimpleNamespace(dispose=dispose))
+    monkeypatch.setattr(entrypoint, "start_loggers", MagicMock())
+    monkeypatch.setattr(entrypoint, "stop_loggers", MagicMock())
+    with pytest.raises(ValueError, match="drain deadline and cleanup allowance"):
+        await entrypoint.main(termination_grace_seconds=41)
+    connect.assert_not_awaited()
+    dispose.assert_awaited_once()
+    audit_lifecycle.register.assert_not_called()
 
 
 async def test_composition_shares_one_client_factory_and_resource_limits(monkeypatch):

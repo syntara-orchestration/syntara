@@ -1,5 +1,6 @@
 """Standalone control-plane worker: python -m syntara.eventstreams.consumer_entrypoint."""
 
+import argparse
 import asyncio
 import signal
 
@@ -88,7 +89,33 @@ async def _connect_temporal(shutdown: asyncio.Event) -> TemporalExecutionService
         await settle_worker_tasks({connecting, stopping}, EventWorkerDefaults.HINT_TIMEOUT_SECONDS)
 
 
-async def main() -> None:
+async def _drain_audit_writes(audit_writer: AuditOutboxWorker | None) -> None:
+    # This process only enqueues audit rows. The platform publisher owns shared
+    # outbox SELECT/DELETE and OTLP delivery.
+    if audit_writer is not None:
+        try:
+            await audit_writer.drain_writes(timeout_seconds=EventWorkerDefaults.HINT_TIMEOUT_SECONDS)
+        except Exception:  # noqa: BLE001 - optional audit cleanup cannot skip database disposal
+            logger.warning("event_worker_audit_close_incomplete")
+
+
+def _validate_termination_grace(grace_seconds: int | None, drain_seconds: float) -> None:
+    """Leave shutdown headroom when a deployment supplies its pod grace period."""
+    if grace_seconds is not None and grace_seconds <= (
+        drain_seconds + EventWorkerDefaults.SHUTDOWN_CLEANUP_ALLOWANCE_SECONDS
+    ):
+        msg = "Termination grace must exceed the event drain deadline and cleanup allowance"
+        raise ValueError(msg)
+
+
+def _arguments() -> argparse.Namespace:
+    """Accept pod lifecycle bounds without exposing worker tuning controls."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--termination-grace-period-seconds", type=int)
+    return parser.parse_args()
+
+
+async def main(*, termination_grace_seconds: int | None = None) -> None:
     """Validate secrets, connect once, and release shared resources after bounded drain."""
     start_loggers()
     loop = asyncio.get_running_loop()
@@ -97,9 +124,11 @@ async def main() -> None:
     audit_writer: AuditOutboxWorker | None = None
     health = EventWorkerHealth()
     try:
-        if not get_settings().eventstream_enabled:
+        settings = get_settings()
+        if not settings.eventstream_enabled:
             logger.info("event_worker_disabled")
             return
+        _validate_termination_grace(termination_grace_seconds, settings.event_drain_timeout_seconds)
         try:
             audit_writer = get_outbox_worker()
             discover_and_register_all_handlers()
@@ -129,12 +158,7 @@ async def main() -> None:
         temporal = None
         try:
             try:
-                # This process only enqueues audit rows. The platform publisher
-                # owns shared outbox SELECT/DELETE and OTLP delivery.
-                if audit_writer is not None:
-                    await audit_writer.drain_writes(timeout_seconds=EventWorkerDefaults.HINT_TIMEOUT_SECONDS)
-            except Exception:  # noqa: BLE001 - optional audit cleanup cannot skip database disposal
-                logger.warning("event_worker_audit_close_incomplete")
+                await _drain_audit_writes(audit_writer)
             finally:
                 await engine.dispose()
         finally:
@@ -147,4 +171,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main(termination_grace_seconds=_arguments().termination_grace_period_seconds))

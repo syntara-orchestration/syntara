@@ -48,6 +48,17 @@ Queue and processing bounds apply per worker or consumer as documented in
 settings. Inline limits include keys, duplicate headers and encoded arguments.
 Keep the container stop grace longer than the drain deadline plus membership
 and hint-listener shutdown time. The local compose grace is 60 seconds.
+The operator and local compose pass their pod/container grace through the
+`--termination-grace-period-seconds` launcher argument. Before dependency startup,
+the launcher checks that grace strictly exceeds the actual backend drain setting
+plus its minimum cleanup allowance (currently 20 + 6 seconds with code defaults).
+The allowance is minimum headroom rather than a measured worst-case shutdown bound.
+
+The operator exposes `enabled`, standard replica/resource/scheduling settings and
+`terminationGracePeriodSeconds`. Fetch, queue, processing, drain and retention
+tuning fields from the earlier alpha operator API are removed. Configuration-only
+changes use the normal rolling strategy; version upgrades drain the pool before
+database migrations. The operator does not inject worker-tuning environment values.
 
 There are no event delivery-retention, terminal-cache, cache-epoch or Temporal
 history-retention override settings. Temporal namespace retention and normal

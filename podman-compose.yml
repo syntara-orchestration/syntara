@@ -397,7 +397,7 @@ services:
     profiles:
       - eventstream
     image: ${APP_IMAGE:-localhost/syntara:latest}
-    command: [start-event-stream-worker]
+    command: [start-event-stream-worker, --termination-grace-period-seconds, '60']
     healthcheck:
       test: [CMD, python, -m, syntara.eventstreams.consumer_health, ready]
       interval: 10s

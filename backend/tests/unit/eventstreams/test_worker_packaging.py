@@ -39,13 +39,17 @@ def test_environment_examples_omit_event_tuning_and_compose_uses_code_defaults()
         assert match.group(1) == task_queue
     assert worker["profiles"] == ["eventstream"]
     assert worker["stop_grace_period"] == "60s"
-    cleanup_headroom = EventWorkerDefaults.PLACEMENT_TIMEOUT_SECONDS + EventWorkerDefaults.HINT_TIMEOUT_SECONDS
+    cleanup_headroom = EventWorkerDefaults.SHUTDOWN_CLEANUP_ALLOWANCE_SECONDS
     assert int(worker["stop_grace_period"].removesuffix("s")) > (
         Settings.model_fields["event_drain_timeout_seconds"].default + cleanup_headroom
     )
     assert "redis" not in worker["depends_on"]
     assert "kafka" not in worker["depends_on"]
-    assert worker["command"] == ["start-event-stream-worker"]
+    assert worker["command"] == [
+        "start-event-stream-worker",
+        "--termination-grace-period-seconds",
+        worker["stop_grace_period"].removesuffix("s"),
+    ]
     assert worker["healthcheck"]["test"] == ["CMD", "python", "-m", "syntara.eventstreams.consumer_health", "ready"]
 
 
@@ -69,7 +73,12 @@ async def test_packaged_launcher_exits_cleanly_when_feature_is_disabled():
     environment["PATH"] = str(Path(sys.executable).parent) + os.pathsep + environment.get("PATH", "")
     launcher = ROOT / "backend/containers/syntara/scripts/start-event-stream-worker"
     process = await asyncio.create_subprocess_exec(
-        str(launcher), env=environment, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
+        str(launcher),
+        "--termination-grace-period-seconds",
+        "60",
+        env=environment,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
     )
     try:
         assert await asyncio.wait_for(process.wait(), timeout=15) == 0
