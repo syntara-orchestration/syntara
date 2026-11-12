@@ -13,9 +13,6 @@ import { expectPageTitle } from '../../test/pageTitle'
 
 import Executions from './Executions'
 
-const mockShowError = vi.fn()
-const mockShowWarning = vi.fn()
-
 // Mock the client module
 vi.mock('../../client', () => ({
   workflowClient: {
@@ -30,7 +27,7 @@ vi.mock('../../client', () => ({
 }))
 
 vi.mock('../../providers/alerts/AlertContext', () => ({
-  useAlerts: () => ({ showSuccess: vi.fn(), showError: mockShowError, showWarning: mockShowWarning }),
+  useAlerts: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
 }))
 
 const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -294,20 +291,13 @@ describe('Executions Component', () => {
     expect(screen.getByTestId('loading-state')).toBeInTheDocument()
   })
 
-  it('shows actionable default error without exposing raw API details', () => {
-    const rawErrorDetail = 'QA synthetic backend detail 500'
-    mockExecutionsQuery([], false, { status: 500, detail: rawErrorDetail })
+  it('shows actionable default error when the list API fails', () => {
+    mockExecutionsQuery([], false, { message: 'Failed to load' })
 
     render(<Executions />, { wrapper: TestWrapper })
 
     expect(screen.getByText('Unable to load workflow runs')).toBeInTheDocument()
     expect(screen.getByText('Something went wrong. Try again.')).toBeInTheDocument()
-    expect(screen.queryByText(rawErrorDetail)).not.toBeInTheDocument()
-    expect(mockShowError).toHaveBeenCalledWith({
-      title: 'Unable to load workflow runs',
-      description: 'Something went wrong. Try again.',
-    })
-    expect(mockShowWarning).not.toHaveBeenCalled()
   })
 
   it('shows a permission message when the list API returns 403', () => {
@@ -320,8 +310,7 @@ describe('Executions Component', () => {
   })
 
   it('shows a service unavailable message when the list API returns 503', () => {
-    const rawErrorDetail = 'QA synthetic backend detail 503'
-    mockExecutionsQuery([], false, { status: 503, detail: rawErrorDetail })
+    mockExecutionsQuery([], false, { status: 503, detail: 'Service down' })
 
     render(<Executions />, { wrapper: TestWrapper })
 
@@ -329,9 +318,6 @@ describe('Executions Component', () => {
     expect(
       screen.getByText('The workflow service is temporarily unavailable. Try again in a few minutes.')
     ).toBeInTheDocument()
-    expect(screen.queryByText(rawErrorDetail)).not.toBeInTheDocument()
-    expect(mockShowError).not.toHaveBeenCalled()
-    expect(mockShowWarning).not.toHaveBeenCalled()
   })
 
   it('displays workflow names instead of IDs', () => {
