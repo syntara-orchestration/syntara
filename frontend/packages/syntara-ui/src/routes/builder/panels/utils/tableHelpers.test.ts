@@ -52,10 +52,9 @@ describe('buildRowKey', () => {
     expect(buildRowKey({}, [])).toBe('')
   })
 
-  it('produces identical keys for rows with identical values', () => {
-    const row1 = { name: 'Alice', age: 30 }
-    const row2 = { name: 'Alice', age: 30 }
-    expect(buildRowKey(row1, ['name', 'age'])).toBe(buildRowKey(row2, ['name', 'age']))
+  it('produces a stable key from the selected values', () => {
+    const row = { name: 'Alice', age: 30 }
+    expect(buildRowKey(row, ['name', 'age'])).toBe('Alice|30')
   })
 
   it('includes pipe separator characters present in values', () => {
