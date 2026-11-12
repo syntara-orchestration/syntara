@@ -1,6 +1,7 @@
 import type { FormDefinition, FormField } from '@syntara/contracts'
 
 import type { FormDefinitionSchemaInput } from './formDefinitionSchema'
+import { FormFieldTypeEnum } from './formFieldTypeEnum'
 
 export const DATE_COMPONENT_NAMES = ['date', 'time', 'timezone'] as const
 
@@ -80,6 +81,15 @@ export function dateIncludesFromField(field: FormField): Record<DateComponentNam
     time: field.include_time ?? false,
     timezone: field.include_timezone ?? false,
   }
+}
+
+/** Date and timezone without time cannot be saved; used for show-in-form validation in the builder. */
+export function isDateFieldDateAndTimezoneWithoutTime(field: FormField): boolean {
+  if (field.type !== FormFieldTypeEnum.DATE) {
+    return false
+  }
+  const includes = dateIncludesFromField(field)
+  return includes.date && includes.timezone && !includes.time
 }
 
 function countIncludedDateComponents(includes: Record<DateComponentName, boolean>): number {

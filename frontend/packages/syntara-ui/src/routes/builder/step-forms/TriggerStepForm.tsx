@@ -31,7 +31,6 @@ import { useSynForm } from '../../../hooks/useSynForm'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useEffectiveFormDefinitionServerValidationErrors } from '../hooks/useEffectiveFormDefinitionServerValidationErrors'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
-import { partitionFormTriggerServerValidationErrors } from '../utils/partitionFormTriggerServerValidationErrors'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { buildTriggerFormDefaults } from './buildTriggerFormDefaults'
@@ -48,6 +47,7 @@ import {
 } from './triggerFormFieldBuilderCommitContext'
 import { normalizeWebhookPath, triggerFormSchema, type TriggerFormData } from './triggerFormSchema'
 import { useApplyServerValidationToTriggerForm } from './useApplyServerValidationToTriggerForm'
+import { useFormDefinitionFieldServerErrors } from './useFormDefinitionBuilderServerFieldErrors'
 import { WebhookFields } from './WebhookTriggerFields'
 
 const executionConflictLabelHelp = (
@@ -440,9 +440,10 @@ export function TriggerStepForm({
     }
   )
 
-  const formDefinitionFieldErrors = useMemo(
-    () => partitionFormTriggerServerValidationErrors(effectiveServerValidationErrors).formFieldErrors,
-    [effectiveServerValidationErrors]
+  const formDefinitionFieldErrors = useFormDefinitionFieldServerErrors(
+    formDefinition,
+    effectiveServerValidationErrors,
+    readPreparedFormDefinition
   )
 
   useApplyServerValidationToTriggerForm(form, effectiveServerValidationErrors)

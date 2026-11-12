@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  isDateFieldDateAndTimezoneWithoutTime,
   isSoleIncludedDateComponent,
   normalizeDateDefaultForIncludes,
   nextDateIncludes,
@@ -10,6 +11,29 @@ import { safeParseFormDefinition } from './formDefinitionSchema'
 import { FormFieldTypeEnum } from './formFieldTypeEnum'
 
 describe('dateFieldUtils', () => {
+  it('detects date and timezone without time', () => {
+    expect(
+      isDateFieldDateAndTimezoneWithoutTime({
+        type: FormFieldTypeEnum.DATE,
+        value_name: 'due',
+        label: 'Due',
+        include_date: true,
+        include_timezone: true,
+        include_time: false,
+      })
+    ).toBe(true)
+    expect(
+      isDateFieldDateAndTimezoneWithoutTime({
+        type: FormFieldTypeEnum.DATE,
+        value_name: 'due',
+        label: 'Due',
+        include_date: true,
+        include_timezone: true,
+        include_time: true,
+      })
+    ).toBe(false)
+  })
+
   it('marks the sole included component as locked', () => {
     const onlyDate = { date: true, time: false, timezone: false }
     expect(isSoleIncludedDateComponent(onlyDate, 'date')).toBe(true)

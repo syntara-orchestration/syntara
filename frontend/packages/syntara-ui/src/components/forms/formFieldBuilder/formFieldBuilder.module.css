@@ -20,6 +20,13 @@
   color: var(--pf-t--global--color--status--danger--default);
 }
 
+.showInFormFieldset {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
 .designTab :global(.pf-v6-c-form__group-control) {
   margin-block-start: var(--pf-t--global--spacer--sm);
 }

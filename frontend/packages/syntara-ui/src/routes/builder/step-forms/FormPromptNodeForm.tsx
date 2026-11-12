@@ -15,7 +15,6 @@ import { detachPromise } from '../../../utils/detachPromise'
 import { useEffectiveFormDefinitionServerValidationErrors } from '../hooks/useEffectiveFormDefinitionServerValidationErrors'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
 import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
-import { partitionFormTriggerServerValidationErrors } from '../utils/partitionFormTriggerServerValidationErrors'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { ApproverMultiSelect } from './ApproverMultiSelect'
@@ -49,6 +48,7 @@ import stepFormStyles from './shared/stepFormStyles.module.css'
 import { StepFormTabsLayout } from './shared/StepFormTabsLayout'
 import { StepSettingsForm } from './shared/StepSettingsForm'
 import { useApprovalDecideGroups } from './useApprovalDecideGroups'
+import { useFormDefinitionFieldServerErrors } from './useFormDefinitionBuilderServerFieldErrors'
 import { useFormPromptSubmitUsers } from './useFormPromptSubmitUsers'
 
 type NodeSettings = Activity['settings']
@@ -379,10 +379,10 @@ export function FormPromptNodeForm(props: Readonly<FormPromptNodeFormProps>) {
     serverValidationErrors,
     { readPreparedDefinition: readPreparedFormDefinition }
   )
-
-  const formDefinitionFieldErrors = useMemo(
-    () => partitionFormTriggerServerValidationErrors(effectiveServerValidationErrors).formFieldErrors,
-    [effectiveServerValidationErrors]
+  const formDefinitionFieldErrors = useFormDefinitionFieldServerErrors(
+    formDefinition,
+    effectiveServerValidationErrors,
+    readPreparedFormDefinition
   )
 
   const syncFormDefinitionFromBuilder = useCallback(() => {

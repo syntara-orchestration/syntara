@@ -1,9 +1,10 @@
-import type { FormDefinition } from '@syntara/contracts'
+import type { FormDefinition, FormFieldType } from '@syntara/contracts'
 import { render, screen, waitFor } from '@testing-library/react'
-import { FormProvider, useForm, useFormState } from 'react-hook-form'
+import type { ReactNode } from 'react'
+import { FormProvider, useController, useForm, useFormContext, useFormState } from 'react-hook-form'
 import { describe, expect, it } from 'vitest'
 
-import { FormFieldTypeEnum } from '../../../forms'
+import { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE, FormFieldTypeEnum } from '../../../forms'
 
 import { createDefaultField } from './createDefaultField'
 import type { FormDefinitionFieldServerError } from './formDefinitionFieldServerError'
@@ -15,17 +16,29 @@ function LabelErrorDisplay() {
   return <div data-testid="label-error">{typeof labelMessage === 'string' ? labelMessage : ''}</div>
 }
 
+function IncludeTimeErrorDisplay() {
+  const { control } = useFormContext<FormDefinition>()
+  const { fieldState } = useController({ control, name: 'fields.0.include_time' })
+  const message = fieldState.error?.message
+  if (typeof message !== 'string' || message.length === 0) {
+    return null
+  }
+  return <p>{message}</p>
+}
+
 function TestHarness({
   serverFieldErrors,
-}: Readonly<{ serverFieldErrors?: ReadonlyArray<FormDefinitionFieldServerError> }>) {
-  const field = createDefaultField(FormFieldTypeEnum.TEXT)
+  fieldType = FormFieldTypeEnum.TEXT,
+  errorDisplay = <LabelErrorDisplay />,
+}: Readonly<{
+  serverFieldErrors?: ReadonlyArray<FormDefinitionFieldServerError>
+  fieldType?: FormFieldType
+  errorDisplay?: ReactNode
+}>) {
+  const field = createDefaultField(fieldType)
   const methods = useForm<FormDefinition>({ defaultValues: { fields: [field] } })
   useApplyServerFormFieldErrors(methods, serverFieldErrors)
-  return (
-    <FormProvider {...methods}>
-      <LabelErrorDisplay />
-    </FormProvider>
-  )
+  return <FormProvider {...methods}>{errorDisplay}</FormProvider>
 }
 
 describe('useApplyServerFormFieldErrors', () => {
@@ -34,6 +47,26 @@ describe('useApplyServerFormFieldErrors', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('label-error')).toHaveTextContent('Label is required')
+    })
+  })
+
+  it('maps include_time server errors onto form field paths', async () => {
+    render(
+      <TestHarness
+        fieldType={FormFieldTypeEnum.DATE}
+        errorDisplay={<IncludeTimeErrorDisplay />}
+        serverFieldErrors={[
+          {
+            fieldIndex: 0,
+            subPath: 'include_time',
+            message: DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE,
+          },
+        ]}
+      />
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE)).toBeVisible()
     })
   })
 

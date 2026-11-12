@@ -15,6 +15,7 @@ import type { FormDefinitionFieldServerError } from './formFieldBuilder/formDefi
 import styles from './formFieldBuilder/formFieldBuilder.module.css'
 import { FormFieldBuilderCommitContext } from './formFieldBuilder/formFieldBuilderCommitContext'
 import { FormFieldBuilderDesignTab } from './formFieldBuilder/FormFieldBuilderDesignTab'
+import { FormFieldBuilderDraftModeContext } from './formFieldBuilder/formFieldBuilderDraftModeContext'
 import { FormFieldBuilderJsonSchemaTab } from './formFieldBuilder/FormFieldBuilderJsonSchemaTab'
 import type { FormFieldBuilderOptionsMode } from './formFieldBuilder/formFieldBuilderOptionsModeContext'
 import { FormFieldBuilderOptionsModeProvider } from './formFieldBuilder/FormFieldBuilderOptionsModeProvider'
@@ -86,7 +87,7 @@ export function SynFormFieldBuilder({
     methods.reset(JSON.parse(valueKey) as FormDefinitionSchemaInput)
   }, [valueKey, methods])
 
-  useApplyServerFormFieldErrors(methods, serverFieldErrors)
+  useApplyServerFormFieldErrors(methods, serverFieldErrors, valueKey)
 
   const commit = useCallback(() => {
     const raw = methods.getValues()
@@ -130,37 +131,39 @@ export function SynFormFieldBuilder({
 
   return (
     <FormProvider {...methods}>
-      <FormFieldBuilderOptionsModeProvider mode={optionsMode}>
-        <FormFieldBuilderCommitContext value={commit}>
-          {designOnly ? (
-            designTab
-          ) : (
-            <Tabs
-              activeKey={activeTab}
-              onSelect={(_event, tabIndex) => setActiveTab(tabIndex as BuilderTab)}
-              aria-label="Form builder views"
-            >
-              <Tab eventKey="design" title={<TabTitleText>Design</TabTitleText>}>
-                {designTab}
-              </Tab>
-              <Tab eventKey="preview" title={<TabTitleText>Preview</TabTitleText>}>
-                <div className={styles.tabPanelBody}>
-                  <FormFieldBuilderPreviewTab
-                    submitLabel={previewSubmitLabel}
-                    cssOverrideSource={previewCssOverrideSource}
-                    description={previewDescription}
-                  />
-                </div>
-              </Tab>
-              <Tab eventKey="json" title={<TabTitleText>JSON Schema</TabTitleText>}>
-                <div className={styles.tabPanelBody}>
-                  <FormFieldBuilderJsonSchemaTab isDisabled={isDisabled} />
-                </div>
-              </Tab>
-            </Tabs>
-          )}
-        </FormFieldBuilderCommitContext>
-      </FormFieldBuilderOptionsModeProvider>
+      <FormFieldBuilderDraftModeContext.Provider value={isDraftBuilder}>
+        <FormFieldBuilderOptionsModeProvider mode={optionsMode}>
+          <FormFieldBuilderCommitContext value={commit}>
+            {designOnly ? (
+              designTab
+            ) : (
+              <Tabs
+                activeKey={activeTab}
+                onSelect={(_event, tabIndex) => setActiveTab(tabIndex as BuilderTab)}
+                aria-label="Form builder views"
+              >
+                <Tab eventKey="design" title={<TabTitleText>Design</TabTitleText>}>
+                  {designTab}
+                </Tab>
+                <Tab eventKey="preview" title={<TabTitleText>Preview</TabTitleText>}>
+                  <div className={styles.tabPanelBody}>
+                    <FormFieldBuilderPreviewTab
+                      submitLabel={previewSubmitLabel}
+                      cssOverrideSource={previewCssOverrideSource}
+                      description={previewDescription}
+                    />
+                  </div>
+                </Tab>
+                <Tab eventKey="json" title={<TabTitleText>JSON Schema</TabTitleText>}>
+                  <div className={styles.tabPanelBody}>
+                    <FormFieldBuilderJsonSchemaTab isDisabled={isDisabled} />
+                  </div>
+                </Tab>
+              </Tabs>
+            )}
+          </FormFieldBuilderCommitContext>
+        </FormFieldBuilderOptionsModeProvider>
+      </FormFieldBuilderDraftModeContext.Provider>
     </FormProvider>
   )
 }
