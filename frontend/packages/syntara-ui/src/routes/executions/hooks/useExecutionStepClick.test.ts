@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import type React from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 
 import { useExecutionStepClick } from './useExecutionStepClick'
 

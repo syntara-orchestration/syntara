@@ -1,7 +1,7 @@
 import { ActivityTypeEnum, EdgeHandleEnum, type Activity } from '@syntara/contracts'
 import { useMemo } from 'react'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 import { buildTriggerNodeId } from '../../../utils/triggerNodeIds'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { ActivityState } from '../../workflows/execution/types'

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useFileUploadWithProgress } from '../../../hooks/useFileUploadWithProgress'
 import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { deleteFileById } from '../../../utils/deleteFile'
-import type { UploadedFile } from '../components/file-upload'
+import type { UploadedFile } from '../components/file-upload/FileUpload'
 
 import { useFileUploadState, type FileContextType } from './useFileUploadState'
 

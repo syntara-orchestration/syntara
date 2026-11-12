@@ -2,7 +2,7 @@ import { EdgeHandleEnum, type SwitchConfig } from '@syntara/contracts'
 import { useEffect, useMemo, useRef } from 'react'
 import { flushSync } from 'react-dom'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 import type { ButtonEdgePlaceholderNode, NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { OnAddNodeFromEdge } from '../types'
 import { filterButtonEdges, filterRealNodes, isPlaceholderNode, isRealEdge } from '../utils/filterHelpers'

@@ -1,7 +1,7 @@
 import type { Approval } from '@syntara/contracts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { detachPromise } from '../../../utils/detachPromise'
 import { getApprovalLoadErrorAlert } from '../../approvals/approvalLoadErrors'

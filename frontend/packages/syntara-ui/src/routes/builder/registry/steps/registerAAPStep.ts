@@ -1,5 +1,5 @@
 import AnsibleIcon from '../../../../assets/ansible-automation-platform.svg?react'
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 import {
   createAAPJobTemplateActivity,
   createAAPWorkflowTemplateActivity,

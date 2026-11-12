@@ -1,4 +1,4 @@
-import type { MenuNodeTypeUnion } from '../../../../../constants'
+import type { MenuNodeTypeUnion } from '../../../../../constants/nodeTypes'
 import { useNodeActions } from '../../../../../routes/builder/NodeActionsContext'
 
 import { useCanvasMenuActions, type StepMenuAction } from './useStepMenuActions'

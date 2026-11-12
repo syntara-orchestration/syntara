@@ -1,7 +1,7 @@
 import { RhUiFileCodeIcon, RhUiElectricityFillIcon, RhUiPlugFillIcon } from '@patternfly/react-icons'
 import { ExecutorTypeEnum } from '@syntara/contracts'
 
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 import { createApiActivity, createScriptActivity, useWorkflowStore } from '../../../../stores/useWorkflowStore'
 import { ActionStepForm } from '../../step-forms/ActionStepForm'
 import type { ActionFormData } from '../../stepFormTypes'

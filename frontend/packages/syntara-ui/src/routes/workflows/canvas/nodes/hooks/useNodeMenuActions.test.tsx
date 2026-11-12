@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { StepMenuCategory } from '../../../../../constants'
+import { StepMenuCategory } from '../../../../../constants/nodeTypes'
 import { NodeActionsContext, type NodeActionsContextValue } from '../../../../../routes/builder/NodeActionsContext'
 
 import { useNodeMenuActions } from './useNodeMenuActions'

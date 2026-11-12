@@ -13,7 +13,8 @@ import type { ReactNode } from 'react'
 import { useState } from 'react'
 
 import { SynStepMenu } from '../../components/steps/SynStepMenu'
-import { FlowNodeType, RegistryStepId } from '../../constants'
+import { FlowNodeType } from '../../constants/nodeTypes'
+import { RegistryStepId } from '../../constants/registryStepIds'
 import { useAlerts } from '../../providers/alerts/AlertContext'
 import {
   useWorkflowStore,

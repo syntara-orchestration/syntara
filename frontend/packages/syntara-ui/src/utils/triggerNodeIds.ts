@@ -1,4 +1,4 @@
-import { StepMenuCategory, type StepMenuCategoryUnion } from '../constants'
+import { StepMenuCategory, type StepMenuCategoryUnion } from '../constants/nodeTypes'
 
 export function buildTriggerNodeId(index: number): string {
   return `trigger-${index}`

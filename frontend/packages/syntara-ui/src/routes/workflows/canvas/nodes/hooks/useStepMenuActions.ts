@@ -10,7 +10,7 @@ import {
 import { useReactFlow } from '@xyflow/react'
 import { createElement, useCallback, type ReactNode } from 'react'
 
-import { type StepMenuCategoryUnion, StepMenuCategory } from '../../../../../constants'
+import { type StepMenuCategoryUnion, StepMenuCategory } from '../../../../../constants/nodeTypes'
 import { useAlerts } from '../../../../../providers/alerts/AlertContext'
 import type { NodeActionsContextValue } from '../../../../../routes/builder/NodeActionsContext'
 import { useStepActions } from '../../../../../routes/builder/StepActionsContext'
@@ -19,7 +19,7 @@ import { detachPromise } from '../../../../../utils/detachPromise'
 import { resolveFlowNodeId } from '../../../../../utils/triggerNodeIds'
 
 // Re-export for convenience
-export { StepMenuCategory, type StepMenuCategoryUnion } from '../../../../../constants'
+export { StepMenuCategory, type StepMenuCategoryUnion } from '../../../../../constants/nodeTypes'
 
 export type StepMenuAction = {
   id: string

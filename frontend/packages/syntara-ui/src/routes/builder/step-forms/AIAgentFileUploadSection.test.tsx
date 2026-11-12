@@ -11,7 +11,7 @@ import {
 import { useFileUploadWithProgress } from '../../../hooks/useFileUploadWithProgress'
 import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { downloadFileById } from '../../../utils/downloadFile'
-import type { UploadedFile } from '../components/file-upload'
+import type { UploadedFile } from '../components/file-upload/FileUpload'
 
 import { AIAgentFileUploadSection } from './AIAgentFileUploadSection'
 import type { FileContextType } from './useFileUploadState'
@@ -37,7 +37,7 @@ vi.mock('../../../utils/deleteFile', () => ({
   deleteFileById: vi.fn(() => Promise.resolve()),
 }))
 
-vi.mock('../components/file-upload', () => ({
+vi.mock('../components/file-upload/FileUpload', () => ({
   FileUpload: ({
     files = [],
     onFileDownload,

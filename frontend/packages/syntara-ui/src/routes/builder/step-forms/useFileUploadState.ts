@@ -6,7 +6,7 @@ import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { deleteFileById } from '../../../utils/deleteFile'
 import { detachPromise } from '../../../utils/detachPromise'
 import { generateUUID } from '../../../utils/generateUUID'
-import type { UploadedFile } from '../components/file-upload'
+import type { UploadedFile } from '../components/file-upload/FileUpload'
 
 export type MarkPersistedFn = (fileIds?: Iterable<string>) => void
 

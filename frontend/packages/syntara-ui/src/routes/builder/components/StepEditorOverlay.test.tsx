@@ -2,7 +2,7 @@ import { ExecutorTypeEnum } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { RegistryStepId } from '../../../constants'
+import { RegistryStepId } from '../../../constants/registryStepIds'
 import type { DocKey } from '../../../utils/docs/types'
 
 import { StepEditorOverlay } from './StepEditorOverlay'

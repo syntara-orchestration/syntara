@@ -79,7 +79,6 @@ export default tseslint.config(
       'playwright.config.ts',
       'test-results/**',
       'playwright-report/**',
-      '.tmp-xfail-int-*/**',
       'scripts/**',
       'eslint-plugin-syntara/**',
     ],
