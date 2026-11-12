@@ -59,15 +59,7 @@ async def session_app(
     mock_evaluator.health = AsyncMock(return_value=True)
     mock_evaluator.start = MagicMock()
     mock_evaluator.stop = AsyncMock()
-    # evaluate() is sync; AsyncMock would drop allowed_projects on 3.12.
-    mock_evaluator.evaluate = MagicMock(
-        return_value={
-            "allow": True,
-            "deny": False,
-            "matched_policy": "test-allow-all",
-            "allowed_projects": ["*"],
-        }
-    )
+    mock_evaluator.evaluate = AsyncMock(return_value={"allow": True})
 
     # A test that entered the app lifespan earlier with an incomplete patch
     # set (e.g. test_app_lifecycle.py, which does not patch
