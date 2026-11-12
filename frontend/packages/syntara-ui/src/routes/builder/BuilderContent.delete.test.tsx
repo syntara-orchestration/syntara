@@ -28,6 +28,17 @@ vi.mock('../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
+// The builder reads step-type verdicts; gating itself is covered by
+// AddStepPanel.stepTypeGating.test.tsx.
+vi.mock('../../hooks/useNodeKindsQuery', () => ({
+  useNodeKindsQuery: () => ({
+    query: { isPending: false },
+    nodeKinds: [],
+    nodeKindByKind: new Map(),
+    isUnavailable: false,
+  }),
+}))
+
 vi.mock('../../hooks/routing/useLocation', () => ({
   useLocation: () => '/workflow-builder/workflow-1',
 }))

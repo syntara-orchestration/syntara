@@ -28,6 +28,7 @@ import { identityProviders, type IdentityProvider } from './resources/identityPr
 import { validateGroupJmespathExpression } from './utils/jmespathValidation'
 import { users, userIdentities, type UserRead, type UserIdentityRead } from './resources/users'
 import { groups, userGroupMemberships, type GroupRead } from './resources/groups'
+import { nodeKindsForCaller } from './resources/nodeKinds'
 import {
   mockProjects,
   mockPolicies,
@@ -3858,6 +3859,41 @@ export const handlers = [
   }),
 
   // ── Access Management: Projects ─────────────────────────────────────────
+
+  // ==========================================================================
+  // Node kinds (ANSTRAT-2533 P6) — step-type permissions for the add-step panel
+  // ==========================================================================
+
+  http.get('/api/v1/node_kinds', ({ request }) => {
+    const url = new URL(request.url)
+    const projectId = url.searchParams.get('project_id')
+    if (!projectId) {
+      return HttpResponse.json(
+        {
+          type: 'validation_error',
+          title: 'Unprocessable Entity',
+          detail: 'project_id is required',
+          code: 'VALIDATION_ERROR',
+          retryable: false,
+        },
+        { status: 422 }
+      )
+    }
+    const project = mockProjects.find((p) => p.id === projectId)
+    if (!project) {
+      return HttpResponse.json(
+        {
+          type: 'not_found',
+          title: 'Not Found',
+          detail: `Project ${projectId} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+    return HttpResponse.json(nodeKindsForCaller(project.name))
+  }),
 
   http.get('/api/v1/projects', ({ request }) => {
     const url = new URL(request.url)
