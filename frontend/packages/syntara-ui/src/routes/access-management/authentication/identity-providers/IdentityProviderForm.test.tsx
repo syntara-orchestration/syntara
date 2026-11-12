@@ -124,11 +124,22 @@ describe('IdentityProviderForm', () => {
       expect(screen.getByRole('button', { name: 'Test connection' })).toBeInTheDocument()
     })
 
-    it('renders cancel button on all steps', () => {
+    it('renders cancel link on all steps', async () => {
       setupMocks()
+      const user = userEvent.setup()
       render(<IdentityProviderForm mode="add" />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute(
+        'href',
+        '/system-administration/authentication'
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Claim mapping' }))
+
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute(
+        'href',
+        '/system-administration/authentication'
+      )
     })
 
     it('renders all required form fields', () => {
