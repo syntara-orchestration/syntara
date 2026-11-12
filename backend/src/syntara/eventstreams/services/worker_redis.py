@@ -1,25 +1,24 @@
-"""One process-owned event-domain Redis pool for terminal proofs and hints."""
+"""Process-owned Redis connection for optional subscription change hints."""
 
 import asyncio
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
-from syntara.core.cache.base import redis_error_handler
+from syntara.core.cache.base import BaseRedisClient, redis_error_handler
 from syntara.core.cache.pubsub_client import PubSubMixin
 from syntara.core.constants import EventWorkerDefaults
-from syntara.eventstreams.services.delivery_cache import DeliveryRedisClient
 
 if TYPE_CHECKING:
     from redis.asyncio.client import PubSub
 
 
-class EventWorkerRedisClient(DeliveryRedisClient, PubSubMixin):
-    """Reuse BaseRedisClient + CacheMixin through the completed proof storage adapter."""
+class EventWorkerRedisClient(BaseRedisClient, PubSubMixin):
+    """Keep notifications independent of Kafka delivery resolution."""
 
     _client_name = "event-worker"
 
     async def pubsub_subscribe(self, channel: str) -> "PubSub":
-        """Retain and close partial subscriptions without disconnecting cache users."""
+        """Close partial subscriptions without disconnecting the worker connection."""
         pubsub = self._ensure_connected().pubsub()
         try:
             async with redis_error_handler("event_worker_subscribe", channel=channel):

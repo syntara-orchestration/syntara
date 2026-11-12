@@ -3,7 +3,7 @@
 import asyncio
 import random
 import time
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from contextlib import suppress
 from datetime import UTC, datetime
 from uuid import UUID
@@ -16,7 +16,6 @@ from syntara.eventstreams.core.placement import PlacementLost, SubscriptionPlace
 from syntara.eventstreams.core.runtime import RuntimeState, SubscriptionRunnerFactory
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.eventstreams.services.placement_service import SubscriptionPlacementService
-from syntara.eventstreams.services.runtime_control_service import EventRuntimeControlService
 from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
 from syntara.eventstreams.services.subscription_supervisor import SubscriptionSupervisor
 from syntara.eventstreams.services.worker_gate import EventWorkerGate
@@ -45,12 +44,12 @@ class EventWorkerManager:
         placement: SubscriptionPlacementService,
         resources: EventWorkerResources,
         *,
-        controls: EventRuntimeControlService | None = None,
+        connection_revision: Callable[[SubscriptionSnapshot], Awaitable[str]] | None = None,
     ) -> None:
         """Inject completed provider ports and process-owned limits, never a session."""
         self._reader = reader
         self._factory = runner_factory
-        self._controls = controls
+        self._connection_revision = connection_revision
         self._registered: dict[UUID, SubscriptionSnapshot] = {}
         self._placement = placement
         self._resources = resources
@@ -195,7 +194,9 @@ class EventWorkerManager:
             generation, started = self._gate.generation, time.monotonic()
             async with asyncio.timeout(EventWorkerDefaults.STARTUP_TIMEOUT_SECONDS):
                 snapshots = await self._reader.read()
-                blocked = await self._reader.recovery_holds()
+                # Recovery tokens fence their partition in the position service;
+                # they must not block healthy partitions of the same source.
+                blocked: set[UUID] = set()
                 members = await self._membership.call(self._placement.list_live_workers, require_trusted=False)
                 await self._reconcile_uncertain()
             if self._closing:
@@ -330,11 +331,8 @@ class EventWorkerManager:
 
     async def _retire(self, key: UUID) -> None:
         supervisor = self._supervisors.get(key)
-        previous = self._registered.get(key)
         if supervisor is not None:
             status = await supervisor.stop()
-            if self._controls is not None and previous is not None:
-                await self._controls.acknowledge(previous, status)
             if status.state != RuntimeState.STOPPED:
                 if not self._closing:
                     self._pending[key] = None
@@ -371,8 +369,7 @@ class EventWorkerManager:
         lease = authority.lease
         if lease is None:
             return
-        if not await self._register(key, snapshot):
-            return
+        self._registered[key] = snapshot
         supervisor = self._supervisors.get(key)
         if supervisor is None:
             supervisor = SubscriptionSupervisor(
@@ -380,19 +377,10 @@ class EventWorkerManager:
                 self._factory,
                 placement=authority,
                 startup_timeout_seconds=EventWorkerDefaults.STARTUP_TIMEOUT_SECONDS,
+                connection_revision=self._connection_revision,
             )
             self._supervisors[key] = supervisor
-        status = await supervisor.apply(snapshot)
-        if self._controls is not None:
-            await self._controls.acknowledge(snapshot, status, lease=lease)
-
-    async def _register(self, key: UUID, snapshot: SubscriptionSnapshot) -> bool:
-        if self._controls is not None and self._registered.get(key) != snapshot:
-            lease = self._placement.authority(key).lease
-            if lease is None or not await self._controls.register(snapshot, lease):
-                return False
-            self._registered[key] = snapshot
-        return True
+        await supervisor.apply(snapshot)
 
     def _retry_retirement(self, key: UUID) -> None:
         self._retirement_retries.pop(key, None)

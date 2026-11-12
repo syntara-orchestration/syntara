@@ -11,7 +11,7 @@ from uuid import UUID
 import yaml
 
 from syntara.core.config.base import Settings
-from syntara.core.constants import EventDeliveryDefaults, EventWorkerDefaults
+from syntara.core.constants import EventWorkerDefaults
 from syntara.eventstreams.consumer_service import placement_targets
 from syntara.eventstreams.models.consumer_worker import EventConsumerWorker
 from syntara.eventstreams.models.subscription import EventSubscription
@@ -20,42 +20,28 @@ from syntara.integrations.models.integration_configuration import KafkaConfigura
 ROOT = Path(__file__).resolve().parents[4]
 
 
-def example_defaults(path):
-    values = re.findall(r"^# (APP_EVENT\w+)=(.+)$", path.read_text(), re.MULTILINE)
-    assert len(values) == len(dict(values)), f"Duplicate event configuration in {path}"
-    return dict(values)
-
-
-def test_environment_examples_and_compose_match_settings_defaults():
-    root = example_defaults(ROOT / ".env.example")
-    assert root == example_defaults(ROOT / "backend/.env.example")
-    assert root["APP_EVENTSTREAM_ENABLED"] == "false"
-    assert root["APP_EVENT_DELIVERY_CACHE_ENABLED"] == "false"
+def test_environment_examples_omit_event_tuning_and_compose_uses_code_defaults():
     compose = yaml.safe_load((ROOT / "podman-compose.yml").read_text())
     worker = compose["services"]["eventstream-consumer"]
     env = dict(value.split("=", 1) for value in worker["environment"] if "=" in value)
     inherited = {value for value in worker["environment"] if "=" not in value}
-    assert inherited == {"APP_EVENT_DELIVERY_CACHE_EPOCH", "APP_EVENT_DELIVERY_CACHE_CLOCK_ERROR_BOUND_SECONDS"}
+    assert inherited == set()
+    assert {key for key in env if key.startswith("APP_EVENT")} == {"APP_EVENTSTREAM_ENABLED"}
+    assert Settings.model_fields["eventstream_enabled"].default is False
+    assert env["APP_EVENTSTREAM_ENABLED"] == "${APP_EVENTSTREAM_ENABLED:-false}"
     task_queue = Settings.model_fields["task_queue"].default
     assert env["APP_TASK_QUEUE"] == task_queue
     for path in [ROOT / ".env.example", ROOT / "backend/.env.example"]:
-        match = re.search(r"^APP_TASK_QUEUE=([^\s#]+)", path.read_text(), re.MULTILINE)
+        contents = path.read_text()
+        assert re.search(r"^\s*#?\s*APP_EVENT\w*\s*=", contents, re.MULTILINE) is None
+        match = re.search(r"^APP_TASK_QUEUE=([^\s#]+)", contents, re.MULTILINE)
         assert match is not None
         assert match.group(1) == task_queue
-    for key, value in root.items():
-        default = Settings.model_fields[key.removeprefix("APP_").lower()].default
-        if default is None:
-            assert value.startswith("<")
-            assert value.endswith(">")
-            assert key in inherited
-            continue
-        assert value == str(default).lower()
-        assert env[key] == "${" + key + ":-" + value + "}"
     assert worker["profiles"] == ["eventstream"]
     assert worker["stop_grace_period"] == "60s"
     cleanup_headroom = EventWorkerDefaults.PLACEMENT_TIMEOUT_SECONDS + EventWorkerDefaults.HINT_TIMEOUT_SECONDS
     assert int(worker["stop_grace_period"].removesuffix("s")) > (
-        float(root["APP_EVENT_DRAIN_TIMEOUT_SECONDS"]) + cleanup_headroom
+        Settings.model_fields["event_drain_timeout_seconds"].default + cleanup_headroom
     )
     assert "redis" not in worker["depends_on"]
     assert "kafka" not in worker["depends_on"]
@@ -111,23 +97,13 @@ def test_disposable_broker_has_no_persistent_storage_or_customer_credentials():
     assert "auto.create.topics.enable=false" in server
 
 
-def test_terminal_retention_and_claim_cache_lifetimes_remain_independent():
-    assert Settings.model_fields["event_delivery_retention_seconds"].default == 3600
-    assert EventDeliveryDefaults.CLAIM_LEASE_SECONDS == 60
-    assert EventDeliveryDefaults.CLAIM_RENEWAL_INTERVAL_SECONDS == 20
-    assert EventDeliveryDefaults.TERMINAL_CACHE_TTL_SECONDS == 60
-
-
-def test_operating_guide_configuration_matches_environment_examples():
+def test_operating_guide_defaults_match_code_defaults():
     guide = (ROOT / "backend/docs/kafka-worker-operations.md").read_text()
-    documented = dict(re.findall(r"^\| `(APP_EVENT\w+)` \| (.+?) \|$", guide, re.MULTILINE))
-    examples = example_defaults(ROOT / ".env.example")
-    assert documented.keys() == examples.keys()
-    for key, value in examples.items():
-        if Settings.model_fields[key.removeprefix("APP_").lower()].default is None:
-            assert documented[key].startswith("unset;")
-        else:
-            assert documented[key] == f"`{value}`"
+    documented = dict(re.findall(r"^\| `(event\w+)` \| `(.+?)` \|$", guide, re.MULTILINE))
+    defaults = {name: field.default for name, field in Settings.model_fields.items() if name.startswith("event")}
+    assert documented.keys() == defaults.keys()
+    for name, value in defaults.items():
+        assert documented[name] == str(value).lower()
 
 
 def test_documented_sizing_examples_match_provider_targets():

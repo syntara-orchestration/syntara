@@ -1,8 +1,7 @@
 -- Manual operational-state example; never part of setup or compose startup.
--- Close admission and stop all consumers, recovery loops and cache readers/writers first.
--- Coordinate the external cache epoch separately before restored state is reactivated.
+-- Close admission and stop all event workers before restored state is reactivated.
 -- Supply the existing stable Installation.id with psql --set=deployment_id=... .
--- Delivery tokens, source/group boundaries and Execution evidence must remain intact.
+-- Source/group boundaries, recovery tokens and Execution evidence must remain intact.
 BEGIN;
 
 UPDATE event_subscriptions AS subscription

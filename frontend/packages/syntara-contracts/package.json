@@ -19,6 +19,7 @@
     "gen:local:tool-manager": "openapi-typescript ../../../backend/src/syntara/schemas/tool_manager/openapi.yaml --output ./src/tool-manager.ts --default-non-nullable false",
     "gen:local:workflow": "openapi-typescript ../../../backend/src/syntara/schemas/workflows/v2/openapi.yaml --output ./src/workflow-api.ts --default-non-nullable false",
     "gen:local:files": "openapi-typescript ../../../backend/src/syntara/schemas/files/openapi.yaml --output ./src/files-api.ts --default-non-nullable false",
+    "gen:local:filtering": "openapi-typescript ../../../backend/src/syntara/schemas/filtering/openapi.yaml --output ./src/filtering-api.ts --default-non-nullable false",
     "gen:local:aap": "openapi-typescript ../../../backend/src/syntara/schemas/aap/openapi.yaml --output ./src/aap-api.ts --default-non-nullable false",
     "gen:local:approvals": "openapi-typescript ../../../backend/src/syntara/schemas/approvals/openapi.yaml --output ./src/approvals-api.ts --default-non-nullable false",
     "gen:local:executions": "openapi-typescript ../../../backend/src/syntara/schemas/workflows/v2/executions_openapi.yaml --output ./src/executions-api.ts --default-non-nullable false",

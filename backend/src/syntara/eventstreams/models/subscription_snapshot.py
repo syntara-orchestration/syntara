@@ -17,10 +17,12 @@ from types import MappingProxyType
 from typing import Any, ClassVar
 from uuid import UUID
 
-from pydantic import ConfigDict, field_serializer, field_validator
+from pydantic import ConfigDict, PrivateAttr, ValidationInfo, field_serializer, field_validator, model_validator
 from sqlmodel import SQLModel
 
 from syntara.eventstreams.adapters.source_configuration import SourceConfiguration
+from syntara.eventstreams.core.filtering import PreparedSubscriptionFilter
+from syntara.eventstreams.models.filter_configuration import FilterConfiguration
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 
@@ -65,6 +67,8 @@ class SubscriptionSnapshot(SQLModel):
     # Stored as a recursively read-only mapping so the frozen processing context
     # cannot be mutated (directly or nested) or aliased to the live subscription.
     input_schema: Mapping[str, Any] | None
+    filter: Mapping[str, Any] | None = None
+    _prepared_filter: PreparedSubscriptionFilter | None = PrivateAttr(default=None)
 
     desired_enabled: bool
     paused: bool
@@ -75,42 +79,66 @@ class SubscriptionSnapshot(SQLModel):
         extra="forbid", frozen=True
     )
 
-    @field_validator("input_schema", mode="after")
+    @field_validator("input_schema", "filter", mode="after")
     @classmethod
     def _freeze_input_schema(cls, value: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
-        """Detach and recursively freeze the published input schema."""
+        """Detach and recursively freeze published schema and filter values."""
         return None if value is None else _deep_freeze(value)
 
-    @field_serializer("input_schema")
+    @field_serializer("input_schema", "filter")
     def _serialize_input_schema(self, value: Mapping[str, Any] | None, _info: Any) -> Any:  # noqa: ANN401
-        """Serialize the frozen schema back to plain JSON (dicts/lists)."""
+        """Serialize frozen schema and filter values back to plain JSON."""
         return None if value is None else _to_plain_json(value)
+
+    @model_validator(mode="after")
+    def _prepare_filter(self, info: ValidationInfo) -> "SubscriptionSnapshot":
+        """Prepare immutable published conditions when loading this configuration."""
+        prepare = info.context is None or info.context.get("prepare_filter", True)
+        if self.filter is not None and prepare:
+            configuration = FilterConfiguration.model_validate(_to_plain_json(self.filter))
+            # Use Pydantic's private-attribute setter while public snapshot fields remain frozen.
+            super().__setattr__("_prepared_filter", PreparedSubscriptionFilter(configuration))
+        return self
+
+    @property
+    def prepared_filter(self) -> PreparedSubscriptionFilter | None:
+        """Return the programs reused for messages under this loaded configuration."""
+        if self.filter is not None and self._prepared_filter is None:
+            msg = "Subscription filter was not prepared for message processing"
+            raise ValueError(msg)
+        return self._prepared_filter
 
     @classmethod
     def from_models(
         cls,
         subscription: EventSubscription,
         source: EventSubscriptionSource,
+        *,
+        prepare_filter: bool = True,
     ) -> "SubscriptionSnapshot":
         """Build an immutable snapshot from an already-loaded subscription and source."""
-        return cls(
-            subscription_id=subscription.id,
-            workflow_id=subscription.workflow_id,
-            project_id=subscription.project_id,
-            trigger_node_id=subscription.trigger_node_id,
-            published_version_id=subscription.published_version_id,
-            configuration_revision=subscription.configuration_revision,
-            source_id=source.id,
-            source_generation=source.generation,
-            deployment_id=source.deployment_id,
-            transport=source.transport,
-            integration_id=source.integration_id,
-            integration_identity=source.integration_identity,
-            configuration=source.configuration,
-            runtime_credential_id=subscription.runtime_credential_id,
-            input_schema=subscription.input_schema,
-            desired_enabled=subscription.desired_enabled,
-            paused=subscription.paused,
-            retired=subscription.retired,
-            enabled_by=subscription.enabled_by,
+        return cls.model_validate(
+            {
+                "subscription_id": subscription.id,
+                "workflow_id": subscription.workflow_id,
+                "project_id": subscription.project_id,
+                "trigger_node_id": subscription.trigger_node_id,
+                "published_version_id": subscription.published_version_id,
+                "configuration_revision": subscription.configuration_revision,
+                "source_id": source.id,
+                "source_generation": source.generation,
+                "deployment_id": source.deployment_id,
+                "transport": source.transport,
+                "integration_id": source.integration_id,
+                "integration_identity": source.integration_identity,
+                "configuration": source.configuration,
+                "runtime_credential_id": subscription.runtime_credential_id,
+                "input_schema": subscription.input_schema,
+                "filter": subscription.filter,
+                "desired_enabled": subscription.desired_enabled,
+                "paused": subscription.paused,
+                "retired": subscription.retired,
+                "enabled_by": subscription.enabled_by,
+            },
+            context={"prepare_filter": prepare_filter},
         )

@@ -9,19 +9,20 @@ import asyncio
 import ssl
 from collections.abc import Iterable
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any
 
 import structlog
-from aiokafka.conn import AIOKafkaConnection, collect_hosts, create_conn
+from aiokafka.conn import AIOKafkaConnection, collect_hosts
 from aiokafka.errors import IncompatibleBrokerVersion, KafkaError
 from aiokafka.protocol.api import Request
 from aiokafka.protocol.metadata import MetadataRequest_v4, MetadataRequest_v5
 
 from syntara.eventstreams.models.responses import EventSubscriptionTestResponse
 from syntara.integrations.adapters.kafka import KafkaAdapter, KafkaAuthenticationConfigurationError
+from syntara.integrations.lib.kafka_connection import create_kafka_connection as create_conn
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
-_PREFLIGHT_TIMEOUT_SECONDS = 10
+PREFLIGHT_TIMEOUT_SECONDS = 10
 _CLOSE_TIMEOUT_SECONDS = 1
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -45,7 +46,7 @@ class NonCreatingMetadataRequest(Request[MetadataRequest_v4 | MetadataRequest_v5
 async def _connect(config: KafkaConfiguration, options: dict[str, Any]) -> AIOKafkaConnection | None:
     for host, port, _ in collect_hosts(list(config.bootstrap_servers), randomize=False):
         try:
-            return cast("AIOKafkaConnection", await create_conn(host, port, **options))
+            return await create_conn(host, port, **options)
         except (ssl.SSLError, IncompatibleBrokerVersion):
             # Classified by the caller. Both subclass the fallback errors below.
             raise
@@ -84,8 +85,8 @@ async def test_kafka_connection(
     result = EventSubscriptionTestResponse(success=False, checked_at=datetime.now(UTC))
     connection = None
     try:
-        options = KafkaAdapter(config).connection_options(credential, _PREFLIGHT_TIMEOUT_SECONDS)
-        async with asyncio.timeout(_PREFLIGHT_TIMEOUT_SECONDS):
+        options = KafkaAdapter(config).connection_options(credential, PREFLIGHT_TIMEOUT_SECONDS)
+        async with asyncio.timeout(PREFLIGHT_TIMEOUT_SECONDS):
             connection = await _connect(config, options)
             if connection is None:
                 result.connection = "failed"

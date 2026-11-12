@@ -506,11 +506,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         validate_parameters = (
             validate_event_subscribe_draft_parameters if allow_incomplete else validate_event_subscribe_parameters
         )
-        configs = [
-            validate_parameters(trigger["parameters"])
+        subscribe_triggers = [
+            trigger
             for trigger in workflow_definition.get("triggers", [])
             if trigger.get("type") == NodeType.EVENT_SUBSCRIBE_TRIGGER
         ]
+        configs = [validate_parameters(trigger["parameters"]) for trigger in subscribe_triggers]
         if not configs:
             return
         # Cert-authenticated service principals bypass OPA at the dependency layer
@@ -524,7 +525,10 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             else None
         )
         integration_service = IntegrationService(self.session, self.user)
-        for config in configs:
+        for trigger, config in zip(subscribe_triggers, configs, strict=True):
+            # Persist cleared fields as null while preserving non-empty source.
+            if "filter" in trigger["parameters"] and config.filter is None:
+                trigger["parameters"]["filter"] = None
             if (
                 config.integration_id is not None
                 and visible_ids is not None
@@ -1913,6 +1917,10 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if workflow.is_builtin:
             raise BuiltinWorkflowDeleteError(workflow.name)
 
+        # Accepted Kafka handoffs use this same lifecycle lock when saving their
+        # Execution. Count only after taking it, so a concurrent save cannot slip
+        # between the active-execution check and deletion.
+        await self.session.exec(select(Workflow.id).where(Workflow.id == workflow_id).with_for_update())
         non_terminal_count = await self.session.scalar(
             select(func.count())
             .select_from(Execution)

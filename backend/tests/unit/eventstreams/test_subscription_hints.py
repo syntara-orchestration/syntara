@@ -53,11 +53,10 @@ async def test_unavailable_redis_does_not_raise_into_worker():
     client.disconnect.assert_not_awaited()
 
 
-async def test_pubsub_retry_keeps_shared_cache_pool_available(monkeypatch):
+async def test_pubsub_retry_reuses_worker_connection(monkeypatch):
     monkeypatch.setattr(EventWorkerDefaults, "RECONCILE_INTERVAL_SECONDS", 0.01)
     client = EventWorkerRedisClient()
     backend = MagicMock()
-    backend.getrange = AsyncMock(return_value="isolated terminal proof")
     backend.aclose = AsyncMock()
     first, second = MagicMock(), MagicMock()
     for subscription in (first, second):
@@ -76,7 +75,7 @@ async def test_pubsub_retry_keeps_shared_cache_pool_available(monkeypatch):
     try:
         await eventually(lambda: second.get_message.await_count > 0)
         first.aclose.assert_awaited_once()
-        assert await client.get("isolated-proof-key") == "isolated terminal proof"
+        assert client._client is backend
         backend.aclose.assert_not_awaited()
     finally:
         await listener.stop()

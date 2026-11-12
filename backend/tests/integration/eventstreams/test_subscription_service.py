@@ -6,6 +6,8 @@ changes, source replacement, unpublish, snapshots, conservative deletion guards,
 and the absence of account-binding/standing-execution gates.
 """
 
+from copy import deepcopy
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -20,6 +22,7 @@ from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
+from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition
 from syntara.eventstreams.exceptions import EventSubscriptionInUseError
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
@@ -195,6 +198,83 @@ async def test_publish_creates_subscription_and_source(
     assert source.transport == "kafka"
     assert source.configuration.group_id == f"syntara.{source.deployment_id}.{sub.id}.1"
     assert source.retired_at is None
+
+
+async def test_filter_republication_preserves_source_group_and_stored_position(
+    test_db_session: AsyncSession,
+    test_user: User,
+    workflow: Workflow,
+    kafka_integration: Integration,
+    runtime_credential: Credential,
+) -> None:
+    service = EventSubscriptionService(test_db_session, test_user)
+    configuration = {"expression": 'input.key.text.startsWith("orders-") && input.payload.value.ok'}
+    node = _trigger_node(node_id="incoming", integration_id=kafka_integration.id, credential_id=runtime_credential.id)
+    node["parameters"]["filter"] = configuration
+    first_version = await _make_version(test_db_session, workflow, test_user, [deepcopy(node)], version=1)
+    created = await service.sync_from_published_definition(workflow, first_version, enabled=True)
+    first = created.created[0]
+    source_before = (await _sources(test_db_session, first.subscription_id))[0]
+    group_before = source_before.configuration.group_id
+    position = KafkaPartitionInitialPosition(
+        source_id=source_before.id,
+        partition=0,
+        initialization_kind="first_activation",
+        initial_next_offset=101,
+        initial_commit_confirmed_at=datetime.now(UTC),
+    )
+    test_db_session.add(position)
+    await test_db_session.flush()
+    stored_position = position.model_dump()
+    assert first.model_dump(mode="json")["filter"] == configuration
+
+    changed = {"expression": 'input.key.text.startsWith("alerts-") && input.payload.value.ok'}
+    node["parameters"]["filter"] = changed
+    second_version = await _make_version(test_db_session, workflow, test_user, [deepcopy(node)], version=2)
+    projected = await service.sync_from_published_definition(workflow, second_version, enabled=True)
+    second = projected.updated[0]
+    assert second.subscription_id == first.subscription_id
+    assert second.source_id == first.source_id
+    assert second.source_generation == first.source_generation
+    assert second.configuration_revision == first.configuration_revision + 1
+    assert second.model_dump(mode="json")["filter"] == changed
+    assert second.prepared_filter is not None
+    sources = await _sources(test_db_session, first.subscription_id)
+    assert len(sources) == 1
+    assert sources[0].configuration.group_id == group_before
+    await test_db_session.refresh(position)
+    assert position.model_dump() == stored_position
+
+    third_version = await _make_version(test_db_session, workflow, test_user, [deepcopy(node)], version=3)
+    unchanged = await service.sync_from_published_definition(workflow, third_version, enabled=True)
+    assert unchanged.updated[0].configuration_revision == second.configuration_revision
+
+
+@pytest.mark.parametrize(
+    "configuration",
+    [
+        {"expression": "true", "format_version": 1},
+        {"expression": "42"},
+        {"expression": "input =="},
+        {"expression": "unknown(input)"},
+    ],
+)
+async def test_publication_rejects_invalid_direct_filter_configurations(
+    test_db_session: AsyncSession,
+    test_user: User,
+    workflow: Workflow,
+    kafka_integration: Integration,
+    runtime_credential: Credential,
+    configuration: dict[str, Any],
+) -> None:
+    node = _trigger_node(node_id="incoming", integration_id=kafka_integration.id, credential_id=runtime_credential.id)
+    node["parameters"]["filter"] = configuration
+    version = await _make_version(test_db_session, workflow, test_user, [node], version=1)
+    with pytest.raises(SafeValueError, match="Invalid Event Subscribe"):
+        await EventSubscriptionService(test_db_session, test_user).sync_from_published_definition(
+            workflow, version, enabled=True
+        )
+    assert await _subscriptions(test_db_session, workflow.id) == []
 
 
 @pytest.mark.parametrize("republish", [False, True])
@@ -483,6 +563,44 @@ async def test_republish_after_unpublish_reenables_same_identity(
     assert len(sources) == 1  # no new generation; backlog/progress retained
     assert sources[0].id == source_before.id
     assert sources[0].configuration.group_id == source_before.configuration.group_id
+
+
+@pytest.mark.parametrize("desired_enabled", [False, True])
+async def test_republish_clears_legacy_pause_and_preserves_source(
+    test_db_session: AsyncSession,
+    test_user: User,
+    workflow: Workflow,
+    kafka_integration: Integration,
+    runtime_credential: Credential,
+    *,
+    desired_enabled: bool,
+) -> None:
+    service = EventSubscriptionService(test_db_session, test_user)
+    node = _trigger_node(node_id="incoming", integration_id=kafka_integration.id, credential_id=runtime_credential.id)
+    v1 = await _make_version(test_db_session, workflow, test_user, [node], version=1)
+    await service.sync_from_published_definition(workflow, v1, enabled=True)
+    subscription = (await _subscriptions(test_db_session, workflow.id))[0]
+    source = (await _sources(test_db_session, subscription.id))[0]
+    subscription_id, source_id, group_id = subscription.id, source.id, source.configuration.group_id
+    revision = subscription.configuration_revision
+    subscription.paused = True
+    subscription.desired_enabled = desired_enabled
+    await test_db_session.flush()
+
+    v2 = await _make_version(test_db_session, workflow, test_user, [node], version=2)
+    changeset = await service.sync_from_published_definition(workflow, v2, enabled=True)
+
+    saved = (await _subscriptions(test_db_session, workflow.id))[0]
+    assert saved.id == subscription_id
+    assert saved.published_version_id == v2.id
+    assert not saved.paused
+    assert saved.desired_enabled
+    assert saved.configuration_revision == revision + 1
+    assert not changeset.updated[0].paused
+    sources = await _sources(test_db_session, saved.id)
+    assert len(sources) == 1
+    assert sources[0].id == source_id
+    assert sources[0].configuration.group_id == group_id
 
 
 async def test_trigger_removal_retires_subscription_and_preserves_rows(

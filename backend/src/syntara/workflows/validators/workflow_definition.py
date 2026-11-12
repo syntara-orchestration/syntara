@@ -87,10 +87,9 @@ def _extract_node_ids(workflow_definition: dict[str, Any]) -> set[str]:
 
 
 def _check_definition_limits(workflow_definition: dict[str, Any]) -> list[ValidationFinding]:
-    """Return structured findings for node/edge count violations.
+    """Return structured findings for workflow complexity violations.
 
-    Size is enforced at the API layer (WorkflowDefinitionValidator on model fields),
-    so only structural complexity checks are needed here for UI-facing feedback.
+    Size is enforced at the API layer (WorkflowDefinitionValidator on model fields).
     """
     findings: list[ValidationFinding] = []
     nodes = workflow_definition.get("nodes", [])

@@ -11,17 +11,14 @@ import pytest
 import pytest_asyncio
 
 from syntara.core.config.base import get_settings
-from syntara.core.constants import EventSchedulingDefaults
 from syntara.core.exceptions import SafeValueError
 from syntara.eventstreams.adapters import kafka_record_runner as runner_module
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
-from syntara.eventstreams.adapters.kafka_delivery_reader import KafkaDeliveryReader
 from syntara.eventstreams.adapters.kafka_initial_position import PositionResult, PositionStatus
 from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaInitialPositionService
 from syntara.eventstreams.adapters.kafka_record_runner import KafkaRecordRunner
-from syntara.eventstreams.core.handler import ResolvedDelivery
+from syntara.eventstreams.core import runtime as runtime_module
 from syntara.eventstreams.core.placement import PlacementAuthority
-from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.core.runtime import (
     RunnerStatus,
     RuntimeFailureCode,
@@ -29,18 +26,13 @@ from syntara.eventstreams.core.runtime import (
     RuntimeState,
     SubscriptionRuntimeError,
 )
-from syntara.eventstreams.services import recovery_service as recovery_module
 from syntara.eventstreams.services import subscription_supervisor as module
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
-from syntara.eventstreams.services.recovery_service import EventExecutionRecoveryService
 from syntara.eventstreams.services.subscription_supervisor import SubscriptionSupervisor
-from syntara.workflows.models.execution import Execution
 from tests.helpers.eventstream_runtime import IsolatedSubscriptionRunner, confirmed_placement
 from tests.unit.eventstreams.test_connection_provider import connection_context
-from tests.unit.eventstreams.test_execution_preparation_service import preparation_context
-from tests.unit.eventstreams.test_record_processing_service import terminal
 
 
 @pytest_asyncio.fixture
@@ -50,7 +42,7 @@ async def harness(monkeypatch):
     monkeypatch.setattr(module, "get_settings", lambda: settings)
     now = [datetime(2026, 1, 1, tzinfo=UTC)]
     monkeypatch.setattr(module, "_utc_now", lambda: now[0])
-    monkeypatch.setattr(module.random, "uniform", lambda *_args: 1.0)
+    monkeypatch.setattr(runtime_module.random, "uniform", lambda *_args: 1.0)
     trace = []
     runners = []
 
@@ -212,8 +204,6 @@ async def test_supervisor_resume_delegates_to_managed_runner_initialization(harn
     monkeypatch.setattr(runner_module, "get_settings", lambda: settings)
     processing = MagicMock(spec=EventRecordProcessingService)
     processing.admission_eligible.return_value = True
-    deliveries = MagicMock(spec=KafkaDeliveryReader)
-    deliveries.first_pending.return_value = None
     runners, clients, initialized = [], [], []
 
     async def factory(binding) -> KafkaRecordRunner:
@@ -240,10 +230,8 @@ async def test_supervisor_resume_delegates_to_managed_runner_initialization(harn
             MagicMock(),
             MagicMock(spec=EventExecutionPreparationService),
             MagicMock(spec=EventAdmissionService),
-            owner_worker_id="supervised",
             processing=processing,
             positions=positions,
-            deliveries=deliveries,
         )
 
         async def start() -> None:
@@ -293,28 +281,27 @@ async def test_runner_holds_remain_blocked_without_restart_or_implicit_recovery(
     assert runner.stop_calls == 0
 
 
-async def test_transient_start_failures_back_off_and_open_a_local_circuit(harness):
+@pytest.mark.parametrize("jitter", [0.5, 1.0])
+async def test_connection_failures_keep_retrying_with_jitter_capped_at_thirty_seconds(harness, monkeypatch, jitter):
     context = harness
+    monkeypatch.setattr(runtime_module.random, "uniform", lambda *_args: jitter)
     failure = SubscriptionRuntimeError(RuntimeFailureCode.CONNECTION_UNAVAILABLE, transient=True)
     context.factory.side_effect = failure
-    for attempt in range(1, EventSchedulingDefaults.IMMEDIATE_ATTEMPTS + 1):
+    for attempt, delay in enumerate([1, 2, 4, 8, 16, 30, 30, 30], start=1):
         status = await context.supervisor.apply(context.snapshot)
         assert status.failure_count == attempt
-        assert status.retry_at > context.now[0]
-        assert status.circuit_open is (attempt == EventSchedulingDefaults.IMMEDIATE_ATTEMPTS)
+        assert status.state == RuntimeState.BACKOFF
+        assert status.retry_at == context.now[0] + timedelta(seconds=delay * jitter)
+        assert not status.circuit_open
         await context.supervisor.apply(context.snapshot)
         assert context.factory.await_count == attempt
-        if not status.circuit_open:
-            context.now[0] = status.retry_at
-    assert status.state == RuntimeState.BLOCKED
-    assert status.retry_at == context.now[0] + timedelta(seconds=EventSchedulingDefaults.TRANSIENT_PROBE_SECONDS)
-    context.now[0] = status.retry_at
+        context.now[0] = status.retry_at
     context.factory.side_effect = context.spawn
     assert (await context.supervisor.apply(context.snapshot)).state == RuntimeState.ACTIVE
     assert not context.supervisor.status.circuit_open
 
 
-async def test_repeated_runtime_crashes_do_not_reset_the_failure_budget(harness):
+async def test_repeated_runtime_crashes_preserve_backoff_without_stopping_retries(harness):
     context = harness
 
     def crashing(snapshot) -> IsolatedSubscriptionRunner:
@@ -323,30 +310,135 @@ async def test_repeated_runtime_crashes_do_not_reset_the_failure_budget(harness)
         return runner
 
     context.factory.side_effect = crashing
-    for attempt in range(1, EventSchedulingDefaults.IMMEDIATE_ATTEMPTS + 1):
+    for attempt in range(1, 9):
         await context.supervisor.apply(context.snapshot)
         await context.supervisor._task
         status = context.supervisor.status
         assert status.failure_count == attempt
+        assert status.state == RuntimeState.BACKOFF
+        assert status.retry_at <= context.now[0] + timedelta(seconds=30)
         await context.supervisor.apply(context.snapshot)
         assert context.factory.await_count == attempt
         context.now[0] = status.retry_at
-    assert status.circuit_open
+    assert not status.circuit_open
 
 
-async def test_configuration_failure_requires_explicit_retry_without_live_refresh(harness):
+@pytest.mark.parametrize(
+    "failure",
+    [
+        SafeValueError("PRIVATE credential contents"),
+        SubscriptionRuntimeError(RuntimeFailureCode.CONNECTION_UNAVAILABLE),
+        SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE),
+    ],
+)
+async def test_connection_failures_recover_without_revision_change_or_manual_retry(harness, failure):
     context = harness
-    context.factory.side_effect = SafeValueError("PRIVATE credential contents")
+    reader = AsyncMock(return_value="connection-1")
+    context.supervisor._connection_revision = reader
+    context.factory.side_effect = failure
     status = await context.supervisor.apply(context.snapshot)
-    assert status.state == RuntimeState.BLOCKED
-    assert status.reason == "configuration_unavailable"
-    assert status.retry_at is None
+    assert status.state == RuntimeState.BACKOFF
+    assert status.retry_at is not None
     assert "PRIVATE" not in status.model_dump_json()
     context.factory.side_effect = context.spawn
-    context.now[0] += timedelta(days=1)
     await context.supervisor.apply(context.snapshot)
     context.factory.assert_awaited_once()
-    assert (await context.supervisor.retry()).state == RuntimeState.ACTIVE
+    context.now[0] = status.retry_at
+    assert (await context.supervisor.apply(context.snapshot)).state == RuntimeState.ACTIVE
+    assert reader.await_count == 3
+    assert context.factory.await_count == 2
+
+
+async def test_unexpected_implementation_failure_does_not_become_a_connection_retry(harness):
+    harness.factory.side_effect = RuntimeError("PRIVATE implementation failure")
+    status = await harness.supervisor.apply(harness.snapshot)
+    assert status.state == RuntimeState.BLOCKED
+    assert status.reason == "runner_failed"
+    assert status.retry_at is None
+    harness.now[0] += timedelta(days=1)
+    await harness.supervisor.apply(harness.snapshot)
+    harness.factory.assert_awaited_once()
+
+
+async def test_unchanged_connection_revision_keeps_the_existing_consumer(harness):
+    reader = AsyncMock(return_value="connection-1")
+    harness.supervisor._connection_revision = reader
+    await harness.supervisor.apply(harness.snapshot)
+    await harness.supervisor.apply(harness.snapshot)
+    assert reader.await_count == 2
+    harness.factory.assert_awaited_once()
+    assert not harness.runners[0].stopped
+
+
+async def test_connection_change_replaces_consumer_without_changing_source(harness):
+    reader = AsyncMock(return_value="connection-1")
+    harness.supervisor._connection_revision = reader
+    await harness.supervisor.apply(harness.snapshot)
+    old = harness.runners[0]
+    old.drain_release = asyncio.Event()
+    reader.return_value = "connection-2"
+    replacing = asyncio.create_task(harness.supervisor.apply(harness.snapshot))
+    await old.drain_entered.wait()
+    assert not old.accepting
+    assert len(harness.runners) == 1
+    old.drain_release.set()
+    result = await replacing
+    assert result.state == RuntimeState.ACTIVE
+    assert old.stopped
+    assert len(harness.runners) == 2
+    assert all(runner.snapshot == harness.snapshot for runner in harness.runners)
+    assert harness.runners[1].snapshot.configuration.group_id == old.snapshot.configuration.group_id
+    assert harness.supervisor._runner_connection_revision == "connection-2"
+
+
+async def test_unavailable_connection_stops_and_resumes_without_republish(harness):
+    reader = AsyncMock(return_value="connection-1")
+    harness.supervisor._connection_revision = reader
+    await harness.supervisor.apply(harness.snapshot)
+    reader.side_effect = SafeValueError("PRIVATE credential contents")
+    status = await harness.supervisor.apply(harness.snapshot)
+    assert harness.runners[0].stopped
+    assert status.state == RuntimeState.BLOCKED
+    assert status.desired_active  # The published subscription is still desired.
+    assert status.reason == "configuration_unavailable"
+    assert "PRIVATE" not in status.model_dump_json()
+    await harness.supervisor.apply(harness.snapshot)
+    harness.factory.assert_awaited_once()
+    reader.side_effect = None
+    # Availability can recover without changed timestamps, for example after
+    # restoring an Integration's existing project assignment.
+    status = await harness.supervisor.apply(harness.snapshot)
+    assert status.state == RuntimeState.ACTIVE
+    assert harness.factory.await_count == 2
+    assert harness.runners[1].snapshot == harness.snapshot
+
+
+async def test_corrected_connection_revision_clears_a_startup_configuration_failure(harness):
+    reader = AsyncMock(return_value="connection-1")
+    harness.supervisor._connection_revision = reader
+    harness.factory.side_effect = SafeValueError("invalid connection settings")
+    assert (await harness.supervisor.apply(harness.snapshot)).state == RuntimeState.BACKOFF
+    harness.factory.side_effect = harness.spawn
+    await harness.supervisor.apply(harness.snapshot)
+    harness.factory.assert_awaited_once()  # The same revision keeps its retry policy.
+    reader.return_value = "connection-2"
+    assert (await harness.supervisor.apply(harness.snapshot)).state == RuntimeState.ACTIVE
+    assert harness.factory.await_count == 2
+
+
+async def test_connection_refresh_preserves_permanent_content_error(harness):
+    reader = AsyncMock(return_value="connection-1")
+    harness.supervisor._connection_revision = reader
+    await harness.supervisor.apply(harness.snapshot)
+    harness.runners[0].observation = RunnerStatus(
+        state=RuntimeState.BLOCKED, reason="activity_log_unavailable", permanent_content_error=True
+    )
+    reader.return_value = "connection-2"
+    status = await harness.supervisor.apply(harness.snapshot)
+    assert harness.runners[0].stopped
+    assert status.permanent_content_error
+    assert status.state == RuntimeState.BLOCKED
+    harness.factory.assert_awaited_once()
 
 
 async def test_one_subscription_failure_does_not_stop_another_supervisor(harness):
@@ -685,55 +777,10 @@ async def test_factory_returning_wrong_binding_is_stopped_without_start(harness)
     harness.factory.return_value = runner
     status = await harness.supervisor.apply(harness.snapshot)
     assert status.state == RuntimeState.BLOCKED
+    assert status.reason == RuntimeFailureCode.RUNNER_FAILED.value
+    assert status.retry_at is None
     assert runner.start_calls == 0
     assert runner.stopped
-
-
-@pytest.mark.parametrize("change", ["paused", "unpublished", "retired", "revision", "placement"])
-async def test_frozen_work_remains_discoverable_by_consumer_independent_recovery(harness, monkeypatch, change):
-    context = preparation_context(monkeypatch)
-    prepared = await context.prepare()
-    assert isinstance(prepared, PreparedExecution)
-    execution = context.rows[Execution]
-    frozen = execution.model_dump()
-    supervisor = SubscriptionSupervisor(
-        context.snapshot.subscription_id, harness.factory, placement=confirmed_placement(context.snapshot)
-    )
-    harness.supervisors.append(supervisor)
-    await supervisor.apply(context.snapshot)
-    updates = {"configuration_revision": context.snapshot.configuration_revision + 1}
-    if change == "placement":
-        await supervisor.placement_lost()
-    elif change == "revision":
-        updates.update(published_version_id=uuid4(), runtime_credential_id=uuid4())
-    else:
-        updates.update(desired_enabled=False)
-        if change != "unpublished":
-            updates[change] = True
-    if change != "placement":
-        await supervisor.apply(context.snapshot.model_copy(update=updates))
-    if change not in {"revision", "placement"}:
-        assert supervisor.status.state == RuntimeState.STOPPED
-    context.store.claim_due.return_value = [prepared.claim]
-    monkeypatch.setattr(recovery_module, "EventDeliveryStore", lambda _session: context.store)
-    admission = MagicMock(spec=EventAdmissionService)
-
-    async def recover(claim) -> ResolvedDelivery:
-        assert context.events[-1] == "commit"
-        assert claim.binding == prepared.claim.binding
-        assert execution.model_dump() == frozen
-        return terminal(claim.identity)
-
-    admission.recover_claim.side_effect = recover
-    recovered = await EventExecutionRecoveryService(lambda: context.session, admission).recover_due(
-        "recovery", limit=10
-    )
-    assert isinstance(recovered[0][1], ResolvedDelivery)
-    context.store.claim_due.assert_awaited_once_with("recovery", limit=10, prepared_only=True)
-    admission.recover_claim.assert_awaited_once_with(prepared.claim)
-    assert execution.model_dump() == frozen
-    assert context.events.count("freeze") == 1
-    assert harness.factory.await_count == (2 if change == "revision" else 1)
 
 
 async def test_no_factory_or_restart_without_current_confirmed_placement(harness):
@@ -984,7 +1031,7 @@ async def test_drain_ignoring_cancellation_cannot_hold_the_loss_hook_or_prevent_
     assert not harness.placement.local_in_use
 
 
-async def test_revision_change_cannot_restart_past_a_known_permanent_error(harness):
+async def test_revision_change_revalidates_uncommitted_content_with_a_new_runner(harness):
     await harness.supervisor.apply(harness.snapshot)
     runner = harness.runners[0]
     runner.observation = RunnerStatus(
@@ -995,6 +1042,7 @@ async def test_revision_change_cannot_restart_past_a_known_permanent_error(harne
     )
     result = await harness.supervisor.apply(changed)
     assert runner.stopped
-    assert result.state == RuntimeState.BLOCKED
-    assert result.permanent_content_error
-    harness.factory.assert_awaited_once()
+    assert result.state == RuntimeState.ACTIVE
+    assert not result.permanent_content_error
+    assert harness.factory.await_count == 2
+    assert harness.runners[1].snapshot == changed

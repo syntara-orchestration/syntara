@@ -60,8 +60,8 @@ Use `integration.example.json` as the Integration create-body template:
 
 The saved first partition set starts at the `read_committed` visible end; newly
 added partitions start at their earliest retained offset. Retries preserve saved
-boundaries. Missing established checkpoints or unknown legacy first-set history
-need guarded recovery, never an automatic reset to latest. See
+boundaries. Missing established checkpoints recover automatically from retained beginning.
+Unknown legacy first-set history stays blocked; it never resets to latest. See
 [partition operating guidance](../../docs/kafka-worker-operations.md#partition-initialization-and-upgrade-ambiguity).
 
 Enable the independent worker explicitly; the flag remains false by default:
@@ -91,17 +91,12 @@ checkout. Restart `eventstream-consumer` after Python source changes; rebuild th
 backend image after dependency changes. This keeps local Kafka tests on the same
 source revision as the API and Temporal workers.
 
-Compose passes through the existing placement heartbeat/liveness/lease settings
-and proof-cache options. Terminal caching remains disabled by default. Its epoch
-and clock-error bound have no generated defaults: if caching is explicitly
-enabled, supply a trusted UUID kept outside PostgreSQL restore and a validated
-clock bound below the skew margin. Reuse that epoch across ordinary restarts.
-Shorter TTL/retention or changed skew needs coordinated drain and external epoch
-rotation before shorter cleanup. Ordinary Redis eviction/loss needs neither
-database recovery nor epoch rotation; never flush shared Redis.
+Worker tuning uses the built-in placement, queue and processing defaults.
+Redis carries reconciliation hints only; no terminal cache is used.
 
-To stop the example, first pause/retire its subscription through normal controls,
-then stop the worker with its grace period and remove only the disposable broker:
+To stop the example, first unpublish its workflow. To retire the subscription,
+remove its Subscribe listener and publish the updated workflow. Then stop the
+worker with its grace period and remove only the disposable broker:
 
 ```bash
 uv run --project backend podman-compose --profile eventstream stop eventstream-consumer
@@ -119,6 +114,6 @@ execution of this fixture remain later verification work.
 `reset-placement.example.sql` is a manual operational-state example linked from
 the [restore procedure](../../docs/kafka-worker-operations.md#recovery-before-reactivation).
 It is never part of disposable broker initialization, setup or compose startup.
-It requires every old worker/cache reader/writer to be stopped, external epoch
-coordination, and the existing deployment UUID. It clears only that deployment's
-membership and active-generation placement; delivery claims and evidence remain.
+It requires every old event worker to be stopped and the existing deployment
+UUID. It clears only that deployment's membership and active-generation
+placement; source boundaries and normal Executions remain intact.

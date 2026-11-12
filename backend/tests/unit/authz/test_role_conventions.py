@@ -218,6 +218,9 @@ class TestDeterministicUUIDs:  # noqa: D101
 
 
 class TestRegistryIntegrity:  # noqa: D101
+    def test_subscription_control_permissions_are_not_registered(self) -> None:
+        assert all(policy.resource != "event_subscription" for policy in BUILTIN_POLICIES)
+
     def test_no_duplicate_policy_names(self) -> None:
         names = [p.name for p in BUILTIN_POLICIES]
         assert len(names) == len(set(names)), f"Duplicate policies: {[n for n in names if names.count(n) > 1]}"

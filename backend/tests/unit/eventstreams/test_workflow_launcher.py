@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
@@ -9,11 +10,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
-from google.protobuf.duration_pb2 import Duration
 from temporalio.api.common.v1 import Header, Payloads, WorkflowType
 from temporalio.api.history.v1 import HistoryEvent, WorkflowExecutionStartedEventAttributes
-from temporalio.api.namespace.v1 import NamespaceConfig
-from temporalio.api.workflowservice.v1 import DescribeNamespaceResponse
 from temporalio.common import WorkflowIDConflictPolicy, WorkflowIDReusePolicy
 from temporalio.converter import DataConverter
 from temporalio.exceptions import WorkflowAlreadyStartedError
@@ -78,11 +76,6 @@ async def launcher_context(monkeypatch: pytest.MonkeyPatch) -> LauncherContext:
     client.data_converter = DataConverter.default
     client.start_workflow = AsyncMock(return_value=handle)
     client.get_workflow_handle.return_value = handle
-    client.workflow_service.describe_namespace = AsyncMock(
-        return_value=DescribeNamespaceResponse(
-            config=NamespaceConfig(workflow_execution_retention_ttl=Duration(seconds=259200))
-        )
-    )
     launcher = TemporalWorkflowLauncher(TemporalExecutionService(client, "user", background_task_queue="builtin"))
     return LauncherContext(prepared, launcher, client, handle, event, description)
 
@@ -93,13 +86,13 @@ async def test_start_uses_frozen_arguments_and_explicit_policies(launcher_contex
     prepared = context.prepared.model_copy(update={"is_builtin": builtin})
     accepted = await context.launcher.start(prepared)
     kwargs = context.client.start_workflow.call_args.kwargs
-    assert kwargs["id"] == prepared.claim.identity.temporal_workflow_id
+    assert kwargs["id"] == prepared.identity.temporal_workflow_id
     assert kwargs["args"] == prepared.workflow_arguments()
     assert kwargs["task_queue"] == queue
     assert kwargs["id_reuse_policy"] == WorkflowIDReusePolicy.REJECT_DUPLICATE
     assert kwargs["id_conflict_policy"] == WorkflowIDConflictPolicy.FAIL
     assert accepted.execution_id == prepared.execution_id
-    assert accepted.input_fingerprint == prepared.claim.binding.input_fingerprint
+    assert accepted.input_fingerprint == prepared.binding.input_fingerprint
     assert accepted.temporal_run_id == "accepted-run"
     context.handle.cancel.assert_not_called()
 
@@ -117,6 +110,72 @@ async def test_already_started_verifies_pinned_signed_history(launcher_context) 
     context.handle.cancel.assert_not_called()
 
 
+async def test_lookup_recovers_original_arguments_without_a_preparation(launcher_context) -> None:
+    context = launcher_context
+    accepted = await context.launcher.lookup(context.prepared.identity)
+    recovered = accepted.preparation()
+    assert recovered.workflow_arguments() == context.prepared.workflow_arguments()
+    assert recovered.binding == context.prepared.binding
+    assert accepted.acceptance.temporal_run_id == "accepted-run"
+    context.client.start_workflow.assert_not_awaited()
+    assert context.client.get_workflow_handle.call_args.kwargs["run_id"] == "accepted-run"
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    ["execution", "identity", "version", "principal", "source", "event_type", "context_type", "coordinates_type"],
+)
+async def test_lookup_rejects_signed_arguments_for_inconsistent_event_coordinates(launcher_context, mismatch) -> None:
+    context = launcher_context
+    arguments = deepcopy(context.prepared.workflow_arguments())
+    metadata = arguments[8]
+    assert isinstance(metadata, dict)
+    if mismatch == "execution":
+        arguments[1] = "another-execution"
+    elif mismatch == "identity":
+        metadata["event"]["identity"]["source_generation"] += 1
+    elif mismatch == "version":
+        metadata["workflow_context"]["execution"]["workflow_version_id"] = "another-version"
+    elif mismatch == "principal":
+        metadata["event"]["execution_principal_id"] = "not-a-principal-id"
+    elif mismatch == "event_type":
+        metadata["event"] = None
+    elif mismatch == "context_type":
+        metadata["workflow_context"] = None
+    elif mismatch == "coordinates_type":
+        metadata["workflow_context"]["workflow"] = None
+    else:
+        envelope = arguments[3]
+        assert isinstance(envelope, dict)
+        envelope["metadata"]["offset"] = "999"
+    started = context.event.workflow_execution_started_event_attributes
+    started.input.CopyFrom(Payloads(payloads=DataConverter.default.payload_converter.to_payloads(arguments)))
+    started.header.CopyFrom(
+        Header(
+            fields=workflow_auth.build_auth_header(
+                context.prepared.temporal_workflow_id, "orchestrator_workflow", arguments
+            )
+        )
+    )
+    with pytest.raises(EventLaunchError) as captured:
+        await context.launcher.lookup(context.prepared.identity)
+    assert captured.value.code == SchedulingFailureCode.EVIDENCE_MISMATCH
+    context.client.start_workflow.assert_not_awaited()
+
+
+async def test_missing_history_after_describe_is_not_absence(launcher_context) -> None:
+    context = launcher_context
+
+    history = MagicMock()
+    history.__anext__ = AsyncMock(side_effect=RPCError("PRIVATE", RPCStatusCode.NOT_FOUND, b""))
+    context.handle.fetch_history_events.side_effect = None
+    context.handle.fetch_history_events.return_value = history
+    with pytest.raises(EventLaunchError) as captured:
+        await context.launcher.lookup(context.prepared.identity)
+    assert captured.value.code == SchedulingFailureCode.HISTORY_UNAVAILABLE
+    context.client.start_workflow.assert_not_awaited()
+
+
 @pytest.mark.parametrize("operation", ["describe", "duplicate"])
 async def test_queue_configuration_change_preserves_accepted_recovery(launcher_context, operation) -> None:
     context = launcher_context
@@ -132,7 +191,7 @@ async def test_queue_configuration_change_preserves_accepted_recovery(launcher_c
         accepted = await replacement.start(context.prepared)
         assert context.client.start_workflow.call_args.kwargs["task_queue"] == "replacement-user"
     else:
-        accepted = await replacement.describe(context.prepared)
+        accepted = await replacement._describe(context.prepared, None)
         context.client.start_workflow.assert_not_awaited()
     assert accepted.temporal_run_id == "accepted-run"
     assert context.description.task_queue == "user"
@@ -149,7 +208,7 @@ async def test_mismatching_evidence_never_resolves(launcher_context, mismatch) -
     elif mismatch == "type":
         context.description.workflow_type = "another-type"
     elif mismatch == "run":
-        prepared = prepared.model_copy(update={"claim": prepared.claim.model_copy(update={"temporal_run_id": "other"})})
+        context.description.run_id = "other"
     elif mismatch == "input":
         context.event.workflow_execution_started_event_attributes.input.CopyFrom(
             Payloads(payloads=DataConverter.default.payload_converter.to_payloads(["different arguments"]))
@@ -159,7 +218,7 @@ async def test_mismatching_evidence_never_resolves(launcher_context, mismatch) -
     else:
         context.event.event_id = 2
     with pytest.raises(EventLaunchError) as captured:
-        await context.launcher.describe(prepared)
+        await context.launcher._describe(prepared, "accepted-run")
     assert captured.value.code == SchedulingFailureCode.EVIDENCE_MISMATCH
     assert not captured.value.transient
     context.client.start_workflow.assert_not_awaited()
@@ -172,7 +231,7 @@ async def test_describe_failure_is_sanitized_and_never_starts(launcher_context, 
     context = launcher_context
     context.handle.describe.side_effect = RPCError("PRIVATE", status, b"")
     with pytest.raises(EventLaunchError) as captured:
-        await context.launcher.describe(context.prepared)
+        await context.launcher._describe(context.prepared, None)
     assert "PRIVATE" not in str(captured.value)
     expected = (
         SchedulingFailureCode.TEMPORAL_NOT_FOUND
@@ -181,41 +240,3 @@ async def test_describe_failure_is_sanitized_and_never_starts(launcher_context, 
     )
     assert captured.value.code == expected
     context.client.start_workflow.assert_not_awaited()
-
-
-async def test_retention_comes_from_namespace(launcher_context) -> None:
-    context = launcher_context
-    assert await context.launcher.history_retention_seconds() == 259200
-    request = context.client.workflow_service.describe_namespace.call_args.args[0]
-    assert request.namespace == "test"
-
-
-@pytest.mark.parametrize(
-    ("status", "transient"),
-    [
-        (RPCStatusCode.PERMISSION_DENIED, False),
-        (RPCStatusCode.UNAUTHENTICATED, False),
-        (RPCStatusCode.INVALID_ARGUMENT, False),
-        (RPCStatusCode.FAILED_PRECONDITION, False),
-        (RPCStatusCode.UNAVAILABLE, True),
-        (RPCStatusCode.DEADLINE_EXCEEDED, True),
-    ],
-)
-async def test_namespace_rpc_failure_preserves_classification(launcher_context, status, *, transient) -> None:
-    context = launcher_context
-    context.client.workflow_service.describe_namespace.side_effect = RPCError("PRIVATE", status, b"")
-    with pytest.raises(EventLaunchError) as captured:
-        await context.launcher.history_retention_seconds()
-    assert captured.value.code == SchedulingFailureCode.HISTORY_UNAVAILABLE
-    assert captured.value.transient is transient
-    assert "PRIVATE" not in str(captured.value)
-    context.client.start_workflow.assert_not_awaited()
-
-
-async def test_unknown_retention_is_unavailable(launcher_context) -> None:
-    context = launcher_context
-    context.client.workflow_service.describe_namespace.side_effect = TimeoutError("PRIVATE")
-    with pytest.raises(EventLaunchError) as captured:
-        await context.launcher.history_retention_seconds()
-    assert captured.value.code == SchedulingFailureCode.HISTORY_UNAVAILABLE
-    assert captured.value.transient
