@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from syntara.workflows.utils.namespace_resolver import TEMPLATE_PATTERN
+from syntara.workflow_core.utils.namespace_resolver import TEMPLATE_PATTERN
 
 #: A resolved path into a node's output: dict keys (``str``) and list indices (``int``).
 type FieldPath = tuple[str | int, ...]

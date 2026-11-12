@@ -13,10 +13,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
 from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 
 # ---------------------------------------------------------------------------
 # Helpers that build realistic definitions

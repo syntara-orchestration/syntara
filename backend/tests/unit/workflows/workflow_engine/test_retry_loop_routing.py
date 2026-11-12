@@ -12,8 +12,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
 from syntara.workflow_core.models import (
     DoWhileLoopState,
@@ -21,6 +19,8 @@ from syntara.workflow_core.models import (
     LoopType,
     NodeSettingsNoRetry,
 )
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import retry_loop_record_activity_id
 
 _TEST_GRAPHS: dict[int, MagicMock] = {}
@@ -570,7 +570,8 @@ async def test_replayed_loop_does_not_evaluate_do_while_condition(patched_workfl
         patch.object(wf, "_replayed_loop_control", new_callable=AsyncMock, return_value=replayed_result),
         patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.safe_eval_with_namespace") as evaluate,
         patch(
-            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
+            new_callable=AsyncMock,
         ) as execute,
     ):
         result = await wf._execute_loop_node(

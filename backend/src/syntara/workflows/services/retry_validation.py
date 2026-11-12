@@ -79,6 +79,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlmodel import select
 
+from syntara.workflow_core.utils.credential_scrubber import REDACTED
 from syntara.workflows.exceptions import ExecutionNotFoundError
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
@@ -89,7 +90,6 @@ from syntara.workflows.utils.loop_iteration_names import (
     strip_iteration_suffix,
 )
 from syntara.workflows.utils.template_refs import FieldPath, find_template_refs, paths_overlap
-from syntara.workflow_core.utils.credential_scrubber import REDACTED
 
 if TYPE_CHECKING:
     from uuid import UUID

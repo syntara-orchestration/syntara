@@ -18,22 +18,21 @@ from temporalio.service import RPCError, RPCStatusCode
 from syntara.core.exceptions import SafeValueError
 from syntara.workflow_core.models import ActivityName, NodeType
 from syntara.workflow_runtime.engines.temporal.activities.internal import register_activity_monitoring
+from syntara.workflow_runtime.engines.temporal.services.activity_execution_sync import (
+    ActivityExecutionSyncMixin,
+)
 from syntara.workflow_runtime.engines.temporal.services.activity_execution_synchronizer import (
     ActivityExecutionSynchronizer,
 )
 from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import (
     _PENDING_ACTIVITY_STATE_STARTED as STARTED_STATE,
+)
+from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import (
     ActivitySyncService,
     ExecutionMonitorMetadata,
     SyntheticActivityStarted,
     SyntheticPartialOutput,
 )
-from syntara.workflow_runtime.engines.utils.timeout_messages import (
-    build_timeout_error_message,
-    format_timeout_friendly,
-)
-from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
-from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import retry_loop_record_activity_id
 from syntara.workflow_runtime.engines.utils.timeout_messages import (
     build_timeout_error_message,

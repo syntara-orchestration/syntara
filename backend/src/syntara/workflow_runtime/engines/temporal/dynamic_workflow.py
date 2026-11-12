@@ -29,9 +29,6 @@ with workflow.unsafe.imports_passed_through():
     from syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity import (
         resolve_workflow_integration,
     )
-    from syntara.workflows.models.activity_execution import ActivityStatus
-        resolve_workflow_integration,
-    )
     from syntara.workflow_runtime.engines.temporal.activities.integration_scope_activity import validate_node_references
     from syntara.workflow_runtime.engines.temporal.activities.wait_activity import complete_wait
     from syntara.workflow_runtime.engines.temporal.constants import (
@@ -48,6 +45,7 @@ with workflow.unsafe.imports_passed_through():
         resolve_timeout,
     )
     from syntara.workflow_runtime.engines.utils.timeout_messages import build_timeout_error_message
+    from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
 from syntara.workflow_core.models import (
     NODE_OUTPUT_MODELS,

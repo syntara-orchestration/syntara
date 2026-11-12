@@ -11,10 +11,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity import (
     fetch_retry_source_state_activity,
 )
+from syntara.workflows.models.activity_execution import ActivityStatus
 
 
 async def _run(
