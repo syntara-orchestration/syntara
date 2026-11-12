@@ -127,11 +127,11 @@ The agentic activity sends `HEARTBEAT_STOP_MONITOR: True` immediately at dispatc
 
 **Integration connections override management credentials at execution time.** Each `IntegrationConnectionConfig` pairs an `integration_id` with a `credential_id`, allowing the workflow author to substitute a different credential for a specific integration during this execution. Integrations not listed are treated as unauthenticated — the management credential is reserved for tool discovery and health checks and is never used during workflow execution. Credential UUIDs are passed, not secrets.
 
-Parameters are defined by `AgenticExecutorParameters` in `workflow_definition.py`; see that model (or the JSON Schema under `schemas/workflows/v2/executors/`) for the current field list rather than a copy here.
+Parameters are defined by `AgenticExecutorParameters` in `workflow_core/models.py`; see that model (or the JSON Schema under `schemas/workflows/v2/executors/`) for the current field list rather than a copy here.
 
 ## Accessing Results
 
-Downstream nodes access agentic output via the expression system: `${node_id.output}` for the response content, `${node_id.tool_calls}` for tool calls made during execution, and `${node_id.structured_output_metadata}` for fallback strategy details. See `AgenticOutput` in `workflow_definition.py` for the full output shape. Output mapping applies the same way as for any other executor node.
+Downstream nodes access agentic output via the expression system: `${node_id.output}` for the response content, `${node_id.tool_calls}` for tool calls made during execution, and `${node_id.structured_output_metadata}` for fallback strategy details. See `AgenticOutput` in `workflow_core/models.py` for the full output shape. Output mapping applies the same way as for any other executor node.
 
 ## Related Documentation
 

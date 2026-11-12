@@ -22,8 +22,8 @@ from syntara.integrations.models.integration import (
 )
 from syntara.integrations.models.llm_model import LLMModel
 from syntara.tool_manager.models.tool import Tool, ToolStatus
-from syntara.workflows.workflow_engine.activities import integration_scope_activity
-from syntara.workflows.workflow_engine.activities.integration_scope_activity import (
+from syntara.workflow_runtime.engines.temporal.activities import integration_scope_activity
+from syntara.workflow_runtime.engines.temporal.activities.integration_scope_activity import (
     _validate_node,
     validate_node_references,
 )

@@ -213,7 +213,7 @@ services:
   temporal-worker:
     image: ${APP_IMAGE:-localhost/syntara:latest}
     restart: unless-stopped
-    command: [python, -m, syntara.workflows.worker]
+    command: [python, -m, syntara.workflow_runtime.workers.worker]
     extra_hosts: # Dev mode: resolves 'syntara' to host when API runs outside containers
       - "syntara:host-gateway"
     environment:
@@ -292,7 +292,7 @@ services:
       moto:
         condition: service_healthy
     healthcheck:
-      test: [CMD-SHELL, 'cat /proc/[0-9]*/cmdline 2>/dev/null | grep -qa syntara.workflows.worker']
+      test: [CMD-SHELL, 'cat /proc/[0-9]*/cmdline 2>/dev/null | grep -qa syntara.workflow_runtime.workers.worker']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -301,7 +301,7 @@ services:
   temporal-background-worker:
     image: ${APP_IMAGE:-localhost/syntara:latest}
     restart: unless-stopped
-    command: [python, -m, syntara.workflows.background_worker]
+    command: [python, -m, syntara.workflow_runtime.workers.background_worker]
     extra_hosts:
       - "syntara:host-gateway"
     environment:
@@ -365,7 +365,7 @@ services:
       moto:
         condition: service_healthy
     healthcheck:
-      test: [CMD-SHELL, 'cat /proc/[0-9]*/cmdline 2>/dev/null | grep -qa syntara.workflows.background_worker']
+      test: [CMD-SHELL, 'cat /proc/[0-9]*/cmdline 2>/dev/null | grep -qa syntara.workflow_runtime.workers.background_worker']
       interval: 30s
       timeout: 10s
       retries: 3

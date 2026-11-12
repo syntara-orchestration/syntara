@@ -105,7 +105,19 @@ class AAPNotConfiguredError(SyntaraError): ...
 
 The `@fastapi_exception` decorator resolves string paths via `importlib` at registration time. See `src/syntara/auth/exceptions.py` for the reference implementation. See `src/syntara/core/exception_registry.py` line 59.
 
-All domains use string-based handler references. The only remaining import cycle edge is `auth.__init__` ↔ `auth.dependencies` (accepted — public API boundary).
+All domains use string-based handler references. The `auth.__init__` ↔
+`auth.dependencies` edge remains accepted as a public API boundary.
+
+### Workflow API and runtime boundary
+
+The workflow runtime currently imports API-owned SQLModel records and audit
+handlers because activity synchronization and execution services persist API
+records directly. API routers and services depend on the runtime through
+facades, so this migration intentionally retains a runtime-to-API dependency
+while the persistence boundary is being extracted. This is not yet a fully
+replaceable engine boundary; new engine-specific dependencies should remain
+behind runtime facades, and future engine replacement should introduce ports
+or move the persisted runtime records into `workflow_core`.
 
 ## TYPE_CHECKING Pattern
 
