@@ -297,7 +297,7 @@ describe('Executions Component', () => {
     render(<Executions />, { wrapper: TestWrapper })
 
     expect(screen.getByText('Unable to load workflow runs')).toBeInTheDocument()
-    expect(screen.getByText('Unable to load workflow runs. Try again.')).toBeInTheDocument()
+    expect(screen.getByText('Something went wrong. Try again.')).toBeInTheDocument()
   })
 
   it('shows a permission message when the list API returns 403', () => {
@@ -306,7 +306,7 @@ describe('Executions Component', () => {
     render(<Executions />, { wrapper: TestWrapper })
 
     expect(screen.getByText('Access denied')).toBeInTheDocument()
-    expect(screen.getByText('You do not have permission to view executions in this project.')).toBeInTheDocument()
+    expect(screen.getByText('You do not have permission to view workflow runs in this project.')).toBeInTheDocument()
   })
 
   it('shows a service unavailable message when the list API returns 503', () => {
