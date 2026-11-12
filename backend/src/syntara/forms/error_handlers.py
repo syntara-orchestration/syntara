@@ -47,7 +47,7 @@ def form_prompt_not_authorized_handler(request: Request, exc: "FormPromptNotAuth
         status_code=status.HTTP_403_FORBIDDEN,
         problem_type=PROBLEM_TYPES["forbidden"],
         title="Not Authorized",
-        detail="The user is not in the responder users or groups configured for this form prompt",
+        detail="You are not authorized to respond to this form prompt",
         code="FORM_PROMPT_NOT_AUTHORIZED",
         retryable=False,
         instance=str(request.url),
