@@ -37,7 +37,6 @@ export default function registerFormPromptStep() {
             fallback_decision: data.fallback_decision,
             submit_label: data.submit_label,
             success_message: data.success_message,
-            css_override: data.css_override,
             settings: data.settings,
           })
         )

@@ -84,7 +84,6 @@ export default function registerHumanTasksStep() {
               fallback_decision: formData.fallback_decision,
               submit_label: formData.submit_label,
               success_message: formData.success_message,
-              css_override: formData.css_override,
               settings: formData.settings,
             })
           )

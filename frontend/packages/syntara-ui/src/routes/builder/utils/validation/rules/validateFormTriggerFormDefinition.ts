@@ -4,13 +4,7 @@ import { humanizeFormDefinitionValidationError, safeParseFormDefinition } from '
 import type { EdgeConnection } from '../../../types/edge'
 import type { ValidationContext, ValidationError } from '../types'
 
-const FORM_TRIGGER_PARAMETER_KEYS = [
-  'form_definition',
-  'message',
-  'submit_label',
-  'success_message',
-  'css_override',
-] as const
+const FORM_TRIGGER_PARAMETER_KEYS = ['form_definition', 'message', 'submit_label', 'success_message'] as const
 
 type DraftFormField = { type?: string; value_name?: string; options?: { source?: string } }
 

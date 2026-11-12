@@ -11,7 +11,6 @@ export function mapFormTriggerValidationFieldPath(fieldPath: string | null | und
   if (relative === 'message') return 'message'
   if (relative === 'submit_label') return 'submit_label'
   if (relative === 'success_message') return 'success_message'
-  if (relative === 'css_override') return 'css_override'
   if (relative.startsWith('form_definition')) return 'form_definition'
   return null
 }

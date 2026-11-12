@@ -1,13 +1,11 @@
 import type { FormsAPI } from '@syntara/contracts'
 
-import { resolveFormPromptCssOverride } from '../../../components/forms/resolveFormPromptCssOverride'
 import { SynDynamicForm } from '../../../components/forms/SynDynamicForm'
 import formStepResponseSurfaceStyles from '../../../components/forms/synFormStepResponseSurface.module.css'
 
 type FormDefinition = FormsAPI.components['schemas']['FormDefinition']
 
 type FormPromptPendingResponseFormProps = Readonly<{
-  cssOverrideSource?: string | null
   responseFormId: string
   definition: FormDefinition
   submitLabel: string
@@ -18,7 +16,6 @@ type FormPromptPendingResponseFormProps = Readonly<{
 }>
 
 export function FormPromptPendingResponseForm({
-  cssOverrideSource,
   responseFormId,
   definition,
   submitLabel,
@@ -27,11 +24,8 @@ export function FormPromptPendingResponseForm({
   disabledFieldTooltip,
   onSubmit,
 }: FormPromptPendingResponseFormProps) {
-  const cssOverride = resolveFormPromptCssOverride(cssOverrideSource)
-
   return (
     <div className={`${formStepResponseSurfaceStyles.formStepResponseForm} form-step-response-form`}>
-      {cssOverride ? <style>{cssOverride}</style> : null}
       <SynDynamicForm
         id={responseFormId}
         definition={definition}

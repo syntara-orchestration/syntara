@@ -65,7 +65,6 @@ export type FormPromptFormSubmitData = {
   fallback_decision?: 'submit' | 'fallback' | null
   submit_label?: string | null
   success_message?: string | null
-  css_override?: string | null
   settings?: NodeSettings
 }
 
@@ -189,7 +188,6 @@ function FormPromptFormFields({
   const formDefinition = useWatch({ control, name: 'form_definition' })
   const message = useWatch({ control, name: 'message' })
   const submitLabel = useWatch({ control, name: 'submit_label' })
-  const cssOverrideSource = useWatch({ control, name: 'css_override' })
   const builderCommitRef = use(FormFieldBuilderCommitRefContext)
   const storeProjectId = useWorkflowStore((state) => state.projectId)
   const effectiveProjectId = projectId ?? storeProjectId
@@ -324,7 +322,6 @@ function FormPromptFormFields({
           registerCommit={registerBuilderCommit}
           isDisabled={isVersionView}
           previewSubmitLabel={submitLabel}
-          previewCssOverrideSource={cssOverrideSource}
           previewDescription={message}
         />
       </StackItem>
@@ -354,7 +351,6 @@ function FormPromptFormFields({
         formDefinition={resolvedDefinition}
         message={message}
         submitLabel={submitLabel}
-        cssOverrideSource={cssOverrideSource}
       />
     </>
   )

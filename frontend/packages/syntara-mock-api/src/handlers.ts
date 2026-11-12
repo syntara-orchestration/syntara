@@ -2004,10 +2004,6 @@ export const handlers = [
           typeof parameters.success_message === 'string' && parameters.success_message.length > 0
             ? parameters.success_message
             : 'Thank you — the workflow will continue.'
-        const cssOverride =
-          typeof parameters.css_override === 'string' && parameters.css_override.trim().length > 0
-            ? parameters.css_override.trim()
-            : undefined
         formPrompts.push({
           id: uuidv4(),
           created_at: timestamp,
@@ -2032,7 +2028,6 @@ export const handlers = [
           },
           submit_label: submitLabel,
           success_message: successMessage,
-          ...(cssOverride ? { css_override: cssOverride } : {}),
           responder_users: Array.isArray(parameters.responder_users)
             ? mockFormPromptResponderUsers(parameters.responder_users)
             : [{ id: 'user-admin', username: 'admin' }],

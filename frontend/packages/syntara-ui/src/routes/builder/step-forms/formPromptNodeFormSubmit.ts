@@ -10,8 +10,6 @@ export function mapFormPromptFormDataToSubmit(
 ): FormPromptFormSubmitData {
   const submitLabel = data.submit_label?.trim()
   const successMessage = data.success_message?.trim()
-  const cssOverride = data.css_override?.trim()
-
   const effectiveCof = resolveEffectiveContinueOnFailure(data.settings?.continue_on_failure, systemContinueOnFailure)
   const fallbackDecision = effectiveCof.isEffectivelyEnabled ? (data.fallback_decision ?? 'fallback') : 'submit'
 
@@ -25,7 +23,6 @@ export function mapFormPromptFormDataToSubmit(
     fallback_decision: fallbackDecision,
     ...(submitLabel ? { submit_label: submitLabel } : {}),
     ...(successMessage ? { success_message: successMessage } : {}),
-    ...(cssOverride ? { css_override: cssOverride } : {}),
     settings: persistStepSettings(data.settings),
   }
 }
