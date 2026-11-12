@@ -82,8 +82,7 @@ function SubmittedDataReadOnly({ data }: Readonly<{ data: Record<string, unknown
 
 function getDisabledFieldTooltip(
   permissions: ReturnType<typeof useFormPromptPermissions>,
-  canSubmitAsResponder: boolean,
-  prompt: FormPromptRead
+  canSubmitAsResponder: boolean
 ): string | undefined {
   if (permissions.canSubmit && canSubmitAsResponder) {
     return undefined
@@ -92,27 +91,14 @@ function getDisabledFieldTooltip(
     return permissions.tooltips.submit
   }
 
-  const userLabels = prompt.responder_users?.map((user) => user.username || user.id) ?? []
-  const groupLabels = prompt.responder_groups?.map((group) => group.name || group.id) ?? []
-  const parts: string[] = []
-  if (userLabels.length > 0) {
-    parts.push(`Users: ${userLabels.join(', ')}`)
-  }
-  if (groupLabels.length > 0) {
-    parts.push(`Groups: ${groupLabels.join(', ')}`)
-  }
-  if (parts.length === 0) {
-    return 'You are not configured as a responder for this form. Contact your Admin to request access.'
-  }
-  return `You are not configured as a responder for this form. Designated responders: ${parts.join('; ')}. Contact your Admin to request access.`
+  return 'You are not in the responder users or groups configured for this form.'
 }
 
 function getSubmitTooltip(
   permissions: ReturnType<typeof useFormPromptPermissions>,
-  canSubmitAsResponder: boolean,
-  prompt: FormPromptRead
+  canSubmitAsResponder: boolean
 ): string | undefined {
-  return getDisabledFieldTooltip(permissions, canSubmitAsResponder, prompt)
+  return getDisabledFieldTooltip(permissions, canSubmitAsResponder)
 }
 
 function FormPromptSummary({
@@ -318,8 +304,8 @@ function FormPromptResponseReady({
 
   const isPending = isFormPromptResponsePending(prompt, now)
   const canSubmit = permissions.canSubmit && canSubmitAsResponder && isPending
-  const disabledFieldTooltip = getDisabledFieldTooltip(permissions, canSubmitAsResponder, prompt)
-  const submitTooltip = getSubmitTooltip(permissions, canSubmitAsResponder, prompt)
+  const disabledFieldTooltip = getDisabledFieldTooltip(permissions, canSubmitAsResponder)
+  const submitTooltip = getSubmitTooltip(permissions, canSubmitAsResponder)
 
   const handleSubmit = async (responseData: Record<string, unknown>) => {
     try {
