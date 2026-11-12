@@ -22,10 +22,15 @@ export async function isExecutionPlaneListReachable(app: Page): Promise<boolean>
   }
 }
 
-/** True when exactly one OpenShift integration exists (create form cluster binding). */
-export async function hasSingleOpenShiftIntegration(app: Page): Promise<boolean> {
+type OpenShiftIntegrationList = {
+  resources?: Array<{ name?: string | null }>
+  total?: number
+}
+
+/** Sole OpenShift integration name when exactly one is installed; otherwise null. */
+export async function getSoleOpenShiftIntegrationName(app: Page): Promise<string | null> {
   const token = await getAuthToken(app)
-  if (!token) return false
+  if (!token) return null
 
   try {
     const url = new URL(
@@ -33,13 +38,20 @@ export async function hasSingleOpenShiftIntegration(app: Page): Promise<boolean>
       appBaseUrl
     ).toString()
     const response = await app.request.get(url, { headers: { Authorization: `Bearer ${token}` } })
-    if (!response.ok()) return false
-    const body = (await response.json()) as { resources?: unknown[]; total?: number }
+    if (!response.ok()) return null
+    const body = (await response.json()) as OpenShiftIntegrationList
     const count = body.total ?? body.resources?.length ?? 0
-    return count === 1
+    if (count !== 1) return null
+    const name = body.resources?.[0]?.name?.trim()
+    return name || null
   } catch {
-    return false
+    return null
   }
+}
+
+/** True when exactly one OpenShift integration exists (create form cluster binding). */
+export async function hasSingleOpenShiftIntegration(app: Page): Promise<boolean> {
+  return (await getSoleOpenShiftIntegrationName(app)) !== null
 }
 
 /** Creates an execution target via the facade API. Caller must delete the returned id. */

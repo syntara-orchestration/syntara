@@ -2,10 +2,10 @@
  * E2E: Delete execution target (list + detail)
  *
  * Covers:
- * - List kebab delete → 202 success toast; target leaves the filtered list
+ * - List kebab delete → 202 success toast (target may remain listed while draining)
  * - Detail kebab delete → navigate back to Execution Plane list
- * - Default target delete → 409 conflict; target remains
- * - In-use target delete → 409 conflict; target remains
+ * - Default-target conflict toast (intercepted 409; no mock seed dependency)
+ * - In-use conflict toast (intercepted 409; no mock seed dependency)
  *
  * Skipped when Execution Plane API is unreachable (compose CI does not start it).
  */
@@ -19,8 +19,6 @@ import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 
 const LIST_URL = '/execution-plane'
-const DEFAULT_TARGET_NAME = 'Prod OpenShift West'
-const IN_USE_TARGET_NAME = 'Worker Pool 01'
 
 async function filterTargetsByName(app: Page, name: string): Promise<void> {
   await app.getByPlaceholder('Filter by name').fill(name)
@@ -32,6 +30,38 @@ async function confirmDeleteDialog(app: Page): Promise<void> {
   await expect(dialog.getByText('Delete execution target?')).toBeVisible()
   await dialog.getByRole('checkbox', { name: /permanently deleted/i }).click()
   await dialog.getByRole('button', { name: 'Delete' }).click()
+}
+
+async function withDeleteConflict(
+  app: Page,
+  targetId: string,
+  detail: string,
+  run: () => Promise<void>
+): Promise<void> {
+  const deleteRoute = `**/api/execution_plane/v1/execution_targets/${targetId}`
+  await app.route(deleteRoute, async (route) => {
+    if (route.request().method() !== 'DELETE') {
+      await route.continue()
+      return
+    }
+    await route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        type: 'https://api.example.com/errors/conflict',
+        title: 'Conflict',
+        detail,
+        code: 'CONFLICT',
+        retryable: false,
+      }),
+    })
+  })
+
+  try {
+    await run()
+  } finally {
+    await app.unroute(deleteRoute)
+  }
 }
 
 test.describe('Execution Plane — delete execution target', { tag: '@pr-check' }, () => {
@@ -58,8 +88,9 @@ test.describe('Execution Plane — delete execution target', { tag: '@pr-check' 
       await app.getByRole('menuitem', { name: /Delete execution target/i }).click()
       await confirmDeleteDialog(app)
 
+      // DELETE returns 202 Accepted; the target may remain listed briefly while draining.
       await expect(app.getByText('Deletion accepted')).toBeVisible()
-      await expect(app.getByRole('row', { name: new RegExp(name) })).toHaveCount(0)
+      await expect(app.getByText(/may remain listed briefly while draining completes/i)).toBeVisible()
     } finally {
       await deleteExecutionTargetViaApi(app, targetId)
     }
@@ -87,34 +118,56 @@ test.describe('Execution Plane — delete execution target', { tag: '@pr-check' 
   })
 
   test('shows conflict when deleting the default target', async ({ app }) => {
-    await app.goto(toAppUrl(LIST_URL))
-    await expect(app.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
-    await filterTargetsByName(app, DEFAULT_TARGET_NAME)
+    const name = buildUniqueName('e2e-et-del-default')
+    const created = await createExecutionTargetViaApi(app, { name })
+    const targetId = created.id
+    const conflictDetail = 'Cannot delete the default execution target; promote another target first'
 
-    const row = app.getByRole('row', { name: new RegExp(DEFAULT_TARGET_NAME) })
-    await expect(row).toBeVisible({ timeout: 15_000 })
-    await openRowKebab(row, /Delete execution target/i)
-    await app.getByRole('menuitem', { name: /Delete execution target/i }).click()
-    await confirmDeleteDialog(app)
+    try {
+      await withDeleteConflict(app, targetId, conflictDetail, async () => {
+        await app.goto(toAppUrl(LIST_URL))
+        await expect(app.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+        await filterTargetsByName(app, name)
 
-    await expect(app.getByText('Delete failed')).toBeVisible()
-    await expect(app.getByText(/promote another target first/i)).toBeVisible()
-    await expect(app.getByRole('row', { name: new RegExp(DEFAULT_TARGET_NAME) })).toBeVisible()
+        const row = app.getByRole('row', { name: new RegExp(name) })
+        await expect(row).toBeVisible({ timeout: 15_000 })
+        await openRowKebab(row, /Delete execution target/i)
+        await app.getByRole('menuitem', { name: /Delete execution target/i }).click()
+        await confirmDeleteDialog(app)
+
+        await expect(app.getByText('Delete failed')).toBeVisible()
+        await expect(app.getByText(/promote another target first/i)).toBeVisible()
+        await expect(app.getByRole('row', { name: new RegExp(name) })).toBeVisible()
+      })
+    } finally {
+      await deleteExecutionTargetViaApi(app, targetId)
+    }
   })
 
   test('shows conflict when deleting an in-use target', async ({ app }) => {
-    await app.goto(toAppUrl(LIST_URL))
-    await expect(app.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
-    await filterTargetsByName(app, IN_USE_TARGET_NAME)
+    const name = buildUniqueName('e2e-et-del-inuse')
+    const created = await createExecutionTargetViaApi(app, { name })
+    const targetId = created.id
+    const conflictDetail = 'Execution target is in use and cannot be deleted'
 
-    const row = app.getByRole('row', { name: new RegExp(IN_USE_TARGET_NAME) })
-    await expect(row).toBeVisible({ timeout: 15_000 })
-    await openRowKebab(row, /Delete execution target/i)
-    await app.getByRole('menuitem', { name: /Delete execution target/i }).click()
-    await confirmDeleteDialog(app)
+    try {
+      await withDeleteConflict(app, targetId, conflictDetail, async () => {
+        await app.goto(toAppUrl(LIST_URL))
+        await expect(app.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+        await filterTargetsByName(app, name)
 
-    await expect(app.getByText('Delete failed')).toBeVisible()
-    await expect(app.getByText(/in use and cannot be deleted/i)).toBeVisible()
-    await expect(app.getByRole('row', { name: new RegExp(IN_USE_TARGET_NAME) })).toBeVisible()
+        const row = app.getByRole('row', { name: new RegExp(name) })
+        await expect(row).toBeVisible({ timeout: 15_000 })
+        await openRowKebab(row, /Delete execution target/i)
+        await app.getByRole('menuitem', { name: /Delete execution target/i }).click()
+        await confirmDeleteDialog(app)
+
+        await expect(app.getByText('Delete failed')).toBeVisible()
+        await expect(app.getByText(/in use and cannot be deleted/i)).toBeVisible()
+        await expect(app.getByRole('row', { name: new RegExp(name) })).toBeVisible()
+      })
+    } finally {
+      await deleteExecutionTargetViaApi(app, targetId)
+    }
   })
 })
