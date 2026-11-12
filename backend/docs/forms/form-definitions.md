@@ -15,7 +15,7 @@ supported type and its defined settings; unknown types and extra settings are re
 100-field cap is a limit for usability, not a technical requirement.
 
 The supported field types are `text`, `email`, `number`, `checkbox`, `date`, `dropdown`, and
-`multi_select`. Text fields have a UI-only `display` property: `single_line` (the default),
+`multi_select`. Text fields have a UI-only `display` property: `single_line`,
 `multi_line`, or `masked`. The backend preserves this rendering hint but does not interpret it.
 
 `display: "masked"` hides the value in the UI but does not encrypt or redact its
