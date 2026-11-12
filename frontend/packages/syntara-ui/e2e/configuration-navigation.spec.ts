@@ -1,5 +1,10 @@
 import { test, expect, toAppUrl } from './fixtures'
-import { expectDockedNavGroupChildLinks, mainNavigation, navigateViaConfigurationMenu } from './helpers/docked-nav'
+import {
+  expandDockedNavGroup,
+  expectDockedNavGroupChildLinks,
+  mainNavigation,
+  navigateViaConfigurationMenu,
+} from './helpers/docked-nav'
 
 test.describe('Configuration Navigation & Tabs', () => {
   test('displays all Configuration sub-navigation tabs', async ({ app }) => {
@@ -20,12 +25,12 @@ test.describe('Configuration Navigation & Tabs', () => {
     await expect(app.getByRole('heading', { level: 1, name: 'Credentials' })).toBeVisible()
   })
 
-  test('opens an Integrations flyout link in a new tab on modified click', async ({ app }) => {
+  test('opens an Integrations sub-navigation link in a new tab on modified click', async ({ app }) => {
     await app.goto(toAppUrl('/workflows'))
     await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
-    await app.getByRole('button', { name: 'Configuration', exact: true }).hover()
-    const integrationsLink = app.getByRole('menuitem', { name: 'Integrations', exact: true })
+    await expandDockedNavGroup(app, 'Configuration', 'Integrations')
+    const integrationsLink = mainNavigation(app).getByRole('link', { name: 'Integrations', exact: true })
     await expect(integrationsLink).toHaveAttribute('href', '/configuration/integrations')
 
     const openedPagePromise = app.context().waitForEvent('page')

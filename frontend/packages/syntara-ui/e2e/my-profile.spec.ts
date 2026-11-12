@@ -106,7 +106,7 @@ test.describe('My Profile — user menu navigation', () => {
     await app.goto(toAppUrl('/workflows'))
     await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
-    await app.getByRole('button', { name: 'User menu' }).hover()
+    await app.getByRole('button', { name: 'User menu' }).click()
     const profileLink = app.getByRole('menuitem', { name: 'My Profile', exact: true })
     await expect(profileLink).toHaveAttribute('href', MY_PROFILE_URL)
 
