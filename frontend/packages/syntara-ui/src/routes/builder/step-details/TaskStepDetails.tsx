@@ -39,6 +39,11 @@ import {
   validateJobTemplateId,
   validateWorkflowTemplateId,
 } from '../utils/aapHelpers'
+import {
+  buildScriptExecutionProfile,
+  parseScriptExecutionFormFields,
+  type ExecutionTargetProfile,
+} from '../utils/scriptExecutionProfile'
 
 import { AIAgentStepDetails } from './AIAgentStepDetails'
 
@@ -126,10 +131,14 @@ function parseHeaders(entries: Array<{ key: string; value: string }> | undefined
 /**
  * Build activity config and validate form data for submission.
  */
-function buildActivityConfig(
-  data: RegistryActionFormData
-):
-  | { language: string; code: string; credential_id?: string }
+function buildActivityConfig(data: RegistryActionFormData):
+  | {
+      language: string
+      code: string
+      credential_id?: string
+      environment?: Record<string, string>
+      execution_profile?: ExecutionTargetProfile
+    }
   | { method: string; url: string; headers?: Record<string, string>; body?: unknown; credential_id?: string } {
   const isScript = data.executor === ExecutorTypeEnum.SCRIPT
 
@@ -198,8 +207,15 @@ function buildScriptConfig(data: RegistryActionFormData): {
   code: string
   credential_id?: string
   environment?: Record<string, string>
+  execution_profile?: ExecutionTargetProfile
 } {
-  const config: { language: string; code: string; credential_id?: string; environment?: Record<string, string> } = {
+  const config: {
+    language: string
+    code: string
+    credential_id?: string
+    environment?: Record<string, string>
+    execution_profile?: ExecutionTargetProfile
+  } = {
     language: data.language ?? 'python',
     code: data.code ?? '',
   }
@@ -211,6 +227,11 @@ function buildScriptConfig(data: RegistryActionFormData): {
   const env = parseJsonEnvironment(data.parameters)
   if (env) {
     config.environment = env
+  }
+
+  const executionProfile = buildScriptExecutionProfile(data.affinity, data.execution_target_id)
+  if (executionProfile) {
+    config.execution_profile = executionProfile
   }
 
   return config
@@ -438,6 +459,7 @@ function buildExecutorInitialData(
   const isScript = executor === ExecutorTypeEnum.SCRIPT
   const isHTTP = executor === ExecutorTypeEnum.HTTP_REQUEST
   const serializedBody = isHTTP && config.body ? serializeBody(config.body) : undefined
+  const executionFields = isScript ? parseScriptExecutionFormFields(config) : undefined
 
   return {
     name: taskData.name,
@@ -460,6 +482,8 @@ function buildExecutorInitialData(
       (config as { credentialId?: string; credential_id?: string }).credentialId ??
       (config as { credentialId?: string; credential_id?: string }).credential_id ??
       undefined,
+    affinity: executionFields?.affinity,
+    execution_target_id: executionFields?.execution_target_id,
     settings: taskData.settings,
   }
 }

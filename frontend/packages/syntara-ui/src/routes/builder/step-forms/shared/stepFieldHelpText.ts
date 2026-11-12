@@ -28,6 +28,10 @@ export const SCRIPT_CODE_HELP =
 export const SCRIPT_ENV_VARS_HELP =
   "Define input variables as key-value pairs that are passed to the script's execution context. Use expressions like ${previous_step.result} to pass data from earlier steps."
 
+export const SCRIPT_AFFINITY_HELP = 'Routing rules that direct work to execution targets.'
+
+export const SCRIPT_EXECUTION_TARGET_HELP = 'Pin this node to a specific execution target.'
+
 export const HTTP_METHOD_HELP =
   'Select the HTTP method for the request: GET retrieves data; POST creates data; PUT replaces data; PATCH updates data partially; DELETE removes data.'
 

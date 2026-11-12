@@ -1,6 +1,7 @@
 import { EdgeHandleEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
+import { ScriptAffinityEnum } from '../routes/builder/utils/scriptExecutionProfile'
 import { buildSwitchCasePort } from '../routes/builder/utils/switchCaseHelpers'
 
 import {
@@ -324,6 +325,35 @@ describe('workflowFactories', () => {
         })
 
         expect(activity.parameters).not.toHaveProperty('environment')
+      })
+
+      it('includes execution_profile when affinity is required_target', () => {
+        const activity = createScriptActivity({
+          id: 'task-9',
+          name: 'Script',
+          language: 'python',
+          code: 'pass',
+          affinity: ScriptAffinityEnum.REQUIRED_TARGET,
+          executionTargetId: 'target-1',
+        })
+
+        expect(activity.parameters.execution_profile).toEqual({
+          type: 'execution_target',
+          execution_target_id: 'target-1',
+        })
+      })
+
+      it('omits execution_profile when affinity is none', () => {
+        const activity = createScriptActivity({
+          id: 'task-10',
+          name: 'Script',
+          language: 'python',
+          code: 'pass',
+          affinity: ScriptAffinityEnum.NONE,
+          executionTargetId: 'target-1',
+        })
+
+        expect(activity.parameters).not.toHaveProperty('execution_profile')
       })
     })
 
