@@ -24,6 +24,10 @@ from syntara.workflows.workflow_engine.models.workflow_definition import Activit
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
 
 logger = structlog.stdlib.get_logger(__name__)
+
+# Identity Temporal's history service uses when it terminates a workflow on its own
+# (history size / event-count limits), as opposed to a user, CLI or scheduler.
+TEMPORAL_HISTORY_SERVICE_IDENTITY = "history-service"
 _COMPOSITE_ITER_SEP = "#iter-"
 
 
@@ -87,9 +91,28 @@ class ActivityExecutionStateMixin:
         if event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT:
             return ExecutionStatus.FAILED, "Workflow execution timed out"
         if event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED:
-            return ExecutionStatus.CANCELLED, "Workflow was forcibly terminated"
+            return ActivityExecutionStateMixin._extract_terminated_status_and_error(event)
         msg = f"Event type {event_type} is not a workflow completion event"
         raise SafeValueError(msg)
+
+    @staticmethod
+    def _extract_terminated_status_and_error(event: HistoryEvent) -> tuple[ExecutionStatus, str]:
+        """Map a WorkflowExecutionTerminated event, keeping the reason Temporal recorded.
+
+        A termination issued by the Temporal history service itself (for example
+        when the workflow history exceeds the configured size or event-count
+        limit) is a platform failure, not a user cancellation, so it maps to
+        FAILED. Any other termination (CLI, operator, scheduler) stays CANCELLED
+        but carries the reason when one was given.
+        """
+        attrs = event.workflow_execution_terminated_event_attributes
+        reason = (attrs.reason or "").strip() if attrs else ""
+        identity = (attrs.identity or "") if attrs else ""
+        if identity == TEMPORAL_HISTORY_SERVICE_IDENTITY:
+            return ExecutionStatus.FAILED, f"Terminated by Temporal: {reason or 'no reason given'}"
+        if reason:
+            return ExecutionStatus.CANCELLED, f"Workflow was forcibly terminated: {reason}"
+        return ExecutionStatus.CANCELLED, "Workflow was forcibly terminated"
 
     @staticmethod
     def _extract_completed_status_and_error(event: HistoryEvent) -> tuple[ExecutionStatus, str | None]:
@@ -273,9 +296,14 @@ class ActivityExecutionStateMixin:
                     execution.error_details = error_details
                 execution.updated_at = datetime.now(UTC)
 
-                # If workflow was cancelled, mark running activities as cancelled and pending as skipped
+                # If the workflow was cancelled or terminated, mark running activities as
+                # cancelled and pending as skipped (a termination by the Temporal server maps
+                # to FAILED, but its in-flight activities were still cut short, not skipped).
                 updated_activities: list[tuple[ActivityExecution, dict[str, Any]]] = []
-                if status == ExecutionStatus.CANCELLED:
+                if (
+                    status == ExecutionStatus.CANCELLED
+                    or event.event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED
+                ):
                     updated_activities = self._update_non_terminal_activities_on_cancel(execution, completed_at)
 
                 # Safety net: mid-workflow sync (via _sync_skipped_nodes on converge/condition

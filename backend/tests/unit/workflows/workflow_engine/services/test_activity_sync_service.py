@@ -1136,6 +1136,8 @@ class TestWorkflowEventExtraction:
         event_type: int,
         event_id: int = 100,
         failure_message: str | None = None,
+        terminate_reason: str = "",
+        terminate_identity: str = "",
     ) -> Mock:
         """Create a mock workflow completion event."""
         event = Mock()
@@ -1167,6 +1169,8 @@ class TestWorkflowEventExtraction:
 
         elif event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED:
             attrs = Mock()
+            attrs.reason = terminate_reason
+            attrs.identity = terminate_identity
             event.workflow_execution_terminated_event_attributes = attrs
 
         return event
@@ -1219,6 +1223,48 @@ class TestWorkflowEventExtraction:
         assert status == ExecutionStatus.FAILED
         # Implementation uses default message, not custom failure message
         assert error_details == "Workflow execution timed out"
+
+    def test_extract_execution_status_terminated_by_history_service_is_failed_with_reason(self) -> None:
+        """TERMINATED by Temporal's history service (history limits) maps to FAILED and keeps the reason."""
+        from syntara.workflows.models.execution import ExecutionStatus
+
+        event = self._create_workflow_event(
+            EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED,
+            terminate_reason="Workflow history size exceeds limit.",
+            terminate_identity="history-service",
+        )
+
+        status, _completed_at, error_details = self.service._extract_execution_status_from_event(event)
+
+        assert status == ExecutionStatus.FAILED
+        assert error_details == "Terminated by Temporal: Workflow history size exceeds limit."
+
+    def test_extract_execution_status_terminated_with_reason_keeps_cancelled_and_reason(self) -> None:
+        """TERMINATED by someone else (CLI, operator) stays CANCELLED but surfaces the reason."""
+        from syntara.workflows.models.execution import ExecutionStatus
+
+        event = self._create_workflow_event(
+            EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED,
+            terminate_reason="  manual stop from CLI  ",
+            terminate_identity="ops@host",
+        )
+
+        status, _completed_at, error_details = self.service._extract_execution_status_from_event(event)
+
+        assert status == ExecutionStatus.CANCELLED
+        assert error_details == "Workflow was forcibly terminated: manual stop from CLI"
+
+    def test_extract_execution_status_terminated_without_attributes(self) -> None:
+        """TERMINATED event with no attributes falls back to the generic message."""
+        from syntara.workflows.models.execution import ExecutionStatus
+
+        event = self._create_workflow_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED)
+        event.workflow_execution_terminated_event_attributes = None
+
+        status, _completed_at, error_details = self.service._extract_execution_status_from_event(event)
+
+        assert status == ExecutionStatus.CANCELLED
+        assert error_details == "Workflow was forcibly terminated"
 
     def test_extract_execution_status_raises_on_invalid_event(self) -> None:
         """Test extraction raises SafeValueError for non-completion events."""
@@ -1352,6 +1398,12 @@ class TestExecutionStatusUpdates:
         elif event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED:
             attrs = Mock()
             event.workflow_execution_completed_event_attributes = attrs
+
+        elif event_type == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED:
+            attrs = Mock()
+            attrs.reason = failure_message or ""
+            attrs.identity = "history-service"
+            event.workflow_execution_terminated_event_attributes = attrs
 
         return event
 
@@ -1526,6 +1578,58 @@ class TestExecutionStatusUpdates:
         assert execution.status == ExecutionStatus.FAILED
         assert execution.completed_at is not None
         assert execution.error_details == "Database connection timeout"
+        mock_session.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_update_execution_status_on_termination_by_temporal(self) -> None:
+        """TERMINATED by the history service: FAILED with the reason, in-flight activities cancelled."""
+        from syntara.workflows.models.execution import ExecutionStatus
+
+        execution = self._create_mock_execution(self.execution_id, status="RUNNING")
+        running_activity = ActivityExecution(
+            id=uuid4(),
+            execution_id=self.execution_id,
+            activity_name="body",
+            node_type="script",
+            temporal_activity_id="body",
+            status=ActivityStatus.RUNNING,
+            started_at=datetime.now(UTC),
+        )
+        pending_activity = ActivityExecution(
+            id=uuid4(),
+            execution_id=self.execution_id,
+            activity_name="after",
+            node_type="script",
+            temporal_activity_id="after",
+            status=ActivityStatus.PENDING,
+        )
+        execution.activities = [running_activity, pending_activity]
+
+        mock_result = Mock()
+        mock_result.one_or_none.return_value = execution
+        mock_session = Mock()
+        mock_session.exec = AsyncMock(return_value=mock_result)
+        mock_session.commit = AsyncMock()
+        mock_session.rollback = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+        self.mock_session_factory.return_value = mock_session
+
+        event = self._create_workflow_event(
+            EventType.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED,
+            event_id=100,
+            failure_message="Workflow history size exceeds limit.",
+        )
+        metadata = create_test_metadata(execution_id=self.execution_id)
+
+        with patch.object(self.service, "_publish_activity_patches", new=AsyncMock()) as publish_patches:
+            await self.service._update_execution_status_from_event(metadata, event)
+
+        assert execution.status == ExecutionStatus.FAILED
+        assert execution.error_details == "Terminated by Temporal: Workflow history size exceeds limit."
+        assert running_activity.status == ActivityStatus.CANCELLED
+        assert pending_activity.status == ActivityStatus.SKIPPED
+        publish_patches.assert_awaited_once()
         mock_session.commit.assert_awaited_once()
 
     @pytest.mark.asyncio
