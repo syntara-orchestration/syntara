@@ -2,6 +2,7 @@
 
 import asyncio
 import signal
+import sys
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -25,6 +26,51 @@ from tests.unit.eventstreams.test_connection_provider import connection_context
 from tests.unit.eventstreams.test_consumer_service import eventually
 
 manager_context = consumer_tests.manager_context
+
+
+@pytest.mark.parametrize(
+    ("grace", "drain", "valid"),
+    [
+        (None, 20, True),
+        (60, 20, True),
+        (27, 20, True),
+        (26, 20, False),
+        (20, 20, False),
+        (0, 20, False),
+        (-1, 20, False),
+        (42, 35, True),
+        (41, 35, False),
+    ],
+)
+def test_termination_grace_includes_actual_drain_and_cleanup(grace, drain, valid):
+    if valid:
+        entrypoint._validate_termination_grace(grace, drain)
+    else:
+        with pytest.raises(ValueError, match="drain deadline and cleanup allowance"):
+            entrypoint._validate_termination_grace(grace, drain)
+
+
+@pytest.mark.parametrize("grace", [None, 60, 90])
+def test_launcher_accepts_deployment_grace_argument(monkeypatch, grace):
+    arguments = ["consumer_entrypoint"]
+    if grace is not None:
+        arguments += ["--termination-grace-period-seconds", str(grace)]
+    monkeypatch.setattr(sys, "argv", arguments)
+    assert entrypoint._arguments().termination_grace_period_seconds == grace
+
+
+async def test_unsafe_termination_grace_fails_before_external_startup(monkeypatch):
+    settings = get_settings().model_copy(update={"eventstream_enabled": True, "event_drain_timeout_seconds": 35})
+    connect, dispose = AsyncMock(), AsyncMock()
+    monkeypatch.setattr(entrypoint, "get_settings", lambda: settings)
+    monkeypatch.setattr(entrypoint, "create_temporal_execution_service", connect)
+    monkeypatch.setattr(entrypoint, "engine", SimpleNamespace(dispose=dispose))
+    monkeypatch.setattr(entrypoint, "start_loggers", MagicMock())
+    monkeypatch.setattr(entrypoint, "stop_loggers", MagicMock())
+    with pytest.raises(ValueError, match="drain deadline and cleanup allowance"):
+        await entrypoint.main(termination_grace_seconds=41)
+    connect.assert_not_awaited()
+    dispose.assert_awaited_once()
 
 
 async def test_composition_shares_one_client_factory_and_resource_limits(monkeypatch):
