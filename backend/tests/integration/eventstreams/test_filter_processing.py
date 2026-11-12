@@ -77,9 +77,7 @@ async def test_cel_skips_leave_no_execution_or_audit_rows(
     service, preparation, admission, event = await processing(context, expression)
     log = Mock()
     monkeypatch.setattr(module, "logger", log)
-    result = await service.process(
-        context.snapshot, context.identity(), event.model_copy(update={"value": value})
-    )
+    result = await service.process(context.snapshot, context.identity(), event.model_copy(update={"value": value}))
     assert isinstance(result, SkippedRecord)
     assert result.outcome == outcome
     assert result.error_code == code
@@ -126,16 +124,12 @@ async def test_false_key_condition_can_skip_invalid_json_without_decoding(prepar
 
 
 @pytest.mark.parametrize("value", [b"not-json", None], ids=["invalid-json", "tombstone"])
-async def test_matching_filter_holds_invalid_content_without_execution(
-    preparation_context, monkeypatch, value
-) -> None:
+async def test_matching_filter_holds_invalid_content_without_execution(preparation_context, monkeypatch, value) -> None:
     context = preparation_context
     service, preparation, admission, event = await processing(context, "true")
     logs = Mock()
     monkeypatch.setattr(module, "logger", logs)
-    result = await service.process(
-        context.snapshot, context.identity(), event.model_copy(update={"value": value})
-    )
+    result = await service.process(context.snapshot, context.identity(), event.model_copy(update={"value": value}))
     assert isinstance(result, HeldRecord)
     assert result.permanent_content_error
     async with context.session_factory() as session:

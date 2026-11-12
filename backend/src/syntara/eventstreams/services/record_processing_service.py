@@ -145,10 +145,9 @@ class EventRecordProcessingService:
             if isinstance(decoded, SkippedRecord):
                 return decoded if self._admission_open(snapshot, admission_guard) else self._hold("admission_closed")
             return await self._prepare_and_schedule(snapshot, identity, decoded, admission_guard)
-        except (SQLAlchemyError, OSError, TimeoutError):
-            self._dependency_failed(snapshot)
-            return self._hold("dependency_unavailable")
-        except (SyntaraError, ValueError):
+        except (SQLAlchemyError, OSError, TimeoutError, SyntaraError, ValueError) as exc:
+            if isinstance(exc, (SQLAlchemyError, OSError, TimeoutError)):
+                self._dependency_failed(snapshot)
             return self._hold("dependency_unavailable")
 
     async def _prepare_and_schedule(

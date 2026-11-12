@@ -1272,7 +1272,7 @@ async def test_failed_skip_commit_is_reevaluated_after_restart_and_filter_revisi
     runner = harness.runner
     runner.snapshot = context.snapshot
     runner._processing = processing
-    processing.admission_eligible = AsyncMock(return_value=True)
+    monkeypatch.setattr(processing, "admission_eligible", AsyncMock(return_value=True))
     harness.client.assignment = frozenset({2})
     await runner.on_partitions_assigned(frozenset({2}), 7)
     state = runner._partitions[2]
@@ -1315,9 +1315,7 @@ async def test_failed_skip_commit_is_reevaluated_after_restart_and_filter_revisi
         await restarted._enqueue({2: [record]}, 8)
         await restarted._advance(restarted._partitions[2])
         prepare.assert_awaited_once()
-        assert (
-            prepare.call_args.args[0].configuration_revision == revised.configuration_revision
-        )
+        assert prepare.call_args.args[0].configuration_revision == revised.configuration_revision
         await restarted._commit_positions((restarted._partitions[2],))
         assert harness.client.commit.await_args_list[-1].kwargs == {"expected_epoch": 8}
         assert harness.client.commit.await_args_list[-1].args == ({2: 6},)
@@ -1340,7 +1338,7 @@ async def test_completed_filter_skip_commits_during_drain_without_processing_the
     gate = Mock()
     gate.admission_open.return_value = gate.resolution_open.return_value = True
     runner._gate = processing._gate = gate
-    processing.admission_eligible = AsyncMock(return_value=True)
+    monkeypatch.setattr(processing, "admission_eligible", AsyncMock(return_value=True))
     harness.settings.event_drain_timeout_seconds = 1
     harness.client.assignment = frozenset({2})
     await runner.on_partitions_assigned(frozenset({2}), 7)
@@ -1380,7 +1378,7 @@ async def test_completed_filter_skip_cannot_bypass_commit_safety_during_drain(
     gate = Mock()
     gate.admission_open.return_value = gate.resolution_open.return_value = True
     runner._gate = processing._gate = gate
-    processing.admission_eligible = AsyncMock(return_value=True)
+    monkeypatch.setattr(processing, "admission_eligible", AsyncMock(return_value=True))
     harness.settings.event_drain_timeout_seconds = 1
     harness.client.assignment = frozenset({2})
     await runner.on_partitions_assigned(frozenset({2}), 7)
@@ -1410,7 +1408,7 @@ async def test_filter_skip_finishing_after_admission_closes_is_not_a_completed_p
     runner = harness.runner
     runner.snapshot = context.snapshot
     runner._processing = processing
-    processing.admission_eligible = AsyncMock(return_value=True)
+    monkeypatch.setattr(processing, "admission_eligible", AsyncMock(return_value=True))
     harness.client.assignment = frozenset({2})
     await runner.on_partitions_assigned(frozenset({2}), 7)
     state = runner._partitions[2]
@@ -1438,7 +1436,8 @@ async def test_unbufferable_record_with_closed_admission_retries_before_filterin
     state = runner._partitions[2]
     state.ready = state.eligible = True
     harness.settings.event_queue_max_bytes = 1
-    processing.admission_eligible = AsyncMock(return_value=False)
+    eligible = AsyncMock(return_value=False)
+    monkeypatch.setattr(processing, "admission_eligible", eligible)
 
     await runner._enqueue({2: [record]}, 7)
     assert state.held is not None
@@ -1451,7 +1450,7 @@ async def test_unbufferable_record_with_closed_admission_retries_before_filterin
     harness.client.seek.assert_awaited_with(2, 5, expected_epoch=7)
 
     # Retry only after current admission checks succeed.
-    processing.admission_eligible.return_value = True
+    eligible.return_value = True
     state.held = None
     await runner._advance(state)
     await runner._enqueue({2: [record]}, 7)

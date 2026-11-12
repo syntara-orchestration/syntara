@@ -182,7 +182,12 @@ class KafkaRecordRunner:
         return self._gate is None or self._gate.resolution_open(self.snapshot) is True
 
     def _admission_open(self) -> bool:
-        return self._placement_open() and (self._gate is None or self._gate.admission_open(self.snapshot) is True)
+        return (
+            not self._closing
+            and not self._stopped
+            and self._placement_open()
+            and (self._gate is None or self._gate.admission_open(self.snapshot) is True)
+        )
 
     def _transport_open(self) -> bool:
         return self._placement_open() and (self._gate is None or self._gate.transport_open(self.snapshot) is True)

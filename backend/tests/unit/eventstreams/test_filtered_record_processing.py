@@ -48,9 +48,7 @@ def filtered_context(
 async def test_local_outcomes_do_not_write_or_schedule(monkeypatch, expression, value, outcome, code) -> None:
     context, service, admission, event, logs = filtered_context(monkeypatch, {"expression": expression})
     context.events.clear()
-    result = await service.process(
-        context.snapshot, context.identity, event.model_copy(update={"value": value})
-    )
+    result = await service.process(context.snapshot, context.identity, event.model_copy(update={"value": value}))
     assert isinstance(result, SkippedRecord)
     assert result.identity == context.identity
     assert result.configuration_revision == context.snapshot.configuration_revision

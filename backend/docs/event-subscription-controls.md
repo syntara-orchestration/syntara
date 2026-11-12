@@ -23,8 +23,12 @@ recovery or retirement endpoints. Publishing, unpublishing and listener changes
 continue through the workflow lifecycle.
 
 Publishing a subscription with a legacy pause flag clears that flag and advances
-its configuration revision. Existing paused subscriptions remain stopped until
-their workflows are republished; the upgrade does not resume them automatically.
+its configuration revision. Stop event workers before upgrading. The upgrade
+also clears legacy pause flags and advances the configuration revision for
+desired, non-retired subscriptions matching their workflow's current enabled
+publication. These subscriptions resume under normal worker checks after the
+upgrade. Unpublish a workflow before upgrading if it must remain stopped.
+Disabled, retired and unpublished subscriptions remain unchanged.
 
 The worker retains subscription placement leases, partition recovery fences and
 bounded local draining. Matching records commit only after verified Temporal
