@@ -26,11 +26,13 @@ import {
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
 import { DroppableField } from '../panels/fields/DroppableField'
 import type { ActionFormData as RegistryActionFormData } from '../stepFormTypes'
+import { ScriptAffinityEnum } from '../utils/scriptExecutionProfile'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { actionFormSchema, type ActionFormData, type ActionFormValues } from './actionFormSchema'
 import { HttpCredentialSection, HttpUrlField } from './httpCredentialSection'
 import { KeyValueFields } from './KeyValueFields'
+import { ScriptExecutionTab } from './ScriptExecutionTab'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { stepHelp } from './shared/stepFieldHelp'
 import { StepFormContainer } from './shared/StepFormContainer'
@@ -399,10 +401,18 @@ function ActionFormFields({
   )
 
   const isHttpRequest = executor === ExecutorTypeEnum.HTTP_REQUEST
+  const isScript = executor === ExecutorTypeEnum.SCRIPT
   const timeoutStepType = isHttpRequest ? 'http_request' : 'script'
   const settingsContent = <StepSettingsForm timeoutStepType={timeoutStepType} supportsRetryPolicy={isHttpRequest} />
+  const executionContent = isScript ? <ScriptExecutionTab /> : undefined
 
-  return <StepFormTabsLayout parametersContent={parametersContent} settingsContent={settingsContent} />
+  return (
+    <StepFormTabsLayout
+      parametersContent={parametersContent}
+      executionContent={executionContent}
+      settingsContent={settingsContent}
+    />
+  )
 }
 
 export function ActionStepForm(props: Readonly<ActionStepFormProps>) {
@@ -413,17 +423,19 @@ export function ActionStepForm(props: Readonly<ActionStepFormProps>) {
     url: '',
     language: 'python',
     method: 'GET',
+    affinity: ScriptAffinityEnum.NONE,
     settings: {},
     ...props.initialData,
   }
 
   const handleSubmit = (data: ActionFormValues) => {
+    const isScript = data.executor === ExecutorTypeEnum.SCRIPT
     // Clean up data based on executor type (schema type is assignable to registry type)
     const cleanedData: RegistryActionFormData = {
       name: data.name,
       executor: data.executor,
-      language: data.executor === ExecutorTypeEnum.SCRIPT ? data.language : undefined,
-      code: data.executor === ExecutorTypeEnum.SCRIPT ? data.code : undefined,
+      language: isScript ? data.language : undefined,
+      code: isScript ? data.code : undefined,
       method: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.method : undefined,
       url: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.url : undefined,
       headers: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.headers : undefined,
@@ -431,6 +443,9 @@ export function ActionStepForm(props: Readonly<ActionStepFormProps>) {
       parameters: data.parameters ?? undefined,
       requiresApproval: props.initialData?.requiresApproval,
       credential_id: data.credential_id ?? undefined,
+      affinity: isScript ? data.affinity : undefined,
+      execution_target_id:
+        isScript && data.affinity === ScriptAffinityEnum.REQUIRED_TARGET ? data.execution_target_id : undefined,
       settings: {
         ...data.settings,
         retry_policy: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.settings?.retry_policy : undefined,

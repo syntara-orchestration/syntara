@@ -72,6 +72,8 @@ export default function registerActionStep() {
               code: data.code,
               credentialId: data.credential_id,
               environment: data.parameters,
+              affinity: data.affinity,
+              executionTargetId: data.execution_target_id,
               settings: data.settings,
             })
           })

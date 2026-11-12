@@ -35,6 +35,30 @@ vi.mock('../../access/useAllProjects', () => ({
   useSelectableProjects: vi.fn(),
 }))
 
+vi.mock('./useAllEnabledExecutionTargets', () => ({
+  useAllEnabledExecutionTargets: vi.fn(() => ({
+    targets: [],
+    isLoading: false,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+}))
+
+vi.mock('../../execution-plane/useExecutionTargetPermissions', () => ({
+  useExecutionTargetPermissions: vi.fn(() => ({
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+    isLoading: false,
+    tooltips: { create: '', update: '', enable: '', delete: '' },
+  })),
+}))
+
+vi.mock('@tanstack/react-router', () => ({
+  useNavigate: () => vi.fn(),
+}))
+
 // Mock ExpandableCodeEditor to use a simple textarea for testing
 vi.mock('../components/ExpandableCodeEditor', () => ({
   ExpandableCodeEditor: ({
@@ -89,6 +113,18 @@ describe('ActionStepForm', () => {
     expect(screen.getByLabelText(/Script code editor/i)).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'URL' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'HTTP Method' })).not.toBeInTheDocument()
+  })
+
+  it('shows the Execution tab for script executor', () => {
+    renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} initialData={{ executor: 'script' }} />)
+
+    expect(screen.getByRole('tab', { name: 'Execution' })).toBeInTheDocument()
+  })
+
+  it('does not show the Execution tab for HTTP request executor', () => {
+    renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} initialData={{ executor: 'http_request' }} />)
+
+    expect(screen.queryByRole('tab', { name: 'Execution' })).not.toBeInTheDocument()
   })
 
   it('submits form even with empty script (permissive schema)', async () => {

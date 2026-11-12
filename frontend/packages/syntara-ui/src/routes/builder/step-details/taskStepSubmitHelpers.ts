@@ -4,6 +4,7 @@ import { generateUUID } from '../../../utils/generateUUID'
 import { PROTOTYPE_POLLUTION_KEYS, safeJSONReviver } from '../../../utils/jsonSafeParse'
 import { parseJsonEnvironment } from '../../../utils/parseJsonEnvironment'
 import type { ActionFormData as RegistryActionFormData } from '../stepFormTypes'
+import { buildScriptExecutionProfile, parseScriptExecutionFormFields } from '../utils/scriptExecutionProfile'
 
 export { safeJSONReviver }
 
@@ -29,11 +30,14 @@ export function buildRegistryActionInitialData(
   parameters: Record<string, unknown>,
   taskData: TaskActivity
 ): Partial<RegistryActionFormData> {
+  const isScript = executor === ExecutorTypeEnum.SCRIPT
+  const executionFields = isScript ? parseScriptExecutionFormFields(parameters) : undefined
+
   return {
     name: taskData.name,
-    executor: executor === ExecutorTypeEnum.SCRIPT ? ExecutorTypeEnum.SCRIPT : ExecutorTypeEnum.HTTP_REQUEST,
-    language: executor === ExecutorTypeEnum.SCRIPT ? (parameters.language as string | undefined) : undefined,
-    code: executor === ExecutorTypeEnum.SCRIPT ? (parameters.code as string | undefined) : undefined,
+    executor: isScript ? ExecutorTypeEnum.SCRIPT : ExecutorTypeEnum.HTTP_REQUEST,
+    language: isScript ? (parameters.language as string | undefined) : undefined,
+    code: isScript ? (parameters.code as string | undefined) : undefined,
     method:
       executor === ExecutorTypeEnum.HTTP_REQUEST
         ? (parameters.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | undefined)
@@ -54,10 +58,9 @@ export function buildRegistryActionInitialData(
       return typeof parameters.body === 'string' ? parameters.body : JSON.stringify(parameters.body, null, 2)
     })(),
     credential_id: (parameters as { credential_id?: string }).credential_id ?? undefined,
-    parameters:
-      executor === ExecutorTypeEnum.SCRIPT && parameters.environment
-        ? JSON.stringify(parameters.environment, null, 2)
-        : undefined,
+    parameters: isScript && parameters.environment ? JSON.stringify(parameters.environment, null, 2) : undefined,
+    affinity: executionFields?.affinity,
+    execution_target_id: executionFields?.execution_target_id,
   }
 }
 
@@ -65,6 +68,10 @@ export function buildRegistryActivityUpdate(taskData: TaskActivity, data: Regist
   const apiHeaders = data.executor === ExecutorTypeEnum.HTTP_REQUEST ? headersEntriesToRecord(data.headers) : undefined
 
   const scriptEnv = data.executor === ExecutorTypeEnum.SCRIPT ? parseJsonEnvironment(data.parameters) : undefined
+  const executionProfile =
+    data.executor === ExecutorTypeEnum.SCRIPT
+      ? buildScriptExecutionProfile(data.affinity, data.execution_target_id)
+      : undefined
 
   return {
     ...taskData,
@@ -77,6 +84,7 @@ export function buildRegistryActivityUpdate(taskData: TaskActivity, data: Regist
             code: data.code ?? '',
             ...(data.credential_id && { credential_id: data.credential_id }),
             ...(scriptEnv && { environment: scriptEnv }),
+            ...(executionProfile && { execution_profile: executionProfile }),
           }
         : {
             method: data.method,

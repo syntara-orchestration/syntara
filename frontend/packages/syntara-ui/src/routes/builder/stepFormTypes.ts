@@ -1,5 +1,7 @@
 import type { MissedSchedulePolicy, NodeSettings } from '@syntara/contracts'
 
+import type { ScriptAffinity } from './utils/scriptExecutionProfile'
+
 export type TriggerFormData = {
   name?: string
   triggerType: string
@@ -28,5 +30,9 @@ export type ActionFormData = {
   parameters?: string
   requiresApproval?: boolean
   credential_id?: string
+  /** Script Execution tab: none lets EP place; required_target pins a target. */
+  affinity?: ScriptAffinity
+  /** Required when affinity is required_target. */
+  execution_target_id?: string
   settings?: NodeSettings
 }

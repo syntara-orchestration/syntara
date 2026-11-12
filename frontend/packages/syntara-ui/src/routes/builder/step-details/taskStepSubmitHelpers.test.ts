@@ -2,6 +2,7 @@ import { ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import type { ActionFormData } from '../stepFormTypes'
+import { ScriptAffinityEnum } from '../utils/scriptExecutionProfile'
 
 import { buildRegistryActionInitialData, buildRegistryActivityUpdate, safeJSONReviver } from './taskStepSubmitHelpers'
 
@@ -95,6 +96,20 @@ describe('taskStepSubmitHelpers', () => {
       )
       expect(data.parameters).toBeUndefined()
     })
+
+    it('hydrates affinity from execution_profile', () => {
+      const data = buildRegistryActionInitialData(
+        ExecutorTypeEnum.SCRIPT,
+        {
+          language: 'python',
+          code: 'pass',
+          execution_profile: { type: 'execution_target', execution_target_id: 'target-1' },
+        },
+        baseTask
+      )
+      expect(data.affinity).toBe(ScriptAffinityEnum.REQUIRED_TARGET)
+      expect(data.execution_target_id).toBe('target-1')
+    })
   })
 
   describe('buildRegistryActivityUpdate', () => {
@@ -109,6 +124,21 @@ describe('taskStepSubmitHelpers', () => {
       expect(activity.type).toBe(ExecutorTypeEnum.SCRIPT)
       expect(activity.name).toBe('S')
       expect((activity.parameters as { code: string }).code).toBe('pass')
+    })
+
+    it('persists execution_profile for required_target affinity', () => {
+      const data: ActionFormData = {
+        name: 'S',
+        executor: ExecutorTypeEnum.SCRIPT,
+        language: 'python',
+        code: 'pass',
+        affinity: ScriptAffinityEnum.REQUIRED_TARGET,
+        execution_target_id: 'target-1',
+      }
+      const activity = buildRegistryActivityUpdate(baseTask, data)
+      expect(activity.parameters).toMatchObject({
+        execution_profile: { type: 'execution_target', execution_target_id: 'target-1' },
+      })
     })
 
     it('converts header entries for http_request', () => {
