@@ -5,6 +5,7 @@ re-deriving the loop's decision. That is what makes it correct under
 ``continue_on_failure``, where a failed body node does not mean the loop exited.
 """
 
+import asyncio
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -38,6 +39,8 @@ def _wf(
     wf.skipped_nodes = set()
     wf.failed_nodes = {}
     wf.node_inputs = {}
+    wf.activity_input_history = {}
+    wf.activity_output_history = {}
     wf.node_control_data = {}
     wf.loop_state = {}
     wf.loop_body_map = {}
@@ -257,6 +260,49 @@ async def test_nested_loop_replays_before_inner_failed_iteration(patched_workflo
     assert result is not None
     assert result["control"]["next_port"] == "iterate"
     patched_workflow.execute_activity.assert_awaited_once()
+
+
+def test_nested_loop_feedback_preserves_parent_for_retry_path(patched_workflow) -> None:
+    wf = _wf(retry_points=["body_a"], bodies={"outer": {"inner", "body_a"}, "inner": {"body_a"}})
+    wf.loop_body_map = {"inner": "outer", "body_a": "inner"}
+    wf.node_control_data = {"outer": {"current_index": 0}, "inner": {"current_index": 1}}
+    wf._retry_selected_failure_paths = {"body_a": [[0, 1]]}
+
+    # The body's feedback edge returns to the inner controller. It must not
+    # overwrite the controller's existing membership in the outer loop.
+    wf._track_loop_body("inner", "body_a", is_loop_iterate=False)
+
+    assert wf.loop_body_map["inner"] == "outer"
+    assert wf._loop_ancestor_chain("body_a") == ["outer", "inner"]
+    assert wf._enter_live_retry_mode_at_selected_node(ActivityNode(node_id="body_a", node_type="script", parameters={}))
+    assert wf._retry_live_loop_ids == {"outer", "inner"}
+
+
+def test_root_loop_feedback_keeps_controller_entry(patched_workflow) -> None:
+    wf = _wf(retry_points=["body_a"], bodies={"loop": {"body_a"}})
+    wf.loop_body_map = {"body_a": "loop"}
+
+    wf._track_loop_body("loop", "body_a", is_loop_iterate=False)
+
+    assert wf.loop_body_map["loop"] == "loop"
+
+
+@pytest.mark.asyncio
+async def test_pending_nested_controller_prevents_duplicate_loop_schedule(patched_workflow) -> None:
+    wf = _wf(retry_points=["body_a"], bodies={"inner": {"body_a"}})
+    wf.loop_body_map = {"body_a": "inner"}
+    wf.resolver.set_namespace("body_a", {"status": "completed"})
+    graph = MagicMock()
+    pending_controller = asyncio.create_task(asyncio.Event().wait())
+
+    try:
+        wf._check_loop_body_completion("body_a", graph, {"inner": pending_controller})
+
+        graph.get_node.assert_not_called()
+    finally:
+        pending_controller.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await pending_controller
 
 
 @pytest.mark.asyncio

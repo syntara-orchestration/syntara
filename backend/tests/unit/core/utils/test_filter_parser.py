@@ -7,8 +7,10 @@ is implemented.
 
 from enum import Enum
 from unittest.mock import MagicMock
+from uuid import UUID, uuid4
 
 import pytest
+from sqlmodel import select
 
 from syntara.core.exceptions import SafeValueError
 from syntara.core.utils.filters import (
@@ -16,9 +18,11 @@ from syntara.core.utils.filters import (
     FilterOperator,
     _convert_filter_value,
     _sanitize_like_value,
+    apply_filters,
     matches_query_param,
     parse_filters,
 )
+from syntara.credentials.models.credential import Credential
 
 
 class TestFilterParser:
@@ -725,6 +729,36 @@ class TestFilterValueConversion:
         field_attr.type.python_type = None
         result = _convert_filter_value("any_value", field_attr)
         assert result == "any_value"
+
+    def test_convert_filter_value_uuid_valid(self) -> None:
+        field_attr = MagicMock()
+        field_attr.type.python_type = UUID
+        field_attr.key = "project_id"
+        value = str(uuid4())
+
+        result = _convert_filter_value(value, field_attr)
+
+        assert result == UUID(value)
+        assert isinstance(result, UUID)
+
+    def test_convert_filter_value_uuid_invalid(self) -> None:
+        field_attr = MagicMock()
+        field_attr.type.python_type = UUID
+        field_attr.key = "project_id"
+
+        with pytest.raises(SafeValueError, match="Invalid UUID value for field 'project_id'"):
+            _convert_filter_value("not-a-uuid", field_attr)
+
+    def test_uuid_equality_filter_binds_uuid(self) -> None:
+        project_id = uuid4()
+        query = apply_filters(
+            select(Credential),
+            [Filter(field="project_id", operator=FilterOperator.EQ, value=str(project_id))],
+            Credential,
+        )
+
+        compiled = query.compile()
+        assert compiled.params["project_id_1"] == project_id
 
 
 class TestSQLInjectionProtection:

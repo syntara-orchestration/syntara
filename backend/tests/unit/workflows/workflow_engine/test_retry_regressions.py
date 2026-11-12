@@ -6,6 +6,7 @@ about the definition format rather than the format itself.
 """
 
 import asyncio
+import logging
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -105,6 +106,8 @@ def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     wf.loop_body_map = {}
     wf.loop_iteration_results = {}
     wf.node_inputs = {}
+    wf.activity_input_history = {}
+    wf.activity_output_history = {}
     # A converge reads this to tell whether a loop predecessor is still iterating,
     # so it must exist even on a workflow built without __init__.
     wf.node_control_data = {}
@@ -144,6 +147,16 @@ def test_multi_node_body_remains_eligible_for_per_iteration_replay() -> None:
 
     # Bodies restore per iteration now, so they are eligible rather than excluded.
     assert {"body_a", "body_b", "body_c"} <= restorable
+
+
+@pytest.mark.asyncio
+async def test_restored_skipped_node_uses_supported_structured_logger_arguments() -> None:
+    """A stdlib logger must not fail a workflow task while recording a restored skip."""
+    wf = _wf()
+
+    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as temporal_workflow:
+        temporal_workflow.logger = logging.getLogger("restored-skipped-node-test")
+        await wf._process_restored_terminal_task("not_run", "skipped", MagicMock(), {})
 
 
 # ---------------------------------------------------------------------------
