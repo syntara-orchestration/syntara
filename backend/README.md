@@ -805,20 +805,14 @@ the Temporal worker with:
 ```dotenv
 APP_SCRIPT_NODES_ENABLED=true
 APP_SCRIPT_OPENSHIFT_INTEGRATION_ID=<integration UUID>
-APP_SCRIPT_OPENSHIFT_PORT_FORWARD=false
 ```
 
 The credential needs create/get/delete access to pods in that namespace. Workers
-normally run inside the cluster with access to pod TCP port 50051. For a local
-development worker without pod-network access, set
-`APP_SCRIPT_OPENSHIFT_PORT_FORWARD=true`. This starts an ephemeral loopback
-`oc port-forward` tunnel per script pod, using the worker host's active oc login
-and create permission on `pods/portforward`. Health, Execute and Cancel still use
-SDK gRPC through that tunnel; it is closed before pod cleanup. This mode requires
-the `oc` executable on the worker PATH and is disabled by default.
-No Service, external
-Route, or pod-log permission is needed. The current image serves plaintext gRPC;
-keep it on the trusted workload network and restrict access with network policies.
+run inside the cluster and need access to the cluster API on TCP 443 and script
+pod IPs on TCP 50051. Script execution connects directly to the pod IP using SDK
+gRPC. No Service, external Route, or pod-log permission is needed. The current
+image serves plaintext gRPC; keep it on the trusted workload network and restrict
+access with network policies.
 
 Operators must configure an approved image implementing `syntara.container/v1alpha1`
 and advertising `syntara.script-python.script-python` for Python or
@@ -879,9 +873,8 @@ do not receive that token. Private workload images require a pull secret linked
 to the namespace's default service account, since the script pod does not specify
 its own image pull secret.
 
-Verify `APP_SCRIPT_NODES_ENABLED=true` and
-`APP_SCRIPT_OPENSHIFT_PORT_FORWARD=false` in the running worker. Allow worker
-access to the cluster API on TCP 443 and script pod IPs on TCP 50051.
+Verify `APP_SCRIPT_NODES_ENABLED=true` in the running worker. Allow worker access
+to the cluster API on TCP 443 and script pod IPs on TCP 50051.
 
 ```bash
 oc get pods -n "$AO_NS" -o wide

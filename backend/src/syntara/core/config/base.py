@@ -1504,11 +1504,6 @@ class WorkflowEngineSettings(BaseSettings):
         description="Default OpenShift integration for script execution; auto-discovers if blank",
     )
 
-    script_openshift_port_forward: bool = Field(
-        default=False,
-        description="Development only: tunnel script gRPC through local oc login instead of connecting to pod IPs",
-    )
-
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]
         default="http://localhost:8000/api/v1",
         description="Base URL for Agent Orchestrator API",

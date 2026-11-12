@@ -40,7 +40,7 @@ async def test_activity_dispatch_preserves_outputs(return_code):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("scenario", ["success", "failed", "timeout", "api_error", "cancel", "port_forward"])
+@pytest.mark.parametrize("scenario", ["success", "failed", "timeout", "api_error", "cancel"])
 async def test_remote_lifecycle(scenario):
     import asyncio
 
@@ -66,12 +66,7 @@ async def test_remote_lifecycle(scenario):
         script_image="registry.example/script:test",
     )
     client = httpx.AsyncClient(base_url=config.base_url, transport=httpx.MockTransport(handler))
-    forward = MagicMock()
-    forward.__aenter__ = AsyncMock(return_value="127.0.0.1:43210")
-    forward.__aexit__ = AsyncMock(return_value=False)
     with (
-        patch.object(remote, "get_settings") as settings,
-        patch.object(remote, "script_port_forward", return_value=forward) as port_forward,
         patch.object(remote, "_connection", new=AsyncMock(return_value=(config, "secret-token"))),
         patch.object(remote.httpx, "AsyncClient", return_value=client),
         patch.object(remote.activity, "info", return_value=MagicMock()),
@@ -85,8 +80,7 @@ async def test_remote_lifecycle(scenario):
             ),
         ) as invoke,
     ):
-        settings.return_value.script_openshift_port_forward = scenario == "port_forward"
-        if scenario in {"success", "port_forward"}:
+        if scenario == "success":
             result = await remote.execute_openshift_script("bash", "echo hello", {}, 5, 1000)
             assert result["stdout"] == "hello"
         else:
@@ -103,18 +97,12 @@ async def test_remote_lifecycle(scenario):
     container = pod["spec"]["containers"][0]
     assert "command" not in container
     assert "env" not in container
-    if scenario in {"success", "port_forward"}:
-        expected = "127.0.0.1:43210" if scenario == "port_forward" else "10.0.0.2:50051"
-        assert invoke.await_args.args[0] == expected
+    if scenario == "success":
+        assert invoke.await_args.args[0] == "10.0.0.2:50051"
         invocation = invoke.await_args.args[1]
         assert invocation.inputs["code"] == "echo hello"
         assert "language" not in invocation.inputs
         assert invocation.step_revision_id == "syntara.script-bash.script-bash"
-    if scenario == "port_forward":
-        assert port_forward.call_args.args[:2] == (config.base_url, config.namespace)
-        forward.__aexit__.assert_awaited_once()
-    else:
-        port_forward.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -198,10 +186,8 @@ async def test_language_selects_image_and_contract(language):
         patch.object(remote.httpx, "AsyncClient", return_value=client),
         patch.object(remote.activity, "info", return_value=MagicMock()),
         patch.object(remote.activity, "heartbeat"),
-        patch.object(remote, "get_settings") as settings,
         patch.object(remote, "invoke_script", new=AsyncMock(return_value={})) as invoke,
     ):
-        settings.return_value.script_openshift_port_forward = False
         await remote.execute_openshift_script(language, "code", {"KEY": "value"}, 5, 1000)
     import json
 
