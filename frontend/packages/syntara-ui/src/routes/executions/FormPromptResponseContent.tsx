@@ -193,7 +193,6 @@ function FormPromptResponseBody({
             <StackItem>
               {hasUnresolvedDynamicOptions ? <FormPromptUnresolvedDynamicOptionsAlert /> : null}
               <FormPromptPendingResponseForm
-                cssOverrideSource={prompt.css_override}
                 responseFormId={responseFormId}
                 definition={prompt.form_definition}
                 submitLabel={submitLabel}

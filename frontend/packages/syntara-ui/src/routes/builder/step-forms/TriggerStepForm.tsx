@@ -484,7 +484,6 @@ export function TriggerStepForm({
         message: isFormTrigger ? data.message : undefined,
         submit_label: isFormTrigger ? data.submit_label : undefined,
         success_message: isFormTrigger ? data.success_message : undefined,
-        css_override: isFormTrigger ? data.css_override : undefined,
       }
       onSubmit(cleanedData)
     },

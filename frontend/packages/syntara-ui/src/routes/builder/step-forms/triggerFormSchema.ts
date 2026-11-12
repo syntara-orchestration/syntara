@@ -37,7 +37,6 @@ const triggerFormSchemaBase = z.object({
   message: z.string().max(2000).optional(),
   submit_label: z.string().max(64).optional(),
   success_message: z.string().max(500).optional(),
-  css_override: z.string().max(10000).optional(),
 })
 
 function validateInputSchemaJson(schemaText: string | undefined, ctx: z.RefinementCtx) {

@@ -9,7 +9,6 @@ export type FormTriggerPresentation = {
   message?: string | null
   submitLabel?: string | null
   successMessage?: string | null
-  cssOverride?: string | null
 }
 
 type TriggerParametersLike = {
@@ -17,7 +16,6 @@ type TriggerParametersLike = {
   message?: string | null
   submit_label?: string | null
   success_message?: string | null
-  css_override?: string | null
   input_schema?: Record<string, unknown>
 }
 
@@ -40,7 +38,6 @@ export function readFormTriggerPresentation(parameters?: TriggerParametersLike):
     message: parameters.message,
     submitLabel: parameters.submit_label,
     successMessage: parameters.success_message,
-    cssOverride: parameters.css_override,
   }
 }
 

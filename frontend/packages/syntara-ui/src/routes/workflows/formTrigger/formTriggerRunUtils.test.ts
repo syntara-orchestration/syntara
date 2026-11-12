@@ -40,7 +40,6 @@ describe('formTriggerRunUtils', () => {
         message: 'Please complete',
         submit_label: 'Go',
         success_message: 'Thanks',
-        css_override: '.x {}',
       })
 
       expect(result).toEqual({
@@ -50,7 +49,6 @@ describe('formTriggerRunUtils', () => {
         message: 'Please complete',
         submitLabel: 'Go',
         successMessage: 'Thanks',
-        cssOverride: '.x {}',
       })
     })
   })

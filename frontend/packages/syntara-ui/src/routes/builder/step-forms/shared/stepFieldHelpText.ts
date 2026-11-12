@@ -108,8 +108,6 @@ export const FORM_PROMPT_SUBMIT_LABEL_HELP = 'Label on the submit button when th
 
 export const FORM_PROMPT_SUCCESS_MESSAGE_HELP = 'Message shown after the responder successfully submits the form.'
 
-export const FORM_PROMPT_CSS_OVERRIDE_HELP = 'Custom CSS applied to the form view when presented to responders.'
-
 export const LOOP_ITEMS_HELP =
   'Enter an expression that resolves to a list of items, for example ${previous_step.server_list}. The loop will iterate once for each item in the list.'
 
