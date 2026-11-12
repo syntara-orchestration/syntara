@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import Select
 from sqlalchemy.dialects import postgresql
 
-from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import (
+from syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity import (
     probe_retry_loop_iteration,
 )
 
@@ -32,7 +32,7 @@ async def _run(
         yield session
 
     with patch(
-        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        "syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
         answer = await probe_retry_loop_iteration("src-1", iterate_entry_ids, child_loop_entry_ids or [], path)

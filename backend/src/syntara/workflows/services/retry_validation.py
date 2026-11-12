@@ -89,7 +89,7 @@ from syntara.workflows.utils.loop_iteration_names import (
     strip_iteration_suffix,
 )
 from syntara.workflows.utils.template_refs import FieldPath, find_template_refs, paths_overlap
-from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
+from syntara.workflow_core.utils.credential_scrubber import REDACTED
 
 if TYPE_CHECKING:
     from uuid import UUID

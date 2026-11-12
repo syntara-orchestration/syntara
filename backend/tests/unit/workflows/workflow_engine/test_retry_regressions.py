@@ -14,9 +14,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
 # ---------------------------------------------------------------------------
 # Helpers that build realistic definitions
@@ -127,8 +127,8 @@ def _retry(*eligible: str) -> dict[str, Any]:
 @pytest.fixture
 def mock_wf() -> Generator[MagicMock, None, None]:
     with (
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched,
-        patch("syntara.workflows.workflow_engine.retry_mixin.workflow", patched),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as patched,
+        patch("syntara.workflow_runtime.engines.temporal.retry_mixin.workflow", patched),
     ):
         patched.logger = MagicMock()
         yield patched
@@ -154,7 +154,7 @@ async def test_restored_skipped_node_uses_supported_structured_logger_arguments(
     """A stdlib logger must not fail a workflow task while recording a restored skip."""
     wf = _wf()
 
-    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as temporal_workflow:
+    with patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as temporal_workflow:
         temporal_workflow.logger = logging.getLogger("restored-skipped-node-test")
         await wf._process_restored_terminal_task("not_run", "skipped", MagicMock(), {})
 
@@ -508,7 +508,7 @@ class TestNoOverwrittenFailureNamespaceEntry:
     def test_the_namespace_comes_from_the_restored_output_builder(self) -> None:
         import inspect
 
-        from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+        from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 
         source = inspect.getsource(OrchestratorWorkflow._handle_node_failure)
         assignments = [line.strip() for line in source.splitlines() if line.strip().startswith("namespace_entry =")]
@@ -651,7 +651,7 @@ def test_fail_converge_does_not_detach_selected_retry_path() -> None:
     wf._timed_out_converge_nodes = set()
     pending: dict[str, asyncio.Task[Any]] = {"b2": MagicMock(spec=asyncio.Task)}
 
-    with patch("syntara.workflows.workflow_engine.converge_mixin.workflow") as patched:
+    with patch("syntara.workflow_runtime.engines.temporal.converge_mixin.workflow") as patched:
         patched.logger = MagicMock()
         wf._fail_converge_node("join", "gate failed", graph, pending)
 

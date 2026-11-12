@@ -479,7 +479,7 @@ class TestUnselectedTriggerSkipping:
         }
 
         with patch(
-            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
             new_callable=AsyncMock,
             return_value={"output": {"status": "ok"}},
         ) as execute_activity:

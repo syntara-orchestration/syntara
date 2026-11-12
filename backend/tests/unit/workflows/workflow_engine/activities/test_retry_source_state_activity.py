@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from syntara.workflows.models.activity_execution import ActivityStatus
-from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import (
+from syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity import (
     fetch_retry_source_state_activity,
 )
 
@@ -36,7 +36,7 @@ async def _run(
         yield session
 
     with patch(
-        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        "syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
         states = await fetch_retry_source_state_activity("src-1")

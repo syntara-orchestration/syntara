@@ -17,11 +17,11 @@ from temporalio.exceptions import ApplicationError
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
-from syntara.workflows.workflow_engine.retry_mixin import (
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.models import ActivityName, NodeType
+from syntara.workflow_runtime.engines.temporal.retry_mixin import (
     _CONTROL_NODE_TYPES_FOR_RETRY,
     WorkflowRetryMixin,
 )
@@ -33,8 +33,8 @@ from .conftest import init_workflow_runtime
 def mock_wf() -> Generator[MagicMock, None, None]:
     """Patch the Temporal workflow module so execute_activity is awaitable."""
     with (
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched,
-        patch("syntara.workflows.workflow_engine.retry_mixin.workflow", patched),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as patched,
+        patch("syntara.workflow_runtime.engines.temporal.retry_mixin.workflow", patched),
     ):
         patched.logger = MagicMock()
         yield patched
@@ -605,8 +605,8 @@ def test_has_iteration_suffix(*, activity_name: str, expected: bool) -> None:
 
 def _chain_graph(*, cof_nodes: set[str] | None = None) -> WorkflowGraph:
     """Build trigger -> step_1 -> step_2 -> step_3, optionally with CoF on some nodes."""
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
     cof_nodes = cof_nodes or set()
     backend = InMemoryGraphBackend()
@@ -693,8 +693,8 @@ def test_control_nodes_are_never_restored(node_type: str) -> None:
     downstream expressions would resolve against a namespace the retry never
     populated.
     """
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
@@ -745,8 +745,8 @@ def _loop_graph() -> WorkflowGraph:
     ``iterate`` port, with the feedback edges stripped at graph build time. The
     loop itself exits to ``step_2`` via its ``complete`` port.
     """
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
@@ -815,8 +815,8 @@ async def test_restoring_a_loop_body_uses_its_canonical_temporal_path(mock_wf: M
 
 def test_a_loop_node_uses_its_probe_instead_of_generic_node_restoration() -> None:
     """The loop must reach its executor so it can probe each source iteration."""
-    from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
-    from syntara.workflows.workflow_engine.retry_mixin import _CONTROL_NODE_TYPES_FOR_RETRY
+    from syntara.workflow_core.models import NodeType
+    from syntara.workflow_runtime.engines.temporal.retry_mixin import _CONTROL_NODE_TYPES_FOR_RETRY
 
     wf = _make_workflow(_retry("step_2"))
     graph = _loop_graph()
@@ -1224,7 +1224,7 @@ class TestReplayedTimestampUpdateHandler:
             seen["timeout"] = timeout
 
         with patch(
-            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.wait_condition",
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.wait_condition",
             _wait,
         ):
             result = await cast("Any", wf).get_replayed_node_timestamps_when_ready(activity_id)
@@ -1476,8 +1476,8 @@ async def test_restored_unselected_failure_replays_exclusive_recorded_successor(
     import asyncio
     from unittest.mock import AsyncMock
 
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
     backend = InMemoryGraphBackend()
     backend.add_node("east", {"id": "east", "type": "script", "parameters": {}})
@@ -1741,8 +1741,8 @@ async def test_a_restored_completion_does_not_stash_its_output_as_failure_fallba
 
 def _converge_fanin_graph() -> WorkflowGraph:
     """b1 and b2 both feed join (converge, strategy=any, n=2), then step_3."""
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
@@ -1795,8 +1795,8 @@ class TestConvergeAlwaysGoesThroughItsGate:
 
 def _approval_graph() -> WorkflowGraph:
     """Trigger -> approval -> (approved | rejected) -> failed_step."""
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
@@ -1856,7 +1856,7 @@ def test_a_restored_approval_would_schedule_both_of_its_branches() -> None:
     approval unsafe. If this ever starts returning one branch, the exclusion above is
     no longer strictly necessary, though it would still be the safer default.
     """
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     graph = _approval_graph()
     approval = ActivityNode("approval", "approval", {})
@@ -1872,7 +1872,7 @@ def test_a_wait_node_is_restored_rather_than_rerun() -> None:
     the full window again or skip it entirely depending on how far the clock has
     moved since. Restoring keeps what actually happened.
     """
-    from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+    from syntara.workflow_core.models import NodeType
 
     assert NodeType.WAIT not in _CONTROL_NODE_TYPES_FOR_RETRY
     assert NodeType.APPROVAL not in _CONTROL_NODE_TYPES_FOR_RETRY

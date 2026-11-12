@@ -11,13 +11,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from syntara.workflows.models.activity_execution import ActivityStatus
-from syntara.workflows.workflow_engine.activities.retry_node_replay_activity import (
+from syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity import (
     _result_digest,
     fetch_retry_converge_metadata_activity,
     replay_retry_node_activity,
     retry_control_ports,
 )
-from syntara.workflows.workflow_engine.constants import RESTORABLE_SOURCE_STATUSES
+from syntara.workflow_runtime.engines.temporal.constants import RESTORABLE_SOURCE_STATUSES
 
 
 class _Row:
@@ -72,7 +72,7 @@ async def _run(
         yield session
 
     with patch(
-        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        "syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
         return await replay_retry_node_activity("src-1", node_id, wanted) if node_id is not None else None
@@ -249,7 +249,7 @@ async def test_the_lookup_filters_by_temporal_id_in_the_query() -> None:
         yield session
 
     with patch(
-        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        "syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
         assert await replay_retry_node_activity("src-1", "ui label", "step_target") is None
@@ -515,7 +515,7 @@ async def _run_ports(pairs: list[Any]) -> dict[str, str]:
         yield session
 
     with patch(
-        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        "syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
         return await retry_control_ports("src-1")
@@ -580,7 +580,7 @@ async def _run_metadata(
         yield session
 
     with patch(
-        "syntara.workflows.workflow_engine.activities.retry_node_replay_activity.get_db",
+        "syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity.get_db",
         mock_get_db,
     ):
         return await fetch_retry_converge_metadata_activity(
