@@ -201,7 +201,8 @@ describe('RolesTab', () => {
             {
               ...mockRoles[0],
               name: 'step-author',
-              description: 'Author all workflow step types',
+              description:
+                'Author all workflow step types. Step authoring depends on this role: restrict step types with deny policies instead of removing it.',
               policies: ['step_type:write:any'],
               scope: 'system',
               is_system_scoped: true,
