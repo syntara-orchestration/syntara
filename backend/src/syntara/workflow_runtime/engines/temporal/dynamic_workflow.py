@@ -386,17 +386,15 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             )
             return
 
-        self.resolver.set_namespace(completed_node_id, {**output, "status": "completed"})
-        self.activity_output_history.setdefault(completed_node_id, []).append(
-            copy.deepcopy({**output, "status": "completed"})
-        )
+        completed_output = {**output, "status": "completed"}
+        self.resolver.set_namespace(completed_node_id, completed_output)
+        self.activity_output_history.setdefault(completed_node_id, []).append(copy.deepcopy(completed_output))
         completed_node = graph.get_node(completed_node_id)
         if completed_node.type == NodeType.APPROVAL:
             history_activity_id = self._approval_activity_id(completed_node_id)
             if history_activity_id != completed_node_id:
-                self.activity_output_history.setdefault(history_activity_id, []).append(
-                    copy.deepcopy({**output, "status": "completed"})
-                )
+                self.activity_output_history.setdefault(history_activity_id, []).append(copy.deepcopy(completed_output))
+        self._record_occurrence_aliases(completed_node_id, output=completed_output)
         workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
         await self._schedule_successors(completed_node_id=completed_node_id, graph=graph, pending_tasks=pending_tasks)
         self._cancel_skipped_pending_tasks(pending_tasks)
@@ -423,7 +421,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         if restored_status == ActivityStatus.SKIPPED.value:
             workflow.logger.info(
                 f"Node {node_id} restored as skipped, not scheduling successors",
-                pending=list(pending_tasks.keys()),
+                extra={"pending": list(pending_tasks.keys())},
             )
             self._cancel_skipped_pending_tasks(pending_tasks)
             return
@@ -550,6 +548,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
 
         self.resolver.set_namespace(node_id, namespace_entry)
         self._record_failure_history(node_id, namespace_entry, graph)
+        self._record_occurrence_aliases(node_id, output=namespace_entry)
         self._route_failure_after_recording(
             node_id, graph, is_cancellation=is_cancellation, continue_on_failure=continue_on_failure
         )
@@ -601,6 +600,18 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             history_activity_id = self._approval_activity_id(node_id)
         if history_activity_id and history_activity_id != node_id:
             self.activity_output_history.setdefault(history_activity_id, []).append(copy.deepcopy(namespace_entry))
+
+    def _record_input_history(self, node: ActivityNode, resolved_parameters: dict[str, Any]) -> None:
+        """Keep resolved inputs available to iteration-specific sync queries."""
+        self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
+        self.activity_input_history.setdefault(node.id, []).append(copy.deepcopy(resolved_parameters))
+        if node.type == NodeType.APPROVAL:
+            history_activity_id = self._approval_activity_id(node.id)
+            if history_activity_id != node.id:
+                self.activity_input_history.setdefault(history_activity_id, []).append(
+                    copy.deepcopy(resolved_parameters)
+                )
+        self._record_occurrence_aliases(node.id, inputs=self.node_inputs[node.id])
 
     def _route_failure_after_recording(
         self,
@@ -975,8 +986,13 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             self.loop_body_map[successor_id] = completed_node_id
         elif completed_node_id in self.loop_body_map:
             parent_loop_id = self.loop_body_map[completed_node_id]
-            self.loop_body_map[successor_id] = parent_loop_id
-            workflow.logger.info(f"Node {successor_id} transitively marked as loop body of {parent_loop_id}")
+            # A loop body's feedback edge points back to its controller. Keep
+            # that controller's existing parent when it is itself nested; replacing
+            # it with itself loses the outer iteration from retry paths. Root loops
+            # still get the self-entry used to guard their pending controller task.
+            if successor_id != parent_loop_id or successor_id not in self.loop_body_map:
+                self.loop_body_map[successor_id] = parent_loop_id
+                workflow.logger.info(f"Node {successor_id} transitively marked as loop body of {parent_loop_id}")
 
     def _should_skip_successor(
         self,
@@ -1323,7 +1339,10 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # Find all loop body nodes
         loop_body_nodes = [node_id for node_id, parent in self.loop_body_map.items() if parent == loop_id]
 
-        return any(node_id in pending_tasks for node_id in loop_body_nodes)
+        # The feedback edge schedules the controller itself. For a nested loop,
+        # its parent mapping must remain intact, so it is not necessarily present
+        # among its own body nodes while that task is pending.
+        return loop_id in pending_tasks or any(node_id in pending_tasks for node_id in loop_body_nodes)
 
     def _clear_loop_body(self, loop_id: str) -> None:
         """Clear loop body nodes from tracking to allow re-execution.
@@ -2061,14 +2080,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             self._apply_input_overrides(node, resolved_parameters)
 
         timeout_seconds = resolve_timeout(node, self._runtime_settings)
-        self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
-        self.activity_input_history.setdefault(node.id, []).append(copy.deepcopy(resolved_parameters))
-        if node.type == NodeType.APPROVAL:
-            history_activity_id = self._approval_activity_id(node.id)
-            if history_activity_id != node.id:
-                self.activity_input_history.setdefault(history_activity_id, []).append(
-                    copy.deepcopy(resolved_parameters)
-                )
+        self._record_input_history(node, resolved_parameters)
 
         result = await self._dispatch_node(node, resolved_parameters, graph, timeout_seconds)
         return self._process_node_result(node, result)
@@ -2288,6 +2300,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         control_data = result.get("control")
         if control_data:
             self.node_control_data[node.id] = control_data
+            self._record_occurrence_aliases(node.id, control=control_data)
 
         output_data = result.get("output", result)
 

@@ -23,15 +23,17 @@ from syntara.workflow_runtime.engines.temporal.services.activity_execution_synch
 )
 from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import (
     _PENDING_ACTIVITY_STATE_STARTED as STARTED_STATE,
-)
-    _PENDING_ACTIVITY_STATE_STARTED as STARTED_STATE,
-)
-from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import (
     ActivitySyncService,
     ExecutionMonitorMetadata,
     SyntheticActivityStarted,
     SyntheticPartialOutput,
 )
+from syntara.workflow_runtime.engines.utils.timeout_messages import (
+    build_timeout_error_message,
+    format_timeout_friendly,
+)
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import retry_loop_record_activity_id
 from syntara.workflow_runtime.engines.utils.timeout_messages import (
     build_timeout_error_message,
@@ -6595,13 +6597,16 @@ class TestReplayedNodeStateOverride:
         self.service._apply_replayed_state(
             {
                 "status": "skipped",
-                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                # A skipped source node never started; do not keep the replay
+                # activity's later start time beside this earlier completion.
+                "started_at": None,
                 "completed_at": datetime(2026, 1, 1, 0, 1, 0, tzinfo=UTC),
             },
             activity_data,
         )
 
         assert activity_data["status"] == ActivityStatus.SKIPPED
+        assert activity_data["started_at"] is None
         assert activity_data["completed_at"] == datetime(2026, 1, 1, 0, 1, 0, tzinfo=UTC)
 
     def test_apply_restores_an_unselected_failure_with_its_reason(self) -> None:
@@ -7187,3 +7192,25 @@ class TestInitializeMonitoringSetsRetryFlag:
         await service._initialize_monitoring(uuid4())
 
         handle.query.assert_awaited_once_with("is_retry_from_failure")
+
+
+class TestOccurrenceQueryId:
+    """Loop body I/O must be loaded from the Temporal ID, not the live canvas slot."""
+
+    def test_loop_body_uses_temporal_id(self) -> None:
+        assert (
+            ActivityExecutionSyncMixin._occurrence_query_id(
+                {"activity_id": "body", "temporal_activity_id": "body_iter_0"},
+                is_body_iteration=True,
+            )
+            == "body_iter_0"
+        )
+
+    def test_non_body_keeps_canvas_id(self) -> None:
+        assert (
+            ActivityExecutionSyncMixin._occurrence_query_id(
+                {"activity_id": "loop", "temporal_activity_id": "loop_iter_0"},
+                is_body_iteration=False,
+            )
+            == "loop"
+        )
