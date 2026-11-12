@@ -846,6 +846,23 @@ def test_non_loop_successors_of_a_loop_stay_restorable() -> None:
     assert restorable == {"body_a", "loop_1", "step_2"}
 
 
+def test_skipped_loop_successors_run_after_retrying_a_body_failure() -> None:
+    """A body failure can leave completion successors skipped before they run."""
+    downstream = _make_workflow(_retry("body_b"))
+    graph = _loop_graph()
+    downstream._loop_bodies = {"loop_1": {"body_a", "body_b"}}
+    downstream._retry_source_statuses = {
+        "body_a": ActivityStatus.COMPLETED.value,
+        "body_b": ActivityStatus.FAILED.value,
+        "step_2": ActivityStatus.SKIPPED.value,
+    }
+
+    restorable = downstream._retry_restorable_nodes(graph)
+
+    assert "step_2" not in restorable
+    assert downstream._should_restore_node("step_2", graph) is False
+
+
 # ---------------------------------------------------------------------------
 # Restoring a node: fetch, inject, and the fall-through cases
 # ---------------------------------------------------------------------------

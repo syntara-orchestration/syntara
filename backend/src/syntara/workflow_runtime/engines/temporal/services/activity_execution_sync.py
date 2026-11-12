@@ -453,7 +453,16 @@ class ActivityExecutionSyncMixin:
                 activity_data["error_details"] = error_details
 
         preserve_timestamp_values = bool(replayed_state.get("_preserve_timestamp_values"))
-        if replayed_state.get("started_at") is not None or preserve_timestamp_values:
+        # A replayed terminal node may never have started in the source run (for
+        # example, a branch skipped after its sibling failed). Clear the synthetic
+        # replay activity's start time in that case; otherwise its current-run start
+        # can be later than the source completion time and violate the timestamp
+        # ordering constraint when the restored row is persisted.
+        if (
+            replayed_state.get("started_at") is not None
+            or preserve_timestamp_values
+            or (source_status in RESTORABLE_SOURCE_STATUSES and "started_at" in replayed_state)
+        ):
             activity_data["started_at"] = replayed_state.get("started_at")
         # Applied for any terminal status, not just COMPLETED: a restored skip or
         # failure carries the source time too, and stamping this run's time instead
@@ -650,11 +659,12 @@ class ActivityExecutionSyncMixin:
         if existing.status in TERMINAL_ACTIVITY_STATUSES and not loop_control_iterating and not is_new:
             return None
 
-        input_data, output_data = await self._resolve_activity_io(handle, activity_id, activity_data, existing)
+        query_id = self._occurrence_query_id(activity_data, is_body_iteration=is_body_iteration)
+        input_data, output_data = await self._resolve_activity_io(handle, query_id, activity_data, existing)
         control_data = (
             await self._resolve_activity_control(
                 handle,
-                activity_id,
+                query_id,
                 activity_data,
                 existing,
             )
@@ -714,6 +724,22 @@ class ActivityExecutionSyncMixin:
         else:
             output_data = existing.output_data
         return input_data, output_data
+
+    @staticmethod
+    def _occurrence_query_id(activity_data: dict[str, Any], *, is_body_iteration: bool) -> str:
+        """Return the workflow-state key for this activity event.
+
+        Loop body occurrences share a canvas ID whose live slot is overwritten
+        on the next turn. Query the Temporal activity ID so delayed history
+        sync still loads that occurrence's input, output, and control data.
+        """
+        activity_id = str(activity_data["activity_id"])
+        if not is_body_iteration:
+            return activity_id
+        temporal_id = activity_data.get("temporal_activity_id")
+        if isinstance(temporal_id, str) and temporal_id:
+            return temporal_id
+        return activity_id
 
     async def _resolve_activity_io(
         self,
