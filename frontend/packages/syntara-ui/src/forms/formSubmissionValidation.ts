@@ -22,8 +22,6 @@ function isEmptyValue(value: unknown): value is '' | null | undefined | never[] 
 
 const TRIM_ON_SUBMIT_FIELD_TYPES: ReadonlySet<FormField['type']> = new Set([
   FormFieldTypeEnum.TEXT,
-  FormFieldTypeEnum.TEXTAREA,
-  FormFieldTypeEnum.MASKED_TEXT,
   FormFieldTypeEnum.EMAIL,
 ])
 
