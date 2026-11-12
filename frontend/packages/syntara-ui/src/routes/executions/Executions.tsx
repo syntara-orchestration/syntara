@@ -152,23 +152,27 @@ export default function Executions() {
   }
 
   const listError = executionsQuery.error
-  useApiErrorAlert(listError, { title: 'Unable to load workflow runs', suppress503: true })
+  const listErrorMessage = getExecutionsListLoadErrorMessage(listError)
+  useApiErrorAlert(listError, {
+    title: 'Unable to load workflow runs',
+    message: listErrorMessage,
+    suppress503: true,
+  })
 
   const queryState = (() => {
     if (listError) {
-      const message = getExecutionsListLoadErrorMessage(listError)
       if (isServiceUnavailableError(listError)) {
-        return <SynEmptyStateServiceUnavailable description={message} showAdminHint={false} />
+        return <SynEmptyStateServiceUnavailable description={listErrorMessage} showAdminHint={false} />
       }
       if (isForbiddenError(listError)) {
-        return <SynEmptyStateAccessDenied description={message} />
+        return <SynEmptyStateAccessDenied description={listErrorMessage} />
       }
       return (
         <SynErrorState
           title="Unable to load workflow runs"
           message={{
             status: getErrorStatus(listError),
-            detail: message,
+            detail: listErrorMessage,
             retryable: isRetryableError(listError),
           }}
           onRetry={() => detachPromise(executionsQuery.refetch())}
