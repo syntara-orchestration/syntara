@@ -130,6 +130,11 @@ export async function routeFallbackContinueScenario(
     formPromptNodeId = 'collect_input',
   }: { executionId: string; promptId: string; fallbackStepName: string; formPromptNodeId?: string }
 ): Promise<void> {
+  // Real-backend runs keep the execution paused in Temporal; live WS snapshots override
+  // patched REST responses in the header badge (useExecutionWithLiveStatus). Drop WS
+  // so route.fetch → fulfill fixtures stay authoritative (see execution-details-filtering.spec.ts).
+  await app.routeWebSocket(`**/ws/workflows/v1/executions/${executionId}**`, () => {})
+
   await app.route(`**/api/v1/executions/${executionId}**`, async (route) => {
     if (!isExecutionDetailGet(route)) {
       await route.continue()
