@@ -89,7 +89,7 @@ describe('RetryFromFailureSidePanel', () => {
     ).toBeInTheDocument()
   })
 
-  it('defaults the retry scope to all affected branches', async () => {
+  it('defaults the retry scope to all affected steps', async () => {
     const user = userEvent.setup()
     vi.mocked(useRetryFromFailurePreview).mockReturnValue({
       preview: {
@@ -118,7 +118,7 @@ describe('RetryFromFailureSidePanel', () => {
     })
     renderPanel()
 
-    expect(screen.getByRole('radio', { name: 'Retry all affected branches' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Retry from all affected steps' })).toBeChecked()
     expect(screen.getByText('5 steps will be retried')).toBeInTheDocument()
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
 
@@ -142,7 +142,7 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
   })
 
-  it('previews an exact selected subset and retries only the checked branches', async () => {
+  it('previews an exact selected subset and retries only the checked steps', async () => {
     const user = userEvent.setup()
     const onRetryPreviewPointIdsChange = vi.fn()
     const allPoints = ['step-1', 'step-2']
@@ -168,7 +168,7 @@ describe('RetryFromFailureSidePanel', () => {
 
     await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith(allPoints))
 
-    await user.click(screen.getByRole('radio', { name: 'Choose branches' }))
+    await user.click(screen.getByRole('radio', { name: 'Choose steps' }))
     await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith([]))
     await user.click(screen.getByRole('checkbox', { name: 'First Step' }))
     await waitFor(() => expect(onRetryPreviewPointIdsChange).toHaveBeenLastCalledWith(['step-1']))
@@ -176,7 +176,7 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByText('4 steps will be retried')).toBeInTheDocument()
     expect(screen.getByText('3 completed results retained')).toBeInTheDocument()
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Retry plan updated. 1 selected branch. 4 steps to retry. Retry starts at First Step. 3 completed results retained.'
+      'Retry plan updated. 1 selected step. 4 steps to retry. Retry starts at First Step. 3 completed results retained.'
     )
     const retryStartsAt = screen.getByTestId('retry-starts-at')
     expect(retryStartsAt).toHaveTextContent('First Step')
@@ -187,14 +187,14 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByText('5 steps will be retried')).toBeInTheDocument()
     expect(screen.getByText('2 completed results retained')).toBeInTheDocument()
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Retry plan updated. 2 selected branches. 5 steps to retry. Retry starts at First Step, Second Step. 2 completed results retained.'
+      'Retry plan updated. 2 selected steps. 5 steps to retry. Retry starts at First Step, Second Step. 2 completed results retained.'
     )
 
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
     expect(mockHandleRetry).toHaveBeenCalledWith(['step-1', 'step-2'], {})
   })
 
-  it('requires a selected branch before showing a subset plan', async () => {
+  it('requires a selected step before showing a subset plan', async () => {
     const user = userEvent.setup()
     vi.mocked(useRetryFromFailurePreview).mockReturnValue({
       preview: {
@@ -209,9 +209,9 @@ describe('RetryFromFailureSidePanel', () => {
     })
     renderPanel()
 
-    await user.click(screen.getByRole('radio', { name: 'Choose branches' }))
+    await user.click(screen.getByRole('radio', { name: 'Choose steps' }))
 
-    expect(screen.getByRole('heading', { name: 'Info alert: Choose at least one branch' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Info alert: Choose at least one step' })).toBeInTheDocument()
     expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
   })
 
@@ -321,12 +321,12 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByTestId('retry-starts-at')).toHaveTextContent('First Step')
     expect(screen.getByTestId('retry-starts-at')).toHaveTextContent('Second Step')
     expect(screen.getByTestId('retry-unavailable-output')).toHaveTextContent('Second Step')
-    expect(screen.getByRole('radio', { name: 'Retry all affected branches' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Retry from all affected steps' })).toBeChecked()
     expect(screen.queryByRole('checkbox', { name: 'First Step' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('radio', { name: 'Choose branches' }))
+    await user.click(screen.getByRole('radio', { name: 'Choose steps' }))
     expect(screen.getByRole('checkbox', { name: 'First Step' })).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Second Step' })).toBeInTheDocument()
-    await user.click(screen.getByRole('radio', { name: 'Retry all affected branches' }))
+    await user.click(screen.getByRole('radio', { name: 'Retry from all affected steps' }))
     await user.click(screen.getByTestId('retry-from-failure-confirm'))
 
     expect(mockHandleRetry).toHaveBeenCalledWith(undefined, {})
@@ -368,7 +368,7 @@ describe('RetryFromFailureSidePanel', () => {
 
     expect(onRetryInputOverridePointIdsChange).toHaveBeenCalledWith(['step-failed'])
 
-    await user.click(screen.getByRole('radio', { name: 'Choose branches' }))
+    await user.click(screen.getByRole('radio', { name: 'Choose steps' }))
     await user.click(screen.getByRole('checkbox', { name: 'Second Step' }))
 
     expect(screen.getByTestId('retry-starts-at')).toHaveTextContent('Second Step')
@@ -402,7 +402,7 @@ describe('RetryFromFailureSidePanel', () => {
     expect(mockHandleRetry).toHaveBeenCalledWith(undefined, { 'step-failed': { code: 'echo retry' } })
   })
 
-  it('describes sanitized replacement starts and warns when a failed branch is left unselected', async () => {
+  it('describes sanitized replacement starts and warns when a failed step is left unselected', async () => {
     const user = userEvent.setup()
     const allPoints = ['fetch-inventory', 'call-api']
     vi.mocked(useRetryFromFailurePreview).mockImplementation(({ retryPointIds }) => {
@@ -437,14 +437,14 @@ describe('RetryFromFailureSidePanel', () => {
       failedActivityIds: ['process-inventory', 'call-api'],
     })
 
-    await user.click(screen.getByRole('radio', { name: 'Choose branches' }))
-    expect(screen.getByRole('group', { name: 'Select the branches where the retry should begin' })).toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'Choose steps' }))
+    expect(screen.getByRole('group', { name: 'Select the steps where the retry should begin' })).toBeInTheDocument()
     expect(screen.getByText('Failed step: Process inventory')).toBeInTheDocument()
     expect(screen.getByText('Output sanitized — retry starts upstream')).toBeInTheDocument()
     await user.click(screen.getByRole('checkbox', { name: 'Call external API' }))
 
-    expect(screen.getByTestId('retry-partial-scope-warning')).toHaveTextContent('Some branches may fail')
-    expect(screen.getByTestId('retry-plan-card')).toHaveTextContent('1 of 2 affected branches selected')
+    expect(screen.getByTestId('retry-partial-scope-warning')).toHaveTextContent('Workflow may fail')
+    expect(screen.getByTestId('retry-plan-card')).toHaveTextContent('1 of 2 affected steps selected')
     expect(screen.getByTestId('retry-plan-card')).toHaveTextContent('1 failed step remains failed')
     expect(await axe(container)).toHaveNoViolations()
   })
