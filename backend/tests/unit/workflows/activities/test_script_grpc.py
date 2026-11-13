@@ -3,16 +3,20 @@
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from typing import Any, cast
 from unittest.mock import patch
 
 import grpc
 import pytest
 from syntara_plugin.runtime import ContainerInvocation
-from syntara_plugin.runtime.protocol import container_pb2 as pb
+from syntara_plugin.runtime.protocol import container_pb2 as _pb
 from syntara_plugin.runtime.protocol import container_pb2_grpc as rpc
 from temporalio.exceptions import ApplicationError
 
 from syntara.workflows.workflow_engine.activities.script_grpc import SCRIPT_STEP_IDS, invoke_script
+
+# The SDK generates protobuf attributes dynamically, which mypy cannot discover.
+pb: Any = cast("Any", _pb)
 
 
 @pytest.mark.asyncio

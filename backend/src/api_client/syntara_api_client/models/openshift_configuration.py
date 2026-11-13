@@ -23,7 +23,7 @@ class OpenShiftConfiguration:
         insecure_skip_tls_verify (bool | Unset): Disable TLS certificate verification for connections to this
             integration. Default: False.
         ca_certificate (None | str | Unset): PEM-encoded CA certificate to trust for this integration's TLS connections.
-        script_image (None | str | Unset): Script container image implementing the ContainerService gRPC contract.
+        script_image (None | str | Unset): Script container image implementing the ContainerService gRPC contract
     """
 
     base_url: str
