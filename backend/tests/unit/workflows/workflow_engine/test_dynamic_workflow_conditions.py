@@ -84,6 +84,25 @@ def _build_condition_with_downstream_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
+def _build_shared_successor_graph(node_type: str, port_a: str, port_b: str) -> WorkflowGraph:
+    """Build: trigger -> branch_node -> (port_a AND port_b both -> shared) -> shared_downstream.
+
+    Both outgoing ports of the branch node are wired to the *same* successor,
+    mirroring a workflow where a user connects both the approved and rejected
+    branches of an approval node to one target.
+    """
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("branch_node", {"id": "branch_node", "type": node_type, "parameters": {}})
+    backend.add_node("shared", {"id": "shared", "type": "script", "parameters": {}})
+    backend.add_node("shared_downstream", {"id": "shared_downstream", "type": "script", "parameters": {}})
+    backend.add_edge("trigger", "branch_node", None)
+    backend.add_edge("branch_node", "shared", {"from_port": port_a})
+    backend.add_edge("branch_node", "shared", {"from_port": port_b})
+    backend.add_edge("shared", "shared_downstream", None)
+    return WorkflowGraph(backend)
+
+
 def _build_linear_graph() -> WorkflowGraph:
     """Build: trigger -> node_a -> node_b (linear chain)."""
     backend = InMemoryGraphBackend()
@@ -206,6 +225,48 @@ class TestSkipPropagation:
         wf._mark_downstream_as_skipped("node_a", graph)
 
         assert "node_b" in wf.skipped_nodes
+
+
+# ---------------------------------------------------------------------------
+# Tests: Shared successor across both branches
+# ---------------------------------------------------------------------------
+
+
+class TestSharedSuccessorAcrossBranches:
+    """A successor wired to both branch ports must run exactly once either way.
+
+    The workflow designer allows connecting both outputs of a condition,
+    approval, or switch node to the same target node. Whichever branch is
+    taken, that shared successor (and anything downstream of it) must still
+    be scheduled rather than skipped.
+    """
+
+    @pytest.mark.parametrize(
+        ("node_type", "port_a", "port_b", "taken_port"),
+        [
+            ("condition", "true", "false", "true"),
+            ("condition", "true", "false", "false"),
+            ("approval", "approved", "rejected", "approved"),
+            ("approval", "approved", "rejected", "rejected"),
+            ("switch", "case_a", "case_b", "case_a"),
+            ("switch", "case_a", "case_b", "case_b"),
+        ],
+    )
+    def test_shared_successor_not_skipped_for_either_decision(
+        self, node_type: str, port_a: str, port_b: str, taken_port: str
+    ) -> None:
+        """The shared successor and its downstream node must be scheduled, not skipped."""
+        wf = _make_workflow()
+        graph = _build_shared_successor_graph(node_type, port_a, port_b)
+        wf.resolver.set_namespace("trigger", {})
+        wf.node_control_data["branch_node"] = {"next_port": taken_port}
+        pending: dict[str, asyncio.Task[Any]] = {}
+
+        _run_schedule_successors(wf, "branch_node", graph, pending)
+
+        assert "shared" in pending
+        assert "shared" not in wf.skipped_nodes
+        assert "shared_downstream" not in wf.skipped_nodes
 
 
 # ---------------------------------------------------------------------------
