@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { HelpPopover } from '../../../components/expressions/HelpPopover'
 
 import { SettingInput } from './SettingInput'
+import { getStringPatternError } from './settingValidation'
 import { valuesEqual } from './valuesEqual'
 
 type RuntimeSetting = SettingsAPI.components['schemas']['RuntimeSettingRead']
@@ -126,7 +127,9 @@ export function SettingField({
     return null
   }, [numericBounds, value])
 
-  const fieldError = numericError || stringError
+  const schema = (setting.validation_schema ?? {}) as Record<string, unknown>
+  const stringPatternError = getStringPatternError(setting.value_type, value, schema.pattern as string | undefined)
+  const fieldError = numericError || stringPatternError || stringError
 
   useEffect(() => {
     onValidationChange?.(setting.key, !!fieldError)
@@ -157,7 +160,6 @@ export function SettingField({
     </Dropdown>
   )
 
-  const schema = (setting.validation_schema ?? {}) as Record<string, unknown>
   const shouldGrow =
     setting.value_type === 'json' || (setting.value_type === 'string' && !Array.isArray(schema.allowed_values))
   const showKebab = setting.value_type !== 'boolean' && setting.category !== 'notifications' && !readOnly

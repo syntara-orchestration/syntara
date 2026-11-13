@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from 'react'
+import { useCallback, useEffect, useReducer, useRef, type Dispatch } from 'react'
 
 import {
   buildRepeatingInterval,
@@ -73,32 +73,47 @@ function parseInitialState(value: string): BuilderState {
 }
 
 export function useScheduleBuilder(value: string, timezone: string, onChange?: (interval: string) => void) {
-  const [state, dispatch] = useReducer(builderReducer, value, parseInitialState)
+  const [state, reducerDispatch] = useReducer(builderReducer, value, parseInitialState)
+  const stateRef = useRef(state)
   const prevValueRef = useRef(value)
   const lastEmittedRef = useRef<string | undefined>(undefined)
 
+  const emitInterval = useCallback(
+    (nextState: BuilderState, nextTimezone: string) => {
+      const interval = buildRepeatingInterval({
+        ...nextState,
+        timezone: nextTimezone,
+      })
+      if (!interval || interval === value) return
+      lastEmittedRef.current = interval
+      onChange?.(interval)
+    },
+    [onChange, value]
+  )
+
+  const dispatch: Dispatch<BuilderAction> = useCallback(
+    (action) => {
+      const nextState = builderReducer(stateRef.current, action)
+      stateRef.current = nextState
+      reducerDispatch(action)
+      emitInterval(nextState, timezone)
+    },
+    [emitInterval, reducerDispatch, timezone]
+  )
+
+  const emitTimezoneChange = useCallback(
+    (nextTimezone: string) => emitInterval(stateRef.current, nextTimezone),
+    [emitInterval]
+  )
+
   useEffect(() => {
     if (value !== prevValueRef.current && value !== lastEmittedRef.current) {
-      dispatch({ type: 'INIT', payload: parseInitialState(value) })
+      const nextState = parseInitialState(value)
+      stateRef.current = nextState
+      reducerDispatch({ type: 'INIT', payload: nextState })
     }
     prevValueRef.current = value
   }, [value])
 
-  const { startDate, startTime, endDate, frequency, intervalCount } = state
-
-  useEffect(() => {
-    const interval = buildRepeatingInterval({
-      startDate,
-      startTime,
-      endDate,
-      frequency,
-      intervalCount,
-      timezone,
-    })
-    if (!interval || interval === value) return
-    lastEmittedRef.current = interval
-    onChange?.(interval)
-  }, [startDate, startTime, endDate, frequency, intervalCount, timezone, onChange, value])
-
-  return { state, dispatch }
+  return { state, dispatch, emitTimezoneChange }
 }
