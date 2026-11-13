@@ -26,6 +26,7 @@ from syntara.workflows.utils.namespace_resolver import NamespaceResolver
 from syntara.workflows.workflow_engine.constants import INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS
 from syntara.workflows.workflow_engine.dynamic_workflow import (
     ALLOWED_TRIGGER_TYPES,
+    LOOP_WAIT_COMPLETION_ACTIVITY_ID_PATCH,
     OrchestratorWorkflow,
 )
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
@@ -216,17 +217,26 @@ class TestExecuteExecutorNodeUnknownType:
 
 
 class TestExecuteWaitNode:
-    """Loop waits must complete the exact Temporal activity they started."""
+    """Loop waits must complete the right Temporal activity for each history version."""
 
     @pytest.mark.parametrize(
-        ("loop_body_map", "node_control_data", "temporal_activity_id"),
+        ("loop_body_map", "node_control_data", "temporal_activity_id", "completion_mode"),
         [
-            ({"wait_node": "loop_node"}, {"loop_node": {"current_index": 0}}, "wait_node_iter_0"),
-            ({"wait_node": "loop_node"}, {"loop_node": {"current_index": 1}}, "wait_node_iter_1"),
+            ({"wait_node": "loop_node"}, {"loop_node": {"current_index": 0}}, "wait_node_iter_0", "new"),
+            ({"wait_node": "loop_node"}, {"loop_node": {"current_index": 1}}, "wait_node_iter_1", "new"),
             (
                 {"wait_node": "inner_loop", "inner_loop": "outer_loop"},
                 {"outer_loop": {"current_index": 2}, "inner_loop": {"current_index": 1}},
                 "wait_node_iter_2_iter_1",
+                "new",
+            ),
+            ({"wait_node": "loop_node"}, {"loop_node": {"current_index": 0}}, "wait_node_iter_0", "legacy"),
+            ({"wait_node": "loop_node"}, {"loop_node": {"current_index": 1}}, "wait_node_iter_1", "legacy"),
+            (
+                {"wait_node": "inner_loop", "inner_loop": "outer_loop"},
+                {"outer_loop": {"current_index": 2}, "inner_loop": {"current_index": 1}},
+                "wait_node_iter_2_iter_1",
+                "legacy",
             ),
         ],
     )
@@ -237,6 +247,7 @@ class TestExecuteWaitNode:
         loop_body_map: dict[str, str],
         node_control_data: dict[str, dict[str, int]],
         temporal_activity_id: str,
+        completion_mode: str,
     ) -> None:
         mock_temporal_workflow = request.getfixturevalue("_mock_temporal_workflow")
         wf = _make_workflow()
@@ -249,18 +260,28 @@ class TestExecuteWaitNode:
         mock_temporal_workflow.sleep = AsyncMock()
         mock_temporal_workflow.execute_local_activity = AsyncMock()
         mock_temporal_workflow.info.return_value = MagicMock(workflow_id="test-wf-id", run_id="test-run-id")
+        mock_temporal_workflow.patched.return_value = completion_mode == "new"
 
         result = await wf._execute_wait_node("wait_node", {"duration": 1}, None)
 
         mock_temporal_workflow.start_activity.assert_called_once()
         assert mock_temporal_workflow.start_activity.call_args.kwargs["activity_id"] == temporal_activity_id
-        mock_temporal_workflow.execute_local_activity.assert_awaited_once()
-        completion_args = mock_temporal_workflow.execute_local_activity.await_args.kwargs["args"]
-        assert completion_args == ["test-wf-id", "test-run-id", temporal_activity_id]
-        assert (
-            mock_temporal_workflow.execute_local_activity.await_args.kwargs["activity_id"]
-            == f"__internal__complete_wait_{temporal_activity_id}"
+        mock_temporal_workflow.patched.assert_called_once_with(LOOP_WAIT_COMPLETION_ACTIVITY_ID_PATCH)
+        expected_completions = (
+            [(temporal_activity_id, f"__internal__complete_wait_{temporal_activity_id}")]
+            if completion_mode == "new"
+            else [
+                ("wait_node", "__internal__complete_wait_wait_node"),
+                (temporal_activity_id, f"__internal__recover_wait_{temporal_activity_id}"),
+            ]
         )
+        assert [
+            (call.kwargs["args"], call.kwargs["activity_id"])
+            for call in mock_temporal_workflow.execute_local_activity.await_args_list
+        ] == [
+            (["test-wf-id", "test-run-id", completion_target], local_activity_id)
+            for completion_target, local_activity_id in expected_completions
+        ]
         assert result == workflow_result
 
 

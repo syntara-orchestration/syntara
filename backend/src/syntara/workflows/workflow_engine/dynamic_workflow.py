@@ -79,6 +79,11 @@ ALLOWED_TRIGGER_TYPES: set[str] = {
 # Marker value for pre-resolved node inputs in test executions
 PRE_RESOLVED_MARKER = "__pre_resolved"
 
+# Version marker for the loop-wait completion command change. Older histories
+# completed waits using the canvas node ID, even though loop waits were started
+# with an iteration-specific Temporal activity ID.
+LOOP_WAIT_COMPLETION_ACTIVITY_ID_PATCH = "loop-wait-completion-activity-id"
+
 
 def _parse_items(items: Any) -> Any:  # noqa: ANN401
     """Parse loop items from string JSON to a list if needed."""
@@ -1483,12 +1488,32 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         workflow.logger.info(f"Wait node {node_id}: sleeping for {total_seconds}s")
         await workflow.sleep(timedelta(seconds=total_seconds))
 
-        # Step 3: Complete the async wait activity via local activity
+        # Step 3: Preserve the legacy command when replaying old loop histories.
+        # Its target may not exist, which the completion activity treats as a
+        # successful no-op; the iteration-specific wait can still be pending.
+        legacy_loop_wait = node_id in self.loop_body_map and not workflow.patched(
+            LOOP_WAIT_COMPLETION_ACTIVITY_ID_PATCH
+        )
+        if legacy_loop_wait:
+            await workflow.execute_local_activity(
+                complete_wait,
+                args=[workflow.info().workflow_id, workflow.info().run_id, node_id],
+                start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
+                activity_id=f"__internal__complete_wait_{node_id}",
+            )
+
+        # Complete the wait that was actually started. Use a distinct command
+        # ID after the legacy call so replay can append this recovery operation.
+        completion_activity_id = (
+            f"__internal__recover_wait_{temporal_activity_id}"
+            if legacy_loop_wait
+            else f"__internal__complete_wait_{temporal_activity_id}"
+        )
         await workflow.execute_local_activity(
             complete_wait,
             args=[workflow.info().workflow_id, workflow.info().run_id, temporal_activity_id],
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
-            activity_id=f"__internal__complete_wait_{temporal_activity_id}",
+            activity_id=completion_activity_id,
         )
 
         # Await the handle to get the activity result
