@@ -69,6 +69,7 @@ class ActivitySyncPublisherMixin:
                 completed_at=activity.completed_at,
                 error_details=activity.error_details,
                 output_data=activity.output_data,
+                runtime_metadata=activity.runtime_metadata,
                 iteration=activity.iteration,
             )
             ops.append({"op": "add", "path": "/activities/-", "value": data.model_dump(mode="json")})
