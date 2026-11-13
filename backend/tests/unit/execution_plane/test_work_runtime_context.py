@@ -10,7 +10,7 @@ from syntara.workflows.workflow_engine.activities.ep import ep_dispatch_activity
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("execution_exists", [True, False])
-async def test_metadata_uses_persisted_execution_context(monkeypatch, *, execution_exists: bool) -> None:
+async def test_runtime_context_uses_persisted_execution_context(monkeypatch, *, execution_exists: bool) -> None:
     execution_id, project_id, workflow_id = uuid4(), uuid4(), uuid4()
     session = AsyncMock()
     rows = MagicMock()
@@ -21,12 +21,18 @@ async def test_metadata_uses_persisted_execution_context(monkeypatch, *, executi
     factory.return_value.__aexit__ = AsyncMock(return_value=None)
     monkeypatch.setattr(dispatch, "AsyncSessionLocal", factory)
 
-    metadata = await dispatch._work_metadata(execution_id)
+    if not execution_exists:
+        from temporalio.exceptions import ApplicationError
+
+        with pytest.raises(ApplicationError, match="Execution does not exist"):
+            await dispatch._work_runtime_context(execution_id)
+        return
+    runtime_context = await dispatch._work_runtime_context(execution_id)
 
     expected = {"execution_id": str(execution_id)}
     if execution_exists:
         expected.update(project_id=str(project_id), workflow_id=str(workflow_id))
-    assert metadata == expected
+    assert runtime_context == expected
     assert session.exec.await_args is not None
     query = session.exec.await_args.args[0].compile()
     assert execution_id in query.params.values()

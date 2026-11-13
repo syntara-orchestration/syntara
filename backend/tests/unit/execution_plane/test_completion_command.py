@@ -167,11 +167,11 @@ async def test_completion_missing_activity_remains_retryable(callback):
 
 
 @pytest.mark.asyncio
-async def test_completion_metadata_cannot_redirect_activity_or_result(callback):
+async def test_completion_runtime_context_cannot_redirect_activity_or_result(callback):
     app, temporal, _ = callback
     message = completion()
     body = message.model_dump(mode="json")
-    body["command"]["payload"]["metadata"] = {"activity_execution_id": str(uuid4()), "project_id": str(uuid4())}
+    body["command"]["payload"]["runtime_context"] = {"activity_execution_id": str(uuid4()), "project_id": str(uuid4())}
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=body)
     assert response.status_code == 200, response.text

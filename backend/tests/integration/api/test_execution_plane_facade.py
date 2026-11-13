@@ -533,3 +533,30 @@ async def test_get_list_rejects_invalid_upstream_json(auth_client: AsyncClient, 
         ep.get(ep_path).mock(return_value=Response(200, text="not-json"))
         response = await auth_client.get(path)
     assert response.status_code == 502, response.text
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        {"runtime_context[project_id]": "project", "runtime_context[execution_id]": ""},
+        {"runtime_context[nested.key]": "a,b", "include_total": "true", "limit": "1"},
+    ],
+)
+async def test_work_runtime_context_filters_are_forwarded_unchanged(
+    auth_client: AsyncClient, query: dict[str, str]
+) -> None:
+    page: dict[str, Any] = {"resources": [], "next": None, "prev": None, "total": 0}
+    with respx.mock(base_url=_EP_BASE, assert_all_called=True) as ep:
+        route = ep.get("/v1/work-items").mock(return_value=Response(200, json=page))
+        response = await auth_client.get("/api/execution_plane/v1/work_items", params=query)
+    assert response.status_code == 200, response.text
+    assert dict(route.calls.last.request.url.params) == {"limit": "20", **query}
+    assert response.json() == page
+
+
+@pytest.mark.parametrize("key", ["runtime_context", "runtime_context[]", "runtime_context[x][eq]"])
+async def test_malformed_context_filters_are_rejected_before_ep(auth_client: AsyncClient, key: str) -> None:
+    with respx.mock(assert_all_called=False) as ep:
+        response = await auth_client.get("/api/execution_plane/v1/work_items", params={key: "value"})
+    assert response.status_code == 422
+    assert not ep.calls

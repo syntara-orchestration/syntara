@@ -70,7 +70,7 @@ def mock_activity_context() -> Generator[MagicMock, None, None]:
         patch.object(activity_module, "ExecutionPlaneHttpClient", _FakeEPClient),
         patch.object(
             activity_module,
-            "_work_metadata",
+            "_work_runtime_context",
             AsyncMock(return_value={"project_id": "test-project", "workflow_id": "test-workflow"}),
         ),
     ):
@@ -169,10 +169,8 @@ class TestScriptActivityDispatch:
         invocation = command_payload["invocation"]
         assert isinstance(invocation, dict)
         assert invocation == {
-            "workflow_run_id": "unit-run",
             "step_revision_id": "script.v1",
             "inputs": {"language": "bash", "code": ":"},
-            "runtime_context": {},
             "credential_bindings": [],
             "timeout_seconds": 300,
         }

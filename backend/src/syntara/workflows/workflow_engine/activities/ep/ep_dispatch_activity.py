@@ -52,17 +52,15 @@ _EXECUTION_TARGET_SELECTOR_FIELD = "_execution_target_id"
 _CREDENTIAL_BINDINGS_FIELD = "credential_bindings"
 
 
-def _build_invocation(input_config: dict[str, Any], info: Any) -> dict[str, Any]:  # noqa: ANN401
+def _build_invocation(input_config: dict[str, Any]) -> dict[str, Any]:
     """Build the versioned SDK request before AO freezes it for activity retries."""
     return {
-        "workflow_run_id": info.workflow_run_id,
         "step_revision_id": _STEP_REVISION_ID,
         "inputs": {
             key: value
             for key, value in input_config.items()
             if not key.startswith("_") and key not in {_EXECUTION_PROFILE_FIELD, _CREDENTIAL_BINDINGS_FIELD}
         },
-        "runtime_context": {},
         "credential_bindings": input_config.get(_CREDENTIAL_BINDINGS_FIELD, []),
         "timeout_seconds": int(
             input_config.get(
@@ -73,18 +71,22 @@ def _build_invocation(input_config: dict[str, Any], info: Any) -> dict[str, Any]
     }
 
 
-async def _work_metadata(execution_id: uuid.UUID) -> dict[str, object]:
-    """Attach AO-owned descriptive context without expanding EP's domain schema."""
+async def _work_runtime_context(execution_id: uuid.UUID) -> dict[str, object]:
+    """Provide coherent AO execution context to EP and the plugin."""
     async with AsyncSessionLocal() as session:
         row = (
             await session.exec(
                 select(Execution.project_id, Execution.workflow_id).where(col(Execution.id) == execution_id)
             )
         ).first()
-    metadata: dict[str, object] = {"execution_id": str(execution_id)}
-    if row is not None:
-        metadata.update(project_id=str(row[0]), workflow_id=str(row[1]))
-    return metadata
+    if row is None:
+        message = "Execution does not exist"
+        raise ApplicationError(message, type="ContextError", non_retryable=True)
+    return {
+        "execution_id": str(execution_id),
+        "project_id": str(row[0]),
+        "workflow_id": str(row[1]),
+    }
 
 
 async def _submit_and_read_work(
@@ -132,12 +134,6 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
     """Submit a stable work command and recover existing work after an ambiguous retry."""
     settings = get_settings()
     info = activity.info()
-    workflow_id = info.workflow_id
-    run_id = info.workflow_run_id
-    if workflow_id is None or run_id is None:
-        msg = "Temporal activity context is missing workflow or run identity"
-        raise ApplicationError(msg, type="ContextError", non_retryable=True)
-
     work_item_id = execution_plane_work_item_id(execution_id, info.activity_id)
     selectors = _build_work_execute_selectors(execution_target_id)
 
@@ -148,8 +144,8 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
     try:
         message = WorkExecute(
             work_item_id=work_item_id,
-            metadata=await _work_metadata(execution_id),
-            invocation=WorkloadInvocation.model_validate(_build_invocation(input_config, info)),
+            runtime_context=await _work_runtime_context(execution_id),
+            invocation=WorkloadInvocation.model_validate(_build_invocation(input_config)),
             image=image,
             selectors=selectors,
             output_config=output_config,

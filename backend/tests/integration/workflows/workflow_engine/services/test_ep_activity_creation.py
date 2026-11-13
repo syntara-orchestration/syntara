@@ -175,7 +175,7 @@ async def test_dispatch_moves_credential_bindings_out_of_inputs(
     first_message = ep_submission.call_args.args[1]
     payload = WorkExecute.model_validate(first_message.command.payload)
     assert payload.invocation.inputs == {"language": "bash", "code": "echo ok"}
-    assert payload.invocation.runtime_context == {}
+    assert "runtime_context" not in payload.invocation.model_dump()
     assert [
         (binding.credential_recipe_id, binding.credential_ref) for binding in payload.invocation.credential_bindings
     ] == [
@@ -186,7 +186,7 @@ async def test_dispatch_moves_credential_bindings_out_of_inputs(
     await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None)
     second_message = ep_submission.call_args.args[1]
     assert second_message.message_id != first_message.message_id
-    assert payload.metadata == {
+    assert payload.runtime_context == {
         "execution_id": str(test_execution.id),
         "project_id": str(test_execution.project_id),
         "workflow_id": str(test_execution.workflow_id),

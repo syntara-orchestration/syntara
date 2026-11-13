@@ -60,7 +60,6 @@ def workload_command(
         attempt_id="attempt",
         credential_ref=credential_ref or uuid4(),
         credential_recipe_id=credential_recipe_id,
-        workflow_run_id="workflow-run",
         step_revision_id="step-revision",
     ).to_message(
         source_id="execution-plane",

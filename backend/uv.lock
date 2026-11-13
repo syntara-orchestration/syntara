@@ -975,8 +975,8 @@ wheels = [
 
 [[package]]
 name = "execution-plane-client"
-version = "0.1.19.dev1+g4029b9fea"
-source = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&rev=4029b9feae87058ea26e2e3a4fd9f9213b8d514b#4029b9feae87058ea26e2e3a4fd9f9213b8d514b" }
+version = "0.1.19.dev4+g1405f940b"
+source = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&rev=1405f940b176a570e8597ad50d57974fc18f8202#1405f940b176a570e8597ad50d57974fc18f8202" }
 dependencies = [
     { name = "pydantic" },
 ]
@@ -4451,7 +4451,7 @@ requires-dist = [
     { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.35.0" },
     { name = "cachetools", specifier = ">=5.0" },
     { name = "cryptography", specifier = ">=48.0.1" },
-    { name = "execution-plane-client", git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&rev=4029b9feae87058ea26e2e3a4fd9f9213b8d514b" },
+    { name = "execution-plane-client", git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&rev=1405f940b176a570e8597ad50d57974fc18f8202" },
     { name = "fastapi", specifier = ">=0.135.0" },
     { name = "fastmcp", marker = "extra == 'dev'", specifier = ">=3.2.0,<4.0.0" },
     { name = "filelock", specifier = ">=4.2.1" },
