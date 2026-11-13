@@ -15,6 +15,7 @@ from temporalio.client import Client
 from temporalio.converter import DataConverter
 from temporalio.worker import Worker
 
+from syntara.authz.evaluator import RegoEvaluator
 from syntara.core.config.base import get_encryption_key, get_settings
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.lib.encryption import key_from_string
@@ -35,6 +36,22 @@ from syntara.workflows.workflow_engine.services.activity_sync_service import Act
 from syntara.workflows.workflow_engine.workflow_auth import init_signing_key
 
 logger = structlog.stdlib.get_logger(__name__)
+
+
+async def _start_worker_authz_evaluator() -> RegoEvaluator:
+    """Load the worker process's own Rego policy, failing closed if unhealthy.
+
+    The Temporal worker runs separately from the API, so it initializes its own
+    authorization evaluator. A failed healthcheck raises, preventing the worker
+    from accepting authorization-dependent activities without a working policy
+    engine.
+    """
+    evaluator = RegoEvaluator()
+    evaluator.start()
+    if not await evaluator.health():
+        msg = "Authorization evaluator failed startup healthcheck"
+        raise RuntimeError(msg)
+    return evaluator
 
 
 class TemporalWorkerService:
@@ -88,6 +105,7 @@ class TemporalWorkerService:
         self.worker: Worker | None = None
         self._worker_task: asyncio.Task[None] | None = None
         self.activity_sync_service: ActivitySyncService | None = None
+        self._authz_evaluator: RegoEvaluator | None = None
 
     def _build_concurrency_config(self) -> dict[str, int]:
         config: dict[str, int] = {}
@@ -162,9 +180,16 @@ class TemporalWorkerService:
                 SubWorkflowSetupActivity,
             )
 
+            # The worker runs as a separate process from the API, so it loads
+            # its own Rego policy (fails closed on an unhealthy evaluator).
+            authz_evaluator = await _start_worker_authz_evaluator()
+            self._authz_evaluator = authz_evaluator
+            logger.info("Authorization evaluator ready for worker")
+
             sub_workflow_setup = SubWorkflowSetupActivity(
                 session_factory=AsyncSessionLocal,
                 task_queue=self.task_queue,
+                evaluator=authz_evaluator,
             )
             activities: list[Callable[..., Any]] = [
                 *self._activity_registry.values(),
@@ -230,6 +255,11 @@ class TemporalWorkerService:
 
         # Flush pending telemetry events after worker has fully stopped
         flush_telemetry()
+
+        # Release the authorization evaluator's Rego interpreter
+        if self._authz_evaluator is not None:
+            await self._authz_evaluator.stop()
+            self._authz_evaluator = None
 
         # Client cleanup is handled automatically by Temporal SDK
         self.client = None

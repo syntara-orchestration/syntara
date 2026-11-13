@@ -36,6 +36,9 @@ LOOP_ITERATION_UNIQUE_IDS_PATCH = "loop-iteration-unique-ids"
 
 _LOOP_ITER_CHAIN_RE = re.compile(r"(?:_iter_\d+)+$")
 _LOOP_ITER_CAPTURE_RE = re.compile(r"_iter_(\d+)$")
+# Applied ONLY to a matched trailing chain, never the whole id, so an
+# ``_iter_N`` embedded in a canvas node id is not read as an iteration suffix.
+_LOOP_ITER_INDEX_RE = re.compile(r"_iter_(\d+)")
 
 
 def use_unique_loop_iteration_ids() -> bool:
@@ -58,6 +61,19 @@ def innermost_iteration_index(activity_id: str) -> int | None:
     """Return the last ``_iter_N`` index, or None if the ID has no iteration suffix."""
     match = _LOOP_ITER_CAPTURE_RE.search(activity_id)
     return int(match.group(1)) if match else None
+
+
+def loop_iteration_indices(activity_id: str) -> list[int]:
+    """Return every trailing ``_iter_N`` index, outermost first; ``[]`` if none.
+
+    Only the anchored trailing chain is parsed (via ``_LOOP_ITER_CHAIN_RE``),
+    so an ``_iter_N`` embedded in a canvas node id is not mistaken for an
+    iteration suffix. ``a_iter_3`` -> ``[3]``; ``a_iter_1_iter_0`` -> ``[1, 0]``.
+    """
+    match = _LOOP_ITER_CHAIN_RE.search(activity_id)
+    if match is None:
+        return []
+    return [int(n) for n in _LOOP_ITER_INDEX_RE.findall(match.group(0))]
 
 
 def join_loop_iteration_id(node_id: str, indices: Sequence[int]) -> str:

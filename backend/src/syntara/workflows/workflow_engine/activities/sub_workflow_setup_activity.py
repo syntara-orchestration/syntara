@@ -32,7 +32,9 @@ if TYPE_CHECKING:
 
     from sqlmodel.ext.asyncio.session import AsyncSession
 
+    from syntara.authz.evaluator import AuthzEvaluator
     from syntara.workflows.models.execution import Execution
+    from syntara.workflows.models.workflow import Workflow
     from syntara.workflows.models.workflow_version import WorkflowVersion
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -40,6 +42,72 @@ logger = structlog.stdlib.get_logger(__name__)
 _SUB_WORKFLOW_NAMESPACE = UUID("a3e4c7f0-1b2d-4e5f-8a9c-0d1e2f3a4b5c")
 
 _MAX_SUB_WORKFLOW_DEPTH = 10
+
+
+async def authorize_child_invocation(
+    session: AsyncSession,
+    evaluator: AuthzEvaluator,
+    *,
+    actor_id: UUID,
+    child_workflow: Workflow,
+) -> None:
+    """Enforce execute-permission for a sub-workflow invocation.
+
+    Authorizes the propagated initiator identity against the child workflow's own
+    project, mirroring the direct-execution check in ``create_execution``
+    (``execution:run``, project-scoped). The project is resolved from the
+    authoritative workflow record, never from caller-supplied input, so a caller
+    cannot spoof a project it is permitted to run in.
+
+    Fails closed: a missing or disabled principal, or an explicit deny, raises a non-retryable
+    ``ApplicationError``; transient evaluator or database errors propagate unchanged
+    so Temporal retries them instead of treating the failure as a grant.
+
+    For scheduled parents the propagated identity is the workflow author
+    (AAP-95035); authorizing the author is a V1 decision pending Product/Security
+    review (tracked under AAP-91266).
+    """
+    from sqlmodel import select  # noqa: PLC0415
+
+    from syntara.authz.engine import AuthzRequest, authorize  # noqa: PLC0415
+    from syntara.authz.models.project import Project  # noqa: PLC0415
+    from syntara.core.models.user import User  # noqa: PLC0415
+
+    project_result = await session.exec(select(Project.name).where(Project.id == child_workflow.project_id))
+    resource_project = project_result.first() or ""
+
+    # Reject a missing OR disabled principal. Deactivating a user revokes their
+    # sessions but leaves role assignments intact, and the authz resolver does not
+    # filter disabled users, so an in-flight parent must not launch a child after
+    # its initiator is disabled. The HTTP path is covered by session auth; the
+    # worker has no session, so fail closed here.
+    actor = await session.get(User, actor_id)
+    if actor is None or not actor.is_enabled:
+        msg = "Sub-workflow invocation principal is missing or disabled; refusing to create child execution."
+        raise ApplicationError(msg, type="SubWorkflowAuthorizationError", non_retryable=True)
+
+    authz_result = await authorize(
+        session,
+        evaluator,
+        AuthzRequest(
+            user_id=actor_id,
+            action="run",
+            resource_type="execution",
+            resource_id="",
+            resource_project=resource_project,
+            user_labels=actor.labels,
+            user_metadata=actor.authz_metadata,
+        ),
+    )
+    if not authz_result.allowed or authz_result.denied:
+        logger.info(
+            "Sub-workflow invocation authorization denied",
+            actor_id=str(actor_id),
+            child_workflow_id=str(child_workflow.id),
+            denied_by=authz_result.denied_by,
+        )
+        msg = "Not authorized to run child workflow."
+        raise ApplicationError(msg, type="SubWorkflowAuthorizationError", non_retryable=True)
 
 
 class SubWorkflowSetupActivity:
@@ -52,10 +120,18 @@ class SubWorkflowSetupActivity:
         self,
         session_factory: Callable[..., AsyncSession],
         task_queue: str,
+        evaluator: AuthzEvaluator | None = None,
     ) -> None:
-        """Initialize with shared session factory and task queue."""
+        """Initialize with shared session factory, task queue, and authz evaluator.
+
+        ``evaluator`` is injected by the worker process and drives child-invocation
+        authorization. It defaults to ``None`` so unit/integration tests that do not
+        exercise authorization can construct the activity unchanged; when ``None`` the
+        execute-permission check is skipped (the worker always supplies one).
+        """
         self._session_factory = session_factory
         self._task_queue = task_queue
+        self._evaluator = evaluator
 
     @activity.defn(name=ActivityName.SUB_WORKFLOW)
     async def run(
@@ -216,6 +292,17 @@ class SubWorkflowSetupActivity:
                 child_project_id=child_workflow.project_id,
                 child_execution_id_str=child_execution_id_str,
             )
+
+            # Execute-permission enforcement runs whenever an evaluator is wired
+            # (always in the worker process); it is skipped only when the activity
+            # is constructed without one, e.g. tests that do not exercise authz.
+            if self._evaluator is not None:
+                await authorize_child_invocation(
+                    session,
+                    self._evaluator,
+                    actor_id=created_by_uuid,
+                    child_workflow=child_workflow,
+                )
 
             if not child_workflow.is_enabled:
                 msg = (
