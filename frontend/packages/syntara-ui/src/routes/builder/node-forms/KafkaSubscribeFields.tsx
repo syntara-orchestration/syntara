@@ -11,6 +11,7 @@ import { useIsVersionView } from '../VersionViewContext'
 
 import { KafkaCredentialConnection } from './KafkaCredentialConnection'
 import { KafkaIntegrationField } from './KafkaIntegrationField'
+import { KafkaSubscribeFilter } from './KafkaSubscribeFilter'
 import { kafkaSubscribeParameters } from './kafkaSubscribeMapping'
 import { KafkaSubscribePreflight } from './KafkaSubscribePreflight'
 import { KafkaSubscribeResourceContext } from './kafkaSubscribeResourceContext'
@@ -47,6 +48,7 @@ export function KafkaSubscribeFields({
     values.runtimeCredentialId,
     values.topic,
     values.inputSchema,
+    values.filterExpression,
     resourceErrors,
   ])
 
@@ -59,6 +61,21 @@ export function KafkaSubscribeFields({
             credential authenticates to Kafka. The platform supplies the workflow execution identity automatically.
           </Content>
         </Alert>
+      </StackItem>
+      <StackItem>
+        <ExpandableSection
+          toggleText="Message delivery behavior"
+          isExpanded={deliveryExpanded}
+          onToggle={(_event, expanded) => setDeliveryExpanded(expanded)}
+        >
+          <Content component={ContentVariants.p}>
+            Each subscription uses a platform-managed group. Partitions present at first activation start with new
+            messages at the visible-end boundary saved when each partition initializes. Partitions added later start at
+            their earliest retained message. Initialized partitions resume from valid committed offsets. Missing or
+            invalid established checkpoints require recovery; they do not reset automatically. Auto-commit is off.
+            Commit follows durable scheduling or resolution, without waiting for workflow completion.
+          </Content>
+        </ExpandableSection>
       </StackItem>
       <StackItem>
         <fieldset disabled={isReadOnly} className={nodeFormStyles.disabledFieldset}>
@@ -137,19 +154,7 @@ export function KafkaSubscribeFields({
         </fieldset>
       </StackItem>
       <StackItem>
-        <ExpandableSection
-          toggleText="Show message delivery details"
-          isExpanded={deliveryExpanded}
-          onToggle={(_event, expanded) => setDeliveryExpanded(expanded)}
-        >
-          <Content component={ContentVariants.p}>
-            Each subscription uses a platform-managed group. Partitions present at first activation start with new
-            messages at the visible-end boundary saved when each partition initializes. Partitions added later start at
-            their earliest retained message. Initialized partitions resume from valid committed offsets. Missing or
-            invalid established checkpoints require recovery; they do not reset automatically. Auto-commit is off.
-            Commit follows durable scheduling or resolution, without waiting for workflow completion.
-          </Content>
-        </ExpandableSection>
+        <KafkaSubscribeFilter isReadOnly={isReadOnly} />
       </StackItem>
       <StackItem>
         <KafkaSubscribePreflight

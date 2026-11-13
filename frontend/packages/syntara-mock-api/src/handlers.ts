@@ -6,7 +6,7 @@ import type * as ApprovalsAPI from '@syntara/contracts/src/approvals-api.js'
 import type * as ExecutionsAPI from '@syntara/contracts/src/executions-api.js'
 import type * as ToolManagerAPI from '@syntara/contracts/src/tool-manager.js'
 import type * as WorkflowAPI from '@syntara/contracts/src/workflow-api.js'
-import type { Approval, Tool, WorkflowWithVersion, WorkflowsResponse } from '@syntara/contracts'
+import type { Approval, FilteringAPI, Tool, WorkflowWithVersion, WorkflowsResponse } from '@syntara/contracts'
 import {
   ExecutionStatusEnum,
   IntegrationStatusEnum,
@@ -357,6 +357,39 @@ const knownFileMetadata: Record<
 }
 
 export const handlers = [
+  // Canned CEL fixtures only. Real expression compilation/evaluation belongs to the backend.
+  http.post('/api/v1/filtering/test', async ({ request }) => {
+    const body = (await request.json()) as FilteringAPI.components['schemas']['FilterTestRequest']
+    const expression = body.expression ?? ''
+    if (Array.from(expression).length > 16_384 || expression === 'input.') {
+      return HttpResponse.json<FilteringAPI.components['schemas']['FilterValidationProblem']>(
+        {
+          type: 'https://api.example.com/errors/validation-error',
+          title: 'Invalid CEL filter expression',
+          detail: 'filter_invalid_syntax',
+          code: 'filter_invalid_syntax',
+          retryable: false,
+          line: 1,
+          column: 7,
+        },
+        { status: 422 }
+      )
+    }
+    const fixtures: Record<string, FilteringAPI.components['schemas']['FilterResult']> = {
+      true: { outcome: 'match' },
+      false: { outcome: 'no_match' },
+      'input.payload.state == "decoded" && input.payload.value.status == "ready"': { outcome: 'match' },
+    }
+    const fixture = Object.hasOwn(fixtures, expression.trim()) ? fixtures[expression.trim()] : undefined
+    return HttpResponse.json<FilteringAPI.components['schemas']['FilterResult']>(
+      !expression.trim()
+        ? { outcome: 'match' }
+        : (fixture ?? {
+            outcome: 'evaluation_error',
+            error_code: 'filter_evaluation_failed',
+          })
+    )
+  }),
   http.get('/api/v1/tools', ({ request }) => {
     const url = new URL(request.url)
     const statusFilter = url.searchParams.get('status')

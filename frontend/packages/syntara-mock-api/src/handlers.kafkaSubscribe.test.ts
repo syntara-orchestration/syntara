@@ -1,4 +1,5 @@
 import { createServer } from '@mswjs/http-middleware'
+import type { FilteringAPI } from '@syntara/contracts'
 import type { Server } from 'node:http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -67,5 +68,46 @@ describe('Kafka subscription preflight mock', () => {
     { ...body, integration_id: 'other' },
   ])('rejects invalid bindings', async (parameters) => {
     expect((await preflight('admin', parameters)).status).toBe(422)
+  })
+})
+
+describe('Kafka filter test mock', () => {
+  function testFilter(body: FilteringAPI.components['schemas']['FilterTestRequest']) {
+    return fetch(`${baseUrl}/api/v1/filtering/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  it.each([
+    ['true', 'match'],
+    ['false', 'no_match'],
+    ['input.missing', 'evaluation_error'],
+    ['constructor', 'evaluation_error'],
+    ['', 'match'],
+    ['  \n', 'match'],
+    [null, 'match'],
+    [undefined, 'match'],
+  ] as const)('returns the contracted outcome for fixture %s', async (expression, outcome) => {
+    const response = await testFilter({ expression, input: null })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toStrictEqual(
+      outcome === 'evaluation_error' ? { outcome, error_code: 'filter_evaluation_failed' } : { outcome }
+    )
+  })
+
+  it('returns safe configuration errors with compiler locations', async () => {
+    const response = await testFilter({ expression: 'input.', input: { private: 'sample data' } })
+    expect(response.status).toBe(422)
+    expect(await response.json()).toStrictEqual({
+      type: 'https://api.example.com/errors/validation-error',
+      title: 'Invalid CEL filter expression',
+      detail: 'filter_invalid_syntax',
+      code: 'filter_invalid_syntax',
+      retryable: false,
+      line: 1,
+      column: 7,
+    })
   })
 })
