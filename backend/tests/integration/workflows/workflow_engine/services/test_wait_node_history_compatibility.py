@@ -11,9 +11,10 @@ import pytest
 from temporalio import activity, workflow
 from temporalio.worker import Replayer, Worker
 
-from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+with workflow.unsafe.imports_passed_through():
+    from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
+    from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+    from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 
 if TYPE_CHECKING:
     from temporalio.testing import WorkflowEnvironment
