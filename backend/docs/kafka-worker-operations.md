@@ -114,7 +114,8 @@ python -m syntara.eventstreams.consumer_health ready
 ```
 
 Each returns zero on success and nonzero on failure, using a fresh response from
-the worker event loop at `127.0.0.1:8765`. The listener uses an internal protocol,
+the worker event loop at `127.0.0.1:8768`, separate from the local MCP service ports.
+The listener uses an internal protocol,
 without an HTTP endpoint, Kubernetes Service or published container port. Probe
 clients import only the Python standard library. Liveness does not query Kafka,
 Redis, message traffic or subscription lag. Readiness reads the manager's current
