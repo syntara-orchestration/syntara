@@ -13,6 +13,14 @@ import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
+from syntara_api_client.api.integrations import list_integration_catalog
+from syntara_api_client.models import (
+    ListIntegrationCatalogEnabled,
+    ListIntegrationCatalogIntegrationType,
+)
+from syntara_api_client.models.list_integration_catalog_integration_type_eq_type_0 import (
+    ListIntegrationCatalogIntegrationTypeEqType0,
+)
 
 from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
@@ -20,7 +28,7 @@ from syntara.authz.engine import AllowedProjectsResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.integrations import router as current
-from syntara.integrations.models.integration import Integration, IntegrationType
+from syntara.integrations.models.integration import Integration, IntegrationScope, IntegrationStatus, IntegrationType
 from syntara.integrations.models.integration_configuration import KafkaConfiguration, MCPServerConfigurationInput
 
 
@@ -317,6 +325,7 @@ async def test_catalog_pages_and_filters_all_types_without_changing_v1(
             updated_by=test_user.id,
             integration_type=IntegrationType.KAFKA,
             enabled=False,
+            validation_status=IntegrationStatus.ERROR,
             configuration=KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"], security_protocol="SSL"),
         )
     )
@@ -340,13 +349,45 @@ async def test_catalog_pages_and_filters_all_types_without_changing_v1(
     assert previous.status_code == 200
     assert [row["name"] for row in previous.json()["resources"]] == [names[-2]]
 
-    for filters in [{"integration_type": "kafka"}, {"name[contains]": "Kafka"}, {"enabled": "false"}]:
+    for filters in [
+        {"integration_type": "kafka"},
+        {"integration_type[eq]": "kafka"},
+        {"name[contains]": "Kafka"},
+        {"enabled": "false"},
+        {"enabled[eq]": "false"},
+        {"validation_status[eq]": IntegrationStatus.ERROR.value},
+        {"scope[eq]": IntegrationScope.GLOBAL.value, "integration_type[eq]": "kafka"},
+    ]:
         response = await auth_client.get("/api/v1/integrations/catalog", params={**filters, "include_total": "true"})
         assert response.status_code == 200
         page = response.json()
         assert page["total"] == 1
         assert page["resources"][0]["integration_type"] == "kafka"
         assert page["resources"][0]["configuration"]["bootstrap_servers"] == ["broker.example.com:9093"]
+    generated_query = list_integration_catalog._get_kwargs(
+        enabled=ListIntegrationCatalogEnabled(eq=False),
+        integration_type=ListIntegrationCatalogIntegrationType(eq=ListIntegrationCatalogIntegrationTypeEqType0.KAFKA),
+        include_total=True,
+    )["params"]
+    assert generated_query["enabled[eq]"] is False
+    assert generated_query["integration_type[eq]"] == "kafka"
+    assert "eq" not in generated_query
+    generated_response = await auth_client.get("/api/v1/integrations/catalog", params=generated_query)
+    assert generated_response.status_code == 200
+    assert generated_response.json()["total"] == 1
+    assert generated_response.json()["resources"][0]["integration_type"] == "kafka"
+    unmatched_credential = await auth_client.get(
+        "/api/v1/integrations/catalog",
+        params={"management_credential_id[eq]": str(uuid4()), "include_total": "true"},
+    )
+    assert unmatched_credential.status_code == 200
+    assert unmatched_credential.json()["resources"] == []
+    assert unmatched_credential.json()["total"] == 0
+    project_catalog = await auth_client.get(
+        "/api/v1/integrations/catalog", params={"project_id": str(uuid4()), "include_total": "true"}
+    )
+    assert project_catalog.status_code == 200
+    assert project_catalog.json()["total"] == 3
     legacy = await auth_client.get("/api/v1/integrations", params={"include_total": "true"})
     assert legacy.status_code == 200
     assert legacy.json()["total"] == 2

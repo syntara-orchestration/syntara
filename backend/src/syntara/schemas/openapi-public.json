@@ -14493,12 +14493,33 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
+              "allOf": [
                 {
-                  "$ref": "#/components/schemas/IntegrationStatus"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IntegrationStatus"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Filter by validation status"
                 },
                 {
-                  "type": "null"
+                  "type": "object",
+                  "properties": {
+                    "eq": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/IntegrationStatus"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Filter by validation status"
+                    }
+                  }
                 }
               ],
               "title": "Validation Status"
@@ -14510,15 +14531,35 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
+              "allOf": [
                 {
-                  "type": "boolean"
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Filter by enabled status"
                 },
                 {
-                  "type": "null"
+                  "type": "object",
+                  "properties": {
+                    "eq": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Filter by enabled status"
+                    }
+                  }
                 }
               ],
-              "description": "Filter by enabled status",
               "title": "Enabled"
             },
             "description": "Filter by enabled status"
@@ -14528,12 +14569,33 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
+              "allOf": [
                 {
-                  "$ref": "#/components/schemas/IntegrationScope"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IntegrationScope"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Filter by visibility scope"
                 },
                 {
-                  "type": "null"
+                  "type": "object",
+                  "properties": {
+                    "eq": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/IntegrationScope"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Filter by visibility scope"
+                    }
+                  }
                 }
               ],
               "title": "Scope"
@@ -14545,13 +14607,35 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
+              "allOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Filter by management credential ID"
                 },
                 {
-                  "type": "null"
+                  "type": "object",
+                  "properties": {
+                    "eq": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Filter by management credential ID"
+                    }
+                  }
                 }
               ],
               "title": "Management Credential Id"
@@ -14572,6 +14656,8 @@
                   "type": "null"
                 }
               ],
+              "description": "Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations.",
+              "x-query-param": true,
               "title": "Project Id"
             },
             "description": "Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations."
@@ -14581,18 +14667,45 @@
             "in": "query",
             "required": false,
             "schema": {
-              "anyOf": [
+              "allOf": [
                 {
-                  "type": "string",
-                  "enum": [
-                    "mcp_server",
-                    "llm_provider",
-                    "ansible_automation_platform",
-                    "kafka"
-                  ]
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "mcp_server",
+                        "llm_provider",
+                        "ansible_automation_platform",
+                        "kafka"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Filter by integration type"
                 },
                 {
-                  "type": "null"
+                  "type": "object",
+                  "properties": {
+                    "eq": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "mcp_server",
+                            "llm_provider",
+                            "ansible_automation_platform",
+                            "kafka"
+                          ],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Filter by integration type"
+                    }
+                  }
                 }
               ],
               "title": "Integration Type"

@@ -446,7 +446,6 @@ export function CredentialSelector({
         }}
         shouldFocusToggleOnSelect
         toggle={renderToggle}
-        shouldFocusToggleOnSelect
       >
         <CredentialOptions
           label={label}

@@ -8,9 +8,11 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
 from ...models.integration_catalog_list_response import IntegrationCatalogListResponse
-from ...models.integration_scope import IntegrationScope
-from ...models.integration_status import IntegrationStatus
-from ...models.list_integration_catalog_integration_type_type_0 import ListIntegrationCatalogIntegrationTypeType0
+from ...models.list_integration_catalog_enabled import ListIntegrationCatalogEnabled
+from ...models.list_integration_catalog_integration_type import ListIntegrationCatalogIntegrationType
+from ...models.list_integration_catalog_management_credential_id import ListIntegrationCatalogManagementCredentialId
+from ...models.list_integration_catalog_scope import ListIntegrationCatalogScope
+from ...models.list_integration_catalog_validation_status import ListIntegrationCatalogValidationStatus
 from ...types import UNSET, Response, Unset
 
 
@@ -20,12 +22,12 @@ def _get_kwargs(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    validation_status: IntegrationStatus | None | Unset = UNSET,
-    enabled: bool | None | Unset = UNSET,
-    scope: IntegrationScope | None | Unset = UNSET,
-    management_credential_id: None | Unset | UUID = UNSET,
+    validation_status: ListIntegrationCatalogValidationStatus | Unset = UNSET,
+    enabled: ListIntegrationCatalogEnabled | Unset = UNSET,
+    scope: ListIntegrationCatalogScope | Unset = UNSET,
+    management_credential_id: ListIntegrationCatalogManagementCredentialId | Unset = UNSET,
     project_id: None | Unset | UUID = UNSET,
-    integration_type: ListIntegrationCatalogIntegrationTypeType0 | None | Unset = UNSET,
+    integration_type: ListIntegrationCatalogIntegrationType | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
@@ -50,39 +52,34 @@ def _get_kwargs(
 
     params["include_total"] = include_total
 
-    json_validation_status: None | str | Unset
-    if isinstance(validation_status, Unset):
-        json_validation_status = UNSET
-    elif isinstance(validation_status, IntegrationStatus):
-        json_validation_status = validation_status.value
-    else:
-        json_validation_status = validation_status
-    params["validation_status"] = json_validation_status
+    json_validation_status: dict[str, Any] | Unset = UNSET
+    if not isinstance(validation_status, Unset):
+        json_validation_status = validation_status.to_dict()
+    if not isinstance(json_validation_status, Unset):
+        params.update({f"validation_status[{operator}]": value for operator, value in json_validation_status.items()})
 
-    json_enabled: bool | None | Unset
-    if isinstance(enabled, Unset):
-        json_enabled = UNSET
-    else:
-        json_enabled = enabled
-    params["enabled"] = json_enabled
+    json_enabled: dict[str, Any] | Unset = UNSET
+    if not isinstance(enabled, Unset):
+        json_enabled = enabled.to_dict()
+    if not isinstance(json_enabled, Unset):
+        params.update({f"enabled[{operator}]": value for operator, value in json_enabled.items()})
 
-    json_scope: None | str | Unset
-    if isinstance(scope, Unset):
-        json_scope = UNSET
-    elif isinstance(scope, IntegrationScope):
-        json_scope = scope.value
-    else:
-        json_scope = scope
-    params["scope"] = json_scope
+    json_scope: dict[str, Any] | Unset = UNSET
+    if not isinstance(scope, Unset):
+        json_scope = scope.to_dict()
+    if not isinstance(json_scope, Unset):
+        params.update({f"scope[{operator}]": value for operator, value in json_scope.items()})
 
-    json_management_credential_id: None | str | Unset
-    if isinstance(management_credential_id, Unset):
-        json_management_credential_id = UNSET
-    elif isinstance(management_credential_id, UUID):
-        json_management_credential_id = str(management_credential_id)
-    else:
-        json_management_credential_id = management_credential_id
-    params["management_credential_id"] = json_management_credential_id
+    json_management_credential_id: dict[str, Any] | Unset = UNSET
+    if not isinstance(management_credential_id, Unset):
+        json_management_credential_id = management_credential_id.to_dict()
+    if not isinstance(json_management_credential_id, Unset):
+        params.update(
+            {
+                f"management_credential_id[{operator}]": value
+                for operator, value in json_management_credential_id.items()
+            }
+        )
 
     json_project_id: None | str | Unset
     if isinstance(project_id, Unset):
@@ -93,14 +90,11 @@ def _get_kwargs(
         json_project_id = project_id
     params["project_id"] = json_project_id
 
-    json_integration_type: None | str | Unset
-    if isinstance(integration_type, Unset):
-        json_integration_type = UNSET
-    elif isinstance(integration_type, ListIntegrationCatalogIntegrationTypeType0):
-        json_integration_type = integration_type.value
-    else:
-        json_integration_type = integration_type
-    params["integration_type"] = json_integration_type
+    json_integration_type: dict[str, Any] | Unset = UNSET
+    if not isinstance(integration_type, Unset):
+        json_integration_type = integration_type.to_dict()
+    if not isinstance(json_integration_type, Unset):
+        params.update({f"integration_type[{operator}]": value for operator, value in json_integration_type.items()})
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
@@ -187,12 +181,12 @@ def sync_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    validation_status: IntegrationStatus | None | Unset = UNSET,
-    enabled: bool | None | Unset = UNSET,
-    scope: IntegrationScope | None | Unset = UNSET,
-    management_credential_id: None | Unset | UUID = UNSET,
+    validation_status: ListIntegrationCatalogValidationStatus | Unset = UNSET,
+    enabled: ListIntegrationCatalogEnabled | Unset = UNSET,
+    scope: ListIntegrationCatalogScope | Unset = UNSET,
+    management_credential_id: ListIntegrationCatalogManagementCredentialId | Unset = UNSET,
     project_id: None | Unset | UUID = UNSET,
-    integration_type: ListIntegrationCatalogIntegrationTypeType0 | None | Unset = UNSET,
+    integration_type: ListIntegrationCatalogIntegrationType | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | IntegrationCatalogListResponse]:
     """List integration catalog
@@ -204,12 +198,14 @@ def sync_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        validation_status (IntegrationStatus | None | Unset):
-        enabled (bool | None | Unset): Filter by enabled status
-        scope (IntegrationScope | None | Unset):
-        management_credential_id (None | Unset | UUID):
-        project_id (None | Unset | UUID):
-        integration_type (ListIntegrationCatalogIntegrationTypeType0 | None | Unset):
+        validation_status (ListIntegrationCatalogValidationStatus | Unset):
+        enabled (ListIntegrationCatalogEnabled | Unset):
+        scope (ListIntegrationCatalogScope | Unset):
+        management_credential_id (ListIntegrationCatalogManagementCredentialId | Unset):
+        project_id (None | Unset | UUID): Filter to integrations that are global or assigned to
+            this project. Restricted to projects the user has RBAC access to; querying inaccessible
+            projects returns only global integrations.
+        integration_type (ListIntegrationCatalogIntegrationType | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -247,12 +243,12 @@ def sync(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    validation_status: IntegrationStatus | None | Unset = UNSET,
-    enabled: bool | None | Unset = UNSET,
-    scope: IntegrationScope | None | Unset = UNSET,
-    management_credential_id: None | Unset | UUID = UNSET,
+    validation_status: ListIntegrationCatalogValidationStatus | Unset = UNSET,
+    enabled: ListIntegrationCatalogEnabled | Unset = UNSET,
+    scope: ListIntegrationCatalogScope | Unset = UNSET,
+    management_credential_id: ListIntegrationCatalogManagementCredentialId | Unset = UNSET,
     project_id: None | Unset | UUID = UNSET,
-    integration_type: ListIntegrationCatalogIntegrationTypeType0 | None | Unset = UNSET,
+    integration_type: ListIntegrationCatalogIntegrationType | Unset = UNSET,
 ) -> ErrorData | IntegrationCatalogListResponse | None:
     """List integration catalog
 
@@ -263,12 +259,14 @@ def sync(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        validation_status (IntegrationStatus | None | Unset):
-        enabled (bool | None | Unset): Filter by enabled status
-        scope (IntegrationScope | None | Unset):
-        management_credential_id (None | Unset | UUID):
-        project_id (None | Unset | UUID):
-        integration_type (ListIntegrationCatalogIntegrationTypeType0 | None | Unset):
+        validation_status (ListIntegrationCatalogValidationStatus | Unset):
+        enabled (ListIntegrationCatalogEnabled | Unset):
+        scope (ListIntegrationCatalogScope | Unset):
+        management_credential_id (ListIntegrationCatalogManagementCredentialId | Unset):
+        project_id (None | Unset | UUID): Filter to integrations that are global or assigned to
+            this project. Restricted to projects the user has RBAC access to; querying inaccessible
+            projects returns only global integrations.
+        integration_type (ListIntegrationCatalogIntegrationType | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -300,12 +298,12 @@ async def asyncio_detailed(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    validation_status: IntegrationStatus | None | Unset = UNSET,
-    enabled: bool | None | Unset = UNSET,
-    scope: IntegrationScope | None | Unset = UNSET,
-    management_credential_id: None | Unset | UUID = UNSET,
+    validation_status: ListIntegrationCatalogValidationStatus | Unset = UNSET,
+    enabled: ListIntegrationCatalogEnabled | Unset = UNSET,
+    scope: ListIntegrationCatalogScope | Unset = UNSET,
+    management_credential_id: ListIntegrationCatalogManagementCredentialId | Unset = UNSET,
     project_id: None | Unset | UUID = UNSET,
-    integration_type: ListIntegrationCatalogIntegrationTypeType0 | None | Unset = UNSET,
+    integration_type: ListIntegrationCatalogIntegrationType | Unset = UNSET,
 ) -> Response[ErrorData | IntegrationCatalogListResponse]:
     """List integration catalog
 
@@ -316,12 +314,14 @@ async def asyncio_detailed(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        validation_status (IntegrationStatus | None | Unset):
-        enabled (bool | None | Unset): Filter by enabled status
-        scope (IntegrationScope | None | Unset):
-        management_credential_id (None | Unset | UUID):
-        project_id (None | Unset | UUID):
-        integration_type (ListIntegrationCatalogIntegrationTypeType0 | None | Unset):
+        validation_status (ListIntegrationCatalogValidationStatus | Unset):
+        enabled (ListIntegrationCatalogEnabled | Unset):
+        scope (ListIntegrationCatalogScope | Unset):
+        management_credential_id (ListIntegrationCatalogManagementCredentialId | Unset):
+        project_id (None | Unset | UUID): Filter to integrations that are global or assigned to
+            this project. Restricted to projects the user has RBAC access to; querying inaccessible
+            projects returns only global integrations.
+        integration_type (ListIntegrationCatalogIntegrationType | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -356,12 +356,12 @@ async def asyncio(
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
     include_total: bool | Unset = False,
-    validation_status: IntegrationStatus | None | Unset = UNSET,
-    enabled: bool | None | Unset = UNSET,
-    scope: IntegrationScope | None | Unset = UNSET,
-    management_credential_id: None | Unset | UUID = UNSET,
+    validation_status: ListIntegrationCatalogValidationStatus | Unset = UNSET,
+    enabled: ListIntegrationCatalogEnabled | Unset = UNSET,
+    scope: ListIntegrationCatalogScope | Unset = UNSET,
+    management_credential_id: ListIntegrationCatalogManagementCredentialId | Unset = UNSET,
     project_id: None | Unset | UUID = UNSET,
-    integration_type: ListIntegrationCatalogIntegrationTypeType0 | None | Unset = UNSET,
+    integration_type: ListIntegrationCatalogIntegrationType | Unset = UNSET,
 ) -> ErrorData | IntegrationCatalogListResponse | None:
     """List integration catalog
 
@@ -372,12 +372,14 @@ async def asyncio(
         cursor (None | str | Unset): Pagination cursor from previous response
         sort (None | str | Unset): Sort parameter (e.g., 'name', '-created_at')
         include_total (bool | Unset): Include total count in response (expensive) Default: False.
-        validation_status (IntegrationStatus | None | Unset):
-        enabled (bool | None | Unset): Filter by enabled status
-        scope (IntegrationScope | None | Unset):
-        management_credential_id (None | Unset | UUID):
-        project_id (None | Unset | UUID):
-        integration_type (ListIntegrationCatalogIntegrationTypeType0 | None | Unset):
+        validation_status (ListIntegrationCatalogValidationStatus | Unset):
+        enabled (ListIntegrationCatalogEnabled | Unset):
+        scope (ListIntegrationCatalogScope | Unset):
+        management_credential_id (ListIntegrationCatalogManagementCredentialId | Unset):
+        project_id (None | Unset | UUID): Filter to integrations that are global or assigned to
+            this project. Restricted to projects the user has RBAC access to; querying inaccessible
+            projects returns only global integrations.
+        integration_type (ListIntegrationCatalogIntegrationType | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
