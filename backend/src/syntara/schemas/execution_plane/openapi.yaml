@@ -575,35 +575,6 @@ paths:
       x-app-permission:
         resource: work_item
         action: read
-  /api/execution_plane/v1/commands:
-    post:
-      tags:
-        - Execution Plane
-      summary: Receive an Execution Plane command
-      description: Authenticate one command, dispatch it through the registry, and return its result.
-      operationId: receive_execution_plane_command
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/MessageEnvelope'
-        required: true
-      responses:
-        '200':
-          description: Successful Response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TransportReceipt'
-        '422':
-          description: Validation Error
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/HTTPValidationError'
-      x-app-permission:
-        resource: null
-        action: null
 components:
   schemas:
     BackendType:
@@ -613,81 +584,6 @@ components:
         - openshell
       title: BackendType
       description: Supported execution target backends.
-    Command:
-      properties:
-        command_id:
-          type: string
-          format: uuid
-          title: Command Id
-        parent_command_id:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Parent Command Id
-        command_type:
-          type: string
-          pattern: ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$
-          title: Command Type
-        command_revision:
-          type: integer
-          exclusiveMinimum: 0.0
-          title: Command Revision
-        payload:
-          additionalProperties: true
-          type: object
-          title: Payload
-        occurred_at:
-          type: string
-          format: date-time
-          title: Occurred At
-      additionalProperties: false
-      type: object
-      required:
-        - command_id
-        - command_type
-        - command_revision
-        - payload
-        - occurred_at
-      title: Command
-      description: One versioned operation; participants persist only its domain effects.
-    CommandScope:
-      properties:
-        client_id:
-          type: string
-          maxLength: 255
-          minLength: 1
-          pattern: ^[A-Za-z0-9_.:@/-]+$
-          title: Client Id
-      additionalProperties: false
-      type: object
-      required:
-        - client_id
-      title: CommandScope
-      description: Initiating service client; project authorization belongs to the caller.
-    CredentialResolveCommandResult:
-      properties:
-        command_type:
-          type: string
-          const: credential.resolve
-          title: Command Type
-          default: credential.resolve
-        command_revision:
-          type: integer
-          const: 1
-          title: Command Revision
-          default: 1
-        credential:
-          type: string
-          maxLength: 65536
-          minLength: 1
-          title: Credential
-      additionalProperties: false
-      type: object
-      required:
-        - credential
-      title: CredentialResolveCommandResult
-      description: Typed result returned for a credential-resolution command.
     ExecutionTargetCreate:
       properties:
         name:
@@ -942,53 +838,6 @@ components:
         - namespace
       title: KubernetesTargetPlacement
       description: Validated Kubernetes placement for target-management writes.
-    MessageEnvelope:
-      properties:
-        message_id:
-          type: string
-          format: uuid
-          title: Message Id
-        message_type:
-          type: string
-          const: command.submit
-          title: Message Type
-          default: command.submit
-        command_id:
-          type: string
-          format: uuid
-          title: Command Id
-        sequence:
-          type: integer
-          minimum: 0.0
-          title: Sequence
-          default: 0
-        source_id:
-          type: string
-          maxLength: 255
-          minLength: 1
-          pattern: ^[A-Za-z0-9_.:@/-]+$
-          title: Source Id
-        destination_id:
-          type: string
-          maxLength: 255
-          minLength: 1
-          pattern: ^[A-Za-z0-9_.:@/-]+$
-          title: Destination Id
-        scope:
-          $ref: '#/components/schemas/CommandScope'
-        command:
-          $ref: '#/components/schemas/Command'
-      additionalProperties: false
-      type: object
-      required:
-        - message_id
-        - command_id
-        - source_id
-        - destination_id
-        - scope
-        - command
-      title: MessageEnvelope
-      description: Participant identity around one logical command.
     RHELPlacement:
       properties:
         type:
@@ -999,37 +848,6 @@ components:
       type: object
       title: RHELPlacement
       description: Placeholder for RHEL-specific execution-target metadata.
-    ResourceReference:
-      properties:
-        kind:
-          type: string
-          maxLength: 255
-          minLength: 1
-          pattern: ^[A-Za-z0-9_.:@/-]+$
-          title: Kind
-        resource_id:
-          type: string
-          format: uuid
-          title: Resource Id
-        resource_key:
-          anyOf:
-            - type: string
-              format: uuid
-            - type: 'null'
-          title: Resource Key
-        revision:
-          anyOf:
-            - type: integer
-              exclusiveMinimum: 0.0
-            - type: 'null'
-          title: Revision
-      additionalProperties: false
-      type: object
-      required:
-        - kind
-        - resource_id
-      title: ResourceReference
-      description: Safe reference from a command to a participant-owned resource.
     ResourcesResponse_ExecutionTargetRead_:
       properties:
         resources:
@@ -1082,36 +900,6 @@ components:
       required:
         - resources
       title: ResourcesResponse[WorkItemRead]
-    TargetHealthCommandResult:
-      properties:
-        command_type:
-          type: string
-          const: execution_target.health
-          title: Command Type
-          default: execution_target.health
-        command_revision:
-          type: integer
-          const: 1
-          title: Command Revision
-          default: 1
-        healthy:
-          type: boolean
-          title: Healthy
-        message:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Message
-        skipped:
-          type: boolean
-          title: Skipped
-          default: false
-      additionalProperties: false
-      type: object
-      required:
-        - healthy
-      title: TargetHealthCommandResult
-      description: Typed result returned for an execution-target health command.
     TargetStatus:
       type: string
       enum:
@@ -1124,39 +912,6 @@ components:
         - failed
       title: TargetStatus
       description: Lifecycle states of an execution target.
-    TransportReceipt:
-      properties:
-        received:
-          type: boolean
-          const: true
-          title: Received
-          default: true
-        message_id:
-          type: string
-          format: uuid
-          title: Message Id
-        resource:
-          anyOf:
-            - $ref: '#/components/schemas/ResourceReference'
-            - type: 'null'
-        result:
-          anyOf:
-            - oneOf:
-                - $ref: '#/components/schemas/CredentialResolveCommandResult'
-                - $ref: '#/components/schemas/TargetHealthCommandResult'
-              discriminator:
-                propertyName: command_type
-                mapping:
-                  credential.resolve: '#/components/schemas/CredentialResolveCommandResult'
-                  execution_target.health: '#/components/schemas/TargetHealthCommandResult'
-            - type: 'null'
-          title: Result
-      additionalProperties: false
-      type: object
-      required:
-        - message_id
-      title: TransportReceipt
-      description: Receipt of a handled request, without a persisted command record.
     ValidationError:
       properties:
         loc:

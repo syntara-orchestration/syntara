@@ -50,6 +50,15 @@ def test_execution_plane_facade_uses_shared_client_models() -> None:
     assert get_type_hints(facade.list_work_items)["params"] is WorkItemListParams
 
 
+def test_execution_plane_public_contract_excludes_callback_commands() -> None:
+    from tools.export_openapi import build_ep_spec_app
+
+    spec = build_ep_spec_app().openapi()
+
+    assert "/api/execution_plane/v1/commands" not in spec["paths"]
+    assert "MessageEnvelope" not in spec["components"]["schemas"]
+
+
 def test_execution_target_facade_rejects_the_old_flat_namespace_contract() -> None:
     with pytest.raises(ValidationError):
         ExecutionTargetRead.model_validate(

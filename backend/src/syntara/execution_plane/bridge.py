@@ -36,6 +36,7 @@ registry = build_ao_registry()
     "/commands",
     status_code=status.HTTP_200_OK,
     dependencies=[NO_PERMISSION],
+    include_in_schema=False,
     operation_id="receive_execution_plane_command",
     summary="Receive an Execution Plane command",
 )
