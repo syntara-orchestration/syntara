@@ -20,8 +20,11 @@ Your goal is to review code with high clarity, consistency, and alignment with t
 ### Step 1a: Check the commit history
 
 ```bash
-# See commits on current branch not in main
-git log main..HEAD --oneline
+# Read and fetch the base branch for the current PR
+BASE_BRANCH=$(gh pr view --json baseRefName --jq .baseRefName)
+BASE_REF="origin/${BASE_BRANCH}"
+git fetch origin "refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+git log "${BASE_REF}..HEAD" --oneline
 ```
 
 ### Step 1b: Verify file count matches PR
@@ -40,7 +43,7 @@ git diff <first-commit>^..<last-commit> --stat
 
 If the numbers don't match the GitHub PR page (e.g., GitHub shows 3 files but git diff shows 17):
 
-- The branch may be **out of sync with main**
+- The branch may be **out of sync with the PR's base branch**
 - Use `git show <commit>` for single-commit PRs instead
 - Ask the user to clarify which commits to review
 
@@ -48,7 +51,7 @@ If the numbers don't match the GitHub PR page (e.g., GitHub shows 3 files but gi
 
 | Problem                  | Cause                                                    | Solution                                              |
 | ------------------------ | -------------------------------------------------------- | ----------------------------------------------------- |
-| Reviewing too many files | `git diff main...HEAD` includes unrelated merged commits | Use `git show <commit>` for the PR's actual commit(s) |
+| Reviewing too many files | Comparing against the wrong base can include unrelated commits | Use the PR's base ref in `git diff` |
 | Missing files            | Wrong commit range                                       | Check `git log` first to identify correct commits     |
 | Stale diff               | Branch not rebased                                       | Note this to the user, review only PR commits         |
 
@@ -106,7 +109,7 @@ Check whether the changes follow:
 | New `use*.ts` hook without `use*.test.ts(x)`                   | #13 -- every new hook needs a dedicated test file                                                         |
 | `useEffect` + `setState` for derived/computed values           | #14 -- compute during render or use `useMemo`                                                             |
 | `useEffect` + `setValue` watching form fields                  | #15 -- move cascading resets to field's `onChange` handler                                                |
-| `PlusCircleIcon` or non-`RhUi*` icons                          | #17 -- use `RhUiAddIcon`, `RhUiDuplicate`, etc.                                                           |
+| `PlusCircleIcon` or non-`RhUi*` icons                          | #17 -- use `RhUiAddIcon`, `RhUiDuplicateIcon`, etc.                                                       |
 | Inline style objects (`style={{ ... }}`)                       | #18 -- refactor to CSS module classes                                                                     |
 | `let` counter inside `.map()`                                  | #19 -- pre-compute indices immutably                                                                      |
 | `aria-label` on `<div>` (non-interactive)                      | span is ESLint; still flag `aria-label` on generic `<div>` (coding standards §27)                         |
@@ -138,7 +141,7 @@ AI agents and contributors sometimes bypass rules instead of fixing the underlyi
 
 ```bash
 # Run against the PR diff to find bypass attempts
-git diff main...HEAD -- '*.ts' '*.tsx' | grep '^+' | grep -v '^+++' | grep -iE 'eslint-disable|@ts-ignore|@ts-expect-error|TODO|FIXME|HACK|XXX|enabled:\s*false'
+git diff "${BASE_REF}...HEAD" -- '*.ts' '*.tsx' | grep '^+' | grep -v '^+++' | grep -iE 'eslint-disable|@ts-ignore|@ts-expect-error|TODO|FIXME|HACK|XXX|enabled:\s*false'
 ```
 
 | Pattern in diff                                               | Why it blocks                                                                                          | What to do instead                                                                                                                    |

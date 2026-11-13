@@ -24,7 +24,7 @@ There is **no hook-based enforcement** in upstream. The replacement is
 
 | Allowed upstream | Role |
 | --- | --- |
-| `CLAUDE.md`, `AGENTS.md`, and component `CLAUDE.md` / `AGENTS.md` | On-demand agent instructions |
+| `AGENTS.md` and component `AGENTS.md` | On-demand agent instructions |
 | `.agents/skills/**` | Canonical skill documents maintainers choose to ship |
 | `.claude/skills/**` | Tracked repository symlinks to `.agents/skills/**` for Claude Code |
 | `.claude/commands/**` (when present) | Slash-command prompts as markdown |
@@ -49,13 +49,31 @@ skills (and commands, when present). In particular the following stay private:
 
 Do not force-add ignored agent settings or hooks in a pull request.
 
+## Claude Code instruction files
+
+`AGENTS.md` is the canonical instruction file at the repository root and in
+components. Keep a relative `CLAUDE.md` symlink beside each one so Claude Code
+setups that load only `CLAUDE.md` receive the same instructions. Do not maintain
+separate Claude-specific copies. Edit the `AGENTS.md` target when instructions
+change.
+
+Claude Code v2.1.277 and later can load `AGENTS.md` directly when its default
+project-instructions setting is enabled. A `CLAUDE.md` symlink also supports
+older sessions and configurations that read only `CLAUDE.md`. Claude Code's
+Edit and Write tools refuse to write through the symlink; edit the target file
+instead. On Windows, creating these links needs Developer Mode or administrator
+privileges, and Git must have `core.symlinks` enabled. Otherwise, the checkout
+may replace a link with a plain text file containing its target path. If a
+Windows checkout cannot preserve symlinks, use a `CLAUDE.md` file containing
+`@AGENTS.md` instead. See the [Claude Code memory documentation](https://code.claude.com/docs/en/memory#share-one-file-with-other-coding-tools).
+
 ## Who may change skills and related agent docs
 
 | Path | Ownership / review |
 | --- | --- |
 | This policy (`.github/AI_AGENT_POLICY.md`) | `@syntara-orchestration/syntara-leads` (see [CODEOWNERS](CODEOWNERS)) |
-| Root / component `CLAUDE.md`, `AGENTS.md` | Same reviewers as the area of the change; treat policy-affecting edits as governance |
-| `.agents/skills/**` and `.claude/skills/**` | Owning product team per [CODEOWNERS]; `.claude/skills/**` links to `.agents/skills/**` |
+| Root / component `AGENTS.md` | Same reviewers as the area of the change; treat policy-affecting edits as governance |
+| `.agents/skills/**` and `.claude/skills/**` | Owning product team per [CODEOWNERS](CODEOWNERS); `.claude/skills/**` links to `.agents/skills/**` |
 | Re-introducing hooks or shipping `settings.json` | **Not permitted** under this policy. Requires an explicit policy revision reviewed by `@syntara-orchestration/syntara-leads` |
 
 ### Review bar for skill and instruction changes
@@ -134,4 +152,4 @@ Do not edit the vendored copy as the source of truth.
 ## Related contributor docs
 
 - Frontend AI workflow guide: [`frontend/docs/ai-assisted-development.md`](../frontend/docs/ai-assisted-development.md)
-- Root agent entrypoints: [`CLAUDE.md`](../CLAUDE.md), [`AGENTS.md`](../AGENTS.md)
+- Root agent entrypoint: [`AGENTS.md`](../AGENTS.md)
