@@ -35,6 +35,8 @@ export type CredentialSelectorProps = {
   compatibleTypeNames?: string[]
   /** Label for the form group */
   label?: string
+  /** Hide the visual label while retaining accessible toggle and menu names. */
+  hideLabel?: boolean
   /** Field ID for form group */
   fieldId?: string
   /** Whether the field is disabled */
@@ -274,6 +276,7 @@ export function CredentialSelector({
   onChange,
   compatibleTypeNames,
   label = 'Credential',
+  hideLabel = false,
   fieldId = 'credential-selector',
   isDisabled = false,
   allowCreate = false,
@@ -426,7 +429,12 @@ export function CredentialSelector({
   )
 
   return (
-    <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId} isRequired={isRequired}>
+    <FormGroup
+      label={hideLabel ? undefined : label}
+      labelHelp={hideLabel ? undefined : resolvedLabelHelp}
+      fieldId={fieldId}
+      isRequired={isRequired}
+    >
       <SynSelect
         id={fieldId}
         isOpen={isOpen}

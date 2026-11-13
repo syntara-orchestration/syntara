@@ -1,4 +1,4 @@
-"""Kafka socket policy shared by health checks and long-running consumers.
+"""Kafka socket policy shared by health checks, consumers and producers.
 
 Only this connection's event-loop view changes. The real loop and aiokafka's
 module globals are never patched. aiokafka remains responsible for Kafka framing,
@@ -92,7 +92,7 @@ class _PinnedLoop:
 
 
 # aiokafka 0.14 leaves its connection methods untyped.
-class _PolicyKafkaConnection(AIOKafkaConnection):
+class PinnedKafkaConnection(AIOKafkaConnection):
     """Use upstream framing/authentication with a connection-local pinned loop."""
 
     _loop: Any
@@ -107,23 +107,34 @@ class _PolicyKafkaConnection(AIOKafkaConnection):
         self._loop = _PinnedLoop(original_loop)
         try:
             return cast("tuple[asyncio.StreamReader, asyncio.StreamWriter]", await AIOKafkaConnection.connect(self))
+        except BaseException:
+            closed = AIOKafkaConnection.close(self)
+            # No protocol can settle connection_lost when socket setup failed.
+            if self._writer is None and closed is not None and not closed.done():
+                closed.cancel()
+            raise
         finally:
             self._loop = original_loop
 
+    def send(self, request: Request[Any], expect_response: bool = True) -> Awaitable[Any]:  # noqa: FBT001, FBT002 - upstream signature
+        """Expose the upstream response awaitable through a typed boundary."""
+        return cast("Awaitable[Any]", AIOKafkaConnection.send(self, request, expect_response=expect_response))
+
     def close(self, reason: object = None, exc: BaseException | None = None) -> asyncio.Future[None] | None:
-        """Keep normal Kafka shutdown, but never await an unopened socket's close."""
-        had_socket = self._protocol is not None
-        closed = AIOKafkaConnection.close(self, reason=reason, exc=exc)
-        if not had_socket and closed is not None and not closed.done():
-            # A policy/DNS/TCP failure cannot trigger connection_lost.
-            closed.set_result(None)
-            return None
-        return cast("asyncio.Future[None] | None", closed)
+        """Expose the upstream close future without changing socket shutdown."""
+        return cast("asyncio.Future[None] | None", AIOKafkaConnection.close(self, reason=reason, exc=exc))
+
+
+async def create_pinned_connection(host: str, port: int, **kwargs: object) -> PinnedKafkaConnection:
+    """Open a pinned connection while retaining upstream producer close behavior."""
+    connection = PinnedKafkaConnection(host, port, **kwargs)
+    await connection.connect()
+    return connection
 
 
 async def create_kafka_connection(host: str, port: int, **kwargs: Any) -> AIOKafkaConnection:  # noqa: ANN401 - upstream connection options
     """Enforce the existing Integration policy for every newly opened socket."""
-    connection = _PolicyKafkaConnection(host, port, **kwargs)
+    connection = PinnedKafkaConnection(host, port, **kwargs)
     try:
         await connection.connect()
     except ValueError:
@@ -137,7 +148,7 @@ async def create_kafka_connection(host: str, port: int, **kwargs: Any) -> AIOKaf
     return connection
 
 
-class _PinnedKafkaConnection(_PolicyKafkaConnection):
+class _PinnedKafkaConnection(PinnedKafkaConnection):
     """Short-lived health connection with bounded, immediate socket shutdown."""
 
     def close(self, reason: object = None, exc: BaseException | None = None) -> asyncio.Future[None] | None:
@@ -155,10 +166,6 @@ class _PinnedKafkaConnection(_PolicyKafkaConnection):
             return None
         writer.transport.abort()
         return cast("asyncio.Future[None] | None", closed)
-
-    def send(self, request: Request[Any], expect_response: bool = True) -> Awaitable[Any]:  # noqa: FBT001, FBT002 - upstream signature
-        """Expose the upstream response awaitable through a typed boundary."""
-        return cast("Awaitable[Any]", AIOKafkaConnection.send(self, request, expect_response=expect_response))
 
 
 class KafkaHealthClient:

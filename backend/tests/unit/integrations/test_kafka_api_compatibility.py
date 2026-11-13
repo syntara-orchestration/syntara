@@ -13,6 +13,14 @@ import pytest_asyncio
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlmodel.ext.asyncio.session import AsyncSession
+from syntara_api_client.api.integrations import list_integration_catalog
+from syntara_api_client.models import (
+    ListIntegrationCatalogEnabled,
+    ListIntegrationCatalogIntegrationType,
+)
+from syntara_api_client.models.list_integration_catalog_integration_type_eq_type_0 import (
+    ListIntegrationCatalogIntegrationTypeEqType0,
+)
 
 from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
@@ -20,7 +28,7 @@ from syntara.authz.engine import AllowedProjectsResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.integrations import router as current
-from syntara.integrations.models.integration import Integration, IntegrationType
+from syntara.integrations.models.integration import Integration, IntegrationScope, IntegrationStatus, IntegrationType
 from syntara.integrations.models.integration_configuration import KafkaConfiguration, MCPServerConfigurationInput
 
 
@@ -292,3 +300,95 @@ async def test_kafka_filters_and_totals_apply_before_pagination(
     assert second.json()["total"] == 2
     assert [item["name"] for item in second.json()["resources"]] == ["B orders"]
     assert second.json()["next"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sort", ["name", "-name"])
+async def test_catalog_pages_and_filters_all_types_without_changing_v1(
+    auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, sort: str
+) -> None:
+    """The UI receives a single ordered cursor stream containing Kafka and legacy rows."""
+    rows = [
+        Integration(
+            name=name,
+            created_by=test_user.id,
+            updated_by=test_user.id,
+            integration_type=IntegrationType.MCP_SERVER,
+            configuration=MCPServerConfigurationInput(base_url="https://example.com"),
+        )
+        for name in ["A legacy", "C legacy"]
+    ]
+    rows.append(
+        Integration(
+            name="B Kafka",
+            created_by=test_user.id,
+            updated_by=test_user.id,
+            integration_type=IntegrationType.KAFKA,
+            enabled=False,
+            validation_status=IntegrationStatus.ERROR,
+            configuration=KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"], security_protocol="SSL"),
+        )
+    )
+    test_db_session.add_all(rows)
+    await test_db_session.commit()
+
+    params: dict[str, str | int] = {"limit": 1, "sort": sort, "include_total": "true"}
+    names: list[str] = []
+    for _ in rows:
+        response = await auth_client.get("/api/v1/integrations/catalog", params=params)
+        assert response.status_code == 200
+        page = response.json()
+        assert page["total"] == 3
+        names.extend(row["name"] for row in page["resources"])
+        if page["next"] is None:
+            break
+        params["cursor"] = page["next"]
+    assert names == sorted([row.name for row in rows], reverse=sort.startswith("-"))
+    assert page["next"] is None
+    previous = await auth_client.get("/api/v1/integrations/catalog", params={**params, "cursor": page["prev"]})
+    assert previous.status_code == 200
+    assert [row["name"] for row in previous.json()["resources"]] == [names[-2]]
+
+    for filters in [
+        {"integration_type": "kafka"},
+        {"integration_type[eq]": "kafka"},
+        {"name[contains]": "Kafka"},
+        {"enabled": "false"},
+        {"enabled[eq]": "false"},
+        {"validation_status[eq]": IntegrationStatus.ERROR.value},
+        {"scope[eq]": IntegrationScope.GLOBAL.value, "integration_type[eq]": "kafka"},
+    ]:
+        response = await auth_client.get("/api/v1/integrations/catalog", params={**filters, "include_total": "true"})
+        assert response.status_code == 200
+        page = response.json()
+        assert page["total"] == 1
+        assert page["resources"][0]["integration_type"] == "kafka"
+        assert page["resources"][0]["configuration"]["bootstrap_servers"] == ["broker.example.com:9093"]
+    generated_query = list_integration_catalog._get_kwargs(
+        enabled=ListIntegrationCatalogEnabled(eq=False),
+        integration_type=ListIntegrationCatalogIntegrationType(eq=ListIntegrationCatalogIntegrationTypeEqType0.KAFKA),
+        include_total=True,
+    )["params"]
+    assert generated_query["enabled[eq]"] is False
+    assert generated_query["integration_type[eq]"] == "kafka"
+    assert "eq" not in generated_query
+    generated_response = await auth_client.get("/api/v1/integrations/catalog", params=generated_query)
+    assert generated_response.status_code == 200
+    assert generated_response.json()["total"] == 1
+    assert generated_response.json()["resources"][0]["integration_type"] == "kafka"
+    unmatched_credential = await auth_client.get(
+        "/api/v1/integrations/catalog",
+        params={"management_credential_id[eq]": str(uuid4()), "include_total": "true"},
+    )
+    assert unmatched_credential.status_code == 200
+    assert unmatched_credential.json()["resources"] == []
+    assert unmatched_credential.json()["total"] == 0
+    project_catalog = await auth_client.get(
+        "/api/v1/integrations/catalog", params={"project_id": str(uuid4()), "include_total": "true"}
+    )
+    assert project_catalog.status_code == 200
+    assert project_catalog.json()["total"] == 3
+    legacy = await auth_client.get("/api/v1/integrations", params={"include_total": "true"})
+    assert legacy.status_code == 200
+    assert legacy.json()["total"] == 2
+    assert all(row["integration_type"] != "kafka" for row in legacy.json()["resources"])

@@ -115,9 +115,21 @@ describe('NodeSettingsForm', () => {
   })
 
   describe('timeout', () => {
+    it('persists an advisory expected duration and restores inheritance when cleared', async () => {
+      const onValid = vi.fn()
+      const { user } = setup({}, { settings: { timeout: 30 } }, onValid)
+      const input = screen.getByRole('spinbutton', { name: 'Expected duration (seconds)' })
+      await user.type(input, '2')
+      await user.click(screen.getByRole('button', { name: 'Save settings' }))
+      await waitFor(() => expect(onValid).toHaveBeenLastCalledWith({ settings: { timeout: 30, expected_duration: 2 } }))
+      await user.clear(input)
+      await user.click(screen.getByRole('button', { name: 'Save settings' }))
+      await waitFor(() => expect(onValid).toHaveBeenLastCalledWith({ settings: { timeout: 30 } }))
+    })
     it('renders a seconds input when timeoutFormat is seconds', () => {
       setup({ timeoutFormat: 'seconds' })
       expect(screen.getByRole('spinbutton', { name: 'Timeout (seconds)' })).toBeInTheDocument()
+      expect(screen.getAllByText('Timeout (seconds)')).toHaveLength(1)
     })
 
     it('renders duration picker when timeoutFormat is duration', () => {
@@ -257,7 +269,9 @@ describe('NodeSettingsForm', () => {
     it('shows fallback text when no system default', () => {
       vi.mocked(useWorkflowEngineDefaults).mockReturnValue({ defaults: null, isLoading: false })
       setup({ timeoutFormat: 'duration' })
-      expect(screen.getByText(/Falls back to system default if not set/)).toBeInTheDocument()
+      expect(
+        screen.getByText('How long to wait before timing out. Falls back to system default if not set.')
+      ).toBeInTheDocument()
     })
   })
 

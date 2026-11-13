@@ -13,13 +13,13 @@ from typing import Any
 
 import structlog
 from aiokafka.conn import AIOKafkaConnection, collect_hosts
-from aiokafka.errors import IncompatibleBrokerVersion, KafkaError
+from aiokafka.errors import AuthenticationFailedError, IncompatibleBrokerVersion, KafkaError, SaslAuthenticationFailed
 from aiokafka.protocol.api import Request
 from aiokafka.protocol.metadata import MetadataRequest_v4, MetadataRequest_v5
 
 from syntara.eventstreams.models.responses import EventSubscriptionTestResponse
 from syntara.integrations.adapters.kafka import KafkaAdapter, KafkaAuthenticationConfigurationError
-from syntara.integrations.lib.kafka_connection import create_kafka_connection as create_conn
+from syntara.integrations.lib.kafka_connection import create_pinned_connection as create_conn
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
 PREFLIGHT_TIMEOUT_SECONDS = 10
@@ -47,10 +47,14 @@ async def _connect(config: KafkaConfiguration, options: dict[str, Any]) -> AIOKa
     for host, port, _ in collect_hosts(list(config.bootstrap_servers), randomize=False):
         try:
             return await create_conn(host, port, **options)
-        except (ssl.SSLError, IncompatibleBrokerVersion):
-            # Classified by the caller. Both subclass the fallback errors below.
+        except (ssl.SSLError, IncompatibleBrokerVersion, AuthenticationFailedError, SaslAuthenticationFailed):
+            # Classified by the caller before the fallback errors below.
             raise
-        except (OSError, KafkaError):
+        except (OSError, KafkaError) as exc:
+            # Fallback must not turn an unclassified terminal broker error
+            # into a retryable connection failure for Publish.
+            if isinstance(exc, KafkaError) and not exc.retriable:
+                raise
             continue
     return None
 
@@ -109,7 +113,7 @@ async def test_kafka_connection(
     except ssl.SSLError:
         result.connection = "failed"
         result.error_code = "tls_failed"
-    except (OSError, KafkaError):
+    except (OSError, KafkaError, ValueError):
         result.connection = "failed"
         result.error_code = "connection_failed"
     finally:

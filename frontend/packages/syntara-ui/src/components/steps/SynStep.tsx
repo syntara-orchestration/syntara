@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 
 import { FlowNodeType } from '../../constants'
 import { ExecutionStatusBadge } from '../../routes/builder/components/ExecutionStatusBadge'
+import { RunningLongWarning } from '../../routes/builder/components/RunningLongWarning'
 import { targetHandleStyle, sourceHandleStyle } from '../../routes/workflows/canvas/nodes/common/handleStyle'
 import { useSemanticZoom } from '../../routes/workflows/canvas/nodes/hooks/useSemanticZoom'
 import { NODE_TYPE_COLORS } from '../../routes/workflows/canvas/nodeTypeColors'
@@ -95,6 +96,27 @@ const isWideTaskNode = (nodeProps: NodeProps) => {
   }
 
   return false
+}
+
+function StepRunningLongWarning({ state, node }: Readonly<{ state: ExecutionState; node: TaskActivity }>) {
+  return (
+    <div
+      style={{
+        ...NODE_BOTTOM_BADGE_STYLE,
+        bottom: undefined,
+        top: 'calc(-1 * var(--pf-t--global--spacer--lg))',
+        zIndex: 10,
+      }}
+    >
+      <RunningLongWarning
+        status={state.status}
+        startedAt={state.started_at}
+        completedAt={state.completed_at}
+        nodeType={node.type}
+        expectedDuration={node.settings?.expected_duration}
+      />
+    </div>
+  )
 }
 
 // eslint-disable-next-line complexity
@@ -276,6 +298,9 @@ export function SynStep(props: {
           </div>
         )}
         {!isSemanticZoom && hasValidationError && <ValidationErrorBadge />}
+        {!isSemanticZoom && props.executionState && (
+          <StepRunningLongWarning state={props.executionState} node={props.nodeProps.data as TaskActivity} />
+        )}
         {!props.disableTarget && (
           <Handle
             type="target"

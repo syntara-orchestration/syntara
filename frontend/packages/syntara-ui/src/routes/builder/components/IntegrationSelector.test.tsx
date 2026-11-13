@@ -1,5 +1,5 @@
 import type { IntegrationsAPI } from '@syntara/contracts'
-import { IntegrationStatusEnum } from '@syntara/contracts'
+import { IntegrationStatusEnum, IntegrationTypeEnum } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -7,16 +7,10 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { integrationsClient } from '../../../client'
+import { IntegrationSelector, type IntegrationSelectorProps } from './IntegrationSelector'
 
-import { IntegrationSelector } from './IntegrationSelector'
-
-vi.mock('../../../client', () => ({
-  integrationsClient: {
-    useQuery: vi.fn(),
-    useMutation: vi.fn(),
-  },
-}))
+const { integrationsQuery } = vi.hoisted(() => ({ integrationsQuery: vi.fn() }))
+vi.mock('./useAllIntegrations', () => ({ useAllIntegrations: integrationsQuery }))
 
 type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
@@ -52,39 +46,81 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 )
 
 function mockQuerySuccess(resources = mockIntegrations) {
-  vi.mocked(integrationsClient.useQuery).mockReturnValue({
-    data: { resources, next: null, prev: null },
+  integrationsQuery.mockReturnValue({
+    data: resources,
     isPending: false,
     isError: false,
     refetch: vi.fn(),
-  } as ReturnType<typeof integrationsClient.useQuery>)
+  })
 }
 
 function mockQueryLoading() {
-  vi.mocked(integrationsClient.useQuery).mockReturnValue({
+  integrationsQuery.mockReturnValue({
     data: undefined,
     isPending: true,
     isError: false,
     refetch: vi.fn(),
-  } as ReturnType<typeof integrationsClient.useQuery>)
+  })
 }
 
 function mockQueryError() {
-  vi.mocked(integrationsClient.useQuery).mockReturnValue({
+  integrationsQuery.mockReturnValue({
     data: undefined,
     isPending: false,
     isError: true,
     refetch: vi.fn(),
-  } as ReturnType<typeof integrationsClient.useQuery>)
+  })
 }
 
 function renderSelector(props: Partial<Parameters<typeof IntegrationSelector>[0]> = {}) {
   const onChange = vi.fn()
-  render(<IntegrationSelector onChange={onChange} {...props} />, { wrapper })
-  return { onChange }
+  const view = render(<IntegrationSelector onChange={onChange} {...props} />, { wrapper })
+  return { ...view, onChange }
 }
 
 describe('IntegrationSelector', () => {
+  it('uses the Kafka API and workflow project scope for Kafka selection', () => {
+    mockQuerySuccess([])
+    renderSelector({ integrationType: IntegrationTypeEnum.KAFKA, projectId: 'project-id', label: 'Kafka integration' })
+    expect(integrationsQuery).toHaveBeenCalledWith(IntegrationTypeEnum.KAFKA, 'project-id')
+  })
+
+  it('shows Kafka broker addresses and availability in the integration menu', async () => {
+    const kafkaIntegration = {
+      id: 'kafka-integration',
+      name: 'Kafka Cluster (Demo)',
+      integration_type: IntegrationTypeEnum.KAFKA,
+      validation_status: IntegrationStatusEnum.AVAILABLE,
+      configuration: {
+        integration_type: IntegrationTypeEnum.KAFKA,
+        bootstrap_servers: ['broker-1.example.invalid:9093', 'broker-2.example.invalid:9093'],
+        security_protocol: 'SASL_SSL',
+      },
+    } satisfies IntegrationsAPI.components['schemas']['KafkaIntegrationRead']
+    integrationsQuery.mockReturnValue({ data: [kafkaIntegration], isPending: false, isError: false })
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    const { container } = render(
+      <IntegrationSelector
+        integrationType={IntegrationTypeEnum.KAFKA}
+        label="Integration"
+        isRequired
+        placeholder="Select a Kafka integration"
+        onChange={onChange}
+      />,
+      { wrapper }
+    )
+
+    expect(screen.getByRole('button', { name: 'Integration' })).toHaveTextContent('Select a Kafka integration')
+    await user.click(screen.getByRole('button', { name: 'Integration' }))
+    expect(screen.queryByRole('option', { name: 'Select a Kafka integration' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(screen.getByRole('option', { name: /Kafka Cluster \(Demo\)/ })).toHaveTextContent('Available')
+    expect(screen.getByText('broker-1.example.invalid:9093, broker-2.example.invalid:9093')).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+    await user.click(screen.getByRole('option', { name: /Kafka Cluster \(Demo\)/ }))
+    expect(onChange).toHaveBeenCalledWith(kafkaIntegration.id)
+  })
   beforeEach(() => {
     mockQuerySuccess()
   })
@@ -103,7 +139,72 @@ describe('IntegrationSelector', () => {
     mockQueryLoading()
     renderSelector()
     expect(screen.getByRole('button')).toBeDisabled()
-    expect(screen.getByText('Loading integrations...')).toBeInTheDocument()
+    expect(screen.getByRole('button')).toHaveTextContent('Select an MCP server integration...')
+    expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.queryByText('Loading integrations...')).not.toBeInTheDocument()
+  })
+
+  it('keeps the Kafka prompt stable through initial loading and cached refreshes', async () => {
+    const option = {
+      id: 'kafka-id',
+      name: 'Orders Kafka',
+      integration_type: IntegrationTypeEnum.KAFKA,
+      enabled: true,
+      configuration: { integration_type: IntegrationTypeEnum.KAFKA, bootstrap_servers: ['broker.example.com:9093'] },
+    } satisfies IntegrationsAPI.components['schemas']['KafkaIntegrationRead']
+    const onChange = vi.fn()
+    const props: IntegrationSelectorProps = {
+      integrationType: IntegrationTypeEnum.KAFKA,
+      label: 'Integration',
+      placeholder: 'Select a Kafka integration',
+      onChange,
+    }
+    mockQueryLoading()
+    const { rerender } = render(<IntegrationSelector {...props} />, { wrapper })
+    const toggle = screen.getByRole('button', { name: 'Integration' })
+    expect(toggle).toHaveTextContent('Select a Kafka integration')
+    expect(toggle).toHaveAttribute('aria-busy', 'true')
+    expect(toggle).toBeDisabled()
+
+    integrationsQuery.mockReturnValue({ data: [option], isPending: false, isError: false })
+    rerender(<IntegrationSelector {...props} />)
+    expect(toggle).toHaveTextContent('Select a Kafka integration')
+    expect(toggle).not.toHaveAttribute('aria-busy', 'true')
+    const user = userEvent.setup()
+    await user.click(toggle)
+    expect(screen.getByRole('option', { name: /^Orders Kafka\b/ })).toBeInTheDocument()
+
+    integrationsQuery.mockReturnValue({ data: [option], isPending: false, isFetching: true, isError: false })
+    rerender(<IntegrationSelector {...props} />)
+    expect(toggle).toBeEnabled()
+    expect(toggle).toHaveTextContent('Select a Kafka integration')
+    expect(toggle).not.toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('option', { name: /^Orders Kafka\b/ })).toBeInTheDocument()
+
+    integrationsQuery.mockReturnValue({ data: [option], isPending: false, isError: true, refetch: vi.fn() })
+    rerender(<IntegrationSelector {...props} value={option.id} />)
+    expect(toggle).toHaveTextContent('Orders Kafka')
+    expect(screen.getByRole('option', { name: /^Orders Kafka\b/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry loading integrations' })).toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])('shows only the disabled empty row for Kafka when refreshing is %s', async (isFetching) => {
+    integrationsQuery.mockReturnValue({ data: [], isPending: false, isFetching, isError: false })
+    const { container } = renderSelector({
+      integrationType: IntegrationTypeEnum.KAFKA,
+      label: 'Integration',
+      placeholder: 'Select a Kafka integration',
+    })
+    const toggle = screen.getByRole('button', { name: 'Integration' })
+    expect(toggle).toHaveTextContent('Select a Kafka integration')
+    expect(toggle).toBeEnabled()
+    expect(toggle).not.toHaveAttribute('aria-busy', 'true')
+    await userEvent.setup().click(toggle)
+    expect(screen.getByRole('option', { name: 'No Kafka integrations available' })).toBeDisabled()
+    expect(screen.queryByRole('option', { name: 'Select a Kafka integration' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(await axe(container)).toHaveNoViolations()
   })
 
   it('shows integrations in dropdown when opened', async () => {
@@ -233,20 +334,12 @@ describe('IntegrationSelector', () => {
 
   it('passes project_id to the integrations query when projectId is provided', () => {
     renderSelector({ projectId: 'proj-123' })
-    expect(integrationsClient.useQuery).toHaveBeenCalledWith('get', '/integrations', {
-      params: {
-        query: { integration_type: 'mcp_server', enabled: true, project_id: 'proj-123' },
-      },
-    })
+    expect(integrationsQuery).toHaveBeenCalledWith(IntegrationTypeEnum.MCP_SERVER, 'proj-123')
   })
 
   it('does not include project_id in the query when projectId is omitted', () => {
     renderSelector()
-    expect(integrationsClient.useQuery).toHaveBeenCalledWith('get', '/integrations', {
-      params: {
-        query: { integration_type: 'mcp_server', enabled: true },
-      },
-    })
+    expect(integrationsQuery).toHaveBeenCalledWith(IntegrationTypeEnum.MCP_SERVER, undefined)
   })
 
   it('renders only project-scoped integrations when projectId filters the result set', async () => {

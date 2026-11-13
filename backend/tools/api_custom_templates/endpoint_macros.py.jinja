@@ -50,6 +50,8 @@ if isinstance(additional_params, dict):
     {% endif %}
     {%- if not property.json_is_dict %}
 params["{{ property.name }}"] = {{ destination }}
+    {% elif property.data is defined and property.data.allOf and "eq" in (((property.required_properties or []) + (property.optional_properties or [])) | map(attribute="name") | list) %}
+{{ guarded_statement(property, destination, 'params.update({f"' + property.name + '[{operator}]": value for operator, value in ' + destination + '.items()})') }}
     {% else %}
 {{ guarded_statement(property, destination, "params.update(" + destination + ")") }}
     {% endif %}

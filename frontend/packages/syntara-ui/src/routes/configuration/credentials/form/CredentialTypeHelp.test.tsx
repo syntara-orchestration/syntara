@@ -5,12 +5,10 @@ import { axe } from 'vitest-axe'
 import { CREDENTIAL_TYPE_HELP } from './CredentialTypeHelp'
 
 describe('CredentialTypeHelp', () => {
-  it('describes Kafka as the SASL login for validation and listener runtime', () => {
+  it('describes the connection modes that need Kafka login fields', () => {
     render(CREDENTIAL_TYPE_HELP)
 
-    expect(
-      screen.getByText(/SASL username and password for connector validation and listener runtime/)
-    ).toBeInTheDocument()
+    expect(screen.getByText(/SASL_SSL requires a username and password/)).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

@@ -20,6 +20,7 @@ export const RegistryNodeId = {
   ACTION: 'action',
   ACTION_SCRIPT: 'action-script',
   ACTION_API: 'action-api',
+  ACTION_KAFKA: 'kafka_publish',
   APPROVAL: 'approval',
   LOGIC: 'logic',
   LOGIC_CONDITION: 'logic-condition',

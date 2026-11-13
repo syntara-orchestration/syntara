@@ -1,12 +1,20 @@
 """Preflight sends non-creating metadata only and never claims runtime ACLs."""
 
+import asyncio
 import ssl
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from aiokafka.errors import IncompatibleBrokerVersion, KafkaConnectionError
+from aiokafka.errors import (
+    AuthenticationFailedError,
+    IncompatibleBrokerVersion,
+    KafkaConnectionError,
+    SaslAuthenticationFailed,
+    UnknownError,
+    UnsupportedSaslMechanismError,
+)
 from aiokafka.protocol.metadata import MetadataRequest_v4, MetadataRequest_v5, MetadataResponse_v4, MetadataResponse_v5
 
 from syntara.eventstreams.adapters.kafka_preflight import NonCreatingMetadataRequest
@@ -54,6 +62,7 @@ async def test_missing_denied_or_unavailable_topic_is_safe(topics: list[tuple[An
         (TimeoutError("private-value"), "timeout"),
         (KafkaConnectionError("private-value"), "connection_failed"),
         (IncompatibleBrokerVersion("old"), "safe_metadata_unsupported"),
+        (ValueError("private-value"), "connection_failed"),
     ],
 )
 async def test_failures_are_sanitized_and_close_connections(error: Exception, code: str) -> None:
@@ -98,6 +107,21 @@ async def test_empty_credentials_never_connect(credential: dict[str, Any]) -> No
         result = await preflight(CONFIG, credential, "alerts")
     assert result.error_code == "authentication_configuration"
     create.assert_not_called()
+
+
+async def test_destination_policy_failure_is_sanitized() -> None:
+    with (
+        patch(
+            "syntara.integrations.lib.kafka_connection.approved_broker_addresses",
+            new=AsyncMock(side_effect=ValueError("private-address")),
+        ),
+        patch.object(asyncio.get_running_loop(), "create_connection", new=AsyncMock()) as socket,
+    ):
+        result = await preflight(CONFIG, CREDENTIAL, "alerts")
+    assert not result.success
+    assert result.error_code == "connection_failed"
+    assert "private-address" not in result.model_dump_json()
+    socket.assert_not_awaited()
 
 
 @pytest.mark.parametrize("version", [4, 5])
@@ -150,3 +174,16 @@ async def test_bootstrap_fallback_is_bounded_and_uses_same_runtime_identity() ->
         assert (await preflight(config, CREDENTIAL, "alerts")).success
     assert create.call_count == 2
     assert all(c.kwargs["sasl_plain_username"] == "runtime" for c in create.call_args_list)
+
+
+@pytest.mark.parametrize(
+    "error", [AuthenticationFailedError, SaslAuthenticationFailed, UnsupportedSaslMechanismError, UnknownError]
+)
+async def test_terminal_failure_is_not_hidden_by_bootstrap_fallback(error: type[Exception]) -> None:
+    from syntara.eventstreams.adapters.kafka_preflight import _connect
+
+    config = KafkaConfiguration(bootstrap_servers=["one.example.com:9093", "two.example.com:9093"])
+    with patch(f"{MODULE}.create_conn", side_effect=error("private-value")) as create:
+        with pytest.raises(error):
+            await _connect(config, {})
+    assert create.call_count == 1

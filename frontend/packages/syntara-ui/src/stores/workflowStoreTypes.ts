@@ -44,6 +44,8 @@ export type WorkflowDefinition = Omit<WorkflowDefinitionBase, 'triggers' | 'node
  * paths (e.g., executor type detection in detectTaskNodeType).
  */
 export type ActivityMetadata = {
+  /** Unfinished Kafka payload editor text; never an executable message value. */
+  __kafkaPublishPayloadDraft?: string
   __isGeneric?: boolean
   __customMessage?: string
   __reverseHandles?: boolean
@@ -75,6 +77,10 @@ export type ActivityWithMetadata = Activity & {
  */
 function sanitizeMetadata(raw: Record<string, unknown>): ActivityMetadata {
   const sanitized: ActivityMetadata = {}
+
+  if (typeof raw.__kafkaPublishPayloadDraft === 'string') {
+    sanitized.__kafkaPublishPayloadDraft = raw.__kafkaPublishPayloadDraft
+  }
 
   if ('__isGeneric' in raw) {
     sanitized.__isGeneric = Boolean(raw.__isGeneric)

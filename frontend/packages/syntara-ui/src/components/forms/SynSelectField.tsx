@@ -14,6 +14,7 @@ type SynSelectFieldControlProps<TFieldValues extends FieldValues, TName extends 
   fieldState: ControllerFieldState
   resolvedFieldId: string
   label: string
+  ariaLabel?: string
   options: SynSelectFieldOption[]
   placeholder: string
   isDisabled?: boolean
@@ -24,6 +25,7 @@ function SynSelectFieldControl<TFieldValues extends FieldValues, TName extends F
   fieldState,
   resolvedFieldId,
   label,
+  ariaLabel,
   options,
   placeholder,
   isDisabled,
@@ -46,7 +48,8 @@ function SynSelectFieldControl<TFieldValues extends FieldValues, TName extends F
       field={field}
       fieldState={fieldState}
       resolvedFieldId={resolvedFieldId}
-      label={label}
+      label={ariaLabel ?? label}
+      ariaLabel={ariaLabel}
       options={options}
       displayLabel={displayLabel}
       selected={selectedValue}
@@ -76,6 +79,8 @@ export type SynSelectFieldProps<
   control?: Control<TFieldValues>
   /** Label text rendered above the select. */
   label: string
+  /** Accessible name when repeated fields need more context than their visual labels. */
+  ariaLabel?: string
   /**
    * HTML `id` used as `FormGroup.fieldId` and on the select toggle.
    * Defaults to the `name` prop.
@@ -126,6 +131,7 @@ export function SynSelectField<
   name,
   control,
   label,
+  ariaLabel,
   fieldId,
   isRequired,
   labelHelp,
@@ -152,6 +158,7 @@ export function SynSelectField<
           fieldState={fieldState}
           resolvedFieldId={resolvedFieldId}
           label={label}
+          ariaLabel={ariaLabel}
           options={options}
           placeholder={placeholder}
           isDisabled={isDisabled}

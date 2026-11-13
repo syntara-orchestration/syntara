@@ -28,6 +28,14 @@
       "continue_on_failure": {
         "type": "boolean",
         "description": "When true, downstream nodes continue executing even if this node fails. Inherits from global settings when absent."
+      },
+      "expected_duration": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "minimum": 1,
+        "description": "Advisory expected duration in seconds. Does not stop execution. Inherits the system default when omitted."
       }
     },
     "additionalProperties": false

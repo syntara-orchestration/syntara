@@ -65,6 +65,13 @@ The calculated retry delay is capped at 30 seconds and has no attempt limit.
 Each reconciliation reloads current Integration and Credential settings.
 Corrected remote broker access can recover without republishing the workflow.
 
+Kafka Publish preflight and producer connections enforce that same policy at
+socket creation. Each new connection uses an approved numeric address while TLS
+continues to verify the original broker hostname. Metadata-advertised brokers and
+reconnects, including DNS changes on reused producers, go through the shared
+policy again. The Publish connection wrapper preserves aiokafka's normal producer
+shutdown and pending-delivery ownership.
+
 Publish to activate a listener. Unpublish or disable the workflow to stop
 consumption. Remove the listener and publish the updated workflow to retire its
 source. There are no separate pause, resume, retry, manual recovery or retirement

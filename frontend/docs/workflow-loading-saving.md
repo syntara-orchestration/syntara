@@ -108,6 +108,14 @@ Every time edges change:
 
 ## Saving Process
 
+Shared step settings include an optional positive integer `expected_duration` in
+seconds. It survives save/reopen and version viewing alongside timeout and retry
+settings. Clearing the field inherits `workflow_engine.expected_duration_seconds`
+(60 seconds by default). While a step is active, the canvas and execution activity
+lists show **Running long** once its elapsed duration reaches the threshold. This
+is a display warning; it does not stop execution or change timeout/retry behavior.
+The display uses the current administrator default when there is no step override.
+
 ### File: `workflowDefinitionBuilder.ts`
 
 `buildWorkflowDefinition()` produces the v2 API payload:

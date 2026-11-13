@@ -193,7 +193,7 @@ function renderSelector(props: Partial<CredentialSelectorProps> = {}) {
   return render(<CredentialSelector {...defaultProps} />, { wrapper })
 }
 
-function StagedCredentialSelector() {
+function RequiredCredentialSelector() {
   const [value, setValue] = useState<string>()
   return (
     <KafkaCredentialConnection
@@ -268,15 +268,18 @@ describe('CredentialSelector', () => {
     expect(input).toHaveFocus()
   })
 
-  it('restores focus to Change when Enter selection closes the staged picker', async () => {
+  it('collapses required Kafka setup and focuses Change after keyboard selection', async () => {
     mockUseQuery()
     const user = userEvent.setup()
-    render(<StagedCredentialSelector />, { wrapper })
+    render(<RequiredCredentialSelector />, { wrapper })
+    expect(screen.queryByRole('textbox', { name: 'Credential' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Set up connection' }))
-    await user.click(screen.getByRole('textbox', { name: 'Credential' }))
-    await user.type(screen.getByRole('textbox', { name: 'Credential' }), 'Production')
+    const input = screen.getByRole('textbox', { name: 'Credential' })
+    await user.click(input)
+    await user.type(input, 'Production')
     await user.keyboard('{ArrowDown}{Enter}')
     expect(screen.queryByRole('textbox', { name: 'Credential' })).not.toBeInTheDocument()
+    expect(screen.getByText('Production API Key')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Change' })).toHaveFocus()
   })
 
@@ -285,6 +288,18 @@ describe('CredentialSelector', () => {
     renderSelector({ label: 'API Credential' })
 
     expect(screen.getByText('API Credential')).toBeInTheDocument()
+  })
+
+  it('keeps the picker accessible when its visual label is hidden', async () => {
+    mockUseQueryLegacy()
+    const user = userEvent.setup()
+    const { container } = renderSelector({ label: 'Runtime credential', hideLabel: true })
+
+    expect(screen.queryByText('Runtime credential')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Runtime credential' }))
+    expect(screen.getByRole('listbox', { name: 'Runtime credential options' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Staging Token' })).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
   })
 
   it('shows dropdown with credential list when clicked', async () => {
@@ -397,6 +412,16 @@ describe('CredentialSelector', () => {
     expect(screen.getByText('Production API Key')).toBeInTheDocument()
     expect(screen.getByText('Staging Token')).toBeInTheDocument()
     expect(screen.getByText('Dev Bearer Token')).toBeInTheDocument()
+  })
+
+  it('does not offer incompatible credentials while credential types are unavailable', async () => {
+    const user = userEvent.setup()
+    mockUseQuery({ credentialTypes: { data: undefined, isPending: true } })
+    renderSelector({ compatibleTypeNames: ['Kafka'] })
+    await user.click(screen.getByRole('button', { name: 'Credential' }))
+    expect(screen.queryByRole('option', { name: 'Production API Key' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Staging Token' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Dev Bearer Token' })).not.toBeInTheDocument()
   })
 
   it('shows selected credential name on toggle after selection', async () => {

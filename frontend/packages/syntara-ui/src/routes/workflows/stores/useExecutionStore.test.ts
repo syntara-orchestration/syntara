@@ -187,7 +187,7 @@ describe('useExecutionStore', () => {
     it('updates visualization with workflow definition', () => {
       const execution = createMockExecution({
         workflow_definition: { workflow: { activities: [{ id: 'task1' }] } },
-      } as unknown as Partial<Execution>)
+      })
 
       useExecutionStore.getState().setExecution(execution)
 

@@ -21,6 +21,20 @@ settings = get_settings()
 _UVICORN_LOGGER_NAMES = ("uvicorn", "uvicorn.error", "uvicorn.access")
 
 
+class KafkaDiagnosticFilter(logging.Filter):
+    """Keep SDK protocol dumps, message bytes and broker errors out of log sinks."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Preserve severity and source while discarding untrusted SDK details."""
+        if record.name == "aiokafka" or record.name.startswith("aiokafka."):
+            record.msg = "Kafka client diagnostic (details suppressed)"
+            record.args = ()
+            record.exc_info = None
+            record.exc_text = None
+            record.stack_info = None
+        return True
+
+
 class ExcludeCELDiagnostics(logging.Filter):
     """Keep dependency diagnostics containing filter inputs out of application logs."""
 
@@ -116,6 +130,7 @@ def build_uvicorn_logging_config(log_level: str) -> dict[str, Any]:
         "version": 1,
         "disable_existing_loggers": False,
         "filters": {
+            "kafka_diagnostics": {"()": KafkaDiagnosticFilter},
             "exclude_cel_diagnostics": {"()": "syntara.core.logging.logging.ExcludeCELDiagnostics"},
         },
         "formatters": {
@@ -128,8 +143,8 @@ def build_uvicorn_logging_config(log_level: str) -> dict[str, Any]:
             "syntara": {
                 "formatter": "syntara",
                 "class": "logging.StreamHandler",
-                "filters": ["exclude_cel_diagnostics"],
                 "stream": "ext://sys.stdout",
+                "filters": ["exclude_cel_diagnostics", "kafka_diagnostics"],
             },
         },
         "loggers": {
@@ -225,6 +240,7 @@ def configure_app_logging() -> None:
     handler = logging.StreamHandler()
     handler.addFilter(ExcludeCELDiagnostics())
     handler.setFormatter(build_syntara_formatter())
+    handler.addFilter(KafkaDiagnosticFilter())
 
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
@@ -234,6 +250,7 @@ def configure_app_logging() -> None:
     # Create and attach OTLP handler if enabled
     otel_handler = create_otel_handler()
     if otel_handler is not None:
+        otel_handler.addFilter(KafkaDiagnosticFilter())
         otel_handler.addFilter(ExcludeCELDiagnostics())
         root_logger.addHandler(otel_handler)
         logging.getLogger(__name__).info(

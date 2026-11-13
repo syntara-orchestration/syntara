@@ -23,6 +23,7 @@ function makeWrapper() {
 function makeSettingsResponse(overrides: Record<string, unknown> = {}) {
   const defaults: Record<string, unknown> = {
     'workflow_engine.continue_on_failure': false,
+    'workflow_engine.expected_duration_seconds': 60,
     'workflow_engine.script_timeout_seconds': 300,
     'workflow_engine.agentic_timeout_seconds': 300,
     'workflow_engine.aap_timeout_seconds': 3600,
@@ -62,6 +63,7 @@ describe('useWorkflowEngineDefaults', () => {
     await waitFor(() => expect(result.current.defaults).not.toBeNull())
 
     const { timeoutSeconds } = result.current.defaults!
+    expect(result.current.defaults!.expectedDurationSeconds).toBe(60)
     expect(timeoutSeconds.script).toBe(300)
     expect(timeoutSeconds.agentic).toBe(300)
     expect(timeoutSeconds.aap).toBe(3600)
@@ -99,6 +101,7 @@ describe('useWorkflowEngineDefaults', () => {
     expect(result.current.defaults!.timeoutSeconds.script).toBeNull()
     expect(result.current.defaults!.retry.maxRetries).toBeNull()
     expect(result.current.defaults!.continueOnFailure).toBeNull()
+    expect(result.current.defaults!.expectedDurationSeconds).toBeNull()
   })
 
   it('throws and returns null defaults on API error', async () => {

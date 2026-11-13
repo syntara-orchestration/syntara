@@ -40,7 +40,7 @@ _UPSERT_UPDATE_FIELDS = (
 GA_CREDENTIAL_TYPES: list[dict[str, Any]] = [
     {
         "name": "Kafka",
-        "description": "SASL username and password for connector validation and listener runtime",
+        "description": "Kafka connection credential; SASL_SSL requires a username and password",
         "inputs": {
             "fields": [
                 {
@@ -48,7 +48,7 @@ GA_CREDENTIAL_TYPES: list[dict[str, Any]] = [
                     "label": "Username",
                     "type": "string",
                     "secret": False,
-                    "help_text": "SASL username used for connector validation and listener runtime.",
+                    "help_text": "Required for SASL_SSL. Leave blank for SSL or opted-in PLAINTEXT.",
                     "placeholder": "Enter username",
                 },
                 {
@@ -57,11 +57,12 @@ GA_CREDENTIAL_TYPES: list[dict[str, Any]] = [
                     "type": "string",
                     "secret": True,
                     "min_length": _KAFKA_PASSWORD_MIN_LENGTH,
-                    "help_text": "Kafka SASL password. Encrypted at rest.",
+                    "help_text": "Required for SASL_SSL. Encrypted at rest. Omit for SSL or opted-in PLAINTEXT.",
                     "placeholder": "Enter password",
                 },
             ],
-            "required": ["username", "password"],
+            "required": [],
+            "required_together": [["username", "password"]],
         },
         "injectors": {
             "extra_vars": {

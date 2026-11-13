@@ -59,7 +59,6 @@ from syntara.workflows.models.execution import (
     PreResolvedNodeOutput,
 )
 from syntara.workflows.models.workflow import Workflow
-from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, resolve_trigger_node
@@ -159,9 +158,7 @@ class ExecutionsConvertResourceMixin(ConvertResourceMixin):
 
         if self.include and len(self.include) > 0:
             if ExecutionInclude.WORKFLOW_DEFINITION in self.include:
-                result.workflow_definition = WorkflowDefinition.model_construct(
-                    **resource.workflow_version.workflow_definition
-                )
+                result.workflow_definition = resource.workflow_version.workflow_definition
 
             # Only include activities if explicitly requested
             if ExecutionInclude.ACTIVITIES in self.include:

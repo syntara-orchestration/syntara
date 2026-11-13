@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Syntara API",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "description": "A distributed multi-agent workflow orchestration system"
   },
   "servers": [
@@ -14405,6 +14405,464 @@
         "tags": [
           "Identity Providers"
         ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/integrations/catalog": {
+      "get": {
+        "summary": "List integration catalog",
+        "description": "List integrations of every supported type with filtering and pagination.",
+        "operationId": "list_integration_catalog",
+        "tags": [
+          "Integrations"
+        ],
+        "x-app-permission": {
+          "resource": "integration",
+          "action": "read"
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 100,
+              "default": 20,
+              "description": "Maximum number of results per page",
+              "title": "Limit"
+            },
+            "description": "Maximum number of results per page"
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Pagination cursor from previous response",
+              "title": "Cursor"
+            },
+            "description": "Pagination cursor from previous response"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^-?[a-z][a-z0-9_]*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Sort parameter (e.g., 'name', '-created_at')",
+              "title": "Sort"
+            },
+            "description": "Sort parameter (e.g., 'name', '-created_at')"
+          },
+          {
+            "name": "include_total",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "description": "Include total count in response (expensive)",
+              "title": "Include Total"
+            },
+            "description": "Include total count in response (expensive)"
+          },
+          {
+            "name": "validation_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IntegrationStatus"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Filter by validation status"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "eq": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/IntegrationStatus"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Filter by validation status"
+                    }
+                  }
+                }
+              ],
+              "title": "Validation Status"
+            },
+            "description": "Filter by validation status"
+          },
+          {
+            "name": "enabled",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Filter by enabled status"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "eq": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Filter by enabled status"
+                    }
+                  }
+                }
+              ],
+              "title": "Enabled"
+            },
+            "description": "Filter by enabled status"
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/IntegrationScope"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Filter by visibility scope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "eq": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/IntegrationScope"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Filter by visibility scope"
+                    }
+                  }
+                }
+              ],
+              "title": "Scope"
+            },
+            "description": "Filter by visibility scope"
+          },
+          {
+            "name": "management_credential_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Filter by management credential ID"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "eq": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Filter by management credential ID"
+                    }
+                  }
+                }
+              ],
+              "title": "Management Credential Id"
+            },
+            "description": "Filter by management credential ID (credential used for admin operations like validation and tool/model discovery)"
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations.",
+              "x-query-param": true,
+              "title": "Project Id"
+            },
+            "description": "Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations."
+          },
+          {
+            "name": "integration_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "anyOf": [
+                    {
+                      "enum": [
+                        "mcp_server",
+                        "llm_provider",
+                        "ansible_automation_platform",
+                        "kafka"
+                      ],
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Filter by integration type"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "eq": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "mcp_server",
+                            "llm_provider",
+                            "ansible_automation_platform",
+                            "kafka"
+                          ],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Filter by integration type"
+                    }
+                  }
+                }
+              ],
+              "title": "Integration Type"
+            },
+            "description": "Filter by integration type"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntegrationCatalogListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/bad-request",
+                  "title": "Bad Request",
+                  "detail": "The request was malformed or contained invalid parameters",
+                  "code": "BAD_REQUEST",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/unauthorized",
+                  "title": "Unauthorized",
+                  "detail": "Authentication is required to access this resource",
+                  "code": "UNAUTHORIZED",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/forbidden",
+                  "title": "Forbidden",
+                  "detail": "You do not have permission to access this resource",
+                  "code": "FORBIDDEN",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/not-found",
+                  "title": "Resource Not Found",
+                  "detail": "No resource exists with the provided identifier",
+                  "code": "NOT_FOUND",
+                  "retryable": false,
+                  "instance": "/api/v1/workflows"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/conflict",
+                  "title": "Conflict",
+                  "detail": "The request conflicts with the current state of the resource",
+                  "code": "CONFLICT",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/validation-error",
+                  "title": "Validation Error",
+                  "detail": "Field 'name' must be between 1 and 255 characters",
+                  "code": "VALIDATION_ERROR",
+                  "retryable": false,
+                  "instance": "/api/v1/workflows"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/internal-error",
+                  "title": "Internal Server Error",
+                  "detail": "An unexpected error occurred",
+                  "code": "INTERNAL_ERROR",
+                  "retryable": true
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/rate-limited",
+                  "title": "Too Many Requests",
+                  "detail": "Rate limit exceeded. Try again in 60 seconds.",
+                  "code": "RATE_LIMITED",
+                  "retryable": true
+                }
+              }
+            }
+          }
+        },
         "security": [
           {
             "bearerAuth": []
@@ -45952,6 +46410,79 @@
         "title": "IntegrationProjectAssignmentListResponse",
         "description": "Paginated response for listing project assignments."
       },
+      "IntegrationCatalogListResponse": {
+        "title": "IntegrationCatalogListResponse",
+        "description": "Paginated integrations of every supported type.",
+        "properties": {
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next",
+            "description": "Cursor for next page of results"
+          },
+          "prev": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev",
+            "description": "Cursor for previous page of results"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total",
+            "description": "Total count of resources (only when include_total=true)"
+          },
+          "resources": {
+            "type": "array",
+            "title": "Resources",
+            "description": "Array of resources in current page",
+            "maxItems": 100,
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/IntegrationRead"
+                },
+                {
+                  "$ref": "#/components/schemas/KafkaIntegrationRead"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "resources"
+        ],
+        "type": "object",
+        "examples": [
+          {
+            "next": "eyJpZCI6InV1aWQifQ",
+            "total": 150
+          },
+          {
+            "next": "eyJpZCI6Im5leHQifQ",
+            "prev": "eyJpZCI6InByZXYifQ"
+          }
+        ]
+      },
       "IntegrationListResponse": {
         "title": "IntegrationListResponse",
         "description": "Paginated list response for integrations.",
@@ -51806,13 +52337,15 @@
           "workflow_definition": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/WorkflowDefinition"
+                "additionalProperties": true,
+                "type": "object"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "Workflow definition from the executed version. Only included when requested via ?include=workflow_definition query parameter."
+            "description": "Workflow definition from the executed version. Only included when requested via ?include=workflow_definition query parameter.",
+            "title": "Workflow Definition"
           },
           "activities": {
             "anyOf": [
@@ -52099,6 +52632,7 @@
           "agentic",
           "approval",
           "http_request",
+          "kafka_publish",
           "internal_activity",
           "script"
         ]
@@ -53518,6 +54052,9 @@
                   "$ref": "#/components/schemas/HTTPRequestNode"
                 },
                 {
+                  "$ref": "#/components/schemas/KafkaPublishNode"
+                },
+                {
                   "$ref": "#/components/schemas/AgenticNode"
                 },
                 {
@@ -53555,7 +54092,8 @@
                   "loop": "#/components/schemas/LoopNode",
                   "script": "#/components/schemas/ScriptNode",
                   "switch": "#/components/schemas/SwitchNode",
-                  "wait": "#/components/schemas/WaitNode"
+                  "wait": "#/components/schemas/WaitNode",
+                  "kafka_publish": "#/components/schemas/KafkaPublishNode"
                 }
               }
             },
@@ -55594,6 +56132,19 @@
       },
       "NodeSettingsCof": {
         "properties": {
+          "expected_duration": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Duration",
+            "description": "Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted."
+          },
           "continue_on_failure": {
             "anyOf": [
               {
@@ -55609,10 +56160,23 @@
         "additionalProperties": false,
         "type": "object",
         "title": "NodeSettingsCof",
-        "description": "Settings with continue_on_failure only (converge, loop)."
+        "description": "Settings with failure behavior and an advisory expected duration."
       },
       "NodeSettingsCofDisabled": {
         "properties": {
+          "expected_duration": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Duration",
+            "description": "Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted."
+          },
           "continue_on_failure": {
             "anyOf": [
               {
@@ -55643,6 +56207,19 @@
       },
       "NodeSettingsNoRetry": {
         "properties": {
+          "expected_duration": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Duration",
+            "description": "Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted."
+          },
           "continue_on_failure": {
             "anyOf": [
               {
@@ -55685,6 +56262,19 @@
       },
       "NodeSettingsFull": {
         "properties": {
+          "expected_duration": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Duration",
+            "description": "Expected duration in seconds for an advisory Running long warning. Does not stop execution. Inherits the system default when omitted."
+          },
           "continue_on_failure": {
             "anyOf": [
               {
@@ -56026,6 +56616,211 @@
             "$ref": "#/components/schemas/ValidationResult"
           }
         }
+      },
+      "KafkaEncodedValue": {
+        "properties": {
+          "encoding": {
+            "type": "string",
+            "enum": [
+              "utf-8",
+              "base64"
+            ],
+            "title": "Encoding"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "encoding",
+          "value"
+        ],
+        "title": "KafkaEncodedValue",
+        "description": "Explicit text or binary representation; empty bytes remain distinct from null."
+      },
+      "KafkaPublishHeader": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KafkaEncodedValue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "KafkaPublishHeader",
+        "description": "One ordered header; duplicate names and null values are intentional."
+      },
+      "KafkaPublishParameters": {
+        "properties": {
+          "integration_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
+            "title": "Integration Id"
+          },
+          "credential_id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
+            "title": "Credential Id",
+            "description": "Required runtime Kafka credential reference"
+          },
+          "topic": {
+            "not": {
+              "enum": [
+                ".",
+                ".."
+              ]
+            },
+            "type": "string",
+            "maxLength": 249,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9._-]+$",
+            "title": "Topic"
+          },
+          "payload": {
+            "title": "Payload",
+            "description": "Required JSON value; explicit null publishes JSON null, not a tombstone"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KafkaEncodedValue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "headers": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KafkaPublishHeader"
+                },
+                "type": "array"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Headers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "integration_id",
+          "credential_id",
+          "topic",
+          "payload"
+        ],
+        "title": "KafkaPublishParameters",
+        "description": "Fixed destination and a templated JSON message, with no producer overrides."
+      },
+      "KafkaPublishNode": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "title": "Id",
+            "description": "Unique identifier for the node within the workflow"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Human-readable name for the node"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Human-readable description of the node purpose"
+          },
+          "outputs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputs",
+            "description": "Output extraction mapping"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodePosition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional UI position hint"
+          },
+          "type": {
+            "type": "string",
+            "const": "kafka_publish",
+            "title": "Type"
+          },
+          "parameters": {
+            "$ref": "#/components/schemas/KafkaPublishParameters"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeSettingsFull"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "parameters"
+        ],
+        "title": "KafkaPublishNode",
+        "description": "Publish one JSON record using a step-selected Kafka connection."
       }
     },
     "securitySchemes": {

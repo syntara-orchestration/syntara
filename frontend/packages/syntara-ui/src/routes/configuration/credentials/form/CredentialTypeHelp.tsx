@@ -9,7 +9,8 @@ export const CREDENTIAL_TYPE_HELP = (
     </Content>
     <Content component="ul">
       <Content component="li">
-        <strong>Kafka</strong> &ndash; SASL username and password for connector validation and listener runtime
+        <strong>Kafka</strong> &ndash; Connection credential for Kafka. SASL_SSL requires a username and password; SSL
+        and opted-in PLAINTEXT do not require SASL fields.
       </Content>
       <Content component="li">
         <strong>HTTP Bearer Token</strong> &ndash; For APIs using bearer token authentication

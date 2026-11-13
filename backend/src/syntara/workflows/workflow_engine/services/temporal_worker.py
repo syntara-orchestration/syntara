@@ -32,6 +32,10 @@ from syntara.workflows.workflow_engine.models.workflow_definition import Activit
 from syntara.workflows.workflow_engine.scheduled_launcher import ScheduledExecutionLauncher, ScheduledWorkflowLauncher
 from syntara.workflows.workflow_engine.services.activity_sync_registry import set_activity_sync_service
 from syntara.workflows.workflow_engine.services.activity_sync_service import ActivitySyncService
+from syntara.workflows.workflow_engine.services.kafka_publish_pool import (
+    KafkaPublishPool,
+    initialize_kafka_publish_pool,
+)
 from syntara.workflows.workflow_engine.workflow_auth import init_signing_key
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -88,6 +92,7 @@ class TemporalWorkerService:
         self.worker: Worker | None = None
         self._worker_task: asyncio.Task[None] | None = None
         self.activity_sync_service: ActivitySyncService | None = None
+        self.kafka_publish_pool: KafkaPublishPool | None = None
 
     def _build_concurrency_config(self) -> dict[str, int]:
         config: dict[str, int] = {}
@@ -114,6 +119,8 @@ class TemporalWorkerService:
 
             # Derive the workflow auth HMAC key before the sandbox starts.
             init_signing_key()
+            if ActivityName.KAFKA_PUBLISH in self._activity_registry:
+                self.kafka_publish_pool = initialize_kafka_publish_pool(self.max_concurrent_activities)
 
             # Encrypt credential payloads in Temporal event history using AES-256-GCM.
             # Uses symmetric encrypt/decrypt (not one-way scrubbing) so workers can
@@ -215,6 +222,10 @@ class TemporalWorkerService:
                 logger.info("Worker task cancelled successfully")
 
             self._worker_task = None
+
+        if self.kafka_publish_pool is not None:
+            await self.kafka_publish_pool.close()
+            self.kafka_publish_pool = None
 
         # Flush pending telemetry events after worker has fully stopped
         flush_telemetry()

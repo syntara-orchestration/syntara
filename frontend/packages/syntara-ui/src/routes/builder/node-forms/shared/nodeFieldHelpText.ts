@@ -1,10 +1,26 @@
 /** Help popover body text for workflow builder node form fields. */
 
+export const KAFKA_PUBLISH_PAYLOAD_HELP =
+  'Templates can replace the full payload or appear inside JSON strings. Example: {"order_id":"${trigger.payload.order_id}"}. Arrays are sent as one Kafka record.'
+
+export const KAFKA_PUBLISH_KEY_ENCODING_HELP =
+  'Null sends no bytes. An empty UTF-8 or Base64 value sends an empty byte sequence.'
+
+export const KAFKA_PUBLISH_HEADERS_HELP =
+  'Headers are sent in the order shown, and duplicate names are allowed. A null value sends no bytes; an empty value sends an empty byte sequence. You can add up to 128 headers and drag entries to reorder them.'
+
+export const KAFKA_PUBLISH_HEADER_SOURCE_ENTRIES_HELP = "Configure each header's name, encoding, and value."
+export const KAFKA_PUBLISH_HEADER_SOURCE_TEMPLATE_HELP =
+  'Provide one expression that resolves to an ordered list of headers.'
+
 export const SETTINGS_CONTINUE_ON_FAILURE_HELP =
   'Controls what happens when this step fails. System default uses the administrator setting. Continue on failure marks the step as failed but lets downstream steps continue. Stop workflow or branch on failure halts execution at this step.'
 
 export const SETTINGS_TIMEOUT_HELP =
   'The maximum duration this step can run before it is marked as failed. If the step exceeds the limit, it is stopped and a timeout error is recorded. If you do not set a value, the step uses the global default timeout.'
+
+export const SETTINGS_EXPECTED_DURATION_HELP =
+  'Show a Running long warning when an active step exceeds this duration. This does not stop the step or change timeout and retry behavior. Leave empty to use the administrator-configured system default.'
 
 export const SETTINGS_RETRY_TOGGLE_HELP =
   'When enabled, you can customize the retry behavior for this step. When disabled, the system default retry policy applies. Retries are available for HTTP request, AAP job template, and AAP workflow template steps.'

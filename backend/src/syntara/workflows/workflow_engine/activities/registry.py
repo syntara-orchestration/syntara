@@ -32,6 +32,8 @@ from syntara.workflows.workflow_engine.activities.integration_resolution_activit
 from syntara.workflows.workflow_engine.activities.integration_scope_activity import validate_node_references
 from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
 from syntara.workflows.workflow_engine.activities.internal_activity import execute_internal_activity
+from syntara.workflows.workflow_engine.activities.kafka_publish_activity import execute_kafka_publish_activity
+from syntara.workflows.workflow_engine.activities.kafka_publish_connection import prepare_kafka_publish
 from syntara.workflows.workflow_engine.activities.loop import loop
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
@@ -63,6 +65,8 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     event_subscribe_trigger,
     switch,
     execute_http_request_activity,
+    prepare_kafka_publish,
+    execute_kafka_publish_activity,
     execute_internal_activity,
     loop,
     manual_trigger,

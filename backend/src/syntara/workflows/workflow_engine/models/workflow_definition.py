@@ -137,6 +137,8 @@ class ActivityName(StrEnum):
     AGENTIC = "execute_agentic_activity"
     APPROVAL = "execute_approval_activity"
     HTTP_REQUEST = "execute_http_request_activity"
+    KAFKA_PUBLISH = "execute_kafka_publish_activity"
+    KAFKA_PUBLISH_PREPARE = "prepare_kafka_publish"
     INTERNAL_ACTIVITY = "execute_internal_activity"
     SCRIPT = "execute_script_activity"
     # Internal
@@ -175,6 +177,7 @@ class NodeType(str, Enum):
     AGENTIC = "agentic"
     APPROVAL = "approval"
     HTTP_REQUEST = "http_request"
+    KAFKA_PUBLISH = "kafka_publish"
     INTERNAL_ACTIVITY = "internal_activity"
     SCRIPT = "script"
 
@@ -309,9 +312,17 @@ class NodeSettingsBase(BaseModel):
 
 
 class NodeSettingsCof(NodeSettingsBase):
-    """Settings with continue_on_failure only (converge, loop)."""
+    """Settings with failure behavior and an advisory expected duration."""
 
     continue_on_failure: bool | None = None
+    expected_duration: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "Expected duration in seconds for an advisory Running long warning. "
+            "Does not stop execution. Inherits the system default when omitted."
+        ),
+    )
 
 
 class NodeSettingsCofDisabled(NodeSettingsCof):
@@ -949,6 +960,17 @@ class HttpRequestOutput(NodeOutput):
     elapsed: float | None = None
 
 
+class KafkaPublishOutput(NodeOutput):
+    """Broker acknowledgment metadata, without message data or credentials."""
+
+    topic: str | None = Field(default=None, description="Topic containing the acknowledged record")
+    partition: int | None = Field(default=None, description="Kafka partition selected by the producer")
+    offset: str | None = Field(default=None, description="Kafka offset as a decimal string; null when unavailable")
+    timestamp_ms: int | None = Field(
+        default=None, description="Kafka record timestamp in milliseconds; null when unavailable"
+    )
+
+
 class AAPJobTemplateOutput(NodeOutput):
     """Output model for AAP job template executor nodes."""
 
@@ -1027,6 +1049,7 @@ class WaitOutput(NodeOutput):
 NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {
     NodeType.SCRIPT: ScriptOutput,
     NodeType.HTTP_REQUEST: HttpRequestOutput,
+    NodeType.KAFKA_PUBLISH: KafkaPublishOutput,
     NodeType.AAP_JOB_TEMPLATE: AAPJobTemplateOutput,
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: AAPWorkflowJobTemplateOutput,
     NodeType.AGENTIC: AgenticOutput,
