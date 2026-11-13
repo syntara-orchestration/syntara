@@ -37,8 +37,14 @@ services:
       - default
       - kind
 
+  execution-plane-api:
+    # On-demand target health probes resolve the kind API server from the API.
+    networks:
+      - default
+      - kind
+
   execution-plane-worker:
-    # Join the kind podman network so the API-server hostname resolves in-container.
+    # Work dispatch also resolves the kind API server from the worker.
     networks:
       - default
       - kind

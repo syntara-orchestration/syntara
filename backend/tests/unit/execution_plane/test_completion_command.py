@@ -1,6 +1,7 @@
 """Exercise AO's EP callback using real shared command envelopes."""
 
 from collections.abc import Awaitable, Callable
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -10,6 +11,7 @@ from execution_plane_client.commands.control import Completion, CompletionStatus
 from execution_plane_client.protocol import ResourceReference
 from fastapi import FastAPI, Request, Response
 
+from syntara.authz.exceptions import AuthorizationDeniedError, authorization_denied_handler
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import get_db
 from syntara.execution_plane import bridge
@@ -17,9 +19,14 @@ from syntara.workflows.executions_router import get_temporal_execution_service
 
 
 @pytest.fixture
-def callback() -> tuple[FastAPI, AsyncMock, MagicMock]:
+def callback(monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, AsyncMock, MagicMock]:
     app = FastAPI()
     app.include_router(bridge.router)
+    app.add_exception_handler(AuthorizationDeniedError, authorization_denied_handler)  # type: ignore[arg-type]
+    app.state.authz_evaluator = MagicMock()
+    authorize = AsyncMock()
+    authorize.return_value.allowed = True
+    monkeypatch.setattr(bridge, "authorize", authorize)
     session = AsyncMock()
     rows = MagicMock()
     rows.first.return_value = ("workflow-id", "activity-id")
@@ -57,6 +64,57 @@ def test_router_only_exposes_the_command_ingress():
 
 def test_command_ingress_is_not_published_in_openapi():
     assert all(not route.include_in_schema for route in bridge.router.routes)
+
+
+@pytest.mark.asyncio
+async def test_completion_authorizes_ep_service_principal(callback, monkeypatch):
+    app, temporal, _ = callback
+    authorize = AsyncMock()
+    authorize.return_value.allowed = True
+    monkeypatch.setattr(bridge, "authorize", authorize)
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=completion().model_dump(mode="json"))
+
+    assert response.status_code == 200, response.text
+    assert authorize.await_count == 1
+    request_arg = authorize.await_args.args[2]
+    assert request_arg.user_id == bridge.service_principal_id(get_settings().ep_callback_service_cn)
+    assert request_arg.resource_type == "execution-plane-callback"
+    assert request_arg.action == "complete"
+    assert request_arg.groups == []
+    temporal.complete_async_activity.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_completion_rejects_service_principal_without_callback_role(callback, monkeypatch):
+    app, temporal, _ = callback
+    authorize = AsyncMock()
+    authorize.return_value.allowed = False
+    monkeypatch.setattr(bridge, "authorize", authorize)
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=completion().model_dump(mode="json"))
+
+    assert response.status_code == 403
+    authorize.assert_awaited_once()
+    temporal.complete_async_activity.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_completion_rejects_wrong_certificate_identity(callback, monkeypatch):
+    app, temporal, _ = callback
+    monkeypatch.setattr(
+        bridge,
+        "get_settings",
+        lambda: SimpleNamespace(ep_callback_service_cn="other-allowlisted-service"),
+    )
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=completion().model_dump(mode="json"))
+
+    assert response.status_code == 403
+    temporal.complete_async_activity.assert_not_awaited()
 
 
 @pytest.mark.asyncio

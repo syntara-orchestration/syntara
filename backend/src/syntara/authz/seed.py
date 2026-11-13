@@ -231,6 +231,28 @@ async def _ensure_group_membership(session: AsyncSession, user: User, group: Gro
         await session.exec(insert(user_groups).values(user_id=user.id, group_id=group.id))
 
 
+async def _ensure_service_role_assignment(session: AsyncSession, principal_id: UUID, role_name: str) -> None:
+    """Create a global service-principal role assignment if it does not exist."""
+    existing = await session.exec(
+        select(RoleAssignment).where(
+            RoleAssignment.principal_id == principal_id,
+            RoleAssignment.role_name == role_name,
+            RoleAssignment.project_id.is_(None),  # type: ignore[union-attr]
+        )
+    )
+    if not existing.one_or_none():
+        session.add(
+            RoleAssignment(
+                id=uuid4(),
+                principal_id=principal_id,
+                role_name=role_name,
+                project_id=None,
+                is_builtin=True,
+                labels={},
+            )
+        )
+
+
 async def _seed_assignments_and_admin(
     session: AsyncSession,
     auth_group: Group,
@@ -247,15 +269,18 @@ async def _seed_assignments_and_admin(
     await _ensure_role_assignment(session, users_group, "project-user", is_builtin=False, project_id=default_project.id)
 
     # Seed service principals for internal mTLS-authenticated services
-    from syntara.core.models.principal import KNOWN_SERVICE_CNS, Principal, service_principal_id  # noqa: PLC0415
+    from syntara.core.models.principal import Principal, configured_service_cns, service_principal_id  # noqa: PLC0415
 
-    for cn in KNOWN_SERVICE_CNS:
+    for cn in configured_service_cns():
         sp_id = service_principal_id(cn)
         existing = await session.get(Principal, sp_id)
         if not existing:
             session.add(Principal.for_service(cn))
             await session.flush()
             logger.info("Service principal created", cn=cn, principal_id=str(sp_id))
+
+    ep_principal_id = service_principal_id(get_settings().ep_callback_service_cn)
+    await _ensure_service_role_assignment(session, ep_principal_id, "execution-plane-callback")
 
     # Bootstrap admin user
     existing_admin_user = await session.exec(select(User).where(User.username == BOOTSTRAP_ADMIN_USERNAME))

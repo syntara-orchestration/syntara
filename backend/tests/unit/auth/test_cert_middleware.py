@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
+    from contextlib import AbstractContextManager
     from pathlib import Path
 
 import pytest
@@ -445,17 +446,37 @@ class TestAllowlistDriftWarning:
             mock.return_value.s2s_tls_crl_path = None
             ClientCertAuthMiddleware(AsyncMock())
         mock_logger.warning.assert_called_once()
-        assert "KNOWN_SERVICE_CNS entries missing" in mock_logger.warning.call_args[0][0]
+        assert "Service certificate CNs missing" in mock_logger.warning.call_args[0][0]
 
     def test_no_warning_when_all_known_cns_in_allowlist(self) -> None:
-        from syntara.core.models.principal import KNOWN_SERVICE_CNS
+        from syntara.core.models.principal import configured_service_cns
 
         with (
             patch("syntara.auth.cert_middleware.get_settings") as mock,
             patch("syntara.auth.cert_middleware.logger") as mock_logger,
         ):
             mock.return_value.s2s_tls_enabled = True
-            mock.return_value.s2s_tls_cn_allowlist = list(KNOWN_SERVICE_CNS)
+            mock.return_value.s2s_tls_cn_allowlist = list(configured_service_cns())
             mock.return_value.s2s_tls_crl_path = None
             ClientCertAuthMiddleware(AsyncMock())
         mock_logger.warning.assert_not_called()
+
+    def test_warns_when_configured_execution_plane_cn_missing_from_allowlist(
+        self,
+        override_settings: Callable[..., AbstractContextManager[object]],
+    ) -> None:
+        from syntara.core.models.principal import KNOWN_SERVICE_CNS
+
+        certificate_cn = "execution-plane.k8s.serviceaccount"
+        with (
+            override_settings(
+                ep_callback_service_cn=certificate_cn,
+                s2s_tls_enabled=True,
+                s2s_tls_cn_allowlist=list(KNOWN_SERVICE_CNS),
+                s2s_tls_crl_path=None,
+            ),
+            patch("syntara.auth.cert_middleware.logger") as mock_logger,
+        ):
+            ClientCertAuthMiddleware(AsyncMock())
+        mock_logger.warning.assert_called_once()
+        assert certificate_cn in mock_logger.warning.call_args.args[1]

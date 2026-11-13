@@ -461,12 +461,24 @@ services:
       - EP_AO_JWT_ISSUER=${APP_SERVER_PUBLIC_URL:-https://0.0.0.0:8000}
       - EP_AO_CLIENT_ID=syntara-orchestration
       - EP_CREDENTIAL_ENCRYPTION_KEY_PATH=/run/secrets/ep-credential-encryption-key
+      - EP_COMPLETION_CALLBACK_URL=https://syntara:8000/api/execution_plane/v1/commands
+      - EP_CALLBACK_CA_CERT_PATH=/run/secrets/s2s-ca.pem
+      - EP_CALLBACK_CERT_PATH=/run/secrets/ep-callback.crt
+      - EP_CALLBACK_KEY_PATH=/run/secrets/ep-callback.key
+      - EP_CREDENTIAL_RESOLUTION_CALLBACK_URL=https://syntara:8000/api/execution_plane/v1/commands
+      - EP_CREDENTIAL_RESOLUTION_CALLBACK_CA_CERT_PATH=/run/secrets/s2s-ca.pem
+      - EP_CREDENTIAL_RESOLUTION_CALLBACK_CERT_PATH=/run/secrets/ep-callback.crt
+      - EP_CREDENTIAL_RESOLUTION_CALLBACK_KEY_PATH=/run/secrets/ep-callback.key
+      - EP_CREDENTIAL_RESOLUTION_CALLBACK_TIMEOUT_SECONDS=${EP_CREDENTIAL_RESOLUTION_CALLBACK_TIMEOUT_SECONDS:-10}
     volumes:
       - ./backend/.secrets/jwt-primary.pub:/run/secrets/ao-jwt-public.pem:ro,z
       - ./backend/.secrets/ep-credential-encryption-key:/run/secrets/ep-credential-encryption-key:ro,z
       - ./backend/.secrets/certs/execution-plane.crt:/run/secrets/ep-api/tls.crt:ro,z
       - ./backend/.secrets/certs/execution-plane.key:/run/secrets/ep-api/tls.key:ro,z
       - ./backend/.secrets/certs/ca.pem:/run/secrets/ep-api/ca.pem:ro,z
+      - ./backend/.secrets/certs/ca.pem:/run/secrets/s2s-ca.pem:ro,z
+      - ./backend/.secrets/certs/execution-plane.crt:/run/secrets/ep-callback.crt:ro,z
+      - ./backend/.secrets/certs/execution-plane.key:/run/secrets/ep-callback.key:ro,z
     depends_on:
       execution-plane-migrate:
         condition: service_completed_successfully

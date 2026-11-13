@@ -54,7 +54,7 @@ Each service has a distinct CN matching the production naming convention:
 
 The UI CN is deliberately excluded from the allowlist. The UI's nginx proxy presents a client cert for transport trust (proving it's the real UI pod), but user requests through nginx must fall through to JWT auth. Without this exclusion, the UI cert would grant service identity — bypassing OPA authorization and logging all user requests as a service actor.
 
-The canonical list of service CNs is defined in `syntara.core.models.principal.KNOWN_SERVICE_CNS` and validated against the cert generation tool at import time.
+The canonical list of service CNs is defined in `syntara.core.models.principal.KNOWN_SERVICE_CNS`; `configured_service_cns()` adds the configured Execution Plane callback identity. Certificate generation validates that every canonical CN has a local certificate; it may also generate additional deployment-specific identities, such as the local Execution Plane certificate.
 
 ## Certificate Requirements
 
