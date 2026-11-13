@@ -22,33 +22,31 @@ function baseFormData(overrides: Partial<FormPromptFormData> = {}): FormPromptFo
 
 describe('mapFormPromptFormDataToSubmit', () => {
   it('trims strings and omits empty optional fields', () => {
-    const result = mapFormPromptFormDataToSubmit(baseFormData(), false)
+    const result = mapFormPromptFormDataToSubmit(baseFormData())
     expect(result.name).toBe('Survey')
     expect(result.message).toBe('Hello')
     expect(result.submit_label).toBe('Send')
     expect(result.success_message).toBe('Done')
     expect(result.css_override).toBe('.x { color: red; }')
     expect(result.responder_users).toBeUndefined()
-    expect(result.fallback_decision).toBe('submit')
+    expect(result.fallback_decision).toBe('fallback')
   })
 
-  it('forces submit fallback_decision when continue-on-failure is not effectively enabled', () => {
+  it('preserves fallback_decision when continue-on-failure is not effectively enabled', () => {
     const result = mapFormPromptFormDataToSubmit(
-      baseFormData({ fallback_decision: 'fallback', settings: { continue_on_failure: false } }),
-      false
+      baseFormData({ fallback_decision: 'fallback', settings: { continue_on_failure: false } })
     )
-    expect(result.fallback_decision).toBe('submit')
+    expect(result.fallback_decision).toBe('fallback')
   })
 
   it('preserves settings.timeout from loaded activity data', () => {
-    const result = mapFormPromptFormDataToSubmit(baseFormData({ settings: { timeout: 900 } }), false)
+    const result = mapFormPromptFormDataToSubmit(baseFormData({ settings: { timeout: 900 } }))
     expect(result.settings).toEqual({ timeout: 900 })
   })
 
   it('keeps fallback_decision when continue-on-failure is effectively enabled', () => {
     const result = mapFormPromptFormDataToSubmit(
-      baseFormData({ fallback_decision: 'fallback', settings: { continue_on_failure: true } }),
-      false
+      baseFormData({ fallback_decision: 'fallback', settings: { continue_on_failure: true } })
     )
     expect(result.fallback_decision).toBe('fallback')
   })

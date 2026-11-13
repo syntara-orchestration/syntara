@@ -795,7 +795,7 @@ export async function configureFormPromptFallbackRouting(page: Page) {
   const fallbackToggle = page.getByRole('button', { name: 'Fallback decision', exact: true })
   await expect(fallbackToggle).toBeEnabled({ timeout: 10_000 })
   await fallbackToggle.click()
-  const visibleFallbackOption = page.getByRole('option', { name: 'Fallback path (default)' }).filter({ visible: true })
+  const visibleFallbackOption = page.getByRole('option', { name: 'Fallback path' }).filter({ visible: true })
   await expect(visibleFallbackOption).toHaveCount(1, { timeout: 10_000 })
   await visibleFallbackOption.click()
 }

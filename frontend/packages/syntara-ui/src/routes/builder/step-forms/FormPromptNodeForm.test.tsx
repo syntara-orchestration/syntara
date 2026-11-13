@@ -49,17 +49,6 @@ vi.mock('./useApprovalDecideGroups', () => ({
   useApprovalDecideGroups: mockUseApprovalDecideGroups,
 }))
 
-const { mockUseWorkflowEngineDefaults } = vi.hoisted(() => ({
-  mockUseWorkflowEngineDefaults: vi.fn(() => ({
-    defaults: { timeoutSeconds: { form_prompt: 86400 }, continueOnFailure: false },
-    isLoading: false,
-  })),
-}))
-
-vi.mock('../hooks/useWorkflowEngineDefaults', () => ({
-  useWorkflowEngineDefaults: mockUseWorkflowEngineDefaults,
-}))
-
 vi.mock('../../../stores/useWorkflowStore', () => ({
   useWorkflowStore: (selector: (state: { projectId: string | undefined }) => unknown) =>
     selector({ projectId: mockWorkflowProjectId.current }),
@@ -98,10 +87,6 @@ describe('FormPromptNodeForm', () => {
       error: null,
       refetch: vi.fn(),
     })
-    mockUseWorkflowEngineDefaults.mockReturnValue({
-      defaults: { timeoutSeconds: { form_prompt: 86400 }, continueOnFailure: false },
-      isLoading: false,
-    })
   })
 
   describe('Rendering', () => {
@@ -133,6 +118,12 @@ describe('FormPromptNodeForm', () => {
       expect(screen.getByRole('heading', { name: 'Timeout' })).toBeInTheDocument()
       expect(screen.getByText('Fallback decision')).toBeInTheDocument()
       expect(screen.getByText('Form submission window')).toBeInTheDocument()
+    })
+
+    it('defaults fallback decision to fallback path when continue on failure is off', () => {
+      renderFormPrompt(<FormPromptNodeForm onSubmit={mockOnSubmit} />)
+
+      expect(screen.getByRole('button', { name: 'Fallback decision' })).toHaveTextContent('Fallback path')
     })
 
     it('shows Settings tab content when selected', async () => {
@@ -277,7 +268,7 @@ describe('FormPromptNodeForm', () => {
       )
     })
 
-    it('forces submit fallback_decision when continue on failure is off', async () => {
+    it('preserves fallback_decision when continue on failure is off', async () => {
       const user = userEvent.setup()
 
       renderFormPrompt(
@@ -300,7 +291,7 @@ describe('FormPromptNodeForm', () => {
 
       expect(mockOnSubmit).toHaveBeenCalledWith(
         expect.objectContaining({
-          fallback_decision: 'submit',
+          fallback_decision: 'fallback',
         })
       )
     })

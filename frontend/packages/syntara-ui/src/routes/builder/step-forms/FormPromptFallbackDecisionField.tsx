@@ -17,7 +17,7 @@ import {
 const FALLBACK_HELPER_ID = 'form-prompt-fallback-decision-helper'
 
 function fallbackToggleLabel(value: string): string {
-  return value === 'submit' ? 'Submitted path' : 'Fallback path (default)'
+  return value === 'submit' ? 'Submitted path' : 'Fallback path'
 }
 
 function parseFormPromptFallbackDecision(value: string | number | undefined): 'submit' | 'fallback' {
@@ -25,7 +25,7 @@ function parseFormPromptFallbackDecision(value: string | number | undefined): 's
 }
 
 const FORM_PROMPT_FALLBACK_OPTIONS = [
-  { value: 'fallback', label: 'Fallback path (default)' },
+  { value: 'fallback', label: 'Fallback path' },
   { value: 'submit', label: 'Submitted path' },
 ] as const
 
@@ -34,7 +34,7 @@ export function FormPromptFallbackDecisionField() {
   const { control, setValue } = useFormContext<FormPromptFormData>()
   const { isEffectivelyEnabled, source } = useEffectiveContinueOnFailure()
   const fallbackDecision = useWatch({ control, name: 'fallback_decision' })
-  const timeoutDecision = isEffectivelyEnabled ? (fallbackDecision ?? 'fallback') : 'submit'
+  const timeoutDecision = fallbackDecision ?? 'fallback'
 
   const disabledMessage = getFallbackDecisionDisabledMessage(source)
   const showDisabledGuidance = !isVersionView && !isEffectivelyEnabled
