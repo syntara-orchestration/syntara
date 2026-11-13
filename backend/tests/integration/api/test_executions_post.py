@@ -11,11 +11,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.models import User
+from syntara.workflow_runtime.execution import WorkflowExecutionService
 from syntara.workflows.models import Workflow
 from syntara.workflows.models.execution import Execution
-from syntara.workflows.workflow_engine.services.temporal_execution_service import (
-    TemporalExecutionService,
-)
 from tests.helpers.user_reference import assert_user_reference
 
 
@@ -176,9 +174,9 @@ async def test_create_execution_temporal_connection_failure_graceful_degradation
     This ensures graceful degradation when Temporal is down, regardless of the
     specific exception type (ConnectionError, RPCError, OSError, RuntimeError).
     """
-    # Mock create_temporal_execution_service to raise the exception
+    # Mock create_workflow_execution_service to raise the exception
     with patch(
-        "syntara.workflows.executions_router.create_temporal_execution_service",
+        "syntara.workflows.executions_router.create_workflow_execution_service",
         side_effect=exception,
     ):
         response = await auth_client.post(
@@ -236,7 +234,7 @@ async def test_create_execution_temporal_workflow_start_failure(
     result = await test_db_session.exec(select(func.count()).select_from(Execution))
     executions_before = result.one()
 
-    # Mock create_temporal_execution_service to return a service
+    # Mock create_workflow_execution_service to return a service
     mock_temporal_service = AsyncMock()
 
     # Mock start_workflow to raise RPCError (workflow start failure)
@@ -247,11 +245,11 @@ async def test_create_execution_temporal_workflow_start_failure(
     )
     mock_temporal_service.start_workflow = AsyncMock(side_effect=rpc_error)
 
-    async def mock_create_service() -> TemporalExecutionService:
+    async def mock_create_service() -> WorkflowExecutionService:
         return mock_temporal_service
 
     with patch(
-        "syntara.workflows.executions_router.create_temporal_execution_service",
+        "syntara.workflows.executions_router.create_workflow_execution_service",
         side_effect=mock_create_service,
     ):
         response = await auth_client.post(

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import httpx
 import pytest
 
-from syntara.workflows.clients.agent_orchestrator_client import (
+from syntara.workflow_runtime.clients.agent_orchestrator_client import (
     AgentOrchestratorClient,
 )
 

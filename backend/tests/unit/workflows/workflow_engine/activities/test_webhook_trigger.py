@@ -8,7 +8,7 @@ Covers:
 
 import pytest
 
-from syntara.workflows.workflow_engine.activities.webhook_trigger import webhook_trigger
+from syntara.workflow_runtime.engines.temporal.activities.webhook_trigger import webhook_trigger
 
 
 async def test_webhook_trigger_basic() -> None:

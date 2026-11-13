@@ -9,7 +9,7 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from syntara.workflows.workflow_engine.activities.aap_common import (
+from syntara.workflow_runtime.engines.temporal.activities.aap_common import (
     MAX_CONSECUTIVE_POLL_ERRORS,
     AAPActivityExecutionError,
     _is_transient_poll_error,
@@ -17,7 +17,7 @@ from syntara.workflows.workflow_engine.activities.aap_common import (
     build_aap_job_url,
     poll_until_complete,
 )
-from syntara.workflows.workflow_engine.activities.common import (
+from syntara.workflow_runtime.engines.temporal.activities.common import (
     HEARTBEAT_PARTIAL_OUTPUT_KEY,
     HEARTBEAT_STOP_MONITOR,
 )
