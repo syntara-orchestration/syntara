@@ -12,6 +12,8 @@ from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, SubWorkflowExecutorParameters
 
+from .template_expressions import extract_element_expressions
+
 NodeTarget = tuple[str | None, UUID, str, Mapping[str, Any]]
 TargetWorkflow = tuple[str | None, UUID, UUID | None, Mapping[str, Any] | None]
 
@@ -131,12 +133,44 @@ def _required_trigger_input_names(trigger: Mapping[str, Any]) -> list[str]:
     return [name for name in required if isinstance(name, str)]
 
 
+def _referenced_child_step_ids(
+    workflow_definition: Mapping[str, Any],
+    subworkflow_node_id: str | None,
+) -> set[str]:
+    """Find child step IDs referenced through a Sub-workflow output expression."""
+    if subworkflow_node_id is None:
+        return set()
+
+    triggers = workflow_definition.get("triggers")
+    nodes = workflow_definition.get("nodes")
+    elements = [*(triggers if isinstance(triggers, list) else []), *(nodes if isinstance(nodes, list) else [])]
+    referenced_ids: set[str] = set()
+    for element in elements:
+        if not isinstance(element, dict):
+            continue
+        for expression, _field_path in extract_element_expressions(element):
+            scope, *path = expression.split(".")
+            if scope != subworkflow_node_id or not path:
+                continue
+            result_field, *path = path
+            if result_field != "Result" or not path:
+                continue
+            outputs_field, *path = path
+            if outputs_field != "outputs" or not path:
+                continue
+            child_step_id, *_ = path
+            if child_step_id:
+                referenced_ids.add(child_step_id)
+    return referenced_ids
+
+
 def _validate_target_workflow(
     target_workflow: TargetWorkflow | None,
     project_id: UUID,
     trigger_node_id: str,
     node_id: str | None,
     input_mapping: Mapping[str, Any],
+    parent_workflow_definition: Mapping[str, Any],
 ) -> list[ValidationFinding]:
     if target_workflow is None:
         return [
@@ -145,7 +179,7 @@ def _validate_target_workflow(
             )
         ]
 
-    workflow_name, target_project_id, published_version_id, published_definition = target_workflow
+    _workflow_name, target_project_id, published_version_id, published_definition = target_workflow
     if target_project_id != project_id:
         return [
             _invalid_reference_finding(
@@ -156,8 +190,12 @@ def _validate_target_workflow(
         ]
     if published_version_id is None:
         return [
-            _invalid_reference_finding(
-                "The selected child workflow must have a published version.", node_id, "parameters.workflow_id"
+            ValidationFinding(
+                severity=ValidationSeverity.warning,
+                category=ValidationCategory.invalid_reference,
+                message="The selected child workflow has no published version",
+                node_id=node_id,
+                field_path="parameters.workflow_id",
             )
         ]
     selected_trigger = _get_selected_subworkflow_trigger(published_definition, trigger_node_id)
@@ -170,11 +208,11 @@ def _validate_target_workflow(
             )
         ]
 
-    return [
+    findings = [
         ValidationFinding(
             severity=ValidationSeverity.warning,
             category=ValidationCategory.missing_field,
-            message=(f"Child workflow '{workflow_name}' requires input '{input_name}', not provided in input_mapping"),
+            message=f"The selected child workflow requires input '{input_name}', not provided in input_mapping",
             node_id=node_id,
             field_path=f"parameters.input_mapping.{input_name}",
         )
@@ -182,16 +220,40 @@ def _validate_target_workflow(
         if input_name not in input_mapping
     ]
 
+    published_nodes = published_definition.get("nodes") if isinstance(published_definition, Mapping) else None
+    published_step_ids: set[str] = set()
+    if isinstance(published_nodes, list):
+        for child_node in published_nodes:
+            if isinstance(child_node, Mapping):
+                child_step_id = child_node.get("id")
+                if isinstance(child_step_id, str):
+                    published_step_ids.add(child_step_id)
+    stale_step_ids = sorted(_referenced_child_step_ids(parent_workflow_definition, node_id) - published_step_ids)
+    findings.extend(
+        [
+            ValidationFinding(
+                severity=ValidationSeverity.warning,
+                category=ValidationCategory.invalid_reference,
+                message=f"Parent references child step '{step_id}' which no longer exists",
+                node_id=node_id,
+                field_path=f"Result.outputs.{step_id}",
+            )
+            for step_id in stale_step_ids
+        ]
+    )
+    return findings
+
 
 async def validate_subworkflow_project_references(
     session: AsyncSession,
     workflow_definition: dict[str, Any],
     project_id: UUID,
 ) -> list[ValidationFinding]:
-    """Ensure each configured child workflow is invokable from the parent Project.
+    """Validate child workflow targets, required inputs, and referenced child step IDs.
 
     Reuse the parameter model's UUID check because the service can receive raw
-    workflow-definition dictionaries. Collect IDs first to batch the lookup.
+    workflow-definition dictionaries. Collect IDs first to batch the lookup. Findings for
+    missing child inputs, unpublished children, or stale child step IDs are warnings.
     """
     nodes = workflow_definition.get("nodes", [])
     if not isinstance(nodes, list):
@@ -210,6 +272,7 @@ async def validate_subworkflow_project_references(
                 trigger_node_id,
                 node_id,
                 input_mapping,
+                workflow_definition,
             )
         )
 
