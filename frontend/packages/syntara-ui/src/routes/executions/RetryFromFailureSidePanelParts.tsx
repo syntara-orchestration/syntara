@@ -197,7 +197,7 @@ function RetryScopeSelector({
           <Radio
             id={`${scopeId}-all`}
             name={`${scopeId}-scope`}
-            label="Retry all affected branches"
+            label="Retry from all affected steps"
             isChecked={scopeMode === 'all'}
             isDisabled={isRetryPending}
             onChange={onSelectAll}
@@ -205,7 +205,7 @@ function RetryScopeSelector({
           <Radio
             id={`${scopeId}-selected`}
             name={`${scopeId}-scope`}
-            label="Choose branches"
+            label="Choose steps"
             isChecked={scopeMode === 'selected'}
             isDisabled={isRetryPending}
             onChange={onChoosePoints}
@@ -219,7 +219,7 @@ function RetryScopeSelector({
               <FormGroup
                 fieldId={`${scopeId}-retry-points`}
                 role="group"
-                label="Select the branches where the retry should begin"
+                label="Select the steps where the retry should begin"
               >
                 <List isPlain>
                   {selectablePoints.map((point) => (
@@ -257,10 +257,10 @@ function RetryScopeSelector({
                 <Alert
                   isInline
                   variant="warning"
-                  title="Some branches may fail"
+                  title="Workflow may fail"
                   data-testid="retry-partial-scope-warning"
                 >
-                  Skipped branches may leave downstream dependencies or the merge step without the inputs they need.
+                  Skipped steps may leave downstream dependencies or the merge step without the inputs they need.
                 </Alert>
               </StackItem>
             )}
@@ -285,8 +285,8 @@ function RetryPlanContent({
 }: RetryPlanContentProps) {
   if (isEmptySelection) {
     return (
-      <Alert isInline variant="info" title="Choose at least one branch">
-        Select one or more branches to see the retry plan for that selection.
+      <Alert isInline variant="info" title="Choose at least one step">
+        Select one or more steps to see the retry plan for that selection.
       </Alert>
     )
   }
@@ -309,8 +309,8 @@ function RetryPlanContent({
 
   if (!preview) {
     return (
-      <Alert isInline variant="info" title="Choose at least one branch">
-        Select one or more branches to see the retry plan for that selection.
+      <Alert isInline variant="info" title="Choose at least one step">
+        Select one or more steps to see the retry plan for that selection.
       </Alert>
     )
   }
@@ -318,7 +318,7 @@ function RetryPlanContent({
   if (!preview.eligible) {
     return (
       <Alert isInline variant="warning" title="This retry selection cannot be used" data-testid="retry-rejected">
-        {preview.reason ?? 'The selected branches cannot be retried.'}
+        {preview.reason ?? 'The selected steps cannot be retried.'}
       </Alert>
     )
   }
@@ -369,7 +369,7 @@ function RetryPlanSummary({
         <DescriptionListGroup>
           <DescriptionListTerm>Scope</DescriptionListTerm>
           <DescriptionListDescription>
-            {selectedPointCount} of {affectedPointCount} affected branches selected
+            {selectedPointCount} of {affectedPointCount} affected steps selected
           </DescriptionListDescription>
         </DescriptionListGroup>
       )}

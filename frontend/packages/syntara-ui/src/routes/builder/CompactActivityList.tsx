@@ -59,7 +59,7 @@ export function CompactActivityList({
                 <ActivityStatusLabel
                   status={state?.status ?? ACTIVITY_STATUS.PENDING}
                   nodeType={type}
-                  replayed={isReplayedStep(state?.startedAt, replayBaselineAt, state?.status)}
+                  replayed={isReplayedStep(state?.startedAt, replayBaselineAt, state?.status, state?.outputData)}
                 />
               </Td>
             </Tr>

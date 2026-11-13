@@ -423,13 +423,20 @@ describe('BuilderFlow execution view', () => {
       ],
       triggers: [{ id: 'trigger-manual', type: 'manual', name: 'Manual Trigger' }],
     })
-    // Retry created at noon. The trigger and first step carry the source run's
+    // Retry created at noon. The trigger and failed step carry the source run's
     // 11:00 start; the second actually ran inside the retry at 12:00:05.
     setRetryReplayBaseline('2026-10-09T12:00:00Z')
     setExecutionState(
       new Map([
         ['trigger-manual', { status: 'completed', startedAt: '2026-10-09T11:00:00Z' } as never],
-        ['task-replayed', { status: 'completed', startedAt: '2026-10-09T11:00:00Z' } as never],
+        [
+          'task-replayed',
+          {
+            status: 'failed',
+            startedAt: '2026-10-09T11:00:00Z',
+            outputData: { partial_result: 'available' },
+          } as never,
+        ],
         ['task-fresh', { status: 'running', startedAt: '2026-10-09T12:00:05Z' } as never],
       ])
     )
@@ -451,6 +458,7 @@ describe('BuilderFlow execution view', () => {
     expect(stateOf('trigger-0').replayed).toBe(false)
     expect(stateOf('trigger-0').started_at).toBe('2026-10-09T11:00:00Z')
     expect(stateOf('task-replayed').replayed).toBe(true)
+    expect(stateOf('task-replayed').status).toBe('failed')
     expect(stateOf('task-fresh').replayed).toBe(false)
   })
 
