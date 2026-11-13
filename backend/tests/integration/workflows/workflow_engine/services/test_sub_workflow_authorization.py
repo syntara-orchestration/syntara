@@ -45,6 +45,15 @@ class _StubEvaluator:
     def __init__(self, *, allow: bool) -> None:
         self._allow = allow
 
+    def start(self) -> None:
+        return None
+
+    async def stop(self) -> None:
+        return None
+
+    async def health(self) -> bool:
+        return True
+
     def evaluate(self, authz_input: dict[str, Any]) -> dict[str, Any]:
         if self._allow:
             return {"allow": True, "deny": False, "matched_policy": "test-allow"}

@@ -12,7 +12,7 @@ from uuid import uuid4
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.authz.engine import AuthzResult
+from syntara.authz.engine import AuthzRequest, AuthzResult
 from syntara.workflows.workflow_engine.activities.sub_workflow_setup_activity import (
     authorize_child_invocation,
 )
@@ -85,9 +85,9 @@ async def test_unknown_principal_fails_closed_without_calling_engine() -> None:
 
 @pytest.mark.asyncio
 async def test_authorizes_actor_against_child_project() -> None:
-    captured: dict[str, object] = {}
+    captured: dict[str, AuthzRequest] = {}
 
-    async def _fake_authorize(session: object, evaluator: object, request: object) -> AuthzResult:
+    async def _fake_authorize(session: object, evaluator: object, request: AuthzRequest) -> AuthzResult:
         captured["request"] = request
         return _allow()
 
