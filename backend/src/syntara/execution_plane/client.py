@@ -17,6 +17,7 @@ import httpx
 import jwt
 from execution_plane_client.commands.control import CancelCommand
 from execution_plane_client.commands.results import TransportReceipt
+from execution_plane_client.commands.work import WorkDelete
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -31,7 +32,7 @@ EP_CLIENT_ID = "syntara-orchestration"
 EP_AUDIENCE = "execution-plane"
 EP_TOKEN_LIFETIME_SECONDS = 300
 EP_SCOPES = (
-    "work.execute command.cancel cluster.register cluster.update cluster.delete "
+    "work.execute work.delete command.cancel cluster.register cluster.update cluster.delete "
     "execution_target.register execution_target.update execution_target.delete "
     "execution_target.health "
     "work-items:read execution-targets:read clusters:read"
@@ -133,6 +134,15 @@ class ExecutionPlaneHttpClient:
     async def cancel_work_item(self, *, work_item_id: UUID) -> TransportReceipt:
         """Request cancellation through the shared command contract."""
         message = CancelCommand(target_command_id=work_item_id).to_message(
+            source_id=EP_CLIENT_ID,
+            destination_id=EP_AUDIENCE,
+            client_id=EP_CLIENT_ID,
+        )
+        return await self.submit_command(message)
+
+    async def delete_work_item(self, *, work_item_id: UUID) -> TransportReceipt:
+        """Request background cleanup through the shared command contract."""
+        message = WorkDelete(work_item_id=work_item_id).to_message(
             source_id=EP_CLIENT_ID,
             destination_id=EP_AUDIENCE,
             client_id=EP_CLIENT_ID,

@@ -67,6 +67,18 @@ forwards cooperative cancellation over gRPC and only reports confirmed
 cancellation after the cold-start worker has stopped. A result received during
 the cancellation race wins.
 
+`reconcile_work_item_cancellations` compares live EP work against existing
+cancelled AO executions and retries cancellation independently for each item.
+It uses existing execution/activity records; it does not create retry records.
+Periodic scheduling is intentionally deferred while this logic is validated.
+
+Project and workflow deletion capture associated WorkItem IDs before cascading
+execution/activity deletion. After commit, a background task sends `work.delete`
+for those IDs. EP persists deletion intent, cancels active work, and removes its
+record after resource cleanup. EP request failures are logged without undoing
+AO deletion. There is no AO deletion reconciler; broader execution cleanup,
+including deletion by an age threshold, is separate planned work.
+
 ## Integration configuration
 
 AO commits OpenShift integration configuration before attempting EP delivery.
