@@ -102,7 +102,7 @@ dev = [
     "moto[s3]>=5.0.0",  # for S3 mock testing
     "boto3-stubs[s3]>=1.35.0",  # type stubs for boto3 S3
     # MCP testing infrastructure
-    "fastmcp>=3.2.0,<4.0.0",  # for MCP test server creation
+    "fastmcp>=3.4.10,<4.0.0",  # for MCP test server creation
     "authlib>=1.7.1",  # CVE-2026-44681: open redirect in OIDC implicit/hybrid grants
     "testcontainers[postgres,redis]>=4.14.0",  # for auto-starting PostgreSQL/Redis in tests
     "syntara-api-client",  # local API client for E2E tests
