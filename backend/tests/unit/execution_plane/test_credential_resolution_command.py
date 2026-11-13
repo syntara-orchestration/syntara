@@ -2,19 +2,22 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import httpx
 import pytest
-from execution_plane_client.commands.credentials import CredentialResolve
+from execution_plane_client.commands.credentials import CredentialResolve, CredentialResolveWorkload
+from execution_plane_client.errors import ProtocolConflict
 from fastapi import FastAPI, Request, Response
 
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import get_db
 from syntara.execution_plane import bridge
 from syntara.execution_plane.commands import credentials as command_credentials
+from syntara.execution_plane.commands.context import AOCommandContext
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -44,6 +47,11 @@ def credential_command() -> MessageEnvelope:
         destination_id="syntara-orchestration",
         client_id="syntara-orchestration",
     )
+
+
+@pytest.fixture
+def command_context() -> AOCommandContext:
+    return AOCommandContext(session=AsyncMock(), temporal_service=None)
 
 
 @pytest.mark.asyncio
@@ -99,3 +107,97 @@ async def test_credential_command_rejects_invalid_command(callback: tuple[FastAP
         response = await client.post("/api/execution_plane/v1/commands", json=body)
 
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("token_field", ["bearer_token", "token", "api_key"])
+async def test_cluster_credential_resolver_returns_configured_token(
+    monkeypatch: pytest.MonkeyPatch,
+    token_field: str,
+) -> None:
+    session = AsyncMock()
+    credential_ref = uuid4()
+    credential = SimpleNamespace(enabled=True, secret_id=uuid4())
+    credential_type = SimpleNamespace(injectors={"extra_vars": {token_field: "{{token}}"}})
+    secret_service = SimpleNamespace(retrieve_secret=AsyncMock(return_value={"token": "resolved-token"}))
+
+    async def fetch_credential_with_type(
+        _session: AsyncMock,
+        _credential_ref: object,
+    ) -> tuple[SimpleNamespace, SimpleNamespace]:
+        return credential, credential_type
+
+    monkeypatch.setattr(command_credentials, "fetch_credential_with_type", fetch_credential_with_type)
+    monkeypatch.setattr(command_credentials, "create_secret_service", lambda _session: secret_service)
+
+    resolved = await command_credentials.CredentialResolveCommandHandler()._resolve_credential(
+        session,
+        credential_ref,
+    )
+
+    assert resolved == "resolved-token"
+
+
+@pytest.mark.asyncio
+async def test_cluster_credential_resolver_rejects_disabled_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = AsyncMock()
+    credential_ref = uuid4()
+    credential = SimpleNamespace(enabled=False, secret_id=uuid4())
+    credential_type = SimpleNamespace(injectors={})
+
+    async def fetch_credential_with_type(
+        _session: AsyncMock,
+        _credential_ref: object,
+    ) -> tuple[SimpleNamespace, SimpleNamespace]:
+        return credential, credential_type
+
+    monkeypatch.setattr(command_credentials, "fetch_credential_with_type", fetch_credential_with_type)
+
+    with pytest.raises(ValueError, match="Credential is disabled"):
+        await command_credentials.CredentialResolveCommandHandler()._resolve_credential(session, credential_ref)
+
+
+@pytest.mark.asyncio
+async def test_cluster_credential_resolver_rejects_documents_without_tokens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session = AsyncMock()
+    credential_ref = uuid4()
+    credential = SimpleNamespace(enabled=True, secret_id=uuid4())
+    credential_type = SimpleNamespace(injectors={"extra_vars": {}})
+    secret_service = SimpleNamespace(retrieve_secret=AsyncMock(return_value={}))
+
+    async def fetch_credential_with_type(
+        _session: AsyncMock,
+        _credential_ref: object,
+    ) -> tuple[SimpleNamespace, SimpleNamespace]:
+        return credential, credential_type
+
+    monkeypatch.setattr(command_credentials, "fetch_credential_with_type", fetch_credential_with_type)
+    monkeypatch.setattr(command_credentials, "create_secret_service", lambda _session: secret_service)
+
+    with pytest.raises(ValueError, match="Credential did not resolve to an API token"):
+        await command_credentials.CredentialResolveCommandHandler()._resolve_credential(session, credential_ref)
+
+
+@pytest.mark.asyncio
+async def test_cluster_credential_command_handler_rejects_unexpected_payload(
+    command_context: AOCommandContext,
+) -> None:
+    message = credential_command()
+    payload = CredentialResolveWorkload(
+        attempt_id="attempt",
+        credential_ref=uuid4(),
+        credential_recipe_id="acme.echo.api-token",
+        workflow_run_id="workflow-run",
+        step_revision_id="step-revision",
+    )
+
+    with pytest.raises(ProtocolConflict):
+        await command_credentials.CredentialResolveCommandHandler().handle(
+            message,
+            payload,
+            command_context,
+        )

@@ -7,3 +7,7 @@ class CommandDependencyUnavailableError(RuntimeError):
 
 class CommandResourceNotFoundError(LookupError):
     """The command does not address an existing AO resource."""
+
+
+class CommandResourceStateError(RuntimeError):
+    """The addressed AO resource is not in a state that permits the command."""
