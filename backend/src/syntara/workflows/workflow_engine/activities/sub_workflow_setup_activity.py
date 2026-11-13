@@ -58,7 +58,7 @@ async def authorize_child_invocation(
     authoritative workflow record, never from caller-supplied input, so a caller
     cannot spoof a project it is permitted to run in.
 
-    Fails closed: an unknown principal or an explicit deny raises a non-retryable
+    Fails closed: a missing or disabled principal, or an explicit deny, raises a non-retryable
     ``ApplicationError``; transient evaluator or database errors propagate unchanged
     so Temporal retries them instead of treating the failure as a grant.
 
@@ -75,9 +75,14 @@ async def authorize_child_invocation(
     project_result = await session.exec(select(Project.name).where(Project.id == child_workflow.project_id))
     resource_project = project_result.first() or ""
 
+    # Reject a missing OR disabled principal. Deactivating a user revokes their
+    # sessions but leaves role assignments intact, and the authz resolver does not
+    # filter disabled users, so an in-flight parent must not launch a child after
+    # its initiator is disabled. The HTTP path is covered by session auth; the
+    # worker has no session, so fail closed here.
     actor = await session.get(User, actor_id)
-    if actor is None:
-        msg = "Sub-workflow invocation principal not found; refusing to create child execution."
+    if actor is None or not actor.is_enabled:
+        msg = "Sub-workflow invocation principal is missing or disabled; refusing to create child execution."
         raise ApplicationError(msg, type="SubWorkflowAuthorizationError", non_retryable=True)
 
     authz_result = await authorize(

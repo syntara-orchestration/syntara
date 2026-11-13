@@ -36,6 +36,7 @@ def _user() -> MagicMock:
     user = MagicMock()
     user.labels = {}
     user.authz_metadata = {}
+    user.is_enabled = True
     return user
 
 
@@ -115,3 +116,16 @@ async def test_transient_engine_error_propagates_and_is_not_swallowed() -> None:
     session = _session(user=_user())
     with patch(_AUTHORIZE, _boom), pytest.raises(RuntimeError):
         await authorize_child_invocation(session, MagicMock(), actor_id=uuid4(), child_workflow=_child_workflow())
+
+
+@pytest.mark.asyncio
+async def test_disabled_principal_fails_closed_without_calling_engine() -> None:
+    disabled = _user()
+    disabled.is_enabled = False  # deactivated user: sessions revoked, role assignments remain
+    session = _session(user=disabled)
+    engine = AsyncMock(return_value=_allow())
+    with patch(_AUTHORIZE, engine), pytest.raises(ApplicationError) as exc:
+        await authorize_child_invocation(session, MagicMock(), actor_id=uuid4(), child_workflow=_child_workflow())
+    assert exc.value.non_retryable is True
+    assert exc.value.type == "SubWorkflowAuthorizationError"
+    engine.assert_not_awaited()
