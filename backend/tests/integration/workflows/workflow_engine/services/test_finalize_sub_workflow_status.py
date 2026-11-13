@@ -8,11 +8,10 @@ schema and assert the **persisted** ``activity_execution.status`` after commit,
 covering the FAILED > COMPLETED > SKIPPED precedence and mixed ``for_each``
 outcomes in both iteration orders.
 
-Note: per-iteration activity rows are not currently produced for sub-workflow
-nodes (they are created from Temporal activity events, which the internal
-setup activity never emits), so a ``for_each`` sub-workflow is represented by a
-single aggregate row in practice. These tests exercise composite iteration rows
-directly to pin the finalizer's base-node precedence behavior.
+Note: these tests seed composite iteration rows (``{node}#iter-{n}``) directly to
+pin the finalizer's base-node precedence behaviour. The setup-sync path produces
+those per-iteration rows for a ``for_each`` sub-workflow, and the finalizer applies
+the base-node status to each of them.
 """
 
 from __future__ import annotations

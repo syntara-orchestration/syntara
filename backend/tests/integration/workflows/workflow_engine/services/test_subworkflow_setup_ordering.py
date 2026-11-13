@@ -1,10 +1,10 @@
-"""Deterministic for_each sub-workflow aggregate row under event-ordered sync (DB-backed).
+"""Per-iteration for_each sub-workflow rows under event-ordered sync (DB-backed).
 
-Every for_each iteration of a sub-workflow node maps to the same aggregate
-ActivityExecution row. The synchronizer applies pending updates in ascending Temporal
-event-id order, so the row's final input_data/output_data (and the emitted WebSocket
-state) is deterministic: the iteration with the highest scheduled event id wins, regardless of the
-underlying set's iteration order.
+Every for_each iteration of a sub-workflow node persists its own ActivityExecution
+row: the canvas row for iteration 0 and ``{node}#iter-{n}`` for later iterations.
+Each row is keyed by the Temporal iteration index, so an iteration always maps to
+the same row and keeps its own input_data/output_data and child link, regardless of
+the order its scheduled events arrive in.
 
 These drive the real event processor + synchronizer against the alembic-built schema.
 """
@@ -37,6 +37,12 @@ if TYPE_CHECKING:
 _PREFIX = "__internal__setup_sub_workflow_"
 _NODE = "sub_wf_node"
 _EMPTY_DEF: dict[str, Any] = {"schema_version": "2.0.0", "triggers": [], "nodes": [], "edges": []}
+
+
+def _nn(d: dict[str, Any] | None) -> dict[str, Any]:
+    """Narrow an optional I/O dict so it can be indexed in assertions (mypy --strict)."""
+    assert d is not None
+    return d
 
 
 def _setup_result(child_workflow_id: str, input_data: dict[str, Any]) -> dict[str, Any]:
@@ -139,8 +145,9 @@ def _metadata(exec_id: UUID) -> ExecutionMonitorMetadata:
         execution_id=exec_id,
         last_processed_event_id=0,
         activity_definitions_map={},
-        activity_index_map={},
+        activity_index_map={_NODE: 0},
         pending_activity_updates={},
+        next_activity_index=1,
     )
 
 
@@ -158,19 +165,20 @@ def _drive_iteration(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_for_each_aggregate_row_is_deterministic_latest_wins(
+async def test_for_each_each_iteration_persists_its_own_row(
     test_db_session: AsyncSession,
     test_db_session_factory: async_sessionmaker[AsyncSession],
     test_user: User,
     test_project_id: UUID,
 ) -> None:
-    """The aggregate row reflects the highest-event-id iteration, not set order."""
+    """Each iteration persists its own row + child link, independent of event order."""
     exec_id = await _seed_parent_with_node_row(test_db_session, created_by=test_user.id, project_id=test_project_id)
     publisher = AsyncMock()
     service = ActivitySyncService(Mock(), test_db_session_factory, publisher)
     metadata = _metadata(exec_id)
 
-    # Scheduled ids chosen so raw set order ([16, 1, 2]) differs from sorted ([1, 2, 16]).
+    # Scheduled ids out of iteration order: rows key on the iteration index, not the
+    # event order ([16, 1, 2] vs sorted [1, 2, 16]).
     assert list({16, 1, 2}) != sorted({16, 1, 2})
     _drive_iteration(service, metadata, sched=16, iter_idx=0, child_wf="wf-HIGH")
     _drive_iteration(service, metadata, sched=1, iter_idx=1, child_wf="wf-low")
@@ -180,53 +188,58 @@ async def test_for_each_aggregate_row_is_deterministic_latest_wins(
 
     async with test_db_session_factory() as session:
         result = await session.exec(select(ActivityExecution).where(ActivityExecution.execution_id == exec_id))
-        rows = result.all()
-    assert len(rows) == 1  # single aggregate row, not one-per-iteration
-    row = rows[0]
-    assert row.input_data is not None
-    assert row.output_data is not None
-    # Highest scheduled id (16) wins deterministically.
-    assert row.input_data["workflow_id"] == "wf-HIGH"
-    assert row.input_data["input_parameters"] == {"iter": 0}
-    assert row.output_data["workflow_id"] == "wf-HIGH"
-    # WebSocket state derives from this persisted aggregate row (asserted above),
-    # so it reflects the winning wf-HIGH iteration. The publish path itself is not
-    # exercised by driving _sync_activities_to_db directly (it runs in the monitor
-    # flow), so determinism is asserted on the row rather than the publisher here.
+        rows = {r.activity_name: r for r in result.all()}
+
+    # One row per iteration: the canvas row (iteration 0) plus #iter-1, #iter-2.
+    assert set(rows) == {_NODE, f"{_NODE}#iter-1", f"{_NODE}#iter-2"}
+    # Each row carries its OWN iteration's child, not a single "latest wins" value.
+    assert rows[_NODE].iteration == 0
+    assert _nn(rows[_NODE].input_data)["workflow_id"] == "wf-HIGH"
+    assert _nn(rows[_NODE].input_data)["input_parameters"] == {"iter": 0}
+    assert _nn(rows[_NODE].output_data)["workflow_id"] == "wf-HIGH"
+    assert rows[f"{_NODE}#iter-1"].iteration == 1
+    assert _nn(rows[f"{_NODE}#iter-1"].input_data)["workflow_id"] == "wf-low"
+    assert _nn(rows[f"{_NODE}#iter-1"].input_data)["input_parameters"] == {"iter": 1}
+    assert rows[f"{_NODE}#iter-2"].iteration == 2
+    assert _nn(rows[f"{_NODE}#iter-2"].input_data)["workflow_id"] == "wf-mid"
+    assert _nn(rows[f"{_NODE}#iter-2"].input_data)["input_parameters"] == {"iter": 2}
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_for_each_aggregate_row_deterministic_across_batches(
+async def test_for_each_iterations_persist_across_batches(
     test_db_session: AsyncSession,
     test_db_session_factory: async_sessionmaker[AsyncSession],
     test_user: User,
     test_project_id: UUID,
 ) -> None:
-    """A later batch (higher scheduled ids) overwrites an earlier one.
+    """Per-iteration rows accumulate across sync batches; each keeps its own child.
 
-    Manually invokes synchronization twice: this validates cross-batch update
-    behaviour, not the monitor's checkpoint guarantee. Batch monotonicity itself is
-    enforced by the monitor's ``last_processed_event_id`` skip and is not exercised here.
+    Manually invokes synchronization twice to validate cross-batch update behaviour.
+    Batch monotonicity itself is enforced by the monitor's ``last_processed_event_id``
+    skip and is not exercised here.
     """
     exec_id = await _seed_parent_with_node_row(test_db_session, created_by=test_user.id, project_id=test_project_id)
     service = ActivitySyncService(Mock(), test_db_session_factory, AsyncMock())
     metadata = _metadata(exec_id)
 
-    # Batch 1: lower scheduled ids.
+    # Batch 1: iterations 0 and 1.
     _drive_iteration(service, metadata, sched=10, iter_idx=0, child_wf="wf-batch1-a")
     _drive_iteration(service, metadata, sched=20, iter_idx=1, child_wf="wf-batch1-b")
     await service._sync_activities_to_db(metadata, Mock())  # clears pending
 
-    # Batch 2: strictly higher scheduled ids (monotonic forward progress).
-    # Highest scheduled id across both batches is 130 -> wf-batch2-a is the winner.
+    # Batch 2: iterations 2 and 3, higher scheduled ids, out of iteration order.
     _drive_iteration(service, metadata, sched=130, iter_idx=2, child_wf="wf-batch2-a")
     _drive_iteration(service, metadata, sched=120, iter_idx=3, child_wf="wf-batch2-b")
     await service._sync_activities_to_db(metadata, Mock())
 
     async with test_db_session_factory() as session:
         result = await session.exec(select(ActivityExecution).where(ActivityExecution.execution_id == exec_id))
-        rows = result.all()
-    assert len(rows) == 1
-    # Highest id overall is 130 (batch 2) -> wf-batch2-a wins.
-    assert rows[0].input_data["workflow_id"] == "wf-batch2-a"
+        rows = {r.activity_name: r for r in result.all()}
+
+    # Four rows, one per iteration across both batches, each with its own child.
+    assert set(rows) == {_NODE, f"{_NODE}#iter-1", f"{_NODE}#iter-2", f"{_NODE}#iter-3"}
+    assert _nn(rows[_NODE].input_data)["workflow_id"] == "wf-batch1-a"
+    assert _nn(rows[f"{_NODE}#iter-1"].input_data)["workflow_id"] == "wf-batch1-b"
+    assert _nn(rows[f"{_NODE}#iter-2"].input_data)["workflow_id"] == "wf-batch2-a"
+    assert _nn(rows[f"{_NODE}#iter-3"].input_data)["workflow_id"] == "wf-batch2-b"
