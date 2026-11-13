@@ -33,7 +33,7 @@ export function StepRawDataView({ node }: StepRawDataViewProps) {
       <DescriptionListGroup>
         <DescriptionListTerm>Node data</DescriptionListTerm>
         <DescriptionListDescription>
-          <SynCodeBlock jsonObject={node.data} />
+          <SynCodeBlock jsonObject={node.data} language="json" />
         </DescriptionListDescription>
       </DescriptionListGroup>
     </DescriptionList>

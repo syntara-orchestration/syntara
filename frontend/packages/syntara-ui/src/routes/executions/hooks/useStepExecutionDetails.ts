@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { executionsClient } from '../../../client'
+import { getLoadedShikiService, loadShikiService } from '../../../components/details/shiki-service-loader'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { ActivityStatus } from '../../workflows/execution/types'
 import { parseCompositeKey } from '../../workflows/execution/utils/activityState'
@@ -34,6 +35,28 @@ export function useStepExecutionDetails(
   const effectiveIteration = iteration ?? keyIteration
   const activityName =
     effectiveIteration != null && effectiveIteration > 0 ? `${baseId}#iter-${effectiveIteration}` : baseId
+
+  // Keep fetched data available while delaying its display until JSON highlighting is ready.
+  const [isShikiSettled, setIsShikiSettled] = useState(() => getLoadedShikiService()?.isShikiReady('json') ?? false)
+
+  useEffect(() => {
+    if (isShikiSettled || !executionId || !stepId) return
+
+    let isCurrent = true
+    const settlePreload = () => {
+      if (isCurrent) setIsShikiSettled(true)
+    }
+    detachPromise(
+      loadShikiService()
+        .then(({ preloadShiki }) => preloadShiki('json'))
+        .then(settlePreload, settlePreload)
+    )
+
+    return () => {
+      isCurrent = false
+    }
+  }, [executionId, isShikiSettled, stepId])
+
   const queryResult = executionsClient.useQuery(
     'get',
     '/executions/{execution_id}/activities',
@@ -46,7 +69,7 @@ export function useStepExecutionDetails(
     { enabled: !!executionId && !!stepId }
   )
 
-  const { data, isLoading, error, refetch } = queryResult
+  const { data, isLoading, isSuccess, error, refetch } = queryResult
 
   const prevStatusRef = useRef(activityStatus)
   useEffect(() => {
@@ -57,8 +80,14 @@ export function useStepExecutionDetails(
   }, [activityStatus, refetch])
 
   return useMemo(() => {
-    if (!data) {
-      return { inputData: null, outputData: null, isLoading, error, refetch }
+    if (!data || !isShikiSettled) {
+      return {
+        inputData: null,
+        outputData: null,
+        isLoading: isLoading || (isSuccess && !isShikiSettled),
+        error,
+        refetch,
+      }
     }
 
     const activity = data.resources?.[0]
@@ -69,9 +98,9 @@ export function useStepExecutionDetails(
     return {
       inputData: activity?.input_data ?? null,
       outputData: activity?.output_data ?? null,
-      isLoading,
+      isLoading: isLoading || (isSuccess && !isShikiSettled),
       error,
       refetch,
     }
-  }, [data, isLoading, error, refetch])
+  }, [data, error, isLoading, isShikiSettled, isSuccess, refetch])
 }

@@ -1,5 +1,5 @@
 import type { Approval } from '@syntara/contracts'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe } from 'vitest-axe'
 
@@ -150,12 +150,12 @@ describe('ApprovalReadOnlyView', () => {
     expect(screen.getByText('Emergency Rollback')).toBeInTheDocument()
   })
 
-  it('renders approval context as JSON', () => {
+  it('renders approval context as JSON', async () => {
     render(<ApprovalReadOnlyView {...defaultProps} />)
 
     expect(screen.getByText('Approval context')).toBeInTheDocument()
     // JSON should contain approval data
-    expect(screen.getByText(/"id"/)).toBeInTheDocument()
-    expect(screen.getByText(/"approval-1"/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent('"id"'))
+    await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent('"approval-1"'))
   })
 })

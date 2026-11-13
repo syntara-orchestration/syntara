@@ -220,7 +220,7 @@ export function PolicyDetailSidebar({ policy, onClose, projectName }: Readonly<P
                         >
                           Conditions:
                         </Content>
-                        <SynCodeBlock jsonObject={stmt.conditions} noMaxHeight enableCopy={false} />
+                        <SynCodeBlock jsonObject={stmt.conditions} language="json" noMaxHeight enableCopy={false} />
                       </FlexItem>
                     )}
                   </Flex>
@@ -239,7 +239,7 @@ export function PolicyDetailSidebar({ policy, onClose, projectName }: Readonly<P
           <Title headingLevel="h3" size={TitleSizes.md} style={{ marginBottom: 'var(--pf-t--global--spacer--sm)' }}>
             Policy definition
           </Title>
-          <SynCodeBlock jsonObject={policyJson} noMaxHeight enableCopy />
+          <SynCodeBlock jsonObject={policyJson} language="json" noMaxHeight enableCopy />
         </StackItem>
       </Stack>
     </SynPanel>
