@@ -1,7 +1,7 @@
 """Shared CEL endpoint behavior with actual parsing, evaluation and HTTP validation."""
 
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
 from syntara.auth import get_current_user
+from syntara.authz import dependencies as authz_dependencies
+from syntara.authz.engine import AllowedProjectsResult
 from syntara.core.database.session import get_db
 from syntara.core.error_handlers import http_exception_handler, validation_error_handler
 from syntara.core.exception_registry import register_exceptions
@@ -28,12 +30,18 @@ _URL = "/api/v1/filtering/test"
 
 
 @pytest.fixture
-def app() -> FastAPI:
+def app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     """Retain real authentication and error handlers without external database access."""
     instance = FastAPI()
     instance.include_router(router, prefix="/api/v1")
     register_exceptions(instance)
     instance.dependency_overrides[get_db] = lambda: MagicMock()
+    instance.state.authz_evaluator = MagicMock()
+    monkeypatch.setattr(
+        authz_dependencies,
+        "resolve_allowed_projects",
+        AsyncMock(return_value=AllowedProjectsResult(all_projects=False, project_ids=[uuid4()])),
+    )
 
     async def validation(request: Request, exc: Exception) -> JSONResponse:
         assert isinstance(exc, RequestValidationError)
@@ -50,7 +58,7 @@ def app() -> FastAPI:
 
 @pytest.fixture
 def client(app: FastAPI) -> TestClient:
-    """Replace authentication only; exercise the real shared evaluator."""
+    """Supply an authenticated project workflow creator; keep CEL evaluation real."""
     app.dependency_overrides[get_current_user] = lambda: MagicMock()
     return TestClient(app)
 
@@ -58,6 +66,29 @@ def client(app: FastAPI) -> TestClient:
 def test_authentication_is_required(app: FastAPI) -> None:
     response = TestClient(app).post(_URL, json={"expression": "true", "input": None})
     assert response.status_code == 401
+
+
+@pytest.mark.parametrize("scope", ["system", "project", "none"])
+@pytest.mark.parametrize("expression", ["true", "input =="])
+def test_workflow_designer_permission_is_required(client: TestClient, monkeypatch, scope: str, expression: str) -> None:
+    permission = AsyncMock(
+        return_value=AllowedProjectsResult(
+            all_projects=scope == "system", project_ids=[uuid4()] if scope == "project" else []
+        )
+    )
+    monkeypatch.setattr(authz_dependencies, "resolve_allowed_projects", permission)
+    evaluate = Mock(side_effect=AssertionError("Unauthorized callers must not evaluate CEL"))
+    if scope == "none":
+        monkeypatch.setattr(router_module, "PreparedFilter", evaluate)
+    response = client.post(_URL, json={"expression": expression, "input": {}})
+    assert response.status_code == (403 if scope == "none" else 200 if expression == "true" else 422)
+    permission.assert_awaited_once()
+    call = permission.await_args
+    assert call is not None
+    assert call.kwargs["resource_type"] == "workflow"
+    assert call.kwargs["action"] == "create"
+    if scope == "none":
+        evaluate.assert_not_called()
 
 
 @pytest.mark.parametrize(

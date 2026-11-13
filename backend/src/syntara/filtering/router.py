@@ -9,7 +9,8 @@ from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
 
 from syntara.auth import get_current_user
-from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
+from syntara.authz.dependencies import AnyProjectPermission
+from syntara.core.syntara_router import SyntaraRouter
 from syntara.filtering.evaluator import PreparedFilter
 from syntara.filtering.exceptions import FilterValidationError
 from syntara.filtering.models.result import FilterResult
@@ -72,13 +73,14 @@ router = SyntaraRouter(
     "/test",
     operation_id="test_cel_filter",
     summary="Test a CEL filter expression",
-    dependencies=[NO_PERMISSION, Depends(get_current_user)],
+    dependencies=[Depends(get_current_user), Depends(AnyProjectPermission("workflow", "create"))],
     responses={422: {"model": FilterValidationProblem, "description": "Invalid request or CEL expression"}},
 )
 def test_cel_filter(body: FilterTestRequest) -> FilterResult:
     """Evaluate caller-supplied JSON with the shared CEL evaluator.
 
-    Authentication is required; no stored resources are read or changed.
+    Requires authentication and workflow:create permission in at least one project.
+    Evaluates only supplied JSON; no Kafka decoding or payload-schema validation.
     Invalid CEL returns 422. Evaluation returns match, no_match or evaluation_error.
     """
     return PreparedFilter(body.expression).evaluate(body.input)

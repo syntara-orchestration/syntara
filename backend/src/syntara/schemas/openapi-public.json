@@ -12936,7 +12936,7 @@
           "Filtering"
         ],
         "summary": "Test a CEL filter expression",
-        "description": "Evaluate caller-supplied JSON with the shared CEL evaluator.\n\nAuthentication is required; no stored resources are read or changed.\nInvalid CEL returns 422. Evaluation returns match, no_match or evaluation_error.",
+        "description": "Evaluate caller-supplied JSON with the shared CEL evaluator.\n\nRequires authentication and workflow:create permission in at least one project.\nEvaluates only supplied JSON; no Kafka decoding or payload-schema validation.\nInvalid CEL returns 422. Evaluation returns match, no_match or evaluation_error.",
         "operationId": "test_cel_filter",
         "requestBody": {
           "content": {
@@ -13096,8 +13096,8 @@
           }
         ],
         "x-app-permission": {
-          "resource": null,
-          "action": null
+          "resource": "workflow",
+          "action": "create"
         }
       }
     },
