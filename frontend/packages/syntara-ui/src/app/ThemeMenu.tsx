@@ -1,18 +1,17 @@
 import {
+  Button,
   Divider,
   MenuSearch,
   MenuSearchInput,
-  MenuToggle,
+  Popper,
   SelectGroup,
   ToggleGroup,
   ToggleGroupItem,
   Tooltip,
 } from '@patternfly/react-core'
-import type { MenuToggleElement } from '@patternfly/react-core'
 import { RhUiAutoLightDarkModeIcon, RhUiDarkModeIcon, RhUiLightModeIcon } from '@patternfly/react-icons'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 
-import { SynSelect } from '../components/SynSelect'
 import type { ColorSchemePreference } from '../providers/theme/colorScheme'
 import type { ContrastPreference } from '../providers/theme/contrastMode'
 import { useColorScheme } from '../providers/theme/useColorScheme'
@@ -21,6 +20,22 @@ import styles from './ThemeMenu.module.css'
 
 const COLOR_SCHEME_TITLE_ID = 'theme-menu-color-scheme'
 const CONTRAST_MODE_TITLE_ID = 'theme-menu-contrast'
+const THEME_PANEL_ID = 'theme-settings-panel'
+
+const POPOVER_POSITION_MODIFIERS: Record<string, string> = {
+  top: 'pf-m-top',
+  bottom: 'pf-m-bottom',
+  left: 'pf-m-left',
+  right: 'pf-m-right',
+  'top-start': 'pf-m-top-left',
+  'top-end': 'pf-m-top-right',
+  'bottom-start': 'pf-m-bottom-left',
+  'bottom-end': 'pf-m-bottom-right',
+  'left-start': 'pf-m-left-top',
+  'left-end': 'pf-m-left-bottom',
+  'right-start': 'pf-m-right-top',
+  'right-end': 'pf-m-right-bottom',
+}
 
 const COLOR_SCHEME_OPTIONS = [
   { value: 'system', label: 'System' },
@@ -66,152 +81,123 @@ function contrastButtonId(value: ContrastPreference): string {
 }
 
 /**
- * Masthead theme menu modeled on the PatternFly documentation theme selector:
- * separate toggle groups for color scheme and contrast mode. Theme variant
- * (Default vs Project Felt) stays on the brand config, not this menu.
+ * Theme preferences use an expandable, non-modal panel. Keeping the panel in
+ * the normal tab order lets keyboard users move through it and continue into
+ * the page without trapping focus. Theme variant (Default vs Project Felt)
+ * stays on the brand config, not this panel.
  */
-function focusStaysInThemeMenu(
-  next: EventTarget | null,
-  menu: HTMLElement | null,
-  toggle: HTMLElement | null
-): boolean {
-  return next instanceof Node && (Boolean(menu?.contains(next)) || Boolean(toggle?.contains(next)))
-}
-
 export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
   const { colorSchemePreference, setColorScheme, contrastPreference, setContrastMode } = useColorScheme()
   const [isOpen, setIsOpen] = useState(false)
   const toggleRef = useRef<HTMLButtonElement | null>(null)
-  const menuRef = useRef<HTMLDivElement | null>(null)
   const toggleName = themeToggleName(colorSchemePreference, contrastPreference)
-
-  useEffect(() => {
-    if (!isOpen) {
-      return
-    }
-
-    let closeTimer: ReturnType<typeof setTimeout> | undefined
-    const onFocusOut = (event: FocusEvent) => {
-      if (focusStaysInThemeMenu(event.relatedTarget, menuRef.current, toggleRef.current)) {
-        return
-      }
-      // A click can emit focusout with a null relatedTarget before focus lands on the option.
-      clearTimeout(closeTimer)
-      closeTimer = setTimeout(() => {
-        const active = document.activeElement
-        if (focusStaysInThemeMenu(active, menuRef.current, toggleRef.current)) {
-          return
-        }
-        setIsOpen(false)
-      }, 0)
-    }
-
-    const menu = menuRef.current
-    const toggle = toggleRef.current
-    menu?.addEventListener('focusout', onFocusOut)
-    toggle?.addEventListener('focusout', onFocusOut)
-    return () => {
-      clearTimeout(closeTimer)
-      menu?.removeEventListener('focusout', onFocusOut)
-      toggle?.removeEventListener('focusout', onFocusOut)
-    }
-  }, [isOpen])
-
-  const toggle = (dropdownRef: React.Ref<MenuToggleElement>) => (
-    <MenuToggle
-      ref={(node) => {
-        toggleRef.current = node instanceof HTMLButtonElement ? node : null
-        if (typeof dropdownRef === 'function') {
-          dropdownRef(node)
-        } else if (dropdownRef) {
-          dropdownRef.current = node
-        }
-      }}
-      isExpanded={isOpen}
-      variant="plain"
-      icon={colorSchemeIcon(colorSchemePreference)}
-      isDocked
-      aria-label={toggleName}
-      onClick={() => setIsOpen((open) => !open)}
-    >
-      Theme
-    </MenuToggle>
-  )
 
   return (
     <>
-      <SynSelect
-        isOpen={isOpen}
-        innerRef={menuRef}
-        onOpenChange={setIsOpen}
-        onOpenChangeKeys={['Escape']}
-        shouldFocusToggleOnSelect
-        toggle={toggle}
-        className={styles.themeMenu}
-        isScrollable={false}
-        popperProps={{
-          // right-end opens upward from the dock so the menu clears the viewport bottom.
-          placement: 'right-end',
-          offset: [-12, 8],
-          preventOverflow: true,
-          enableFlip: true,
-          width: 'max-content',
-        }}
+      <Button
+        ref={toggleRef}
+        isExpanded={isOpen}
+        isDocked
+        variant="plain"
+        icon={colorSchemeIcon(colorSchemePreference)}
+        aria-label={toggleName}
+        aria-controls={isOpen ? THEME_PANEL_ID : undefined}
+        onClick={() => setIsOpen((open) => !open)}
       >
-        <SelectGroup
-          label={
-            <div className="pf-v6-c-menu__group-title" id={COLOR_SCHEME_TITLE_ID}>
-              Color scheme
-            </div>
+        Theme
+      </Button>
+      <Popper
+        isVisible={isOpen}
+        triggerRef={toggleRef}
+        appendTo="inline"
+        placement="right-end"
+        distance={8}
+        positionModifiers={POPOVER_POSITION_MODIFIERS}
+        onDocumentClick={(event, trigger, popper) => {
+          if (!(event?.target instanceof Node)) {
+            return
           }
-        >
-          <MenuSearch>
-            <MenuSearchInput>
-              <ToggleGroup aria-labelledby={COLOR_SCHEME_TITLE_ID}>
-                {COLOR_SCHEME_OPTIONS.map((option) => (
-                  <ToggleGroupItem
-                    key={option.value}
-                    text={option.label}
-                    buttonId={colorSchemeButtonId(option.value)}
-                    isSelected={colorSchemePreference === option.value}
-                    onChange={() => {
-                      setColorScheme(option.value)
-                    }}
-                  />
-                ))}
-              </ToggleGroup>
-            </MenuSearchInput>
-          </MenuSearch>
-        </SelectGroup>
-        <Divider />
-        <SelectGroup
-          label={
-            <div className="pf-v6-c-menu__group-title" id={CONTRAST_MODE_TITLE_ID}>
-              Contrast mode
-            </div>
+          if (trigger?.contains(event.target) || popper?.contains(event.target)) {
+            return
           }
-        >
-          <MenuSearch>
-            <MenuSearchInput>
-              <ToggleGroup aria-labelledby={CONTRAST_MODE_TITLE_ID}>
-                {CONTRAST_OPTIONS.map((option) => (
-                  <ToggleGroupItem
-                    key={option.value}
-                    text={option.label}
-                    buttonId={contrastButtonId(option.value)}
-                    isSelected={contrastPreference === option.value}
-                    onChange={() => {
-                      setContrastMode(option.value)
-                    }}
-                  />
-                ))}
-              </ToggleGroup>
-            </MenuSearchInput>
-          </MenuSearch>
-        </SelectGroup>
-      </SynSelect>
+          setIsOpen(false)
+        }}
+        onDocumentKeyDown={(event) => {
+          if (event?.key === 'Escape') {
+            setIsOpen(false)
+            toggleRef.current?.focus()
+          }
+        }}
+        popper={
+          <div
+            id={THEME_PANEL_ID}
+            role="group"
+            aria-label="Theme settings"
+            className={`pf-v6-c-popover pf-m-no-padding pf-m-width-auto ${styles.themeMenu}`}
+          >
+            <div className="pf-v6-c-popover__arrow" />
+            <div className="pf-v6-c-popover__content">
+              <div className="pf-v6-c-popover__body">
+                <div className={styles.themeContent}>
+                  <SelectGroup
+                    label={
+                      <div className="pf-v6-c-menu__group-title" id={COLOR_SCHEME_TITLE_ID}>
+                        Color scheme
+                      </div>
+                    }
+                  >
+                    <MenuSearch>
+                      <MenuSearchInput>
+                        <ToggleGroup aria-labelledby={COLOR_SCHEME_TITLE_ID}>
+                          {COLOR_SCHEME_OPTIONS.map((option) => (
+                            <ToggleGroupItem
+                              key={option.value}
+                              text={option.label}
+                              buttonId={colorSchemeButtonId(option.value)}
+                              isSelected={colorSchemePreference === option.value}
+                              onChange={() => {
+                                setColorScheme(option.value)
+                              }}
+                            />
+                          ))}
+                        </ToggleGroup>
+                      </MenuSearchInput>
+                    </MenuSearch>
+                  </SelectGroup>
+                  <Divider />
+                  <SelectGroup
+                    label={
+                      <div className="pf-v6-c-menu__group-title" id={CONTRAST_MODE_TITLE_ID}>
+                        Contrast mode
+                      </div>
+                    }
+                  >
+                    <MenuSearch>
+                      <MenuSearchInput>
+                        <ToggleGroup aria-labelledby={CONTRAST_MODE_TITLE_ID}>
+                          {CONTRAST_OPTIONS.map((option) => (
+                            <ToggleGroupItem
+                              key={option.value}
+                              text={option.label}
+                              buttonId={contrastButtonId(option.value)}
+                              isSelected={contrastPreference === option.value}
+                              onChange={() => {
+                                setContrastMode(option.value)
+                              }}
+                            />
+                          ))}
+                        </ToggleGroup>
+                      </MenuSearchInput>
+                    </MenuSearch>
+                  </SelectGroup>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+      />
       {props.showTooltip && !isOpen && (
-        <Tooltip aria="none" aria-live="off" triggerRef={toggleRef} content="Theme" position="right" />
+        <Tooltip aria="none" aria-live="off" triggerRef={toggleRef} content={toggleName} position="right" />
       )}
     </>
   )
