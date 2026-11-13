@@ -1256,3 +1256,100 @@ class TestWebhookServiceAccountSchemaFindings:
         sa_errors = [f for f in result.findings if f.field_path == "parameters.authorized_service_account_ids"]
         assert len(sa_errors) == 1
         assert sa_errors[0].node_id == "eda_trigger_1"
+
+
+class TestSubWorkflowOutputMappingValidation:
+    """SubWorkflow Trigger output_mapping must reference existing steps."""
+
+    def test_valid_output_mapping(self, validator: WorkflowValidator) -> None:
+        """Valid output_mapping references existing step."""
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "test-subworkflow",
+            "triggers": [
+                {
+                    "id": "subworkflow_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "artifact_url": {"type": "string"},
+                            },
+                        },
+                        "output_mapping": {
+                            "artifact_url": "${deploy.url}",
+                        },
+                    },
+                }
+            ],
+            "nodes": [
+                {"id": "deploy", "type": "script", "parameters": {"language": "python", "code": "print('deploy')"}}
+            ],
+            "edges": [{"from": "subworkflow_trigger", "to": "deploy"}],
+        }
+        validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_references_unknown_step(self, validator: WorkflowValidator) -> None:
+        """output_mapping referencing unknown step raises error."""
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "test-subworkflow",
+            "triggers": [
+                {
+                    "id": "subworkflow_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "artifact_url": {"type": "string"},
+                            },
+                        },
+                        "output_mapping": {
+                            "artifact_url": "${unknown_step.url}",
+                        },
+                    },
+                }
+            ],
+            "nodes": [
+                {"id": "deploy", "type": "script", "parameters": {"language": "python", "code": "print('deploy')"}}
+            ],
+            "edges": [{"from": "subworkflow_trigger", "to": "deploy"}],
+        }
+        # Template expression validator catches this first
+        with pytest.raises(SafeValueError, match="references unknown activity or scope 'unknown_step'"):
+            validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_multiple_fields_one_invalid(self, validator: WorkflowValidator) -> None:
+        """output_mapping with one invalid reference raises error."""
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "test-subworkflow",
+            "triggers": [
+                {
+                    "id": "subworkflow_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "artifact_url": {"type": "string"},
+                                "build_id": {"type": "string"},
+                            },
+                        },
+                        "output_mapping": {
+                            "artifact_url": "${deploy.url}",  # Valid
+                            "build_id": "${nonexistent.id}",  # Invalid
+                        },
+                    },
+                }
+            ],
+            "nodes": [
+                {"id": "deploy", "type": "script", "parameters": {"language": "python", "code": "print('deploy')"}}
+            ],
+            "edges": [{"from": "subworkflow_trigger", "to": "deploy"}],
+        }
+        # Template expression validator catches this first
+        with pytest.raises(SafeValueError, match="references unknown activity or scope 'nonexistent'"):
+            validator.validate_workflow_definition(definition)

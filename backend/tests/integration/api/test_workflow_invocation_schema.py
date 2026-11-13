@@ -313,6 +313,106 @@ async def test_published_workflow_without_subworkflow_trigger_returns_empty_sche
 
 
 @pytest.mark.asyncio
+async def test_workflow_invocation_schema_includes_output_schema_and_mapping(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: str,
+) -> None:
+    """Verify that output_schema and output_mapping are returned when present on SubWorkflow Triggers."""
+    workflow = Workflow(
+        name=f"test-output-schema-{uuid4().hex[:8]}",
+        created_by=test_user.id,
+        project_id=UUID(test_project_id),
+        current_version=1,
+        is_enabled=False,
+    )
+    test_db_session.add(workflow)
+    await test_db_session.flush()
+
+    published_version = WorkflowVersion(
+        workflow_id=workflow.id,
+        version=1,
+        schema_version="2.0.0",
+        workflow_definition={
+            "schema_version": "2.0.0",
+            "name": "test-output-contract",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "name": "Child Trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {"environment": {"type": "string"}},
+                        },
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "artifact_url": {"type": "string", "description": "Build artifact URL"},
+                                "release_tag": {"type": "string", "description": "Release version tag"},
+                            },
+                            "required": ["artifact_url"],
+                        },
+                        "output_mapping": {
+                            "artifact_url": "${deploy_app.artifact_url}",
+                            "release_tag": "${build_step.image_tag}",
+                        },
+                    },
+                },
+            ],
+            "nodes": [],
+            "edges": [],
+        },
+        created_by=test_user.id,
+    )
+    test_db_session.add(published_version)
+    await test_db_session.commit()
+
+    workflow.published_version_id = published_version.id
+    await test_db_session.commit()
+
+    response = await auth_client.get(f"/api/v1/workflows/{workflow.id}/invocation_schema")
+
+    assert response.status_code == 200
+    body = response.json()
+
+    # Remove dynamic timestamp for comparison
+    body.pop("published_version_created_at")
+
+    assert body == {
+        "workflow_id": str(workflow.id),
+        "published_version_id": str(published_version.id),
+        "published_version": 1,
+        "published_version_name": None,
+        "is_eligible": True,
+        "triggers": [
+            {
+                "trigger_node_id": "child_trigger",
+                "name": "Child Trigger",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"environment": {"type": "string"}},
+                },
+                "output_schema": {
+                    "type": "object",
+                    "properties": {
+                        "artifact_url": {"type": "string", "description": "Build artifact URL"},
+                        "release_tag": {"type": "string", "description": "Release version tag"},
+                    },
+                    "required": ["artifact_url"],
+                },
+                "output_mapping": {
+                    "artifact_url": "${deploy_app.artifact_url}",
+                    "release_tag": "${build_step.image_tag}",
+                },
+            },
+        ],
+    }
+
+
+@pytest.mark.asyncio
 async def test_stateless_validate_does_not_apply_project_scope_check(
     auth_client: AsyncClient,
     test_db_session: AsyncSession,

@@ -24,6 +24,7 @@ Usage:
 """
 
 from .activity_execution import ActivityExecution, ActivityExecutionListResponse, ActivityStatus
+from .breaking_changes import BreakingChange, BreakingChangesResponse, TriggerBreakingChanges
 from .execution import (
     TERMINAL_EXECUTION_STATUSES,
     ActivityData,
@@ -91,6 +92,8 @@ __all__ = [
     "ActivityPatchMessage",
     "ActivitySignalPayload",
     "ActivityStatus",
+    "BreakingChange",
+    "BreakingChangesResponse",
     "ChildExecutionListParams",
     "DetailedValidationProblemDetail",
     "Execution",
@@ -107,6 +110,7 @@ __all__ = [
     "PublishWorkflowVersionResponse",
     "PublishedWorkflowStepMetadataRead",
     "SignalResponse",
+    "TriggerBreakingChanges",
     "ValidationCategory",
     "ValidationFinding",
     "ValidationResult",

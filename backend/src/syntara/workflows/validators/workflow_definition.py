@@ -7,6 +7,7 @@ registry retrieve callback and cached for the lifetime of the process.
 """
 
 import json
+import re
 from collections import defaultdict, deque
 from functools import lru_cache
 from typing import Any
@@ -498,6 +499,74 @@ def collect_scheduled_trigger_config_findings(
     return findings
 
 
+def _check_output_mapping_references(  # noqa: C901
+    workflow_definition: dict[str, Any], node_ids: set[str]
+) -> list[ValidationFinding]:
+    """Validate that SubWorkflow Trigger output_mapping references existing steps.
+
+    Args:
+        workflow_definition: The workflow definition dictionary
+        node_ids: Set of all valid node IDs in the workflow
+
+    Returns:
+        List of validation findings for invalid step references in output_mapping
+
+    """
+    findings: list[ValidationFinding] = []
+
+    triggers = workflow_definition.get("triggers", [])
+    if not isinstance(triggers, list):
+        return findings
+
+    for trigger in triggers:
+        if not isinstance(trigger, dict):
+            continue
+
+        trigger_id = trigger.get("id")
+        trigger_type = trigger.get("type")
+
+        # Only validate SubWorkflow Triggers
+        if trigger_type != "subworkflow_trigger":
+            continue
+
+        parameters = trigger.get("parameters", {})
+        if not isinstance(parameters, dict):
+            continue
+
+        output_mapping = parameters.get("output_mapping", {})
+        if not isinstance(output_mapping, dict):
+            continue
+
+        # Check each mapping expression references a valid step
+        for field_path, expression in output_mapping.items():
+            if not isinstance(expression, str):
+                continue
+
+            # Extract step ID from template expression like "${step.field}" or "${step}"
+            match = re.match(r"^\$\{([^.}]+)", expression)
+            if not match:
+                continue
+
+            referenced_step = match.group(1)
+
+            # Check if the referenced step exists in the workflow
+            if referenced_step not in node_ids:
+                findings.append(
+                    ValidationFinding(
+                        severity=ValidationSeverity.error,
+                        category=ValidationCategory.invalid_reference,
+                        message=(
+                            f"Output mapping for field '{field_path}' references unknown step '{referenced_step}'. "
+                            f"Expression: {expression}"
+                        ),
+                        node_id=trigger_id,
+                        field_path=f"parameters.output_mapping.{field_path}",
+                    )
+                )
+
+    return findings
+
+
 class WorkflowValidator:
     """Validator for V2 workflows and metadata.
 
@@ -525,6 +594,7 @@ class WorkflowValidator:
         node_ids = _extract_node_ids(workflow_definition)
         self._validate_graph_structure(workflow_definition, node_ids)
         self._validate_template_expressions(workflow_definition, node_ids)
+        self._validate_output_mapping_references(workflow_definition, node_ids)
         scheduled_trigger_findings = collect_scheduled_trigger_config_findings(workflow_definition)
         if scheduled_trigger_findings:
             raise SafeValueError(scheduled_trigger_findings[0].message)
@@ -749,5 +819,20 @@ class WorkflowValidator:
 
     def _validate_template_expressions(self, workflow_definition: dict[str, Any], node_ids: set[str]) -> None:
         findings = check_template_expressions(workflow_definition, node_ids)
+        if findings:
+            raise SafeValueError(findings[0].message)
+
+    def _validate_output_mapping_references(self, workflow_definition: dict[str, Any], node_ids: set[str]) -> None:
+        """Validate SubWorkflow Trigger output_mapping step references.
+
+        Args:
+            workflow_definition: Workflow definition dictionary
+            node_ids: Set of valid node IDs
+
+        Raises:
+            SafeValueError: If output_mapping references unknown steps
+
+        """
+        findings = _check_output_mapping_references(workflow_definition, node_ids)
         if findings:
             raise SafeValueError(findings[0].message)

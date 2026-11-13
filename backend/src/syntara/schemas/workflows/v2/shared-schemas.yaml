@@ -366,6 +366,21 @@ components:
           type: object
           additionalProperties: true
           title: Input Schema
+        output_schema:
+          anyOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+          title: Output Schema
+          description: JSON Schema defining the outputs exposed to parent workflows. Provides encapsulation—parent sees only declared fields, not internal child step structure.
+        output_mapping:
+          anyOf:
+            - type: object
+              additionalProperties:
+                type: string
+            - type: 'null'
+          title: Output Mapping
+          description: Template expressions mapping internal step outputs to declared output fields. Keys are dotted paths from output_schema; values are template expressions (e.g., '${step.field}').
 
     WorkflowInvocationSchemaRead:
       type: object

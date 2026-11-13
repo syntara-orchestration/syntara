@@ -118,7 +118,11 @@ def _effective_output_schema_for_node(node: dict[str, Any]) -> dict[str, Any] | 
     unknown types until execution. The workflow engine's status field is added
     independently of executor output mapping and remains available.
     """
-    node_type = node.get("type")
+    if not isinstance(node, dict):
+        msg = f"Expected dict for node parameter, got {type(node).__name__}"
+        raise TypeError(msg)
+
+    node_type = node.get("type")  # type: ignore[unreachable]
     if not isinstance(node_type, str):
         return None
 
@@ -142,7 +146,17 @@ def _effective_output_schema_for_node(node: dict[str, Any]) -> dict[str, Any] | 
     if "status" in properties:
         effective_properties["status"] = properties["status"]
 
-    return {**output_schema, "properties": effective_properties}
+    # Filter required array to only include fields that exist in effective_properties
+    effective_required = [field for field in output_schema.get("required", []) if field in effective_properties]
+
+    result = {**output_schema, "properties": effective_properties}
+    if effective_required:
+        result["required"] = effective_required
+    elif "required" in result:
+        # Remove required key if no fields are required after mapping
+        del result["required"]
+
+    return result
 
 
 def _step_metadata_for_nodes(nodes: object) -> list[WorkflowStepMetadataRead]:
@@ -1134,11 +1148,15 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     continue
                 parameters = trigger.get("parameters")
                 input_schema = parameters.get("input_schema") if isinstance(parameters, dict) else None
+                output_schema = parameters.get("output_schema") if isinstance(parameters, dict) else None
+                output_mapping = parameters.get("output_mapping") if isinstance(parameters, dict) else None
                 invocation_triggers.append(
                     WorkflowInvocationTriggerSchema(
                         trigger_node_id=trigger_node_id,
                         name=trigger.get("name") if isinstance(trigger.get("name"), str) else None,
                         input_schema=input_schema if isinstance(input_schema, dict) else {},
+                        output_schema=output_schema if isinstance(output_schema, dict) else None,
+                        output_mapping=output_mapping if isinstance(output_mapping, dict) else None,
                     )
                 )
 

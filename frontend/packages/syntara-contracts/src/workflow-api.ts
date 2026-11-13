@@ -574,6 +574,20 @@ export interface components {
       input_schema?: {
         [key: string]: unknown
       }
+      /**
+       * Output Schema
+       * @description JSON Schema defining the outputs exposed to parent workflows. Provides encapsulation—parent sees only declared fields, not internal child step structure.
+       */
+      output_schema?: {
+        [key: string]: unknown
+      } | null
+      /**
+       * Output Mapping
+       * @description Template expressions mapping internal step outputs to declared output fields. Keys are dotted paths from output_schema; values are template expressions (e.g., '${step.field}').
+       */
+      output_mapping?: {
+        [key: string]: string
+      } | null
     }
     /**
      * WorkflowInvocationSchemaRead

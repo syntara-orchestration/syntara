@@ -5,6 +5,14 @@ import { safeJSONReviver } from '../../../utils/jsonSafeParse'
 import { parseRepeatingInterval } from '../../../utils/triggerFormatting'
 import { isValidWebhookPath } from '../../../utils/webhookPath'
 
+const subWorkflowOutputFieldSchema = z.object({
+  path: z.string().max(256),
+  type: z.enum(['string', 'number', 'boolean', 'object', 'array', 'unknown']),
+  required: z.boolean(),
+  description: z.string().optional(),
+  expression: z.string().optional(),
+})
+
 /**
  * Zod schema for the Trigger node form.
  * Manual and webhook fields stay optional so incomplete triggers can be added
@@ -30,6 +38,11 @@ const triggerFormSchemaBase = z.object({
     ])
     .optional(),
   inputSchema: z.string().optional(),
+  outputSchema: z.string().optional(),
+  outputFields: z.array(subWorkflowOutputFieldSchema).optional(),
+  outputMapping: z.record(z.string(), z.string()).optional(),
+  triggerId: z.string().optional(),
+  triggerIndex: z.number().optional(),
   webhookPath: z.string().optional(),
   authorizedServiceAccountIds: z.array(z.string().uuid()).optional(),
 })

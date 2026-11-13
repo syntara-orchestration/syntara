@@ -12,6 +12,7 @@ import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import type { Trigger } from '../../../stores/workflowStoreTypes'
 import { parseJsonSchema } from '../../../utils/jsonSafeParse'
 import { isValidWebhookPath, normalizeWebhookPath } from '../../../utils/webhookPath'
+import { outputFieldsFromSchema, outputMappingFromFields } from '../utils/subWorkflowOutputContract'
 import type { TriggerFormData } from '../node-forms/TriggerNodeForm'
 import { TriggerNodeForm } from '../node-forms/TriggerNodeForm'
 
@@ -192,12 +193,22 @@ function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: stri
   }
   if (data.triggerType === TriggerTypeEnum.SUBWORKFLOW_TRIGGER) {
     const inputSchema = parseJsonSchema(data.inputSchema)
+    const outputSchema = parseJsonSchema(data.outputSchema)
+
+    // Build output_mapping from either outputFields (Simple mode) or outputMapping (Advanced mode)
+    const outputMapping =
+      data.outputFields && data.outputFields.length > 0
+        ? outputMappingFromFields(data.outputFields)
+        : (data.outputMapping ?? {})
+
     return {
       id: trigger.id ?? 'subworkflow_trigger',
       type: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
       name: name ?? 'Workflow Trigger',
       parameters: {
         ...(inputSchema && { input_schema: inputSchema }),
+        ...(outputSchema && { output_schema: outputSchema }),
+        ...(Object.keys(outputMapping).length > 0 && { output_mapping: outputMapping }),
       },
     }
   }
@@ -227,10 +238,18 @@ export function TriggerNodeDetails({ trigger, triggerIndex, onClose, onHeaderCon
     }
 
     if (trigger.type === TriggerTypeEnum.SUBWORKFLOW_TRIGGER) {
+      const outputSchema = trigger.parameters?.output_schema
+      const outputMapping = trigger.parameters?.output_mapping as Record<string, string> | undefined
+
       return {
         name: trigger.name,
         triggerType: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
         inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
+        outputSchema: serializeInputSchema(outputSchema),
+        outputFields: outputFieldsFromSchema(outputSchema, outputMapping ?? {}),
+        outputMapping: outputMapping ?? {},
+        triggerId: trigger.id,
+        triggerIndex,
       }
     }
 
