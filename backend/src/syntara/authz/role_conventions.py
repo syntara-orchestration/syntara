@@ -117,6 +117,10 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     # executions
     PolicyInfo("execution", "read", roles=("admin", "auditor")),
     PolicyInfo("execution", "run", roles=("admin",)),
+    # internal service callbacks
+    PolicyInfo("execution-plane-callback", "complete", roles=("execution-plane-callback",)),
+    PolicyInfo("execution-plane-callback", "resolve-credential", roles=("execution-plane-callback",)),
+    PolicyInfo("execution-plane-callback", "resolve-credential-workload", roles=("execution-plane-callback",)),
     # approvals
     PolicyInfo("approval", "read", roles=("admin", "auditor")),
     PolicyInfo("approval", "decide", roles=("admin",)),
@@ -257,6 +261,7 @@ BUILTIN_ROLES: list[RoleInfo] = [
         scope="project",
     ),
     RoleInfo("project-auditor", "Read-only access within a project", scope="project"),
+    RoleInfo("execution-plane-callback", "Execute Execution Plane callback commands"),
     RoleInfo(
         "authenticated",
         "Default permissions granted to all authenticated users",

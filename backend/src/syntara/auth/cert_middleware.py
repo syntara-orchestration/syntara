@@ -121,12 +121,12 @@ class ClientCertAuthMiddleware:
             _load_revoked_serials(settings.s2s_tls_crl_path) if settings.s2s_tls_crl_path is not None else None
         )
         if self._tls_enabled and self._cn_allowlist is not None:
-            from syntara.core.models.principal import KNOWN_SERVICE_CNS  # noqa: PLC0415
+            from syntara.core.models.principal import configured_service_cns  # noqa: PLC0415
 
-            missing = set(KNOWN_SERVICE_CNS) - self._cn_allowlist
+            missing = set(configured_service_cns()) - self._cn_allowlist
             if missing:
                 logger.warning(
-                    "KNOWN_SERVICE_CNS entries missing from APP_S2S_TLS_CN_ALLOWLIST: %s — "
+                    "Service certificate CNs missing from APP_S2S_TLS_CN_ALLOWLIST: %s — "
                     "these services will authenticate via TLS but not receive service identity",
                     ", ".join(sorted(missing)),
                 )

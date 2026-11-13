@@ -16,9 +16,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import select
 
 from syntara.core.models.principal import (
-    KNOWN_SERVICE_CNS,
     Principal,
     PrincipalType,
+    configured_service_cns,
     service_principal_id,
 )
 from syntara.core.models.user import User, user_display_name
@@ -35,9 +35,11 @@ if TYPE_CHECKING:
 
 logger = structlog.stdlib.get_logger(__name__)
 
-# Service principals (mTLS-authenticated internal services) get a ``principals``
-# row but no child-table row, so their display name is derived from the cert CN.
-_SERVICE_CN_BY_PRINCIPAL_ID: dict[UUID, str] = {service_principal_id(cn): cn for cn in KNOWN_SERVICE_CNS}
+
+def _service_cn_by_principal_id() -> dict[UUID, str]:
+    """Map service principal IDs to CNs, including configured service identities."""
+    return {service_principal_id(cn): cn for cn in configured_service_cns()}
+
 
 # ``delete_user`` / ``delete_service_account`` remove the child row but keep the
 # ``principals`` row so created_by/updated_by FKs stay valid; such principals must
@@ -136,7 +138,7 @@ def _resolve_principal(
         return ResolvedPrincipal(DELETED_SERVICE_ACCOUNT_NAME, UserReferenceType.DELETED_SERVICE_ACCOUNT)
     if ptype is PrincipalType.SYSTEM:
         return ResolvedPrincipal(SYSTEM_PRINCIPAL_NAME, UserReferenceType.SYSTEM)
-    name = _SERVICE_CN_BY_PRINCIPAL_ID.get(principal_id) or str(principal_id)
+    name = _service_cn_by_principal_id().get(principal_id) or str(principal_id)
     return ResolvedPrincipal(name, UserReferenceType.SERVICE)
 
 
