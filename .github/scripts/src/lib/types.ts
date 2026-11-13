@@ -9,6 +9,7 @@ export const WorkflowRunSchema = z.object({
   name: z.string(),
   head_branch: z.string(),
   status: z.string(),
+  event: z.string(),
   conclusion: z.string().nullable(),
   created_at: z.string(),
 })
@@ -69,6 +70,24 @@ export const EnvironmentSchema = z.object({
   repository: z.string().min(1, 'GITHUB_REPOSITORY is required'),
   runId: z.number().int().positive('GITHUB_RUN_ID must be a positive integer'),
   headRef: z.string().optional(),
+  eventName: z.string().optional(),
+})
+
+/** Builds a validator for a required numeric value passed as a string environment variable. */
+const requiredFiniteNumber = (name: string) =>
+  z
+    .string({ error: `${name} is required` })
+    .trim()
+    .min(1, `${name} is required`)
+    .transform(Number)
+    .refine(Number.isFinite, `${name} must be a finite number`)
+
+/** Validates values passed from the queue-health workflow to the unhealthy alert. */
+export const UnhealthyAlertEnvironmentSchema = z.object({
+  queueDepth: requiredFiniteNumber('QUEUE_DEPTH'),
+  minutesSinceMerge: requiredFiniteNumber('MINUTES_SINCE_MERGE'),
+  timeoutMinutes: requiredFiniteNumber('TIMEOUT_MINUTES'),
+  queueUrl: z.string({ error: 'QUEUE_URL is required' }).url('QUEUE_URL must be a valid URL'),
 })
 
 export type WorkflowRun = z.infer<typeof WorkflowRunSchema>
@@ -88,3 +107,4 @@ export type HealthState = {
 }
 
 export type Environment = z.infer<typeof EnvironmentSchema>
+export type UnhealthyAlertEnvironment = z.infer<typeof UnhealthyAlertEnvironmentSchema>
