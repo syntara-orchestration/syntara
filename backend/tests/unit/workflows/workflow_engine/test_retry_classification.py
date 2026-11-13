@@ -1,0 +1,1986 @@
+"""Retry-from-failure classification and override application in the engine .
+
+The control plane  validates a retry and hands the engine
+``workflow_metadata.retry``. These tests cover the engine half: overrides
+replacing resolved inputs, and completed upstream nodes being skipped with their
+outputs restored.
+"""
+
+from collections.abc import Callable, Generator
+from datetime import timedelta
+from typing import Any, ClassVar, cast
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from temporalio.exceptions import ApplicationError
+
+from syntara.core.exceptions import SafeValueError
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.models import ActivityName, NodeType
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.retry_mixin import (
+    _CONTROL_NODE_TYPES_FOR_RETRY,
+    WorkflowRetryMixin,
+)
+from syntara.workflows.models.activity_execution import ActivityStatus
+
+from .conftest import init_workflow_runtime
+
+
+@pytest.fixture
+def mock_wf() -> Generator[MagicMock, None, None]:
+    """Patch the Temporal workflow module so execute_activity is awaitable."""
+    with (
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as patched,
+        patch("syntara.workflow_runtime.engines.temporal.retry_mixin.workflow", patched),
+    ):
+        patched.logger = MagicMock()
+        yield patched
+
+
+def _make_workflow(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
+    """Create an OrchestratorWorkflow with initialized state, bypassing __init__."""
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+    wf.skipped_nodes = set()
+    wf.failed_nodes = {}
+    wf.resolver = NamespaceResolver()
+    wf.node_inputs = {}
+    wf.node_control_data = {}
+    wf.loop_state = {}
+    wf.loop_body_map = {}
+    wf.loop_iteration_results = {}
+    wf._loop_bodies = {}
+    wf._active_loop_iteration = {}
+    wf._timeout_tasks = {}
+    wf._timed_out_converge_nodes = set()
+    wf._detached_nodes = set()
+    wf._converge_branch_nodes = {}
+    init_workflow_runtime(wf)
+    wf.execution_id = "test-execution-id"
+    wf._created_by_user_id = ""
+    wf.request_id = None
+    wf.pre_resolved_outputs = {}
+    wf.stop_after_nodes = set()
+    wf.retry_context = retry_context or {}
+    return wf
+
+
+def _node(node_id: str = "step_2", parameters: dict[str, Any] | None = None) -> ActivityNode:
+    return ActivityNode(
+        node_id=node_id,
+        node_type="script",
+        parameters=parameters if parameters is not None else {},
+    )
+
+
+def test_converge_replay_compares_every_predecessor_by_identity() -> None:
+    """A converge can replay only when every direct input is restored from source."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1"})
+    wf.loop_body_map = {
+        "inner_loop": "outer_loop",
+        "branch_a": "inner_loop",
+        "branch_b": "inner_loop",
+        "converge": "inner_loop",
+    }
+    wf.node_control_data = {
+        "outer_loop": {"current_index": 1},
+        "inner_loop": {"current_index": 4},
+    }
+    wf._restored_node_timestamps = {
+        "branch_a_iter_1_iter_4": {"started_at": "a"},
+        "branch_b_iter_1_iter_4": {"started_at": "b"},
+    }
+    wf._retry_replay_candidates = {"converge"}
+    graph = MagicMock()
+    graph.get_predecessors.return_value = ["branch_a", "branch_b"]
+    nodes = {
+        "branch_a": ActivityNode("branch_a", NodeType.SCRIPT, {}),
+        "branch_b": ActivityNode("branch_b", NodeType.SCRIPT, {}),
+    }
+    graph.get_node.side_effect = nodes.__getitem__
+    wf._retry_restorable_cache = set(nodes)
+    wf._retry_source_temporal_statuses = {
+        "branch_a_iter_1_iter_4": ActivityStatus.COMPLETED.value,
+        "branch_b_iter_1_iter_4": ActivityStatus.COMPLETED.value,
+    }
+    source_state = {
+        "converge": {
+            "status": ActivityStatus.COMPLETED.value,
+            "input_data": {"strategy": "any", "n_required": 2},
+            "output_branch_count": 2,
+            "gate_metadata": {"strategy": "any", "n_required": 2, "total_branches": 2},
+        },
+        "predecessors": {
+            "branch_a": {"status": ActivityStatus.COMPLETED.value, "result_digest": "a"},
+            "branch_b": {"status": ActivityStatus.COMPLETED.value, "result_digest": "b"},
+        },
+    }
+    temporal_ids = {
+        "branch_a": "branch_a_iter_1_iter_4",
+        "branch_b": "branch_b_iter_1_iter_4",
+    }
+
+    assert wf._retry_converge_metadata_matches(
+        {"strategy": "any", "n_required": 2},
+        ["branch_a", "branch_b"],
+        temporal_ids,
+        source_state,
+        graph,
+    )
+
+    # A pre-resolved branch executes from current input instead of replaying its
+    # source occurrence, so identical arrival order cannot make this a source match.
+    del wf._restored_node_timestamps["branch_b_iter_1_iter_4"]
+    wf.pre_resolved_outputs["branch_b"] = {"value": "new"}
+    assert not wf._retry_converge_metadata_matches(
+        {"strategy": "any", "n_required": 2},
+        ["branch_a", "branch_b"],
+        temporal_ids,
+        source_state,
+        graph,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Full _execute_converge_node path: quorum-aware restore-vs-execute decision
+#
+# These drive the complete retry converge path -- the wait gate,
+# _maybe_restore_retry_converge, _converge_predecessor_will_replay, and
+# _retry_converge_metadata_matches -- so the restore-vs-execute decision is
+# covered against a branch's *actual current* state, not just the gate predicate.
+# ---------------------------------------------------------------------------
+
+
+def _two_branch_converge_graph(strategy: str, n_required: int) -> WorkflowGraph:
+    """Build b1, b2 -> join, where join is a converge with the given gate."""
+    backend = InMemoryGraphBackend()
+    backend.add_node("b1", {"id": "b1", "type": "script", "parameters": {}})
+    backend.add_node("b2", {"id": "b2", "type": "script", "parameters": {}})
+    backend.add_node(
+        "join",
+        {"id": "join", "type": "converge", "parameters": {"strategy": strategy, "n_required": n_required}},
+    )
+    backend.add_edge("b1", "join", None)
+    backend.add_edge("b2", "join", None)
+    return WorkflowGraph(backend)
+
+
+@pytest.mark.asyncio
+async def test_retry_converge_executes_live_when_a_quorum_branch_is_a_rerun(mock_wf: MagicMock) -> None:
+    """1-of-2 both-failed: the quorum winner is a live rerun, so the converge executes.
+
+    Both branches failed in the source run, so retry reruns both; b1 finishes first
+    and satisfies the 1-of-2 gate while b2 is still pending. A source-failed branch
+    is not restorable, so ``_converge_predecessor_will_replay`` classifies b1 as
+    ``live`` and compares its *actual current* completed output -- which cannot match
+    the source's failed status -- so the metadata comparison falls through and the
+    converge executes live rather than restoring a stale result. Exercises the whole
+    ``_execute_converge_node`` -> ``_maybe_restore_retry_converge`` path.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["b1", "b2"]})
+    graph = _two_branch_converge_graph("any", 1)
+    wf._retry_replay_candidates = {"join"}
+    wf._retry_source_statuses = {"b1": "failed", "b2": "failed", "join": "failed"}
+    wf._retry_source_temporal_statuses = {"b1": "failed", "b2": "failed", "join": "failed"}
+    # b1 reran and succeeded; b2 is still in flight (no namespace, not terminal).
+    wf.resolver.set_namespace("b1", {"v": 1, "status": "completed"})
+
+    source_state = {
+        "converge": {
+            "status": ActivityStatus.FAILED.value,
+            "input_data": {"strategy": "any", "n_required": 1},
+            "output_branch_count": 2,
+            "gate_metadata": {"strategy": "any", "n_required": 1, "total_branches": 2},
+        },
+        "predecessors": {
+            "b1": {"status": ActivityStatus.FAILED.value, "result_digest": None},
+            "b2": {"status": ActivityStatus.FAILED.value, "result_digest": None},
+        },
+    }
+    live_result = {"output": {"status": "completed", "converged": True}, "control": None}
+
+    async def _activity(name: Any, *_args: Any, **_kwargs: Any) -> Any:  # noqa: ANN401
+        if name == ActivityName.RETRY_CONVERGE_METADATA:
+            return source_state
+        if name == ActivityName.CONVERGE:
+            return live_result
+        pytest.fail(f"unexpected activity {name}")
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock(side_effect=_activity)
+
+    result = await wf._execute_converge_node("join", {"strategy": "any", "n_required": 1}, None, graph)
+
+    assert result == live_result
+    activities = [call.args[0] for call in mock_wf.execute_activity.call_args_list]
+    assert ActivityName.CONVERGE in activities, "a live rerun quorum must execute the converge"
+    assert "join" not in wf._retry_replay_candidates, "the stale restore must be ruled out"
+
+
+@pytest.mark.asyncio
+async def test_retry_converge_restores_when_every_branch_matches_source(mock_wf: MagicMock) -> None:
+    """Every predecessor is restored and matches the source, so the converge restores.
+
+    The complement of the live case: both branches completed in the source run and
+    have been restored identically, so ``_converge_predecessor_will_replay`` predicts
+    a restore for each, the metadata comparison matches, and the converge replays its
+    recorded result instead of executing the activity.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["unrelated"]})
+    graph = _two_branch_converge_graph("any", 2)
+    wf._retry_replay_candidates = {"join"}
+    wf._retry_source_statuses = {"b1": "completed", "b2": "completed", "join": "completed"}
+    wf._retry_source_temporal_statuses = {"b1": "completed", "b2": "completed", "join": "completed"}
+    # Both branches already restored: a recorded timestamp is what marks them replayed.
+    wf._restored_node_timestamps = {"b1": {"started_at": "x"}, "b2": {"started_at": "y"}}
+    out1 = {"v": 1, "status": "completed"}
+    out2 = {"v": 2, "status": "completed"}
+    wf.resolver.set_namespace("b1", out1)
+    wf.resolver.set_namespace("b2", out2)
+
+    source_state = {
+        "converge": {
+            "status": ActivityStatus.COMPLETED.value,
+            "input_data": {"strategy": "any", "n_required": 2},
+            "output_branch_count": 2,
+            "gate_metadata": {"strategy": "any", "n_required": 2, "total_branches": 2},
+        },
+        "predecessors": {
+            "b1": {"status": ActivityStatus.COMPLETED.value, "result_digest": wf._retry_converge_result_digest(out1)},
+            "b2": {"status": ActivityStatus.COMPLETED.value, "result_digest": wf._retry_converge_result_digest(out2)},
+        },
+    }
+    converge_record = {
+        "output_data": {"status": "completed", "converged": True},
+        "status": ActivityStatus.COMPLETED.value,
+        "input_data": {},
+        "started_at": "s",
+        "completed_at": "c",
+        "control_data": {},
+    }
+
+    async def _activity(name: Any, *_args: Any, **_kwargs: Any) -> Any:  # noqa: ANN401
+        if name == ActivityName.RETRY_CONVERGE_METADATA:
+            return source_state
+        if name == ActivityName.RETRY_NODE_REPLAY:
+            return converge_record
+        pytest.fail(f"unexpected activity {name}")
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock(side_effect=_activity)
+
+    result = await wf._execute_converge_node("join", {"strategy": "any", "n_required": 2}, None, graph)
+
+    assert result == {"output": converge_record["output_data"], "control": None}
+    activities = [call.args[0] for call in mock_wf.execute_activity.call_args_list]
+    assert ActivityName.CONVERGE not in activities, "a fully matched source converge must restore, not execute"
+
+
+@pytest.mark.asyncio
+async def test_retry_converge_restores_when_a_quorum_branch_is_still_pending_replay(mock_wf: MagicMock) -> None:
+    """Quorum is met while another branch is still pending but *predicted* to replay.
+
+    b1 has been restored and satisfies the 1-of-2 gate; b2 has not run yet -- it is
+    not in ``_restored_node_timestamps`` and has no namespace -- but it is a plain
+    restore candidate, so ``_converge_predecessor_will_replay`` predicts a replay for
+    it from ``_should_restore_node`` rather than from an already-recorded timestamp.
+    Because b2 will be restored to exactly its source state, comparing it by that
+    predicted state is safe and the converge restores. This is the branch of
+    ``_converge_predecessor_will_replay`` that uses predicted (not yet realised)
+    retry state, which the restore review asked to cover explicitly.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["unrelated"]})
+    graph = _two_branch_converge_graph("any", 1)
+    wf._retry_replay_candidates = {"join"}
+    wf._retry_source_statuses = {"b1": "completed", "b2": "completed", "join": "completed"}
+    wf._retry_source_temporal_statuses = {"b1": "completed", "b2": "completed", "join": "completed"}
+    out1 = {"v": 1, "status": "completed"}
+    # b1 won the quorum via a restore; b2 is predicted-to-replay but has not run yet
+    # (no recorded timestamp, no namespace), so its classification is a prediction.
+    wf._restored_node_timestamps = {"b1": {"started_at": "x"}}
+    wf.resolver.set_namespace("b1", out1)
+
+    b2_source_digest = "b2-source-digest"
+    source_state = {
+        "converge": {
+            "status": ActivityStatus.COMPLETED.value,
+            "input_data": {"strategy": "any", "n_required": 1},
+            "output_branch_count": 2,
+            "gate_metadata": {"strategy": "any", "n_required": 1, "total_branches": 2},
+        },
+        "predecessors": {
+            "b1": {"status": ActivityStatus.COMPLETED.value, "result_digest": wf._retry_converge_result_digest(out1)},
+            "b2": {"status": ActivityStatus.COMPLETED.value, "result_digest": b2_source_digest},
+        },
+    }
+    converge_record = {
+        "output_data": {"status": "completed", "converged": True},
+        "status": ActivityStatus.COMPLETED.value,
+        "input_data": {},
+        "started_at": "s",
+        "completed_at": "c",
+        "control_data": {},
+    }
+
+    async def _activity(name: Any, *_args: Any, **_kwargs: Any) -> Any:  # noqa: ANN401
+        if name == ActivityName.RETRY_CONVERGE_METADATA:
+            return source_state
+        if name == ActivityName.RETRY_NODE_REPLAY:
+            return converge_record
+        pytest.fail(f"unexpected activity {name}")
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock(side_effect=_activity)
+
+    # The pending branch is genuinely a replay candidate...
+    assert wf._should_restore_node("b2", graph)
+    result = await wf._execute_converge_node("join", {"strategy": "any", "n_required": 1}, None, graph)
+
+    # ...so the converge restores from its predicted (source) state rather than
+    # blocking or executing live.
+    assert result == {"output": converge_record["output_data"], "control": None}
+    activities = [call.args[0] for call in mock_wf.execute_activity.call_args_list]
+    assert ActivityName.CONVERGE not in activities, "a predicted-replay quorum branch must restore, not execute"
+
+
+@pytest.mark.asyncio
+async def test_retry_converge_raises_resolved_gate_failure(mock_wf: MagicMock) -> None:
+    """A deferred gate failure is re-evaluated against resolved config and raised.
+
+    Both branches failed, so the 1-of-2 gate cannot be satisfied. The deferred
+    failure reason routes through the first wait (and its timeout-task cancellation)
+    and the converge raises a non-retryable gate failure rather than executing.
+    """
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["b1", "b2"]})
+    graph = _two_branch_converge_graph("any", 1)
+    # Not a replay candidate, so _maybe_restore_retry_converge is a no-op and the
+    # resolved failure path owns the outcome.
+    wf._retry_replay_candidates = set()
+    wf.failed_nodes = {"b1": "boom", "b2": "boom"}
+    wf.resolver.set_namespace("b1", {"status": "failed"})
+    wf.resolver.set_namespace("b2", {"status": "failed"})
+    wf._retry_converge_failure_reasons = {"join": "Converge node join: required 1 successful branches, got 0"}
+    cancelled = MagicMock()
+    wf._timeout_tasks = {"join": cancelled}
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock()
+
+    with pytest.raises(ApplicationError) as excinfo:
+        await wf._execute_converge_node("join", {"strategy": "any", "n_required": 1}, None, graph)
+
+    assert excinfo.value.type == "RetryConvergeGateFailure"
+    assert "required 1 successful branches" in str(excinfo.value)
+    cancelled.cancel.assert_called_once()
+    mock_wf.execute_activity.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_retry_converge_raises_timeout_failure_verbatim(mock_wf: MagicMock) -> None:
+    """A timed-out gate reason is raised as-is without re-evaluation."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["b1", "b2"]})
+    graph = _two_branch_converge_graph("any", 1)
+    wf._retry_replay_candidates = set()
+    timeout_reason = "Converge node join timed out after 30.0s waiting for predecessors"
+    wf._retry_converge_failure_reasons = {"join": timeout_reason}
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock()
+
+    with pytest.raises(ApplicationError) as excinfo:
+        await wf._execute_converge_node("join", {"strategy": "any", "n_required": 1}, None, graph)
+
+    assert excinfo.value.type == "RetryConvergeGateFailure"
+    assert excinfo.value.message == timeout_reason
+    mock_wf.execute_activity.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Input parameter overrides
+# ---------------------------------------------------------------------------
+
+
+def test_override_replaces_resolved_value() -> None:
+    """An override wins over the value the node would otherwise receive."""
+    wf = _make_workflow({"input_parameter_overrides": {"step_2": {"code": "echo fixed"}}})
+    resolved = {"code": "echo original", "other": "kept"}
+
+    wf._apply_input_overrides(_node(), resolved)
+
+    assert resolved == {"code": "echo fixed", "other": "kept"}
+
+
+def test_override_replaces_value_resolved_from_previous_step() -> None:
+    """AC-14: override an expression-resolved value while preserving other inputs and the definition."""
+    wf = _make_workflow({"input_parameter_overrides": {"step_2": {"code": "echo fixed"}}})
+    wf.resolver.set_namespace("step_1", {"result": "echo from previous step"})
+    original_parameters = {"code": "${step_1.result}", "description": "ran ${step_1.result}"}
+    node = _node(parameters=original_parameters)
+
+    resolved = wf._resolve_node_parameters(node)
+    wf._apply_input_overrides(node, resolved)
+
+    assert resolved == {"code": "echo fixed", "description": "ran echo from previous step"}
+    assert node.parameters == original_parameters
+
+
+def test_override_applies_to_its_own_node_only() -> None:
+    """An override for another node must not touch this one's inputs."""
+    wf = _make_workflow({"input_parameter_overrides": {"step_9": {"code": "echo fixed"}}})
+    resolved = {"code": "echo original"}
+
+    wf._apply_input_overrides(_node("step_2"), resolved)
+
+    assert resolved == {"code": "echo original"}
+
+
+def test_unknown_override_key_is_ignored() -> None:
+    """A key that is not a parameter of the node is not injected.
+
+    The control plane rejects these, so reaching here means the guarantee was
+    bypassed. Ignoring rather than injecting keeps a single run from redefining
+    the workflow.
+    """
+    wf = _make_workflow({"input_parameter_overrides": {"step_2": {"brand_new_param": "x"}}})
+    resolved = {"code": "echo original"}
+
+    wf._apply_input_overrides(_node(), resolved)
+
+    assert resolved == {"code": "echo original"}
+
+
+def test_no_overrides_leaves_inputs_untouched() -> None:
+    """Most retries change nothing, so absent/empty overrides are a no-op."""
+    empty_contexts: list[dict[str, Any]] = [{}, {"input_parameter_overrides": {}}, {"input_parameter_overrides": None}]
+    for retry_context in empty_contexts:
+        wf = _make_workflow(retry_context)
+        resolved = {"code": "echo original"}
+
+        wf._apply_input_overrides(_node(), resolved)
+
+        assert resolved == {"code": "echo original"}
+
+
+def test_override_is_a_noop_on_non_retry_run() -> None:
+    """A normal run has no retry context and must not be affected."""
+    wf = _make_workflow()
+    assert wf.retry_context == {}
+    resolved = {"code": "echo original"}
+
+    wf._apply_input_overrides(_node(), resolved)
+
+    assert resolved == {"code": "echo original"}
+
+
+def test_override_does_not_need_the_target_to_be_a_starting_point() -> None:
+    """A failed node stays overridable even when it is not a retry starting point.
+
+    The control plane emits the eligible set it resolved; the engine applies
+    whatever it is handed rather than re-deriving eligibility.
+    """
+    wf = _make_workflow(
+        {
+            "eligible_point_ids": ["step_1"],
+            "input_parameter_overrides": {"step_2": {"code": "echo fixed"}},
+        }
+    )
+    resolved = {"code": "echo original"}
+
+    wf._apply_input_overrides(_node("step_2"), resolved)
+
+    assert resolved == {"code": "echo fixed"}
+
+
+# ---------------------------------------------------------------------------
+# Retry context is not expression data
+# ---------------------------------------------------------------------------
+
+
+def test_retry_block_is_not_registered_as_a_namespace() -> None:
+    """A user expression must not be able to read the retry block.
+
+    eligible_point_ids and input_parameter_overrides are control-plane state.
+    Exposing them as an expression namespace would let a step read the
+    validated selection and the user's overrides out of its parameters.
+    """
+    metadata = {
+        "workflow_context": {
+            "workflow": {"project_id": "p1", "name": "wf"},
+            "execution": {"created_by_user_id": "u1"},
+        },
+        "retry": {
+            "retry_from_execution_id": "src-1",
+            "eligible_point_ids": ["step_1"],
+            "input_parameter_overrides": {"step_1": {"code": "x"}},
+        },
+    }
+
+    wf = _namespace_probe(metadata)
+
+    assert "retry" not in wf.resolver.namespaces
+    assert wf.retry_context["eligible_point_ids"] == ["step_1"]
+    assert wf._project_id == "p1"
+    assert wf._created_by_user_id == "u1"
+
+
+def _namespace_probe(workflow_metadata: dict[str, Any]) -> OrchestratorWorkflow:
+    """Build a workflow and run only the metadata-unpacking part of __init__."""
+    wf = _make_workflow()
+    wf.execution_id = "exec-1"
+    wf.request_id = None
+    wf._project_id = ""
+    wf._created_by_user_id = ""
+    # Mirrors the unpacking block in __init__ so the test exercises the real
+    # statements without constructing a Temporal workflow instance.
+    wf.retry_context = dict(workflow_metadata.get("retry", {})) if workflow_metadata else {}
+    for ns_key, ns_data in workflow_metadata.items():
+        if ns_key == "retry":
+            continue
+        wf.resolver.set_namespace(ns_key, ns_data)
+    wf_ctx = workflow_metadata.get("workflow_context", {})
+    wf._project_id = wf_ctx.get("workflow", {}).get("project_id", "")
+    wf._created_by_user_id = wf_ctx.get("execution", {}).get("created_by_user_id", "")
+    return wf
+
+
+def test_absent_retry_block_yields_empty_context() -> None:
+    """A normal run must not see a retry context, so nothing downstream activates."""
+    wf = _make_workflow()
+    assert wf.retry_context == {}
+    assert "retry_from_execution_id" not in wf.retry_context
+
+
+# ---------------------------------------------------------------------------
+# Loop iteration id helpers
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("activity_name", "expected"),
+    [
+        ("step_1", "step_1"),
+        ("step_1#iter-0", "step_1"),
+        ("step_1#iter-12", "step_1"),
+    ],
+)
+def test_strip_iteration_suffix(activity_name: str, expected: str) -> None:
+    """A suffixed activity name resolves to its base node id.
+
+    Nested loops append one suffix per enclosing loop, so only the last suffix
+    is stripped and the inner-most base id is kept.
+    """
+    from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
+
+    assert strip_iteration_suffix(activity_name) == expected
+
+
+def test_nested_loop_name_keeps_inner_base_id() -> None:
+    """Nested-loop activity names resolve to the inner base, not the outer.
+
+    ``loop_iteration_ids`` appends one ``_iter_{n}`` per enclosing loop, so a
+    doubly-nested activity strips only the final suffix.
+    """
+    from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
+
+    assert strip_iteration_suffix("outer#iter-1#iter-0") == "outer#iter-1"
+
+
+@pytest.mark.parametrize(
+    ("activity_name", "expected"),
+    [("step_1", False), ("step_1#iter-0", True)],
+)
+def test_has_iteration_suffix(*, activity_name: str, expected: bool) -> None:
+    """Suffix detection distinguishes an iteration activity from a plain one."""
+    from syntara.workflows.utils.loop_iteration_names import has_iteration_suffix
+
+    assert has_iteration_suffix(activity_name) is expected
+
+
+# ---------------------------------------------------------------------------
+# Node classification: which upstream nodes may be restored
+# ---------------------------------------------------------------------------
+
+
+def _chain_graph(*, cof_nodes: set[str] | None = None) -> WorkflowGraph:
+    """Build trigger -> step_1 -> step_2 -> step_3, optionally with CoF on some nodes."""
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+
+    cof_nodes = cof_nodes or set()
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    for node_id in ("step_1", "step_2", "step_3"):
+        raw: dict[str, Any] = {"id": node_id, "type": "script", "parameters": {}}
+        if node_id in cof_nodes:
+            raw["settings"] = {"continue_on_failure": True}
+        backend.add_node(node_id, raw)
+    backend.add_edge("trigger", "step_1", None)
+    backend.add_edge("step_1", "step_2", None)
+    backend.add_edge("step_2", "step_3", None)
+    return WorkflowGraph(backend)
+
+
+def _retry(*eligible: str, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+    context: dict[str, Any] = {
+        "retry_from_execution_id": "src-1",
+        "eligible_point_ids": list(eligible),
+    }
+    if overrides is not None:
+        context["input_parameter_overrides"] = overrides
+    return context
+
+
+def test_upstream_of_failure_point_is_restorable() -> None:
+    """Nodes before the retry points are skipped with their outputs injected."""
+    wf = _make_workflow(_retry("step_2", "step_3"))
+    graph = _chain_graph()
+
+    assert wf._retry_restorable_nodes(graph) == {"step_1"}
+
+
+def test_retry_starting_points_are_never_restored() -> None:
+    """A node being retried must execute, not have its old output injected."""
+    wf = _make_workflow(_retry("step_2"))
+    graph = _chain_graph()
+
+    assert "step_2" not in wf._retry_restorable_nodes(graph)
+
+
+def test_downstream_of_failed_continue_on_failure_step_is_forced_to_rerun() -> None:
+    """A node downstream of the *failed* continue_on_failure step must re-run.
+
+    Its inputs may depend on the failed step's output, which no longer exists, so
+    restoring the old output would replay it against inputs that no longer
+    describe reality.
+    """
+    wf = _make_workflow(_retry("step_1"))
+    graph = _chain_graph(cof_nodes={"step_1"})
+
+    # step_1 is both retried and CoF, so step_2 and step_3 must re-run.
+    assert wf._retry_restorable_nodes(graph) == set()
+
+
+def test_continue_on_failure_on_a_succeeded_node_forces_nothing() -> None:
+    """A CoF node that completed successfully does not force its downstream to re-run.
+
+    R6a is scoped to the *failed* step. step_1 succeeded in the source run and
+    is simply restored, so its downstream is restored too.
+    """
+    wf = _make_workflow(_retry("step_3"))
+    graph = _chain_graph(cof_nodes={"step_1"})
+
+    assert wf._retry_restorable_nodes(graph) == {"step_1", "step_2"}
+
+
+def test_default_continue_on_failure_is_false_so_upstream_is_restored() -> None:
+    """With the catalog default of False, a plain chain restores its upstream."""
+    wf = _make_workflow(_retry("step_3"))
+    graph = _chain_graph()
+
+    assert wf._retry_restorable_nodes(graph) == {"step_1", "step_2"}
+
+
+@pytest.mark.parametrize(
+    "node_type",
+    ["condition", "switch", "converge"],
+)
+def test_control_nodes_are_never_restored(node_type: str) -> None:
+    """Condition/switch/loop/converge/wait decide routing, so they must always run.
+
+    Skipping one would strand the graph: nothing would route past it, and
+    downstream expressions would resolve against a namespace the retry never
+    populated.
+    """
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("ctrl", {"id": "ctrl", "type": node_type, "parameters": {}})
+    backend.add_node("step_2", {"id": "step_2", "type": "script", "parameters": {}})
+    backend.add_edge("trigger", "ctrl", None)
+    backend.add_edge("ctrl", "step_2", None)
+    graph = WorkflowGraph(backend)
+
+    wf = _make_workflow(_retry("step_2"))
+
+    # ctrl is not a retry point, so it is otherwise restorable - unless the
+    # control-node rule excludes it.
+    assert not wf._should_restore_node("ctrl", graph)
+    # The executor node upstream of the retry point still restores.
+    assert wf._should_restore_node("step_2", graph) is False
+
+
+def test_restorable_set_is_memoised() -> None:
+    """The set is derived from the graph and retry context, neither of which mutate."""
+    wf = _make_workflow(_retry("step_3"))
+    graph = _chain_graph()
+
+    first = wf._retry_restorable_nodes(graph)
+    second = wf._retry_restorable_nodes(graph)
+
+    assert first is second
+
+
+def test_non_retry_run_restores_nothing() -> None:
+    """A normal run must not consult classification at all."""
+    wf = _make_workflow()
+    graph = _chain_graph()
+
+    assert wf._retry_restorable_nodes(graph) == {"step_1", "step_2", "step_3"}
+    assert not wf._should_restore_node("step_1", graph)
+
+
+# ---------------------------------------------------------------------------
+# Loop bodies must not be restored as scalar outputs
+# ---------------------------------------------------------------------------
+
+
+def _loop_graph() -> WorkflowGraph:
+    """Build trigger -> loop_1 (body_a -> body_b) -> step_2.
+
+    ``body_a``/``body_b`` are the loop body: reached from the loop node via its
+    ``iterate`` port, with the feedback edges stripped at graph build time. The
+    loop itself exits to ``step_2`` via its ``complete`` port.
+    """
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("loop_1", {"id": "loop_1", "type": "loop", "parameters": {}})
+    backend.add_node("body_a", {"id": "body_a", "type": "script", "parameters": {}})
+    backend.add_node("body_b", {"id": "body_b", "type": "script", "parameters": {}})
+    backend.add_node("step_2", {"id": "step_2", "type": "script", "parameters": {}})
+    backend.add_edge("trigger", "loop_1", None)
+    backend.add_edge("loop_1", "body_a", {"from_port": "iterate"})
+    backend.add_edge("loop_1", "step_2", {"from_port": "complete"})
+    # ``get_outgoing_edges`` only needs ``to``; ``from_port`` is the port that
+    # matters for body membership.
+    backend.add_edge("body_a", "body_b", {"from_port": "iterate"})
+    return WorkflowGraph(backend)
+
+
+def test_loop_body_nodes_are_restored_per_iteration() -> None:
+    """A body is restored once per iteration, not once per node.
+
+    The body is not one node: it runs once per iteration and the loop aggregates a
+    list across them. So the row asked for has to be the one for the iteration the
+    loop is currently replaying — otherwise every iteration would restore
+    iteration 0's output and the list would be the same value N times.
+    """
+    wf = _make_workflow(_retry("step_2"))
+    graph = _loop_graph()
+    wf._loop_bodies = {"loop_1": {"body_a", "body_b"}}
+
+    assert {"body_a", "body_b"} <= wf._retry_restorable_nodes(graph)
+
+    # The full path is used for every occurrence, including iteration zero.
+    body = graph.get_node("body_a")
+    assert body is not None
+    wf.loop_body_map = {"body_a": "loop_1"}
+    wf.node_control_data = {"loop_1": {"current_index": 0}}
+    assert wf._source_temporal_activity_id(body) == "body_a_iter_0"
+    wf.node_control_data["loop_1"]["current_index"] = 2
+    assert wf._source_temporal_activity_id(body) == "body_a_iter_2"
+    outside = graph.get_node("step_2")
+    assert outside is not None
+    assert wf._source_temporal_activity_id(outside) == "step_2"
+
+
+@pytest.mark.asyncio
+async def test_restoring_a_loop_body_uses_its_canonical_temporal_path(mock_wf: MagicMock) -> None:
+    wf = _injectable_workflow(source_statuses={"body_a": ActivityStatus.COMPLETED.value})
+    wf.retry_context = _retry("step_2")
+    graph = _loop_graph()
+    wf.loop_body_map = {"body_a": "loop_1"}
+    wf.node_control_data = {"loop_1": {"current_index": 2}}
+    wf._loop_bodies = {"loop_1": {"body_a", "body_b"}}
+    wf._retry_source_temporal_statuses = {"body_a_iter_2": ActivityStatus.COMPLETED.value}
+    mock_wf.execute_activity = AsyncMock(
+        return_value={"status": "completed", "input_data": {}, "output_data": {"result": 7}}
+    )
+
+    result = await wf._restore_node_state(_node("body_a"), graph)
+
+    assert result is not None
+    call = mock_wf.execute_activity.await_args
+    assert call.kwargs["args"] == ["src-1", "body_a", "body_a_iter_2", False]
+    assert call.kwargs["activity_id"] == "body_a_iter_2"
+    assert "body_a_iter_2" in wf._restored_node_timestamps
+    assert "body_a" not in wf._restored_node_timestamps
+
+
+def test_a_loop_node_uses_its_probe_instead_of_generic_node_restoration() -> None:
+    """The loop must reach its executor so it can probe each source iteration."""
+    from syntara.workflow_core.models import NodeType
+    from syntara.workflow_runtime.engines.temporal.retry_mixin import _CONTROL_NODE_TYPES_FOR_RETRY
+
+    wf = _make_workflow(_retry("step_2"))
+    graph = _loop_graph()
+
+    assert wf._should_restore_node("loop_1", graph) is False
+    assert NodeType.LOOP not in _CONTROL_NODE_TYPES_FOR_RETRY
+    assert NodeType.WAIT not in _CONTROL_NODE_TYPES_FOR_RETRY
+
+
+def test_non_loop_successors_of_a_loop_stay_restorable() -> None:
+    """Excluding the body must not over-reach past the loop's ``complete`` port."""
+    # Retrying from inside the body: body_b is the starting point, body_a is a
+    # loop body and restores per iteration, but step_2 is an ordinary node downstream
+    # of the loop and is still eligible for restoration.
+    downstream = _make_workflow(_retry("body_b"))
+    graph = _loop_graph()
+    downstream._retry_source_statuses = {
+        "body_a": ActivityStatus.COMPLETED.value,
+        "step_2": ActivityStatus.COMPLETED.value,
+    }
+    restorable = downstream._retry_restorable_nodes(graph)
+
+    assert downstream._should_restore_node("step_2", graph) is True
+    assert downstream._should_restore_node("loop_1", graph) is False
+    assert downstream._should_restore_node("body_a", graph) is True
+    assert downstream._should_restore_node("body_b", graph) is False
+    assert restorable == {"body_a", "loop_1", "step_2"}
+
+
+def test_skipped_loop_successors_run_after_retrying_a_body_failure() -> None:
+    """A body failure can leave completion successors skipped before they run."""
+    downstream = _make_workflow(_retry("body_b"))
+    graph = _loop_graph()
+    downstream._loop_bodies = {"loop_1": {"body_a", "body_b"}}
+    downstream._retry_source_statuses = {
+        "body_a": ActivityStatus.COMPLETED.value,
+        "body_b": ActivityStatus.FAILED.value,
+        "step_2": ActivityStatus.SKIPPED.value,
+    }
+
+    restorable = downstream._retry_restorable_nodes(graph)
+
+    assert "step_2" not in restorable
+    assert downstream._should_restore_node("step_2", graph) is False
+
+
+# ---------------------------------------------------------------------------
+# Restoring a node: fetch, inject, and the fall-through cases
+# ---------------------------------------------------------------------------
+
+
+def _injectable_workflow(*, source_statuses: dict[str, str] | None = None) -> OrchestratorWorkflow:
+    """A workflow wired for the restore path, with no retry set by default.
+
+    ``source_statuses`` stands in for what ``_prepare_retry`` loads from the source
+    execution. It defaults to every node being restorable, because a test that
+    exercises the restore path is about a node that *has* a record; the workflow
+    only consults this map to decide whether a replay is worth scheduling.
+    """
+    wf = _make_workflow()
+    if source_statuses is not None:
+        wf._retry_source_statuses = source_statuses
+        wf._retry_source_temporal_statuses = source_statuses
+    else:
+        wf._retry_source_statuses = dict.fromkeys(("step_1", "step_2", "step_3", "trigger"), "completed")
+        wf._retry_source_temporal_statuses = wf._retry_source_statuses
+    return wf
+
+
+@pytest.mark.asyncio
+async def test_restored_output_is_injected_into_the_namespace(mock_wf: MagicMock) -> None:
+    """The skipped node publishes its source output as a completion would.
+
+    Downstream expressions read the namespace, so the entry has to match what a
+    live completion writes - including the synthetic ``status`` key.
+    """
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "completed",
+            "input_data": {},
+            "output_data": {"result": "from-source"},
+        }
+    )
+
+    result = await wf._restore_node_state(node, _chain_graph())
+
+    assert result == {"output": {"result": "from-source"}, "control": None}
+    assert not wf.resolver.has_namespace("step_1")
+    from .conftest import complete_supplied_node
+
+    await complete_supplied_node(wf, node, result, MagicMock())
+    assert wf.resolver.get_namespace("step_1") == {"result": "from-source", "status": "completed"}
+    # Tracked as replayed, not as skipped: it did not get skipped, it ran in an
+    # earlier execution. The converge predicates read skipped_nodes as "never ran".
+    assert "step_1" in wf._restored_node_timestamps
+    assert "step_1" not in wf.skipped_nodes
+
+
+@pytest.mark.asyncio
+async def test_restored_input_survives_supplied_result_handling(mock_wf: MagicMock) -> None:
+    """node_inputs keeps the source run's stored input through result processing.
+
+    ``get_activity_input`` reads node_inputs, so drill-down has to show the input
+    the node actually ran with. Processing the supplied result must not replace it
+    with the pre-resolved marker. A non-empty input is used so "preserved" is
+    distinguishable from "never recorded".
+    """
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={"input_data": {"query": "select 1"}, "output_data": {"result": "ok"}}
+    )
+
+    result = await wf._restore_node_state(node, _chain_graph())
+    assert result is not None
+    wf._process_supplied_result(node, result)
+
+    assert wf.node_inputs["step_1"] == {"query": "select 1"}
+    assert PRE_RESOLVED_MARKER not in wf.node_inputs["step_1"]
+
+
+@pytest.mark.asyncio
+async def test_missing_output_falls_through_to_execution(mock_wf: MagicMock) -> None:
+    """A node with no stored output must run rather than be skipped.
+
+    There would be nothing to inject, so skipping it would leave downstream
+    expressions resolving against a namespace the retry never populated.
+    """
+    wf = _injectable_workflow(source_statuses={})
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(return_value=None)
+
+    assert await wf._restore_node_state(node, _chain_graph()) is None
+    assert "step_1" not in wf.skipped_nodes
+    # Not merely None: the replay is never scheduled, so no event is emitted under
+    # the node's id that the real execution would then be refused by.
+    mock_wf.execute_activity.assert_not_awaited()
+    assert not wf.resolver.has_namespace("step_1")
+
+
+@pytest.mark.asyncio
+async def test_empty_activity_result_falls_through(mock_wf: MagicMock) -> None:
+    """A source run with no restorable row for the node is decided without a query."""
+    wf = _injectable_workflow(source_statuses={"step_2": "failed"})
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(return_value=None)
+
+    assert await wf._restore_node_state(node, _chain_graph()) is None
+    mock_wf.execute_activity.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_restore_dispatches_the_retry_outputs_activity(mock_wf: MagicMock) -> None:
+    """The fetch carries the source execution id, not the output inline.
+
+    The replay runs under the node's own id — not an ``__internal__`` id — so the
+    normal event-driven sync records it node-by-node and maps it to this node.
+    """
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(return_value={"input_data": {}, "output_data": {"result": "ok"}})
+
+    await wf._restore_node_state(node, _chain_graph())
+
+    call = mock_wf.execute_activity.call_args
+    assert call[0][0] == ActivityName.RETRY_NODE_REPLAY
+    assert call.kwargs["args"] == ["src-1", "step_1", "step_1", False]
+    assert call.kwargs["activity_id"] == "step_1"
+
+
+@pytest.mark.asyncio
+async def test_restore_captures_source_state(mock_wf: MagicMock) -> None:
+    """The source run's times, status and error are kept for the sync service.
+
+    The sync service writes the row from the replay activity's own completion, so
+    without this the row would report the replay time and a successful status.
+    """
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "completed",
+            "input_data": {},
+            "output_data": {"result": "ok"},
+            "error_details": None,
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:05:00+00:00",
+        }
+    )
+
+    await wf._restore_node_state(node, _chain_graph())
+
+    assert wf._restored_node_timestamps["step_1"] == {
+        "status": "completed",
+        "error_details": None,
+        "started_at": "2026-01-01T00:00:00+00:00",
+        "completed_at": "2026-01-01T00:05:00+00:00",
+    }
+
+
+@pytest.mark.asyncio
+async def test_maybe_restore_delegates_and_returns_the_synthetic_completion(mock_wf: MagicMock) -> None:
+    """The full path: a restorable node resolves to a completion without dispatching."""
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "completed",
+            "input_data": {},
+            "output_data": {"result": "from-source"},
+        }
+    )
+
+    result = await wf._maybe_restore_retry_output(node, _chain_graph())
+
+    assert result == {"output": {"result": "from-source"}, "control": None}
+    assert "step_1" in wf._restored_node_timestamps
+    assert "step_1" not in wf.skipped_nodes
+
+
+@pytest.mark.asyncio
+async def test_non_restorable_node_is_never_restored(mock_wf: MagicMock) -> None:
+    """A retry starting point is executed, not replaced by its old output."""
+    wf = _injectable_workflow()
+    wf.retry_context = _retry("step_2")
+    node = ActivityNode(node_id="step_2", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(side_effect=AssertionError("must not be called"))
+
+    assert await wf._maybe_restore_retry_output(node, _chain_graph()) is None
+
+
+@pytest.mark.asyncio
+async def test_maybe_restore_returns_none_outside_a_retry(mock_wf: MagicMock) -> None:
+    """A normal run never consults the restore path."""
+    wf = _injectable_workflow()
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(side_effect=AssertionError("must not be called"))
+
+    assert await wf._maybe_restore_retry_output(node, _chain_graph()) is None
+
+
+# ---------------------------------------------------------------------------
+# End-to-end replay of a plain linear chain
+#
+# The scope of this change is a straight line of nodes: each upstream node is
+# replayed from the source run under its own id, and the sync service records it
+# through the normal event path. Loop replay is deliberately absent — a failure
+# inside a loop body restarts the loop from its first iteration, which is tracked
+# separately. These tests walk the whole chain in order so the per-node handoff
+# is covered as one sequence rather than node by node in isolation.
+# ---------------------------------------------------------------------------
+
+
+class TestLinearChainReplay:
+    """A linear chain replays upstream nodes one at a time, in execution order."""
+
+    def setup_method(self) -> None:
+        self.graph = _chain_graph()
+
+    def _restored(self, wf: OrchestratorWorkflow, node_id: str) -> dict[str, Any] | None:
+        return wf._restored_node_timestamps.get(node_id)
+
+    @staticmethod
+    def _times_only(state: dict[str, Any] | None) -> dict[str, Any] | None:
+        if state is None:
+            return None
+        return {"started_at": state.get("started_at"), "completed_at": state.get("completed_at")}
+
+    @pytest.mark.asyncio
+    async def test_upstream_nodes_replay_in_order_and_record_their_source_times(self, mock_wf: MagicMock) -> None:
+        """Each replayed node carries its own input, output and source times.
+
+        The activity is dispatched under the node's own id, so the sync service
+        sees an ordinary activity event and records the node node-by-node. What
+        distinguishes a replay is the payload coming from the source run and the
+        timestamps being the ones recorded when that work actually ran.
+        """
+        wf = _injectable_workflow()
+        wf.retry_context = _retry("step_3")
+        wf.retry_context = _retry("step_3")
+        node_ids: list[str] = []
+
+        async def _replay(_name: str, **kwargs: object) -> dict[str, Any]:
+            node_id = str(kwargs["activity_id"])
+            node_ids.append(node_id)
+            return {
+                "status": "completed",
+                "input_data": {"in": f"{node_id}-input"},
+                "output_data": {"out": f"{node_id}-output"},
+                "started_at": f"2026-01-01T00:0{len(node_ids)}:00+00:00",
+                "completed_at": f"2026-01-01T00:0{len(node_ids)}:30+00:00",
+            }
+
+        mock_wf.execute_activity = AsyncMock(side_effect=_replay)
+
+        first = await wf._maybe_restore_retry_output(self.graph.get_node("step_1"), self.graph)
+        second = await wf._maybe_restore_retry_output(self.graph.get_node("step_2"), self.graph)
+
+        # One node per call, in execution order, each under its own id.
+        assert node_ids == ["step_1", "step_2"]
+        assert first == {"output": {"out": "step_1-output"}, "control": None}
+        assert second == {"output": {"out": "step_2-output"}, "control": None}
+
+        # Both halves republished: the input for drill-down, and an ordinary
+        # completion for the normal result path to publish and schedule from.
+        # That handoff is what makes a replayed node indistinguishable from one
+        # that executed.
+        assert wf.node_inputs["step_1"] == {"in": "step_1-input"}
+        assert wf.node_inputs["step_2"] == {"in": "step_2-input"}
+        assert first["output"] == {"out": "step_1-output"}
+
+        # Source times kept, so the row reports when the work ran.
+        assert self._times_only(self._restored(wf, "step_1")) == {
+            "started_at": "2026-01-01T00:01:00+00:00",
+            "completed_at": "2026-01-01T00:01:30+00:00",
+        }
+        assert self._times_only(self._restored(wf, "step_2")) == {
+            "started_at": "2026-01-01T00:02:00+00:00",
+            "completed_at": "2026-01-01T00:02:30+00:00",
+        }
+
+    @pytest.mark.asyncio
+    async def test_node_with_no_source_record_executes_and_stops_being_a_candidate(self, mock_wf: MagicMock) -> None:
+        """A node with nothing to replay really runs, and stops waiting on times.
+
+        The sync service waits on a candidate's source times. A restorable node
+        with no source record has none and never will, so it is dropped from the
+        candidates — otherwise every such node would stall the sync transaction
+        for the full wait timeout before falling back to Temporal's times.
+        """
+        wf = _injectable_workflow(source_statuses={"step_2": "failed", "step_3": "failed"})
+        wf.retry_context = _retry("step_3")
+        wf._retry_replay_candidates = {"step_1"}
+        mock_wf.execute_activity = AsyncMock(return_value=None)
+
+        assert await wf._maybe_restore_retry_output(self.graph.get_node("step_1"), self.graph) is None
+
+        assert wf._retry_replay_candidates == set()
+        assert wf._restored_node_timestamps == {}
+
+    @pytest.mark.asyncio
+    async def test_retry_candidates_are_known_before_any_node_runs(self, mock_wf: MagicMock) -> None:
+        """The candidate set is settled up front, not discovered mid-graph.
+
+        The sync service asks the workflow whether a completing activity is a
+        replay. If a node were only added to the set at the moment it replayed, a
+        node the workflow had not reached yet would look like an ordinary
+        execution and its source times would be dropped.
+        """
+        wf = _injectable_workflow()
+        wf.retry_context = _retry("step_3")
+        wf.retry_context = _retry("step_3")
+        mock_wf.execute_activity = AsyncMock(
+            side_effect=[{"activity_statuses": {}, "temporal_activity_statuses": {}}, {}]
+        )
+
+        await wf._prepare_retry(self.graph)
+
+        assert wf._retry_replay_candidates == {"step_1", "step_2"}
+
+
+class TestReplayedTimestampUpdateHandler:
+    """The workflow side of the timestamp ask: does it wait, and when.
+
+    The sync service calls this update when a node completes. What matters is
+    which nodes make it block — a node that will never have source times must not
+    hold the caller for the full timeout, and one that will must not answer early.
+
+    ``wait_condition`` is stubbed so the predicate can be evaluated directly: a
+    ``True`` means the handler returns without blocking, ``False`` means it would
+    wait. This exercises the real handler and the real predicate, not a copy.
+    """
+
+    SOURCE_TIMES: ClassVar[dict[str, str | None]] = {
+        "started_at": "2026-01-01T00:00:00+00:00",
+        "completed_at": "2026-01-01T00:05:00+00:00",
+    }
+
+    async def _call(
+        self,
+        activity_id: str,
+        *,
+        candidates: set[str],
+        timestamps: dict[str, dict[str, str | None]],
+    ) -> tuple[dict[str, str | None] | None, bool, int]:
+        """Return (handler result, predicate already true, timeout seconds)."""
+        wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+        wf._retry_replay_candidates = candidates
+        wf._restored_node_timestamps = timestamps
+
+        seen: dict[str, Any] = {}
+
+        async def _wait(predicate: Callable[[], bool], timeout: timedelta | None = None) -> None:  # noqa: ASYNC109
+            # Mirrors wait_condition's real signature, which is why the name stays.
+            seen["satisfied_now"] = predicate()
+            seen["timeout"] = timeout
+
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.wait_condition",
+            _wait,
+        ):
+            result = await cast("Any", wf).get_replayed_node_timestamps_when_ready(activity_id)
+
+        return result, bool(seen["satisfied_now"]), cast("timedelta", seen["timeout"]).seconds
+
+    @pytest.mark.asyncio
+    async def test_a_replayed_node_answers_immediately_with_its_source_times(self) -> None:
+        result, satisfied_now, timeout = await self._call(
+            "script_1",
+            candidates={"script_1"},
+            timestamps={"script_1": self.SOURCE_TIMES},
+        )
+
+        assert result == self.SOURCE_TIMES
+        assert satisfied_now, "a node that already has its times must not make the caller wait"
+        assert timeout == 5
+
+    @pytest.mark.asyncio
+    async def test_a_candidate_without_times_yet_would_wait(self) -> None:
+        """A candidate whose times have not landed is the race the update closes.
+
+        Answering "no times" here would drop them permanently, because the
+        completed event is only ever processed once.
+        """
+        result, satisfied_now, _timeout = await self._call(
+            "script_1",
+            candidates={"script_1", "script_2"},
+            timestamps={},
+        )
+
+        assert satisfied_now is False, "answering early here loses the source times for good"
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_a_loop_occurrence_does_not_fall_back_to_the_canvas_timestamp(self) -> None:
+        result, satisfied_now, _timeout = await self._call(
+            "script_1_iter_2",
+            candidates={"script_1"},
+            timestamps={"script_1": self.SOURCE_TIMES},
+        )
+
+        assert result is None
+        assert not satisfied_now, "a different iteration's times cannot satisfy this occurrence"
+
+    @pytest.mark.asyncio
+    async def test_an_ordinary_node_answers_immediately_with_nothing(self) -> None:
+        result, satisfied_now, _timeout = await self._call(
+            "script_9",
+            candidates={"script_1"},
+            timestamps={"script_1": self.SOURCE_TIMES},
+        )
+
+        assert result is None
+        assert satisfied_now, "a node that is not a replay must never make the caller wait"
+
+    @pytest.mark.asyncio
+    async def test_an_ordinary_run_answers_immediately_because_nothing_is_a_candidate(self) -> None:
+        """No retry means an empty candidate set, so every node answers at once.
+
+        This is what makes asking unconditionally cheap: an ordinary run pays a
+        request per completed node and never waits.
+        """
+        result, satisfied_now, _timeout = await self._call(
+            "script_1",
+            candidates=set(),
+            timestamps={},
+        )
+
+        assert result is None
+        assert satisfied_now
+
+
+class TestRestoredTerminalOutcomeInTheCompletionPath:
+    """A restored skip or failure must survive the completion boundary.
+
+    A restored node returns from its task normally, and a task that returns is
+    indistinguishable from one that really succeeded — so the completion path would
+    republish its namespace as completed and schedule its successors. The sync service
+    corrects the stored row, but routing and downstream expressions read the workflow's
+    in-memory state, which is where the damage lands.
+    """
+
+    def setup_method(self) -> None:
+        self.graph = _chain_graph()
+
+    @pytest.mark.asyncio
+    async def test_a_restored_skip_keeps_its_namespace_entry(self, mock_wf: MagicMock) -> None:
+        wf = _injectable_workflow()
+        wf.retry_context = _retry("step_3")
+        wf.retry_context = _retry("step_3")
+        node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+        mock_wf.execute_activity = AsyncMock(
+            return_value={
+                "status": "skipped",
+                "input_data": {},
+                "output_data": {"reason": "branch not taken"},
+                "error_details": None,
+                "started_at": "2026-01-01T00:00:00+00:00",
+                "completed_at": "2026-01-01T00:00:10+00:00",
+            }
+        )
+
+        from .conftest import complete_supplied_node
+
+        result = await wf._maybe_restore_retry_output(node, self.graph)
+        assert result is not None
+        await complete_supplied_node(wf, node, result, self.graph)
+
+        # The restore path published this entry; the completion boundary must not
+        # have replaced it with a success.
+        assert wf.resolver.get_namespace("step_1") == {"reason": "branch not taken", "status": "skipped"}
+        assert "step_1" in wf.skipped_nodes
+
+    @pytest.mark.asyncio
+    async def test_a_restored_skip_does_not_schedule_successors(self, mock_wf: MagicMock) -> None:
+        """The source run never ran step_2, so this retry must not either."""
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        wf = _injectable_workflow()
+        wf.retry_context = _retry("step_3")
+        wf.retry_context = _retry("step_3")
+        node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+        mock_wf.execute_activity = AsyncMock(
+            return_value={
+                "status": "skipped",
+                "input_data": {},
+                "output_data": {},
+                "error_details": None,
+                "started_at": None,
+                "completed_at": None,
+            }
+        )
+
+        result = await wf._maybe_restore_retry_output(node, self.graph)
+        assert result is not None
+
+        async def supplied() -> dict[str, Any]:
+            return wf._process_supplied_result(node, result)
+
+        task = asyncio.create_task(supplied())
+        schedule = AsyncMock()
+        with patch.object(wf, "_schedule_successors", new=schedule):
+            await wf._process_completed_task(task, {node.id: task}, self.graph)
+
+        schedule.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_restored_failure_propagates_like_a_live_one(self, mock_wf: MagicMock) -> None:
+        """An unselected failure still suppresses what depends on it.
+
+        Its output no longer exists in this run, so a successor that ran against it
+        would be executing against nothing.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        wf = _injectable_workflow(source_statuses={"step_1": "failed", "step_3": "failed"})
+        wf.retry_context = _retry("step_3")
+        node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+        mock_wf.execute_activity = AsyncMock(
+            return_value={
+                "status": "failed",
+                "input_data": {},
+                "output_data": {"partial": True},
+                "error_details": "exit code 1",
+                "started_at": None,
+                "completed_at": None,
+            }
+        )
+
+        result = await wf._maybe_restore_retry_output(node, self.graph)
+        assert result is not None
+        assert wf.failed_nodes["step_1"] == "exit code 1"
+
+        async def supplied() -> dict[str, Any]:
+            return wf._process_supplied_result(node, result)
+
+        task = asyncio.create_task(supplied())
+        schedule = AsyncMock()
+        with (
+            patch.object(wf, "_schedule_successors", new=schedule),
+            patch.object(wf, "_mark_downstream_as_skipped"),
+        ):
+            await wf._process_completed_task(task, {node.id: task}, self.graph)
+
+        schedule.assert_not_awaited()
+        assert "step_1" in wf.failed_nodes
+        # The partial output the source run produced survives propagation. A live
+        # failure recovers it from the executor's ApplicationError.details; a
+        # restored one has no such exception, so without this it would publish the
+        # node's declared output model and a successor reading
+        # steps.step_1.output.partial would find nothing.
+        published = wf.resolver.get_namespace("step_1")
+        assert published is not None
+        assert published["partial"] is True
+        assert published["status"] == "failed"
+        assert published["error"] == "exit code 1"
+
+    @pytest.mark.asyncio
+    async def test_a_restored_completion_still_schedules_successors(self, mock_wf: MagicMock) -> None:
+        """The fix must not stop a genuinely restored success from progressing."""
+        import asyncio
+        from unittest.mock import AsyncMock, patch
+
+        wf = _injectable_workflow()
+        wf.retry_context = _retry("step_3")
+        wf.retry_context = _retry("step_3")
+        node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+        mock_wf.execute_activity = AsyncMock(
+            return_value={
+                "status": "completed",
+                "input_data": {},
+                "output_data": {"result": "ok"},
+                "error_details": None,
+                "started_at": None,
+                "completed_at": None,
+            }
+        )
+
+        result = await wf._maybe_restore_retry_output(node, self.graph)
+        assert result is not None
+
+        async def supplied() -> dict[str, Any]:
+            return wf._process_supplied_result(node, result)
+
+        task = asyncio.create_task(supplied())
+        schedule = AsyncMock()
+        with (
+            patch.object(wf, "_schedule_successors", new=schedule),
+            patch.object(wf, "_cancel_skipped_pending_tasks"),
+        ):
+            await wf._process_completed_task(task, {node.id: task}, self.graph)
+
+        schedule.assert_awaited_once()
+        assert wf.resolver.get_namespace("step_1") == {"result": "ok", "status": "completed"}
+
+
+@pytest.mark.asyncio
+async def test_restored_unselected_failure_replays_exclusive_recorded_successor(
+    mock_wf: MagicMock,
+) -> None:
+    """Exclusive descendants with a source record are replayed, not skipped.
+
+    Skipping ``east_post`` after restoring ``east`` as failed made a later All
+    converge treat that branch as never-run and evaluate the gate without it.
+    """
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("east", {"id": "east", "type": "script", "parameters": {}})
+    backend.add_node("east_post", {"id": "east_post", "type": "script", "parameters": {}})
+    backend.add_node("west", {"id": "west", "type": "script", "parameters": {}})
+    backend.add_node("join", {"id": "join", "type": "converge", "parameters": {"strategy": "all"}})
+    backend.add_edge("east", "east_post", None)
+    backend.add_edge("east_post", "join", None)
+    backend.add_edge("west", "join", None)
+    graph = WorkflowGraph(backend)
+
+    wf = _injectable_workflow(
+        source_statuses={"east": "failed", "east_post": "failed", "west": "failed", "join": "failed"}
+    )
+    wf.retry_context = _retry("west")
+    wf._execute_node = AsyncMock(return_value={"output": {}})  # type: ignore[method-assign]
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "failed",
+            "input_data": {},
+            "output_data": {"partial": True},
+            "error_details": "east failed",
+            "started_at": None,
+            "completed_at": None,
+        }
+    )
+    node = ActivityNode(node_id="east", node_type="script", parameters={})
+    result = await wf._maybe_restore_retry_output(node, graph)
+    assert result is not None
+
+    async def supplied() -> dict[str, Any]:
+        return wf._process_supplied_result(node, result)
+
+    task = asyncio.create_task(supplied())
+    pending = {node.id: task}
+    await wf._process_completed_task(task, pending, graph)
+
+    assert "east" in wf.failed_nodes
+    assert "east_post" not in wf.skipped_nodes
+    assert "east_post" in pending
+    pending["east_post"].cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await pending["east_post"]
+
+
+@pytest.mark.parametrize("successor_type", [NodeType.LOOP, NodeType.CONDITION])
+@pytest.mark.asyncio
+async def test_restored_unselected_failure_keeps_retryable_successor_reachable(
+    mock_wf: MagicMock,
+    successor_type: NodeType,
+) -> None:
+    """Recorded loops and controls must reach _execute_node even if not replayable.
+
+    A loop enters its retry-aware iteration path. A condition with no inferable
+    source route executes against the rebuilt namespace. Neither should be
+    eagerly skipped just because _should_restore_node correctly rejects direct
+    replay for that node type/state.
+    """
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("east", {"id": "east", "type": "script", "parameters": {}})
+    backend.add_node("candidate", {"id": "candidate", "type": successor_type.value, "parameters": {}})
+    backend.add_node("west", {"id": "west", "type": "script", "parameters": {}})
+    backend.add_node("join", {"id": "join", "type": "converge", "parameters": {"strategy": "all"}})
+    if successor_type == NodeType.LOOP:
+        backend.add_node("body", {"id": "body", "type": "script", "parameters": {}})
+        backend.add_edge("candidate", "body", {"from_port": "iterate"})
+        backend.add_edge("candidate", "join", {"from_port": "complete"})
+        backend.add_edge("body", "candidate", {"from_port": "continue"})
+        backend.add_edge("body", "join", {"from_port": "complete"})
+        statuses = {
+            "east": ActivityStatus.FAILED.value,
+            "candidate": ActivityStatus.COMPLETED.value,
+            "body": ActivityStatus.COMPLETED.value,
+            "west": ActivityStatus.FAILED.value,
+            "join": ActivityStatus.FAILED.value,
+        }
+    else:
+        backend.add_node("true_branch", {"id": "true_branch", "type": "script", "parameters": {}})
+        backend.add_node("false_branch", {"id": "false_branch", "type": "script", "parameters": {}})
+        backend.add_edge("candidate", "true_branch", {"from_port": "true"})
+        backend.add_edge("candidate", "false_branch", {"from_port": "false"})
+        backend.add_edge("true_branch", "join", None)
+        backend.add_edge("false_branch", "join", None)
+        statuses = {
+            "east": ActivityStatus.FAILED.value,
+            "candidate": ActivityStatus.COMPLETED.value,
+            "true_branch": ActivityStatus.COMPLETED.value,
+            "false_branch": ActivityStatus.COMPLETED.value,
+            "west": ActivityStatus.FAILED.value,
+            "join": ActivityStatus.FAILED.value,
+        }
+    backend.add_edge("east", "candidate", None)
+    backend.add_edge("west", "join", None)
+    graph = WorkflowGraph(backend)
+
+    wf = _injectable_workflow(source_statuses=statuses)
+    wf.retry_context = _retry("west")
+    wf.failed_nodes["east"] = "unselected source failure"
+    wf._execute_node = AsyncMock(return_value={"output": {}})  # type: ignore[method-assign]
+
+    # This is the direct-replay predicate, which must remain false for these
+    # cases; reachability has its own source-record eligibility check.
+    assert not wf._should_restore_node("candidate", graph)
+    assert wf._is_retry_traversable_source_node("candidate", graph)
+
+    # Failure handling performs this skip propagation before it schedules the
+    # unselected branch's recorded successors.
+    wf._mark_downstream_as_skipped("east", graph)
+    assert "candidate" not in wf.skipped_nodes
+
+    pending: dict[str, asyncio.Task[Any]] = {}
+    await wf._schedule_restorable_unselected_successors("east", graph, pending)
+
+    assert "candidate" in pending
+    await asyncio.sleep(0)
+    wf._execute_node.assert_awaited_once()
+    await_args = wf._execute_node.await_args
+    assert await_args is not None
+    assert await_args.kwargs["node"].id == "candidate"
+    assert await_args.kwargs["graph"] is graph
+
+
+@pytest.mark.asyncio
+async def test_unselected_failure_does_not_schedule_selected_downstream_node(
+    mock_wf: MagicMock,
+) -> None:
+    """A shared successor downstream of a selected point must execute by that path."""
+    from unittest.mock import AsyncMock
+
+    backend = InMemoryGraphBackend()
+    for node_id in ("east", "west", "shared"):
+        backend.add_node(node_id, {"id": node_id, "type": "script", "parameters": {}})
+    backend.add_edge("east", "shared", None)
+    backend.add_edge("west", "shared", None)
+    graph = WorkflowGraph(backend)
+
+    wf = _injectable_workflow(
+        source_statuses={
+            "east": ActivityStatus.FAILED.value,
+            "west": ActivityStatus.FAILED.value,
+            "shared": ActivityStatus.COMPLETED.value,
+        }
+    )
+    wf.retry_context = _retry("west")
+    wf._execute_node = AsyncMock(return_value={"output": {}})  # type: ignore[method-assign]
+    pending: dict[str, Any] = {}
+
+    assert not wf._is_retry_traversable_source_node("shared", graph)
+    await wf._schedule_restorable_unselected_successors("east", graph, pending)
+
+    assert "shared" not in pending
+    wf._execute_node.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_unselected_failure_leaves_missing_source_successor_skipped(
+    mock_wf: MagicMock,
+) -> None:
+    """A node without a source outcome remains skipped instead of being enqueued."""
+    from unittest.mock import AsyncMock
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("east", {"id": "east", "type": "script", "parameters": {}})
+    backend.add_node("never_ran", {"id": "never_ran", "type": "script", "parameters": {}})
+    backend.add_node("west", {"id": "west", "type": "script", "parameters": {}})
+    backend.add_edge("east", "never_ran", None)
+    graph = WorkflowGraph(backend)
+
+    wf = _injectable_workflow(
+        source_statuses={"east": ActivityStatus.FAILED.value, "west": ActivityStatus.FAILED.value}
+    )
+    wf.retry_context = _retry("west")
+    wf.failed_nodes["east"] = "unselected source failure"
+    wf._execute_node = AsyncMock(return_value={"output": {}})  # type: ignore[method-assign]
+
+    wf._mark_downstream_as_skipped("east", graph)
+    pending: dict[str, Any] = {}
+    await wf._schedule_restorable_unselected_successors("east", graph, pending)
+
+    assert "never_ran" in wf.skipped_nodes
+    assert "never_ran" not in pending
+    wf._execute_node.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_a_restored_failure_with_no_output_falls_back_to_the_declared_model(
+    mock_wf: MagicMock,
+) -> None:
+    """A failure with nothing to restore still publishes a usable shape.
+
+    The restored output is the fallback, not the source of truth: a source failure
+    may have produced nothing, and the node's declared output model is what a live
+    failure with no executor output would publish.
+    """
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+
+    wf = _injectable_workflow(source_statuses={"step_1": "failed", "step_3": "failed"})
+    wf.retry_context = _retry("step_3")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "failed",
+            "input_data": {},
+            "output_data": None,
+            "error_details": "exit code 2",
+            "started_at": None,
+            "completed_at": None,
+        }
+    )
+
+    result = await wf._maybe_restore_retry_output(node, _chain_graph())
+    assert result is not None
+
+    async def supplied() -> dict[str, Any]:
+        return wf._process_supplied_result(node, result)
+
+    task = asyncio.create_task(supplied())
+    with (
+        patch.object(wf, "_schedule_successors", new=AsyncMock()),
+        patch.object(wf, "_mark_downstream_as_skipped"),
+    ):
+        await wf._process_completed_task(task, {node.id: task}, _chain_graph())
+
+    published = wf.resolver.get_namespace("step_1")
+    assert published is not None
+    assert published["status"] == "failed"
+    assert published["error"] == "exit code 2"
+
+
+@pytest.mark.asyncio
+async def test_a_restored_completion_does_not_stash_its_output_as_failure_fallback(
+    mock_wf: MagicMock,
+) -> None:
+    """Only a node that did not succeed needs its output kept for the failure path.
+
+    A restored completion publishes through the normal path, so stashing its output
+    would grow a map that nothing reads for the whole run.
+    """
+    wf = _make_workflow(_retry("step_3"))
+    wf.retry_context = _retry("step_3")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "completed",
+            "input_data": {},
+            "output_data": {"result": "ok"},
+            "error_details": None,
+            "started_at": None,
+            "completed_at": None,
+        }
+    )
+
+    await wf._maybe_restore_retry_output(node, _chain_graph())
+
+    assert "step_1" not in wf._restored_node_outputs
+
+
+def _converge_fanin_graph() -> WorkflowGraph:
+    """b1 and b2 both feed join (converge, strategy=any, n=2), then step_3."""
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("b1", {"id": "b1", "type": "script", "parameters": {}})
+    backend.add_node("b2", {"id": "b2", "type": "script", "parameters": {}})
+    backend.add_node("join", {"id": "join", "type": "converge", "parameters": {"strategy": "any", "n_required": 2}})
+    backend.add_node("step_3", {"id": "step_3", "type": "script", "parameters": {}})
+    for src in ("trigger", "b1", "b2"):
+        backend.add_edge(src, "join", None)
+    backend.add_edge("join", "step_3", None)
+    return WorkflowGraph(backend)
+
+
+class TestConvergeAlwaysGoesThroughItsGate:
+    """A converge decides whether it has enough predecessors, so it must be evaluated.
+
+    Regression guard. `_should_skip_successor` had a retry exception that returned
+    False for a converge whose source row was COMPLETED and restorable, skipping
+    `_handle_converge_successor` entirely. That released the converge on the first
+    arriving predecessor instead of when its strategy was satisfied — so with a
+    fan-in feeding a retry point, the converge published the source run's merged
+    output while sibling branches were still restoring, and an expression at the
+    retry point reading a sibling resolved against an empty namespace.
+    """
+
+    def test_the_retry_exception_no_longer_bypasses_the_gate(self) -> None:
+        wf = _injectable_workflow()
+        wf.retry_context = _retry("step_3")
+        wf.retry_context = _retry("step_3")
+        wf._retry_source_statuses = {"b1": "completed", "b2": "completed", "join": "completed"}
+        graph = _converge_fanin_graph()
+        gate = MagicMock(return_value=True)
+
+        with patch.object(wf, "_handle_converge_successor", gate):
+            wf._should_skip_successor(
+                graph.get_node("join"), "b2", is_loop_iterate=False, pending_tasks={}, graph=graph
+            )
+
+        gate.assert_called_once()
+
+    def test_a_completed_converge_is_not_in_the_restorable_set(self) -> None:
+        """A restored converge would release successors the gate never released."""
+        wf = _injectable_workflow()
+        wf.retry_context = _retry("step_3")
+        wf.retry_context = _retry("step_3")
+        graph = _converge_fanin_graph()
+
+        assert not wf._should_restore_node("join", graph)
+
+
+def _approval_graph() -> WorkflowGraph:
+    """Trigger -> approval -> (approved | rejected) -> failed_step."""
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("approval", {"id": "approval", "type": "approval", "parameters": {}})
+    backend.add_node("approved_path", {"id": "approved_path", "type": "script", "parameters": {}})
+    backend.add_node("rejected_path", {"id": "rejected_path", "type": "script", "parameters": {}})
+    backend.add_node("failed_step", {"id": "failed_step", "type": "script", "parameters": {}})
+    backend.add_edge("trigger", "approval", None)
+    backend.add_edge("approval", "approved_path", {"from_port": "approved"})
+    backend.add_edge("approval", "rejected_path", {"from_port": "rejected"})
+    backend.add_edge("approved_path", "failed_step", None)
+    backend.add_edge("rejected_path", "failed_step", None)
+    return WorkflowGraph(backend)
+
+
+def test_an_approval_node_is_restored_and_routes_on_its_recorded_decision() -> None:
+    """An approval is restored rather than re-prompted, and follows its own decision.
+
+    Re-running an approval asks a human for a decision they already made. What a
+    restored approval must *not* do is return no port: with one, the scheduler
+    gets both successors and runs the approved and the rejected path together.
+    So the restore carries the recorded decision as the port, which is what a live
+    approval returns too.
+    """
+    wf = _make_workflow(_retry("failed_step"))
+    graph = _approval_graph()
+
+    assert "approval" in wf._retry_restorable_nodes(graph)
+
+    control = wf._restored_approval_control({"decision": "approved"})
+    assert control == {"next_port": "approved"}
+    assert control is not None
+
+
+def test_a_restored_approval_never_returns_no_port() -> None:
+    """The guard against the both-branches bug, stated directly.
+
+    With ``control`` absent, ``get_next_activities_by_port(node, None)`` documents
+    that it returns every successor. This pins that the approval path always
+    produces a real port, whatever the recorded decision was.
+    """
+    for decision in ("approved", "rejected"):
+        control = WorkflowRetryMixin._restored_approval_control({"decision": decision})
+        assert control is not None
+        assert control["next_port"] == decision
+
+    with pytest.raises(SafeValueError):
+        WorkflowRetryMixin._restored_approval_control({"decision": "maybe"})
+    with pytest.raises(SafeValueError):
+        WorkflowRetryMixin._restored_approval_control({})
+
+
+def test_a_restored_approval_would_schedule_both_of_its_branches() -> None:
+    """Why the exclusion matters: with no port recorded, both branches come back.
+
+    Not a test of the retry path — of the routing primitive that makes restoring an
+    approval unsafe. If this ever starts returning one branch, the exclusion above is
+    no longer strictly necessary, though it would still be the safer default.
+    """
+    from syntara.workflow_core.graph import ActivityNode
+
+    graph = _approval_graph()
+    approval = ActivityNode("approval", "approval", {})
+
+    assert graph.get_next_activities_by_port(approval.id, None) != []
+    assert len(graph.get_next_activities_by_port(approval.id, None)) == 2
+
+
+def test_a_wait_node_is_restored_rather_than_rerun() -> None:
+    """A re-run wait restarts a wait the source run already sat through.
+
+    Its duration is measured against the clock, so re-running would either wait
+    the full window again or skip it entirely depending on how far the clock has
+    moved since. Restoring keeps what actually happened.
+    """
+    from syntara.workflow_core.models import NodeType
+
+    assert NodeType.WAIT not in _CONTROL_NODE_TYPES_FOR_RETRY
+    assert NodeType.APPROVAL not in _CONTROL_NODE_TYPES_FOR_RETRY
+    assert NodeType.CONVERGE in _CONTROL_NODE_TYPES_FOR_RETRY
+
+
+def test_a_restored_completion_upstream_of_an_approval_still_works() -> None:
+    """Excluding approval must not exclude its ordinary neighbours.
+
+    The failure point pulls the approval and both branches into the rerun set; the
+    nodes *before* the failure point remain restorable, which is the whole point of
+    the retry.
+    """
+    wf = _make_workflow(_retry("failed_step"))
+    graph = _approval_graph()
+
+    # The trigger is never restorable either — the retry re-enters at its first
+    # eligible point — but the approval's two branches, being upstream of the
+    # failure, are what actually have to survive the exclusion.
+    assert wf._retry_restorable_nodes(graph) == {"approval", "approved_path", "rejected_path"}
+
+
+@pytest.mark.asyncio
+async def test_a_record_vanishing_after_classification_is_loud(mock_wf: MagicMock) -> None:
+    """The status map says restorable but the row is gone: raise, do not fall through.
+
+    By the time the activity has run, its event has been emitted under the node's
+    own id and the sync service will persist it as this node's execution. Falling
+    through to a real run after that leaves the row terminal, so the real event is
+    refused by the sync service's terminal-status guard and the node displays the
+    replay's output and times for the rest of the execution. A raised error is the
+    only outcome that does not leave a plausible-looking wrong row behind.
+    """
+    from syntara.core.exceptions import SafeValueError
+
+    wf = _injectable_workflow()  # map says step_1 is restorable
+    wf.retry_context = _retry("step_3")
+    node = ActivityNode(node_id="step_1", node_type="script", parameters={})
+    mock_wf.execute_activity = AsyncMock(return_value=None)
+
+    with pytest.raises(SafeValueError, match="disappeared between classification and replay"):
+        await wf._restore_node_state(node, _chain_graph())
+
+
+@pytest.mark.asyncio
+async def test_restoring_an_approval_returns_the_port_the_scheduler_needs(mock_wf: MagicMock) -> None:
+    """Drives the real restore path, so the port has to be wired at the call site.
+
+    Testing ``_restored_approval_control`` alone would pass even if the restore
+    stopped calling it — and a restored approval with no port is exactly the bug
+    that made a retry run both branches of a human decision.
+    """
+    wf = _injectable_workflow(source_statuses={"approval": "completed"})
+    wf.retry_context = _retry("failed_step")
+    node = ActivityNode(node_id="approval", node_type="approval", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={
+            "status": "completed",
+            "input_data": {},
+            "output_data": {"decision": "approved", "decided_by": "someone"},
+            "error_details": None,
+        }
+    )
+
+    result = await wf._restore_node_state(node, _chain_graph())
+
+    assert result is not None
+    assert result["control"] == {"next_port": "approved"}
+    # The port has to be a real one, or get_next_activities_by_port returns every
+    # successor and the rejected path runs alongside the approved one.
+    assert result["control"]["next_port"] in ("approved", "rejected")
+
+
+@pytest.mark.asyncio
+async def test_a_completed_approval_with_no_decision_stops_the_retry(mock_wf: MagicMock) -> None:
+    """A completed approval always recorded a decision, so a missing one is corruption.
+
+    Guessing a branch would run a human decision the operator never chose, so the
+    retry stops instead. The approval activity rejects any other value, so this
+    combination cannot come from a real run.
+    """
+    wf = _injectable_workflow(source_statuses={"approval": "completed"})
+    wf.retry_context = _retry("failed_step")
+    node = ActivityNode(node_id="approval", node_type="approval", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={"status": "completed", "input_data": {}, "output_data": {}, "error_details": None}
+    )
+
+    with pytest.raises(SafeValueError, match="no usable decision"):
+        await wf._restore_node_state(node, _chain_graph())
+
+
+@pytest.mark.asyncio
+async def test_a_failed_approval_does_not_try_to_route(mock_wf: MagicMock) -> None:
+    """Only a completed approval routes; a failed one suppresses successors outright.
+
+    A source failure never carries a decision, so asking for one would reject a
+    perfectly restorable node. The terminal path handles it instead.
+    """
+    wf = _injectable_workflow(source_statuses={"approval": "failed"})
+    wf.retry_context = _retry("failed_step")
+    node = ActivityNode(node_id="approval", node_type="approval", parameters={})
+    mock_wf.execute_activity = AsyncMock(
+        return_value={"status": "failed", "input_data": {}, "output_data": {}, "error_details": "denied"}
+    )
+
+    result = await wf._restore_node_state(node, _chain_graph())
+
+    assert result is not None
+    assert result["control"] is None
+    assert "approval" in wf.failed_nodes

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { Children, isValidElement, type ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { FlowNodeType } from '../../constants'
@@ -22,13 +23,46 @@ const executionStoreState = {
   activityStates: new Map<string, { status: string }>(),
 }
 
+/** Null means "not a retry", so nothing on the canvas is flagged as replayed. */
+let retryReplayBaseline: string | null = null
+
+function setRetryReplayBaseline(baseline: string | null) {
+  retryReplayBaseline = baseline
+}
+
 vi.mock('@xyflow/react', async (importOriginal) => {
   const actual = await importOriginal()
   return {
     ...(actual as Record<string, unknown>),
     ReactFlow: (props: Record<string, unknown>) => {
       latestReactFlowProps = props
-      return <div data-testid="reactflow" />
+      const previewMarkers = Children.toArray(props.children as ReactNode).flatMap((child) =>
+        isValidElement<{
+          nodeId?: string
+          position?: string
+          align?: string
+          offset?: number
+          children?: ReactNode
+          'data-testid'?: string
+        }>(child) && typeof child.props.nodeId === 'string'
+          ? [child.props]
+          : []
+      )
+      return (
+        <div data-testid="reactflow">
+          {previewMarkers.map(({ nodeId, position, align, offset, children, 'data-testid': testId }) => (
+            <div
+              key={`${testId ?? 'retry-preview'}-${nodeId}`}
+              data-testid={testId ?? `retry-preview-${nodeId}`}
+              data-position={position}
+              data-align={align}
+              data-offset={offset}
+            >
+              {children}
+            </div>
+          ))}
+        </div>
+      )
     },
     Background: () => null,
     BackgroundVariant: { Dots: 'dots' },
@@ -41,6 +75,8 @@ vi.mock('@xyflow/react', async (importOriginal) => {
       getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
       getNode: vi.fn(),
     }),
+    useStore: (selector: (state: { transform: [number, number, number]; nodes: unknown[] }) => unknown) =>
+      selector({ transform: [0, 0, 1], nodes: [] }),
     useUpdateNodeInternals: () => vi.fn(),
   }
 })
@@ -144,6 +180,7 @@ vi.mock('../../stores/useWorkflowStore', () => {
 vi.mock('../workflows/stores/useExecutionStore', () => ({
   useExecutionStore: (selector: (state: { activityStates: Map<string, { status: string }> }) => unknown) =>
     selector(executionStoreState),
+  selectRetryReplayBaseline: () => retryReplayBaseline,
 }))
 
 function setWorkflowState(overrides: Partial<typeof workflowStoreState>) {
@@ -244,6 +281,49 @@ describe('BuilderFlow execution view', () => {
     expect(screen.getByRole('progressbar')).toBeInTheDocument()
   })
 
+  it('anchors the retry origin marker above and close to its execution node', () => {
+    setWorkflowState({
+      currentWorkflow: {
+        id: 'workflow-retry-preview',
+        inputs: {},
+        triggers: [],
+        workflow: {
+          activities: [
+            { id: 'step-a', type: 'script', name: 'Step A', parameters: {} },
+            { id: 'step-b', type: 'script', name: 'Step B', parameters: {} },
+          ],
+        },
+      },
+      triggers: [],
+      edges: [{ id: 'edge-step-a-b', source: 'step-a', target: 'step-b' }],
+    })
+    setExecutionState(new Map())
+
+    render(
+      <ExecutionViewContext.Provider value={true}>
+        <BuilderFlow
+          workflowId="workflow-retry-preview"
+          panelOpen={false}
+          executionStatus="failed"
+          retryPreviewPointIds={['step-a#iter-2']}
+        />
+      </ExecutionViewContext.Provider>
+    )
+
+    const retryOrigin = screen.getByTestId('retry-origin-step-a')
+    expect(retryOrigin).toBeInTheDocument()
+    expect(retryOrigin).toHaveAttribute('data-position', 'top')
+    expect(retryOrigin).toHaveAttribute('data-align', 'center')
+    expect(Number(retryOrigin.getAttribute('data-offset'))).toBeGreaterThanOrEqual(8)
+    expect(screen.getByTestId('retry-origin-label-step-a')).toHaveAttribute('aria-hidden', 'true')
+    const nodes = (latestReactFlowProps as Record<string, unknown>).nodes as Array<{
+      id: string
+      ariaLabel?: string
+    }>
+    expect(nodes.find((node) => node.id === 'step-a')?.ariaLabel).toBe('Step A, retry origin')
+    expect(screen.queryByTestId('retry-origin-step-b')).not.toBeInTheDocument()
+  })
+
   it('keeps edit interactions enabled outside execution view', () => {
     render(<BuilderFlow workflowId="workflow-1" panelOpen={false} executionStatus={null} />)
 
@@ -306,12 +386,109 @@ describe('BuilderFlow execution view', () => {
     const loopNode = nodes.find((node) => node.id === 'loop-1')
 
     expect(loopNode).toBeDefined()
-    expect((loopNode?.data as Record<string, unknown>)?.__executionState).toEqual({
+    expect((loopNode?.data as Record<string, unknown>)?.__executionState).toMatchObject({
       status: 'running',
       started_at: undefined,
       completed_at: undefined,
       error_details: undefined,
     })
+  })
+
+  it('marks reused activity output while keeping a rerun trigger distinct', () => {
+    setWorkflowState({
+      currentWorkflow: {
+        id: 'workflow-retry',
+        inputs: {},
+        triggers: [{ id: 'trigger-manual', type: 'manual', name: 'Manual Trigger' }],
+        workflow: {
+          activities: [
+            {
+              id: 'task-replayed',
+              type: 'script',
+              name: 'Replayed Task',
+              task: { executor: 'script', parameters: { language: 'bash', code: 'echo hi' } },
+            },
+            {
+              id: 'task-fresh',
+              type: 'script',
+              name: 'Fresh Task',
+              task: { executor: 'script', parameters: { language: 'bash', code: 'echo hi' } },
+            },
+          ],
+        },
+      },
+      edges: [
+        { id: 'edge-trigger-replayed', source: 'trigger-0', target: 'task-replayed' },
+        { id: 'edge-replayed-fresh', source: 'task-replayed', target: 'task-fresh' },
+      ],
+      triggers: [{ id: 'trigger-manual', type: 'manual', name: 'Manual Trigger' }],
+    })
+    // Retry created at noon. The trigger and first step carry the source run's
+    // 11:00 start; the second actually ran inside the retry at 12:00:05.
+    setRetryReplayBaseline('2026-10-09T12:00:00Z')
+    setExecutionState(
+      new Map([
+        ['trigger-manual', { status: 'completed', startedAt: '2026-10-09T11:00:00Z' } as never],
+        ['task-replayed', { status: 'completed', startedAt: '2026-10-09T11:00:00Z' } as never],
+        ['task-fresh', { status: 'running', startedAt: '2026-10-09T12:00:05Z' } as never],
+      ])
+    )
+
+    render(
+      <ExecutionViewContext.Provider value={true}>
+        <BuilderFlow workflowId="workflow-retry" panelOpen={false} executionStatus="running" />
+      </ExecutionViewContext.Provider>
+    )
+
+    const props = latestReactFlowProps as Record<string, unknown>
+    const nodes = props.nodes as Array<Record<string, unknown>>
+    const stateOf = (id: string) =>
+      ((nodes.find((node) => node.id === id)?.data as Record<string, unknown>)?.__executionState ?? {}) as Record<
+        string,
+        unknown
+      >
+
+    expect(stateOf('trigger-0').replayed).toBe(false)
+    expect(stateOf('trigger-0').started_at).toBe('2026-10-09T11:00:00Z')
+    expect(stateOf('task-replayed').replayed).toBe(true)
+    expect(stateOf('task-fresh').replayed).toBe(false)
+  })
+
+  it('never marks a step as replayed when the run is not a retry', () => {
+    setWorkflowState({
+      currentWorkflow: {
+        id: 'workflow-ordinary',
+        inputs: {},
+        triggers: [{ type: 'manual', name: 'Manual Trigger' }],
+        workflow: {
+          activities: [
+            {
+              id: 'task-only',
+              type: 'script',
+              name: 'Only Task',
+              task: { executor: 'script', parameters: { language: 'bash', code: 'echo hi' } },
+            },
+          ],
+        },
+      },
+      edges: [{ id: 'edge-trigger-only', source: 'trigger-0', target: 'task-only' }],
+      triggers: [{ type: 'manual', name: 'Manual Trigger' }],
+    })
+    setRetryReplayBaseline(null)
+    setExecutionState(new Map([['task-only', { status: 'completed', startedAt: '2020-01-01T00:00:00Z' } as never]]))
+
+    render(
+      <ExecutionViewContext.Provider value={true}>
+        <BuilderFlow workflowId="workflow-ordinary" panelOpen={false} executionStatus="running" />
+      </ExecutionViewContext.Provider>
+    )
+
+    const props = latestReactFlowProps as Record<string, unknown>
+    const nodes = props.nodes as Array<Record<string, unknown>>
+    const state = (nodes.find((node) => node.id === 'task-only')?.data as Record<string, unknown>)
+      ?.__executionState as Record<string, unknown>
+
+    expect(state.replayed).toBe(false)
   })
 
   it('displays loop node as completed via backend status', () => {
@@ -366,7 +543,7 @@ describe('BuilderFlow execution view', () => {
     const loopNode = nodes.find((node) => node.id === 'loop-1')
 
     expect(loopNode).toBeDefined()
-    expect((loopNode?.data as Record<string, unknown>)?.__executionState).toEqual({
+    expect((loopNode?.data as Record<string, unknown>)?.__executionState).toMatchObject({
       status: 'completed',
       started_at: undefined,
       completed_at: undefined,
@@ -426,7 +603,7 @@ describe('BuilderFlow execution view', () => {
     const loopNode = nodes.find((node) => node.id === 'loop-1')
 
     expect(loopNode).toBeDefined()
-    expect((loopNode?.data as Record<string, unknown>)?.__executionState).toEqual({
+    expect((loopNode?.data as Record<string, unknown>)?.__executionState).toMatchObject({
       status: 'pending',
       started_at: undefined,
       completed_at: undefined,
@@ -630,7 +807,7 @@ describe('BuilderFlow execution view', () => {
     const convergeNode = nodes.find((node) => node.id === 'converge-1')
 
     expect(convergeNode).toBeDefined()
-    expect((convergeNode?.data as Record<string, unknown>)?.__executionState).toEqual({
+    expect((convergeNode?.data as Record<string, unknown>)?.__executionState).toMatchObject({
       status: 'running',
       started_at: undefined,
       completed_at: undefined,
@@ -691,7 +868,7 @@ describe('BuilderFlow execution view', () => {
     const convergeNode = nodes.find((node) => node.id === 'converge-1')
 
     expect(convergeNode).toBeDefined()
-    expect((convergeNode?.data as Record<string, unknown>)?.__executionState).toEqual({
+    expect((convergeNode?.data as Record<string, unknown>)?.__executionState).toMatchObject({
       status: 'completed',
       started_at: undefined,
       completed_at: undefined,
@@ -760,7 +937,7 @@ describe('BuilderFlow execution view', () => {
     const convergeNode = nodes.find((node) => node.id === 'converge-1')
 
     expect(convergeNode).toBeDefined()
-    expect((convergeNode?.data as Record<string, unknown>)?.__executionState).toEqual({
+    expect((convergeNode?.data as Record<string, unknown>)?.__executionState).toMatchObject({
       status: 'completed',
       started_at: undefined,
       completed_at: undefined,
@@ -821,7 +998,7 @@ describe('BuilderFlow execution view', () => {
     const convergeNode = nodes.find((node) => node.id === 'converge-1')
 
     expect(convergeNode).toBeDefined()
-    expect((convergeNode?.data as Record<string, unknown>)?.__executionState).toEqual({
+    expect((convergeNode?.data as Record<string, unknown>)?.__executionState).toMatchObject({
       status: 'running',
       started_at: undefined,
       completed_at: undefined,
@@ -882,7 +1059,7 @@ describe('BuilderFlow execution view', () => {
     const convergeNode = nodes.find((node) => node.id === 'converge-1')
 
     expect(convergeNode).toBeDefined()
-    expect((convergeNode?.data as Record<string, unknown>)?.__executionState).toEqual({
+    expect((convergeNode?.data as Record<string, unknown>)?.__executionState).toMatchObject({
       status: 'pending',
       started_at: undefined,
       completed_at: undefined,

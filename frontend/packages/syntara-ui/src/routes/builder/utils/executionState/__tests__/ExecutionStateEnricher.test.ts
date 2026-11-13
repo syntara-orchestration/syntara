@@ -100,7 +100,113 @@ describe('ExecutionStateEnricher', () => {
         started_at: '2024-01-01T00:00:00Z',
         completed_at: undefined,
         error_details: undefined,
+        replayed: false,
       })
+    })
+
+    it('flags a step as replayed when it started before the retry baseline', () => {
+      const activity: Activity = {
+        id: 'task-1',
+        name: 'Task 1',
+        type: 'script',
+        parameters: { language: 'python', code: '' },
+      }
+      const activityStates = new Map<string, ActivityState>([
+        // Carried over from the source run, which predates the retry execution.
+        [
+          'task-1',
+          {
+            activityId: 'task-1',
+            status: 'completed',
+            startedAt: '2024-01-01T00:00:00Z',
+            completedAt: '2024-01-01T00:01:00Z',
+          },
+        ],
+      ])
+
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: [],
+        options: { replayBaselineAt: '2024-01-02T00:00:00Z' },
+      })
+
+      expect(result.__executionState?.replayed).toBe(true)
+    })
+
+    it('does not flag a retained failure as replayed', () => {
+      const activity: Activity = {
+        id: 'task-1',
+        name: 'Task 1',
+        type: 'script',
+        parameters: { language: 'python', code: '' },
+      }
+      const activityStates = new Map<string, ActivityState>([
+        [
+          'task-1',
+          {
+            activityId: 'task-1',
+            status: 'failed',
+            startedAt: '2024-01-01T00:00:00Z',
+            completedAt: '2024-01-01T00:01:00Z',
+          },
+        ],
+      ])
+
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'failed',
+        activityStates: activityStates,
+        edges: [],
+        options: { replayBaselineAt: '2024-01-02T00:00:00Z' },
+      })
+
+      expect(result.__executionState?.replayed).toBe(false)
+      expect(result.__executionState?.status).toBe('failed')
+    })
+
+    it('does not flag a step that started inside the retry window', () => {
+      const activity: Activity = {
+        id: 'task-1',
+        name: 'Task 1',
+        type: 'script',
+        parameters: { language: 'python', code: '' },
+      }
+      const activityStates = new Map<string, ActivityState>([
+        ['task-1', { activityId: 'task-1', status: 'running', startedAt: '2024-01-02T00:00:05Z', completedAt: null }],
+      ])
+
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: [],
+        options: { replayBaselineAt: '2024-01-02T00:00:00Z' },
+      })
+
+      expect(result.__executionState?.replayed).toBe(false)
+    })
+
+    it('never flags a replayed step on an execution with no retry baseline', () => {
+      const activity: Activity = {
+        id: 'task-1',
+        name: 'Task 1',
+        type: 'script',
+        parameters: { language: 'python', code: '' },
+      }
+      const activityStates = new Map<string, ActivityState>([
+        ['task-1', { activityId: 'task-1', status: 'completed', startedAt: '2020-01-01T00:00:00Z', completedAt: null }],
+      ])
+
+      const result = enricher.enrichActivity({
+        activity: activity,
+        executionStatus: 'running',
+        activityStates: activityStates,
+        edges: [],
+      })
+
+      expect(result.__executionState?.replayed).toBe(false)
     })
 
     it('uses backend status for loop node', () => {
@@ -1080,7 +1186,12 @@ describe('ExecutionStateEnricher', () => {
       const triggerData = { name: 'Manual trigger', details: 'Manual', triggerType: 'manual' }
       const activityStates = new Map<string, ActivityState>()
 
-      const result = enricher.enrichTriggerNode('trigger-real-id', triggerData, null, activityStates)
+      const result = enricher.enrichTriggerNode({
+        triggerRealId: 'trigger-real-id',
+        triggerData,
+        executionStatus: null,
+        activityStates,
+      })
 
       expect(result).toEqual(triggerData)
       expect(result.__executionState).toBeUndefined()
@@ -1100,7 +1211,12 @@ describe('ExecutionStateEnricher', () => {
         ],
       ])
 
-      const result = enricher.enrichTriggerNode('trigger-real-id', triggerData, 'running', activityStates)
+      const result = enricher.enrichTriggerNode({
+        triggerRealId: 'trigger-real-id',
+        triggerData,
+        executionStatus: 'running',
+        activityStates,
+      })
 
       expect(result.__executionState?.status).toBe('completed')
       expect(result.__executionState?.started_at).toBe('2024-01-01T00:00:00Z')
@@ -1115,7 +1231,12 @@ describe('ExecutionStateEnricher', () => {
         ['trigger-b-id', { activityId: 'trigger-b-id', status: 'skipped', startedAt: null, completedAt: null }],
       ])
 
-      const result = enricher.enrichTriggerNode('trigger-b-id', triggerData, 'completed', activityStates)
+      const result = enricher.enrichTriggerNode({
+        triggerRealId: 'trigger-b-id',
+        triggerData,
+        executionStatus: 'completed',
+        activityStates,
+      })
 
       expect(result.__executionState?.status).toBe('skipped')
     })
@@ -1124,7 +1245,12 @@ describe('ExecutionStateEnricher', () => {
       const triggerData = { name: 'Manual trigger', details: 'Manual', triggerType: 'manual' }
       const activityStates = new Map<string, ActivityState>()
 
-      const result = enricher.enrichTriggerNode('trigger-real-id', triggerData, 'pending', activityStates)
+      const result = enricher.enrichTriggerNode({
+        triggerRealId: 'trigger-real-id',
+        triggerData,
+        executionStatus: 'pending',
+        activityStates,
+      })
 
       expect(result.__executionState?.status).toBe('pending')
       expect(
@@ -1136,7 +1262,12 @@ describe('ExecutionStateEnricher', () => {
       const triggerData = { name: 'Manual trigger', details: 'Manual', triggerType: 'manual' }
       const activityStates = new Map<string, ActivityState>()
 
-      const result = enricher.enrichTriggerNode(undefined, triggerData, 'running', activityStates)
+      const result = enricher.enrichTriggerNode({
+        triggerRealId: undefined,
+        triggerData,
+        executionStatus: 'running',
+        activityStates,
+      })
 
       expect(result.__executionState?.status).toBe('completed')
     })
@@ -1150,12 +1281,93 @@ describe('ExecutionStateEnricher', () => {
       }
       const activityStates = new Map<string, ActivityState>()
 
-      const result = enricher.enrichTriggerNode('trigger-real-id', triggerData, 'running', activityStates)
+      const result = enricher.enrichTriggerNode({
+        triggerRealId: 'trigger-real-id',
+        triggerData,
+        executionStatus: 'running',
+        activityStates,
+      })
 
       expect(result.metadata).toEqual({
         customProp: 'value',
         __showExecutionBadge: true,
       })
+    })
+
+    it('does not mark a rerun trigger as reused output when its source timestamp is preserved', () => {
+      const triggerData = { name: 'Manual trigger', details: 'Manual', triggerType: 'manual' }
+      const activityStates = new Map<string, ActivityState>([
+        [
+          'trigger-real-id',
+          {
+            activityId: 'trigger-real-id',
+            status: 'completed',
+            startedAt: '2024-01-01T00:00:00Z',
+            completedAt: '2024-01-01T00:00:01Z',
+          },
+        ],
+      ])
+
+      const result = enricher.enrichTriggerNode({
+        triggerRealId: 'trigger-real-id',
+        triggerData,
+        executionStatus: 'completed',
+        activityStates,
+        replayBaselineAt: '2024-01-02T00:00:00Z',
+      })
+
+      expect(result.__executionState?.replayed).toBe(false)
+      expect(result.__executionState?.started_at).toBe('2024-01-01T00:00:00Z')
+      expect(result.__executionState?.completed_at).toBe('2024-01-01T00:00:01Z')
+    })
+
+    it('does not flag a trigger that started inside the retry window', () => {
+      const triggerData = { name: 'Manual trigger', details: 'Manual', triggerType: 'manual' }
+      const activityStates = new Map<string, ActivityState>([
+        [
+          'trigger-real-id',
+          {
+            activityId: 'trigger-real-id',
+            status: 'completed',
+            startedAt: '2024-01-02T00:00:05Z',
+            completedAt: '2024-01-02T00:00:06Z',
+          },
+        ],
+      ])
+
+      const result = enricher.enrichTriggerNode({
+        triggerRealId: 'trigger-real-id',
+        triggerData,
+        executionStatus: 'completed',
+        activityStates,
+        replayBaselineAt: '2024-01-02T00:00:00Z',
+      })
+
+      expect(result.__executionState?.replayed).toBe(false)
+    })
+
+    it('never flags a trigger as replayed when the run is not a retry', () => {
+      const triggerData = { name: 'Manual trigger', details: 'Manual', triggerType: 'manual' }
+      const activityStates = new Map<string, ActivityState>([
+        [
+          'trigger-real-id',
+          {
+            activityId: 'trigger-real-id',
+            status: 'completed',
+            startedAt: '2020-01-01T00:00:00Z',
+            completedAt: '2020-01-01T00:00:01Z',
+          },
+        ],
+      ])
+
+      const result = enricher.enrichTriggerNode({
+        triggerRealId: 'trigger-real-id',
+        triggerData,
+        executionStatus: 'completed',
+        activityStates,
+      })
+
+      expect(result.__executionState?.replayed).toBe(false)
     })
   })
 })

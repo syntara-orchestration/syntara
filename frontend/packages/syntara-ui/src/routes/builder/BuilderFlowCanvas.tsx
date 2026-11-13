@@ -3,6 +3,8 @@ import {
   Background,
   BackgroundVariant,
   ConnectionLineType,
+  NodeToolbar,
+  Position,
   ReactFlow,
   type Connection,
   type EdgeChange,
@@ -16,8 +18,9 @@ import {
   useStore,
   useUpdateNodeInternals,
 } from '@xyflow/react'
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 
+import { SynLabel } from '../../components/labels/SynLabel'
 import { FlowNodeType } from '../../constants'
 import { CanvasControls } from '../workflows/canvas/CanvasControls'
 import { type NodeType } from '../workflows/canvas/nodes/NodeType'
@@ -29,6 +32,8 @@ import canvasStyles from './BuilderFlowCanvas.module.css'
 import { builderEdgeTypes, builderNodeTypes } from './builderFlowConfig'
 import { BUTTON_EDGE_DEFAULT_STROKE } from './edges/buttonEdgeStrokeColor'
 import { EdgeMarkers } from './edges/edgeMarkers'
+import { getRetryPreviewCanvasStates, type RetryPreviewCanvasState } from './retryPreviewCanvasState'
+import { getRetryPreviewLabelPlacements, RETRY_LABEL_BASE_OFFSET, type RetryLabelSide } from './retryPreviewLabelLayout'
 import { markerEnd, type EdgeType } from './utils/workflowToGraph'
 
 type BuilderFlowCanvasProps = {
@@ -37,6 +42,7 @@ type BuilderFlowCanvasProps = {
   effectiveExecutionStatus: string | null
   isReadOnly: boolean
   nodes: NodeType[]
+  retryPreviewNodeIds?: readonly string[]
   edges: EdgeType[]
   onNodesChange: (changes: NodeChange<NodeType>[]) => void
   onNodeDragStart?: OnNodeDrag<NodeType>
@@ -111,6 +117,7 @@ export function BuilderFlowCanvas({
   effectiveExecutionStatus,
   isReadOnly,
   nodes,
+  retryPreviewNodeIds = [],
   edges,
   onNodesChange,
   onNodeDragStart,
@@ -127,6 +134,38 @@ export function BuilderFlowCanvas({
   disableSpacePanning,
   onLayout,
 }: Readonly<BuilderFlowCanvasProps>) {
+  const retryPreviewCanvasStates = useMemo(
+    () =>
+      getRetryPreviewCanvasStates(
+        nodes.map((node) => ({ id: node.id, type: node.type, status: getNodeExecutionStatus(node) })),
+        edges,
+        retryPreviewNodeIds
+      ),
+    [edges, nodes, retryPreviewNodeIds]
+  )
+  const accessibleNodes = useMemo(
+    () =>
+      nodes.map((node) => {
+        const retryState = retryPreviewCanvasStates.get(node.id)
+        if (!retryState) return node
+
+        const nodeName = 'name' in node.data && typeof node.data.name === 'string' ? node.data.name : node.id
+        const stateLabel = getRetryStateAccessibleLabel(retryState)
+        const ariaLabel = `${node.ariaLabel ?? nodeName}, ${stateLabel}`
+        if (retryState === 'origin') return { ...withRetryPreviewOrigin(node), ariaLabel }
+        return {
+          ...node,
+          ariaLabel,
+        }
+      }),
+    [nodes, retryPreviewCanvasStates]
+  )
+  const zoom = useStore((state: ReactFlowState) => state.transform[2])
+  const retryLabelPlacements = useMemo(
+    () => getRetryPreviewLabelPlacements(nodes, retryPreviewCanvasStates, zoom),
+    [nodes, retryPreviewCanvasStates, zoom]
+  )
+
   return (
     <div
       ref={containerRef}
@@ -140,7 +179,7 @@ export function BuilderFlowCanvas({
         </div>
       )}
       <ReactFlow<NodeType, EdgeType>
-        nodes={nodes}
+        nodes={accessibleNodes}
         edges={edges}
         nodeTypes={builderNodeTypes}
         edgeTypes={builderEdgeTypes}
@@ -172,10 +211,90 @@ export function BuilderFlowCanvas({
       >
         <SemanticZoomNodeInternalsUpdater />
         <EdgeMarkers />
+        {retryPreviewNodeIds.map((nodeId) => (
+          <NodeToolbar
+            key={nodeId}
+            nodeId={nodeId}
+            isVisible
+            position={retryLabelToolbarPosition(retryLabelPlacements.get(nodeId)?.side)}
+            align={retryLabelPlacements.get(nodeId)?.align ?? 'center'}
+            offset={retryLabelPlacements.get(nodeId)?.offset ?? RETRY_LABEL_BASE_OFFSET}
+            data-testid={`retry-origin-${nodeId}`}
+          >
+            <span
+              className={canvasStyles.retryPreviewLabel}
+              data-testid={`retry-origin-label-${nodeId}`}
+              aria-hidden="true"
+            >
+              <SynLabel color="blue">Retry origin</SynLabel>
+            </span>
+          </NodeToolbar>
+        ))}
+        {[...retryPreviewCanvasStates].map(([nodeId, state]) => {
+          if (state === 'origin') return null
+          return (
+            <NodeToolbar
+              key={`retry-state-${nodeId}`}
+              nodeId={nodeId}
+              isVisible
+              position={retryLabelToolbarPosition(retryLabelPlacements.get(nodeId)?.side)}
+              align={retryLabelPlacements.get(nodeId)?.align ?? 'center'}
+              offset={retryLabelPlacements.get(nodeId)?.offset ?? RETRY_LABEL_BASE_OFFSET}
+              data-testid={`retry-state-${nodeId}`}
+            >
+              <span
+                className={canvasStyles.retryPreviewLabel}
+                data-testid={`retry-state-label-${nodeId}`}
+                aria-hidden="true"
+              >
+                <RetryStateLabel state={state} />
+              </span>
+            </NodeToolbar>
+          )
+        })}
         {!isReadOnly && <Background variant={BackgroundVariant.Dots} gap={20} size={1} />}
         <CanvasControls onLayout={onLayout} hideLayout={isReadOnly} />
         {!isReadOnly && <UndoRedoControls />}
       </ReactFlow>
     </div>
   )
+}
+
+function getNodeExecutionStatus(node: NodeType): string | undefined {
+  const data = node.data as Record<string, unknown>
+  const executionState = data.__executionState
+  if (!executionState || typeof executionState !== 'object' || !('status' in executionState)) return undefined
+  return typeof executionState.status === 'string' ? executionState.status : undefined
+}
+
+function getRetryStateAccessibleLabel(state: RetryPreviewCanvasState): string {
+  switch (state) {
+    case 'origin':
+      return 'retry origin'
+    case 'will-retry':
+      return 'in retry scope'
+    case 'retained':
+      return 'retains prior result'
+    case 'not-retried':
+      return 'not retried; remains failed'
+  }
+}
+
+function RetryStateLabel({ state }: Readonly<{ state: Exclude<RetryPreviewCanvasState, 'origin'> }>) {
+  if (state === 'will-retry') return <SynLabel color="blue">In retry scope</SynLabel>
+  if (state === 'retained') return <SynLabel color="grey">Retains prior result</SynLabel>
+  return <SynLabel color="orange">Not retried — remains failed</SynLabel>
+}
+
+function retryLabelToolbarPosition(side: RetryLabelSide | undefined): Position {
+  if (side === 'left') return Position.Left
+  if (side === 'right') return Position.Right
+  return Position.Top
+}
+
+function withRetryPreviewOrigin<T extends NodeType>(node: T): T & { data: T['data'] & { __retryPreviewOrigin: true } } {
+  return {
+    ...node,
+    data: Object.assign({}, node.data, { __retryPreviewOrigin: true as const }),
+  }
 }

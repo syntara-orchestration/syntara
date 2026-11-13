@@ -1,38 +1,29 @@
-import { Flex, FlexItem, TitleSizes } from '@patternfly/react-core'
+import { TitleSizes } from '@patternfly/react-core'
 import type { ExecutionsAPI } from '@syntara/contracts'
 import { useNavigate, useParams, useRouterState } from '@tanstack/react-router'
-import type React from 'react'
 import '@xyflow/react/dist/style.css'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { executionsClient } from '../../client'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
-import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
 import { SynReactFlowViewportGuard } from '../../components/layout/SynReactFlowViewportGuard'
-import { ResizableDivider } from '../../components/ResizableDivider'
 import { SynPageTitle } from '../../components/SynPageTitle'
-import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
 import { useDialogState } from '../../hooks/useDialogState'
-import { useAlerts } from '../../providers/alerts'
-import type { FilterConfig } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
 import { canvasNodeIdFromApprovalNodeId } from '../approvals/approvalNodeId'
-import { ExecutionDetailsPanel, type WorkflowDefShape } from '../builder/ExecutionDetailsPanel'
-import { ExecutionViewContent } from '../builder/ExecutionViewContent'
+import type { WorkflowDefShape } from '../builder/ExecutionDetailsPanel'
 import { useActivityNameMap } from '../builder/useActivityNameMap'
-import { WorkflowHistoryCard } from '../builder/WorkflowHistoryCard'
 import type { ActivityState } from '../workflows/execution/types'
 import { useExecutionStore, useExecutionWithLiveStatus } from '../workflows/stores/useExecutionStore'
 
 import { ApprovalSidePanel } from './ApprovalSidePanel'
 import { ExecutionDetailErrorStates } from './components/ExecutionDetailErrorStates'
-import { ConnectionBanner } from './ConnectionBanner'
 import { CopyToEditorDialog } from './CopyToEditorDialog'
 import { isExecutionCancellable } from './executionCancellable'
-import styles from './ExecutionDetail.module.css'
+import { ExecutionDetailContent } from './ExecutionDetailContent'
 import { ExecutionDetailHeaderToolbar, ExecutionDetailTitleRowAddons } from './ExecutionDetailPageHeaderParts'
 import { executionDetailHasTitleRowExtras, executionDetailPageHeading } from './executionDetailPageHeaderTitle'
 import { executionRefetchInterval } from './executionPolling'
@@ -43,6 +34,7 @@ import { useExecutionStepClick } from './hooks/useExecutionStepClick'
 import { useExecutionStreaming, useSyncActivityStore } from './hooks/useExecutionStreaming'
 import { useExecutionWorkflow } from './hooks/useExecutionWorkflow'
 import { useForkWorkflow } from './hooks/useForkWorkflow'
+import { useRetryFromFailurePanel } from './hooks/useRetryFromFailurePanel'
 
 /** Returns true when the page should render a fallback (missing ID, loading, or error) instead of the main content. */
 function shouldShowFallbackState(
@@ -65,11 +57,11 @@ function useResetOnExecutionChange(executionId: string | undefined) {
   }, [executionId, reset])
 }
 
-/** Build activity name map from workflow definition for resolving approval node names. */
-function useActivityNamesForExecution(
+/** Build activity name and type maps from the retained workflow definition. */
+function useActivityMapsForExecution(
   workflowDefinition: WorkflowDefShape | undefined | null,
   activities: (ActivityData | ActivityExecution)[]
-): Map<string, string> {
+): { nameMap: Map<string, string>; typeMap: Map<string, string> } {
   const activityStates = useMemo(() => {
     const map = new Map<string, ActivityState>()
     for (const activity of activities) {
@@ -81,197 +73,14 @@ function useActivityNamesForExecution(
     return map
   }, [activities])
 
-  const { nameMap } = useActivityNameMap(workflowDefinition, activityStates)
-  return nameMap
+  const { nameMap, typeMap } = useActivityNameMap(workflowDefinition, activityStates)
+  return { nameMap, typeMap }
 }
 
-type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
 type ActivityData = ExecutionsAPI.components['schemas']['ActivityData']
 type ActivityExecution = ExecutionsAPI.components['schemas']['ActivityExecution']
 
-type ExecutionWorkflow = {
-  id: string
-  name: string
-  description?: string
-  version: { workflow_definition: WorkflowDefShape | null }
-}
-
 // Inner component that has access to React Flow context
-function ExecutionDetailContent({
-  historyCardOpen,
-  approvalPanel,
-  workflow,
-  execution,
-  activities,
-  executionId,
-  executionsQuery,
-  navigate,
-  filters,
-  onFilterChange,
-  paginationFooterProps,
-  onNodeClick,
-  selectedStepId,
-  selectedStepName,
-  onStepSelect,
-  currentApprovalNodeId,
-}: Readonly<{
-  historyCardOpen: boolean
-  approvalPanel?: React.ReactNode
-  workflow?: ExecutionWorkflow
-  execution: Execution | undefined
-  activities: (ActivityData | ActivityExecution)[]
-  executionId: string
-  executionsQuery: {
-    data?: { resources?: Execution[] }
-    isLoading: boolean
-    error: unknown
-    refetch: () => Promise<unknown>
-  }
-  navigate: ReturnType<typeof useNavigate>
-  filters: FilterConfig[]
-  onFilterChange: (filters: FilterConfig[]) => void
-  paginationFooterProps: PaginationFooterProps
-  onNodeClick?: (event: React.MouseEvent, node: { id: string; type?: string; data: Record<string, unknown> }) => void
-  selectedStepId: string | null
-  selectedStepName: string | null
-  onStepSelect: (stepId: string, stepName: string) => void
-  currentApprovalNodeId?: string | null
-}>) {
-  const isStale = useExecutionStore((state) => state.isStale)
-  const isComplete = useExecutionStore((state) => state.isComplete)
-  const { showError } = useAlerts()
-  const prevStatusRef = useRef(execution?.status)
-  const [panelHeight, setPanelHeight] = useState(300)
-
-  const showFailureToast = useCallback(() => {
-    showError({
-      title: `${workflow?.name ?? 'Workflow'} run failed`,
-      description: 'View the run logs and copy to the editor to debug within the editor',
-    })
-  }, [workflow?.name, showError])
-
-  useEffect(() => {
-    const prevStatus = prevStatusRef.current
-    prevStatusRef.current = execution?.status
-
-    if (execution?.status === 'failed' && prevStatus && prevStatus !== 'failed') {
-      showFailureToast()
-    }
-  }, [execution?.status, showFailureToast])
-
-  const MIN_PANEL_HEIGHT = 100
-  const MAX_PANEL_HEIGHT = 600
-
-  const handleResize = useCallback((deltaY: number) => {
-    setPanelHeight((prev) => Math.min(MAX_PANEL_HEIGHT, Math.max(MIN_PANEL_HEIGHT, prev - deltaY)))
-  }, [])
-
-  const panelHeightPercent = Math.round(
-    ((panelHeight - MIN_PANEL_HEIGHT) / (MAX_PANEL_HEIGHT - MIN_PANEL_HEIGHT)) * 100
-  )
-
-  return (
-    <Flex
-      alignItems={{ default: 'alignItemsStretch' }}
-      flexWrap={{ default: 'nowrap' }}
-      gap={{ default: 'gapLg' }}
-      style={{
-        position: 'relative',
-        minWidth: 0,
-        height: '100%',
-        overflow: 'visible',
-        display: 'flex',
-        flexDirection: 'row',
-      }}
-    >
-      <FlexItem
-        style={{
-          position: 'relative',
-          minWidth: 0,
-          flexGrow: 1,
-          height: '100%',
-        }}
-      >
-        {isStale && !isComplete && (
-          <Flex
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              zIndex: 10,
-              padding: 'var(--pf-t--global--spacer--md)',
-              pointerEvents: 'auto',
-            }}
-            onMouseDown={(event) => event.stopPropagation()}
-            onPointerDown={(event) => event.stopPropagation()}
-          >
-            <FlexItem fullWidth={{ default: 'fullWidth' }}>
-              <ConnectionBanner isVisible />
-            </FlexItem>
-          </Flex>
-        )}
-        <SynPanelStack>
-          <SynPanelStackItem isFilled>
-            <ExecutionViewContent
-              workflow={workflow}
-              executionStatus={execution?.status ?? null}
-              executionActivities={activities}
-              executionId={executionId}
-              onNodeClick={onNodeClick}
-              selectedActivityId={currentApprovalNodeId ?? selectedStepId}
-            />
-          </SynPanelStackItem>
-
-          <ResizableDivider onResize={handleResize} currentValue={panelHeightPercent} />
-
-          <SynPanelStackItem style={{ height: `${String(panelHeight)}px` }}>
-            <ExecutionDetailsPanel
-              executionId={executionId}
-              workflowDefinition={workflow?.version.workflow_definition}
-              selectedNodeId={selectedStepId}
-              selectedNodeName={selectedStepName}
-              onNodeSelect={onStepSelect}
-            />
-          </SynPanelStackItem>
-        </SynPanelStack>
-      </FlexItem>
-
-      {approvalPanel && <FlexItem className={styles.approvalPanelSlot}>{approvalPanel}</FlexItem>}
-
-      {historyCardOpen && (
-        <FlexItem className={styles.approvalPanelSlot}>
-          <WorkflowHistoryCard
-            executions={executionsQuery.data?.resources ?? []}
-            selectedExecutionId={executionId}
-            onClose={() => {
-              detachPromise(
-                navigate({
-                  to: '/executions/$executionId',
-                  params: { executionId },
-                  search: (prev: Record<string, unknown>) => ({ ...prev, history: 'closed' }),
-                })
-              )
-            }}
-            onExecutionSelect={(selectedId) => {
-              detachPromise(
-                navigate({
-                  to: '/executions/$executionId',
-                  params: { executionId: selectedId },
-                  search: (prev: Record<string, unknown>) => ({ ...prev }),
-                })
-              )
-            }}
-            filters={filters}
-            onFilterChange={onFilterChange}
-            paginationFooterProps={paginationFooterProps}
-          />
-        </FlexItem>
-      )}
-    </Flex>
-  )
-}
-
 export default function ExecutionDetail() {
   const executionsDocLink = useDocLink('executions')
   const { executionId }: { executionId: string } = useParams({ strict: false })
@@ -311,7 +120,10 @@ export default function ExecutionDetail() {
 
   useSyncActivityStore(execution, activities)
 
-  const activityNameMap = useActivityNamesForExecution(execution?.workflow_definition, activities)
+  const { nameMap: activityNameMap, typeMap: activityTypeMap } = useActivityMapsForExecution(
+    execution?.workflow_definition,
+    activities
+  )
 
   const stepClick = useExecutionStepClick(executionId)
   const { approvals, currentIndex, currentApproval, isApprovalLoading, handleNodeClick, navigateToIndex } = stepClick
@@ -324,6 +136,12 @@ export default function ExecutionDetail() {
   )
   const approvalNavigation = useApprovalNavigation(currentIndex, navigateToIndex, approvals)
   const copyToEditorDialog = useDialogState<void>()
+  const retryPanel = useRetryFromFailurePanel({
+    navigate,
+    executionId,
+    historyCardOpen,
+    closeApprovalPanel: approval.close,
+  })
   const isCancellable = isExecutionCancellable(execution?.status)
 
   const { forkAsNewWorkflow, isForkLoading } = useForkWorkflow({
@@ -334,7 +152,10 @@ export default function ExecutionDetail() {
 
   const toggleHistoryCard = () => {
     const willOpen = !historyCardOpen
-    if (willOpen) approval.close()
+    if (willOpen) {
+      approval.close()
+      retryPanel.closeWithoutFocus()
+    }
     detachPromise(
       navigate({
         to: '/executions/$executionId',
@@ -387,15 +208,17 @@ export default function ExecutionDetail() {
               isCancellable={isCancellable}
               executionId={executionId}
               execution={execution}
+              onRetryFromFailureClick={retryPanel.open}
+              isRetryMode={retryPanel.isOpen}
             />
           }
         />
         <SynPageBody>
           <ExecutionDetailContent
             key={executionId}
-            historyCardOpen={historyCardOpen && !approval.panelOpen}
+            historyCardOpen={historyCardOpen && !approval.panelOpen && !retryPanel.isOpen}
             approvalPanel={
-              approval.panelOpen && currentApproval ? (
+              !retryPanel.isOpen && approval.panelOpen && currentApproval ? (
                 <ApprovalSidePanel
                   approval={currentApproval}
                   message={approval.approvalMessage}
@@ -412,6 +235,10 @@ export default function ExecutionDetail() {
                 />
               ) : undefined
             }
+            retryPanelOpen={retryPanel.isOpen}
+            activityNameMap={activityNameMap}
+            activityTypeMap={activityTypeMap}
+            onRetryPanelClose={retryPanel.close}
             workflow={workflow}
             execution={execution}
             activities={activities}

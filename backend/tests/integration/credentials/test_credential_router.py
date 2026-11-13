@@ -183,11 +183,16 @@ class TestListCredentials:
 
     @pytest.mark.asyncio
     async def test_list_returns_masked_metadata(
-        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str
+        self,
+        auth_client: AsyncClient,
+        bearer_type: CredentialType,
+        test_project_id: str,
+        credential_project_admin: None,
     ) -> None:
         # Create two credentials
+        credential_ids: list[str] = []
         for i in range(2):
-            await auth_client.post(
+            create_resp = await auth_client.post(
                 "/api/v1/credentials",
                 json={
                     "name": f"List Test {i} {uuid4().hex[:8]}",
@@ -196,13 +201,17 @@ class TestListCredentials:
                     "inputs": {"token": f"secret-{i}"},
                 },
             )
+            assert create_resp.status_code == 201
+            credential_ids.append(create_resp.json()["id"])
 
-        resp = await auth_client.get("/api/v1/credentials")
+        resp = await auth_client.get("/api/v1/credentials", params={"project_id": test_project_id})
         assert resp.status_code == 200
         body = resp.json()
-        assert len(body["resources"]) >= 2
+        resources = body["resources"]
+        listed_ids = {resource["id"] for resource in resources}
+        assert set(credential_ids) <= listed_ids
         # All inputs should be masked
-        for resource in body["resources"]:
+        for resource in resources:
             if resource["inputs"]:
                 for value in resource["inputs"].values():
                     assert value == "$encrypted$"
@@ -840,11 +849,15 @@ class TestEnabledFilter:
 
     @pytest.mark.asyncio
     async def test_filter_enabled_true(
-        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str
+        self,
+        auth_client: AsyncClient,
+        bearer_type: CredentialType,
+        test_project_id: str,
+        credential_project_admin: None,
     ) -> None:
         """Verify ?enabled=true returns only enabled credentials."""
         # Create enabled credential
-        await auth_client.post(
+        enabled_resp = await auth_client.post(
             "/api/v1/credentials",
             json={
                 "name": f"Enabled Cred {uuid4().hex[:8]}",
@@ -853,6 +866,8 @@ class TestEnabledFilter:
                 "inputs": {"token": "abc"},
             },
         )
+        assert enabled_resp.status_code == 201
+        enabled_id = enabled_resp.json()["id"]
         # Create and disable a credential
         create_resp = await auth_client.post(
             "/api/v1/credentials",
@@ -863,17 +878,27 @@ class TestEnabledFilter:
                 "inputs": {"token": "def"},
             },
         )
+        assert create_resp.status_code == 201
         disabled_id = create_resp.json()["id"]
-        await auth_client.patch(f"/api/v1/credentials/{disabled_id}", json={"enabled": False})
+        patch_resp = await auth_client.patch(f"/api/v1/credentials/{disabled_id}", json={"enabled": False})
+        assert patch_resp.status_code == 200
 
-        resp = await auth_client.get("/api/v1/credentials?enabled=true")
+        resp = await auth_client.get("/api/v1/credentials", params={"project_id": test_project_id, "enabled": "true"})
         assert resp.status_code == 200
-        for resource in resp.json()["resources"]:
+        resources = resp.json()["resources"]
+        listed_ids = {resource["id"] for resource in resources}
+        assert enabled_id in listed_ids
+        assert disabled_id not in listed_ids
+        for resource in resources:
             assert resource["enabled"] is True
 
     @pytest.mark.asyncio
     async def test_filter_enabled_false(
-        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str
+        self,
+        auth_client: AsyncClient,
+        bearer_type: CredentialType,
+        test_project_id: str,
+        credential_project_admin: None,
     ) -> None:
         """Verify ?enabled=false returns only disabled credentials."""
         # Create and disable a credential
@@ -886,13 +911,16 @@ class TestEnabledFilter:
                 "inputs": {"token": "ghi"},
             },
         )
+        assert create_resp.status_code == 201
         cred_id = create_resp.json()["id"]
-        await auth_client.patch(f"/api/v1/credentials/{cred_id}", json={"enabled": False})
+        patch_resp = await auth_client.patch(f"/api/v1/credentials/{cred_id}", json={"enabled": False})
+        assert patch_resp.status_code == 200
 
-        resp = await auth_client.get("/api/v1/credentials?enabled=false")
+        resp = await auth_client.get("/api/v1/credentials", params={"project_id": test_project_id, "enabled": "false"})
         assert resp.status_code == 200
-        assert len(resp.json()["resources"]) >= 1
-        for resource in resp.json()["resources"]:
+        resources = resp.json()["resources"]
+        assert cred_id in {resource["id"] for resource in resources}
+        for resource in resources:
             assert resource["enabled"] is False
 
 

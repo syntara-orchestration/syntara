@@ -21,6 +21,7 @@ from temporalio.exceptions import ApplicationError
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.authz.engine import AllowedProjectsResult
 from syntara.core.config.base import get_settings
+from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.services import BaseService
 from syntara.core.services.extensions import ConvertResourceMixin, EnrichQueryMixin
@@ -39,6 +40,7 @@ from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,
     ExecutionNotFoundError,
     ExecutionNotRetryableError,
+    ExecutionNotRetryableFromFailureError,
     TemporalUnavailableError,
     TriggerValidationError,
     WorkflowConcurrencyLimitError,
@@ -59,10 +61,13 @@ from syntara.workflows.models.execution import (
     ExecutionRead,
     ExecutionStatus,
     PreResolvedNodeOutput,
+    RetryFromFailureValidationResponse,
+    RetryKind,
 )
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.services.retry_validation import RetryValidation, validate_retry_from_failure
 
 if TYPE_CHECKING:
     from syntara.metrics.recorder import MetricsRecorder
@@ -375,12 +380,14 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         recorder: "MetricsRecorder",
         component: ComponentLabel,
         retried_from_execution_id: UUID | None = None,
+        eligible_point_ids: list[str] | None = None,
+        input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
     ) -> ExecutionRead:
         """Start a Temporal workflow and persist the execution record.
 
-        Shared by create_execution and retry_execution to avoid duplication.
-        Starts Temporal first, then creates the DB record. On DB commit failure,
-        attempts to cancel the orphaned Temporal workflow.
+        Shared by create_execution, retry_execution, and retry_from_failure to
+        avoid duplication. Starts Temporal first, then creates the DB record.
+        On DB commit failure, attempts to cancel the orphaned Temporal workflow.
         """
         # Enforce application-level concurrency cap before touching Temporal.
         # Uses a DB count of non-terminal executions — accurate across API server
@@ -413,6 +420,11 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             created_by_user_id=str(self.user.id),
             created_at=now.isoformat(),
             workflow_version_id=workflow_version.id,
+            retry_from_execution_id=(
+                str(retried_from_execution_id) if eligible_point_ids is not None and retried_from_execution_id else None
+            ),
+            eligible_point_ids=eligible_point_ids,
+            input_parameter_overrides=input_parameter_overrides,
         )
 
         # Start Temporal workflow FIRST (if temporal_service is available)
@@ -454,6 +466,12 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         # Create execution record in database ONLY after Temporal accepts workflow
         _, trigger_node = resolve_trigger_node(workflow_version.workflow_definition, trigger_node_id)
+
+        # Build execution_metadata for retry-from-failure executions
+        execution_metadata = None
+        if eligible_point_ids is not None:
+            execution_metadata = {"eligible_point_ids": eligible_point_ids}
+
         execution = Execution(
             id=execution_id,
             workflow_id=workflow.id,
@@ -464,6 +482,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             input_data=input_data,
             trigger_node_id=trigger_node_id,
             retried_from_execution_id=retried_from_execution_id,
+            execution_metadata=execution_metadata,
             trigger_type=trigger_node.get("type"),
             interface=interface_context_var.get(),
             created_by=self.user.id,
@@ -1171,6 +1190,72 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
             mode=execution.mode.value,
         )
 
+    def _record_retry_request(self, retry_kind: str, outcome: str) -> None:
+        """Record retry request metric (fire-and-forget).
+
+        Args:
+            retry_kind: Type of retry (standard, from_failure)
+            outcome: Request outcome (accepted, rejected, or error)
+
+        """
+        try:
+            recorder = get_metrics_recorder()
+            recorder.record(
+                MetricType.WORKFLOW_RETRY_REQUESTS,
+                value=1,
+                labels={
+                    "retry_kind": retry_kind,
+                    "outcome": outcome,
+                },
+            )
+        except Exception:  # noqa: BLE001
+            logger.debug("Failed to record retry request metric", exc_info=True)
+
+    def _resolve_retry_trigger_node(
+        self,
+        workflow_definition: dict[str, Any],
+        trigger_node_id: str,
+        retry_kind: RetryKind,
+    ) -> str:
+        """Resolve a retry trigger and record malformed definitions as rejected."""
+        try:
+            resolved_trigger_node_id, _ = resolve_trigger_node(workflow_definition, trigger_node_id)
+        except SafeValueError:
+            self._record_retry_request(retry_kind.value, "rejected")
+            raise
+        return resolved_trigger_node_id
+
+    @staticmethod
+    async def _get_failed_step_types(session: AsyncSession, execution_id: UUID) -> list[str]:
+        """Extract and normalize failed step types from execution activities.
+
+        Returns normalized, deduplicated, sorted list of failed node types.
+        Bounded to maximum 50 entries. Uses existing node-type vocabulary.
+
+        Args:
+            session: Database session
+            execution_id: Source execution ID
+
+        Returns:
+            List of failed step type names (e.g., ['http_request', 'llm_call'])
+
+        """
+        from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus  # noqa: PLC0415
+
+        result = await session.exec(
+            select(ActivityExecution)
+            .where(ActivityExecution.execution_id == execution_id)
+            .where(ActivityExecution.status == ActivityStatus.FAILED)
+        )
+        failed_activities = result.all()
+
+        failed_types: set[str] = set()
+        for activity in failed_activities:
+            failed_types.add(activity.node_type.value)
+
+        # Sort deterministically and bound to 50 entries
+        return sorted(failed_types)[:50]
+
     async def retry_execution(self, execution_id: UUID) -> ExecutionRead:
         """Retry a completed execution, re-running with the same version and inputs.
 
@@ -1197,15 +1282,18 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         original = result.one_or_none()
 
         if original is None:
+            self._record_retry_request(RetryKind.STANDARD.value, "rejected")
             raise ExecutionNotFoundError(execution_id)
 
         # Step 2: Validate retryability
         if original.status not in TERMINAL_EXECUTION_STATUSES:
+            self._record_retry_request(RetryKind.STANDARD.value, "rejected")
             raise ExecutionNotRetryableError(
                 execution_id, f"execution is in {original.status.value} state (must be terminal)"
             )
 
         if original.mode == ExecutionMode.TEST:
+            self._record_retry_request(RetryKind.STANDARD.value, "rejected")
             raise ExecutionNotRetryableError(execution_id, "test executions cannot be retried")
 
         # Step 3: Fetch the workflow version used by the original execution
@@ -1214,6 +1302,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         )
         workflow_version = version_result.one_or_none()
         if workflow_version is None:
+            self._record_retry_request(RetryKind.STANDARD.value, "rejected")
             raise ExecutionNotRetryableError(execution_id, "original workflow version no longer exists")
 
         logger.info(
@@ -1226,21 +1315,246 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         # Step 5: Resolve trigger node from the original version's definition
         workflow_def = workflow_version.workflow_definition
         if original.trigger_node_id is None:
-            from syntara.core.exceptions import SafeValueError  # noqa: PLC0415
-
+            self._record_retry_request(RetryKind.STANDARD.value, "rejected")
             msg = "Cannot retry execution: original execution has no trigger_node_id recorded"
             raise SafeValueError(msg)
-        trigger_node_id, _ = resolve_trigger_node(workflow_def, original.trigger_node_id)
+        trigger_node_id = self._resolve_retry_trigger_node(
+            workflow_def,
+            original.trigger_node_id,
+            RetryKind.STANDARD,
+        )
 
         recorder = get_metrics_recorder()
         component = ComponentLabel.EXECUTION_SERVICE
 
-        return await self._start_temporal_and_create_execution(
-            workflow=original.workflow,
-            workflow_version=workflow_version,
-            input_data=original.input_data,
-            trigger_node_id=trigger_node_id,
-            recorder=recorder,
-            component=component,
-            retried_from_execution_id=original.id,
+        try:
+            new_execution = await self._start_temporal_and_create_execution(
+                workflow=original.workflow,
+                workflow_version=workflow_version,
+                input_data=original.input_data,
+                trigger_node_id=trigger_node_id,
+                recorder=recorder,
+                component=component,
+                retried_from_execution_id=original.id,
+            )
+        except Exception:
+            # Infrastructure failures are distinct from ineligible requests.
+            self._record_retry_request(RetryKind.STANDARD.value, "error")
+            raise
+
+        self._record_retry_request(RetryKind.STANDARD.value, "accepted")
+        try:
+            from syntara.audit.emitter import request_id_context_var  # noqa: PLC0415
+            from syntara.workflows.audit.retry_requested import WorkflowRetryRequestedEvent  # noqa: PLC0415
+
+            AuditEventDispatcher.dispatch(
+                WorkflowRetryRequestedEvent(
+                    execution_id=new_execution.id,
+                    source_execution_id=execution_id,
+                    retry_kind=RetryKind.STANDARD.value,
+                    request_id=request_id_context_var.get(),
+                )
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to emit retry telemetry after persistence", exc_info=True)
+
+        return new_execution
+
+    @staticmethod
+    def _to_preview_response(validation: RetryValidation) -> RetryFromFailureValidationResponse:
+        """Map the internal validation verdict onto the preview response model."""
+        return RetryFromFailureValidationResponse(
+            eligible=validation.eligible,
+            reason=validation.reason,
+            eligible_point_ids=validation.eligible_point_ids,
+            sanitized_node_ids=validation.sanitized_node_ids,
+            auto_included_node_ids=validation.auto_included_node_ids,
+            sanitized_replacements=validation.sanitized_replacements,
+            step_count_by_eligible_point=validation.step_count_by_eligible_point,
+            total_step_count=validation.total_step_count,
+            retained_result_count=validation.retained_result_count,
         )
+
+    async def preview_retry_from_failure(
+        self, execution_id: UUID, retry_point_ids: list[str] | None = None
+    ) -> RetryFromFailureValidationResponse:
+        """Report whether this execution can be retried, and what would re-run.
+
+        Backs ``GET /executions/{id}/retry-from-failure-preview``. Takes no
+        input overrides. When ``retry_point_ids`` is omitted, reports the
+        default — every currently failed node. When supplied, reports the
+        validated selection and exact counts for that subset, including
+        deduplicating shared downstream steps.
+
+        Never mutates any state. The same validation chain runs again inside
+        :meth:`retry_from_failure` for the actual selection, so this preview
+        can never be the authority on whether a retry will succeed.
+
+        Raises:
+            ExecutionNotFoundError: If the source execution is gone.
+
+        """
+        validation = await validate_retry_from_failure(self.session, execution_id, retry_point_ids or [])
+        logger.info(
+            "Retry preview",
+            execution_id=execution_id,
+            retry_point_ids=retry_point_ids,
+            eligible=validation.eligible,
+            reason=validation.reason,
+            eligible_point_count=len(validation.eligible_point_ids),
+            retained_result_count=validation.retained_result_count,
+        )
+        return self._to_preview_response(validation)
+
+    async def retry_from_failure(
+        self,
+        execution_id: UUID,
+        retry_point_ids: list[str],
+        input_parameter_overrides: dict[str, dict[str, Any]] | None = None,
+    ) -> ExecutionRead:
+        """Retry an execution from failure points.
+
+        Independently repeats the full validation chain before doing any work
+        — never assumes the validate endpoint was called first. On success,
+        creates a new execution linked to the source via
+        ``retried_from_execution_id`` (the same lineage field used by plain
+        retries) running the exact workflow version *retained from the
+        original run* — later edits to the definition never affect a retry
+        (R10) — and triggers a Temporal run carrying
+        ``retry_from_execution_id``, the eligible retry points, and any
+        validated input parameter overrides for the engine's node
+        classification and parameter application.
+
+        Args:
+            execution_id: ID of the source (failed) execution
+            retry_point_ids: Retry points to resume from; a subset may be
+                passed when multiple parallel branches failed
+            input_parameter_overrides: Per-starting-node input parameter
+                overrides for this run only (SDP AC-14/R10c). Validated, never
+                persisted to the definition.
+
+        Returns:
+            The newly created execution with status=PENDING
+
+        Raises:
+            ExecutionNotFoundError: If the source execution is gone
+            ExecutionNotRetryableFromFailureError: If validation rejects the retry
+
+        """
+        # Re-validates the actual selection rather than trusting any earlier preview:
+        # the preview reports the default (all failed nodes) and cannot speak for a
+        # subset or for the supplied overrides.
+        try:
+            validation = await validate_retry_from_failure(
+                self.session, execution_id, retry_point_ids, input_parameter_overrides
+            )
+        except ExecutionNotFoundError:
+            self._record_retry_request(RetryKind.FROM_FAILURE.value, "rejected")
+            raise
+
+        if not validation.eligible:
+            self._record_retry_request(RetryKind.FROM_FAILURE.value, "rejected")
+            raise ExecutionNotRetryableFromFailureError(execution_id, validation.reason or "retry validation failed")
+        logger.info(
+            "Retry validation",
+            execution_id=execution_id,
+            eligible=validation.eligible,
+            eligible_point_ids=validation.eligible_point_ids,
+            override_node_ids=sorted(input_parameter_overrides or {}),
+        )
+
+        # Loaded again rather than returned by the validator, which keeps its
+        # own instance internal. The row is needed for the fields below, and the
+        # load doubles as the deletion check: deleting a project cascades to its
+        # executions, so the source can vanish between validation and here.
+        # The execution status is deliberately NOT re-checked. Validation already
+        # asserted it, and every status write in the codebase is guarded against
+        # leaving a terminal state, so a FAILED/COMPLETED_WITH_ERRORS row cannot
+        # transition before the retry is dispatched.
+        result = await self.session.exec(select(Execution).where(Execution.id == execution_id))
+        source = result.one_or_none()
+        if source is None:  # Deleted between validation and retry
+            self._record_retry_request(RetryKind.FROM_FAILURE.value, "rejected")
+            raise ExecutionNotFoundError(execution_id)
+
+        workflow_result = await self.session.exec(select(Workflow).where(Workflow.id == source.workflow_id))
+        workflow = workflow_result.one_or_none()
+        if workflow is None:
+            self._record_retry_request(RetryKind.FROM_FAILURE.value, "rejected")
+            raise ExecutionNotFoundError(execution_id)
+
+        snapshot_result = await self.session.exec(
+            select(WorkflowVersion).where(WorkflowVersion.id == source.workflow_version_id)
+        )
+        snapshot_version = snapshot_result.one_or_none()
+        if snapshot_version is None:
+            self._record_retry_request(RetryKind.FROM_FAILURE.value, "rejected")
+            raise ExecutionNotRetryableFromFailureError(execution_id, "original workflow version no longer exists")
+
+        if source.trigger_node_id is None:
+            self._record_retry_request(RetryKind.FROM_FAILURE.value, "rejected")
+            raise ExecutionNotRetryableFromFailureError(
+                execution_id, "source execution has no trigger_node_id recorded"
+            )
+        trigger_node_id = self._resolve_retry_trigger_node(
+            snapshot_version.workflow_definition,
+            source.trigger_node_id,
+            RetryKind.FROM_FAILURE,
+        )
+
+        validated_overrides = input_parameter_overrides or {}
+        logger.info(
+            "Retrying execution from failure",
+            source_execution_id=execution_id,
+            workflow_id=source.workflow_id,
+            eligible_point_ids=validation.eligible_point_ids,
+            override_node_ids=sorted(validated_overrides),
+            created_by=str(self.user.id),
+        )
+
+        recorder = get_metrics_recorder()
+        component = ComponentLabel.EXECUTION_SERVICE
+
+        try:
+            new_execution = await self._start_temporal_and_create_execution(
+                workflow=workflow,
+                workflow_version=snapshot_version,
+                input_data=source.input_data,
+                trigger_node_id=trigger_node_id,
+                recorder=recorder,
+                component=component,
+                retried_from_execution_id=source.id,
+                eligible_point_ids=validation.eligible_point_ids,
+                input_parameter_overrides=validated_overrides,
+            )
+        except Exception:
+            # Infrastructure failures are distinct from ineligible requests.
+            self._record_retry_request(RetryKind.FROM_FAILURE.value, "error")
+            raise
+
+        self._record_retry_request(RetryKind.FROM_FAILURE.value, "accepted")
+        try:
+            from syntara.audit.emitter import request_id_context_var  # noqa: PLC0415
+            from syntara.workflows.audit.retry_requested import WorkflowRetryRequestedEvent  # noqa: PLC0415
+
+            failed_step_types = await self._get_failed_step_types(self.session, execution_id)
+            node_count = (
+                len(snapshot_version.workflow_definition.get("nodes", []))
+                if snapshot_version.workflow_definition
+                else 0
+            )
+
+            AuditEventDispatcher.dispatch(
+                WorkflowRetryRequestedEvent(
+                    execution_id=new_execution.id,
+                    source_execution_id=execution_id,
+                    retry_kind=RetryKind.FROM_FAILURE.value,
+                    node_count=node_count,
+                    failed_step_types=failed_step_types,
+                    request_id=request_id_context_var.get(),
+                )
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("Failed to emit retry telemetry after persistence", exc_info=True)
+
+        return new_execution

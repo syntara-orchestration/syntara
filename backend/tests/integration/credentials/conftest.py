@@ -1,12 +1,14 @@
 """Shared fixtures for credential integration tests."""
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.authz.models import Project
+from syntara.authz.models import Project, RoleAssignment
+from syntara.authz.seed import seed_authz_data
+from syntara.core.models import User
 from syntara.credentials.models.credential_type import CredentialType
 
 
@@ -33,6 +35,24 @@ async def test_project_id(test_db_session: AsyncSession) -> str:
     await test_db_session.commit()
     await test_db_session.refresh(project)
     return str(project.id)
+
+
+@pytest_asyncio.fixture
+async def credential_project_admin(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: str,
+) -> None:
+    """Give the test user list access to the directly-created test project."""
+    await seed_authz_data(test_db_session)
+    test_db_session.add(
+        RoleAssignment(
+            principal_id=test_user.id,
+            project_id=UUID(test_project_id),
+            role_name="project-admin",
+        )
+    )
+    await test_db_session.commit()
 
 
 @pytest_asyncio.fixture
