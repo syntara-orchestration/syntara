@@ -14,7 +14,7 @@ import { parseJsonSchema } from '../../../utils/jsonSafeParse'
 import { isValidWebhookPath, normalizeWebhookPath } from '../../../utils/webhookPath'
 import type { TriggerFormData } from '../node-forms/TriggerNodeForm'
 import { TriggerNodeForm } from '../node-forms/TriggerNodeForm'
-import { outputFieldsFromSchema, outputMappingFromFields } from '../utils/subWorkflowOutputContract'
+import { outputFieldsFromSchema } from '../utils/subWorkflowOutputContract'
 
 /**
  * Deep equality check for triggers to prevent marking workflow dirty when no changes are made.
@@ -108,6 +108,13 @@ function serializeInputSchema(rawSchema: unknown): string | undefined {
   return undefined
 }
 
+function outputMappingFromUnknown(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {}
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+  )
+}
+
 function buildScheduledTrigger(data: TriggerFormData, triggerId: string, name: string): Trigger {
   const scheduleType = (data.scheduleType ?? ScheduleTypeEnum.INTERVAL) as ScheduleType
   const scheduleValueMap: Record<string, string | undefined> = { interval: data.interval, cron: data.cron }
@@ -163,10 +170,7 @@ function buildWebhookStyleTrigger(
 function buildUpdatedSubWorkflowTrigger(data: TriggerFormData, trigger: Trigger, name: string | undefined): Trigger {
   const inputSchema = parseJsonSchema(data.inputSchema)
   const outputSchema = parseJsonSchema(data.outputSchema)
-  const outputMapping =
-    data.outputFields && data.outputFields.length > 0
-      ? outputMappingFromFields(data.outputFields)
-      : (data.outputMapping ?? {})
+  const outputMapping = data.outputMapping ?? {}
 
   return {
     id: trigger.id ?? 'subworkflow_trigger',
@@ -223,14 +227,14 @@ type TriggerNodeDetailsProps = Readonly<{
 
 function buildSubWorkflowInitialData(trigger: Trigger, triggerIndex: number): TriggerFormData {
   const outputSchema = trigger.parameters?.output_schema
-  const outputMapping = trigger.parameters?.output_mapping as Record<string, string> | undefined
+  const outputMapping = outputMappingFromUnknown(trigger.parameters?.output_mapping)
   return {
     name: trigger.name,
     triggerType: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
     inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
     outputSchema: serializeInputSchema(outputSchema),
     outputFields: outputFieldsFromSchema(outputSchema, outputMapping ?? {}),
-    outputMapping: outputMapping ?? {},
+    outputMapping,
     triggerId: trigger.id,
     triggerIndex,
   }

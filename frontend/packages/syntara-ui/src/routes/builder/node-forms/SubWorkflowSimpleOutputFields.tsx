@@ -10,11 +10,19 @@ import { getStepOutputChoices } from './SubWorkflowOutputSourceOptions'
 import { SubWorkflowSimpleOutputFieldCard } from './SubWorkflowSimpleOutputFieldCard'
 import type { TriggerFormData } from './triggerFormSchema'
 
+type OutputField = NonNullable<TriggerFormData['outputFields']>[number]
+
 export function SubWorkflowSimpleOutputFields({
   triggerId,
   triggerIndex,
   isVersionView,
-}: Readonly<{ triggerId: string; triggerIndex: number; isVersionView: boolean }>) {
+  onRowsChange,
+}: Readonly<{
+  triggerId: string
+  triggerIndex: number
+  isVersionView: boolean
+  onRowsChange: (rows: OutputField[]) => void
+}>) {
   const activities = useWorkflowStore((state) => state.currentWorkflow?.workflow.activities ?? [])
   const edges = useWorkflowStore((state) => state.edges)
   const {
@@ -35,7 +43,18 @@ export function SubWorkflowSimpleOutputFields({
   }
 
   const handleAddField = () => {
-    appendOutput({ path: '', type: 'unknown', required: false, description: '', expression: '' })
+    const newField: OutputField = { path: '', type: 'unknown', required: false, description: '', expression: '' }
+    appendOutput(newField)
+    onRowsChange([...outputRows, newField])
+  }
+
+  const handleRemoveField = (index: number) => {
+    removeOutput(index)
+    onRowsChange(outputRows.filter((_row, rowIndex) => rowIndex !== index))
+  }
+
+  const handleRowChange = (index: number, nextRow: OutputField) => {
+    onRowsChange(outputRows.map((row, rowIndex) => (rowIndex === index ? nextRow : row)))
   }
 
   return (
@@ -59,7 +78,8 @@ export function SubWorkflowSimpleOutputFields({
             isVersionView={isVersionView}
             isSourceConditional={isSourceConditional}
             outputNameError={errors.outputFields?.[index]?.path?.message}
-            onRemove={() => removeOutput(index)}
+            onRowChange={(nextRow) => handleRowChange(index, nextRow)}
+            onRemove={() => handleRemoveField(index)}
           />
         )
       })}
