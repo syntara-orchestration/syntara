@@ -9,6 +9,7 @@ on:
       - '*.markdown'
       - '**/*.markdown'
       - '.github/workflows/ci-markdown-links.yml'
+      - '.github/scripts/format-markdown-link-report.mjs'
       - '.github/scripts/package.json'
       - '.github/scripts/package-lock.json'
 
