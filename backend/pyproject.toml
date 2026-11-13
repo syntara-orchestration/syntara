@@ -98,7 +98,7 @@ dev = [
     "types-python-dateutil>=2.8.0",  # type stubs for python-dateutil
     "psutil>=5.9.0",  # for memory monitoring in performance tests
     "scikit-learn-stubs>=0.0.3",  # type stubs for scikit-learn
-    "openapi-python-client>=0.28.3,<0.29.0",  # for API client code generation. 0.29+ requires typer<0.27, conflicts with our typer>=0.27.0
+    "openapi-python-client>=0.29.1,<0.29.2",  # for API client code generation. 0.29+ requires typer<0.27, conflicts with our typer>=0.27.0
     "moto[s3]>=5.0.0",  # for S3 mock testing
     "boto3-stubs[s3]>=1.35.0",  # type stubs for boto3 S3
     # MCP testing infrastructure
