@@ -2,6 +2,7 @@ import { ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import type { ActionFormData } from '../stepFormTypes'
+import { ScriptAffinityEnum } from '../utils/scriptExecutionProfile'
 
 import { buildRegistryActionInitialData, buildRegistryActivityUpdate, safeJSONReviver } from './taskStepSubmitHelpers'
 
@@ -95,6 +96,25 @@ describe('taskStepSubmitHelpers', () => {
       )
       expect(data.parameters).toBeUndefined()
     })
+
+    it('hydrates affinity and settings from execution_profile', () => {
+      const taskWithSettings: TaskActivity = {
+        ...baseTask,
+        settings: { timeout: 120 },
+      }
+      const data = buildRegistryActionInitialData(
+        ExecutorTypeEnum.SCRIPT,
+        {
+          language: 'python',
+          code: 'pass',
+          execution_profile: { type: 'execution_target', execution_target_id: 'target-1' },
+        },
+        taskWithSettings
+      )
+      expect(data.affinity).toBe(ScriptAffinityEnum.REQUIRED_TARGET)
+      expect(data.execution_target_id).toBe('target-1')
+      expect(data.settings).toEqual({ timeout: 120 })
+    })
   })
 
   describe('buildRegistryActivityUpdate', () => {
@@ -109,6 +129,43 @@ describe('taskStepSubmitHelpers', () => {
       expect(activity.type).toBe(ExecutorTypeEnum.SCRIPT)
       expect(activity.name).toBe('S')
       expect((activity.parameters as { code: string }).code).toBe('pass')
+    })
+
+    it('persists execution_profile and settings for required_target affinity', () => {
+      const data: ActionFormData = {
+        name: 'S',
+        executor: ExecutorTypeEnum.SCRIPT,
+        language: 'python',
+        code: 'pass',
+        affinity: ScriptAffinityEnum.REQUIRED_TARGET,
+        execution_target_id: 'target-1',
+        settings: { timeout: 90 },
+      }
+      const activity = buildRegistryActivityUpdate(baseTask, data)
+      expect(activity.parameters).toMatchObject({
+        execution_profile: { type: 'execution_target', execution_target_id: 'target-1' },
+      })
+      expect(activity.settings).toEqual({ timeout: 90 })
+    })
+
+    it('clears execution_profile when affinity is none', () => {
+      const taskWithProfile: TaskActivity = {
+        ...baseTask,
+        parameters: {
+          language: 'python',
+          code: 'pass',
+          execution_profile: { type: 'execution_target', execution_target_id: 'target-1' },
+        },
+      }
+      const data: ActionFormData = {
+        name: 'S',
+        executor: ExecutorTypeEnum.SCRIPT,
+        language: 'python',
+        code: 'pass',
+        affinity: ScriptAffinityEnum.NONE,
+      }
+      const activity = buildRegistryActivityUpdate(taskWithProfile, data)
+      expect(activity.parameters).not.toHaveProperty('execution_profile')
     })
 
     it('converts header entries for http_request', () => {

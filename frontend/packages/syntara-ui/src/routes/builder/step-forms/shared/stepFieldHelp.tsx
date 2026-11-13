@@ -18,6 +18,8 @@ export const stepHelp = {
   scriptLanguage: createFieldHelp('Language', T.SCRIPT_LANGUAGE_HELP),
   scriptCode: createFieldHelp('Script', T.SCRIPT_CODE_HELP),
   scriptEnvVars: createFieldHelp('Environment variables', T.SCRIPT_ENV_VARS_HELP),
+  scriptAffinity: createFieldHelp('Affinity', T.SCRIPT_AFFINITY_HELP),
+  scriptExecutionTarget: createFieldHelp('Execution target', T.SCRIPT_EXECUTION_TARGET_HELP),
   httpMethod: createFieldHelp('HTTP Method', T.HTTP_METHOD_HELP),
   httpUrl: createFieldHelp('URL', T.HTTP_URL_HELP),
   httpHeaders: createFieldHelp('Headers', T.HTTP_HEADERS_HELP),

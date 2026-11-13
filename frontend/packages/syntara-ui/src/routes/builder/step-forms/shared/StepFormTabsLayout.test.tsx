@@ -81,4 +81,63 @@ describe('StepFormTabsLayout', () => {
       expect(screen.getByRole('tab', { name: 'Settings' })).toBeInTheDocument()
     })
   })
+
+  describe('execution tab', () => {
+    it('does not render the Execution tab when executionContent is not provided', () => {
+      render(
+        <StepFormTabsLayout
+          parametersContent={<div>Parameter content</div>}
+          settingsContent={<div>Settings content</div>}
+        />
+      )
+
+      expect(screen.queryByRole('tab', { name: 'Execution' })).not.toBeInTheDocument()
+    })
+
+    it('renders tabs in Parameters, Execution, Settings order', () => {
+      render(
+        <StepFormTabsLayout
+          parametersContent={<div>Parameter content</div>}
+          executionContent={<div>Execution content</div>}
+          settingsContent={<div>Settings content</div>}
+        />
+      )
+
+      const tabs = screen.getAllByRole('tab')
+      expect(tabs.map((tab) => tab.textContent)).toEqual(['Parameters', 'Execution', 'Settings'])
+    })
+
+    it('switches to execution content when Execution tab is clicked', async () => {
+      const user = userEvent.setup()
+      render(
+        <StepFormTabsLayout
+          parametersContent={<div>Parameter content</div>}
+          executionContent={<div>Execution content</div>}
+          settingsContent={<div>Settings content</div>}
+        />
+      )
+
+      await user.click(screen.getByRole('tab', { name: 'Execution' }))
+
+      expect(screen.getByText('Execution content')).toBeInTheDocument()
+      expect(screen.queryByText('Parameter content')).not.toBeInTheDocument()
+      expect(screen.queryByText('Settings content')).not.toBeInTheDocument()
+    })
+
+    it('keeps Settings reachable after Execution when both are present', async () => {
+      const user = userEvent.setup()
+      render(
+        <StepFormTabsLayout
+          parametersContent={<div>Parameter content</div>}
+          executionContent={<div>Execution content</div>}
+          settingsContent={<div>Settings content</div>}
+        />
+      )
+
+      await user.click(screen.getByRole('tab', { name: 'Settings' }))
+
+      expect(screen.getByText('Settings content')).toBeInTheDocument()
+      expect(screen.queryByText('Execution content')).not.toBeInTheDocument()
+    })
+  })
 })
