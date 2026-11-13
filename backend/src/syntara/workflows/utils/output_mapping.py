@@ -146,7 +146,7 @@ def apply_declared_output_mapping(
             raise DeclaredOutputContractError(DeclaredOutputErrorCode.MAPPING_EXPRESSION)
 
         try:
-            value = resolver.resolve_value(expression)
+            value = resolver.resolve_value(expression.strip())
         except (KeyError, AttributeError, TypeError, IndexError):
             # Whether a missing value is acceptable is determined by the schema below.
             continue

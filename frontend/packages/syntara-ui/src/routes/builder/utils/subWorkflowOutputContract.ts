@@ -115,6 +115,25 @@ function clearRequiredProperties(schema: Record<string, unknown>): void {
   }
 }
 
+function collectRequiredObjectPaths(schema: Record<string, unknown>): string[] {
+  const paths: string[] = []
+  const visit = (current: Record<string, unknown>, prefix: string[] = [], requiredAncestors = true) => {
+    if (!isRecord(current.properties)) return
+    const requiredNames = new Set(
+      Array.isArray(current.required) ? current.required.filter((name): name is string => typeof name === 'string') : []
+    )
+    for (const [name, property] of Object.entries(current.properties)) {
+      if (!isRecord(property)) continue
+      const path = [...prefix, name]
+      const isRequired = requiredAncestors && requiredNames.has(name)
+      if (isRequired && (property.type === 'object' || isRecord(property.properties))) paths.push(path.join('.'))
+      visit(property, path, isRequired)
+    }
+  }
+  visit(schema)
+  return paths
+}
+
 function setOutputLeaf(property: Record<string, unknown>, field: SubWorkflowOutputField): void {
   const preservesInteger = field.type === 'number' && property.type === 'integer'
   if (field.type !== 'unknown' && !preservesInteger) property.type = field.type
@@ -184,11 +203,17 @@ export function outputSchemaFromFields(
   if (!isRecord(schema.properties)) schema.properties = {}
   const rootProperties = isRecord(schema.properties) ? schema.properties : {}
   schema.properties = rootProperties
+  const requiredObjectPaths = collectRequiredObjectPaths(schema)
   const validRows = getValidOutputRows(fields)
   const includedPaths = new Set(validRows.map(({ segments }) => segments.join('.')))
   pruneUnusedProperties(rootProperties, includedPaths)
   clearRequiredProperties(schema)
   const requiredByParent = addOutputRows(rootProperties, validRows)
+  for (const path of requiredObjectPaths) {
+    if (!findSchemaAtPath(schema, path)) continue
+    const segments = path.split('.')
+    segments.forEach((segment, index) => addRequiredField(requiredByParent, segments, index, segment))
+  }
   applyRequiredProperties(schema, requiredByParent)
   return Object.keys(rootProperties).length > 0 ? schema : undefined
 }

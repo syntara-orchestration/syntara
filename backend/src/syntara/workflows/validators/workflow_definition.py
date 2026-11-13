@@ -606,7 +606,10 @@ def _check_required_output_mappings(
         )
         for required_path in sorted(required_paths)
         if not any(
-            required_path == mapped_path or required_path.startswith(f"{mapped_path}.") for mapped_path in mapping_paths
+            required_path == mapped_path
+            or required_path.startswith(f"{mapped_path}.")
+            or mapped_path.startswith(f"{required_path}.")
+            for mapped_path in mapping_paths
         )
     ]
 
