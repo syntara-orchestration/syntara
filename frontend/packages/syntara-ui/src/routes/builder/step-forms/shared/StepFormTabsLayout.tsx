@@ -8,14 +8,14 @@ import { useStepFormTabBar } from './useStepFormTabBar'
 
 type StepFormTabKey = 'parameters' | 'execution' | 'settings'
 
-type StepFormTabsLayoutProps = {
+type StepFormTabsLayoutProps = Readonly<{
   parametersContent: ReactNode
   /** When provided, inserts an Execution tab between Parameters and Settings. */
   executionContent?: ReactNode
   settingsContent?: ReactNode
   /** When true, the Settings tab is not rendered. Use for step types with no configurable settings (e.g. condition, switch). */
   hideSettingsTab?: boolean
-}
+}>
 
 function tabContent(
   activeTabKey: StepFormTabKey,
