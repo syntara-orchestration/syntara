@@ -172,6 +172,43 @@ it('retries request failures separately from configuration and evaluation errors
   expect(await screen.findByText('Match', { exact: true })).toBeInTheDocument()
 })
 
+it.each([
+  ['match', 'Match'],
+  ['no_match', 'No match'],
+] as const)(
+  'hides a previous %s outcome while retesting unchanged input and after a request failure',
+  async (outcome, title) => {
+    let complete: ((value: Awaited<ReturnType<typeof filteringFetchClient.POST>>) => void) | undefined
+    const post = vi
+      .spyOn(filteringFetchClient, 'POST')
+      .mockResolvedValueOnce({ data: { outcome }, response: new Response() })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            complete = resolve
+          })
+      )
+    const user = userEvent.setup()
+    renderFilter('true')
+    await openFilterTest()
+    await user.click(screen.getByRole('button', { name: TEST_LABEL }))
+    expect(await screen.findByText(title, { exact: true })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: TEST_LABEL }))
+    expect(await screen.findByText('Testing filter…')).toBeInTheDocument()
+    expect(screen.queryByText(title, { exact: true })).not.toBeInTheDocument()
+    act(() => {
+      complete?.({
+        error: { type: 'server', title: 'Unavailable', detail: 'Try again', code: 'INTERNAL_ERROR', retryable: true },
+        response: new Response(null, { status: 500 }),
+      })
+    })
+    expect(await screen.findByText('Filter test request failed')).toBeInTheDocument()
+    expect(screen.queryByText(title, { exact: true })).not.toBeInTheDocument()
+    expect(post).toHaveBeenCalledTimes(2)
+  }
+)
+
 it.each([EXPRESSION_LABEL, SAMPLE_LABEL])('discards pending responses after changing %s', async (label) => {
   let complete: ((value: Awaited<ReturnType<typeof filteringFetchClient.POST>>) => void) | undefined
   vi.spyOn(filteringFetchClient, 'POST').mockImplementationOnce(

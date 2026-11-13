@@ -56,7 +56,7 @@ export function KafkaFilterTest({
             onRetry={() => detachPromise(testFilter())}
           />
         )}
-        {mutation.data && (
+        {mutation.isSuccess && mutation.data && (
           <Alert
             variant={mutation.data.outcome === 'evaluation_error' ? 'warning' : resultVariant}
             isInline
