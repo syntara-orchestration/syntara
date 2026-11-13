@@ -127,7 +127,7 @@ describe('ExecutionActivityTable', () => {
       expect(screen.getByTestId('activity-status-label-replayed')).toBeInTheDocument()
     })
 
-    it('does not mark a retained failure as replayed', () => {
+    it('does not mark a retained failure without output as replayed', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'failed', startedAt: T0 })]),
         order: [{ id: 'task-1', name: 'Script' }],

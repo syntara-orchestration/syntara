@@ -111,7 +111,7 @@ describe('CompactActivityList', () => {
     expect(screen.getAllByTestId('activity-status-label-replayed')).toHaveLength(1)
   })
 
-  it('does not mark a retained failure as replayed', () => {
+  it('does not mark a retained failure without output as replayed', () => {
     render(
       <CompactActivityList
         activityStates={new Map([state('task-1', { status: 'failed', startedAt: '2024-01-01T00:00:00Z' })])}

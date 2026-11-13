@@ -327,17 +327,17 @@ function getCurrentRetryPlanAnnouncement({
 }>): string {
   if (!shouldAnnounce) return ''
   if (scopeMode === 'selected' && selectedCount === 0) {
-    return 'Retry plan updated. Choose one or more branches to see the retry plan.'
+    return 'Retry plan updated. Choose one or more steps to see the retry plan.'
   }
   if (isLoading) return 'Updating the retry plan for this selection.'
 
-  const scopeLabel = scopeMode === 'all' ? 'All affected branches' : getSelectedScopeLabel(selectedCount)
+  const scopeLabel = scopeMode === 'all' ? 'All affected steps' : getSelectedScopeLabel(selectedCount)
   return getRetryPlanAnnouncement({ preview, isError, scopeLabel, visiblePoints })
 }
 
 function getSelectedScopeLabel(selectedCount: number): string {
-  if (selectedCount === 1) return '1 selected branch'
-  return `${selectedCount} selected branches`
+  if (selectedCount === 1) return '1 selected step'
+  return `${selectedCount} selected steps`
 }
 
 function getRetryPlanAnnouncement({
@@ -354,7 +354,7 @@ function getRetryPlanAnnouncement({
   if (isError) return 'Retry plan could not be updated. Change the selection or close and reopen this panel.'
   if (!preview) return 'Retry plan updated. The retry plan is unavailable.'
   if (!preview.eligible) {
-    return `Retry plan updated. ${preview.reason ?? 'The selected branches cannot be retried.'}`
+    return `Retry plan updated. ${preview.reason ?? 'The selected steps cannot be retried.'}`
   }
 
   const stepSummary = getRetryStepSummary(preview.total_step_count)

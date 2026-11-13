@@ -33,8 +33,10 @@ describe('isReplayedStep', () => {
     expect(isReplayedStep(SOURCE_RUN_END, RETRY_CREATED_AT, ACTIVITY_STATUS.COMPLETED)).toBe(true)
   })
 
-  it('does not flag a retained failure as reused output', () => {
-    expect(isReplayedStep(SOURCE_RUN_START, RETRY_CREATED_AT, ACTIVITY_STATUS.FAILED)).toBe(false)
+  it('flags a retained failure with reusable output', () => {
+    expect(
+      isReplayedStep(SOURCE_RUN_START, RETRY_CREATED_AT, ACTIVITY_STATUS.FAILED, { partial_result: 'available' })
+    ).toBe(true)
   })
 
   it('does not flag a step that failed again during the retry', () => {
