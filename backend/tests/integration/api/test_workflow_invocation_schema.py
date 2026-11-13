@@ -313,13 +313,13 @@ async def test_published_workflow_without_subworkflow_trigger_returns_empty_sche
 
 
 @pytest.mark.asyncio
-async def test_workflow_invocation_schema_includes_output_schema_and_mapping(
+async def test_workflow_invocation_schema_exposes_output_schema_without_internal_mapping(
     auth_client: AsyncClient,
     test_db_session: AsyncSession,
     test_user: User,
     test_project_id: str,
 ) -> None:
-    """Verify that output_schema and output_mapping are returned when present on SubWorkflow Triggers."""
+    """The parent receives the public schema, not internal step-to-output mappings."""
     workflow = Workflow(
         name=f"test-output-schema-{uuid4().hex[:8]}",
         created_by=test_user.id,
@@ -402,10 +402,6 @@ async def test_workflow_invocation_schema_includes_output_schema_and_mapping(
                         "release_tag": {"type": "string", "description": "Release version tag"},
                     },
                     "required": ["artifact_url"],
-                },
-                "output_mapping": {
-                    "artifact_url": "${deploy_app.artifact_url}",
-                    "release_tag": "${build_step.image_tag}",
                 },
             },
         ],

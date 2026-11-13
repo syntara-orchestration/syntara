@@ -11,7 +11,13 @@
         "type": "string",
         "maxLength": 36,
         "format": "uuid",
-        "description": "UUID of the selected child workflow in the same Project (latest published version)."
+        "description": "UUID of the selected child workflow in the same Project."
+      },
+      "workflow_version_id": {
+        "type": ["string", "null"],
+        "maxLength": 36,
+        "format": "uuid",
+        "description": "ID of the published child workflow version to invoke. Required before the parent can be published."
       },
       "trigger_node_id": {
         "type": "string",
@@ -62,7 +68,7 @@
     },
     "SubWorkflowOutputResult": {
       "type": ["object", "null"],
-      "description": "Child execution metadata for Sub-workflow steps.",
+      "description": "Child execution metadata and the declared public output contract for Sub-workflow steps.",
       "properties": {
         "child_execution_id": {
           "type": ["string", "null"],
@@ -90,12 +96,9 @@
         },
         "outputs": {
           "type": ["object", "null"],
-          "description": "Child workflow step outputs. Keys are child step IDs, values are their output data as raw objects. May be null if authorization denied.",
+          "description": "Values mapped to the selected SubWorkflow Trigger's declared public output contract. Internal child step names are not exposed.",
           "maxProperties": 1000,
-          "additionalProperties": {
-            "type": "object",
-            "additionalProperties": true
-          }
+          "additionalProperties": true
         }
       },
       "additionalProperties": false

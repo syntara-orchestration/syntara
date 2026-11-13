@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { workflowClient } from '../../../client'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
 import { useCursorPagination } from '../../../hooks/useCursorPagination'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts, type AlertMessage } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { downloadVersionExport } from '../../../utils/downloadWorkflowExport'
@@ -21,6 +21,28 @@ export function isVersionStatus(s: string): s is VersionStatus {
 }
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
+type TriggerBreakingChanges = WorkflowAPI.components['schemas']['TriggerBreakingChanges']
+
+type PendingVersionPublish = {
+  version: number
+  publishName?: string
+  changeDescription?: string
+  workflowDefinition: Record<string, unknown>
+  onSettled?: () => void
+}
+
+function downloadWorkflowVersion(
+  workflowId: string | null,
+  version: number,
+  showError: (options: AlertMessage) => void
+): void {
+  if (!workflowId) return
+  detachPromise(
+    downloadVersionExport(workflowId, version).catch((err: unknown) => {
+      showError({ title: 'Export failed', description: getErrorMessage(err) })
+    })
+  )
+}
 
 type UseVersionHistoryParams = {
   workflowId: string | null
@@ -72,7 +94,13 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
 
   const restoreMutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/versions/{version}/restore')
   const publishMutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/versions/{version}/publish')
+  const checkBreakingChangesMutation = workflowClient.useMutation(
+    'post',
+    '/workflows/{workflow_id}/versions/{version}/check-breaking-changes'
+  )
   const updateMetadataMutation = workflowClient.useMutation('patch', '/workflows/{workflow_id}/versions/{version}')
+  const [breakingChanges, setBreakingChanges] = useState<TriggerBreakingChanges[]>([])
+  const [pendingPublish, setPendingPublish] = useState<PendingVersionPublish | null>(null)
 
   const allVersions = versionsQuery.data?.resources
   const publishedVersionName = useMemo(() => resolvePublishedVersionName(allVersions), [allVersions])
@@ -88,24 +116,19 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
   )
 
   const exportVersion = useCallback(
-    (version: number) => {
-      if (!workflowId) return
-      detachPromise(
-        downloadVersionExport(workflowId, version).catch((err: unknown) => {
-          showError({ title: 'Export failed', description: getErrorMessage(err) })
-        })
-      )
-    },
+    (version: number) => downloadWorkflowVersion(workflowId, version, showError),
     [workflowId, showError]
   )
 
-  const publishVersion = useCallback(
-    (version: number, publishName?: string, changeDescription?: string) => {
-      if (!workflowId) return
+  const publishVersionNow = useCallback(
+    (pending: PendingVersionPublish) => {
       publishMutation.mutate(
         {
-          params: { path: { workflow_id: workflowId, version } },
-          body: { name: publishName ?? null, change_description: changeDescription ?? null },
+          params: { path: { workflow_id: workflowId ?? '', version: pending.version } },
+          body: {
+            name: pending.publishName ?? null,
+            change_description: pending.changeDescription ?? null,
+          },
         },
         {
           onSuccess: (data) => {
@@ -126,11 +149,69 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
           onError: (error: unknown) => {
             showError({ title: 'Failed to publish version', description: getErrorMessage(error) })
           },
+          onSettled: pending.onSettled,
         }
       )
     },
     [workflowId, publishMutation, versionsQuery, queryClient, showSuccess, showError, onVersionUpdated]
   )
+
+  const publishVersion = useCallback(
+    (version: number, publishName?: string, changeDescription?: string, onSettled?: () => void) => {
+      if (!workflowId) return
+      const workflowDefinition = allVersions?.find((item) => item.version === version)?.workflow_definition
+      if (!workflowDefinition) {
+        showError({
+          title: 'Failed to check output contract changes',
+          description: 'Version definition is unavailable',
+        })
+        return
+      }
+      const pending: PendingVersionPublish = {
+        version,
+        publishName,
+        changeDescription,
+        workflowDefinition,
+        onSettled,
+      }
+      setBreakingChanges([])
+      setPendingPublish(pending)
+      checkBreakingChangesMutation.mutate(
+        {
+          params: { path: { workflow_id: workflowId, version } },
+          body: { workflow_definition: workflowDefinition },
+        },
+        {
+          onSuccess: (response) => {
+            if (response.has_breaking_changes) {
+              setBreakingChanges(response.triggers)
+              return
+            }
+            setPendingPublish(null)
+            publishVersionNow(pending)
+          },
+          onError: (error: unknown) => {
+            setPendingPublish(null)
+            showError({ title: 'Failed to check output contract changes', description: getErrorMessage(error) })
+          },
+        }
+      )
+    },
+    [workflowId, allVersions, checkBreakingChangesMutation, publishVersionNow, showError]
+  )
+
+  const confirmPublishVersion = useCallback(() => {
+    if (!pendingPublish) return
+    const pending = pendingPublish
+    setBreakingChanges([])
+    setPendingPublish(null)
+    publishVersionNow(pending)
+  }, [pendingPublish, publishVersionNow])
+
+  const cancelBreakingChangeWarning = useCallback(() => {
+    setBreakingChanges([])
+    setPendingPublish(null)
+  }, [])
 
   const openInNewWindow = useCallback(
     (version: number) => {
@@ -172,6 +253,10 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
     exportVersion,
     openInNewWindow,
     publishVersion,
+    isPublishingVersion: publishMutation.isPending || checkBreakingChangesMutation.isPending,
+    breakingChanges,
+    confirmPublishVersion,
+    cancelBreakingChangeWarning,
     updateVersionMetadata,
     updateMetadataMutation,
     paginationFooterProps,

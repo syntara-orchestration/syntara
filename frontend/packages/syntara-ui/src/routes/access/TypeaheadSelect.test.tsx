@@ -84,6 +84,33 @@ describe('TypeaheadSelect', () => {
       expect(getInput()).toHaveValue('Alpha Option')
     })
 
+    it('uses the supplied selected label for grouped output fields', () => {
+      renderSelect({
+        options: [{ value: 'build.tag', label: 'tag', group: 'Build' }],
+        selected: 'build.tag',
+        selectedLabel: 'Build · tag',
+      })
+      expect(getInput()).toHaveValue('Build · tag')
+    })
+
+    it('groups options and requests search when grouped results exceed the threshold', async () => {
+      const user = userEvent.setup()
+      renderSelect({
+        options: [
+          { value: 'build.tag', label: 'tag', group: 'Build' },
+          { value: 'deploy.url', label: 'url', group: 'Deploy' },
+        ],
+        searchPromptThreshold: 1,
+      })
+
+      await user.click(getInput())
+      expect(screen.getByText('Type to search step and output names...')).toBeInTheDocument()
+
+      await user.type(getInput(), 'Build')
+      expect(screen.getByRole('option', { name: /tag/i })).toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: /url/i })).not.toBeInTheDocument()
+    })
+
     it('shows clear button when a value is selected', () => {
       renderSelect({ selected: 'opt-2' })
       expect(screen.getByRole('button', { name: 'Clear selection' })).toBeInTheDocument()
@@ -105,6 +132,24 @@ describe('TypeaheadSelect', () => {
       expect(screen.getByRole('option', { name: /Alpha Option/i })).toBeInTheDocument()
       expect(screen.getByRole('option', { name: /Beta Option/i })).toBeInTheDocument()
       expect(screen.getByRole('option', { name: /Gamma Option/i })).toBeInTheDocument()
+    })
+
+    it('groups related choices and prompts to search when the list is large', async () => {
+      const user = userEvent.setup()
+      renderSelect({
+        options: [
+          { value: 'build.tag', label: 'tag', group: 'Build' },
+          { value: 'deploy.url', label: 'url', group: 'Deploy' },
+        ],
+        searchPromptThreshold: 1,
+      })
+
+      await user.click(getInput())
+
+      expect(screen.getByText('Type to search step and output names...')).toBeInTheDocument()
+      await user.type(getInput(), 'Build')
+      expect(screen.getByRole('option', { name: /tag/ })).toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: /url/ })).not.toBeInTheDocument()
     })
 
     it('calls onChange with the selected value when an option is clicked', async () => {

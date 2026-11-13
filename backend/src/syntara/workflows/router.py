@@ -370,12 +370,13 @@ async def get_workflow(
 async def get_workflow_invocation_schema(
     workflow_id: UUID,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
+    version_id: UUID | None = None,
 ) -> WorkflowInvocationSchemaRead:
-    """Get the latest published Subworkflow Trigger schemas for a workflow."""
+    """Get current or pinned published Subworkflow Trigger schemas for a workflow."""
     workflow = await service.get_workflow_by_id(workflow_id)
-    if workflow.published_version_id is None:
+    if version_id is None and workflow.published_version_id is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow has no published version")
-    return await service.get_workflow_invocation_schema(workflow)
+    return await service.get_workflow_invocation_schema(workflow, version_id)
 
 
 @router.patch(

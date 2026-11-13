@@ -373,15 +373,6 @@ components:
             - type: 'null'
           title: Output Schema
           description: JSON Schema defining the outputs exposed to parent workflows. Provides encapsulation—parent sees only declared fields, not internal child step structure.
-        output_mapping:
-          anyOf:
-            - type: object
-              additionalProperties:
-                type: string
-            - type: 'null'
-          title: Output Mapping
-          description: Template expressions mapping internal step outputs to declared output fields. Keys are dotted paths from output_schema; values are template expressions (e.g., '${step.field}').
-
     WorkflowInvocationSchemaRead:
       type: object
       title: WorkflowInvocationSchemaRead
@@ -2539,7 +2530,15 @@ components:
           maxLength: 36
           format: uuid
           title: Workflow Id
-          description: UUID of the selected child workflow in the same Project (latest published version).
+          description: UUID of the selected child workflow in the same Project.
+        workflow_version_id:
+          anyOf:
+            - type: string
+              maxLength: 36
+              format: uuid
+            - type: 'null'
+          title: Workflow Version Id
+          description: ID of the published child workflow version to invoke. Required before the parent can be published.
         trigger_node_id:
           type: string
           pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
@@ -2560,14 +2559,15 @@ components:
         Parameters for Sub-workflow executor.
 
         Defines the design-time configuration for invoking a child workflow from
-        a parent workflow. The Sub-workflow step always invokes the latest published
-        version of the selected target workflow in the same Project (V1).
+        a parent workflow. The Sub-workflow step invokes the published child
+        workflow version stored in workflow_version_id.
 
         When a workflow has multiple Subworkflow Triggers, the calling step must
         select a specific trigger to invoke via the trigger_node_id field.
 
         Attributes:
             workflow_id: UUID of the selected child workflow to invoke.
+            workflow_version_id: ID of the published child version to invoke.
             trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.
             input_mapping: Mapping of child workflow input field names to values.
                 Values can be static (string, int, bool, dict, list) or template

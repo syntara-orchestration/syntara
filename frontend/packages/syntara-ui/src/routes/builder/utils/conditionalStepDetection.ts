@@ -43,12 +43,10 @@ export function isStepConditional(
   triggerIds: string[]
 ): boolean {
   // Build adjacency list for graph traversal
-  const graph = new Map<string, Set<string>>()
+  const graph = new Map<string, string[]>()
   for (const edge of edges) {
-    if (!graph.has(edge.source)) {
-      graph.set(edge.source, new Set())
-    }
-    graph.get(edge.source)!.add(edge.target)
+    const neighbors = graph.get(edge.source) ?? []
+    graph.set(edge.source, [...neighbors, edge.target])
   }
 
   // Build activity type lookup
@@ -56,35 +54,26 @@ export function isStepConditional(
 
   // BFS from triggers to find all paths to the step
   const visited = new Set<string>()
-  const queue: string[] = [...triggerIds]
-  let foundConditionalInPath = false
+  const queue = triggerIds.map((id) => ({ id, conditionalPath: false }))
+  let cursor = 0
 
-  while (queue.length > 0) {
-    const current = queue.shift()!
+  while (cursor < queue.length) {
+    const current = queue[cursor]
+    cursor += 1
+    if (!current) continue
+    const key = `${current.id}:${current.conditionalPath}`
 
-    if (visited.has(current)) continue
-    visited.add(current)
+    if (visited.has(key)) continue
+    visited.add(key)
 
-    // Check if this is a conditional node
-    const currentType = activityTypes.get(current)
-    if (currentType && CONDITIONAL_NODE_TYPES.has(currentType)) {
-      foundConditionalInPath = true
-    }
+    const currentType = activityTypes.get(current.id)
+    const conditionalPath = current.conditionalPath || Boolean(currentType && CONDITIONAL_NODE_TYPES.has(currentType))
 
-    // If we reached the target step
-    if (current === stepId) {
-      // If we found a conditional node in any path to this step, it's conditional
-      if (foundConditionalInPath) {
-        return true
-      }
-    }
+    if (current.id === stepId && conditionalPath) return true
 
-    // Add neighbors to queue
-    const neighbors = graph.get(current) ?? new Set()
+    const neighbors = graph.get(current.id) ?? []
     for (const neighbor of neighbors) {
-      if (!visited.has(neighbor)) {
-        queue.push(neighbor)
-      }
+      queue.push({ id: neighbor, conditionalPath })
     }
   }
 

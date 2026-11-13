@@ -9,6 +9,7 @@ import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { usePublishWorkflow, useUnpublishWorkflow } from './usePublishWorkflow'
 
 const mockPublishMutate = vi.fn()
+const mockCheckBreakingChangesMutate = vi.fn()
 const mockUnpublishMutate = vi.fn()
 const mockShowSuccess = vi.fn()
 const mockShowError = vi.fn()
@@ -39,6 +40,9 @@ vi.mock('../utils/workflowDefinitionBuilder', () => ({
 vi.mock('../../../client', () => ({
   workflowClient: {
     useMutation: vi.fn((_method: string, path: string) => {
+      if (path.includes('/check-breaking-changes')) {
+        return { mutate: mockCheckBreakingChangesMutate, isPending: false }
+      }
       if (path.includes('/publish')) {
         return { mutate: mockPublishMutate, isPending: false }
       }
@@ -71,6 +75,14 @@ describe('usePublishWorkflow', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockCheckBreakingChangesMutate.mockImplementation(
+      (
+        _params: unknown,
+        callbacks?: {
+          onSuccess?: (response: { has_breaking_changes: boolean; triggers: [] }) => void
+        }
+      ) => callbacks?.onSuccess?.({ has_breaking_changes: false, triggers: [] })
+    )
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   })
 
@@ -336,7 +348,7 @@ describe('usePublishWorkflow', () => {
     expect(mockMarkClean).toHaveBeenCalled()
   })
 
-  it('does not include workflow_definition when store is clean', () => {
+  it('checks the saved workflow definition before publishing when the store is clean', () => {
     vi.mocked(useWorkflowStore.getState).mockReturnValue({
       currentWorkflow: {
         workflow: { name: 'Test WF', description: 'A desc', activities: [] },
@@ -357,10 +369,54 @@ describe('usePublishWorkflow', () => {
       result.current.publish('v1.0')
     })
 
-    expect(mockBuildWorkflowDefinition).not.toHaveBeenCalled()
+    expect(mockBuildWorkflowDefinition).toHaveBeenCalledOnce()
+    expect(mockCheckBreakingChangesMutate).toHaveBeenCalledOnce()
     const publishCall = mockPublishMutate.mock.calls[0] as unknown[]
     const requestArg = publishCall[0] as { body: Record<string, unknown> }
-    expect(requestArg.body).not.toHaveProperty('workflow_definition')
+    expect(requestArg.body).toHaveProperty('workflow_definition', { built: true })
+  })
+
+  it('waits for confirmation before publishing breaking output contract changes', () => {
+    const mockWorkflow = {
+      workflow: { name: 'Test WF', description: 'A desc', activities: [] },
+      triggers: [],
+    }
+    vi.mocked(useWorkflowStore.getState).mockReturnValue({
+      currentWorkflow: mockWorkflow,
+      isDirty: true,
+      edges: [],
+      nodePositions: {},
+      _positionsUserModified: false,
+      markClean: mockMarkClean,
+    } as unknown as ReturnType<typeof useWorkflowStore.getState>)
+    mockCheckBreakingChangesMutate.mockImplementation(
+      (
+        _params: unknown,
+        callbacks?: {
+          onSuccess?: (response: {
+            has_breaking_changes: boolean
+            triggers: [{ trigger_id: string; trigger_name: string | null; changes: [] }]
+          }) => void
+        }
+      ) =>
+        callbacks?.onSuccess?.({
+          has_breaking_changes: true,
+          triggers: [{ trigger_id: 'child-trigger', trigger_name: 'Child Trigger', changes: [] }],
+        })
+    )
+
+    const { result } = renderHook(() => usePublishWorkflow({ workflowId: 'wf-123', currentVersion: 3 }), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    act(() => result.current.publish('v2'))
+
+    expect(result.current.breakingChanges).toHaveLength(1)
+    expect(mockPublishMutate).not.toHaveBeenCalled()
+
+    act(() => result.current.confirmPublish())
+
+    expect(mockPublishMutate).toHaveBeenCalledOnce()
   })
 })
 

@@ -34,7 +34,7 @@ export type ChildWorkflowSelectorProps = {
   selectedTriggerNodeId: string
   workflowError?: string
   triggerError?: string
-  onWorkflowChange: (workflowId: string | null, defaultTriggerId: string) => void
+  onWorkflowChange: (workflowId: string | null, defaultTriggerId: string, versionId: string) => void
   onTriggerChange: (triggerNodeId: string) => void
   setSearchTerm: (searchTerm: string) => void
   isLoading: boolean
@@ -374,13 +374,13 @@ export function ChildWorkflowSelector({
     const workflowId = value === undefined ? null : String(value)
     const option = options.find((candidate) => candidate.value === workflowId)
 
-    onWorkflowChange(workflowId, defaultTriggerId(option))
+    onWorkflowChange(workflowId, defaultTriggerId(option), option?.publishedVersionId ?? '')
     setFilterValue('')
     setIsOpen(false)
   }
 
   const clear = () => {
-    onWorkflowChange(null, '')
+    onWorkflowChange(null, '', '')
     setFilterValue('')
     inputRef.current?.focus()
   }

@@ -51,12 +51,24 @@ class OutputSchemaChange:
         }
 
 
-def _extract_properties_flat(schema: dict[str, Any], prefix: str = "") -> dict[str, tuple[str, bool]]:
+def _schema_type_label(schema: dict[str, Any]) -> str:
+    raw_type = schema.get("type", "unknown")
+    if isinstance(raw_type, str):
+        return raw_type
+    if isinstance(raw_type, list):
+        return " | ".join(str(value) for value in raw_type)
+    return "unknown"
+
+
+def _extract_properties_flat(
+    schema: dict[str, Any], prefix: str = "", *, required_ancestors: bool = True
+) -> dict[str, tuple[str, bool]]:
     """Extract all properties from a JSON Schema into a flat dictionary.
 
     Args:
         schema: JSON Schema object
-        prefix: Current path prefix for nested properties
+        prefix: Current dotted path prefix
+        required_ancestors: Whether every ancestor object is itself required
 
     Returns:
         Dictionary mapping field paths to (type, is_required) tuples
@@ -78,14 +90,14 @@ def _extract_properties_flat(schema: dict[str, Any], prefix: str = "") -> dict[s
             continue
 
         field_path = f"{prefix}.{field_name}" if prefix else field_name
-        field_type = field_schema.get("type", "unknown")
-        is_required = field_name in required_fields
+        field_type = _schema_type_label(field_schema)
+        is_required = required_ancestors and field_name in required_fields
 
         result[field_path] = (field_type, is_required)
 
         # Recursively process nested objects
-        if field_type == "object" and "properties" in field_schema:
-            nested = _extract_properties_flat(field_schema, prefix=field_path)
+        if isinstance(field_schema.get("properties"), dict):
+            nested = _extract_properties_flat(field_schema, prefix=field_path, required_ancestors=is_required)
             result.update(nested)
 
     return result
@@ -147,8 +159,8 @@ def detect_output_schema_breaking_changes(  # noqa: C901
     # Check for type changes
     for field_path in old_fields:
         if field_path in new_fields:
-            old_type, _ = old_fields[field_path]
-            new_type, _ = new_fields[field_path]
+            old_type, old_required = old_fields[field_path]
+            new_type, new_required = new_fields[field_path]
             if old_type != new_type:
                 changes.append(
                     OutputSchemaChange(
@@ -156,6 +168,16 @@ def detect_output_schema_breaking_changes(  # noqa: C901
                         field_path=field_path,
                         old_type=old_type,
                         new_type=new_type,
+                    )
+                )
+            if new_required and not old_required:
+                changes.append(
+                    OutputSchemaChange(
+                        change_type="required_output",
+                        field_path=field_path,
+                        old_type=old_type,
+                        new_type=new_type,
+                        description=f"Output is now required: {field_path}",
                     )
                 )
 
@@ -212,7 +234,6 @@ def detect_workflow_breaking_changes(
 
     # Check each new trigger against its old version
     for trigger_id, new_trigger in new_triggers.items():
-
         old_trigger = old_triggers.get(trigger_id)
         if old_trigger is None:
             # New trigger - no breaking changes
@@ -228,5 +249,20 @@ def detect_workflow_breaking_changes(
 
         if changes:
             result[trigger_id] = [change.to_dict() for change in changes]
+
+    for trigger_id, old_trigger in old_triggers.items():
+        if trigger_id in new_triggers:
+            continue
+        old_params = old_trigger.get("parameters", {})
+        old_output_schema = old_params.get("output_schema") if isinstance(old_params, dict) else None
+        changes = detect_output_schema_breaking_changes(old_output_schema, None)
+        changes.append(
+            OutputSchemaChange(
+                change_type="removed_trigger",
+                field_path=trigger_id,
+                description=f"Removed SubWorkflow Trigger: {trigger_id}",
+            )
+        )
+        result[trigger_id] = [change.to_dict() for change in changes]
 
     return result

@@ -9,6 +9,8 @@ const mockRefetch = vi.fn().mockResolvedValue({})
 const mockExportVersion = vi.fn()
 const mockOpenInNewWindow = vi.fn()
 const mockPublishVersion = vi.fn()
+const mockConfirmPublishVersion = vi.fn()
+const mockCancelBreakingChangeWarning = vi.fn()
 const mockHandleExitVersionView = vi.fn()
 const mockHandleConfirmRestore = vi.fn()
 
@@ -32,6 +34,10 @@ vi.mock('./useBuilderVersionHistory', () => ({
     exportVersion: mockExportVersion,
     openInNewWindow: mockOpenInNewWindow,
     publishVersion: mockPublishVersion,
+    isPublishingVersion: false,
+    breakingChanges: [],
+    confirmPublishVersion: mockConfirmPublishVersion,
+    cancelBreakingChangeWarning: mockCancelBreakingChangeWarning,
     isViewingVersion: mockIsViewingVersion,
     viewedVersionDate: mockViewedVersionDate,
     viewedVersionStatus: null,
@@ -371,7 +377,7 @@ describe('useBuilderVersionPanel', () => {
     expect(result.current.versionSidePanel.editDialog.isOpen).toBe(false)
   })
 
-  it('publishDialog.onPublish calls publishVersion and closes dialog', () => {
+  it('publishDialog.onPublish checks the contract before closing the dialog', () => {
     const { result } = renderHook(() => useBuilderVersionPanel(createParams()))
 
     act(() => {
@@ -384,7 +390,9 @@ describe('useBuilderVersionPanel', () => {
       result.current.versionSidePanel.publishDialog.onPublish('Release', 'Description')
     })
 
-    expect(mockPublishVersion).toHaveBeenCalledWith(2, 'Release', 'Description')
+    expect(mockPublishVersion).toHaveBeenCalledWith(2, 'Release', 'Description', expect.any(Function))
+    const publishCall = mockPublishVersion.mock.calls[0] as unknown as [number, string, string, () => void]
+    act(() => publishCall[3]())
     expect(result.current.versionSidePanel.publishDialog.isOpen).toBe(false)
   })
 

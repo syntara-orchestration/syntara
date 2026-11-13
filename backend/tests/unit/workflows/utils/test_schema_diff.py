@@ -109,6 +109,24 @@ class TestDetectOutputSchemaBreakingChanges:
         # New optional fields are not breaking
         assert len(changes) == 0
 
+    def test_existing_optional_output_became_required(self) -> None:
+        """Strengthening an existing optional field to required is breaking."""
+        old_schema = {
+            "type": "object",
+            "properties": {"deployment_id": {"type": "string"}},
+        }
+        new_schema = {
+            "type": "object",
+            "properties": {"deployment_id": {"type": "string"}},
+            "required": ["deployment_id"],
+        }
+
+        changes = detect_output_schema_breaking_changes(old_schema, new_schema)
+
+        assert len(changes) == 1
+        assert changes[0].change_type == "required_output"
+        assert changes[0].field_path == "deployment_id"
+
     def test_nested_field_removed(self) -> None:
         """Detect when a nested field is removed."""
         old_schema = {
@@ -139,6 +157,21 @@ class TestDetectOutputSchemaBreakingChanges:
         assert len(changes) == 1
         assert changes[0].change_type == "removed_output"
         assert changes[0].field_path == "result.code"
+
+    def test_nested_type_change_detected_without_explicit_parent_type(self) -> None:
+        """Object properties are compared even when their schema omits ``type: object``."""
+        old_schema = {
+            "type": "object",
+            "properties": {"metadata": {"properties": {"status": {"type": "string"}}}},
+        }
+        new_schema = {
+            "type": "object",
+            "properties": {"metadata": {"properties": {"status": {"type": "number"}}}},
+        }
+
+        changes = detect_output_schema_breaking_changes(old_schema, new_schema)
+
+        assert any(change.change_type == "type_change" and change.field_path == "metadata.status" for change in changes)
 
     def test_multiple_breaking_changes(self) -> None:
         """Detect multiple breaking changes at once."""

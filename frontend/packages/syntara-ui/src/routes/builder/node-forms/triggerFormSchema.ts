@@ -69,6 +69,144 @@ function validateInputSchemaJson(schemaText: string | undefined, ctx: z.Refineme
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function parseOutputSchemaJson(text: string, ctx: z.RefinementCtx): Record<string, unknown> | undefined {
+  if (text.length > 100_000) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Output schema must be 100KB or less',
+      path: ['outputSchema'],
+    })
+    return undefined
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text, safeJSONReviver) as unknown
+  } catch {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid JSON — check syntax', path: ['outputSchema'] })
+    return undefined
+  }
+  if (!isRecord(parsed) || !isRecord(parsed['properties'])) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Output schema must define an object with properties',
+      path: ['outputSchema'],
+    })
+    return undefined
+  }
+  return parsed
+}
+
+function getOutputSchemaPaths(schema: Record<string, unknown>) {
+  const paths = new Set<string>()
+  const requiredPaths = new Set<string>()
+  const visit = (current: Record<string, unknown>, prefix: string[] = [], requiredAncestors = true) => {
+    if (!isRecord(current['properties'])) return
+    const requiredNames = new Set(
+      Array.isArray(current['required'])
+        ? current['required'].filter((name): name is string => typeof name === 'string')
+        : []
+    )
+    for (const [name, rawProperty] of Object.entries(current['properties'])) {
+      if (!isRecord(rawProperty)) continue
+      const fieldPath = [...prefix, name]
+      const path = fieldPath.join('.')
+      paths.add(path)
+      const isRequired = requiredAncestors && requiredNames.has(name)
+      if (isRequired) requiredPaths.add(path)
+      visit(rawProperty, fieldPath, isRequired)
+    }
+  }
+  visit(schema)
+  return { paths, requiredPaths }
+}
+
+function validateOutputMappings(
+  outputMapping: Record<string, string>,
+  paths: Set<string>,
+  requiredPaths: Set<string>,
+  ctx: z.RefinementCtx
+) {
+  for (const [path, expression] of Object.entries(outputMapping)) {
+    if (!paths.has(path)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Mapping path "${path}" is not declared in the output schema`,
+        path: ['outputMapping', path],
+      })
+    } else if (!/^\$\{[^{}]+\}$/.test(expression.trim())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Mapping value must be a template expression such as ${step.field}',
+        path: ['outputMapping', path],
+      })
+    }
+  }
+  const mappedPaths = Object.keys(outputMapping)
+  for (const path of requiredPaths) {
+    const hasMapping = mappedPaths.some((mappedPath) => path === mappedPath || path.startsWith(`${mappedPath}.`))
+    if (!hasMapping) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Required output "${path}" needs a mapping`,
+        path: ['outputMapping', path],
+      })
+    }
+  }
+}
+
+function validateSimpleOutputNames(data: z.infer<typeof triggerFormSchemaBase>, ctx: z.RefinementCtx) {
+  if (data.triggerType !== TriggerTypeEnum.SUBWORKFLOW_TRIGGER) return
+  const allowedSegment = /^[a-zA-Z0-9_ -]+$/
+  const seenPaths = new Set<string>()
+  for (const [index, field] of (data.outputFields ?? []).entries()) {
+    const segments = field.path.split('.').map((segment) => segment.trim())
+    const path = segments.join('.')
+    if (!path) continue
+    if (segments.some((segment) => !segment || !allowedSegment.test(segment))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Use letters, numbers, spaces, underscores, or hyphens in each field name.',
+        path: ['outputFields', index, 'path'],
+      })
+    }
+    if (
+      seenPaths.has(path) ||
+      [...seenPaths].some((seenPath) => seenPath.startsWith(`${path}.`) || path.startsWith(`${seenPath}.`))
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Output names must be unique and cannot overlap a parent object path.',
+        path: ['outputFields', index, 'path'],
+      })
+    }
+    seenPaths.add(path)
+  }
+}
+
+function validateOutputContract(data: z.infer<typeof triggerFormSchemaBase>, ctx: z.RefinementCtx) {
+  if (data.triggerType !== TriggerTypeEnum.SUBWORKFLOW_TRIGGER) return
+  const text = data.outputSchema?.trim() ?? ''
+  const outputMapping = data.outputMapping ?? {}
+  if (!text) {
+    if (Object.keys(outputMapping).length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Output mappings require an output schema',
+        path: ['outputMapping'],
+      })
+    }
+    return
+  }
+  const schema = parseOutputSchemaJson(text, ctx)
+  if (!schema) return
+  const { paths, requiredPaths } = getOutputSchemaPaths(schema)
+  validateOutputMappings(outputMapping, paths, requiredPaths, ctx)
+}
+
 function validateWebhookPathFormat(webhookPath: string | undefined, ctx: z.RefinementCtx) {
   const trimmed = webhookPath?.trim() ?? ''
   const normalized = trimmed.replace(/^\/+/, '').toLowerCase()
@@ -134,6 +272,8 @@ export const triggerFormSchema = triggerFormSchemaBase.superRefine((data, ctx) =
   ) {
     validateInputSchemaJson(data.inputSchema, ctx)
   }
+  validateSimpleOutputNames(data, ctx)
+  validateOutputContract(data, ctx)
 
   if (data.triggerType === TriggerTypeEnum.SCHEDULED && data.scheduleType === ScheduleTypeEnum.INTERVAL) {
     if (!data.interval?.trim()) {

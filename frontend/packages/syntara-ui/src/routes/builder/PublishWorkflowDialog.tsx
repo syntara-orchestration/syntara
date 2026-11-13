@@ -1,4 +1,16 @@
-import { Button, Content, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import {
+  Alert,
+  Button,
+  Content,
+  Form,
+  List,
+  ListItem,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+} from '@patternfly/react-core'
+import type { WorkflowAPI } from '@syntara/contracts'
 import { format } from 'date-fns'
 import { useEffect } from 'react'
 
@@ -19,9 +31,20 @@ type PublishWorkflowDialogProps = Readonly<{
   isPublishing: boolean
   onClose: () => void
   onPublish: (publishName?: string, description?: string) => void
+  breakingChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
+  onConfirmBreakingChanges?: () => void
+  onCancelBreakingChanges?: () => void
 }>
 
-export function PublishWorkflowDialog({ isOpen, isPublishing, onClose, onPublish }: PublishWorkflowDialogProps) {
+export function PublishWorkflowDialog({
+  isOpen,
+  isPublishing,
+  onClose,
+  onPublish,
+  breakingChanges = [],
+  onConfirmBreakingChanges,
+  onCancelBreakingChanges,
+}: PublishWorkflowDialogProps) {
   const form = useSynForm({
     schema: publishWorkflowSchema,
     defaultValues: { name: '', description: '' },
@@ -40,6 +63,7 @@ export function PublishWorkflowDialog({ isOpen, isPublishing, onClose, onPublish
     const desc = data.description?.trim()
     onPublish(name || undefined, desc || undefined)
   }
+  const hasBreakingChanges = breakingChanges.length > 0
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} variant="small" aria-label="Publish workflow">
@@ -50,6 +74,23 @@ export function PublishWorkflowDialog({ isOpen, isPublishing, onClose, onPublish
           workflow runs. These triggered runs will happen in the background and can be viewed in run history. The
           previously published workflow can be viewed in version history.
         </Content>
+        {hasBreakingChanges && (
+          <Alert variant="warning" isInline title="Breaking output contract changes">
+            <Content component="p">
+              Parent workflows may rely on these outputs. Review the changes before publishing.
+            </Content>
+            {breakingChanges.map((trigger) => (
+              <section key={trigger.trigger_id}>
+                <Content component="h4">{trigger.trigger_name || trigger.trigger_id}</Content>
+                <List isPlain>
+                  {trigger.changes.map((change) => (
+                    <ListItem key={`${change.change_type}-${change.field_path}`}>{change.description}</ListItem>
+                  ))}
+                </List>
+              </section>
+            ))}
+          </Alert>
+        )}
         <Form onSubmit={handleSubmit(onSubmit)} id="publish-workflow-form">
           <SynForm form={form}>
             <SynTextField name="name" label="Version name" fieldId="publish-name" isRequired ariaLabel="Version name" />
@@ -67,14 +108,22 @@ export function PublishWorkflowDialog({ isOpen, isPublishing, onClose, onPublish
       <ModalFooter>
         <Button
           variant="primary"
-          type="submit"
-          form="publish-workflow-form"
+          type={hasBreakingChanges ? 'button' : 'submit'}
+          form={hasBreakingChanges ? undefined : 'publish-workflow-form'}
+          onClick={hasBreakingChanges ? onConfirmBreakingChanges : undefined}
           isLoading={isPublishing}
           isDisabled={isPublishing}
         >
-          Publish workflow
+          {hasBreakingChanges ? 'Publish anyway' : 'Publish workflow'}
         </Button>
-        <Button variant="link" onClick={handleClose} isDisabled={isPublishing}>
+        <Button
+          variant="link"
+          onClick={() => {
+            onCancelBreakingChanges?.()
+            handleClose()
+          }}
+          isDisabled={isPublishing}
+        >
           Cancel
         </Button>
       </ModalFooter>

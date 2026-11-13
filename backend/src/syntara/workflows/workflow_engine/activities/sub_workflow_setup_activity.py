@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
     from syntara.workflows.models.execution import Execution
+    from syntara.workflows.models.workflow_version import WorkflowVersion
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -69,7 +70,8 @@ class SubWorkflowSetupActivity:
         """Resolve child workflow and prepare execution record.
 
         Args:
-            parameters: Resolved node parameters (workflow_id, trigger_node_id, input_mapping).
+            parameters: Resolved node parameters (workflow_id, workflow_version_id,
+                trigger_node_id, input_mapping).
             parent_execution_id: Parent execution ID for lineage tracking.
             parent_node_id: Node ID of the SUB_WORKFLOW step in the parent.
             created_by_user_id: User who started the parent execution.
@@ -105,6 +107,11 @@ class SubWorkflowSetupActivity:
             msg = "Sub-workflow node is missing required 'trigger_node_id' parameter"
             raise ApplicationError(msg, type="ConfigError", non_retryable=True)
 
+        child_version_id = parameters.get("workflow_version_id")
+        if not child_version_id:
+            msg = "Sub-workflow node is missing required 'workflow_version_id' parameter"
+            raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+
         try:
             child_workflow_id = UUID(child_workflow_id_str)
         except ValueError:
@@ -132,6 +139,7 @@ class SubWorkflowSetupActivity:
             child_execution_id=child_execution_id,
             child_execution_id_str=child_execution_id_str,
             trigger_node_id=trigger_node_id,
+            child_version_id=child_version_id,
             input_mapping=parameters.get("input_mapping", {}),
             parent_execution_id=parent_execution_id,
             parent_node_id=parent_node_id,
@@ -147,6 +155,7 @@ class SubWorkflowSetupActivity:
         child_execution_id: UUID,
         child_execution_id_str: str,
         trigger_node_id: str,
+        child_version_id: str | None,
         input_mapping: dict[str, Any],
         parent_execution_id: str,
         parent_node_id: str,
@@ -154,12 +163,9 @@ class SubWorkflowSetupActivity:
         created_by_uuid: UUID,
         current_depth: int,
     ) -> dict[str, Any]:
-        from sqlmodel import select  # noqa: PLC0415
-
         from syntara.workflows.exceptions import WorkflowNotPublishedError  # noqa: PLC0415
         from syntara.workflows.models.execution import Execution, ExecutionStatus  # noqa: PLC0415
         from syntara.workflows.models.workflow import Workflow  # noqa: PLC0415
-        from syntara.workflows.models.workflow_version import WorkflowVersion  # noqa: PLC0415
         from syntara.workflows.utils.workflow_metadata import (  # noqa: PLC0415
             build_workflow_metadata,
             resolve_user_display_name,
@@ -187,23 +193,21 @@ class SubWorkflowSetupActivity:
         if resume_result is not None:
             return resume_result
 
-        # New invocation: resolve the currently-published version, validate it, and
-        # create the child execution pinned to that version.
+        # New invocation: honor the version stored in the parent definition.
         async with self._session_factory() as session:
-            result = await session.exec(
-                select(Workflow, WorkflowVersion)
-                .join(WorkflowVersion, WorkflowVersion.id == Workflow.published_version_id)  # type: ignore[arg-type]
-                .where(Workflow.id == child_workflow_id)
-            )
-            row = result.first()
-            if row is None:
+            child_workflow = await session.get(Workflow, child_workflow_id)
+            if child_workflow is None:
                 raise ApplicationError(
                     str(WorkflowNotPublishedError(child_workflow_id)),
                     type="WorkflowNotPublishedError",
                     non_retryable=True,
                 )
-
-            child_workflow, child_version = row
+            child_version = await self._get_published_child_version(
+                session,
+                child_workflow_id=child_workflow_id,
+                child_published_version_id=child_workflow.published_version_id,
+                workflow_version_id=child_version_id,
+            )
 
             await self._assert_child_in_parent_project(
                 session,
@@ -228,7 +232,7 @@ class SubWorkflowSetupActivity:
             child_wf_name = child_workflow.name
             child_wf_id = child_workflow.id
             child_wf_project_id = child_workflow.project_id
-            child_version_id = child_version.id
+            resolved_child_version_id = child_version.id
             child_version_number = child_version.version
             workflow_def = child_version.workflow_definition
             now = datetime.now(UTC)
@@ -247,14 +251,14 @@ class SubWorkflowSetupActivity:
                 created_by=created_by_user_id,
                 created_by_user_id=created_by_user_id,
                 created_at=now.isoformat(),
-                workflow_version_id=child_version_id,
+                workflow_version_id=resolved_child_version_id,
             )
             child_metadata["sub_workflow_depth"] = current_depth + 1
 
             execution = Execution(
                 id=child_execution_id,
                 workflow_id=child_wf_id,
-                workflow_version_id=child_version_id,
+                workflow_version_id=resolved_child_version_id,
                 project_id=child_wf_project_id,
                 temporal_workflow_id=temporal_workflow_id,
                 status=ExecutionStatus.PENDING,
@@ -294,6 +298,42 @@ class SubWorkflowSetupActivity:
             "child_workflow_name": child_wf_name,
             "child_workflow_version": child_version_number,
         }
+
+    @staticmethod
+    async def _get_published_child_version(
+        session: AsyncSession,
+        *,
+        child_workflow_id: UUID,
+        child_published_version_id: UUID | None,
+        workflow_version_id: str | None,
+    ) -> WorkflowVersion:
+        """Load the pinned version and ensure it belongs to this child and was published."""
+        from sqlmodel import select  # noqa: PLC0415
+
+        from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent  # noqa: PLC0415
+        from syntara.workflows.models.workflow_version import WorkflowVersion  # noqa: PLC0415
+
+        try:
+            version_uuid = UUID(str(workflow_version_id))
+        except (TypeError, ValueError):
+            msg = "Invalid workflow_version_id format for sub-workflow reference"
+            raise ApplicationError(msg, type="ConfigError", non_retryable=True) from None
+
+        version = await session.get(WorkflowVersion, version_uuid)
+        if version is None or version.workflow_id != child_workflow_id:
+            msg = "The pinned child workflow version is no longer available. Update the Sub-workflow step."
+            raise ApplicationError(msg, type="WorkflowVersionMissingError", non_retryable=True)
+        if version.id != child_published_version_id:
+            publish_event = await session.exec(
+                select(WorkflowPublishEvent.id).where(
+                    WorkflowPublishEvent.version_id == version.id,
+                    WorkflowPublishEvent.action == PublishAction.PUBLISHED,
+                )
+            )
+            if publish_event.first() is None:
+                msg = "The pinned child workflow version was never published. Update the Sub-workflow step."
+                raise ApplicationError(msg, type="WorkflowVersionNotPublishedError", non_retryable=True)
+        return version
 
     async def _assert_child_in_parent_project(
         self,

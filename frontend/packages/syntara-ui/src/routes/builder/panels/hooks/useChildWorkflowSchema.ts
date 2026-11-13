@@ -139,10 +139,10 @@ function buildChildStepSchemas(
   ]
 }
 
-function useInvocationSchemaQuery(workflowId: string | null) {
+function useInvocationSchemaQuery(workflowId: string | null, workflowVersionId: string | null) {
   return useQuery({
-    queryKey: invocationSchemaQueryKey(workflowId ?? ''),
-    queryFn: () => fetchInvocationSchema(workflowId ?? ''),
+    queryKey: invocationSchemaQueryKey(workflowId ?? '', workflowVersionId),
+    queryFn: () => fetchInvocationSchema(workflowId ?? '', workflowVersionId),
     enabled: Boolean(workflowId),
   })
 }
@@ -202,15 +202,16 @@ function isSchemaLoading({
  */
 export function useChildWorkflowSchema({
   workflowId,
+  workflowVersionId,
   triggerNodeId,
-}: Readonly<{ workflowId: string | null; triggerNodeId: string | null }>) {
+}: Readonly<{ workflowId: string | null; workflowVersionId?: string | null; triggerNodeId: string | null }>) {
   const queryClient = useQueryClient()
   const {
     data: invocationSchema,
     error: invocationSchemaError,
     isFetching: isFetchingInvocationSchema,
     refetch: refetchInvocationSchema,
-  } = useInvocationSchemaQuery(workflowId)
+  } = useInvocationSchemaQuery(workflowId, workflowVersionId ?? null)
 
   const eligibleTriggers = invocationSchema?.triggers ?? []
   const selectedTriggerNodeId = getSelectedTriggerNodeId(eligibleTriggers, triggerNodeId)
@@ -241,20 +242,20 @@ export function useChildWorkflowSchema({
   const retry = useCallback(() => {
     detachPromise(
       (async () => {
-        const latestInvocation = await refetchInvocationSchema()
-        const latestSchema = latestInvocation.data
-        if (latestInvocation.error || !latestSchema || !workflowId) return
+        const selectedInvocation = await refetchInvocationSchema()
+        const selectedSchema = selectedInvocation.data
+        if (selectedInvocation.error || !selectedSchema || !workflowId) return
 
-        const latestTriggerNodeId = getSelectedTriggerNodeId(latestSchema.triggers, triggerNodeId)
-        if (!shouldLoadPublishedDefinition(workflowId, latestSchema, latestTriggerNodeId)) return
+        const selectedTriggerNodeId = getSelectedTriggerNodeId(selectedSchema.triggers, triggerNodeId)
+        if (!shouldLoadPublishedDefinition(workflowId, selectedSchema, selectedTriggerNodeId)) return
 
-        const latestVersionId = latestSchema.published_version_id
-        const latestVersion = latestSchema.published_version
-        if (!latestVersionId || latestVersion == null) return
+        const selectedVersionId = selectedSchema.published_version_id
+        const selectedVersion = selectedSchema.published_version
+        if (!selectedVersionId || selectedVersion == null) return
 
         await queryClient.fetchQuery({
-          queryKey: childWorkflowVersionQueryKey(workflowId, latestVersionId, latestVersion),
-          queryFn: () => fetchChildWorkflowVersion(workflowId, latestVersion),
+          queryKey: childWorkflowVersionQueryKey(workflowId, selectedVersionId, selectedVersion),
+          queryFn: () => fetchChildWorkflowVersion(workflowId, selectedVersion),
           staleTime: 5 * 60 * 1000,
         })
       })()

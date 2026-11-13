@@ -268,7 +268,13 @@ export function BuilderContent(props: BuilderContentProps) {
     dispatch,
   })
 
-  const { publish: onPublish, isPublishing } = usePublishWorkflow({
+  const {
+    publish: onPublish,
+    isPublishing,
+    breakingChanges,
+    confirmPublish,
+    cancelBreakingChangeWarning,
+  } = usePublishWorkflow({
     workflowId,
     currentVersion,
     workflowName,
@@ -599,6 +605,9 @@ export function BuilderContent(props: BuilderContentProps) {
                   publishedVersionId={workflow?.published_version_id ?? null}
                   currentVersionId={workflow?.version?.id}
                   isPublishing={isPublishing}
+                  breakingChanges={breakingChanges}
+                  onConfirmPublish={confirmPublish}
+                  onCancelBreakingChanges={cancelBreakingChangeWarning}
                   ProjectSelector={ProjectSelector}
                   dispatch={dispatch}
                   markDirty={markDirty}

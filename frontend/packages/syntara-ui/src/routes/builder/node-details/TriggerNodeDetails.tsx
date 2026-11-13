@@ -12,9 +12,9 @@ import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import type { Trigger } from '../../../stores/workflowStoreTypes'
 import { parseJsonSchema } from '../../../utils/jsonSafeParse'
 import { isValidWebhookPath, normalizeWebhookPath } from '../../../utils/webhookPath'
-import { outputFieldsFromSchema, outputMappingFromFields } from '../utils/subWorkflowOutputContract'
 import type { TriggerFormData } from '../node-forms/TriggerNodeForm'
 import { TriggerNodeForm } from '../node-forms/TriggerNodeForm'
+import { outputFieldsFromSchema, outputMappingFromFields } from '../utils/subWorkflowOutputContract'
 
 /**
  * Deep equality check for triggers to prevent marking workflow dirty when no changes are made.
@@ -160,59 +160,58 @@ function buildWebhookStyleTrigger(
   }
 }
 
+function buildUpdatedSubWorkflowTrigger(data: TriggerFormData, trigger: Trigger, name: string | undefined): Trigger {
+  const inputSchema = parseJsonSchema(data.inputSchema)
+  const outputSchema = parseJsonSchema(data.outputSchema)
+  const outputMapping =
+    data.outputFields && data.outputFields.length > 0
+      ? outputMappingFromFields(data.outputFields)
+      : (data.outputMapping ?? {})
+
+  return {
+    id: trigger.id ?? 'subworkflow_trigger',
+    type: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
+    name: name ?? 'Workflow Trigger',
+    parameters: {
+      ...(inputSchema && { input_schema: inputSchema }),
+      ...(outputSchema && { output_schema: outputSchema }),
+      ...(Object.keys(outputMapping).length > 0 && { output_mapping: outputMapping }),
+    },
+  }
+}
+
 function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: string | undefined): Trigger {
-  if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER) {
-    const inputSchema = parseJsonSchema(data.inputSchema)
-    return {
-      id: trigger.id ?? 'manual_trigger',
-      type: TriggerTypeEnum.MANUAL_TRIGGER,
-      name: name ?? 'Manual Trigger',
-      parameters: {
-        ...(inputSchema && { input_schema: inputSchema }),
-      },
+  switch (data.triggerType) {
+    case TriggerTypeEnum.MANUAL_TRIGGER: {
+      const inputSchema = parseJsonSchema(data.inputSchema)
+      return {
+        id: trigger.id ?? 'manual_trigger',
+        type: TriggerTypeEnum.MANUAL_TRIGGER,
+        name: name ?? 'Manual Trigger',
+        parameters: { ...(inputSchema && { input_schema: inputSchema }) },
+      }
     }
+    case TriggerTypeEnum.SCHEDULED:
+      return buildScheduledTrigger(data, trigger.id ?? 'scheduled_trigger', name ?? 'Scheduled Trigger')
+    case TriggerTypeEnum.WEBHOOK_TRIGGER:
+      return buildWebhookStyleTrigger(
+        data,
+        trigger.id ?? 'webhook_trigger',
+        name ?? 'Webhook Trigger',
+        TriggerTypeEnum.WEBHOOK_TRIGGER
+      )
+    case TriggerTypeEnum.EDA_TRIGGER:
+      return buildWebhookStyleTrigger(
+        data,
+        trigger.id ?? 'eda_trigger',
+        name ?? 'EDA Trigger',
+        TriggerTypeEnum.EDA_TRIGGER
+      )
+    case TriggerTypeEnum.SUBWORKFLOW_TRIGGER:
+      return buildUpdatedSubWorkflowTrigger(data, trigger, name)
+    default:
+      throw new Error('Invalid trigger type')
   }
-  if (data.triggerType === TriggerTypeEnum.SCHEDULED) {
-    return buildScheduledTrigger(data, trigger.id ?? 'scheduled_trigger', name ?? 'Scheduled Trigger')
-  }
-  if (data.triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER) {
-    return buildWebhookStyleTrigger(
-      data,
-      trigger.id ?? 'webhook_trigger',
-      name ?? 'Webhook Trigger',
-      TriggerTypeEnum.WEBHOOK_TRIGGER
-    )
-  }
-  if (data.triggerType === TriggerTypeEnum.EDA_TRIGGER) {
-    return buildWebhookStyleTrigger(
-      data,
-      trigger.id ?? 'eda_trigger',
-      name ?? 'EDA Trigger',
-      TriggerTypeEnum.EDA_TRIGGER
-    )
-  }
-  if (data.triggerType === TriggerTypeEnum.SUBWORKFLOW_TRIGGER) {
-    const inputSchema = parseJsonSchema(data.inputSchema)
-    const outputSchema = parseJsonSchema(data.outputSchema)
-
-    // Build output_mapping from either outputFields (Simple mode) or outputMapping (Advanced mode)
-    const outputMapping =
-      data.outputFields && data.outputFields.length > 0
-        ? outputMappingFromFields(data.outputFields)
-        : (data.outputMapping ?? {})
-
-    return {
-      id: trigger.id ?? 'subworkflow_trigger',
-      type: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
-      name: name ?? 'Workflow Trigger',
-      parameters: {
-        ...(inputSchema && { input_schema: inputSchema }),
-        ...(outputSchema && { output_schema: outputSchema }),
-        ...(Object.keys(outputMapping).length > 0 && { output_mapping: outputMapping }),
-      },
-    }
-  }
-  throw new Error('Invalid trigger type')
 }
 
 type TriggerNodeDetailsProps = Readonly<{
@@ -222,81 +221,82 @@ type TriggerNodeDetailsProps = Readonly<{
   onHeaderContentChange?: (content: ReactNode | null) => void
 }>
 
+function buildSubWorkflowInitialData(trigger: Trigger, triggerIndex: number): TriggerFormData {
+  const outputSchema = trigger.parameters?.output_schema
+  const outputMapping = trigger.parameters?.output_mapping as Record<string, string> | undefined
+  return {
+    name: trigger.name,
+    triggerType: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
+    inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
+    outputSchema: serializeInputSchema(outputSchema),
+    outputFields: outputFieldsFromSchema(outputSchema, outputMapping ?? {}),
+    outputMapping: outputMapping ?? {},
+    triggerId: trigger.id,
+    triggerIndex,
+  }
+}
+
+function buildScheduledInitialData(trigger: Trigger): TriggerFormData | undefined {
+  const scheduleType = (trigger.parameters?.schedule_type as string) ?? ScheduleTypeEnum.INTERVAL
+  const timezone = trigger.parameters?.timezone as string | undefined
+  const missedSchedulePolicy = trigger.parameters?.missed_schedule_policy as MissedSchedulePolicy | undefined
+  if (scheduleType === ScheduleTypeEnum.INTERVAL) {
+    return {
+      name: trigger.name,
+      triggerType: TriggerTypeEnum.SCHEDULED,
+      scheduleType: ScheduleTypeEnum.INTERVAL,
+      interval: trigger.parameters?.interval as string | undefined,
+      timezone,
+      missedSchedulePolicy,
+    }
+  }
+  if (scheduleType === ScheduleTypeEnum.CRON) {
+    return {
+      name: trigger.name,
+      triggerType: TriggerTypeEnum.SCHEDULED,
+      scheduleType: ScheduleTypeEnum.CRON,
+      cron: trigger.parameters?.cron as string | undefined,
+      timezone,
+      missedSchedulePolicy,
+    }
+  }
+  return undefined
+}
+
+function buildWebhookInitialData(trigger: Trigger): TriggerFormData {
+  return {
+    name: trigger.name,
+    triggerType: trigger.type,
+    webhookPath: (trigger.parameters?.webhook_path as string) ?? '',
+    inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
+    authorizedServiceAccountIds: (trigger.parameters?.authorized_service_account_ids as string[] | undefined) ?? [],
+  }
+}
+
+function buildInitialTriggerData(trigger: Trigger, triggerIndex: number): TriggerFormData {
+  if (trigger.type === TriggerTypeEnum.MANUAL_TRIGGER) {
+    return {
+      name: trigger.name,
+      triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
+      inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
+    }
+  }
+  if (trigger.type === TriggerTypeEnum.SUBWORKFLOW_TRIGGER) return buildSubWorkflowInitialData(trigger, triggerIndex)
+  if (trigger.type === TriggerTypeEnum.SCHEDULED) {
+    const scheduledData = buildScheduledInitialData(trigger)
+    if (scheduledData) return scheduledData
+  }
+  if (WEBHOOK_TRIGGER_TYPES.has(trigger.type)) return buildWebhookInitialData(trigger)
+  return { name: trigger.name, triggerType: TriggerTypeEnum.MANUAL_TRIGGER }
+}
+
 export function TriggerNodeDetails({ trigger, triggerIndex, onClose, onHeaderContentChange }: TriggerNodeDetailsProps) {
   const { showError } = useAlerts()
   // Use action accessor - component won't re-render when store state changes
   const { updateTrigger } = useWorkflowStoreActions()
 
   // Extract initial data from trigger — memoized to avoid new object refs on re-render
-  const initialData = useMemo((): TriggerFormData => {
-    if (trigger.type === TriggerTypeEnum.MANUAL_TRIGGER) {
-      return {
-        name: trigger.name,
-        triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
-        inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
-      }
-    }
-
-    if (trigger.type === TriggerTypeEnum.SUBWORKFLOW_TRIGGER) {
-      const outputSchema = trigger.parameters?.output_schema
-      const outputMapping = trigger.parameters?.output_mapping as Record<string, string> | undefined
-
-      return {
-        name: trigger.name,
-        triggerType: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
-        inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
-        outputSchema: serializeInputSchema(outputSchema),
-        outputFields: outputFieldsFromSchema(outputSchema, outputMapping ?? {}),
-        outputMapping: outputMapping ?? {},
-        triggerId: trigger.id,
-        triggerIndex,
-      }
-    }
-
-    if (trigger.type === TriggerTypeEnum.SCHEDULED) {
-      const scheduleType = (trigger.parameters?.schedule_type as string) ?? ScheduleTypeEnum.INTERVAL
-      const timezone = trigger.parameters?.timezone as string | undefined
-      const missedSchedulePolicy = trigger.parameters?.missed_schedule_policy as MissedSchedulePolicy | undefined
-
-      if (scheduleType === ScheduleTypeEnum.INTERVAL) {
-        return {
-          name: trigger.name,
-          triggerType: TriggerTypeEnum.SCHEDULED,
-          scheduleType: ScheduleTypeEnum.INTERVAL,
-          interval: trigger.parameters?.interval as string | undefined,
-          timezone,
-          missedSchedulePolicy,
-        }
-      }
-
-      if (scheduleType === ScheduleTypeEnum.CRON) {
-        return {
-          name: trigger.name,
-          triggerType: TriggerTypeEnum.SCHEDULED,
-          scheduleType: ScheduleTypeEnum.CRON,
-          cron: trigger.parameters?.cron as string | undefined,
-          timezone,
-          missedSchedulePolicy,
-        }
-      }
-    }
-
-    if (WEBHOOK_TRIGGER_TYPES.has(trigger.type)) {
-      return {
-        name: trigger.name,
-        triggerType: trigger.type,
-        webhookPath: (trigger.parameters?.webhook_path as string) ?? '',
-        inputSchema: serializeInputSchema(trigger.parameters?.input_schema),
-        authorizedServiceAccountIds: (trigger.parameters?.authorized_service_account_ids as string[] | undefined) ?? [],
-      }
-    }
-
-    // Default fallback
-    return {
-      name: trigger.name,
-      triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
-    }
-  }, [trigger])
+  const initialData = useMemo(() => buildInitialTriggerData(trigger, triggerIndex), [trigger, triggerIndex])
 
   const handleSubmit = (data: TriggerFormData) => {
     try {

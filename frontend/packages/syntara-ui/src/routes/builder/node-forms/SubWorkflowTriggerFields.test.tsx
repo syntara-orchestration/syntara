@@ -2,8 +2,8 @@ import { render, screen } from '@testing-library/react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { TriggerFormData } from './triggerFormSchema'
 import { SubWorkflowTriggerFields } from './SubWorkflowTriggerFields'
+import type { TriggerFormData } from './triggerFormSchema'
 
 // Mock the code editor to avoid Monaco setup in tests
 vi.mock('../components/ExpandableCodeEditor', () => ({

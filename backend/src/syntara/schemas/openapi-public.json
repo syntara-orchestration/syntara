@@ -37082,7 +37082,7 @@
     "/workflows/{workflow_id}/invocation_schema": {
       "get": {
         "summary": "Get workflow invocation schema",
-        "description": "Get the latest published Subworkflow Trigger schemas for a workflow.",
+        "description": "Get current or pinned published Subworkflow Trigger schemas for a workflow.",
         "operationId": "get_workflow_invocation_schema",
         "tags": [
           "Workflows"
@@ -37106,6 +37106,16 @@
               "format": "uuid",
               "title": "Workflow Id"
             }
+          },
+          {
+            "name": "version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Published child version ID whose Subworkflow Trigger schemas should be returned."
           }
         ],
         "responses": {
@@ -38113,6 +38123,206 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PublishWorkflowVersionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/bad-request",
+                  "title": "Bad Request",
+                  "detail": "The request was malformed or contained invalid parameters",
+                  "code": "BAD_REQUEST",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/unauthorized",
+                  "title": "Unauthorized",
+                  "detail": "Authentication is required to access this resource",
+                  "code": "UNAUTHORIZED",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/forbidden",
+                  "title": "Forbidden",
+                  "detail": "You do not have permission to access this resource",
+                  "code": "FORBIDDEN",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/not-found",
+                  "title": "Resource Not Found",
+                  "detail": "No resource exists with the provided identifier",
+                  "code": "NOT_FOUND",
+                  "retryable": false,
+                  "instance": "/api/v1/workflows"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/conflict",
+                  "title": "Conflict",
+                  "detail": "The request conflicts with the current state of the resource",
+                  "code": "CONFLICT",
+                  "retryable": false
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/validation-error",
+                  "title": "Validation Error",
+                  "detail": "Field 'name' must be between 1 and 255 characters",
+                  "code": "VALIDATION_ERROR",
+                  "retryable": false,
+                  "instance": "/api/v1/workflows"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/rate-limited",
+                  "title": "Too Many Requests",
+                  "detail": "Rate limit exceeded. Try again in 60 seconds.",
+                  "code": "RATE_LIMITED",
+                  "retryable": true
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorData"
+                },
+                "example": {
+                  "type": "https://api.example.com/errors/internal-error",
+                  "title": "Internal Server Error",
+                  "detail": "An unexpected error occurred",
+                  "code": "INTERNAL_ERROR",
+                  "retryable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workflows/{workflow_id}/versions/{version}/check-breaking-changes": {
+      "post": {
+        "summary": "Check for breaking changes before publishing",
+        "description": "Check for breaking changes in SubWorkflow output schemas.\n\nCompares the new workflow definition against the currently published version\nto detect breaking changes such as:\n- Removed outputs\n- Type changes\n- New required outputs\n\nThis endpoint should be called before publishing to warn users about\nbreaking changes that may affect parent workflows.\n",
+        "operationId": "check_breaking_changes",
+        "tags": [
+          "Workflows"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-app-permission": {
+          "resource": "workflow",
+          "action": "read"
+        },
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Workflow Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Version"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkflowValidateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Breaking changes detection result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BreakingChangesResponse"
                 }
               }
             }
@@ -51235,6 +51445,19 @@
             "type": "object",
             "additionalProperties": true,
             "title": "Input Schema"
+          },
+          "output_schema": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Schema",
+            "description": "JSON Schema defining the outputs exposed to parent workflows. Provides encapsulation—parent sees only declared fields, not internal child step structure."
           }
         }
       },
@@ -51629,6 +51852,110 @@
             ],
             "title": "Expected Version",
             "description": "Version the client was editing. If the server's current_version is higher, returns 409 Conflict."
+          }
+        }
+      },
+      "BreakingChange": {
+        "type": "object",
+        "title": "BreakingChange",
+        "description": "A single breaking change detected in an output schema.\n\nAttributes:\n    change_type: Type of breaking change (removed_output, type_change, new_required_output)\n    field_path: Dotted path to the affected field\n    old_type: Previous field type (for type changes)\n    new_type: New field type (for type changes and new required outputs)\n    description: Human-readable description",
+        "required": [
+          "change_type",
+          "field_path",
+          "description"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "change_type": {
+            "type": "string",
+            "title": "Change Type"
+          },
+          "field_path": {
+            "type": "string",
+            "title": "Field Path"
+          },
+          "old_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Type"
+          },
+          "new_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Type"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        }
+      },
+      "TriggerBreakingChanges": {
+        "type": "object",
+        "title": "TriggerBreakingChanges",
+        "description": "Breaking changes for a single SubWorkflow Trigger.\n\nAttributes:\n    trigger_id: ID of the trigger node\n    trigger_name: Name of the trigger (if available)\n    changes: List of breaking changes detected for this trigger",
+        "required": [
+          "trigger_id",
+          "changes"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "trigger_id": {
+            "type": "string",
+            "title": "Trigger Id"
+          },
+          "trigger_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Name"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BreakingChange"
+            },
+            "title": "Changes"
+          }
+        }
+      },
+      "BreakingChangesResponse": {
+        "type": "object",
+        "title": "BreakingChangesResponse",
+        "description": "Response containing all detected breaking changes.\n\nAttributes:\n    has_breaking_changes: True if any breaking changes were detected\n    triggers: List of triggers with breaking changes",
+        "required": [
+          "has_breaking_changes",
+          "triggers"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "has_breaking_changes": {
+            "type": "boolean",
+            "title": "Has Breaking Changes"
+          },
+          "triggers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TriggerBreakingChanges"
+            },
+            "title": "Triggers"
           }
         }
       },
@@ -53917,7 +54244,21 @@
             "maxLength": 36,
             "format": "uuid",
             "title": "Workflow Id",
-            "description": "UUID of the selected child workflow in the same Project (latest published version)."
+            "description": "UUID of the selected child workflow in the same Project."
+          },
+          "workflow_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36,
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Version Id",
+            "description": "ID of the published child workflow version to invoke. Required before the parent can be published."
           },
           "trigger_node_id": {
             "type": "string",
@@ -53939,7 +54280,7 @@
           "trigger_node_id"
         ],
         "title": "SubWorkflowExecutorParameters",
-        "description": "Parameters for Sub-workflow executor.\n\nDefines the design-time configuration for invoking a child workflow from\na parent workflow. The Sub-workflow step always invokes the latest published\nversion of the selected target workflow in the same Project (V1).\n\nWhen a workflow has multiple Subworkflow Triggers, the calling step must\nselect a specific trigger to invoke via the trigger_node_id field.\n\nAttributes:\n    workflow_id: UUID of the selected child workflow to invoke.\n    trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.\n    input_mapping: Mapping of child workflow input field names to values.\n        Values can be static (string, int, bool, dict, list) or template\n        expressions (${step_id.field.path})."
+        "description": "Parameters for Sub-workflow executor.\n\nDefines the design-time configuration for invoking a child workflow from\na parent workflow. The Sub-workflow step invokes the published child\nworkflow version stored in workflow_version_id.\n\nWhen a workflow has multiple Subworkflow Triggers, the calling step must\nselect a specific trigger to invoke via the trigger_node_id field.\n\nAttributes:\n    workflow_id: UUID of the selected child workflow to invoke.\n    workflow_version_id: ID of the published child version to invoke.\n    trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.\n    input_mapping: Mapping of child workflow input field names to values.\n        Values can be static (string, int, bool, dict, list) or template\n        expressions (${step_id.field.path})."
       },
       "ConditionNodeParameters": {
         "properties": {
