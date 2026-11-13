@@ -1,7 +1,8 @@
 import type { WorkflowAPI } from '@syntara/contracts'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
+import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { BuilderAction } from '../builderReducer'
 import type { EdgeConnection } from '../types/edge'
 import { DEFAULT_WORKFLOW_NAME } from '../utils/workflowNaming'
@@ -9,6 +10,12 @@ import { DEFAULT_WORKFLOW_NAME } from '../utils/workflowNaming'
 import { useBuilderWorkflowLifecycle } from './useBuilderWorkflowLifecycle'
 
 type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
+
+const verifySilentMock = vi.hoisted(() => vi.fn())
+vi.mock('../useWorkflowVerification', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../useWorkflowVerification')>()),
+  useWorkflowVerification: () => ({ handleVerifySilent: verifySilentMock }),
+}))
 
 const processExistingWorkflowMock = vi.hoisted(() =>
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- stub ignores input; tests override via mockImplementationOnce
@@ -160,6 +167,62 @@ describe('useBuilderWorkflowLifecycle', () => {
       })
     })
   })
+
+  it.each(['reload', 'first save'])(
+    'restores saved draft findings after %s initializes the workflow',
+    async (scenario) => {
+      const workflow: WorkflowWithVersion = {
+        id: 'wf-1',
+        name: 'Kafka draft',
+        current_version: 1,
+        is_enabled: true,
+        has_validation_issues: true,
+        project_id: 'project-1',
+        created_by: { id: 'user-1', name: 'User', type: 'user' },
+        created_at: '2026-11-13T00:00:00Z',
+        updated_at: '2026-11-13T00:00:00Z',
+        version: {
+          id: 'version-1',
+          workflow_id: 'wf-1',
+          version: 1,
+          schema_version: '2.0.0',
+          created_by: { id: 'user-1', name: 'User', type: 'user' },
+          created_at: '2026-11-13T00:00:00Z',
+          updated_at: '2026-11-13T00:00:00Z',
+          workflow_definition: { nodes: [] },
+        },
+      }
+      const dispatch = vi.fn<(action: BuilderAction) => void>()
+      const loadWorkflowWithEdges = useWorkflowStore.getState().loadWorkflowWithEdges
+      const savedProps = createDeps({ workflow, dispatch, loadWorkflowWithEdges })
+      const { rerender } = renderHook((props) => useBuilderWorkflowLifecycle(props), {
+        initialProps:
+          scenario === 'first save'
+            ? { ...savedProps, workflow: undefined, workflowId: null, isNew: true }
+            : savedProps,
+      })
+      if (scenario === 'first save') {
+        await waitFor(() =>
+          expect(dispatch).toHaveBeenCalledWith({
+            type: 'INIT_WORKFLOW',
+            payload: { name: DEFAULT_WORKFLOW_NAME, description: 'New workflow' },
+          })
+        )
+        act(() => useWorkflowStore.getState().setValidationErrorCount(3))
+        rerender(savedProps)
+      }
+
+      await waitFor(() =>
+        expect(dispatch).toHaveBeenCalledWith({
+          type: 'INIT_WORKFLOW',
+          payload: { name: 'processed', description: 'd', initialViewVersion: undefined },
+        })
+      )
+      expect(useWorkflowStore.getState().validationErrorCount).toBeGreaterThan(0)
+      expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'SET_VALIDATION_ERRORS', source: 'save' }))
+      expect(verifySilentMock).toHaveBeenCalledWith(undefined, [expect.objectContaining({ severity: 'error' })])
+    }
+  )
 
   it('syncs INIT_WORKFLOW from workflow metadata when editing', async () => {
     processExistingWorkflowMock.mockImplementationOnce((wf: WorkflowWithVersion) => ({

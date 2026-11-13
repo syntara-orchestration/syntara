@@ -3,10 +3,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, type Dispatch } from 'react'
 
 import { workflowClient } from '../../../client'
+import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { detachPromise } from '../../../utils/detachPromise'
-import type { BuilderAction } from '../builderReducer'
+import type { BuilderAction, ValidationError } from '../builderReducer'
 import type { EdgeConnection } from '../types/edge'
+import { extractValidationErrors, useWorkflowVerification } from '../useWorkflowVerification'
 import { processExistingWorkflow } from '../utils/processExistingWorkflow'
 import { WORKFLOWS_LIST_PARAMS_FOR_DEFAULT_NAME } from '../utils/workflowListQuery'
 import { DEFAULT_WORKFLOW_NAME, getNextDefaultWorkflowName } from '../utils/workflowNaming'
@@ -50,6 +52,7 @@ export function useBuilderWorkflowLifecycle(options: {
   } = options
 
   const queryClient = useQueryClient()
+  const { handleVerifySilent } = useWorkflowVerification({ dispatch })
 
   const hasLoadedRef = useRef(false)
   const prevWorkflowIdRef = useRef(workflowId)
@@ -97,9 +100,35 @@ export function useBuilderWorkflowLifecycle(options: {
         loadWorkflowWithEdges(flattenedWorkflow, generatedEdges, nodePositions, workflow.project_id ?? null)
         dispatch({ type: 'INIT_WORKFLOW', payload: { ...initPayload, initialViewVersion } })
         hasLoadedRef.current = true
+        if (workflow.has_validation_issues) {
+          // GET retains the issue flag but omits findings. Keep actions gated
+          // while restoring the details from the loaded definition.
+          const findings = extractValidationErrors(workflow)
+          const errors: ValidationError[] = findings?.length
+            ? findings
+            : [
+                {
+                  message: 'This saved workflow has validation issues. Verify the workflow to view details.',
+                  nodeId: null,
+                  severity: 'error',
+                },
+              ]
+          dispatch({ type: 'SET_VALIDATION_ERRORS', payload: errors, source: 'save' })
+          useWorkflowStore.getState().setValidationErrorCount(errors.length)
+          if (!findings?.length) handleVerifySilent(undefined, errors)
+        }
       })
     }
-  }, [isNew, workflow, workflowId, loadWorkflowWithEdges, workflowsListResources, dispatch, initialViewVersion])
+  }, [
+    isNew,
+    workflow,
+    workflowId,
+    loadWorkflowWithEdges,
+    workflowsListResources,
+    dispatch,
+    initialViewVersion,
+    handleVerifySilent,
+  ])
 
   useEffect(() => {
     if (!workflow || isNew || hasLoadedRef.current || workflow.id !== workflowId) {
