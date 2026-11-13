@@ -66,7 +66,7 @@ class CredentialResolveCommandHandler:
 
 
 class CredentialResolveWorkloadCommandHandler:
-    """Resolve one credential for the active work item named by its parent command."""
+    """Resolve one credential for the active work item identified by work_item_id."""
 
     async def _load_activity(self, session: AsyncSession, work_item_id: UUID) -> ActivityExecution | None:
         """Load the activity and its execution/workflow version in one query."""
@@ -132,11 +132,10 @@ class CredentialResolveWorkloadCommandHandler:
         context: AOCommandContext,
     ) -> HandlingResult:
         """Resolve a credential only after validating its work-item binding."""
+        del message
         if not isinstance(payload, CredentialResolveWorkload):
             raise ProtocolConflict
-        work_item_id = message.command.parent_command_id
-        if work_item_id is None:
-            raise ProtocolConflict
+        work_item_id = payload.work_item_id
         activity = await self._load_activity(context.session, work_item_id)
         if activity is None:
             raise CommandResourceNotFoundError

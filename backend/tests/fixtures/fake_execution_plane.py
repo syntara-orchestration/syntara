@@ -36,10 +36,10 @@ class FakeExecutionPlaneHttpClient:
         """Execute the shared work command and return its receipt."""
         payload = WorkExecute.model_validate(message.command.payload)
         result, status = await execute_fixture_script(payload.model_dump(mode="json"))
-        self.work_items[message.command_id] = {"id": str(message.command_id), "status": status, "result": result}
+        self.work_items[payload.work_item_id] = {"id": str(payload.work_item_id), "status": status, "result": result}
         return TransportReceipt(
             message_id=message.message_id,
-            resource=ResourceReference(kind="work_item", resource_id=message.command_id),
+            resource=ResourceReference(kind="work_item", resource_id=payload.work_item_id),
         )
 
     async def get_work_item(self, *, work_item_id: UUID) -> dict[str, Any]:

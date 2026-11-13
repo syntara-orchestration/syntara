@@ -944,7 +944,12 @@ components:
           type: string
           format: uuid
           title: Id
-          description: Work item unique identifier
+          description: Caller-assigned work item identifier
+        metadata:
+          additionalProperties: true
+          type: object
+          title: Metadata
+          description: Non-secret caller-owned context retained with this work item. Execution Plane does not interpret these values for identity, authorization, placement, or lifecycle decisions.
         status:
           $ref: '#/components/schemas/WorkItemStatus'
           description: Work item lifecycle status

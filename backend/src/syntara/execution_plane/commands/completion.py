@@ -95,16 +95,10 @@ class CompletionCommandHandler:
     async def handle(
         self, message: MessageEnvelope, payload: CommandPayload, context: AOCommandContext
     ) -> HandlingResult:
-        """Complete or fail the activity addressed by the originating command."""
+        """Complete or fail the activity addressed by the work-item identifier."""
         if not isinstance(payload, Completion):
             raise ProtocolConflict
-        work_id = message.command.parent_command_id
-        if work_id is None:
-            raise ProtocolConflict
-        if payload.resource is not None and (
-            payload.resource.kind != "work_item" or payload.resource.resource_id != work_id
-        ):
-            raise ProtocolConflict
+        work_id = payload.work_item_id
 
         delivered = await self._complete_activity(
             context=context,
@@ -116,7 +110,8 @@ class CompletionCommandHandler:
             raise CommandResourceNotFoundError
         logger.info(
             "Delivered Execution Plane completion command",
-            command_id=str(message.command_id),
+            work_item_id=str(work_id),
+            message_id=str(message.message_id),
             status=payload.status,
         )
         resource = ResourceReference(kind="work_item", resource_id=work_id)

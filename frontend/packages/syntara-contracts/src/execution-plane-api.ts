@@ -380,9 +380,16 @@ export interface components {
       /**
        * Id
        * Format: uuid
-       * @description Work item unique identifier
+       * @description Caller-assigned work item identifier
        */
       id: string
+      /**
+       * Metadata
+       * @description Non-secret caller-owned context retained with this work item. Execution Plane does not interpret these values for identity, authorization, placement, or lifecycle decisions.
+       */
+      metadata?: {
+        [key: string]: unknown
+      }
       /** @description Work item lifecycle status */
       status: components['schemas']['WorkItemStatus']
       /**

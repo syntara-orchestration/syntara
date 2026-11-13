@@ -7,7 +7,6 @@ from uuid import uuid4
 import httpx
 import pytest
 from execution_plane_client.commands.control import Completion, CompletionStatus
-from execution_plane_client.protocol import ResourceReference
 from fastapi import FastAPI, Request, Response
 
 from syntara.core.config.base import get_settings
@@ -42,12 +41,11 @@ def completion():
     return Completion(
         status=CompletionStatus.COMPLETED,
         result={"output": {"stdout": "ok"}},
-        resource=ResourceReference(kind="work_item", resource_id=work_id),
+        work_item_id=work_id,
     ).to_message(
         source_id="execution-plane",
         destination_id="syntara-orchestration",
         client_id="syntara-orchestration",
-        parent_command_id=work_id,
     )
 
 
@@ -82,7 +80,7 @@ async def test_completion_command_resolves_temporal_activity_and_acknowledges(ca
     assert response.json()["message_id"] == str(message.message_id)
     assert response.json()["received"] is True
     assert response.json()["resource"]["kind"] == "work_item"
-    assert response.json()["resource"]["resource_id"] == str(message.command.parent_command_id)
+    assert response.json()["resource"]["resource_id"] == message.command.payload["work_item_id"]
     validate.assert_called_once()
     if outcome is CompletionStatus.COMPLETED:
         temporal.complete_async_activity.assert_awaited_once_with(
@@ -116,18 +114,31 @@ async def test_completion_rejects_wrong_participant(callback, field):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "invalid", ["parent", "resource", "resource_kind", "revision", "type", "unknown_type", "status", "result"]
+    "invalid",
+    [
+        "missing_work",
+        "invalid_work",
+        "legacy_parent",
+        "resource",
+        "revision",
+        "type",
+        "unknown_type",
+        "status",
+        "result",
+    ],
 )
 async def test_completion_rejects_invalid_correlation_or_command(callback, invalid):
     app, temporal, _ = callback
     body = completion().model_dump(mode="json")
     command = body["command"]
-    if invalid == "parent":
-        command["parent_command_id"] = None
+    if invalid == "missing_work":
+        del command["payload"]["work_item_id"]
+    elif invalid == "invalid_work":
+        command["payload"]["work_item_id"] = None
+    elif invalid == "legacy_parent":
+        command["parent_command_id"] = str(uuid4())
     elif invalid == "resource":
-        command["payload"]["resource"]["resource_id"] = str(uuid4())
-    elif invalid == "resource_kind":
-        command["payload"]["resource"]["kind"] = "cluster"
+        command["payload"]["resource"] = {"kind": "work_item", "resource_id": str(uuid4())}
     elif invalid == "status":
         command["payload"]["status"] = "running"
     elif invalid == "result":
@@ -135,10 +146,10 @@ async def test_completion_rejects_invalid_correlation_or_command(callback, inval
     elif invalid == "unknown_type":
         command["command_type"] = "unknown.command"
     elif invalid == "revision":
-        command["command_revision"] = 2
+        command["command_revision"] = 1
     else:
-        command["command_type"] = "command.cancel"
-        command["payload"] = {"target_command_id": str(uuid4())}
+        command["command_type"] = "work.cancel"
+        command["payload"] = {"work_item_id": str(uuid4())}
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=body)
     assert response.status_code == 422
@@ -156,14 +167,14 @@ async def test_completion_missing_activity_remains_retryable(callback):
 
 
 @pytest.mark.asyncio
-async def test_completion_without_resource_uses_parent_command_id(callback):
+async def test_completion_metadata_cannot_redirect_activity_or_result(callback):
     app, temporal, _ = callback
     message = completion()
     body = message.model_dump(mode="json")
-    body["command"]["payload"].pop("resource")
+    body["command"]["payload"]["metadata"] = {"activity_execution_id": str(uuid4()), "project_id": str(uuid4())}
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=body)
     assert response.status_code == 200, response.text
     assert response.json()["resource"]["kind"] == "work_item"
-    assert response.json()["resource"]["resource_id"] == str(message.command.parent_command_id)
+    assert response.json()["resource"]["resource_id"] == message.command.payload["work_item_id"]
     temporal.complete_async_activity.assert_awaited_once()

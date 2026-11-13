@@ -48,7 +48,9 @@ class _FakeExecutionPlaneClient:
 
 
 @pytest.fixture
-def ep_submission(test_execution: Execution) -> Generator[AsyncMock, None, None]:
+def ep_submission(
+    test_execution: Execution, test_db_session_factory: async_sessionmaker[AsyncSession]
+) -> Generator[AsyncMock, None, None]:
     """Accept EP work without creating its AO activity row."""
     info = Mock(
         workflow_id=test_execution.temporal_workflow_id,
@@ -57,6 +59,7 @@ def ep_submission(test_execution: Execution) -> Generator[AsyncMock, None, None]
     )
     with (
         patch.object(dispatch.activity, "info", return_value=info),
+        patch.object(dispatch, "AsyncSessionLocal", test_db_session_factory),
         patch.object(dispatch, "ExecutionPlaneHttpClient"),
         patch.object(dispatch, "_submit_and_read_work", return_value={"status": "pending"}) as submission,
     ):
@@ -80,7 +83,7 @@ async def test_monitor_and_dispatch_share_identity_in_either_order(
     assert (
         await dispatch._dispatch_to_ep({"language": "bash", "code": "echo ok"}, None, test_execution.id, None) is None
     )
-    work_id = ep_submission.call_args.args[1].command_id
+    work_id = UUID(ep_submission.call_args.args[1].command.payload["work_item_id"])
     assert work_id == uuid5(test_execution.id, _NODE_ID)
 
     temporal = AsyncMock()
@@ -126,7 +129,7 @@ async def test_monitor_updates_row_created_after_dispatch(
     ep_submission: AsyncMock,
 ) -> None:
     await dispatch._dispatch_to_ep({"language": "bash", "code": "echo ok"}, None, test_execution.id, None)
-    work_id = ep_submission.call_args.args[1].command_id
+    work_id = UUID(ep_submission.call_args.args[1].command.payload["work_item_id"])
     monitor = ActivitySyncService(Mock(), test_db_session_factory, AsyncMock())
     metadata = await monitor._initialize_monitoring(test_execution.id)
     now = datetime.now(UTC)
@@ -182,7 +185,12 @@ async def test_dispatch_moves_credential_bindings_out_of_inputs(
 
     await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None)
     second_message = ep_submission.call_args.args[1]
-    assert second_message.command_id == first_message.command_id
+    assert second_message.message_id != first_message.message_id
+    assert payload.metadata == {
+        "execution_id": str(test_execution.id),
+        "project_id": str(test_execution.project_id),
+        "workflow_id": str(test_execution.workflow_id),
+    }
     assert second_message.command.payload == first_message.command.payload
 
 
