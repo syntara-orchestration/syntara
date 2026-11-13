@@ -37,6 +37,7 @@ async def processing(
         await session.flush()
         context.snapshot = SubscriptionSnapshot.from_models(subscription, source)
     preparation, admission = AsyncMock(), AsyncMock()
+    admission.lookup_execution.return_value = None
     admission.recover_accepted.return_value = None
     service = EventRecordProcessingService(context.session_factory, preparation, admission)
     identity = context.identity()
@@ -75,6 +76,8 @@ async def test_cel_skips_leave_no_execution_or_audit_rows(
 ) -> None:
     context = preparation_context
     service, preparation, admission, event = await processing(context, expression)
+    sessions = Mock(side_effect=AssertionError("Local filter outcomes must not open a database session"))
+    service._sessions = sessions
     log = Mock()
     monkeypatch.setattr(module, "logger", log)
     result = await service.process(context.snapshot, context.identity(), event.model_copy(update={"value": value}))
@@ -84,7 +87,9 @@ async def test_cel_skips_leave_no_execution_or_audit_rows(
     async with context.session_factory() as session:
         assert await session.get(Execution, context.identity().execution_id) is None
         assert not (await session.exec(select(AuditOutboxRecord))).all()
-    admission.recover_accepted.assert_awaited_once_with(context.identity())
+    sessions.assert_not_called()
+    admission.lookup_execution.assert_not_awaited()
+    admission.recover_accepted.assert_not_awaited()
     preparation.prepare_delivery.assert_not_awaited()
     admission.schedule.assert_not_awaited()
     (log.error if code else log.info).assert_called_once()

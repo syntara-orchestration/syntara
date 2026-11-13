@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Literal, Protocol
 from pydantic import Field
 
 from syntara.eventstreams.core.deduplication import DeliveryIdentity, DeliveryValue
+from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.core.results import EventDecodeFailure
 from syntara.filtering.models.result import FilterErrorCode
 
@@ -89,3 +90,4 @@ class HeldRecord(DeliveryValue):
     reason: str = Field(min_length=1, max_length=100, pattern=r"^[a-z][a-z0-9_]*$")
     retry_at: datetime | None = None
     permanent_content_error: bool = False
+    handoff: PreparedExecution | None = None

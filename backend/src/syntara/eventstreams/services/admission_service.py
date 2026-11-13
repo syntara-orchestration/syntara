@@ -55,13 +55,23 @@ class EventAdmissionService:
             circuit_open=False,
         )
 
-    async def recover_accepted(self, identity: DeliveryIdentity) -> SchedulingResult | None:
-        """Read Execution first, then recover original signed Temporal arguments."""
+    async def lookup_execution(self, identity: DeliveryIdentity) -> SchedulingResult | None:
+        """Reuse a retained Execution without making a preliminary Temporal call."""
         try:
             async with self._sessions() as session, session.begin():
                 terminal = await EventExecutionStore(session).lookup(identity)
-            if terminal is not None:
-                return ResolvedDelivery(terminal=terminal)
+            return ResolvedDelivery(terminal=terminal) if terminal is not None else None
+        except _STORAGE_ERRORS:
+            return self._storage_failed()
+        except (TypeError, ValueError):
+            return BlockedDelivery(error_code=SchedulingFailureCode.EVIDENCE_MISMATCH)
+
+    async def recover_accepted(self, identity: DeliveryIdentity) -> SchedulingResult | None:
+        """Recover an unfinished handoff using original signed Temporal arguments."""
+        existing = await self.lookup_execution(identity)
+        if existing is not None:
+            return existing
+        try:
             accepted = await self._launcher.lookup(identity)
             return await self._confirm(accepted.preparation(), accepted.acceptance)
         except EventLaunchError as exc:
