@@ -2,7 +2,9 @@ import { type ExecutionStatus, ExecutionStatusEnum } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { useFeatureFlag } from '../../../providers/use-feature-flag'
 import { detachPromise } from '../../../utils/detachPromise'
+import { useRunDetailsPanelExpand } from '../../executions/hooks/useRunDetailsPanelExpand'
 import { useExecutionWebSocket } from '../../workflows/hooks/useExecutionWebSocket'
 import { useExecutionStore } from '../../workflows/stores/useExecutionStore'
 
@@ -26,6 +28,8 @@ type UseBuilderLiveRunPanelResult = {
   handleMostRecentNodeSelect: (nodeId: string, nodeName: string) => void
   handleMostRecentDeselectNode: () => void
   handleCloseMostRecentRunPanel: () => void
+  isPanelExpanded: boolean
+  panelExpandControl?: ReturnType<typeof useRunDetailsPanelExpand>['panelExpandControl']
 }
 
 const MIN_PANEL_HEIGHT = 100
@@ -43,6 +47,12 @@ export function useBuilderLiveRunPanel({
   const [mostRecentSelectedNodeId, setMostRecentSelectedNodeId] = useState<string | null>(null)
   const [mostRecentSelectedNodeName, setMostRecentSelectedNodeName] = useState<string | null>(null)
   const [mostRecentPanelHeight, setMostRecentPanelHeight] = useState(300)
+  const isWorkflowBuilderQolEnabled = useFeatureFlag('workflow_builder_qol')
+  const { isPanelExpanded, panelExpandControl } = useRunDetailsPanelExpand(
+    mostRecentPanelHeight,
+    setMostRecentPanelHeight,
+    isWorkflowBuilderQolEnabled
+  )
 
   const prevExecutionIdRef = useRef<string | null | undefined>(null)
 
@@ -110,5 +120,7 @@ export function useBuilderLiveRunPanel({
     handleMostRecentNodeSelect,
     handleMostRecentDeselectNode,
     handleCloseMostRecentRunPanel: onClosePanel,
+    isPanelExpanded,
+    panelExpandControl,
   }
 }

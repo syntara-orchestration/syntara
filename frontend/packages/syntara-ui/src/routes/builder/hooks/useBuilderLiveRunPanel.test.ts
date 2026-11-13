@@ -25,6 +25,10 @@ vi.mock('../../workflows/stores/useExecutionStore', () => ({
 }))
 
 const mockInvalidateQueries = vi.fn()
+vi.mock('../../../providers/use-feature-flag', () => ({
+  useFeatureFlag: () => false,
+}))
+
 vi.mock('@tanstack/react-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-query')>()
   return {

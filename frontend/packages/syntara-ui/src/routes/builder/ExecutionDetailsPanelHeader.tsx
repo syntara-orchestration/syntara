@@ -19,6 +19,10 @@ import type React from 'react'
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
+import {
+  RunDetailsPanelExpandButton,
+  type RunDetailsPanelExpandControl,
+} from '../executions/RunDetailsPanelExpandButton'
 
 import { StatusLabel } from './ExecutionStatus'
 
@@ -40,6 +44,7 @@ type HeaderMetadataProps = {
   onViewModeChange: (mode: ViewMode) => void
   headerLabel?: string
   onClosePanel?: () => void
+  panelExpandControl?: RunDetailsPanelExpandControl
 }
 
 export function HeaderMetadata({
@@ -50,6 +55,7 @@ export function HeaderMetadata({
   onViewModeChange,
   headerLabel,
   onClosePanel,
+  panelExpandControl,
 }: Readonly<HeaderMetadataProps>) {
   const startDisplay = execution.started_at ?? execution.created_at
 
@@ -108,6 +114,11 @@ export function HeaderMetadata({
                   </FlexItem>
                 )}
               </Flex>
+            </FlexItem>
+          )}
+          {panelExpandControl && (
+            <FlexItem>
+              <RunDetailsPanelExpandButton {...panelExpandControl} />
             </FlexItem>
           )}
           {onClosePanel && (
