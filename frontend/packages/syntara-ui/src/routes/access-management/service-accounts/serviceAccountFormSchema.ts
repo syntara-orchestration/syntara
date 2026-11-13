@@ -16,7 +16,6 @@ export const createServiceAccountSchema = z.object({
       'Use lowercase letters, numbers, and hyphens only. Must start and end with a letter or number.'
     ),
   description: z.string().max(2000, 'Description must be 2000 characters or fewer').optional().nullable(),
-  project_id: z.string().uuid('Select a project'),
 })
 
 export type CreateServiceAccountFormData = z.infer<typeof createServiceAccountSchema>

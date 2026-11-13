@@ -623,18 +623,33 @@ describe('AssignRoleModal', () => {
   })
 
   describe('Service account principal type', () => {
-    it('defaults to project scope for service_account', async () => {
+    it('defaults to system scope for service_account', async () => {
       await renderModal({ principalType: 'service_account', principalId: 'sa-1' })
 
-      // Project selector should be visible (scope defaults to 'project')
-      expect(screen.getByRole('button', { name: 'Select a project...' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'System' })).toBeInTheDocument()
     })
 
-    it('hides scope selector for service_account', async () => {
+    it('shows scope selector for service_account', async () => {
       await renderModal({ principalType: 'service_account', principalId: 'sa-1' })
 
-      // Scope form group should not be present
-      expect(screen.queryByText('Scope')).not.toBeInTheDocument()
+      expect(screen.getByText('Scope')).toBeInTheDocument()
+    })
+
+    it('assigns a system role to a service account', async () => {
+      const user = userEvent.setup()
+      mockMutateAsync.mockResolvedValue({})
+
+      await renderModal({ principalType: 'service_account', principalId: 'sa-1' })
+
+      await user.click(screen.getByPlaceholderText('Search for roles...'))
+      await user.click(screen.getByRole('option', { name: /admin-role/i }))
+      await user.click(screen.getByRole('button', { name: /Assign role/i }))
+
+      await waitFor(() => {
+        expect(mockMutateAsync).toHaveBeenCalledWith({
+          body: { principal_id: 'sa-1', role_name: 'admin-role' },
+        })
+      })
     })
 
     it('assigns project SA role on submit', async () => {
@@ -642,6 +657,9 @@ describe('AssignRoleModal', () => {
       mockMutateAsync.mockResolvedValue({})
 
       await renderModal({ principalType: 'service_account', principalId: 'sa-1' })
+
+      await user.click(screen.getByRole('button', { name: 'System' }))
+      await user.click(screen.getByRole('option', { name: 'Project' }))
 
       // Select a project
       const projectToggle = screen.getByRole('button', { name: 'Select a project...' })

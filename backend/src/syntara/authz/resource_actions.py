@@ -108,17 +108,21 @@ def validate_own_scope_actions(statements: list[dict[str, Any]]) -> str | None:
     """Validate that 'own' scope is only used with actions that resolve ownership.
 
     The 'own' scope checks resource.metadata.created_by == user.id, which requires
-    the corresponding PermissionChecker to wire owner_field. Currently only
-    credential:update wires owner_field="created_by".
+    the corresponding PermissionChecker to wire owner_field. Checkers wiring
+    owner_field today: credential:update, project:update, and the service-account
+    resource-scoped checkers (read/update/delete/disable/enable/rotate_secret).
 
-    Actions like read/delete/use/decide/revoke would be valid semantically (they
-    operate on existing resources), but their checkers don't populate created_by
-    metadata, so an '*:action:own' policy for those actions would silently deny
-    all requests. Reject them upfront instead of fail-silent.
+    Actions like create would be invalid semantically (the resource doesn't
+    exist yet), and actions whose checkers don't populate created_by metadata
+    would silently deny all requests — an '*:action:own' policy for those
+    actions should be rejected upfront instead of fail-silent.
 
     Returns a descriptive error string, or ``None`` if valid.
     """
-    # Only actions whose PermissionChecker wires owner_field today
+    # Conservative action-level allowlist (not pair-aware): 'update' checkers
+    # wire owner_field universally. Other owner_field-wired actions
+    # (service-account read/delete/disable/enable) stay excluded until this
+    # validation derives pairs from route introspection.
     valid_own_actions = {"update"}
 
     for stmt in statements:

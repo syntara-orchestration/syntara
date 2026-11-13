@@ -133,7 +133,7 @@ class PermissionChecker:
 
     async def _resolve_project_from_resource(self, db: AsyncSession, resource_id: str) -> str:
         """Look up project name from a resource's project_id field."""
-        if not self.resource_model or not resource_id:
+        if not self.resource_model or not resource_id or not hasattr(self.resource_model, "project_id"):
             return ""
         model = self.resource_model
         try:

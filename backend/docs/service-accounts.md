@@ -32,6 +32,18 @@ Service accounts reuse the same JWT signing infrastructure as human authenticati
 - **Token validation** — same middleware validates signatures and checks `exp`
 - **Global revocation** — the global revocation timestamp applies to service account tokens (see [Global Token Revocation](authentication.md#global-token-revocation))
 
+## Independent identities and upgrade
+
+A service account is an identity identified by its UUID, independent of any project. Its optional `project_id` records where it was created; it does not scope its access or grant project administrators control over the account. Signed-in human users can create and read service accounts. `created_by` is immutable and does not grant additional management rights. System administrators manage accounts and credentials; system auditors retain read-only access. Explicit deny policies still take precedence.
+
+Accounts receive no roles at creation and do not inherit the human authenticated group. Authorized callers may explicitly grant system roles (including administrator) and project roles in multiple projects. Project administrators control grants within their projects; a role grant gives them no control over the account or its credentials. Creators gain no additional authority to assign or revoke roles. Anyone holding an account's credentials can exercise all its grants, including system administrator.
+
+Creation through Access Management remains projectless. The workflow builder may include its current project as creation context. Clients may omit `project_id`; if supplied, it must name an existing project. The value cannot be changed after creation and becomes null if that project is deleted. Do not use it as an authorization or visibility filter. Use `/service_accounts/directory` for selectors and account-specific `/authz/can_i` checks for management actions. Directory results are not authorization decisions. Existing duplicate-name behavior is unchanged; always use UUIDs as identity.
+
+Migration `17f894482da7` keeps existing `project_id` values, makes the field nullable, and changes its foreign key to `ON DELETE SET NULL`. IDs, credentials, token versions, existing project/system grants, and trigger bindings are preserved; it does not backfill roles or rotate secrets. Downgrade is blocked while any projectless service account exists.
+
+Deleting a project removes its workflows and role grants while preserving accounts, credentials, and access to other projects.
+
 ## Data Model
 
 ### `service_accounts` table
@@ -44,7 +56,7 @@ The `ServiceAccount` model (`src/syntara/service_accounts/models/service_account
 | `name` | VARCHAR(255) | Human-readable name |
 | `description` | VARCHAR(2000) | Optional description |
 | `status` | CHECK constraint (`active`, `disabled`) | Operational status |
-| `project_id` | UUID (FK → `projects`) | Project namespace for resource isolation |
+| `project_id` | UUID (nullable FK → `projects`, `ON DELETE SET NULL`) | Optional creation context; not an access boundary |
 | `token_version` | INT, default 0 | Incremented on disable to invalidate issued tokens |
 | `last_authenticated_at` | TIMESTAMPTZ, nullable | Timestamp of the most recent successful authentication |
 | `created_by` | UUID (FK → `principals`) | User who created the service account |
@@ -56,7 +68,7 @@ The `ServiceAccount` model (`src/syntara/service_accounts/models/service_account
 **Indexes:**
 
 - `ix_service_accounts_created_at_id` — composite index for cursor-based pagination
-- Individual indexes on `status`, `project_id`, `name`, `created_by`, `updated_by`
+- Individual indexes on `status`, `name`, `project_id`, `created_by`, `updated_by`
 
 **Audit level:** `META` — audit events capture metadata fields only.
 
@@ -126,12 +138,13 @@ Secrets are hashed with **Argon2id** using the same `hash_password` / `verify_pa
 
 ### Service account endpoints
 
-All endpoints live under `/api/v1/service_accounts`. Project scoping is enforced via `project_id` in the request body (create) and `VisibilityFilter` (list). All endpoints use `PermissionChecker` per action.
+All endpoints live under `/api/v1/service_accounts`. Management checks use system permissions and honor explicit denies. The list and detail endpoints return full service-account metadata to users with `service_account:read:any`.
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/service_accounts` | Create a service account |
-| `GET` | `/service_accounts` | List service accounts (paginated, filterable, project-scoped) |
+| `GET` | `/service_accounts` | List readable service accounts (paginated, filterable) |
+| `GET` | `/service_accounts/directory` | Searchable, paginated directory for signed-in users; returns only ID, name, status |
 | `GET` | `/service_accounts/{service_account_id}` | Get service account details |
 | `PATCH` | `/service_accounts/{service_account_id}` | Update name and/or description |
 | `DELETE` | `/service_accounts/{service_account_id}` | Hard-delete a service account (cascades credentials and role assignments) |
@@ -155,12 +168,12 @@ Credentials are nested sub-resources of service accounts. Permissions inherit fr
 ### Create flow
 
 ```
-1. Admin creates a service account:
+1. A signed-in human creates a service account:
    POST /api/v1/service_accounts
-   { "name": "CI Pipeline", "description": "...", "project_id": "..." }
+   { "name": "CI Pipeline", "description": "..." }
    -> 201 with service account details (no credentials yet)
 
-2. Admin creates a credential for the service account:
+2. An authorized system administrator creates a credential:
    POST /api/v1/service_accounts/{sa_id}/credentials
    { "credential_type": "client_credentials" }
    -> 201 with credential details + plaintext client_secret
@@ -368,28 +381,24 @@ Service accounts are registered as an authz resource type in `src/syntara/authz/
 
 | Permission | Scope | Roles |
 |------------|-------|-------|
-| `service_account:create` | System | `admin` |
-| `service_account:read` | System | `admin`, `auditor` |
+| `service_account:create` | System | `admin`, signed-in humans |
+| `service_account:read` | System | `admin`, `auditor`, signed-in humans |
 | `service_account:update` | System | `admin` |
 | `service_account:delete` | System | `admin` |
 | `service_account:rotate_secret` | System | `admin` |
 | `service_account:disable` | System | `admin` |
 | `service_account:enable` | System | `admin` |
-| `service_account:create` | Project | `project-admin` |
-| `service_account:read` | Project | `project-admin`, `project-auditor` |
-| `service_account:update` | Project | `project-admin` |
-| `service_account:delete` | Project | `project-admin` |
-| `service_account:rotate_secret` | Project | `project-admin` |
-| `service_account:disable` | Project | `project-admin` |
-| `service_account:enable` | Project | `project-admin` |
+The minimal `/service_accounts/directory` selector endpoint uses `service_account:read:any` as well.
 
 ### Role assignments for service accounts
 
 Service accounts can receive role assignments via the standard role assignment API. The `RoleAssignment` model uses `principal_id` (FK → `principals`), which supports both users and service accounts. The authz resolver (`src/syntara/authz/resolver.py`) resolves effective policies generically via `principal_id`.
 
-The role assignment service (`src/syntara/authz/services/role_assignment_service.py`) handles the `"service_account"` principal type: it validates the SA exists, resolves its name for display, and outer-joins the `ServiceAccount` table in queries.
+The role assignment service (`src/syntara/authz/services/role_assignment_service.py`) handles the `"service_account"` principal type: it validates the SA exists, resolves its name for display, and outer-joins the `ServiceAccount` table in queries. Assignments use the same scope validation and caller permissions as user assignments. System roles require system scope; project roles may be assigned in any project the caller is authorized to administer.
 
 ## Webhook and EDA Integration
+
+A valid trigger binding is sufficient authorization to invoke that webhook or EDA trigger; no execution role is required. Authentication, account/credential status, expiry, revocation, and the trigger allowlist remain enforced.
 
 Service accounts are the required authentication mechanism for webhook and EDA trigger endpoints. External systems (GitHub, Jira, Slack, EDA, etc.) must present a valid service account Bearer token to invoke a trigger.
 
@@ -412,7 +421,7 @@ Each webhook/EDA trigger has an explicit list of authorized service accounts. Th
 
 - `WebhookTriggerParameters` includes an `authorized_service_account_ids` field
 - During workflow save, `_sync_trigger_sa_bindings()` syncs the desired SA IDs against existing bindings (computes add/remove sets)
-- All bound SAs must exist in the same project as the workflow
+- All bound SAs must exist; the same account may be bound to triggers in multiple projects
 - The `webhook_trigger_service_accounts` association table stores the bindings
 
 ### Authentication flow
@@ -446,7 +455,7 @@ External system (e.g., EDA rulebook action) sends:
 
 For Event-Driven Ansible integration, the typical setup is:
 
-1. Create a service account in the same project as the workflow
+1. Create a service account, or select an existing identity from the basic directory
 2. Create a credential for the SA and store the `client_id` / `client_secret`
 3. Configure the workflow's EDA trigger node with the SA in `authorized_service_account_ids`
 4. In the EDA rulebook, use `run_workflow_template` (or a webhook URL action) that:
@@ -517,7 +526,7 @@ The API usage accumulator (`src/syntara/telemetry/api_usage_accumulator.py`) tra
 | Exception | HTTP Status | When |
 |-----------|-------------|------|
 | `ServiceAccountNotFoundError` | 404 | SA not found by ID |
-| `ServiceAccountNameConflictError` | 409 | Duplicate name in project |
+| `ServiceAccountNameConflictError` | 409 | Duplicate service-account name |
 | `ServiceAccountCredentialNotFoundError` | 404 | Credential not found by ID |
 | `ServiceAccountCredentialLimitError` | 409 | Exceeds 10 credentials per SA |
 | `CredentialExpirationExceededError` | 400 | Expiration exceeds `sa_credential_max_lifetime_days` |

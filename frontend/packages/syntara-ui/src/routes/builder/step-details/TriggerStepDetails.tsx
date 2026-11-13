@@ -196,11 +196,18 @@ function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: stri
 type TriggerStepDetailsProps = Readonly<{
   trigger: Trigger
   triggerIndex: number
+  projectId?: string
   onClose: () => void
   onHeaderContentChange?: (content: ReactNode | null) => void
 }>
 
-export function TriggerStepDetails({ trigger, triggerIndex, onClose, onHeaderContentChange }: TriggerStepDetailsProps) {
+export function TriggerStepDetails({
+  trigger,
+  triggerIndex,
+  projectId,
+  onClose,
+  onHeaderContentChange,
+}: TriggerStepDetailsProps) {
   const { showError } = useAlerts()
   // Use action accessor - component won't re-render when store state changes
   const { updateTrigger } = useWorkflowStoreActions()
@@ -279,6 +286,11 @@ export function TriggerStepDetails({ trigger, triggerIndex, onClose, onHeaderCon
   }
 
   return (
-    <TriggerStepForm initialData={initialData} onSubmit={handleSubmit} onHeaderContentChange={onHeaderContentChange} />
+    <TriggerStepForm
+      initialData={initialData}
+      onSubmit={handleSubmit}
+      onHeaderContentChange={onHeaderContentChange}
+      projectId={projectId}
+    />
   )
 }

@@ -192,6 +192,7 @@ function renderEditModeContent(params: {
         <TriggerStepDetails
           trigger={trigger}
           triggerIndex={triggerIdx}
+          projectId={projectId}
           onClose={onClose}
           onHeaderContentChange={onHeaderContentChange}
         />

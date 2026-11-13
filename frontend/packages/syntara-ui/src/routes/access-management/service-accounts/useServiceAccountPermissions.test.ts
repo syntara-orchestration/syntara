@@ -46,7 +46,7 @@ describe('useServiceAccountPermissions', () => {
     expect(result.current.isLoading).toBe(true)
   })
 
-  it('hub chrome only checks create with check_any_project', async () => {
+  it('hub chrome checks project-less creation', async () => {
     vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
     const { result } = renderHook(() => useServiceAccountPermissions(), { wrapper: createWrapper() })
@@ -60,14 +60,14 @@ describe('useServiceAccountPermissions', () => {
     expect(result.current.canRotateSecret).toBe(false)
     expect(accessFetchClient.POST).toHaveBeenCalledTimes(1)
     expect(accessFetchClient.POST).toHaveBeenCalledWith(CAN_I_ENDPOINT, {
-      body: { action: 'create', resource_type: 'service_account', check_any_project: true },
+      body: { action: 'create', resource_type: 'service_account' },
     })
   })
 
-  it('scopes destructive actions to resourceProject on detail/row screens', async () => {
+  it('scopes management actions to the account ID', async () => {
     vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: true } })
 
-    const { result } = renderHook(() => useServiceAccountPermissions({ resourceProject: 'proj-1' }), {
+    const { result } = renderHook(() => useServiceAccountPermissions({ resourceId: 'sa-1' }), {
       wrapper: createWrapper(),
     })
 
@@ -79,16 +79,16 @@ describe('useServiceAccountPermissions', () => {
     expect(result.current.canDelete).toBe(true)
     expect(result.current.canRotateSecret).toBe(true)
     expect(accessFetchClient.POST).toHaveBeenCalledWith(CAN_I_ENDPOINT, {
-      body: { action: 'create', resource_type: 'service_account', resource_project: 'proj-1' },
+      body: { action: 'create', resource_type: 'service_account' },
     })
     expect(accessFetchClient.POST).toHaveBeenCalledWith(CAN_I_ENDPOINT, {
-      body: { action: 'update', resource_type: 'service_account', resource_project: 'proj-1' },
+      body: { action: 'update', resource_type: 'service_account', resource_id: 'sa-1' },
     })
     expect(accessFetchClient.POST).toHaveBeenCalledWith(CAN_I_ENDPOINT, {
-      body: { action: 'delete', resource_type: 'service_account', resource_project: 'proj-1' },
+      body: { action: 'delete', resource_type: 'service_account', resource_id: 'sa-1' },
     })
     expect(accessFetchClient.POST).toHaveBeenCalledWith(CAN_I_ENDPOINT, {
-      body: { action: 'rotate_secret', resource_type: 'service_account', resource_project: 'proj-1' },
+      body: { action: 'rotate_secret', resource_type: 'service_account', resource_id: 'sa-1' },
     })
     const anyProjectCalls = (
       vi.mocked(accessFetchClient.POST).mock.calls as unknown as Array<
@@ -112,7 +112,7 @@ describe('useServiceAccountPermissions', () => {
   it('returns safe defaults when requests fail', async () => {
     vi.mocked(accessFetchClient.POST).mockRejectedValue(new Error('network error'))
 
-    const { result } = renderHook(() => useServiceAccountPermissions({ resourceProject: 'proj-1' }), {
+    const { result } = renderHook(() => useServiceAccountPermissions({ resourceId: 'sa-1' }), {
       wrapper: createWrapper(),
     })
 

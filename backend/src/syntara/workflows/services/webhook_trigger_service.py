@@ -171,7 +171,7 @@ class WebhookTriggerService(BaseService):
         await self._flush_with_conflict_guard()
 
         for trigger_id, desired_sa_ids in sa_bindings:
-            await self._sync_trigger_sa_bindings(trigger_id, desired_sa_ids, workflow_id)
+            await self._sync_trigger_sa_bindings(trigger_id, desired_sa_ids)
 
         logger.info(
             "Synced webhook triggers",
@@ -271,20 +271,15 @@ class WebhookTriggerService(BaseService):
         self,
         trigger_id: UUID,
         desired_sa_ids: set[UUID],
-        workflow_id: UUID,
     ) -> None:
         """Sync the authorized service account bindings for a trigger."""
         if desired_sa_ids:
-            workflow = await self.session.get(Workflow, workflow_id)
-            project_id = workflow.project_id if workflow else None
             query = select(ServiceAccount.id).where(col(ServiceAccount.id).in_(desired_sa_ids))
-            if project_id:
-                query = query.where(ServiceAccount.project_id == project_id)
             result = await self.session.exec(query)
             found_ids = set(result.all())
             missing = desired_sa_ids - found_ids
             if missing:
-                msg = f"Service account(s) not found in this project: {', '.join(str(i) for i in missing)}"
+                msg = f"Service account(s) not found: {', '.join(str(i) for i in missing)}"
                 raise TriggerValidationError(msg)
 
         existing_result = await self.session.exec(

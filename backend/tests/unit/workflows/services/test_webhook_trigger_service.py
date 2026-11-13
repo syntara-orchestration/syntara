@@ -1035,7 +1035,6 @@ class TestSyncTriggerSaBindings:
 
         sa_id = uuid4()
         trigger_id = uuid4()
-        workflow_id = uuid4()
 
         mock_session = AsyncMock(spec=AsyncSession)
         existing_link = Mock(spec=WebhookTriggerServiceAccount)
@@ -1051,7 +1050,7 @@ class TestSyncTriggerSaBindings:
         mock_session.get = AsyncMock(return_value=mock_workflow)
 
         service = _make_service(session=mock_session)
-        await service._sync_trigger_sa_bindings(trigger_id, {sa_id}, workflow_id)
+        await service._sync_trigger_sa_bindings(trigger_id, {sa_id})
 
         mock_session.add.assert_not_called()
         mock_session.execute.assert_not_called()
@@ -1061,7 +1060,6 @@ class TestSyncTriggerSaBindings:
         """New SA binding is inserted when not already present."""
         sa_id = uuid4()
         trigger_id = uuid4()
-        workflow_id = uuid4()
 
         mock_session = AsyncMock(spec=AsyncSession)
         sa_check_result = Mock()
@@ -1074,7 +1072,7 @@ class TestSyncTriggerSaBindings:
         mock_session.get = AsyncMock(return_value=mock_workflow)
 
         service = _make_service(session=mock_session)
-        await service._sync_trigger_sa_bindings(trigger_id, {sa_id}, workflow_id)
+        await service._sync_trigger_sa_bindings(trigger_id, {sa_id})
 
         mock_session.add.assert_called_once()
 
@@ -1085,7 +1083,6 @@ class TestSyncTriggerSaBindings:
 
         stale_sa_id = uuid4()
         trigger_id = uuid4()
-        workflow_id = uuid4()
 
         mock_session = AsyncMock(spec=AsyncSession)
         existing_link = Mock(spec=WebhookTriggerServiceAccount)
@@ -1095,16 +1092,15 @@ class TestSyncTriggerSaBindings:
         mock_session.exec = AsyncMock(return_value=existing_result)
 
         service = _make_service(session=mock_session)
-        await service._sync_trigger_sa_bindings(trigger_id, set(), workflow_id)
+        await service._sync_trigger_sa_bindings(trigger_id, set())
 
         mock_session.execute.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_raises_when_sa_not_found_in_project(self) -> None:
-        """TriggerValidationError raised when SA ID doesn't exist in the project."""
+    async def test_raises_when_sa_not_found(self) -> None:
+        """TriggerValidationError raised when SA ID doesn't exist."""
         sa_id = uuid4()
         trigger_id = uuid4()
-        workflow_id = uuid4()
 
         mock_session = AsyncMock(spec=AsyncSession)
         sa_check_result = Mock()
@@ -1116,8 +1112,8 @@ class TestSyncTriggerSaBindings:
 
         service = _make_service(session=mock_session)
 
-        with pytest.raises(TriggerValidationError, match="not found in this project"):
-            await service._sync_trigger_sa_bindings(trigger_id, {sa_id}, workflow_id)
+        with pytest.raises(TriggerValidationError, match="not found"):
+            await service._sync_trigger_sa_bindings(trigger_id, {sa_id})
 
     @pytest.mark.asyncio
     async def test_empty_desired_set_is_no_op(self) -> None:
@@ -1128,7 +1124,7 @@ class TestSyncTriggerSaBindings:
         mock_session.exec = AsyncMock(return_value=existing_result)
 
         service = _make_service(session=mock_session)
-        await service._sync_trigger_sa_bindings(uuid4(), set(), uuid4())
+        await service._sync_trigger_sa_bindings(uuid4(), set())
 
         mock_session.add.assert_not_called()
         mock_session.execute.assert_not_called()

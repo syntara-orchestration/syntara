@@ -14,47 +14,24 @@
  */
 
 import { test, expect, toAppUrl } from './fixtures'
-import { addEdaTrigger } from './helpers/v2-steps'
-import {
-  buildUniqueName,
-  clickAddConnectedStep,
-  clickSaveAndWait,
-  closeStepEditorPanel,
-  deleteWorkflow,
-  fillCodeEditor,
-  selectProjectIfRequired,
-} from './helpers/workflows'
+import { addEdaTrigger, addScriptStep } from './helpers/v2-steps'
+import { buildUniqueName, clickSaveAndWait, deleteWorkflow, selectProjectIfRequired } from './helpers/workflows'
 import { createServiceAccountViaApi, deleteServiceAccountViaApi, ensureProject } from './utils/api'
 
 test.describe('EDA Trigger', () => {
-  test('user creates a workflow with EDA trigger and saves it', async ({ app }) => {
+  test('a projectless service account can be used by an EDA project workflow', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-eda')
-    const webhookPath = 'github-deployments'
-
     const project = await ensureProject(app)
+    if (!project) throw new Error('EDA E2E: could not ensure a workflow project')
     const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-eda'))
-    await app.goto(toAppUrl('/workflow-builder/new'))
 
     try {
-      // Add EDA trigger
-      await addEdaTrigger(app, 'GitHub Events', webhookPath, sa.name)
+      await app.goto(toAppUrl('/workflow-builder/new'))
+      await addEdaTrigger(app, 'GitHub Events', 'github-deployments', sa.name)
+      await addScriptStep(app, 'Process event', 'print("processing EDA event")')
 
-      // Add a connected script action
-      const panel = await clickAddConnectedStep(app)
-      await panel.getByRole('button', { name: 'Action', exact: true }).click()
-      await panel.getByRole('button', { name: 'Script', exact: true }).click()
-      await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Process event')
-      await fillCodeEditor(app, { value: 'print("processing EDA event")' })
-      await app.getByRole('button', { name: 'Create', exact: true }).click()
-      await closeStepEditorPanel(app)
-
-      // Save workflow (select project right before save)
-      // Pin the workflow to the service account's own project. `ensureProject`
-      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
-      // picks whichever project the dropdown lists first — and the backend
-      // rejects the save with "Service account(s) not found in this project"
-      // whenever those differ. The weak URL guard used to hide that 422.
-      await selectProjectIfRequired(app, project?.name)
+      // The workflow still needs a project; the service account remains projectless.
+      await selectProjectIfRequired(app, project.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await clickSaveAndWait(app)
 

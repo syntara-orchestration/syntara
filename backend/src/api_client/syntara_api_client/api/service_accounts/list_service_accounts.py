@@ -150,7 +150,7 @@ def sync_detailed(
 ) -> Response[ErrorData | ServiceAccountListResponse]:
     """List service accounts
 
-     List service accounts with project-scoped visibility and pagination.
+     List service accounts readable by the current user.
 
     Args:
         limit (int | Unset): Maximum number of results per page Default: 20.
@@ -197,7 +197,7 @@ def sync(
 ) -> ErrorData | ServiceAccountListResponse | None:
     """List service accounts
 
-     List service accounts with project-scoped visibility and pagination.
+     List service accounts readable by the current user.
 
     Args:
         limit (int | Unset): Maximum number of results per page Default: 20.
@@ -238,7 +238,7 @@ async def asyncio_detailed(
 ) -> Response[ErrorData | ServiceAccountListResponse]:
     """List service accounts
 
-     List service accounts with project-scoped visibility and pagination.
+     List service accounts readable by the current user.
 
     Args:
         limit (int | Unset): Maximum number of results per page Default: 20.
@@ -282,7 +282,7 @@ async def asyncio(
 ) -> ErrorData | ServiceAccountListResponse | None:
     """List service accounts
 
-     List service accounts with project-scoped visibility and pagination.
+     List service accounts readable by the current user.
 
     Args:
         limit (int | Unset): Maximum number of results per page Default: 20.

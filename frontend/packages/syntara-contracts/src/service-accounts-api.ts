@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+  '/service_accounts/directory': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List service accounts directory
+     * @description Return ID, name, and status for selectors; this grants no management access.
+     */
+    get: operations['list_service_accounts_directory']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/service_accounts': {
     parameters: {
       query?: never
@@ -13,7 +33,7 @@ export interface paths {
     }
     /**
      * List service accounts
-     * @description List service accounts with project-scoped visibility and pagination.
+     * @description List service accounts readable by the current user.
      */
     get: operations['list_service_accounts']
     put?: never
@@ -225,10 +245,9 @@ export interface components {
       description?: string | null
       /**
        * Project Id
-       * Format: uuid
-       * @description Project to create the service account in
+       * @description Optional creation context; this does not limit the service account's access
        */
-      project_id: string
+      project_id?: string | null
     }
     /**
      * ServiceAccountListResponse
@@ -284,14 +303,12 @@ export interface components {
       name: string
       /** Description */
       description?: string | null
-      status: components['schemas']['ServiceAccountStatus']
       /**
        * Project Id
-       * Format: uuid
+       * @description Project where the service account was created; informational only
        */
-      project_id: string
-      /** Project Name */
-      project_name?: string | null
+      project_id?: string | null
+      status: components['schemas']['ServiceAccountStatus']
       /** Last Authenticated At */
       last_authenticated_at?: string | null
       /**
@@ -340,11 +357,6 @@ export interface components {
        * @description Update the description
        */
       description?: string | null
-      /**
-       * Project Id
-       * @description Project ID (immutable after creation; rejected if different from stored value)
-       */
-      project_id?: string | null
     }
     /**
      * ServiceAccountCredentialType
@@ -595,32 +607,52 @@ export interface components {
       max_lifetime_days?: number
     }
     /**
-     * UserReferenceType
-     * @description Kind of principal a UserReference points at.
-     *
-     *     Only ``user`` references have a user detail page. ``deleted_user`` and
-     *     ``deleted_service_account`` mark principals that were hard-deleted but are
-     *     still recorded as the actor.
-     * @enum {string}
+     * ServiceAccountDirectoryEntry
+     * @description Basic identity for selectors; directory membership does not authorize management.
      */
-    UserReferenceType: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' | 'deleted_service_account'
-    /**
-     * UserReference
-     * @description Minimal user identification for embedding in other resources.
-     *     The name is resolved from the database when the response is built, not
-     *     stored alongside the id, so it always reflects the principal's current
-     *     name. Renaming a user therefore changes the name shown for their past actions.
-     */
-    UserReference: {
+    ServiceAccountDirectoryEntry: {
       /**
+       * Id
        * Format: uuid
-       * @description User's unique identifier
        */
       id: string
-      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
+      /** Name */
       name: string
-      /** @description Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor. */
-      type: components['schemas']['UserReferenceType']
+      status: components['schemas']['ServiceAccountStatus']
+    }
+    /**
+     * ServiceAccountDirectoryListResponse
+     * @description Paginated basic service-account directory.
+     * @example {
+     *       "next": "eyJpZCI6InV1aWQifQ",
+     *       "total": 150
+     *     }
+     * @example {
+     *       "next": "eyJpZCI6Im5leHQifQ",
+     *       "prev": "eyJpZCI6InByZXYifQ"
+     *     }
+     */
+    ServiceAccountDirectoryListResponse: {
+      /**
+       * Next
+       * @description Cursor for next page of results
+       */
+      next?: string | null
+      /**
+       * Prev
+       * @description Cursor for previous page of results
+       */
+      prev?: string | null
+      /**
+       * Total
+       * @description Total count of resources (only when include_total=true)
+       */
+      total?: number | null
+      /**
+       * Resources
+       * @description Array of resources in current page
+       */
+      resources: components['schemas']['ServiceAccountDirectoryEntry'][]
     }
     /**
      * ErrorData
@@ -687,6 +719,34 @@ export interface components {
        * @example /invocations/550e8400-e29b-41d4-a716-446655440000
        */
       instance?: string | null
+    }
+    /**
+     * UserReferenceType
+     * @description Kind of principal a UserReference points at.
+     *
+     *     Only ``user`` references have a user detail page. ``deleted_user`` and
+     *     ``deleted_service_account`` mark principals that were hard-deleted but are
+     *     still recorded as the actor.
+     * @enum {string}
+     */
+    UserReferenceType: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' | 'deleted_service_account'
+    /**
+     * UserReference
+     * @description Minimal user identification for embedding in other resources.
+     *     The name is resolved from the database when the response is built, not
+     *     stored alongside the id, so it always reflects the principal's current
+     *     name. Renaming a user therefore changes the name shown for their past actions.
+     */
+    UserReference: {
+      /**
+       * Format: uuid
+       * @description User's unique identifier
+       */
+      id: string
+      /** @description Principal's current display name, resolved when the response is built. Not a username: for a user this is their first and last name, falling back to the username when both are blank; for a service account it is the account name; for an internal service it is derived from the certificate CN. */
+      name: string
+      /** @description Kind of principal this reference points at. Only `user` references have a user detail page; `deleted_user` / `deleted_service_account` are hard-deleted principals that are still recorded as the actor. */
+      type: components['schemas']['UserReferenceType']
     }
   }
   responses: {
@@ -844,6 +904,47 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  list_service_accounts_directory: {
+    parameters: {
+      query?: {
+        /** @description Maximum number of results per page */
+        limit?: number
+        /** @description Pagination cursor from previous response */
+        cursor?: string | null
+        /** @description Sort parameter (e.g., 'name', '-created_at') */
+        sort?: string | null
+        /** @description Include total count in response (expensive) */
+        include_total?: boolean
+        /** @description Filter by status */
+        status?: components['schemas']['ServiceAccountStatus'] | null
+        /** @description Filter by name */
+        name?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Basic service account identities */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ServiceAccountDirectoryListResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
   list_service_accounts: {
     parameters: {
       query?: {

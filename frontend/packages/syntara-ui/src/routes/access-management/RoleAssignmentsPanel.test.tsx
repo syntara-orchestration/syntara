@@ -1020,6 +1020,44 @@ describe('RoleAssignmentsPanel', () => {
         )
       })
     })
+
+    it('shows and revokes a system role assigned to a service account', async () => {
+      setupMocks({
+        serviceAccountAssignments: [
+          {
+            id: 'sa-system-a1',
+            principal_type: 'service_account',
+            principal_id: 'sa-1',
+            principal_name: 'my-service-account',
+            role_name: 'auditor',
+            role_description: 'Read-only access',
+            role_policies: ['service_account:read'],
+            project_id: null,
+            project_name: null,
+            created_at: '2024-03-01T00:00:00Z',
+          },
+        ],
+      })
+      const user = userEvent.setup()
+      render(<RoleAssignmentsPanel principalType="service_account" principalId="sa-1" />, { wrapper })
+
+      expect(screen.getByText('auditor')).toBeInTheDocument()
+      expect(screen.getByText('System')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Actions for auditor (System)' }))
+      await user.click(await screen.findByRole('menuitem', { name: /Unassign/i }))
+      await user.click(screen.getByRole('button', { name: 'Unassign role' }))
+
+      await waitFor(() => {
+        expect(mockDeleteSystemAssignment).toHaveBeenCalledWith(
+          { params: { path: { assignment_id: 'sa-system-a1' } } },
+          expect.objectContaining({
+            onSuccess: expect.any(Function) as unknown,
+            onError: expect.any(Function) as unknown,
+            onSettled: expect.any(Function) as unknown,
+          })
+        )
+      })
+    })
   })
 
   describe('Hidden columns', () => {

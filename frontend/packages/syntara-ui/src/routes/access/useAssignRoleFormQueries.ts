@@ -62,10 +62,14 @@ export function useAssignRoleFormQueries(control: Control<AssignRoleFormData>) {
   const debouncedSaSearch = useDebouncedValue(saSearchTerm)
   const serviceAccountsQuery = accessClient.useQuery(
     'get',
-    '/service_accounts',
+    '/service_accounts/directory',
     {
       params: {
-        query: { sort: 'name', limit: PAGE_SIZE, ...(debouncedSaSearch ? { name: debouncedSaSearch } : {}) },
+        query: {
+          sort: 'name',
+          limit: PAGE_SIZE,
+          ...(debouncedSaSearch ? { 'name[contains]': debouncedSaSearch } : {}),
+        },
       },
     },
     { enabled: principalType === RolePrincipalType.SERVICE_ACCOUNT }

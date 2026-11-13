@@ -6,7 +6,6 @@ import { useCallback, useMemo, useState } from 'react'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynSelect } from '../../../components/SynSelect'
 import { useCanI } from '../../../hooks/useCanI'
-import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { detachPromise } from '../../../utils/detachPromise'
 
 import { CreateServiceAccountInlineModal } from './CreateServiceAccountInlineModal'
@@ -43,15 +42,15 @@ type ServiceAccountSelectProps = Readonly<{
   selectedIds: string[]
   onChange: (ids: string[]) => void
   isDisabled?: boolean
+  projectId?: string
 }>
 
-export function ServiceAccountSelect({ id, selectedIds, onChange, isDisabled }: ServiceAccountSelectProps) {
+export function ServiceAccountSelect({ id, selectedIds, onChange, isDisabled, projectId }: ServiceAccountSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const { allowed: canCreate } = useCanI('create', 'service_account')
-  const projectId = useWorkflowStore((s) => s.projectId)
 
-  const { serviceAccounts, isLoading, refetch } = useAllServiceAccounts(projectId)
+  const { serviceAccounts, isLoading, refetch } = useAllServiceAccounts()
 
   const selectedSAs = useMemo(
     () => serviceAccounts.filter((sa) => selectedIds.includes(sa.id)),
@@ -119,13 +118,7 @@ export function ServiceAccountSelect({ id, selectedIds, onChange, isDisabled }: 
             </>
           )}
           {serviceAccounts.map((sa) => (
-            <SelectOption
-              key={sa.id}
-              value={sa.id}
-              hasCheckbox
-              isSelected={selectedIds.includes(sa.id)}
-              description={sa.description ?? undefined}
-            >
+            <SelectOption key={sa.id} value={sa.id} hasCheckbox isSelected={selectedIds.includes(sa.id)}>
               {sa.name}
             </SelectOption>
           ))}
@@ -150,7 +143,7 @@ export function ServiceAccountSelect({ id, selectedIds, onChange, isDisabled }: 
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreated={handleCreated}
-        projectId={projectId ?? undefined}
+        projectId={projectId}
       />
     </>
   )
