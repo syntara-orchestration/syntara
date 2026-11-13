@@ -147,7 +147,9 @@ function validateOutputMappings(
   }
   const mappedPaths = Object.keys(outputMapping)
   for (const path of requiredPaths) {
-    const hasMapping = mappedPaths.some((mappedPath) => path === mappedPath || path.startsWith(`${mappedPath}.`))
+    const hasMapping = mappedPaths.some(
+      (mappedPath) => path === mappedPath || path.startsWith(`${mappedPath}.`) || mappedPath.startsWith(`${path}.`)
+    )
     if (!hasMapping) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
