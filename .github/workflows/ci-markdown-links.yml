@@ -9,6 +9,8 @@ on:
       - '*.markdown'
       - '**/*.markdown'
       - '.github/workflows/ci-markdown-links.yml'
+      - '.github/md-link-lint/package.json'
+      - '.github/md-link-lint/package-lock.json'
 
 permissions:
   contents: read
@@ -30,9 +32,12 @@ jobs:
         with:
           # md-link-lint requires Node 22.23.4 or Node 24 and newer.
           node-version: '24.x'
+          cache: npm
+          cache-dependency-path: .github/md-link-lint/package-lock.json
 
-      - name: Install md-link-lint
-        run: npm install --global --ignore-scripts @ansible/md-link-lint@0.1.0
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+        working-directory: .github/md-link-lint
 
       - name: Prepare MkDocs documentation paths
         # MkDocs resolves links through these site-relative paths.
@@ -61,7 +66,7 @@ jobs:
         # Check doc paths as MkDocs sees them.
         run: |
           report="$RUNNER_TEMP/md-link-lint-report.json"
-          if md-link-lint --exclude 'backend/docs/**' --exclude 'frontend/docs/**' --json > "$report"; then
+          if .github/md-link-lint/node_modules/.bin/md-link-lint --exclude 'backend/docs/**' --exclude 'frontend/docs/**' --json > "$report"; then
             status=0
           else
             status=$?
