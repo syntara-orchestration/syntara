@@ -211,6 +211,17 @@ describe('ApprovalDetailContent', () => {
     expect(screen.getByTestId('code-block')).toBeInTheDocument()
   })
 
+  // AAP-89013: approval details should offer the same Schema/Table/JSON view
+  // toggle used elsewhere for structured data (e.g. builder OutputPanel /
+  // NodeExecutionDetailsPanel via ViewToggle), instead of only a raw JSON dump.
+  it('offers a Schema/Table/JSON view toggle for the approval context data', () => {
+    render(<ApprovalDetailContent approval={mockApproval} />, { wrapper })
+
+    expect(screen.getByRole('button', { name: 'Schema' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Table' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'JSON' })).toBeInTheDocument()
+  })
+
   it('has no accessibility violations in pending state', async () => {
     const { container } = render(<ApprovalDetailContent approval={mockApproval} />, { wrapper })
 
