@@ -1833,6 +1833,12 @@ class WorkflowClientSettings(BaseSettings):
         gt=0,
     )
 
+    ep_cancellation_reconciliation_interval_seconds: float = Field(
+        default=1800.0,
+        description="Seconds between fallback EP cancellation reconciliation cycles",
+        gt=0,
+    )
+
     ep_request_timeout_seconds: float = Field(
         default=10.0,
         description="Per-request timeout for AO to EP HTTP operations.",

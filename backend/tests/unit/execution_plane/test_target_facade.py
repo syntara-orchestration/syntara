@@ -334,7 +334,7 @@ async def test_target_usage_counts_active_workloads(harness):
         "limit": "1",
         "include_total": "true",
         "execution_target_id": str(TARGET_ID),
-        "status[in]": "claimed,dispatched,running,cancel_requested,reconciliation_required",
+        "status[in]": "claimed,dispatched,running,reconciliation_required",
     }
 
 
