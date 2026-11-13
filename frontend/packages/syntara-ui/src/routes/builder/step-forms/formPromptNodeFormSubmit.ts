@@ -1,19 +1,12 @@
-import { resolveEffectiveContinueOnFailure } from '../hooks/useEffectiveContinueOnFailure'
-
 import type { FormPromptFormSubmitData } from './FormPromptNodeForm'
 import type { FormPromptFormData } from './formPromptNodeFormSchema'
 import { persistStepSettings } from './shared/stepSettingsSchema'
 
-export function mapFormPromptFormDataToSubmit(
-  data: FormPromptFormData,
-  systemContinueOnFailure: boolean | null
-): FormPromptFormSubmitData {
+export function mapFormPromptFormDataToSubmit(data: FormPromptFormData): FormPromptFormSubmitData {
   const submitLabel = data.submit_label?.trim()
   const successMessage = data.success_message?.trim()
   const cssOverride = data.css_override?.trim()
-
-  const effectiveCof = resolveEffectiveContinueOnFailure(data.settings?.continue_on_failure, systemContinueOnFailure)
-  const fallbackDecision = effectiveCof.isEffectivelyEnabled ? (data.fallback_decision ?? 'fallback') : 'submit'
+  const fallbackDecision = data.fallback_decision ?? 'fallback'
 
   return {
     name: data.name.trim(),

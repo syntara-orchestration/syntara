@@ -11,7 +11,7 @@ describe('getFormPromptNodeFormDefaultValues', () => {
     expect(values.submit_label).toBe('Submit')
     expect(values.success_message).toBe('Response submitted successfully.')
     expect(values.form_definition).toEqual(createEmptyFormDefinition())
-    expect(values.fallback_decision).toBe('submit')
+    expect(values.fallback_decision).toBe('fallback')
     expect(values.settings?.timeout).toBeUndefined()
   })
 
