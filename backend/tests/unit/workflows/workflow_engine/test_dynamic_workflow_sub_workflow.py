@@ -27,6 +27,7 @@ from temporalio.exceptions import CancelledError as TemporalCancelledError
 from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 from temporalio.workflow import ParentClosePolicy
 
+from syntara.workflows.utils.workflow_metadata import build_workflow_metadata
 from syntara.workflows.workflow_engine.activities.sub_workflow_setup_activity import (
     _MAX_SUB_WORKFLOW_DEPTH,
     _SUB_WORKFLOW_NAMESPACE,
@@ -1019,3 +1020,89 @@ class TestDepthInitialization:
         wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
         wf._initialize_state(execution_id="exec-1")
         assert wf._sub_workflow_depth == 0
+
+
+def _meta_with_identity(created_by_user_id: str) -> dict[str, Any]:
+    """Build real workflow_metadata carrying an initiating-user id.
+
+    Uses the production ``build_workflow_metadata`` so the test exercises the
+    exact nesting the setup activity / execution service produce.
+    """
+    return build_workflow_metadata(
+        workflow_name="wf",
+        workflow_id=uuid4(),
+        workflow_version=1,
+        workflow_published=True,
+        workflow_author="Author",
+        project_id=uuid4(),
+        execution_id="exec",
+        execution_mode="manual",
+        created_by="Display Name",
+        created_by_user_id=created_by_user_id,
+        created_at="2026-01-01T00:00:00Z",
+        workflow_version_id=uuid4(),
+    )
+
+
+def _init_from_metadata(metadata: dict[str, Any], execution_id: str = "exec") -> OrchestratorWorkflow:
+    """Initialise an OrchestratorWorkflow from metadata the way Temporal startup does."""
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+    wf._initialize_state(execution_id=execution_id, workflow_metadata=metadata)
+    return wf
+
+
+class TestIdentityPropagation:
+    """Carry the top-level initiator's created_by_user_id into the runtime unchanged.
+
+    AAP-95035: the value survives parent -> child -> grandchild nesting.
+    """
+
+    def test_created_by_user_id_extracted_from_metadata(self) -> None:
+        user_id = str(uuid4())
+        wf = _init_from_metadata(_meta_with_identity(user_id))
+        assert wf._created_by_user_id == user_id
+
+    def test_created_by_user_id_missing_defaults_to_empty(self) -> None:
+        wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+        wf._initialize_state(execution_id="exec", workflow_metadata={"workflow_context": {"execution": {}}})
+        assert wf._created_by_user_id == ""
+
+    def test_identity_unchanged_across_parent_child_grandchild(self) -> None:
+        # The invariant that makes nesting safe: at every level the runtime extracts
+        # the id from metadata, and the metadata handed to the next level is rebuilt
+        # with exactly that id (what SubWorkflowSetupActivity does via
+        # build_workflow_metadata(created_by_user_id=<received id>)).
+        original_user_id = str(uuid4())
+        seen: list[str] = []
+        metadata = _meta_with_identity(original_user_id)
+        for level in ("parent", "child", "grandchild"):
+            wf = _init_from_metadata(metadata, execution_id=f"{level}-exec")
+            seen.append(wf._created_by_user_id)
+            # Model the next hop: the setup activity rebuilds the child's metadata
+            # with the id this level received -- it must not drift.
+            metadata = _meta_with_identity(wf._created_by_user_id)
+        assert seen == [original_user_id, original_user_id, original_user_id]
+
+    async def test_runtime_id_dispatched_to_setup_activity_unchanged(self) -> None:
+        # Ties extraction to dispatch: a workflow initialised from metadata hands
+        # the SAME id to the sub-workflow setup activity (args[3]), so the child it
+        # starts inherits the top-level initiator.
+        user_id = str(uuid4())
+        wf = _init_from_metadata(_meta_with_identity(user_id))
+        # _execute_sub_workflow_node needs a couple of loop-related attributes that
+        # _initialize_state does not populate for a non-looped node.
+        wf.loop_body_map = {}
+        wf.node_control_data = {}
+        setup_result = _make_setup_result()
+        with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+            mock_wf.patched = MagicMock(return_value=True)
+            mock_wf.execute_activity = AsyncMock(return_value=setup_result)
+            mock_wf.execute_child_workflow = AsyncMock(return_value={"status": "completed"})
+            node = ActivityNode(
+                node_id="sub_wf_1",
+                node_type=NodeType.SUB_WORKFLOW,
+                parameters={"workflow_id": "wf-123", "trigger_node_id": "t1"},
+            )
+            await wf._execute_sub_workflow_node(node, node.parameters)
+        args = mock_wf.execute_activity.call_args[1]["args"]
+        assert args[3] == user_id
