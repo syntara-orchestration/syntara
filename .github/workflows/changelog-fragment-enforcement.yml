@@ -1,6 +1,6 @@
 ---
 # Walk phase: new capability — changelog fragment enforcement.
-# Consumes reusable workflow from ansible/actions (PR #167).
+# Consumes reusable workflow from ansible/actions.
 name: "OpenAPI: Changelog Fragment Enforcement"
 
 on:
@@ -16,8 +16,7 @@ permissions:
 
 jobs:
   enforce:
-    # TODO: move to ansible/actions@<release-tag> after PR #167 merges
-    uses: djyasin/actions/.github/workflows/openapi-changelog-fragment.yml@6074497c42b7ef9e201df229dc071b9f4503ab4a # PR #167, feat/changelog-fragment-enforcement branch
+    uses: ansible/actions/.github/workflows/openapi-changelog-fragment.yml@main
     with:
       spec-paths: "backend/src/syntara/schemas/openapi.yaml"
       fragment-dir: "changelogs/fragments"

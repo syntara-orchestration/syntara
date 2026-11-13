@@ -21,7 +21,6 @@ permissions:
 
 jobs:
   detect:
-    # TODO: move to ansible/actions@<release-tag> after PR #161 merges
-    uses: djyasin/actions/.github/workflows/oasdiff-detect-breaking-changes.yml@c44320d35477ed38e7f4932848d3dd15e1c212f8 # PR #161, feat/oasdiff-breaking-change-detection branch
+    uses: ansible/actions/.github/workflows/oasdiff-detect-breaking-changes.yml@main
     with:
       spec-path: backend/src/syntara/schemas/openapi.yaml
