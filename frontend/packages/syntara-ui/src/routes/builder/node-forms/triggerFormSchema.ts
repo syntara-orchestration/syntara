@@ -34,6 +34,7 @@ const triggerFormSchemaBase = z.object({
   integrationId: z.string().optional(),
   runtimeCredentialId: z.string().optional(),
   topic: z.string().optional(),
+  filterExpression: z.string().optional(),
   authorizedServiceAccountIds: z.array(z.string().uuid()).optional(),
 })
 
@@ -115,6 +116,13 @@ function validateCronFormat(cron: string | undefined, ctx: z.RefinementCtx) {
 }
 
 function validateKafkaSubscribe(data: z.infer<typeof triggerFormSchemaBase>, ctx: z.RefinementCtx) {
+  if (Array.from(data.filterExpression ?? '').length > 16_384) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'CEL expression must be 16,384 characters or fewer',
+      path: ['filterExpression'],
+    })
+  }
   if (data.integrationId && !z.string().uuid().safeParse(data.integrationId).success) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Select a Kafka Integration', path: ['integrationId'] })
   }

@@ -112,11 +112,56 @@ beforeEach(() => {
 })
 
 describe('Kafka Subscribe form', () => {
+  it('submits original CEL source after unrelated edits and submits cleared source after removal', async () => {
+    const expression = '  (input.key.kind == "text")\n && true  '
+    const expressionLabel = 'Filter expression (CEL)'
+    const user = userEvent.setup()
+    const onSubmit = vi.fn<(data: TriggerFormData) => void>()
+    renderWithHeader(
+      <TriggerNodeForm
+        initialData={{ ...initialData, filterExpression: expression }}
+        onSubmit={onSubmit}
+        workflowId="workflow-1"
+        projectId="project-1"
+      />
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
+    await user.clear(screen.getByRole('textbox', { name: 'Topic' }))
+    await user.type(screen.getByRole('textbox', { name: 'Topic' }), 'orders.updated')
+    await submitForm()
+    expect(onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ filterExpression: expression, topic: 'orders.updated' })
+    )
+    expect(screen.getByRole('textbox', { name: expressionLabel })).toHaveValue(expression)
+    await user.clear(screen.getByRole('textbox', { name: expressionLabel }))
+    await submitForm()
+    expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ filterExpression: '' }))
+  })
+
+  it('keeps over-limit source available for correction while blocking trigger submission and testing', async () => {
+    const expression = `${' '.repeat(16_381)}true`
+    const onSubmit = vi.fn()
+    renderWithHeader(
+      <TriggerNodeForm
+        initialData={{ ...initialData, filterExpression: expression }}
+        onSubmit={onSubmit}
+        workflowId="workflow-1"
+        projectId="project-1"
+      />
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
+    await submitForm()
+    expect(await screen.findByText('CEL expression must be 16,384 characters or fewer')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Filter expression (CEL)' })).toHaveValue(expression)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Test filter expression' }))
+    expect(screen.getByRole('button', { name: 'Test filter' })).toBeDisabled()
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
   it('discloses fixed delivery policies and explains the next publish', async () => {
     const user = userEvent.setup()
     renderKafka()
     expect(screen.getByText(/Configuration changes apply on the next publish/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Show message delivery details' }))
+    await user.click(screen.getByRole('button', { name: 'Message delivery behavior' }))
 
     expect(
       screen.getByText(
@@ -167,7 +212,7 @@ describe('Kafka Subscribe form', () => {
     expect(mutate).toHaveBeenCalledWith(
       {
         params: { path: { workflow_id: 'workflow-1' } },
-        body: { integration_id: integrationId, credential_id: credentialId, topic: 'orders.created' },
+        body: { integration_id: integrationId, credential_id: credentialId, topic: 'orders.created', filter: null },
       },
       expect.any(Object)
     )

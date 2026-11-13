@@ -1,0 +1,9 @@
+.examples {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.help {
+  max-block-size: 60vh;
+  overflow: auto;
+}

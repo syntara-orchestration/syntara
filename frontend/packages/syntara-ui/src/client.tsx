@@ -6,6 +6,7 @@ import type {
   CredentialsAPI,
   ExecutionsAPI,
   FilesAPI,
+  FilteringAPI,
   IdentityProvidersAPI,
   IntegrationsAPI,
   SettingsAPI,
@@ -114,6 +115,11 @@ workflowFetchClient.use(interfaceTagMiddleware)
 workflowFetchClient.use(authMiddleware)
 export { workflowFetchClient }
 export const workflowClient = createClient(workflowFetchClient)
+
+export const filteringFetchClient = createFetchClient<FilteringAPI.paths>({ baseUrl: '/api/v1/' })
+filteringFetchClient.use(interfaceTagMiddleware)
+filteringFetchClient.use(authMiddleware)
+export const filteringClient = createClient(filteringFetchClient)
 
 export const executionsFetchClient = createFetchClient<ExecutionsAPI.paths>({ baseUrl: '/api/v1/' })
 executionsFetchClient.use(interfaceTagMiddleware)
