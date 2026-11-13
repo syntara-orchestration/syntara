@@ -358,7 +358,7 @@ export default function ExecutionDetail() {
   return (
     <SynPage>
       <SynPageTitle segments={[executionDetailPageHeading(execution, executionId), 'Workflow Runs']} />
-      <SynReactFlowViewportGuard onReturn={() => detachPromise(navigate({ to: AppRoute.Executions.Root }))}>
+      <SynReactFlowViewportGuard returnTo={AppRoute.Executions.Root}>
         <SynPageHeader
           title={executionDetailPageHeading(execution, executionId)}
           docLink={executionsDocLink}
@@ -376,13 +376,11 @@ export default function ExecutionDetail() {
               onReviewClick={approval.open}
               historyCardOpen={historyCardOpen}
               onToggleHistory={toggleHistoryCard}
-              onBackToEditor={() => {
-                if (execution?.workflow_id) {
-                  detachPromise(
-                    navigate({ to: '/workflow-builder/$workflowId', params: { workflowId: execution.workflow_id } })
-                  )
-                }
-              }}
+              editorTo={
+                execution?.workflow_id
+                  ? AppRoute.WorkflowBuilder.Edit.replace(':workflowId', execution.workflow_id)
+                  : undefined
+              }
               onCopyToEditor={() => copyToEditorDialog.open(undefined)}
               isCancellable={isCancellable}
               executionId={executionId}

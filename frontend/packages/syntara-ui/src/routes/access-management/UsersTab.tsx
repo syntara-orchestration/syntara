@@ -313,9 +313,6 @@ export function UsersTab() {
     resetPagination,
   })
 
-  const handleCreateUser = permissions.canCreate
-    ? () => detachPromise(navigate({ to: AppRoute.AccessManagement.CreateUser }))
-    : undefined
   const handleRowNavigate = (path: string) => detachPromise(navigate({ to: path }))
 
   const adminToggle = useAdminToggle(builtinUser, () => detachPromise(refetch()))
@@ -357,7 +354,7 @@ export function UsersTab() {
             title="No users yet"
             description="Create a user to manage access to the platform."
             buttonText="Create user"
-            addData={handleCreateUser}
+            linkTo={permissions.canCreate ? AppRoute.AccessManagement.CreateUser : undefined}
           />
         }
         toolbar={
@@ -369,14 +366,15 @@ export function UsersTab() {
               clearAllFilters={handleClearAllFilters}
               actions={
                 <DisabledWithTooltip isDisabled={!permissions.canCreate} content={permissions.tooltips.create}>
-                  <Button
-                    variant="primary"
-                    icon={<RhUiAddIcon />}
-                    isAriaDisabled={!permissions.canCreate}
-                    onClick={handleCreateUser}
-                  >
-                    Create user
-                  </Button>
+                  {permissions.canCreate ? (
+                    <SynLink to={AppRoute.AccessManagement.CreateUser} variant="primary" icon={<RhUiAddIcon />}>
+                      Create user
+                    </SynLink>
+                  ) : (
+                    <Button variant="primary" icon={<RhUiAddIcon />} isAriaDisabled>
+                      Create user
+                    </Button>
+                  )}
                 </DisabledWithTooltip>
               }
             />

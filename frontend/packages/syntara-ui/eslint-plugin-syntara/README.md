@@ -4,6 +4,21 @@ Custom ESLint rules for the Syntara UI project to enforce project-specific patte
 
 ## Rules
 
+### `no-route-navigation-callbacks`
+
+Flags `onClick`, CTA, and back callbacks that only navigate. Use `SynLink` for page navigation. The rule catches direct `navigate(...)` calls, calls in local handlers, and `detachPromise(navigate(...))`. Callbacks that do other work before navigating remain allowed. Menu actions that close a menu or open a dialog also remain allowed. Route-only `DropdownItem` and `MenuItem` callbacks need a link destination.
+
+```tsx
+// Invalid: Cmd-click and open-in-new-tab do not work.
+<Button onClick={() => navigate({ to: '/users/new' })}>Create user</Button>
+
+// Valid: native link behavior is preserved.
+<SynLink to="/users/new" variant="primary">Create user</SynLink>
+
+// Valid: this callback performs an action before routing.
+<Button onClick={() => { save(); navigate({ to: '/users' }) }}>Save</Button>
+```
+
 ### `no-raw-http-calls`
 
 Disallows raw HTTP usage in UI source code: references to the global `fetch` and `XMLHttpRequest` instantiation. All API communication must go through typed API clients to maintain UI-API parity.

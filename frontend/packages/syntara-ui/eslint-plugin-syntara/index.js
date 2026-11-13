@@ -2,6 +2,7 @@ import noHardcodedDocUrls from './rules/no-hardcoded-doc-urls.js'
 import noLocaleDateFormat from './rules/no-locale-date-format.js'
 import noNestedComponentDefinitions from './rules/no-nested-component-definitions.js'
 import noRawHttpCalls from './rules/no-raw-http-calls.js'
+import noRouteNavigationCallbacks from './rules/no-route-navigation-callbacks.js'
 import preferConfirmationDialog from './rules/prefer-confirmation-dialog.js'
 import preferSynSelect from './rules/prefer-syn-select.js'
 import preferPfListComponents from './rules/prefer-pf-list-components.js'
@@ -17,6 +18,7 @@ export default {
     'no-locale-date-format': noLocaleDateFormat,
     'no-nested-component-definitions': noNestedComponentDefinitions,
     'no-raw-http-calls': noRawHttpCalls,
+    'no-route-navigation-callbacks': noRouteNavigationCallbacks,
     'prefer-confirmation-dialog': preferConfirmationDialog,
     'prefer-syn-select': preferSynSelect,
     'prefer-pf-list-components': preferPfListComponents,

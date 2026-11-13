@@ -103,7 +103,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onReviewClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
-          onBackToEditor={() => {}}
+          editorTo="/workflow-builder/wf-456"
           onCopyToEditor={() => {}}
           isCancellable={false}
           executionId="exec-123"
@@ -131,7 +131,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onReviewClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
-          onBackToEditor={() => {}}
+          editorTo="/workflow-builder/wf-456"
           onCopyToEditor={() => {}}
           isCancellable={true}
           executionId="exec-123"
@@ -152,7 +152,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onReviewClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
-          onBackToEditor={() => {}}
+          editorTo="/workflow-builder/wf-456"
           onCopyToEditor={() => {}}
           isCancellable={true}
           executionId="exec-123"
@@ -173,7 +173,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onReviewClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
-          onBackToEditor={() => {}}
+          editorTo="/workflow-builder/wf-456"
           onCopyToEditor={() => {}}
           isCancellable={false}
           executionId="exec-123"
@@ -210,7 +210,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onReviewClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
-          onBackToEditor={() => {}}
+          editorTo="/workflow-builder/wf-456"
           onCopyToEditor={() => {}}
           isCancellable={false}
           executionId="exec-123"
@@ -238,7 +238,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onReviewClick={() => {}}
           historyCardOpen={true}
           onToggleHistory={() => {}}
-          onBackToEditor={() => {}}
+          editorTo="/workflow-builder/wf-456"
           onCopyToEditor={() => {}}
           isCancellable={true}
           executionId="exec-123"
@@ -248,7 +248,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
     )
     expect(screen.getByRole('button', { name: 'Cancel run' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Review/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Back to editor' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to editor' })).toBeInTheDocument()
   })
 
   it('renders copy to editor button', () => {
@@ -261,7 +261,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onReviewClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
-          onBackToEditor={() => {}}
+          editorTo="/workflow-builder/wf-456"
           onCopyToEditor={() => {}}
           isCancellable={false}
           executionId="exec-123"
@@ -284,7 +284,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onReviewClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
-          onBackToEditor={() => {}}
+          editorTo="/workflow-builder/wf-456"
           onCopyToEditor={onCopyToEditor}
           isCancellable={false}
           executionId="exec-123"
@@ -314,7 +314,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onReviewClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
-          onBackToEditor={() => {}}
+          editorTo="/workflow-builder/wf-456"
           onCopyToEditor={() => {}}
           isCancellable={false}
           executionId="exec-scoped"
@@ -344,7 +344,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onReviewClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
-          onBackToEditor={() => {}}
+          editorTo="/workflow-builder/wf-456"
           onCopyToEditor={() => {}}
           isCancellable={false}
           executionId="exec-terminal"
@@ -373,7 +373,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onReviewClick={() => {}}
           historyCardOpen={false}
           onToggleHistory={() => {}}
-          onBackToEditor={() => {}}
+          editorTo="/workflow-builder/wf-456"
           onCopyToEditor={() => {}}
           isCancellable={true}
           executionId="exec-running"
