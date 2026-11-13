@@ -386,6 +386,18 @@ export interface components {
       /** @description Work item lifecycle status */
       status: components['schemas']['WorkItemStatus']
       /**
+       * Cancellation Requested
+       * @description Whether cancellation intent has been persisted. A true value does not confirm that execution has stopped: status remains dispatched or running until an outcome is known. A result may win the cancellation race. This flag remains true after completion and is also set by deletion.
+       * @default false
+       */
+      cancellation_requested?: boolean
+      /**
+       * Deletion Requested
+       * @description Whether deletion intent has been persisted. Always implies cancellation_requested=true. Active work is cancelled asynchronously, and the record remains readable until resource cleanup is confirmed and the record is removed. This flag does not change an existing terminal outcome or confirm that deletion has completed.
+       * @default false
+       */
+      deletion_requested?: boolean
+      /**
        * Result
        * @description Work execution result payload
        */
@@ -440,7 +452,6 @@ export interface components {
       | 'claimed'
       | 'dispatched'
       | 'running'
-      | 'cancel_requested'
       | 'reconciliation_required'
       | 'completed'
       | 'failed'

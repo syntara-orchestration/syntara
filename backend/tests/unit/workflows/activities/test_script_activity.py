@@ -177,8 +177,20 @@ class TestScriptActivityDispatch:
         complete_async.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_running_response_is_accepted_for_async_completion(self) -> None:
-        _FakeEPClient.responses = [{"id": "00000000-0000-0000-0000-000000000002", "status": "running", "result": None}]
+    @pytest.mark.parametrize("status", ["pending", "claimed", "dispatched", "running", "reconciliation_required"])
+    @pytest.mark.parametrize("deletion_requested", [False, True])
+    async def test_control_request_waits_for_confirmed_completion(
+        self, status: str, *, deletion_requested: bool
+    ) -> None:
+        _FakeEPClient.responses = [
+            {
+                "id": "00000000-0000-0000-0000-000000000002",
+                "status": status,
+                "result": None,
+                "cancellation_requested": True,
+                "deletion_requested": deletion_requested,
+            }
+        ]
         with patch.object(activity_module.activity, "raise_complete_async") as complete_async:
             result = await activity_module.execute_script_activity(
                 {"language": "bash", "code": "sleep 1"}, None, EXECUTION_ID

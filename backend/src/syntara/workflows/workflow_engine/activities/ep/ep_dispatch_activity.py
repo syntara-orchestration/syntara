@@ -189,7 +189,6 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
             "claimed",
             "dispatched",
             "running",
-            "cancel_requested",
             "reconciliation_required",
         }:
             msg = f"Execution Plane returned unsupported work state '{state}'"

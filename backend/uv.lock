@@ -975,8 +975,8 @@ wheels = [
 
 [[package]]
 name = "execution-plane-client"
-version = "0.1.19.dev1+g92f05095f"
-source = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&branch=feat%2Fexecution-plane-cancel-delete#92f05095fc48aa0b3b511d71436a51ff6bb3ef7c" }
+version = "0.1.19.dev8+g1cb669809"
+source = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git?subdirectory=src%2Fexecution_plane_client&branch=feat%2Fexecution-plane-cancel-delete#1cb669809d140b48c81b171944896622f00875e0" }
 dependencies = [
     { name = "pydantic" },
 ]
