@@ -48,7 +48,8 @@ describe('isStepConditional', () => {
     ]
     const edges = [
       { source: 'trigger-0', target: 'check_env' },
-      { source: 'check_env', target: 'deploy' },
+      { source: 'check_env', target: 'deploy', sourceHandle: 'true' },
+      { source: 'check_env', target: 'reject', sourceHandle: 'false' },
     ]
     const triggerIds = ['trigger-0']
 
@@ -62,7 +63,8 @@ describe('isStepConditional', () => {
     ]
     const edges = [
       { source: 'trigger-0', target: 'route' },
-      { source: 'route', target: 'deploy_prod' },
+      { source: 'route', target: 'deploy_prod', sourceHandle: 'case_0' },
+      { source: 'route', target: 'deploy_staging', sourceHandle: 'default' },
     ]
     const triggerIds = ['trigger-0']
 
@@ -76,14 +78,16 @@ describe('isStepConditional', () => {
     ]
     const edges = [
       { source: 'trigger-0', target: 'process_items' },
-      { source: 'process_items', target: 'process_item' },
+      { source: 'process_items', target: 'process_item', sourceHandle: 'loop' },
+      { source: 'process_items', target: 'after_loop', sourceHandle: 'done' },
     ]
     const triggerIds = ['trigger-0']
 
     expect(isStepConditional('process_item', activities, edges, triggerIds)).toBe(true)
+    expect(isStepConditional('after_loop', activities, edges, triggerIds)).toBe(false)
   })
 
-  it('returns false when step is after conditional branch converges', () => {
+  it('does not warn for a step reached by every conditional branch', () => {
     const activities = [
       { id: 'check_env', type: 'condition' },
       { id: 'deploy_staging', type: 'script' },
@@ -92,8 +96,8 @@ describe('isStepConditional', () => {
     ]
     const edges = [
       { source: 'trigger-0', target: 'check_env' },
-      { source: 'check_env', target: 'deploy_staging' },
-      { source: 'check_env', target: 'deploy_prod' },
+      { source: 'check_env', target: 'deploy_staging', sourceHandle: 'true' },
+      { source: 'check_env', target: 'deploy_prod', sourceHandle: 'false' },
       { source: 'deploy_staging', target: 'notify' },
       { source: 'deploy_prod', target: 'notify' },
     ]
@@ -103,10 +107,7 @@ describe('isStepConditional', () => {
     expect(isStepConditional('deploy_staging', activities, edges, triggerIds)).toBe(true)
     expect(isStepConditional('deploy_prod', activities, edges, triggerIds)).toBe(true)
 
-    // Note: In current implementation, 'notify' is also considered conditional
-    // because there's a path through a conditional node to reach it.
-    // This is conservative but safe - better to over-warn than under-warn.
-    expect(isStepConditional('notify', activities, edges, triggerIds)).toBe(true)
+    expect(isStepConditional('notify', activities, edges, triggerIds)).toBe(false)
   })
 
   it('handles multiple trigger IDs', () => {
@@ -139,12 +140,31 @@ describe('isStepConditional', () => {
     ]
     const edges = [
       { source: 'trigger-0', target: 'check_env' },
-      { source: 'check_env', target: 'check_region' },
-      { source: 'check_region', target: 'deploy' },
+      { source: 'check_env', target: 'check_region', sourceHandle: 'true' },
+      { source: 'check_env', target: 'skip_deploy', sourceHandle: 'false' },
+      { source: 'check_region', target: 'deploy', sourceHandle: 'true' },
+      { source: 'check_region', target: 'skip_deploy', sourceHandle: 'false' },
     ]
     const triggerIds = ['trigger-0']
 
     expect(isStepConditional('deploy', activities, edges, triggerIds)).toBe(true)
+  })
+
+  it('does not treat an inner branch join as guaranteed when an outer branch can bypass it', () => {
+    const activities = [
+      { id: 'outer_check', type: 'condition' },
+      { id: 'inner_check', type: 'condition' },
+      { id: 'notify', type: 'script' },
+    ]
+    const edges = [
+      { source: 'trigger-0', target: 'outer_check' },
+      { source: 'outer_check', target: 'inner_check', sourceHandle: 'true' },
+      { source: 'outer_check', target: 'skip_notify', sourceHandle: 'false' },
+      { source: 'inner_check', target: 'notify', sourceHandle: 'true' },
+      { source: 'inner_check', target: 'skip_notify', sourceHandle: 'false' },
+    ]
+
+    expect(isStepConditional('notify', activities, edges, ['trigger-0'])).toBe(true)
   })
 
   it('does not let a conditional sibling path mark an unconditional step conditional', () => {
@@ -155,7 +175,8 @@ describe('isStepConditional', () => {
     ]
     const edges = [
       { source: 'trigger-0', target: 'check' },
-      { source: 'check', target: 'conditional_task' },
+      { source: 'check', target: 'conditional_task', sourceHandle: 'true' },
+      { source: 'check', target: 'skip_task', sourceHandle: 'false' },
       { source: 'trigger-0', target: 'always_task' },
     ]
 
