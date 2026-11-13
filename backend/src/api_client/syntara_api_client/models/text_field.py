@@ -5,6 +5,7 @@ from typing import Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
 
+from ..models.text_field_display import TextFieldDisplay
 from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="TextField")
@@ -12,7 +13,7 @@ T = TypeVar("T", bound="TextField")
 
 @_attrs_define
 class TextField:
-    """Text field.
+    """Text field. The backend preserves `display` but does not interpret it.
 
     Attributes:
         value_name (str):
@@ -21,6 +22,7 @@ class TextField:
         placeholder (None | str | Unset):
         help_text (None | str | Unset):
         required (bool | Unset):  Default: False.
+        display (TextFieldDisplay | Unset):  Default: TextFieldDisplay.SINGLE_LINE.
         default (None | str | Unset):
     """
 
@@ -30,6 +32,7 @@ class TextField:
     placeholder: None | str | Unset = UNSET
     help_text: None | str | Unset = UNSET
     required: bool | Unset = False
+    display: TextFieldDisplay | Unset = TextFieldDisplay.SINGLE_LINE
     default: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
@@ -53,6 +56,10 @@ class TextField:
 
         required = self.required
 
+        display: str | Unset = UNSET
+        if not isinstance(self.display, Unset):
+            display = self.display.value
+
         default: None | str | Unset
         if isinstance(self.default, Unset):
             default = UNSET
@@ -74,6 +81,8 @@ class TextField:
             field_dict["help_text"] = help_text
         if required is not UNSET:
             field_dict["required"] = required
+        if display is not UNSET:
+            field_dict["display"] = display
         if default is not UNSET:
             field_dict["default"] = default
 
@@ -110,6 +119,13 @@ class TextField:
 
         required = d.pop("required", UNSET)
 
+        _display = d.pop("display", UNSET)
+        display: TextFieldDisplay | Unset
+        if isinstance(_display, Unset):
+            display = UNSET
+        else:
+            display = TextFieldDisplay(_display)
+
         def _parse_default(data: object) -> None | str | Unset:
             if data is None:
                 return data
@@ -126,6 +142,7 @@ class TextField:
             placeholder=placeholder,
             help_text=help_text,
             required=required,
+            display=display,
             default=default,
         )
 

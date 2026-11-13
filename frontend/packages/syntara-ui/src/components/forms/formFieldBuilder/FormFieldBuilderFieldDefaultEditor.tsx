@@ -3,6 +3,7 @@ import type { FormDefinition, FormField } from '@syntara/contracts'
 import { Controller, useFormContext } from 'react-hook-form'
 
 import { FormFieldTypeEnum } from '../../../forms'
+import { uiKindForField } from '../../../forms/formFieldUiKind'
 import { FormFieldError, FormFieldHintOrError } from '../../FormFieldError'
 import { SynNumberInputControl } from '../SynNumberInputControl'
 import { SynTextField } from '../SynTextField'
@@ -40,7 +41,7 @@ export function FormFieldBuilderFieldDefaultEditor({
     'dateDefaultValue',
     FORM_FIELD_BUILDER_INITIAL_ANSWER_LABEL
   )
-  const examples = getFormFieldBuilderExamplePlaceholders(field.type)
+  const examples = getFormFieldBuilderExamplePlaceholders(uiKindForField(field))
 
   if (field.type === FormFieldTypeEnum.CHECKBOX) {
     return (
@@ -147,12 +148,7 @@ export function FormFieldBuilderFieldDefaultEditor({
     )
   }
 
-  if (
-    field.type === FormFieldTypeEnum.TEXT ||
-    field.type === FormFieldTypeEnum.TEXTAREA ||
-    field.type === FormFieldTypeEnum.MASKED_TEXT ||
-    field.type === FormFieldTypeEnum.EMAIL
-  ) {
+  if (field.type === FormFieldTypeEnum.TEXT || field.type === FormFieldTypeEnum.EMAIL) {
     return (
       <SynTextField
         name={`fields.${index}.default`}

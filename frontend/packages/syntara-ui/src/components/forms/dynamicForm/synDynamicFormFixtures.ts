@@ -1,3 +1,5 @@
+import { FormFieldDisplayEnum } from '@syntara/contracts'
+
 import { FormFieldTypeEnum, parseFormDefinition } from '../../../forms'
 
 const staticPriorityOptions = {
@@ -44,13 +46,15 @@ export const sampleDynamicFormDefinition = parseFormDefinition({
       options: staticPriorityOptions,
     },
     {
-      type: FormFieldTypeEnum.TEXTAREA,
+      type: FormFieldTypeEnum.TEXT,
+      display: FormFieldDisplayEnum.MULTI_LINE,
       value_name: 'notes',
       label: 'Notes',
       placeholder: 'Optional details',
     },
     {
-      type: FormFieldTypeEnum.MASKED_TEXT,
+      type: FormFieldTypeEnum.TEXT,
+      display: FormFieldDisplayEnum.MASKED,
       value_name: 'token',
       label: 'API token',
     },

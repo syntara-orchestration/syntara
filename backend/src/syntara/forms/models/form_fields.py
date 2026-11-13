@@ -27,23 +27,10 @@ class FormFieldBase(BaseModel):
 
 
 class TextField(FormFieldBase):
-    """Text field."""
+    """Text field. The backend preserves `display` but does not interpret it."""
 
     type: Literal["text"]
-    default: str | None = None
-
-
-class TextAreaField(FormFieldBase):
-    """Text area field."""
-
-    type: Literal["textarea"]
-    default: str | None = None
-
-
-class MaskedTextField(FormFieldBase):
-    """Masked text field."""
-
-    type: Literal["masked_text"]
+    display: Literal["single_line", "multi_line", "masked"] = "single_line"
     default: str | None = None
 
 
@@ -343,15 +330,13 @@ class MultiSelectField(FormFieldBase):
         return defaults
 
 
-CommonFormField = TextField | TextAreaField | MaskedTextField | EmailField | NumberField | CheckboxField | DateField
+CommonFormField = TextField | EmailField | NumberField | CheckboxField | DateField
 
 FormField = Annotated[CommonFormField | DropdownField | MultiSelectField, Discriminator("type")]
 
 # Discriminator values for FormField and OptionsSource unions.
 # Used by validators to normalize Pydantic error paths by stripping union tags.
-FORM_FIELD_TYPES = frozenset(
-    {"text", "textarea", "masked_text", "email", "number", "checkbox", "date", "dropdown", "multi_select"}
-)
+FORM_FIELD_TYPES = frozenset({"text", "email", "number", "checkbox", "date", "dropdown", "multi_select"})
 OPTIONS_SOURCES = frozenset({"static", "dynamic", "dynamic_resolved"})
 
 

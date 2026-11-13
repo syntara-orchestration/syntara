@@ -1,16 +1,16 @@
 import { MenuToggle, type MenuToggleElement, SelectList, SelectOption } from '@patternfly/react-core'
 import { useCallback, useState } from 'react'
 
-import { type FormFieldType } from '../../../forms'
+import { isFormFieldUiKind, type FormFieldUiKind } from '../../../forms/formFieldUiKind'
 import { SynSelect } from '../../SynSelect'
 
 import { fieldTypeLabel, FORM_FIELD_TYPE_SELECT_OPTIONS } from './createDefaultField'
 
 type FormFieldBuilderFieldTypeSelectProps = {
   fieldId: string
-  value: FormFieldType
+  value: FormFieldUiKind
   isDisabled?: boolean
-  onChange: (type: FormFieldType) => void
+  onChange: (type: FormFieldUiKind) => void
 }
 
 type FieldTypeSelectToggleProps = Readonly<{
@@ -58,7 +58,9 @@ export function FormFieldBuilderFieldTypeSelect({
       onOpenChange={setIsOpen}
       selected={value}
       onSelect={(_event, selected) => {
-        onChange(selected as FormFieldType)
+        if (isFormFieldUiKind(selected)) {
+          onChange(selected)
+        }
         setIsOpen(false)
       }}
       shouldFocusToggleOnSelect

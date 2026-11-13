@@ -19,12 +19,10 @@ from syntara.forms.models.form_fields import (
     FormDefinition,
     FormPromptDefinition,
     FormTriggerDefinition,
-    MaskedTextField,
     MultiSelectField,
     NumberField,
     ResolvedOptions,
     StaticOptions,
-    TextAreaField,
     TextField,
 )
 
@@ -54,6 +52,7 @@ class TestFormFieldBase:
         assert field.help_text == "Your login"
         assert field.required is True
         assert field.default == "bob"
+        assert field.display == "single_line"
 
     def test_optional_fields_default(self) -> None:
         """Optional metadata defaults to None/False."""
@@ -63,6 +62,14 @@ class TestFormFieldBase:
         assert field.help_text is None
         assert field.required is False
         assert field.default is None
+        assert field.display == "single_line"
+
+    @pytest.mark.parametrize("display", ["single_line", "multi_line", "masked"])
+    def test_display_options(self, display: str) -> None:
+        """The UI rendering hint is retained and does not change the field model."""
+        field = TextField.model_validate(_text(display=display))
+
+        assert field.display == display
 
     @pytest.mark.parametrize("value_name", ["_private", "snake_case", "camelCase", "a1", "A"])
     def test_valid_value_names(self, value_name: str) -> None:
@@ -93,8 +100,6 @@ class TestFieldDiscriminator:
         ("type_name", "expected_cls", "default"),
         [
             ("text", TextField, "hello"),
-            ("textarea", TextAreaField, "hello"),
-            ("masked_text", MaskedTextField, "secret"),
             ("email", EmailField, "a@b.com"),
             ("number", NumberField, 4.5),
             ("checkbox", CheckboxField, True),
@@ -107,6 +112,12 @@ class TestFieldDiscriminator:
         field = form.fields[0]
         assert isinstance(field, expected_cls)
         assert field.default == default
+
+    @pytest.mark.parametrize("type_name", ["textarea", "masked_text"])
+    def test_removed_text_types_rejected(self, type_name: str) -> None:
+        """The removed wire discriminators are rejected by the hard cutover."""
+        with pytest.raises(ValidationError):
+            _form(_text(type=type_name))
 
     def test_unknown_type_rejected(self) -> None:
         """An unrecognized discriminator value fails validation."""
@@ -242,9 +253,9 @@ class TestAuthoredFormDefinitions:
 
     def test_prompt_and_trigger_keep_shared_non_selection_field_types(self) -> None:
         fields = [
-            _text(type="text", value_name="text_value"),
-            _text(type="textarea", value_name="textarea_value"),
-            _text(type="masked_text", value_name="masked_value"),
+            _text(type="text", value_name="text_value", display="single_line"),
+            _text(type="text", value_name="textarea_value", display="multi_line"),
+            _text(type="text", value_name="masked_value", display="masked"),
             _text(type="email", value_name="email_value"),
             _text(type="number", value_name="number_value"),
             _text(type="checkbox", value_name="checkbox_value"),

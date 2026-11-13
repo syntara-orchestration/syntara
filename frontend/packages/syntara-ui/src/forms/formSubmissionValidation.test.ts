@@ -1,3 +1,4 @@
+import { FormFieldDisplayEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { parseFormDefinition } from './formDefinitionSchema'
@@ -88,8 +89,8 @@ describe('validateFormSubmission', () => {
 
   it.each([
     [FormFieldTypeEnum.TEXT, {} as const, ''],
-    [FormFieldTypeEnum.TEXTAREA, {} as const, ''],
-    [FormFieldTypeEnum.MASKED_TEXT, {} as const, ''],
+    [FormFieldTypeEnum.TEXT, { display: FormFieldDisplayEnum.MULTI_LINE } as const, ''],
+    [FormFieldTypeEnum.TEXT, { display: FormFieldDisplayEnum.MASKED } as const, ''],
     [FormFieldTypeEnum.EMAIL, {} as const, ''],
     [FormFieldTypeEnum.DATE, {} as const, ''],
     [FormFieldTypeEnum.NUMBER, {} as const, null],
@@ -103,8 +104,8 @@ describe('validateFormSubmission', () => {
 
   it.each([
     [FormFieldTypeEnum.TEXT, '', { default: 'prefilled' }, ''],
-    [FormFieldTypeEnum.TEXTAREA, [], { default: 'prefilled' }, ''],
-    [FormFieldTypeEnum.MASKED_TEXT, null, { default: 'prefilled' }, ''],
+    [FormFieldTypeEnum.TEXT, [], { default: 'prefilled', display: FormFieldDisplayEnum.MULTI_LINE }, ''],
+    [FormFieldTypeEnum.TEXT, null, { default: 'prefilled', display: FormFieldDisplayEnum.MASKED }, ''],
     [FormFieldTypeEnum.EMAIL, '', { default: 'user@example.com' }, ''],
     [FormFieldTypeEnum.DATE, '', { default: { date: '2026-01-05' } }, ''],
     [FormFieldTypeEnum.NUMBER, '', { default: 7 }, null],
@@ -136,34 +137,64 @@ describe('validateFormSubmission', () => {
   })
 
   it.each([
-    [FormFieldTypeEnum.TEXT, 'name'],
-    [FormFieldTypeEnum.TEXTAREA, 'notes'],
-    [FormFieldTypeEnum.MASKED_TEXT, 'secret'],
-    [FormFieldTypeEnum.EMAIL, 'contact'],
-  ] as const)('normalizes optional whitespace-only %s fields to an empty string', (fieldType, value_name) => {
-    const definition = form(field(fieldType, value_name))
-    expect(validateFormSubmission(definition, { [value_name]: '   ' })).toEqual({ [value_name]: '' })
-  })
+    [FormFieldTypeEnum.TEXT, 'name', {}],
+    [FormFieldTypeEnum.TEXT, 'notes', { display: FormFieldDisplayEnum.MULTI_LINE }],
+    [FormFieldTypeEnum.TEXT, 'secret', { display: FormFieldDisplayEnum.MASKED }],
+    [FormFieldTypeEnum.EMAIL, 'contact', {}],
+  ] as const)(
+    'normalizes optional whitespace-only %s fields to an empty string',
+    (fieldType, value_name, overrides) => {
+      const definition = form(field(fieldType, value_name, overrides))
+      expect(validateFormSubmission(definition, { [value_name]: '   ' })).toEqual({ [value_name]: '' })
+    }
+  )
 
   it.each([
-    [FormFieldTypeEnum.TEXT, 'name'],
-    [FormFieldTypeEnum.TEXTAREA, 'notes'],
-    [FormFieldTypeEnum.MASKED_TEXT, 'secret'],
-    [FormFieldTypeEnum.EMAIL, 'contact'],
-  ] as const)('treats whitespace-only required %s fields as empty', (fieldType, value_name) => {
-    const definition = form(field(fieldType, value_name, { required: true }))
+    [FormFieldTypeEnum.TEXT, 'name', {}],
+    [FormFieldTypeEnum.TEXT, 'notes', { display: FormFieldDisplayEnum.MULTI_LINE }],
+    [FormFieldTypeEnum.TEXT, 'secret', { display: FormFieldDisplayEnum.MASKED }],
+    [FormFieldTypeEnum.EMAIL, 'contact', {}],
+  ] as const)('treats whitespace-only required %s fields as empty', (fieldType, value_name, overrides) => {
+    const definition = form(field(fieldType, value_name, { ...overrides, required: true }))
     expectValidationErrors(definition, { [value_name]: '   ' }, [[value_name, 'required']])
   })
 
   it.each([
-    [FormFieldTypeEnum.TEXT, 'name', '  Ada  ', 'Ada'],
-    [FormFieldTypeEnum.TEXTAREA, 'notes', '  padded\nbody  ', 'padded\nbody'],
-    [FormFieldTypeEnum.MASKED_TEXT, 'secret', '  ***  ', '***'],
-    [FormFieldTypeEnum.EMAIL, 'contact', '  Bob@Example.COM  ', 'Bob@example.com'],
-  ] as const)('trims outer whitespace from %s submissions', (fieldType, value_name, submitted, expected) => {
-    const definition = form(field(fieldType, value_name))
-    expect(validateFormSubmission(definition, { [value_name]: submitted })).toEqual({ [value_name]: expected })
-  })
+    {
+      fieldType: FormFieldTypeEnum.TEXT,
+      value_name: 'name',
+      submitted: '  Ada  ',
+      expected: 'Ada',
+      overrides: {},
+    },
+    {
+      fieldType: FormFieldTypeEnum.TEXT,
+      value_name: 'notes',
+      submitted: '  padded\nbody  ',
+      expected: 'padded\nbody',
+      overrides: { display: FormFieldDisplayEnum.MULTI_LINE },
+    },
+    {
+      fieldType: FormFieldTypeEnum.TEXT,
+      value_name: 'secret',
+      submitted: '  ***  ',
+      expected: '***',
+      overrides: { display: FormFieldDisplayEnum.MASKED },
+    },
+    {
+      fieldType: FormFieldTypeEnum.EMAIL,
+      value_name: 'contact',
+      submitted: '  Bob@Example.COM  ',
+      expected: 'Bob@example.com',
+      overrides: {},
+    },
+  ] as const)(
+    'trims outer whitespace from $fieldType submissions',
+    ({ fieldType, value_name, submitted, expected, overrides }) => {
+      const definition = form(field(fieldType, value_name, overrides))
+      expect(validateFormSubmission(definition, { [value_name]: submitted })).toEqual({ [value_name]: expected })
+    }
+  )
 
   it('reports required, type, and unknown_field errors together', () => {
     const definition = form(
@@ -255,10 +286,10 @@ describe('validateFormSubmission', () => {
     expect(cleaned).toEqual({ tags: ['a'] })
   })
 
-  it('coerces textarea, masked text, and numeric string inputs', () => {
+  it('coerces text display variants and numeric string inputs', () => {
     const definition = form(
-      field(FormFieldTypeEnum.TEXTAREA, 'notes'),
-      field(FormFieldTypeEnum.MASKED_TEXT, 'secret'),
+      field(FormFieldTypeEnum.TEXT, 'notes', { display: FormFieldDisplayEnum.MULTI_LINE }),
+      field(FormFieldTypeEnum.TEXT, 'secret', { display: FormFieldDisplayEnum.MASKED }),
       field(FormFieldTypeEnum.NUMBER, 'count')
     )
 

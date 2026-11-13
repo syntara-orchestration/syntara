@@ -22,8 +22,6 @@ function isEmptyValue(value: unknown): value is '' | null | undefined | never[] 
 
 const TRIM_ON_SUBMIT_FIELD_TYPES: ReadonlySet<FormField['type']> = new Set([
   FormFieldTypeEnum.TEXT,
-  FormFieldTypeEnum.TEXTAREA,
-  FormFieldTypeEnum.MASKED_TEXT,
   FormFieldTypeEnum.EMAIL,
 ])
 
@@ -38,8 +36,6 @@ function normalizeTextLikeSubmission(field: FormField, raw: unknown): unknown {
 function emptyValueForField(field: FormField): FormSubmissionData[string] {
   switch (field.type) {
     case FormFieldTypeEnum.TEXT:
-    case FormFieldTypeEnum.TEXTAREA:
-    case FormFieldTypeEnum.MASKED_TEXT:
     case FormFieldTypeEnum.EMAIL:
     case FormFieldTypeEnum.DATE:
       return ''
@@ -300,8 +296,6 @@ function coerceMultiSelect(raw: unknown): Array<OptionScalar> {
 function coerceField(field: FormField, raw: unknown): CoercedValue {
   switch (field.type) {
     case FormFieldTypeEnum.TEXT:
-    case FormFieldTypeEnum.TEXTAREA:
-    case FormFieldTypeEnum.MASKED_TEXT:
       return coerceString(raw)
     case FormFieldTypeEnum.EMAIL:
       return coerceEmail(raw)

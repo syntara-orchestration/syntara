@@ -14,11 +14,13 @@ flag, optional help and placeholder text, and a type-specific default. Each fiel
 supported type and its defined settings; unknown types and extra settings are rejected. The
 100-field cap is a limit for usability, not a technical requirement.
 
-The supported field types are `text`, `textarea`, `masked_text`, `email`, `number`, `checkbox`,
-`date`, `dropdown`, and `multi_select`.
+The supported field types are `text`, `email`, `number`, `checkbox`, `date`, `dropdown`, and
+`multi_select`. Text fields have a UI-only `display` property: `single_line`,
+`multi_line`, or `masked`. The backend preserves this rendering hint but does not interpret it.
 
-`masked_text` hides a value in the UI but does not encrypt it. For sensitive values, use the
-[credential system](../credential.md) and reference credentials from supported workflow nodes.
+`display: "masked"` hides the value in the UI but does not encrypt or redact its
+value. For sensitive values, use the [credential system](../credential.md) and reference
+credentials from supported workflow nodes.
 
 `FormPromptDefinition` and `FormTriggerDefinition` both inherit from `FormDefinition`. They share
 the common field models and specialized dropdown and multi-select fields to enforce their option

@@ -2,7 +2,8 @@ import { Checkbox, FormGroup, Stack, StackItem } from '@patternfly/react-core'
 import type { FormDefinition, FormField } from '@syntara/contracts'
 import { Controller, useFormContext } from 'react-hook-form'
 
-import { FormFieldTypeEnum, type FormFieldType } from '../../../forms'
+import { FormFieldTypeEnum } from '../../../forms'
+import { type FormFieldUiKind, uiKindForField } from '../../../forms/formFieldUiKind'
 import { SynTextField } from '../SynTextField'
 
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
@@ -19,7 +20,7 @@ type FormFieldBuilderCardFieldsProps = {
   idPrefix: string
   isDisabled?: boolean
   valueNameLooksGenerated: boolean
-  onTypeChange: (type: FormFieldType) => void
+  onTypeChange: (type: FormFieldUiKind) => void
 }
 
 function isOptionsField(field: FormField): field is AuthoredOptionsFormField {
@@ -39,7 +40,8 @@ export function FormFieldBuilderCardFields({
 }: Readonly<FormFieldBuilderCardFieldsProps>) {
   const commit = useFormFieldBuilderCommit()
   const { control } = useFormContext<FormDefinition>()
-  const examples = getFormFieldBuilderExamplePlaceholders(field.type)
+  const uiKind = uiKindForField(field)
+  const examples = getFormFieldBuilderExamplePlaceholders(uiKind)
 
   return (
     <Stack hasGutter>
@@ -47,7 +49,7 @@ export function FormFieldBuilderCardFields({
         <FormGroup label="Field type" fieldId={`${idPrefix}-type`} isRequired>
           <FormFieldBuilderFieldTypeSelect
             fieldId={`${idPrefix}-type`}
-            value={field.type}
+            value={uiKind}
             isDisabled={isDisabled}
             onChange={onTypeChange}
           />
