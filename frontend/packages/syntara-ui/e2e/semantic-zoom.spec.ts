@@ -65,7 +65,7 @@ test('large workflow remains usable across semantic zoom after adding a step', a
   await app.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(app.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 15_000 })
 
-  // SynStepSemanticZoomBody collapses nodes to a single tooltip button at this zoom level;
+  // SynStepSemanticZoomBody collapses nodes to a compact tile at this zoom level;
   // past the threshold they render a full card with a heading instead — hence the two locators below.
   const addedStepSemanticZoomButton = app
     .locator('.react-flow')

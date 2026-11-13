@@ -71,7 +71,7 @@ If Temporal is unreachable during `sync_scheduled_triggers()` or `delete_trigger
 
 ## Execution Conflict Policy
 
-Controls what happens when a schedule fires while a previous execution from the same schedule is still running. Each policy maps to a Temporal `ScheduleOverlapPolicy` and a catchup window (see `build_schedule_policy()` in `schedule_parser.py`).
+Controls what happens when a schedule fires while a previous execution from the same schedule is still running. Each policy maps to a Temporal `ScheduleOverlapPolicy` and a catchup window (see `build_schedule_policy()` in `workflow_runtime/engines/temporal/schedule_parser.py`).
 
 | Policy | Overlap behavior | Catchup behavior | Use Case |
 |--------|-----------------|-------------------|----------|
@@ -85,7 +85,7 @@ Controls what happens when a schedule fires while a previous execution from the 
 
 ## Schedule Types
 
-The trigger supports two schedule types: **cron** (standard 5-field expressions for clock-aligned schedules) and **interval** (ISO 8601 repeating intervals for fixed cadence). See `ScheduledTriggerConfig` in `workflow_definition.py` and `config_to_temporal_schedule()` in `schedule_parser.py` for format details and validation rules.
+The trigger supports two schedule types: **cron** (standard 5-field expressions for clock-aligned schedules) and **interval** (ISO 8601 repeating intervals for fixed cadence). See `ScheduledTriggerConfig` in `workflow_core/models.py` and `config_to_temporal_schedule()` in `workflow_runtime/engines/temporal/schedule_parser.py` for format details and validation rules.
 
 ## Trigger Output
 
@@ -96,10 +96,10 @@ Scheduled triggers expose two timestamps: `scheduled_at` (when the schedule was 
 | File | Purpose |
 |------|---------|
 | `src/syntara/workflows/services/scheduled_trigger_service.py` | Syncs triggers with Temporal Schedules; cached client |
-| `src/syntara/workflows/workflow_engine/scheduled_launcher.py` | `ScheduledWorkflowLauncher` workflow and `ScheduledExecutionLauncher` activity |
-| `src/syntara/workflows/workflow_engine/activities/scheduled_trigger.py` | Activity: pass-through with output mapping (timing metadata arrives via `input_data`) |
-| `src/syntara/workflows/utils/schedule_parser.py` | `build_schedule_id()`, `config_to_temporal_schedule()` |
-| `src/syntara/workflows/workflow_engine/models/workflow_definition.py` | `ScheduledTriggerConfig` model |
+| `src/syntara/workflow_runtime/engines/temporal/scheduled_launcher.py` | `ScheduledWorkflowLauncher` workflow and `ScheduledExecutionLauncher` activity |
+| `src/syntara/workflow_runtime/engines/temporal/activities/scheduled_trigger.py` | Activity: pass-through with output mapping (timing metadata arrives via `input_data`) |
+| `src/syntara/workflow_runtime/engines/temporal/schedule_parser.py` | `build_schedule_id()`, `config_to_temporal_schedule()` |
+| `src/syntara/workflow_core/models.py` | `ScheduledTriggerConfig` model |
 | `src/syntara/schemas/workflows/v2/triggers/scheduled.schema.json` | JSON Schema for trigger configuration |
 
 ## Related Documentation

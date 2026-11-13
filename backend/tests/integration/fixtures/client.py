@@ -131,8 +131,8 @@ def _override_temporal(
     temporal_worker: Worker,
 ) -> None:
     """Add Temporal execution service to dependency overrides."""
+    from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
     from syntara.workflows.executions_router import get_temporal_execution_service
-    from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
     _svc = TemporalExecutionService(temporal_env.client, "test-workflow-queue", "test-workflow-queue")
     session_app.dependency_overrides[get_temporal_execution_service] = lambda: _svc

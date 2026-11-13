@@ -76,7 +76,7 @@ Adding one is two edits (the full walkthrough is in
 [Resilient Background Execution](resilient-background-execution.md#adding-a-new-built-in-workflow)):
 
 1. **Register a handler** in the `_DISPATCH` map in
-   `workflow_engine/activities/internal_activity.py`, keyed by an activity name. `execute_internal_activity`
+   `workflow_runtime/engines/temporal/activities/internal_activity.py`, keyed by an activity name. `execute_internal_activity`
    looks the name up in `_DISPATCH` and calls your handler — that's the single extension point.
 2. **Add the workflow definition** to `_BUILTIN_DEFINITIONS` in `seed_builtin.py` — a
    `scheduled_trigger` (interval + overlap policy) feeding one `internal_activity` node whose

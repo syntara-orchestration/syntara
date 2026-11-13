@@ -131,8 +131,7 @@ jobs:
             chore: weekly visual regression baseline refresh
             (${{ steps.detect.outputs.added }} new, ${{ steps.detect.outputs.modified }} changed)
           title: >-
-            Visual regression: weekly baseline refresh
-            (${{ steps.detect.outputs.added }} new, ${{ steps.detect.outputs.modified }} changed)
+            chore(ci): refresh weekly visual regression baselines
           body: |
             Weekly scheduled run against `devel` regenerated every screenshot in `page-registry.ts`. **${{ steps.detect.outputs.added }}** are new, **${{ steps.detect.outputs.modified }}** changed since last Monday's run.
 

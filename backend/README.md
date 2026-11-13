@@ -72,6 +72,13 @@ This project uses `uv` for dependency management and provides a comprehensive Ma
 - Python (3.12, 3.13, or 3.14)
 - `uv` package manager
 - [Podman](https://podman.io/docs/installation) (for rootless containers)
+- `libmagic` C library (used by `python-magic` for file type detection; `uv` cannot install it):
+  - macOS: `brew install libmagic`
+  - Fedora/RHEL: `sudo dnf install file-libs`
+  - Debian/Ubuntu: `sudo apt install libmagic1`
+  - Windows: see [the Windows setup guide](../docs/windows-setup-guide.md)
+
+  `make install` and `make check-deps` fail with these hints when it is missing.
 
 ### Installation
 
@@ -126,13 +133,11 @@ make run-all
 # Install dependencies and setup project
 make install
 
-# Start the database (Terminal 1)
-make db-run
+# Start PostgreSQL, Redis, Temporal (server, UI, and workers), moto, and the MCP servers in the background.
+# Returns once PostgreSQL, Redis, Temporal, and moto are healthy.
+make services-run
 
-# Start the cache/Redis (Terminal 2 — required for authentication)
-make cache-run
-
-# Start the development server (Terminal 3)
+# Start the development server (runs migrations and seeders first)
 make dev
 
 # Run tests
@@ -142,7 +147,7 @@ make test-all
 make lint
 ```
 
-> **Note:** The API server requires Redis (`make cache-run`) for authentication and streaming. Authorization is evaluated in-process via regopy from `src/syntara/authz/rego/authz.rego`.
+> **Note:** `make dev` needs PostgreSQL to be accepting connections before it starts, because it runs migrations first. The API server also requires Redis for authentication and streaming, and Temporal to run workflows. Authorization is evaluated in-process via regopy from `src/syntara/authz/rego/authz.rego`.
 
 ### Database Setup
 
@@ -233,7 +238,7 @@ make services-run
 
 **Run Temporal worker separately** (for development without containers):
 ```bash
-uv run python -m syntara.workflows.worker
+uv run python -m syntara.workflow_runtime.workers.worker
 # Or use: make worker-run
 ```
 

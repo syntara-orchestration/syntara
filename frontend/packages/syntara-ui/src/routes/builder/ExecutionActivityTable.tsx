@@ -9,7 +9,6 @@ import { SynScrollableTableContainer } from '../../components/table/SynScrollabl
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import type { ActivityState } from '../workflows/execution/types'
-import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
@@ -145,7 +144,7 @@ export function ExecutionActivityTable({
   const hasAAPColumn = useMemo(() => activityOrder.some((a) => isAAPNodeType(a.type)), [activityOrder])
 
   return (
-    <SynScrollableTableContainer caption="Activity states" useFixedLayout={false} variant="compact">
+    <SynScrollableTableContainer caption="Activity states" useFixedLayout={false}>
       <Thead>
         <Tr>
           <Th modifier="nowrap">Name</Th>
@@ -167,7 +166,7 @@ export function ExecutionActivityTable({
             now={now}
             executionError={executionError}
             onRowClick={onRowClick}
-            isSelected={parseCompositeKey(id).baseId === selectedNodeId}
+            isSelected={id === selectedNodeId}
             hasAAPColumn={hasAAPColumn}
           />
         ))}

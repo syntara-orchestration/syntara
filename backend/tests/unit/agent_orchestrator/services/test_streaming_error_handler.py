@@ -33,10 +33,14 @@ pytestmark = pytest.mark.unit
         (Exception("Unauthorized: Invalid API key"), "AUTHENTICATION_FAILED", False),
         (Exception("HTTP 401: Unauthorized"), "AUTHENTICATION_FAILED", False),
         (Exception("HTTP 403: Forbidden"), "AUTHENTICATION_FAILED", False),
-        # Upstream server errors
+        # Upstream server errors — any 5xx status, not just 500/502/503
         (Exception("HTTP 500: Internal Server Error"), "UPSTREAM_ERROR", True),
         (Exception("HTTP 502: Bad Gateway"), "UPSTREAM_ERROR", True),
         (Exception("HTTP 503: Service Unavailable"), "UPSTREAM_ERROR", True),
+        (Exception("HTTP 504: Gateway Timeout"), "UPSTREAM_ERROR", True),
+        (Exception("HTTP 520: Web Server Returned an Unknown Error"), "UPSTREAM_ERROR", True),
+        (Exception("HTTP 522: Connection Timed Out"), "UPSTREAM_ERROR", True),
+        (Exception("HTTP 529: Overloaded"), "UPSTREAM_ERROR", True),
         # Network errors
         (Exception("Connection refused by host"), "CONNECTION_ERROR", True),
         (Exception("Network unreachable"), "CONNECTION_ERROR", True),
@@ -83,6 +87,10 @@ pytestmark = pytest.mark.unit
         (ValueError("Invalid input format"), "UNKNOWN_ERROR", False),
         (Exception("Something went wrong"), "UNKNOWN_ERROR", False),
         (Exception(""), "UNKNOWN_ERROR", False),
+        # A 4xx status is not a server error
+        (Exception("HTTP 404: Not Found"), "UNKNOWN_ERROR", False),
+        # 5xx-looking digit runs embedded in unrelated numbers are not status codes
+        (Exception("Stream stopped after 1529 tokens (request id 7a520b)"), "UNKNOWN_ERROR", False),
     ],
     ids=[
         "timeout",
@@ -95,6 +103,10 @@ pytestmark = pytest.mark.unit
         "upstream_500",
         "upstream_502",
         "upstream_503",
+        "upstream_504",
+        "upstream_520",
+        "upstream_522",
+        "upstream_529",
         "network_refused",
         "network_unreachable",
         "network_timeout",
@@ -106,6 +118,8 @@ pytestmark = pytest.mark.unit
         "unknown_value_error",
         "unknown_generic",
         "unknown_empty",
+        "unknown_4xx",
+        "unknown_embedded_digit_run",
     ],
 )
 def test_error_classification(
@@ -151,6 +165,38 @@ def test_mixed_error_signals_priority() -> None:
 
     # Rate limit should match first (comes before connection check)
     assert error.code == "RATE_LIMIT_EXCEEDED"
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "HTTP 429: Too Many Requests; upstream returned 502",
+        "Upstream error 520 (previous attempt got 429)",
+    ],
+    ids=["429_with_5xx", "5xx_with_429"],
+)
+def test_5xx_not_masked_by_rate_limit_check(message: str) -> None:
+    """A genuine 5xx must win over an incidental 429 mention in the message."""
+    error = classify_streaming_error(Exception(message))
+
+    assert error.code == "UPSTREAM_ERROR"
+    assert error.retryable is True
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "HTTP 401: Unauthorized; upstream provider returned 500",
+        "HTTP 403: Forbidden (gateway 503)",
+    ],
+    ids=["401_with_5xx", "403_with_5xx"],
+)
+def test_5xx_not_masked_by_auth_check(message: str) -> None:
+    """A genuine 5xx must win over an incidental 401/403 mention in the message."""
+    error = classify_streaming_error(Exception(message))
+
+    assert error.code == "UPSTREAM_ERROR"
+    assert error.retryable is True
 
 
 def test_tool_discovery_not_misclassified_as_llm_network_error() -> None:

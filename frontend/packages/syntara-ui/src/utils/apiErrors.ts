@@ -25,6 +25,7 @@ export type ApiErrorCode =
   | 'WORKFLOW_NAME_CONFLICT'
   | 'WORKFLOW_DISABLED'
   | 'WORKFLOW_NOT_FOUND'
+  | 'WORKFLOW_NOT_PUBLISHED'
   | 'WORKFLOW_VERSION_NOT_FOUND'
   | 'WORKFLOW_DEFINITION_INVALID'
   // Provider/Tool errors
@@ -517,6 +518,7 @@ const ERROR_TITLES: Record<string, string> = {
   WORKFLOW_NAME_CONFLICT: 'Workflow Name Conflict',
   WORKFLOW_DISABLED: 'Workflow Disabled',
   WORKFLOW_NOT_FOUND: 'Workflow Not Found',
+  WORKFLOW_NOT_PUBLISHED: 'Workflow Not Published',
   WORKFLOW_VERSION_NOT_FOUND: 'Workflow Version Not Found',
   WORKFLOW_DEFINITION_INVALID: 'Workflow Definition Invalid',
   // Provider/Tool errors

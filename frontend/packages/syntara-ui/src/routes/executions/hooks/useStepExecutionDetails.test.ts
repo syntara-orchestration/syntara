@@ -164,4 +164,40 @@ describe('useStepExecutionDetails', () => {
       expect(mockRefetch).not.toHaveBeenCalled()
     })
   })
+
+  it('queries the selected loop iteration record', () => {
+    renderHook(() => useStepExecutionDetails('my_activity', 'exec-1', 'completed', 2), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    expect(mockUseQuery).toHaveBeenCalledWith(
+      'get',
+      '/executions/{execution_id}/activities',
+      expect.objectContaining({
+        params: {
+          path: { execution_id: 'exec-1' },
+          query: { activity_name: 'my_activity#iter-2', limit: 1 },
+        },
+      }),
+      expect.anything()
+    )
+  })
+
+  it('does not duplicate an iteration suffix already present in the step ID', () => {
+    renderHook(() => useStepExecutionDetails('my_activity#iter-2', 'exec-1', 'completed', 2), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    expect(mockUseQuery).toHaveBeenCalledWith(
+      'get',
+      '/executions/{execution_id}/activities',
+      expect.objectContaining({
+        params: {
+          path: { execution_id: 'exec-1' },
+          query: { activity_name: 'my_activity#iter-2', limit: 1 },
+        },
+      }),
+      expect.anything()
+    )
+  })
 })

@@ -10,7 +10,6 @@ import {
   Toolbar,
   ToolbarContent,
 } from '@patternfly/react-core'
-// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- MastheadLogo needs a plain anchor; SynLink adds PF Button styling
 import { Link } from '@tanstack/react-router'
 
 import { useBrand } from '../providers/brand'
