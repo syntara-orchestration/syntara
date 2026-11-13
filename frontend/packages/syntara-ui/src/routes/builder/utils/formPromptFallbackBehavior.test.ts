@@ -6,7 +6,7 @@ describe('formPromptFallbackBehavior', () => {
   it('maps legacy fallback_behavior to fallback_decision', () => {
     expect(formPromptFallbackDecisionFromBehavior('fallback')).toBe('fallback')
     expect(formPromptFallbackDecisionFromBehavior('fail')).toBe('submit')
-    expect(formPromptFallbackDecisionFromBehavior(undefined)).toBe('submit')
+    expect(formPromptFallbackDecisionFromBehavior(undefined)).toBe('fallback')
   })
 
   it('prefers explicit fallback_behavior when resolving', () => {
