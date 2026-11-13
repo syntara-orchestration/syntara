@@ -3,7 +3,7 @@
 import asyncio
 from copy import deepcopy
 from dataclasses import dataclass
-from unittest.mock import AsyncMock, PropertyMock, patch
+from unittest.mock import AsyncMock, Mock, PropertyMock, patch
 
 import pytest
 import pytest_asyncio
@@ -12,7 +12,6 @@ from sqlmodel import select
 
 from syntara.core.config.base import Settings
 from syntara.core.models import User
-from syntara.credentials.models.credential import Credential
 from syntara.eventstreams.core.deduplication import (
     DeliveryIdentity,
     TemporalAcceptance,
@@ -22,7 +21,7 @@ from syntara.eventstreams.core.deduplication import (
 from syntara.eventstreams.core.envelope import RawEvent, WorkflowEventEnvelope
 from syntara.eventstreams.core.handler import BlockedDelivery, EventLaunchError, ResolvedDelivery, SchedulingFailureCode
 from syntara.eventstreams.core.preparation import AcceptedWorkflow, PreparedExecution
-from syntara.eventstreams.core.processing import HeldRecord
+from syntara.eventstreams.core.processing import HeldRecord, SkippedRecord
 from syntara.eventstreams.exceptions import EventSubscriptionControlConflictError
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
@@ -221,8 +220,8 @@ async def test_repeated_persistence_preserves_execution_status(scheduling_contex
         assert execution.status == status
 
 
-async def test_restart_recovers_original_version_input_and_principal_before_current_validation(
-    scheduling_context, monkeypatch
+async def test_matching_redelivery_recovers_original_version_input_and_principal_after_duplicate_start(
+    scheduling_context: SchedulingContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     context = scheduling_context
     await context.temporal.start(context.prepared)
@@ -231,12 +230,10 @@ async def test_restart_recovers_original_version_input_and_principal_before_curr
         subscription = await session.get(EventSubscription, context.prepared.identity.subscription_id)
         source = await session.get(EventSubscriptionSource, context.prepared.identity.source_id)
         old = await session.get(WorkflowVersion, context.prepared.workflow_version_id)
-        credential = await session.get(Credential, context.prepared.binding.runtime_credential_id)
         assert workflow is not None
         assert subscription is not None
         assert source is not None
         assert old is not None
-        assert credential is not None
         replacement = WorkflowVersion(
             workflow_id=workflow.id,
             version=old.version + 1,
@@ -248,29 +245,68 @@ async def test_restart_recovers_original_version_input_and_principal_before_curr
         await session.flush()
         workflow.published_version_id = subscription.published_version_id = replacement.id
         subscription.configuration_revision += 1
-        subscription.input_schema = {"type": "string"}
-        credential.enabled = False
+        subscription.input_schema = {"type": "object"}
+        subscription.filter = {"expression": "true"}
         snapshot = SubscriptionSnapshot.from_models(subscription, source)
     preparation = EventExecutionPreparationService(context.delivery.session_factory)
-    forbidden = AsyncMock(side_effect=AssertionError("Accepted work must not be prepared again"))
-    monkeypatch.setattr(preparation, "prepare_delivery", forbidden)
+    prepare = AsyncMock(wraps=preparation.prepare_delivery)
+    monkeypatch.setattr(preparation, "prepare_delivery", prepare)
+    original_lookup = context.temporal.lookup
+
+    async def lookup(identity: DeliveryIdentity, *, run_id: str | None = None) -> AcceptedWorkflow:
+        assert len(context.temporal.starts) == 2  # No lookup before the competing direct start.
+        return await original_lookup(identity, run_id=run_id)
+
+    monkeypatch.setattr(context.temporal, "lookup", lookup)
     admission = EventAdmissionService(context.delivery.session_factory, context.temporal)
     processing = EventRecordProcessingService(context.delivery.session_factory, preparation, admission)
     raw = RawEvent(
-        value=b"invalid redelivery",
+        value=b'{"count":3}',
         source_metadata=WorkflowEventEnvelope.model_validate(context.prepared.input_data).source_metadata,
     )
     with patch.object(Settings, "service_identity", new_callable=PropertyMock, return_value="replacement.ao.svc"):
         result = await processing.process(snapshot, context.prepared.identity, raw)
     assert isinstance(result, ResolvedDelivery)
-    forbidden.assert_not_awaited()
-    assert len(context.temporal.starts) == 1
+    prepare.assert_awaited_once()
+    assert len(context.temporal.starts) == 2
     async with context.delivery.session_factory() as session:
         execution = await session.get(Execution, context.prepared.execution_id)
         assert execution is not None
         assert execution.workflow_version_id == context.prepared.workflow_version_id
         assert execution.input_data == context.prepared.input_data
         assert execution.created_by == context.prepared.binding.execution_principal_id
+
+
+@pytest.mark.parametrize("expression", ["false", "input.payload.value.count"])
+async def test_changed_filter_after_crash_can_leave_accepted_execution_unrepaired(
+    scheduling_context, monkeypatch, expression
+) -> None:
+    context = scheduling_context
+    await context.temporal.start(context.prepared)
+    async with context.delivery.session_factory() as session, session.begin():
+        subscription = await session.get(EventSubscription, context.prepared.identity.subscription_id)
+        source = await session.get(EventSubscriptionSource, context.prepared.identity.source_id)
+        assert subscription is not None
+        assert source is not None
+        subscription.filter = {"expression": expression}
+        subscription.configuration_revision += 1
+        snapshot = SubscriptionSnapshot.from_models(subscription, source)
+    forbidden = Mock(side_effect=AssertionError("Local filter outcomes must not access execution services"))
+    processing = EventRecordProcessingService(forbidden, forbidden, forbidden)
+    raw = RawEvent(
+        value=b'{"count":2}',
+        source_metadata=WorkflowEventEnvelope.model_validate(context.prepared.input_data).source_metadata,
+    )
+    lookup = AsyncMock(side_effect=AssertionError("Local filter outcomes must not access Temporal"))
+    monkeypatch.setattr(context.temporal, "lookup", lookup)
+    result = await processing.process(snapshot, context.prepared.identity, raw)
+    assert isinstance(result, SkippedRecord)
+    assert result.outcome == ("no_match" if expression == "false" else "evaluation_error")
+    forbidden.assert_not_called()
+    lookup.assert_not_awaited()
+    assert len(context.temporal.starts) == 1
+    async with context.delivery.session_factory() as session:
+        assert await session.get(Execution, context.prepared.execution_id) is None
 
 
 async def test_accepted_repair_retries_after_database_outage_without_starting_again(

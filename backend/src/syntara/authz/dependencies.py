@@ -465,6 +465,27 @@ class ProjectScopeFilter:
         return result
 
 
+class AnyProjectPermission(ProjectScopeFilter):
+    """Require an action globally or in at least one accessible project.
+
+    Use for operations on caller-supplied data with no project or stored
+    resource to authorize against. An empty project scope denies access.
+    """
+
+    async def __call__(
+        self,
+        request: Request,
+        current_user: User = Depends(get_current_user),  # noqa: B008
+        db: AsyncSession = Depends(get_db),  # noqa: B008
+    ) -> AllowedProjectsResult:
+        """Reuse project-scope resolution and reject an empty allowed scope."""
+        allowed = await super().__call__(request, current_user, db)
+        if not allowed.all_projects and not allowed.project_ids:
+            message = f"Not authorized to perform {self.action} on {self.resource_type}"
+            raise AuthorizationDeniedError(message)
+        return allowed
+
+
 class VisibilityFilter:
     """FastAPI dependency that resolves what a user is allowed to see."""
 

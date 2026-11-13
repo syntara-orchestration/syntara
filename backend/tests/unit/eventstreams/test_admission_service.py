@@ -60,6 +60,7 @@ async def test_start_precedes_execution_write_and_resolution_follows_commit(sche
     context.launcher.start.side_effect = start
     result = await context.service.schedule(context.prepared)
     assert isinstance(result, ResolvedDelivery)
+    context.launcher.lookup.assert_not_awaited()
     assert len(context.sessions) == 1
     context.sessions[0].begin.return_value.__aexit__.assert_awaited_once_with(None, None, None)
 
@@ -84,21 +85,21 @@ async def test_lost_start_response_recovers_original_arguments(scheduling) -> No
     context.launcher.start.assert_awaited_once()
 
 
-async def test_normal_execution_is_checked_before_temporal(scheduling) -> None:
+async def test_existing_execution_needs_no_temporal_call(scheduling) -> None:
     context = scheduling
     context.store.lookup.return_value = terminal(context.prepared.identity).terminal
-    assert isinstance(await context.service.recover_accepted(context.prepared.identity), ResolvedDelivery)
+    assert isinstance(await context.service.lookup_execution(context.prepared.identity), ResolvedDelivery)
     context.launcher.lookup.assert_not_awaited()
     context.launcher.start.assert_not_awaited()
 
 
-async def test_only_confirmed_absence_allows_new_preparation(scheduling) -> None:
-    assert await scheduling.service.recover_accepted(scheduling.prepared.identity) is None
-    scheduling.launcher.lookup.side_effect = EventLaunchError(SchedulingFailureCode.HISTORY_UNAVAILABLE)
-    result = await scheduling.service.recover_accepted(scheduling.prepared.identity)
-    assert result is not None
-    assert not isinstance(result, ResolvedDelivery)
+async def test_missing_execution_allows_direct_start_without_temporal_lookup(scheduling) -> None:
+    assert await scheduling.service.lookup_execution(scheduling.prepared.identity) is None
+    scheduling.launcher.lookup.assert_not_awaited()
     scheduling.launcher.start.assert_not_awaited()
+    assert isinstance(await scheduling.service.schedule(scheduling.prepared), ResolvedDelivery)
+    scheduling.launcher.lookup.assert_not_awaited()
+    scheduling.launcher.start.assert_awaited_once_with(scheduling.prepared)
 
 
 async def test_database_failure_retries_same_execution_without_restarting(scheduling) -> None:

@@ -28,6 +28,7 @@ from syntara.eventstreams.core.consumer import MAX_POSITION_OFFSET
 from syntara.eventstreams.core.deduplication import DeliveryIdentity
 from syntara.eventstreams.core.envelope import RawEvent
 from syntara.eventstreams.core.handler import ResolvedDelivery
+from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.core.processing import (
     HeldRecord,
     InspectedRecord,
@@ -74,6 +75,7 @@ class _Partition:
     paused: bool = True
     closing: bool = False
     held: HeldRecord | None = None
+    handoff: PreparedExecution | None = None
     resolved_next_offset: int | None = None
     rewind_offset: int | None = None
     reload_required: bool = False
@@ -469,7 +471,10 @@ class KafkaRecordRunner:
             if self._gate is not None:
                 self._gate.source_verified(self.snapshot)
             state.ready = True
-        state.eligible = await self._processing.admission_eligible(self.snapshot)
+        if not state.records:
+            # Refresh intake eligibility between batches. Buffered records use
+            # the shared local gates; only matches need per-record DB checks.
+            state.eligible = await self._processing.admission_eligible(self.snapshot)
         return True
 
     async def _prepare_queue(self, state: _Partition) -> bool:
@@ -506,7 +511,31 @@ class KafkaRecordRunner:
         event = state.records[0]
         identity = self._identity(event)
         epoch = state.epoch
-        result = await self._processing.process(self.snapshot, identity, event, **self._processing_guard(state))
+        guard = self._processing_guard(state)
+        if state.handoff is not None and state.handoff.identity != identity:
+            # A checkpoint reload may replay earlier records, and compaction
+            # may return a later one. Finish the attempted identity first;
+            # its confirmation alone cannot advance this fetched record.
+            await self._finish_handoff(state)
+            return
+        if state.handoff is not None:
+            result = await self._processing.process(self.snapshot, identity, event, handoff=state.handoff, **guard)
+        else:
+            result = await self._processing.process(self.snapshot, identity, event, **guard)
+        self._apply_head_result(state, event, result, epoch=epoch)
+
+    def _apply_head_result(
+        self,
+        state: _Partition,
+        event: RawEvent,
+        result: ResolvedDelivery | HeldRecord | SkippedRecord,
+        *,
+        epoch: int,
+    ) -> None:
+        """Apply a processing result only after ownership and offset-safety checks."""
+        identity = self._identity(event)
+        if isinstance(result, HeldRecord) and result.handoff is not None:
+            state.handoff = result.handoff
         if not self._owned(state) or state.epoch != epoch:
             return
         if not state.records or self._identity(state.records[0]) != identity:
@@ -531,6 +560,27 @@ class KafkaRecordRunner:
         else:
             self._complete_head(state, event, identity.record.offset)
 
+    async def _finish_handoff(self, state: _Partition) -> None:
+        """Confirm the saved identity without resolving a different fetched record."""
+        prepared = state.handoff
+        if prepared is None:
+            return
+        epoch = state.epoch
+        result = await self._processing.process(
+            self.snapshot, prepared.identity, None, handoff=prepared, **self._processing_guard(state)
+        )
+        if not self._owned(state) or state.epoch != epoch:
+            return
+        if not self._resolution_open():
+            state.held = self._retry("dependency_unavailable")
+        elif isinstance(result, HeldRecord):
+            state.held = result
+        elif not isinstance(result, ResolvedDelivery) or result.terminal.identity != prepared.identity:
+            state.held = self._retry("evidence_mismatch")
+        else:
+            state.handoff = None
+            state.held = None
+
     def _complete_head(self, state: _Partition, event: RawEvent, offset: int) -> None:
         """Advance only the delivered head after completion and ownership validation."""
         state.records.popleft()
@@ -539,6 +589,8 @@ class KafkaRecordRunner:
             state.resolved_next_offset = offset + 1
         self._note_inspected(state, offset)
         state.held = None
+        if state.handoff is not None and state.handoff.identity == self._identity(event):
+            state.handoff = None
 
     async def _hold_pending_content(self, state: _Partition) -> None:
         pending = state.pending_failure

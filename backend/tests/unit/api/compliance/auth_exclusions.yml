@@ -18,11 +18,6 @@
 # catch it and ask you to remove the entry.
 
 authenticated:
-  # -- filtering: caller-supplied samples only --
-  - method: POST
-    path: /api/v1/filtering/test
-    justification: Evaluates caller-supplied CEL and JSON without accessing stored resources
-
   # -- auth --
   - method: GET
     path: /api/v1/auth/me

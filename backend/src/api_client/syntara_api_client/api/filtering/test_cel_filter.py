@@ -107,7 +107,8 @@ def sync_detailed(
 
      Evaluate caller-supplied JSON with the shared CEL evaluator.
 
-    Authentication is required; no stored resources are read or changed.
+    Requires authentication and workflow:create permission in at least one project.
+    Evaluates only supplied JSON; no Kafka decoding or payload-schema validation.
     Invalid CEL returns 422. Evaluation returns match, no_match or evaluation_error.
 
     Args:
@@ -145,7 +146,8 @@ def sync(
 
      Evaluate caller-supplied JSON with the shared CEL evaluator.
 
-    Authentication is required; no stored resources are read or changed.
+    Requires authentication and workflow:create permission in at least one project.
+    Evaluates only supplied JSON; no Kafka decoding or payload-schema validation.
     Invalid CEL returns 422. Evaluation returns match, no_match or evaluation_error.
 
     Args:
@@ -178,7 +180,8 @@ async def asyncio_detailed(
 
      Evaluate caller-supplied JSON with the shared CEL evaluator.
 
-    Authentication is required; no stored resources are read or changed.
+    Requires authentication and workflow:create permission in at least one project.
+    Evaluates only supplied JSON; no Kafka decoding or payload-schema validation.
     Invalid CEL returns 422. Evaluation returns match, no_match or evaluation_error.
 
     Args:
@@ -214,7 +217,8 @@ async def asyncio(
 
      Evaluate caller-supplied JSON with the shared CEL evaluator.
 
-    Authentication is required; no stored resources are read or changed.
+    Requires authentication and workflow:create permission in at least one project.
+    Evaluates only supplied JSON; no Kafka decoding or payload-schema validation.
     Invalid CEL returns 422. Evaluation returns match, no_match or evaluation_error.
 
     Args:
