@@ -16,7 +16,7 @@ import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useTableSort } from '../../../hooks/useTableSort'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
-import { getUserDetailPath } from '../accessManagementPaths'
+import { getUserDetailDestination } from '../accessManagementPaths'
 import { AUTH_SOURCE_LOCAL } from '../adminConstants'
 
 import type { UserIdentity, UserSummary } from './identityUtils'
@@ -141,7 +141,7 @@ export function SelectUserStep({
                     }}
                   />
                   <Td dataLabel="Username">
-                    <SynLink to={getUserDetailPath(user.id)} onClick={(e) => e.stopPropagation()}>
+                    <SynLink to={getUserDetailDestination(user.id)} onClick={(e) => e.stopPropagation()}>
                       {user.username}
                     </SynLink>
                   </Td>

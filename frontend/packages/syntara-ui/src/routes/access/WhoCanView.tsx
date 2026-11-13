@@ -24,7 +24,7 @@ import { LinkCell } from '../../components/table/LinkCell'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import { useSynForm } from '../../hooks/useSynForm'
 import { getErrorMessage } from '../../utils/apiErrors'
-import { getUserDetailPath } from '../access-management/accessManagementPaths'
+import { getUserDetailDestination } from '../access-management/accessManagementPaths'
 
 import { accessClient } from './accessClient'
 import { accessControlHelp } from './accessControlFieldHelp'
@@ -120,7 +120,7 @@ function WhoCanResults({
             {users.map((u) => (
               <Tr key={u.id}>
                 <Td dataLabel="Username">
-                  <LinkCell href={getUserDetailPath(u.id)}>
+                  <LinkCell href={getUserDetailDestination(u.id)}>
                     <Truncate content={u.username} />
                   </LinkCell>
                 </Td>
