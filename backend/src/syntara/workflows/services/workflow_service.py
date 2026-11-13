@@ -30,6 +30,7 @@ from syntara.core.services.user_reference_resolution import UserReferenceResolve
 from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
+from syntara.execution_plane.deletion import collect_execution_plane_work_items, schedule_work_item_deletion
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.audit.workflow_lifecycle import WorkflowAction, WorkflowLifecycleEvent
@@ -1721,11 +1722,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         workflow.published_version_id = None
         workflow.is_enabled = False
         await self.session.flush()
-
-        from syntara.execution_plane.deletion import (  # noqa: PLC0415
-            collect_execution_plane_work_items,
-            schedule_work_item_deletion,
-        )
 
         work_item_ids = await collect_execution_plane_work_items(self.session, workflow_id=workflow_id)
 
