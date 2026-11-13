@@ -1,6 +1,7 @@
 """Unit tests for form_prompt activity."""
 
 from collections.abc import Generator
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -14,6 +15,29 @@ from syntara.workflows.workflow_engine.activities.form_prompt_activity import (
     expire_form_prompts_activity,
     fail_detached_form_prompt_activity,
 )
+from syntara.workflows.workflow_engine.models.form_prompt import FormPromptActivityInput
+
+
+def _form_prompt_input(overrides: dict[str, Any] | None = None) -> FormPromptActivityInput:
+    payload: dict[str, Any] = {
+        "execution_id": str(uuid4()),
+        "prompt_node_id": "form1",
+        "name": "Test Form",
+        "form_definition": {},
+        "timeout_at": None,
+        "responder_user_ids": None,
+        "responder_group_ids": None,
+        "project_id": str(uuid4()),
+        "loop_iteration_path": [],
+        "temporal_activity_id": "form1",
+        "message": None,
+        "submit_label": None,
+        "success_message": None,
+        "css_override": None,
+    }
+    if overrides:
+        payload.update(overrides)
+    return cast("FormPromptActivityInput", payload)
 
 
 @pytest.fixture(autouse=True)
@@ -41,11 +65,7 @@ class TestCreateFormPromptActivity:
             pytest.raises(CompleteAsyncError),
         ):
             await create_form_prompt_activity(
-                execution_id=str(uuid4()),
-                prompt_node_id="form1",
-                name="Test Form",
-                form_definition={"fields": []},
-                project_id=str(uuid4()),
+                _form_prompt_input({"form_definition": {"fields": []}}),
             )
 
         mock_client.create_form_prompt.assert_called_once()
@@ -69,13 +89,7 @@ class TestCreateFormPromptActivity:
             ),
             pytest.raises(CompleteAsyncError),
         ):
-            await create_form_prompt_activity(
-                execution_id=str(uuid4()),
-                prompt_node_id="form1",
-                name="Test",
-                form_definition={},
-                project_id=str(uuid4()),
-            )
+            await create_form_prompt_activity(_form_prompt_input({"name": "Test"}))
 
         assert mock_heartbeat.called
         heartbeat_arg = mock_heartbeat.call_args[0][0]
@@ -86,13 +100,7 @@ class TestCreateFormPromptActivity:
         from temporalio.exceptions import ApplicationError
 
         with pytest.raises(ApplicationError) as exc_info:
-            await create_form_prompt_activity(
-                execution_id=str(uuid4()),
-                prompt_node_id="form1",
-                name="Test",
-                form_definition={},
-                project_id="",  # Empty!
-            )
+            await create_form_prompt_activity(_form_prompt_input({"project_id": ""}))
 
         assert exc_info.value.type == "ConfigError"
         assert exc_info.value.non_retryable
@@ -113,13 +121,7 @@ class TestCreateFormPromptActivity:
             ),
             pytest.raises(FormPromptActivityError) as exc_info,
         ):
-            await create_form_prompt_activity(
-                execution_id=str(uuid4()),
-                prompt_node_id="form1",
-                name="Test",
-                form_definition={},
-                project_id=str(uuid4()),
-            )
+            await create_form_prompt_activity(_form_prompt_input())
 
         assert "API error" in str(exc_info.value)
 
@@ -137,18 +139,12 @@ class TestCreateFormPromptActivity:
             ),
             pytest.raises(FormPromptActivityError) as exc_info,
         ):
-            await create_form_prompt_activity(
-                execution_id=str(uuid4()),
-                prompt_node_id="form1",
-                name="Test",
-                form_definition={},
-                project_id=str(uuid4()),
-            )
+            await create_form_prompt_activity(_form_prompt_input())
 
         assert "Unexpected error" in str(exc_info.value)
 
     async def test_request_payload_contains_all_fields(self):
-        """All positional args are included in the request payload."""
+        """All named input fields are included in the request payload."""
         mock_client = AsyncMock()
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
@@ -165,20 +161,22 @@ class TestCreateFormPromptActivity:
             pytest.raises(CompleteAsyncError),
         ):
             await create_form_prompt_activity(
-                execution_id=exec_id,
-                prompt_node_id="form1",
-                name="Test Form",
-                form_definition={"fields": []},
-                timeout_at="2024-01-01T00:00:00Z",
-                responder_user_ids=[str(uuid4())],
-                responder_group_ids=[str(uuid4())],
-                project_id=proj_id,
-                loop_iteration_path=[0, 1],
-                temporal_activity_id="form1_iter_0_iter_1",
-                message="Please fill this out",
-                submit_label="Submit",
-                success_message="Done!",
-                css_override=".form { color: red; }",
+                _form_prompt_input(
+                    {
+                        "execution_id": exec_id,
+                        "form_definition": {"fields": []},
+                        "timeout_at": "2024-01-01T00:00:00Z",
+                        "responder_user_ids": [str(uuid4())],
+                        "responder_group_ids": [str(uuid4())],
+                        "project_id": proj_id,
+                        "loop_iteration_path": [0, 1],
+                        "temporal_activity_id": "form1_iter_0_iter_1",
+                        "message": "Please fill this out",
+                        "submit_label": "Submit",
+                        "success_message": "Done!",
+                        "css_override": ".form { color: red; }",
+                    }
+                ),
             )
 
         call_args = mock_client.create_form_prompt.call_args[0][0]

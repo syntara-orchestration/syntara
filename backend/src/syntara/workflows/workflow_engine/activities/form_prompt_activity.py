@@ -19,6 +19,7 @@ with workflow.unsafe.imports_passed_through():
     )
     from syntara.workflows.workflow_engine import constants
     from syntara.workflows.workflow_engine.services.activity_sync_registry import get_activity_sync_service
+from syntara.workflows.workflow_engine.models.form_prompt import FormPromptActivityInput
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 from syntara.workflows.workflow_engine.utils.loop_iteration_ids import matches_loop_iteration_id
 
@@ -42,77 +43,37 @@ class FormPromptActivityError(ActivityExecutionError):
 
 
 @activity.defn(name=ActivityName.FORM_PROMPT)
-async def create_form_prompt_activity(
-    execution_id: str,
-    prompt_node_id: str,
-    name: str,
-    form_definition: dict[str, Any],
-    timeout_at: str | None = None,
-    responder_user_ids: list[str] | None = None,
-    responder_group_ids: list[str] | None = None,
-    project_id: str = "",
-    loop_iteration_path: list[int] | None = None,
-    temporal_activity_id: str | None = None,
-    message: str | None = None,
-    submit_label: str | None = None,
-    success_message: str | None = None,
-    css_override: str | None = None,
-) -> NoReturn:
-    """Create a form prompt via the Forms API.
-
-    Called as a Temporal activity with async completion. Creates the form
-    prompt in the database, then calls raise_complete_async() so the activity
-    stays STARTED in Temporal until externally completed via the callback endpoint.
-
-    Args:
-        execution_id: Parent workflow execution ID (UUID string).
-        prompt_node_id: Canvas node ID from the workflow definition.
-        name: Display name for the form prompt.
-        form_definition: JSON Schema describing the form fields to collect.
-        timeout_at: ISO datetime string when the prompt expires, or None.
-        responder_user_ids: List of user UUIDs who can respond (None = any user with permission).
-        responder_group_ids: List of group UUIDs whose members can respond.
-        project_id: Project ID for the form prompt (from parent execution).
-        loop_iteration_path: Enclosing-loop indices, outermost first (empty if none).
-        temporal_activity_id: Temporal activity ID to signal on submit.
-        message: Resolved message shown above the form, or None.
-        submit_label: Submit button label, or None.
-        success_message: Message shown after successful submission, or None.
-        css_override: Custom CSS applied to the form, or None.
-
-    Raises:
-        FormPromptActivityError: If form prompt creation fails.
-
-    """
+async def create_form_prompt_activity(activity_input: FormPromptActivityInput) -> NoReturn:
+    """Create a form prompt from a named, typed input object."""
     activity.heartbeat({HEARTBEAT_STOP_MONITOR: True})
 
-    if not project_id:
+    if not activity_input["project_id"]:
         msg = "Form prompt activity requires non-empty 'project_id'"
         raise ApplicationError(msg, type="ConfigError", non_retryable=True)
 
     logger.info(
         "Creating form prompt via Forms API",
         base_url=constants.FORMS_API_BASE_URL,
-        execution_id=execution_id,
-        prompt_node_id=prompt_node_id,
-        name=name,
+        execution_id=activity_input["execution_id"],
+        prompt_node_id=activity_input["prompt_node_id"],
+        name=activity_input["name"],
     )
 
     request_data: dict[str, Any] = {
-        "execution_id": execution_id,
-        "project_id": project_id,
-        "prompt_node_id": prompt_node_id,
-        "name": name,
-        "form_definition": form_definition,
-        "timeout_at": timeout_at,
-        "responder_user_ids": responder_user_ids,
-        "responder_group_ids": responder_group_ids,
-        "loop_iteration_path": loop_iteration_path or [],
-        "temporal_activity_id": temporal_activity_id,
-        "message": message,
-        "submit_label": submit_label,
-        "success_message": success_message,
-        "css_override": css_override,
+        "execution_id": activity_input["execution_id"],
+        "project_id": activity_input["project_id"],
+        "prompt_node_id": activity_input["prompt_node_id"],
+        "name": activity_input["name"],
+        "form_definition": activity_input["form_definition"],
+        "timeout_at": activity_input["timeout_at"],
+        "responder_user_ids": activity_input["responder_user_ids"],
+        "responder_group_ids": activity_input["responder_group_ids"],
+        "loop_iteration_path": activity_input["loop_iteration_path"] or [],
+        "temporal_activity_id": activity_input["temporal_activity_id"],
+        "message": activity_input["message"],
+        "submit_label": activity_input["submit_label"],
+        "success_message": activity_input["success_message"],
+        "css_override": activity_input["css_override"],
     }
 
     try:
@@ -123,14 +84,18 @@ async def create_form_prompt_activity(
     except FormPromptsApiClientError as e:
         logger.exception(
             "Form prompt creation failed",
-            execution_id=execution_id,
-            prompt_node_id=prompt_node_id,
+            execution_id=activity_input["execution_id"],
+            prompt_node_id=activity_input["prompt_node_id"],
             error=str(e),
         )
         raise FormPromptActivityError(str(e)) from e
     except Exception as e:
         msg = f"Unexpected error creating form prompt: {e}"
-        logger.exception(msg, execution_id=execution_id, prompt_node_id=prompt_node_id)
+        logger.exception(
+            msg,
+            execution_id=activity_input["execution_id"],
+            prompt_node_id=activity_input["prompt_node_id"],
+        )
         raise FormPromptActivityError(msg) from e
 
     activity.raise_complete_async()

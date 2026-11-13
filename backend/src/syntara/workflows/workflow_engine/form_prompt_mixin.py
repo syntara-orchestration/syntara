@@ -20,6 +20,7 @@ with workflow.unsafe.imports_passed_through():
     from syntara.forms.validators.options import resolve_dynamic_options
     from syntara.workflows.workflow_engine.activities.form_prompt_activity import fail_detached_form_prompt_activity
     from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
+    from syntara.workflows.workflow_engine.models.form_prompt import FormPromptActivityInput
     from syntara.workflows.workflow_engine.models.workflow_definition import (
         ActivityName,
         ActivityTerminalStatus,
@@ -159,33 +160,13 @@ class WorkflowFormPromptMixin:
         except Exception:  # noqa: BLE001
             workflow.logger.warning("Failed to cancel form prompts (best-effort)")
 
-    async def _prepare_form_prompt_args(
+    async def _prepare_form_prompt_input(
         self,
         node: "ActivityNode",
         graph: "WorkflowGraph",
         resolved_parameters: dict[str, Any],
-    ) -> list[Any]:
-        """Build the positional argument list for create_form_prompt_activity.
-
-        Extra args are always appended, never inserted, so Temporal replay of
-        older histories still matches. Positional arg contract::
-
-            [0] execution_id:          str
-            [1] prompt_node_id:        str
-            [2] name:                  str
-            [3] form_definition:       dict[str, Any]
-            [4] timeout_at:            str | None
-            [5] responder_user_ids:    list[str] | None
-            [6] responder_group_ids:   list[str] | None
-            [7] project_id:            str
-            [8] loop_iteration_path:   list[int]
-            [9] temporal_activity_id: str
-            [10] message:              str | None
-            [11] submit_label:         str | None
-            [12] success_message:      str | None
-            [13] css_override:         str | None
-
-        """
+    ) -> FormPromptActivityInput:
+        """Build the named, typed payload for the Form Prompt activity."""
         # Runtime backstop for the static save-time validator: a form prompt with
         # nothing wired to "submitted" has no destination for a response.
         if not graph.get_next_activities_by_port(node.id, "submitted"):
@@ -231,23 +212,26 @@ class WorkflowFormPromptMixin:
         success_message = resolved_parameters.get("success_message")
         css_override = resolved_parameters.get("css_override")
 
-        # Build positional args in the documented order
-        return [
-            self.execution_id,
-            node.id,
-            name,
-            form_definition,
-            timeout_at,
-            responder_user_ids,
-            responder_group_ids,
-            self._project_id,
-            loop_index_chain(node.id, self.loop_body_map, self.node_control_data),
-            form_prompt_temporal_activity_id(node.id, self.loop_body_map, self.node_control_data),
-            message_text,
-            submit_label,
-            success_message,
-            css_override,
-        ]
+        return {
+            "execution_id": self.execution_id,
+            "prompt_node_id": node.id,
+            "name": name,
+            "form_definition": form_definition,
+            "timeout_at": timeout_at,
+            "responder_user_ids": responder_user_ids,
+            "responder_group_ids": responder_group_ids,
+            "project_id": self._project_id,
+            "loop_iteration_path": loop_index_chain(node.id, self.loop_body_map, self.node_control_data),
+            "temporal_activity_id": form_prompt_temporal_activity_id(
+                node.id,
+                self.loop_body_map,
+                self.node_control_data,
+            ),
+            "message": message_text,
+            "submit_label": submit_label,
+            "success_message": success_message,
+            "css_override": css_override,
+        }
 
     async def _execute_form_prompt_node(
         self,
@@ -266,14 +250,14 @@ class WorkflowFormPromptMixin:
         """
         node_id = node.id
         prompt_activity_id = form_prompt_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
-        args = await self._prepare_form_prompt_args(node, graph, resolved_parameters)
+        activity_input = await self._prepare_form_prompt_input(node, graph, resolved_parameters)
         window = resolve_form_prompt_response_window(node, self._runtime_settings)
 
         result = cast(
             "dict[str, Any]",
             await workflow.execute_activity(
                 ActivityName.FORM_PROMPT,
-                args=args,
+                arg=activity_input,
                 activity_id=prompt_activity_id,
                 start_to_close_timeout=timedelta(seconds=window + self._TEMPORAL_MARGIN),
                 retry_policy=resolve_retry_policy(node, self._runtime_settings),
