@@ -1722,6 +1722,13 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         workflow.is_enabled = False
         await self.session.flush()
 
+        from syntara.execution_plane.deletion import (  # noqa: PLC0415
+            collect_execution_plane_work_items,
+            schedule_work_item_deletion,
+        )
+
+        work_item_ids = await collect_execution_plane_work_items(self.session, workflow_id=workflow_id)
+
         # Hard delete — versions and executions cascade via DB FK
         await self.session.delete(workflow)
         try:
@@ -1735,6 +1742,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 error_type=type(exc).__name__,
             )
             raise
+
+        schedule_work_item_deletion(work_item_ids)
 
         self._emit_lifecycle_event(
             workflow_id=workflow.id,
