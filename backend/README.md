@@ -169,7 +169,27 @@ rewinds it and refreshes recovery/lifecycle checks before filtering it again;
 queue pressure alone does not create a database inspection marker for a CEL skip.
 Deferring a record before inspection/admission also creates no permanent local
 content hold: after shutdown, the next consumer can read the uncommitted record.
-CloudEvents normalization remains separate work.
+
+After successful decoding, `input.cloudevents` exposes normalized CloudEvents
+attributes for both Kafka binary and structured JSON modes. Standard attributes
+use paths such as `input.cloudevents.type` and `input.cloudevents.source`;
+extensions use `input.cloudevents.extensions.priority`. Extension values retain
+the decoder's canonical string representation. Event data remains under
+`input.payload.value`, independently of Kafka keys and headers.
+
+```cel
+input.cloudevents != null &&
+input.cloudevents.type == "order.created" &&
+input.cloudevents.extensions.priority == "3" &&
+input.payload.value.amount > 1000
+```
+
+Equivalent events in either mode use the same expression. Before decoding, on
+decode failure, and for ordinary JSON, `input.cloudevents` is null. Attribute
+conditions run after decoding; only safe key/header conditions can reject early.
+Guard attribute access with `input.cloudevents != null` when the topic also
+contains ordinary JSON. Filtering does not change the workflow envelope or its
+original Kafka value, key, headers, or metadata.
 
 Authenticated callers can use `POST /api/v1/filtering/test` without workflow,
 project, Integration or Credential permissions. Supply required JSON as `input`;
