@@ -1,8 +1,0 @@
-{
-  "name": "@syntara/md-link-lint-workflow",
-  "version": "0.0.0",
-  "private": true,
-  "devDependencies": {
-    "@ansible/md-link-lint": "0.1.0"
-  }
-}
