@@ -18,7 +18,7 @@ from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type
 from syntara.integrations.lib.url_validation import validate_integration_configuration_no_ssrf
-from syntara.integrations.models.integration import Integration, IntegrationType
+from syntara.integrations.models.integration import Integration, IntegrationScope, IntegrationType
 from syntara.integrations.models.integration_configuration import OpenShiftConfiguration
 
 from .common import HEARTBEAT_STOP_MONITOR
@@ -39,16 +39,30 @@ async def _connection() -> tuple[OpenShiftConfiguration, str]:
                 select(Integration)
                 .where(Integration.integration_type == IntegrationType.OPENSHIFT)
                 .where(Integration.enabled == True)  # noqa: E712
-                .limit(1)
+                .where(Integration.scope == IntegrationScope.GLOBAL)
+                .limit(2)
             )
-            integration = result.first()
+            integrations = result.all()
+            if len(integrations) > 1:
+                msg = (
+                    "Multiple enabled global OpenShift integrations found; "
+                    "configure APP_SCRIPT_OPENSHIFT_INTEGRATION_ID"
+                )
+                raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+            integration = integrations[0] if integrations else None
         if integration is None or not integration.enabled or integration.integration_type != IntegrationType.OPENSHIFT:
-            msg = "No enabled OpenShift integration found; configure APP_SCRIPT_OPENSHIFT_INTEGRATION_ID or add one"
+            msg = (
+                "No enabled global OpenShift integration found; "
+                "configure APP_SCRIPT_OPENSHIFT_INTEGRATION_ID or add one"
+            )
             raise ApplicationError(
                 msg,
                 type="ConfigError",
                 non_retryable=True,
             )
+        if integration.scope != IntegrationScope.GLOBAL:
+            msg = "Script execution requires a global OpenShift integration"
+            raise ApplicationError(msg, type="ConfigError", non_retryable=True)
         config = integration.configuration
         if not isinstance(config, OpenShiftConfiguration) or not integration.management_credential_id:
             msg = "Script OpenShift integration requires configuration and a management credential"

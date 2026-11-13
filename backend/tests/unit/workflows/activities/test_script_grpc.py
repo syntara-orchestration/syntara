@@ -65,6 +65,8 @@ async def test_script_protocol(scenario):  # noqa: C901 -- shared real server ex
                 )
                 return
             if scenario.startswith("structured_"):
+                # Mirrors the SDK error result for script exits: diagnostics are part of
+                # the REMOTE_REJECTED payload, so Syntara can preserve them on failure.
                 error = {
                     "message": "Script failed",
                     "code": "TIMEOUT" if scenario == "structured_timeout" else "REMOTE_REJECTED",

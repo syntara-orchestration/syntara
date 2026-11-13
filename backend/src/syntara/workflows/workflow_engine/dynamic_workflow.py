@@ -1173,12 +1173,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             args.extend(extra_args)
 
         retry_policy = resolve_retry_policy(node, self._runtime_settings)
-        # Temporal delivers cancellation to an activity only through its heartbeats,
-        # and only when the schedule carries a heartbeat_timeout -- otherwise the
-        # beats are dropped and cancelling the workflow leaves a long-running
-        # activity (the agent run) executing until start_to_close_timeout. Only
-        # internal activities heartbeat; giving the others a heartbeat timeout would
-        # fail them spuriously. Ref: AAP-88614.
+        # Temporal delivers cancellation to an activity through heartbeats only when
+        # the schedule carries a heartbeat_timeout. Internal and script activities
+        # heartbeat while running; scripts heartbeat during pod startup and gRPC
+        # execution so cancellation reaches SDK Cancel and pod cleanup. Other
+        # executors do not heartbeat, so a heartbeat timeout would fail them spuriously.
+        # See AAP-88614 for the rationale.
         heartbeat_timeout = (
             timedelta(seconds=INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS)
             if node_type in {NodeType.INTERNAL_ACTIVITY, NodeType.SCRIPT}

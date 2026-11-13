@@ -6,6 +6,7 @@ import httpx
 import pytest
 from temporalio.exceptions import ApplicationError
 
+from syntara.integrations.models.integration import IntegrationScope, IntegrationType
 from syntara.integrations.models.integration_configuration import OpenShiftConfiguration
 from syntara.workflows.workflow_engine.activities import openshift_script as remote
 from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
@@ -111,7 +112,7 @@ async def test_no_integration_configured_queries_db():
 
     async def mock_exec(_stmt) -> MagicMock:
         result = MagicMock()
-        result.first.return_value = None
+        result.all.return_value = []
         return result
 
     session_ctx = AsyncMock()
@@ -124,9 +125,50 @@ async def test_no_integration_configured_queries_db():
         patch.object(remote, "AsyncSessionLocal", return_value=session_ctx),
     ):
         settings.return_value.script_openshift_integration_id = None
-        with pytest.raises(ApplicationError, match="No enabled OpenShift integration"):
+        with pytest.raises(ApplicationError, match="No enabled global OpenShift integration"):
             await remote._connection()
         session_ctx.exec.assert_awaited_once()
+        assert "integrations.scope" in str(session_ctx.exec.await_args.args[0])
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_global_integrations_require_explicit_id():
+    result = MagicMock()
+    result.all.return_value = [MagicMock(), MagicMock()]
+    session_ctx = AsyncMock()
+    session_ctx.__aenter__ = AsyncMock(return_value=session_ctx)
+    session_ctx.__aexit__ = AsyncMock(return_value=False)
+    session_ctx.exec = AsyncMock(return_value=result)
+
+    with (
+        patch.object(remote, "get_settings") as settings,
+        patch.object(remote, "AsyncSessionLocal", return_value=session_ctx),
+    ):
+        settings.return_value.script_openshift_integration_id = None
+        with pytest.raises(ApplicationError, match="Multiple enabled global OpenShift integrations"):
+            await remote._connection()
+        assert ".scope" in str(session_ctx.exec.await_args.args[0])
+
+
+@pytest.mark.asyncio
+async def test_explicit_project_scoped_integration_is_rejected():
+    integration = MagicMock()
+    integration.enabled = True
+    integration.integration_type = IntegrationType.OPENSHIFT
+    integration.scope = IntegrationScope.PROJECT
+    session_ctx = AsyncMock()
+    session_ctx.__aenter__ = AsyncMock(return_value=session_ctx)
+    session_ctx.__aexit__ = AsyncMock(return_value=False)
+    session_ctx.get = AsyncMock(return_value=integration)
+
+    with (
+        patch.object(remote, "get_settings") as settings,
+        patch.object(remote, "AsyncSessionLocal", return_value=session_ctx),
+    ):
+        settings.return_value.script_openshift_integration_id = "00000000-0000-0000-0000-000000000001"
+        with pytest.raises(ApplicationError, match="requires a global OpenShift integration"):
+            await remote._connection()
+        session_ctx.get.assert_awaited_once()
 
 
 @pytest.mark.asyncio
