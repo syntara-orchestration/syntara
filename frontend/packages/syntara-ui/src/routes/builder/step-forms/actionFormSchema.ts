@@ -43,16 +43,16 @@ const scriptActionSchema = z
     parameters: optionalJsonObjectSchema,
     credential_id: z.string().optional(),
     affinity: scriptAffinitySchema.default(ScriptAffinityEnum.NONE),
-    execution_target_id: z.string().optional(),
+    execution_target_id: z.uuid({ error: 'Select a valid execution target' }).optional(),
     settings: stepSettingsSchema.optional(),
   })
   .superRefine((data, ctx) => {
     if (data.affinity !== ScriptAffinityEnum.REQUIRED_TARGET) {
       return
     }
-    if (!data.execution_target_id?.trim()) {
+    if (!data.execution_target_id) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'Execution target is required',
         path: ['execution_target_id'],
       })

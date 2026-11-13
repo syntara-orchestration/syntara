@@ -64,4 +64,20 @@ describe('useAllEnabledExecutionTargets', () => {
 
     expect(result.current.targets).toEqual([])
   })
+
+  it('exposes isError when the query fails', async () => {
+    vi.mocked(executionPlaneFetchClient.GET).mockResolvedValue({
+      data: undefined,
+      response: new Response(),
+      error: { detail: 'Server error' },
+    } as never)
+
+    const { result } = renderHook(() => useAllEnabledExecutionTargets(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.isError).toBe(true)
+  })
 })
