@@ -120,6 +120,24 @@ describe('ScriptExecutionTab', () => {
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/execution-plane/create' })
   })
 
+  it('shows an error state with retry when loading targets fails', async () => {
+    const refetch = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(useAllEnabledExecutionTargets).mockReturnValue({
+      targets: [],
+      isLoading: false,
+      isError: true,
+      error: Object.assign(new Error('Network failure'), { status: 500, retryable: true }),
+      refetch,
+    })
+    const user = userEvent.setup()
+    renderTab({ affinity: ScriptAffinityEnum.REQUIRED_TARGET })
+
+    expect(screen.getByTestId('error-state')).toBeInTheDocument()
+    expect(screen.getByText('Error loading execution targets')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(refetch).toHaveBeenCalledOnce()
+  })
+
   it('has no accessibility violations', async () => {
     const { container } = renderTab({ affinity: ScriptAffinityEnum.REQUIRED_TARGET })
     expect(await axe(container)).toHaveNoViolations()

@@ -99,9 +99,17 @@ type ExecutionTargetSelectProps = {
   targets: ExecutionTargetRead[]
   isLoading: boolean
   isDisabled?: boolean
+  hasError?: boolean
 }
 
-function ExecutionTargetSelect({ value, onChange, targets, isLoading, isDisabled }: ExecutionTargetSelectProps) {
+function ExecutionTargetSelect({
+  value,
+  onChange,
+  targets,
+  isLoading,
+  isDisabled,
+  hasError,
+}: ExecutionTargetSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const selectedLabel = targets.find((target) => target.id === value)?.name
 
@@ -122,6 +130,7 @@ function ExecutionTargetSelect({ value, onChange, targets, isLoading, isDisabled
           isExpanded={isOpen}
           isFullWidth
           isDisabled={isDisabled || isLoading}
+          status={hasError ? 'danger' : undefined}
           aria-label="Execution target"
         >
           {isLoading ? (
@@ -138,11 +147,6 @@ function ExecutionTargetSelect({ value, onChange, targets, isLoading, isDisabled
             {target.name}
           </SelectOption>
         ))}
-        {!isLoading && targets.length === 0 && (
-          <SelectOption isDisabled value="none">
-            No execution targets available
-          </SelectOption>
-        )}
       </SelectList>
     </SynSelect>
   )
@@ -199,13 +203,14 @@ function RequiredTargetFields({ isDisabled }: { isDisabled: boolean }) {
       isRequired
       fieldId="script-execution-target"
     >
-      {({ field }) => (
+      {({ field, fieldState }) => (
         <ExecutionTargetSelect
           value={typeof field.value === 'string' ? field.value : ''}
           onChange={field.onChange}
           targets={targets}
           isLoading={isLoading}
           isDisabled={isDisabled}
+          hasError={!!fieldState.error}
         />
       )}
     </SynFormField>

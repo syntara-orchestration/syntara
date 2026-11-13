@@ -25,45 +25,49 @@ function headersEntriesToRecord(
   return Object.keys(result).length > 0 ? result : undefined
 }
 
+function serializeBody(body: unknown): string {
+  if (typeof body === 'string') return body
+  return JSON.stringify(body, null, 2)
+}
+
+/** Hydrate ActionStepForm initial data from a stored script/HTTP activity. */
 export function buildRegistryActionInitialData(
   executor: string,
   parameters: Record<string, unknown>,
   taskData: TaskActivity
 ): Partial<RegistryActionFormData> {
   const isScript = executor === ExecutorTypeEnum.SCRIPT
+  const isHTTP = executor === ExecutorTypeEnum.HTTP_REQUEST
   const executionFields = isScript ? parseScriptExecutionFormFields(parameters) : undefined
+  const credentialId =
+    (parameters as { credentialId?: string; credential_id?: string }).credentialId ??
+    (parameters as { credentialId?: string; credential_id?: string }).credential_id
 
   return {
     name: taskData.name,
     executor: isScript ? ExecutorTypeEnum.SCRIPT : ExecutorTypeEnum.HTTP_REQUEST,
     language: isScript ? (parameters.language as string | undefined) : undefined,
     code: isScript ? (parameters.code as string | undefined) : undefined,
-    method:
-      executor === ExecutorTypeEnum.HTTP_REQUEST
-        ? (parameters.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | undefined)
-        : undefined,
-    url: executor === ExecutorTypeEnum.HTTP_REQUEST ? (parameters.url as string | undefined) : undefined,
+    method: isHTTP ? (parameters.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | undefined) : undefined,
+    url: isHTTP ? (parameters.url as string | undefined) : undefined,
     headers:
-      executor === ExecutorTypeEnum.HTTP_REQUEST && parameters.headers
+      isHTTP && parameters.headers
         ? Object.entries(parameters.headers as Record<string, string>).map(([key, value]) => ({
             id: generateUUID(),
             key,
             value: String(value),
           }))
         : undefined,
-    body: (() => {
-      if (executor !== ExecutorTypeEnum.HTTP_REQUEST || !parameters.body) {
-        return undefined
-      }
-      return typeof parameters.body === 'string' ? parameters.body : JSON.stringify(parameters.body, null, 2)
-    })(),
-    credential_id: (parameters as { credential_id?: string }).credential_id ?? undefined,
+    body: isHTTP && parameters.body ? serializeBody(parameters.body) : undefined,
+    credential_id: credentialId ?? undefined,
     parameters: isScript && parameters.environment ? JSON.stringify(parameters.environment, null, 2) : undefined,
     affinity: executionFields?.affinity,
     execution_target_id: executionFields?.execution_target_id,
+    settings: taskData.settings,
   }
 }
 
+/** Build the updated activity for a script/HTTP ActionStepForm submit. */
 export function buildRegistryActivityUpdate(taskData: TaskActivity, data: RegistryActionFormData): Activity {
   const apiHeaders = data.executor === ExecutorTypeEnum.HTTP_REQUEST ? headersEntriesToRecord(data.headers) : undefined
 
@@ -95,6 +99,7 @@ export function buildRegistryActivityUpdate(taskData: TaskActivity, data: Regist
             }),
             ...(data.credential_id && { credential_id: data.credential_id }),
           },
+    settings: data.settings,
   }
 }
 
