@@ -6,7 +6,7 @@ from sqlmodel import SQLModel
 
 
 class EventFailureCode(StrEnum):
-    """Stable categories for a caller's per-message audit event."""
+    """Stable categories for durable content rejection and safe system logs."""
 
     tombstone = "tombstone"
     invalid_utf8 = "invalid_utf8"
@@ -53,7 +53,7 @@ _FAILURE_MESSAGES = {
 
 
 class EventDecodeFailure(SQLModel):
-    """Safe result for the caller to audit; never proof of durable resolution."""
+    """Safe decoding failure; never proof of a committed delivery rejection."""
 
     code: EventFailureCode
 

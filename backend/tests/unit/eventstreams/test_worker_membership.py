@@ -1,4 +1,4 @@
-"""Independent ownership infrastructure with isolated provider and recovery ports."""
+"""Independent ownership infrastructure with isolated placement providers."""
 
 import asyncio
 from datetime import UTC, datetime, timedelta
@@ -8,17 +8,15 @@ from uuid import UUID
 import pytest
 
 from syntara.eventstreams.core.placement import PlacementUncertainError, WorkerMembership
-from syntara.eventstreams.services.recovery_worker import EventDeliveryRecoveryWorker
 from tests.helpers.eventstream_runtime import IsolatedSubscriptionRunner
 from tests.helpers.eventstream_worker import IsolatedPlacementService
 from tests.unit.eventstreams import test_consumer_service as consumer_tests
 from tests.unit.eventstreams.test_consumer_service import eventually
-from tests.unit.eventstreams.test_worker_resources import TrackingSessionFactory
 
 manager_context = consumer_tests.manager_context
 
 
-async def test_blocked_broker_start_does_not_starve_heartbeat_renewal_or_recovery(manager_context, monkeypatch):
+async def test_blocked_broker_start_does_not_starve_heartbeat_and_lease_renewal(manager_context, monkeypatch):
     context = manager_context
     release = asyncio.Event()
 
@@ -32,26 +30,17 @@ async def test_blocked_broker_start_does_not_starve_heartbeat_renewal_or_recover
     context.manager._membership._settings = context.manager._membership._settings.model_copy(
         update={"event_worker_heartbeat_interval_seconds": 0.01}
     )
-    store = MagicMock()
-    store.claim_due = AsyncMock(return_value=[])
-    monkeypatch.setattr("syntara.eventstreams.services.recovery_worker.EventDeliveryStore", lambda _session: store)
-    recovery = EventDeliveryRecoveryWorker(
-        TrackingSessionFactory(), MagicMock(), resources=context.resources, interval_seconds=0.01
-    )
     await context.manager.start()
-    recovery.start()
     try:
         await eventually(lambda: bool(context.runners) and context.runners[0].start_entered.is_set())
         await eventually(
             lambda: context.pool.trace.count(("heartbeat", context.placement.worker.worker_id)) > 1
             and ("renew", context.snapshot.subscription_id) in context.pool.trace
-            and store.claim_due.await_count > 0
         )
         assert context.manager.ready
         assert not context.runners[0].started
         assert not context.manager.membership_task.done()
     finally:
-        await recovery.stop()
         release.set()
 
 
@@ -224,13 +213,12 @@ async def test_reads_cannot_reopen_gate_while_heartbeat_writes_fail(manager_cont
         await context.manager.reconcile()
         assert not context.manager.ready
         assert not context.resources.scheduling_open
-        assert not context.resources.gate.cache_trusted()
     context.placement.heartbeat_error = False
     await membership._heartbeat()
     assert not context.resources.scheduling_open
     await context.manager.reconcile()
     assert context.manager.ready
-    assert context.resources.gate.cache_trusted()
+    assert context.resources.scheduling_open
 
 
 async def test_delayed_heartbeat_does_not_clear_a_newer_failure(manager_context, monkeypatch):

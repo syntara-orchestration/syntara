@@ -68,7 +68,7 @@ def resolve_supplied_kafka_login(
 
     Returns:
         Injector keys ``kafka_username`` and ``kafka_password``, or ``None``
-        when the security mode allows the credential to be omitted.
+        when the security mode does not use SASL authentication.
 
     Raises:
         CredentialValidationError: If the protocol is unsupported, ``SASL_SSL``
@@ -87,6 +87,8 @@ def resolve_supplied_kafka_login(
     if decrypted_inputs is None:
         msg = "Kafka credential inputs were not supplied for the requested credential"
         raise CredentialValidationError(msg)
+    if not required:
+        return None
 
     username_value = decrypted_inputs.get("username")
     password_value = decrypted_inputs.get("password")

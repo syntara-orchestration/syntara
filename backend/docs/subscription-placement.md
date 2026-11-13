@@ -16,7 +16,7 @@ it with every local supervisor; never reuse a previous process UUID.
 `WorkerMembership` records the confirmed membership deadline and draining flag.
 `SubscriptionPlacementLease` records the subscription, owner, database observation
 time and database expiry. These immutable SQLModel values are separate from
-`SubscriptionSnapshot` and token-fenced `DeliveryClaim` values.
+`SubscriptionSnapshot` and the deterministic record/Execution identity.
 
 A lease value alone does not open admission. Pass
 `placement=provider.authority(subscription_id)` to `SubscriptionSupervisor`.
@@ -68,9 +68,11 @@ timeout.
 ## Supervisor and runner hooks
 
 `apply(snapshot)` applies a desired target under current placement authority.
-`retry()` preserves existing local restart/backoff semantics while ownership is
-valid. A connection failure retains its owned placement instead of releasing and
-reclaiming it on every retry.
+Connection and authentication failures retry on later reconciliations with
+exponential backoff and jitter capped at 30 seconds, without an attempt limit.
+Reconciliation reloads current connection settings; recovery does not require
+calling the internal `retry()` hook. A connection failure retains its owned
+placement instead of releasing and reclaiming it on every retry.
 
 If another local supervisor still holds the reservation, an active target reports
 `blocked` with reason `local_runner_busy`, without consuming connection retry
@@ -106,12 +108,12 @@ reservation until drain, stop and the serving task have all settled. Repeated
 stop requests reuse that cleanup. After an incomplete shutdown, #988 must call
 stop/reapply again to collect its final result before releasing or reacquiring.
 
-Placement loss does not revoke Kafka assignment or a delivery token. Already
-admitted work may finish using valid delivery claims. Resolved offset commits
+Placement loss does not revoke Kafka assignment. Already
+admitted handoffs may finish persisting their accepted Executions. Resolved offset commits
 still require current Kafka assignment, local epoch and the drain deadline.
 Placement expiry never clears delivery evidence, establishes an RPC result, or
-cancels an accepted Temporal execution. Prepared recovery remains independently
-callable without a subscription placement lease or Kafka consumer.
+cancels an accepted Temporal execution. Interrupted handoffs recover through
+redelivery to an active consumer of the same source; there is no separate scanner.
 
 ## Candidate settings and verification
 
@@ -121,18 +123,18 @@ expiry durations to exceed the heartbeat interval.
 
 | Environment setting | Candidate default |
 | --- | --- |
-| `APP_EVENT_WORKER_HEARTBEAT_INTERVAL_SECONDS` | 20 seconds |
-| `APP_EVENT_WORKER_LIVENESS_SECONDS` | 60 seconds |
-| `APP_EVENT_SUBSCRIPTION_LEASE_SECONDS` | 60 seconds |
+| Membership heartbeat interval | 20 seconds |
+| Worker membership lifetime | 60 seconds |
+| Subscription placement lease | 60 seconds |
 
-These are separate from delivery leases and Kafka group/session timeouts. The
+These built-in defaults are separate from Kafka group/session timeouts. The
 deployment must leave enough margin for database latency, retry, process pauses
 and clock behavior. Placement permits temporary takeover overlap; it is not
 strict execution fencing.
 
 The isolated tests describe commit acknowledgement, uncertain reconciliation,
 owner/deployment checks, lifecycle lock order, expired renewal rejection,
-stop-before-reacquisition/release, startup races, backoff and independent recovery.
+stop-before-reacquisition/release, startup races, backoff and accepted-run recovery.
 They do not establish live PostgreSQL contention guarantees or validated fleet
 capacity. Concurrent database and broker failure testing remains necessary before
 release.

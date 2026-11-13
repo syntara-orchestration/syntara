@@ -392,3 +392,19 @@ async def test_credential_only_draft_rejects_unavailable_credential(
     cast("AsyncMock", service.session).get.return_value = credential
     with pytest.raises(SafeValueError, match="unavailable"):
         await service._validate_event_subscribe_bindings(definition, allow_incomplete=True)
+
+
+@pytest.mark.parametrize("expression", ["", "  ", "\n\t"])
+async def test_cleared_filter_is_saved_as_null(
+    service: WorkflowService, definition: dict[str, Any], expression: str
+) -> None:
+    definition["triggers"][0]["parameters"] = {"filter": {"expression": expression}}
+    await service._validate_event_subscribe_bindings(definition, allow_incomplete=True)
+    assert definition["triggers"][0]["parameters"]["filter"] is None
+
+
+async def test_nonempty_filter_source_is_preserved(service: WorkflowService, definition: dict[str, Any]) -> None:
+    expression = "  input.payload.value.count > 2  "
+    definition["triggers"][0]["parameters"] = {"filter": {"expression": expression}}
+    await service._validate_event_subscribe_bindings(definition, allow_incomplete=True)
+    assert definition["triggers"][0]["parameters"]["filter"] == {"expression": expression}

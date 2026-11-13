@@ -104,7 +104,13 @@ class EventSubscription(UserOwnedResource, table=True):
     input_schema: dict[str, Any] | None = Field(
         default=None,
         sa_type=JSONB,
-        description="Validated published input schema; filter configuration/schema is out of scope",
+        description="Validated published input schema",
+    )
+
+    filter: dict[str, Any] | None = Field(
+        default=None,
+        sa_type=JSONB,
+        description="Original CEL expression from the published Subscribe trigger",
     )
 
     desired_enabled: bool = Field(
@@ -114,7 +120,7 @@ class EventSubscription(UserOwnedResource, table=True):
 
     paused: bool = Field(
         default=False,
-        description="User-controlled operational pause; does not rewrite the workflow version",
+        description="Legacy pause flag; cleared by workflow publication",
     )
 
     retired: bool = Field(

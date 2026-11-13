@@ -1,4 +1,4 @@
-"""Kafka connections with shared address pinning and health metadata checks.
+"""Kafka socket policy shared by health checks, consumers and producers.
 
 Only this connection's event-loop view changes. The real loop and aiokafka's
 module globals are never patched. aiokafka remains responsible for Kafka framing,
@@ -128,8 +128,24 @@ async def create_pinned_connection(host: str, port: int, **kwargs: object) -> Pi
     return connection
 
 
+async def create_kafka_connection(host: str, port: int, **kwargs: Any) -> AIOKafkaConnection:  # noqa: ANN401 - upstream connection options
+    """Enforce the existing Integration policy for every newly opened socket."""
+    connection = PinnedKafkaConnection(host, port, **kwargs)
+    try:
+        await connection.connect()
+    except ValueError:
+        connection.close()
+        # aiokafka retries KafkaError; never leak DNS/policy exception contents.
+        msg = "Kafka broker address is not permitted"
+        raise KafkaConnectionError(msg) from None
+    except BaseException:
+        connection.close()
+        raise
+    return connection
+
+
 class _PinnedKafkaConnection(PinnedKafkaConnection):
-    """Short-lived health connections additionally abort on close."""
+    """Short-lived health connection with bounded, immediate socket shutdown."""
 
     def close(self, reason: object = None, exc: BaseException | None = None) -> asyncio.Future[None] | None:
         """Abort a health-check socket without an unbounded TLS shutdown wait.

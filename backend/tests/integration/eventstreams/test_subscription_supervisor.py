@@ -1,4 +1,4 @@
-"""Persisted supervision/recovery boundaries with isolated runners and Temporal."""
+"""Persisted lifecycle and replacement ordering without delivery ledger state."""
 
 from copy import deepcopy
 from datetime import UTC, datetime
@@ -8,21 +8,13 @@ from unittest.mock import AsyncMock
 import pytest
 import pytest_asyncio
 
-from syntara.core.constants import EventDeliveryDefaults
 from syntara.core.models.user import User
 from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.models.credential import Credential
-from syntara.eventstreams.core.deduplication import DeliveryState
-from syntara.eventstreams.core.handler import ResolvedDelivery
-from syntara.eventstreams.core.processing import HeldRecord
-from syntara.eventstreams.core.results import EventFailureCode
 from syntara.eventstreams.core.runtime import RuntimeRevision, RuntimeState
-from syntara.eventstreams.models.delivery import EventDelivery
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
-from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
-from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
 from syntara.eventstreams.services.subscription_service import EventSubscriptionService, lock_source_lifecycle
 from syntara.eventstreams.services.subscription_supervisor import SubscriptionSupervisor
 from syntara.workflows.models.execution import Execution
@@ -33,6 +25,7 @@ from tests.integration.eventstreams import test_execution_scheduling
 from tests.integration.eventstreams.test_execution_scheduling import SchedulingContext
 
 pytestmark = pytest.mark.integration
+preparation_context = test_execution_scheduling.preparation_context
 scheduling_context = test_execution_scheduling.scheduling_context
 
 
@@ -91,7 +84,7 @@ async def runtime(scheduling_context):
 
 
 @pytest.mark.parametrize("lifecycle", ["paused", "unpublished", "retired"])
-async def test_inactive_consumer_teardown_keeps_prepared_recovery_discoverable(runtime, lifecycle):
+async def test_inactive_consumer_teardown_does_not_persist_unaccepted_preparation(runtime, lifecycle):
     context, supervisor = runtime.context, runtime.supervisor
     original = await persisted_snapshot(context)
     await supervisor.apply(original)
@@ -106,30 +99,8 @@ async def test_inactive_consumer_teardown_keeps_prepared_recovery_discoverable(r
     assert inactive.source_id == original.source_id
     assert inactive.configuration == original.configuration
     async with context.delivery.session_factory() as session:
-        row = await session.get(EventDelivery, context.prepared.claim.identity.digest)
-        execution = await session.get(Execution, context.prepared.execution_id)
-        assert row is not None
-        assert execution is not None
-        assert row.state == DeliveryState.IN_PROGRESS
-        assert row.claim_token == context.prepared.claim.token
-        assert row.frozen_binding == context.prepared.claim.binding
-        assert execution.workflow_version_id == original.published_version_id
-        assert execution.input_data == context.prepared.input_data
-    await context.delivery.expire(context.prepared.claim)
-    recovered = await context.recovery.recover_due("after-consumer-stop", limit=1)
-    assert len(recovered) == 1
-    assert isinstance(recovered[0][1], ResolvedDelivery)
-    assert supervisor.status.state == RuntimeState.STOPPED
-    runtime.factory.assert_awaited_once()  # No Kafka client is constructed to repair frozen work.
-    assert len(context.temporal.starts) == 1
-    assert context.temporal.starts[0].workflow_arguments() == context.prepared.workflow_arguments()
-    async with context.delivery.session_factory() as session:
-        row = await session.get(EventDelivery, context.prepared.claim.identity.digest)
-        execution = await session.get(Execution, context.prepared.execution_id)
-        assert row.state == DeliveryState.SCHEDULED
-        assert row.frozen_binding == context.prepared.claim.binding
-        assert execution.input_data == context.prepared.input_data
-        assert execution.execution_metadata["event_delivery"]["scheduling_state"] == "confirmed"
+        assert await session.get(Execution, context.prepared.execution_id) is None
+    assert context.temporal.starts == []
 
 
 @pytest.mark.parametrize("lifecycle", ["paused", "unpublished"])
@@ -200,48 +171,6 @@ async def test_publication_replacement_keeps_prepared_version_credential_and_inp
     assert replacement.runtime_credential_id != original.runtime_credential_id
     assert replacement.source_id == original.source_id
     assert replacement.configuration == original.configuration
-    await context.delivery.expire(context.prepared.claim)
-    result = await context.recovery.recover_due("after-republication", limit=1)
-    assert isinstance(result[0][1], ResolvedDelivery)
-    recovered = context.temporal.starts[0]
-    assert recovered.claim.binding == context.prepared.claim.binding
-    assert recovered.workflow_version_id == original.published_version_id
-    assert recovered.input_data == context.prepared.input_data
-    assert recovered.workflow_arguments() == context.prepared.workflow_arguments()
-
-
-async def test_pause_resume_preserves_durable_permanent_content_evidence(runtime):
-    context, supervisor = runtime.context, runtime.supervisor
-    claim = await context.delivery.claim(offset=10)
-    async with context.delivery.session_factory() as session, session.begin():
-        assert (
-            await context.delivery.store(session).defer(
-                claim,
-                error_code=EventFailureCode.invalid_json.value,
-                next_attempt_at=EventDeliveryDefaults.NO_AUTOMATIC_RETRY_AT,
-            )
-            is None
-        )
-    async with context.delivery.session_factory() as session:
-        row = await session.get(EventDelivery, claim.identity.digest)
-        retained = row.model_dump()
-    await supervisor.apply(await persisted_snapshot(context))
-    await supervisor.apply(await change_lifecycle(context, "paused"))
-    resumed = await change_lifecycle(context, "resumed")
-    await supervisor.apply(resumed)
-    processing = EventRecordProcessingService(
-        context.delivery.session_factory,
-        EventExecutionPreparationService(context.delivery.session_factory),
-        context.admission,
-    )
-    held = await processing.process(resumed, claim.identity, None, "resumed")
-    assert isinstance(held, HeldRecord)
-    assert held.permanent_content_error
-    assert held.retry_at is None
-    assert held.reason == "activity_log_unavailable"
-    async with context.delivery.session_factory() as session:
-        row = await session.get(EventDelivery, claim.identity.digest)
-        assert row.model_dump() == retained
-        assert row.state == DeliveryState.IN_PROGRESS
-        assert row.frozen_binding is None
     assert context.temporal.starts == []
+    async with context.delivery.session_factory() as session:
+        assert await session.get(Execution, context.prepared.execution_id) is None

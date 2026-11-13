@@ -81,9 +81,9 @@ class DrainEvidence(PositionValue):
 
     Quiescence means conflicting processing tasks have drained and remain fenced
     by the supplied recovery token. It does not establish the outcome of an RPC
-    already sent: the service must still repair every prepared delivery.
-    Retained evidence is complete only when durable evidence covers the proposed
-    retained reading window; elapsed time or an empty ledger is insufficient.
+    already sent: redelivery must still recover accepted Temporal runs.
+    Local inspection alone cannot prove durable evidence covers the proposed
+    retained reading window.
     Unknown permanent-content status must be treated as an active error gate.
     """
 
@@ -108,22 +108,4 @@ class PartitionRecoveryControl(Protocol):
 
     async def is_fenced(self, request: PositionRequest, *, token: UUID) -> bool:
         """Verify the same recovery operation still fences local tasks and queued commits."""
-        ...
-
-
-class RecoveryCacheCoordination(Protocol):
-    """External evidence-correction guard; no cache hit or local epoch is proof.
-
-    Backward or unknown-history recovery requires deployment-wide close/drain,
-    retirement of old cache readers/writers and external epoch coordination.
-    Implementations must remain true for this exact token, revision and boundary
-    until durable recovery confirmation; loss of coordination keeps admission
-    closed. A deployment with caching disabled must establish that fact across
-    its readers/writers too. Operator/control wiring belongs to later callers.
-    """
-
-    async def is_coordinated(
-        self, request: PositionRequest, *, token: UUID, recovery_revision: int, boundary: int
-    ) -> bool:
-        """Verify coordinated cache isolation for the named administrative decision."""
         ...

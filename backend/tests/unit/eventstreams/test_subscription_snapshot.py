@@ -1,6 +1,6 @@
 """SubscriptionSnapshot is an immutable projection of a subscription and source."""
 
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import pytest
@@ -45,6 +45,35 @@ def _source(subscription: EventSubscription, *, generation: int = 1) -> EventSub
             topic="infra.alerts", group_id=f"syntara.d.{subscription.id}.{generation}"
         ),
     )
+
+
+def test_filter_is_frozen_prepared_and_round_trips_without_changing_snapshot_equality() -> None:
+    original = {
+        "expression": 'input.headers.env.exists(h, h.text == "prod" || h.text == "stage") && input.payload.value.ok'
+    }
+    subscription = _subscription(filter=original)
+    source = _source(subscription)
+    snapshot = SubscriptionSnapshot.from_models(subscription, source)
+    assert snapshot.prepared_filter is not None
+    assert snapshot.filter is not None
+    dumped = snapshot.model_dump(mode="json")
+    assert dumped["filter"] == original
+    assert SubscriptionSnapshot.model_validate_json(snapshot.model_dump_json()) == snapshot
+    assert SubscriptionSnapshot.from_models(subscription, source) == snapshot
+    with pytest.raises(TypeError):
+        # Deliberately bypass the read-only annotation to verify runtime protection.
+        cast("dict[str, Any]", snapshot.filter)["expression"] = "changed"
+    saved_expression = original["expression"]
+    original["expression"] = "false"
+    assert snapshot.model_dump(mode="json")["filter"]["expression"] == saved_expression
+
+
+def test_resource_check_snapshot_cannot_silently_skip_an_unprepared_filter() -> None:
+    subscription = _subscription(filter={"expression": "false"})
+    snapshot = SubscriptionSnapshot.from_models(subscription, _source(subscription), prepare_filter=False)
+    assert snapshot.model_dump(mode="json")["filter"] == {"expression": "false"}
+    with pytest.raises(ValueError, match="not prepared"):
+        _ = snapshot.prepared_filter
 
 
 def test_from_models_maps_identity_and_configuration() -> None:

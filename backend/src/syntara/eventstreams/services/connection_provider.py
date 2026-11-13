@@ -1,7 +1,5 @@
 """Session-bound runtime availability and non-secret connection revision producer."""
 
-from typing import TYPE_CHECKING
-
 import structlog
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -14,15 +12,10 @@ from syntara.core.storage_exceptions import StorageBackendNotFoundError
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.eventstreams.adapters.connection_credentials import validate_connection_credentials
 from syntara.eventstreams.core.connection_revision import ConnectionRevision
-from syntara.eventstreams.core.deduplication import DeliveryClaim
-from syntara.eventstreams.models.source import EventSubscriptionSource
-from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type
 from syntara.integrations.models.integration import Integration, IntegrationProjectAssignment, IntegrationScope
-
-if TYPE_CHECKING:
-    from uuid import UUID
+from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -38,30 +31,6 @@ class EventConnectionProvider:
         """Inject a session and optionally its secret service for isolated tests."""
         self.session = session
         self._secret_service = secret_service
-
-    async def resolve_frozen(self, claim: DeliveryClaim, project_id: "UUID") -> ConnectionRevision:
-        """Check frozen references independently of current publication/lifecycle."""
-        source = await self.session.get(EventSubscriptionSource, claim.identity.source_id)
-        subscription = await self.session.get(EventSubscription, claim.identity.subscription_id)
-        if (
-            claim.binding is None
-            or source is None
-            or subscription is None
-            or source.subscription_id != subscription.id
-            or subscription.workflow_id != claim.identity.workflow_id
-            or subscription.project_id != project_id
-            or source.generation != claim.identity.source_generation
-            or source.integration_identity != claim.identity.integration_identity
-            or source.deployment_id != claim.identity.deployment_id
-        ):
-            msg = "Frozen event runtime references are unavailable"
-            raise SafeValueError(msg)
-        snapshot = SubscriptionSnapshot.from_models(subscription, source).model_copy(
-            update={
-                "runtime_credential_id": claim.binding.runtime_credential_id,
-            }
-        )
-        return await self.resolve_revision(snapshot)
 
     async def resolve_revision(self, snapshot: SubscriptionSnapshot) -> ConnectionRevision:
         """Validate current availability and return only non-secret change metadata."""
@@ -108,7 +77,13 @@ class EventConnectionProvider:
             # Values remain local and never contribute to the revision hash.
             decrypted = await secret_service.retrieve_secret(credential.secret_id)  # type: ignore[arg-type]
             resolved = InjectorResolver.resolve(credential_type.injectors or {}, decrypted)
-            validate_connection_credentials(snapshot.transport, resolved.extra_vars)
+            validate_connection_credentials(
+                snapshot.transport,
+                resolved.extra_vars,
+                security_protocol=integration.configuration.security_protocol
+                if isinstance(integration.configuration, KafkaConfiguration)
+                else "SASL_SSL",
+            )
         except (EncryptionError, StorageBackendNotFoundError, KeyError, TypeError, ValueError, AttributeError) as exc:
             logger.warning(
                 "Event runtime credential resolution failed",

@@ -35,6 +35,14 @@ class KafkaDiagnosticFilter(logging.Filter):
         return True
 
 
+class ExcludeCELDiagnostics(logging.Filter):
+    """Keep dependency diagnostics containing filter inputs out of application logs."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Allow application diagnostics, which use sanitized filter error codes."""
+        return record.name != "cel_expr_python" and not record.name.startswith("cel_expr_python.")
+
+
 class SyntaraLogRecordRenderer(JSONRenderer):
     """Renderer that outputs JSON."""
 
@@ -121,22 +129,30 @@ def build_uvicorn_logging_config(log_level: str) -> dict[str, Any]:
     return {
         "version": 1,
         "disable_existing_loggers": False,
-        "filters": {"kafka_diagnostics": {"()": KafkaDiagnosticFilter}},
+        "filters": {
+            "kafka_diagnostics": {"()": KafkaDiagnosticFilter},
+            "exclude_cel_diagnostics": {"()": "syntara.core.logging.logging.ExcludeCELDiagnostics"},
+        },
         "formatters": {
             "syntara": {
                 "()": "syntara.core.logging.logging.build_syntara_formatter",
             },
         },
         "handlers": {
+            "discard_cel_diagnostics": {"class": "logging.NullHandler"},
             "syntara": {
                 "formatter": "syntara",
                 "class": "logging.StreamHandler",
                 "stream": "ext://sys.stdout",
-                "filters": ["kafka_diagnostics"],
+                "filters": ["exclude_cel_diagnostics", "kafka_diagnostics"],
             },
         },
         "loggers": {
-            name: {"handlers": ["syntara"], "level": log_level, "propagate": False} for name in _UVICORN_LOGGER_NAMES
+            **{
+                name: {"handlers": ["syntara"], "level": log_level, "propagate": False}
+                for name in _UVICORN_LOGGER_NAMES
+            },
+            "cel_expr_python": {"handlers": ["discard_cel_diagnostics"], "propagate": False},
         },
         "root": {
             "handlers": ["syntara"],
@@ -214,8 +230,15 @@ def _on_log_level_changed(_key: str, new_value: Any) -> None:  # noqa: ANN401
 
 def configure_app_logging() -> None:
     """Configure structlog and stdlib logging for structured logs."""
+    # Stop dependency records before they can reach root handlers added later.
+    cel_logger = logging.getLogger("cel_expr_python")
+    cel_logger.handlers.clear()
+    cel_logger.addHandler(logging.NullHandler())
+    cel_logger.propagate = False
+
     # Always attach stdout handler
     handler = logging.StreamHandler()
+    handler.addFilter(ExcludeCELDiagnostics())
     handler.setFormatter(build_syntara_formatter())
     handler.addFilter(KafkaDiagnosticFilter())
 
@@ -228,6 +251,7 @@ def configure_app_logging() -> None:
     otel_handler = create_otel_handler()
     if otel_handler is not None:
         otel_handler.addFilter(KafkaDiagnosticFilter())
+        otel_handler.addFilter(ExcludeCELDiagnostics())
         root_logger.addHandler(otel_handler)
         logging.getLogger(__name__).info(
             "logging.root_otel_configured",
