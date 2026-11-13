@@ -2,7 +2,6 @@ import { Button, Popover } from '@patternfly/react-core'
 import { type ReactNode, useRef } from 'react'
 
 import { FieldHelpIcon } from './FieldHelpIcon'
-import styles from './FieldHelpIcon.module.css'
 
 export type FieldHelpPopoverProps = Readonly<{
   /** Body content for the popover (plain text or rich React nodes). */
@@ -15,6 +14,7 @@ export type FieldHelpPopoverProps = Readonly<{
 
 /**
  * Label help for FormGroup: RhUi question-mark icon + Popover with shared ref.
+ * Uses FormGroupLabelHelp's inline, unpadded button presentation.
  *
  * Pass as `labelHelp` on FormGroup:
  * ```tsx
@@ -34,8 +34,9 @@ export function FieldHelpPopover({
       <Button
         ref={triggerRef}
         variant="plain"
+        isInline
+        hasNoPadding
         aria-label={triggerAriaLabel}
-        className={styles.trigger}
         icon={<FieldHelpIcon />}
       />
     </Popover>

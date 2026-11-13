@@ -21,7 +21,7 @@ export default function registerActionNode() {
         label: 'Action',
         icon: RhUiElectricityFillIcon,
         category: 'action',
-        description: 'Run scripts, make API calls, or invoke another published workflow.',
+        description: 'Run scripts, make API calls, invoke another published workflow, or publish messages to Kafka.',
         keywords: ['script', 'api', 'http', 'python', 'javascript', 'bash', 'rest'],
         order: 30,
         selectionTitle: 'Select an action node',

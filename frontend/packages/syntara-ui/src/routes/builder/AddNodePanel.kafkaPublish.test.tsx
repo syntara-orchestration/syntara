@@ -27,7 +27,9 @@ describe('Kafka Publish action selection', () => {
     const { container } = render(<AddNodePanel onClose={vi.fn()} onSelectNode={vi.fn()} />)
 
     expect(screen.queryByRole('button', { name: 'Kafka Publish' })).not.toBeInTheDocument()
-    expect(screen.getByText('Run scripts, make API calls, or invoke another published workflow.')).toBeInTheDocument()
+    expect(
+      screen.getByText('Run scripts, make API calls, invoke another published workflow, or publish messages to Kafka.')
+    ).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
 
     await user.click(screen.getByRole('button', { name: 'Action' }))

@@ -120,6 +120,10 @@ class PinnedKafkaConnection(AIOKafkaConnection):
         """Expose the upstream response awaitable through a typed boundary."""
         return cast("Awaitable[Any]", AIOKafkaConnection.send(self, request, expect_response=expect_response))
 
+    def close(self, reason: object = None, exc: BaseException | None = None) -> asyncio.Future[None] | None:
+        """Expose the upstream close future without changing socket shutdown."""
+        return cast("asyncio.Future[None] | None", AIOKafkaConnection.close(self, reason=reason, exc=exc))
+
 
 async def create_pinned_connection(host: str, port: int, **kwargs: object) -> PinnedKafkaConnection:
     """Open a pinned connection while retaining upstream producer close behavior."""

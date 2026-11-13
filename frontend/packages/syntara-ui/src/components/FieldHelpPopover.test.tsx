@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { Form, FormGroup, TextInput } from '@patternfly/react-core'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { createFieldHelp } from './createFieldHelp'
@@ -22,6 +23,39 @@ describe('FieldHelpPopover', () => {
     expect(await screen.findByRole('dialog', { name: 'Input schema' })).toBeVisible()
     expect(screen.getByText('Input schema')).toBeInTheDocument()
     expect(screen.getByText('Define an input schema.')).toBeInTheDocument()
+  })
+
+  it.each(['{Enter}', ' '])('opens field help with %s without submitting the form', async (key) => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    render(
+      <Form
+        onSubmit={(event) => {
+          event.preventDefault()
+          onSubmit()
+        }}
+      >
+        <FormGroup
+          label="JSON payload"
+          fieldId="payload"
+          labelHelp={<FieldHelpPopover headerContent="JSON payload" helpText="Payload help." />}
+        >
+          <TextInput id="payload" />
+        </FormGroup>
+      </Form>
+    )
+
+    const trigger = screen.getByRole('button', { name: 'More info for JSON payload' })
+    await user.tab()
+    expect(trigger).toHaveFocus()
+    await user.keyboard(key)
+    expect(await screen.findByRole('dialog', { name: 'JSON payload' })).toBeVisible()
+    expect(screen.getByText('Payload help.')).toBeVisible()
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
   })
 
   it('supports ReactNode body content', async () => {

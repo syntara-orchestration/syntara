@@ -160,6 +160,8 @@ export function TaskActivityDetails(
               {renderText('URL', (config as { url: string }).url)}
             </>
           )}
+          {taskExecutor === ExecutorTypeEnum.KAFKA_PUBLISH &&
+            renderText('Target topic', typeof config.topic === 'string' ? config.topic : undefined)}
           {renderText(
             isExpression(aapJobConfig?.job_template_name) ? 'Job template expression' : 'Job template',
             aapJobConfig?.job_template_name

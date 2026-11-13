@@ -74,8 +74,8 @@ function mockQueryError() {
 
 function renderSelector(props: Partial<Parameters<typeof IntegrationSelector>[0]> = {}) {
   const onChange = vi.fn()
-  render(<IntegrationSelector onChange={onChange} {...props} />, { wrapper })
-  return { onChange }
+  const view = render(<IntegrationSelector onChange={onChange} {...props} />, { wrapper })
+  return { ...view, onChange }
 }
 
 describe('IntegrationSelector', () => {
@@ -99,22 +99,27 @@ describe('IntegrationSelector', () => {
     } satisfies IntegrationsAPI.components['schemas']['KafkaIntegrationRead']
     integrationsQuery.mockReturnValue({ data: [kafkaIntegration], isPending: false, isError: false })
     const user = userEvent.setup()
+    const onChange = vi.fn()
     const { container } = render(
       <IntegrationSelector
         integrationType={IntegrationTypeEnum.KAFKA}
         label="Integration"
         isRequired
         placeholder="Select a Kafka integration"
-        onChange={vi.fn()}
+        onChange={onChange}
       />,
       { wrapper }
     )
 
     expect(screen.getByRole('button', { name: 'Integration' })).toHaveTextContent('Select a Kafka integration')
     await user.click(screen.getByRole('button', { name: 'Integration' }))
+    expect(screen.queryByRole('option', { name: 'Select a Kafka integration' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(1)
     expect(screen.getByRole('option', { name: /Kafka Cluster \(Demo\)/ })).toHaveTextContent('Available')
     expect(screen.getByText('broker-1.example.invalid:9093, broker-2.example.invalid:9093')).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
+    await user.click(screen.getByRole('option', { name: /Kafka Cluster \(Demo\)/ }))
+    expect(onChange).toHaveBeenCalledWith(kafkaIntegration.id)
   })
   beforeEach(() => {
     mockQuerySuccess()
@@ -184,18 +189,22 @@ describe('IntegrationSelector', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
-  it('preserves a completed empty Kafka list during a refresh', async () => {
-    integrationsQuery.mockReturnValue({ data: [], isPending: false, isFetching: true, isError: false })
-    renderSelector({
+  it.each([false, true])('shows only the disabled empty row for Kafka when refreshing is %s', async (isFetching) => {
+    integrationsQuery.mockReturnValue({ data: [], isPending: false, isFetching, isError: false })
+    const { container } = renderSelector({
       integrationType: IntegrationTypeEnum.KAFKA,
       label: 'Integration',
       placeholder: 'Select a Kafka integration',
     })
     const toggle = screen.getByRole('button', { name: 'Integration' })
+    expect(toggle).toHaveTextContent('Select a Kafka integration')
     expect(toggle).toBeEnabled()
     expect(toggle).not.toHaveAttribute('aria-busy', 'true')
     await userEvent.setup().click(toggle)
-    expect(screen.getByRole('option', { name: 'No Kafka integrations available' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'No Kafka integrations available' })).toBeDisabled()
+    expect(screen.queryByRole('option', { name: 'Select a Kafka integration' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(await axe(container)).toHaveNoViolations()
   })
 
   it('shows integrations in dropdown when opened', async () => {

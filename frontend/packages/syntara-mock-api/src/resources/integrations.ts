@@ -17,10 +17,10 @@ export const integrations: IntegrationRead[] = [
     enabled: true,
     validation_status: IntegrationStatusEnum.AVAILABLE,
     scope: 'global',
-    configuration: null,
-    kafka_configuration: {
+    configuration: {
       integration_type: IntegrationTypeEnum.KAFKA,
       bootstrap_servers: ['kafka.example.com:9093'],
+      security_protocol: 'SASL_SSL',
       sasl_mechanism: 'SCRAM-SHA-256',
     },
     management_credential_id: null,

@@ -89,7 +89,9 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     const panel = await clickAddConnectedStep(app)
     await expect(panel.getByRole('button', { name: 'Kafka Publish', exact: true })).toBeHidden()
     await expect(
-      panel.getByText('Run scripts, make API calls, or invoke another published workflow.', { exact: true })
+      panel.getByText('Run scripts, make API calls, invoke another published workflow, or publish messages to Kafka.', {
+        exact: true,
+      })
     ).toBeVisible()
     await panel.getByRole('button', { name: 'Action', exact: true }).click()
     await expect(panel.getByRole('heading', { level: 3 })).toHaveText(['Kafka Publish', 'REST API', 'Script'])
@@ -98,16 +100,21 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Publish outcome')
     const deliveryToggle = app.getByRole('button', { name: 'Message delivery behavior', exact: true })
     const deliveryAlert = app.getByRole('region', { name: 'Message delivery behavior', exact: true })
+    await expect(deliveryAlert.getByRole('button', { name: 'Message delivery behavior', exact: true })).toBeVisible()
+    await deliveryAlert.screenshot({ path: testInfo.outputPath('kafka-publish-delivery-alert-expanded.png') })
     await deliveryToggle.click()
     await expect(deliveryToggle).toHaveAttribute('aria-expanded', 'false')
     await expect(deliveryAlert.getByRole('note')).toHaveCount(0)
-    const [alert, title] = await Promise.all([
+    const [alert, toggle, title] = await Promise.all([
       deliveryAlert.boundingBox(),
+      deliveryToggle.boundingBox(),
       deliveryAlert.getByRole('heading', { name: /Message delivery behavior/ }).boundingBox(),
     ])
-    if (!alert || !title) throw new Error('Collapsed delivery alert is not visible')
+    if (!alert || !toggle || !title) throw new Error('Collapsed delivery alert is not visible')
+    expect(toggle.x + toggle.width).toBeLessThan(title.x)
     const collapsedTitleOffset = Math.abs(title.y + title.height / 2 - (alert.y + alert.height / 2))
     expect(collapsedTitleOffset).toBeLessThanOrEqual(3)
+    await deliveryAlert.screenshot({ path: testInfo.outputPath('kafka-publish-delivery-alert-collapsed.png') })
     await deliveryToggle.press('Enter')
     await expect(deliveryToggle).toHaveAttribute('aria-expanded', 'true')
     await expect(app.getByText('Drag to reorder headers.', { exact: true })).toBeHidden()
@@ -168,6 +175,14 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
       .locator('[role="group"][aria-roledescription="node"]')
       .filter({ hasText: 'Publish outcome' })
     await layoutCanvas(app)
+    await expect(publishNode.getByText('Target topic', { exact: true })).toBeVisible()
+    await expect(publishNode.getByText('automation.outcomes', { exact: true })).toBeVisible()
+    await publishNode.screenshot({ path: testInfo.outputPath('kafka-publish-canvas-topic.png') })
+    await publishNode.getByRole('button', { name: 'Collapse step details', exact: true }).click()
+    await expect(publishNode.getByText('Target topic', { exact: true })).toBeHidden()
+    await expect(publishNode.getByText('automation.outcomes', { exact: true })).toBeHidden()
+    await publishNode.getByRole('button', { name: 'Expand step details', exact: true }).click()
+    await expect(publishNode.getByText('automation.outcomes', { exact: true })).toBeVisible()
     await publishNode.hover()
     await publishNode.getByRole('button', { name: 'Step actions menu', exact: true }).click()
     await app.getByRole('menuitem', { name: 'Disable', exact: true }).click()
@@ -223,6 +238,7 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     await expect(secondGrip).toBeFocused()
     await app.getByRole('textbox', { name: 'Target topic', exact: true }).fill('automation.outcomes.updated')
     await app.getByRole('button', { name: 'Update', exact: true }).click()
+    await expect(publishNode.getByText('automation.outcomes.updated', { exact: true })).toBeVisible()
     await clickSaveAndWait(app)
     const saved = await apiRequest(app, 'get', `/workflows/${workflowId}`, { token })
     expect(saved.ok()).toBeTruthy()
