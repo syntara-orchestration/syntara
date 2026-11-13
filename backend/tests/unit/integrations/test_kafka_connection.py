@@ -83,9 +83,10 @@ async def test_metadata_ports_are_validated(port: int) -> None:
 
 
 @pytest.mark.asyncio
-async def test_pinned_connection_uses_upstream_streams_and_closes() -> None:
+@pytest.mark.parametrize("health_check", [False, True])
+async def test_pinned_connection_uses_upstream_streams_and_closes(*, health_check: bool) -> None:
     """Exercise the upstream stream/protocol setup against a real local socket."""
-    from syntara.integrations.lib.kafka_connection import _PinnedKafkaConnection
+    from syntara.integrations.lib.kafka_connection import PinnedKafkaConnection, _PinnedKafkaConnection
 
     async def accept(_reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         writer.close()
@@ -93,7 +94,8 @@ async def test_pinned_connection_uses_upstream_streams_and_closes() -> None:
 
     server = await asyncio.start_server(accept, "127.0.0.1", 0)
     port = server.sockets[0].getsockname()[1]
-    conn = _PinnedKafkaConnection("broker.example.com", port, security_protocol="PLAINTEXT")
+    connection_class = _PinnedKafkaConnection if health_check else PinnedKafkaConnection
+    conn = connection_class("broker.example.com", port, security_protocol="PLAINTEXT")
     try:
         with (
             patch(

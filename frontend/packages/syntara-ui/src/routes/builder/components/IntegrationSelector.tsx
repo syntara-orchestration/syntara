@@ -172,16 +172,18 @@ export function IntegrationSelector({
       <SynSelect
         id={fieldId}
         isOpen={isOpen}
-        selected={value ?? NO_INTEGRATION_VALUE}
+        selected={value ?? (isKafka ? undefined : NO_INTEGRATION_VALUE)}
         onSelect={handleSelect}
         onOpenChange={setIsOpen}
         toggle={renderToggle}
         shouldFocusToggleOnSelect
       >
         <SelectList aria-label={`${label} options`}>
-          <SelectOption value={NO_INTEGRATION_VALUE} isSelected={!value}>
-            {isKafka ? 'Select a Kafka integration' : 'No integration (use direct connection)'}
-          </SelectOption>
+          {!isKafka && (
+            <SelectOption value={NO_INTEGRATION_VALUE} isSelected={!value}>
+              No integration (use direct connection)
+            </SelectOption>
+          )}
           {integrations.map((integration) => (
             <SelectOption
               key={integration.id}

@@ -4,17 +4,24 @@
   color: var(--pf-t--global--icon--color--regular);
 }
 
-.deliveryAlert :global(.pf-v6-c-alert__icon) {
-  align-self: center;
-  scale: 1;
-}
+.deliveryAlert {
+  /* Reserve space for our controlled toggle through Alert's public padding hook. */
+  --pf-v6-c-alert--PaddingInlineStart: calc(
+    var(--pf-t--global--spacer--lg) + var(--pf-t--global--icon--size--md) + 2 *
+      var(--pf-t--global--spacer--action--horizontal--plain--default)
+  );
 
-.deliveryAlert :global(.pf-v6-c-alert__title) {
-  align-self: center;
+  position: relative;
 }
 
 .deliveryToggle {
-  padding: 0;
+  position: absolute;
+  inset-block-start: calc(var(--pf-t--global--spacer--md) - var(--pf-t--global--spacer--control--vertical--plain));
+  inset-inline-start: var(--pf-t--global--spacer--sm);
+}
+
+.deliveryTitle {
+  font: inherit;
 }
 
 .dragHandle:active {

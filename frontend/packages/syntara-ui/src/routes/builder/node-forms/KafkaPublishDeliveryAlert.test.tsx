@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -10,9 +10,12 @@ describe('Kafka Publish delivery alert', () => {
     const user = userEvent.setup()
     const { container } = render(<KafkaPublishDeliveryAlert />)
     const toggle = screen.getByRole('button', { name: 'Message delivery behavior' })
+    expect(within(screen.getByRole('heading', { name: 'Message delivery behavior' })).queryByRole('button')).toBeNull()
+    expect(screen.getByRole('region', { name: 'Message delivery behavior' })).toContainElement(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByText(/Kafka acknowledgment confirms broker receipt/)).toBeVisible()
     expect(screen.getByRole('note', { name: 'Kafka Publish delivery details' })).toBeVisible()
+    expect(await axe(container)).toHaveNoViolations()
     act(() => toggle.focus())
     await user.keyboard('{Enter}')
     expect(toggle).toHaveFocus()

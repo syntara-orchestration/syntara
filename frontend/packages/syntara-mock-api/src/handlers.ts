@@ -424,7 +424,7 @@ export const handlers = [
 
   // ── Integrations ──────────────────────────────────────────────────────────
 
-  ...(['integrations', 'kafka_integrations'] as const).map((resource) =>
+  ...(['integrations', 'kafka_integrations', 'integrations/catalog'] as const).map((resource) =>
     http.get(`/api/v1/${resource}`, ({ request }) => {
       const url = new URL(request.url)
       const nameContains = url.searchParams.get('name[contains]')
@@ -437,7 +437,9 @@ export const handlers = [
       const includeTotal = url.searchParams.get('include_total') === 'true'
 
       let filtered = integrations.filter(
-        (i) => (i.integration_type === IntegrationTypeEnum.KAFKA) === (resource === 'kafka_integrations')
+        (i) =>
+          resource === 'integrations/catalog' ||
+          (i.integration_type === IntegrationTypeEnum.KAFKA) === (resource === 'kafka_integrations')
       )
       if (nameContains) {
         const lower = nameContains.toLowerCase()

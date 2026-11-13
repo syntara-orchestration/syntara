@@ -87,8 +87,6 @@ def resolve_supplied_kafka_login(
     if decrypted_inputs is None:
         msg = "Kafka credential inputs were not supplied for the requested credential"
         raise CredentialValidationError(msg)
-    if not required:
-        return None
 
     username_value = decrypted_inputs.get("username")
     password_value = decrypted_inputs.get("password")

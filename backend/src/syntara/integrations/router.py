@@ -44,6 +44,10 @@ from syntara.integrations.models.integration import (
 from syntara.integrations.models.integration import (
     IntegrationUpdate as InternalUpdate,
 )
+from syntara.integrations.models.integration_catalog import (
+    IntegrationCatalogListParams,
+    IntegrationCatalogListResponse,
+)
 from syntara.integrations.models.kafka_integration import (
     KafkaIntegrationCreate,
     KafkaIntegrationListParams,
@@ -234,6 +238,31 @@ async def list_integrations(
     )
 
     return IntegrationListResponse.model_validate(result.model_dump())
+
+
+@router.get(
+    "/integrations/catalog",
+    summary="List integration catalog",
+    dependencies=[Depends(_read_gate), Depends(_read_all_scope)],
+    operation_id="list_integration_catalog",
+)
+async def list_integration_catalog(
+    request: Request,
+    service: Annotated[IntegrationService, Depends(get_integration_service)],
+    params: Annotated[IntegrationCatalogListParams, Query()],
+    allowed_projects: Annotated[AllowedProjectsResult, Depends(integration_read_visibility)],
+) -> IntegrationCatalogListResponse:
+    """List integrations of every supported type with filtering and pagination."""
+    result = await service.list_integrations(
+        limit=params.limit,
+        cursor=params.cursor,
+        sort=params.sort,
+        query_params_items=request.query_params.items(),
+        include_total=params.include_total,
+        allowed_projects=allowed_projects,
+        project_id=params.project_id,
+    )
+    return IntegrationCatalogListResponse.model_validate(result.model_dump())
 
 
 @router.get(

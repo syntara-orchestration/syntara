@@ -124,6 +124,7 @@ function SortableHeader({
                   <SynTextField
                     name={`headers.${index}.name`}
                     label="Header name"
+                    placeholder="Enter a header name"
                     ariaLabel={`${label} name`}
                     isDisabled={readOnly}
                   />
