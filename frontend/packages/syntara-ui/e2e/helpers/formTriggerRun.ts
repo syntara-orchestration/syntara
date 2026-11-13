@@ -14,7 +14,6 @@ export type FormTriggerNodeParameters = {
   form_definition?: Record<string, unknown>
   submit_label?: string
   success_message?: string
-  css_override?: string
 }
 
 const DEFAULT_FORM_TRIGGER_PARAMETERS: FormTriggerNodeParameters = {

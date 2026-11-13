@@ -43,8 +43,7 @@ const FORM_PROMPT_PARAMETER_KEY_SET = {
   fallback_decision: true,
   submit_label: true,
   success_message: true,
-  css_override: true,
-} satisfies Record<keyof WorkflowAPI.components['schemas']['FormPromptNodeParameters'], true>
+} satisfies Record<Exclude<keyof WorkflowAPI.components['schemas']['FormPromptNodeParameters'], 'css_override'>, true>
 
 const FORM_PROMPT_PARAMETER_KEYS = new Set(Object.keys(FORM_PROMPT_PARAMETER_KEY_SET))
 

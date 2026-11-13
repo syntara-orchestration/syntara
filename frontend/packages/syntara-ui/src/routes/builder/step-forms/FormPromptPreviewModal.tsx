@@ -16,7 +16,6 @@ type FormPromptPreviewModalProps = Readonly<{
   formDefinition: FormDefinition
   message?: string | null
   submitLabel?: string | null
-  cssOverrideSource?: string | null
 }>
 
 export function FormPromptPreviewModal({
@@ -25,7 +24,6 @@ export function FormPromptPreviewModal({
   formDefinition,
   message,
   submitLabel,
-  cssOverrideSource,
 }: FormPromptPreviewModalProps) {
   const parsed = useMemo(() => safeParseFormDefinition(formDefinition), [formDefinition])
   const showDynamicOptionsNotice = parsed.success && formDefinitionHasUnresolvedDynamicOptions(parsed.data)
@@ -46,12 +44,7 @@ export function FormPromptPreviewModal({
               </StackItem>
             ) : null}
             <StackItem>
-              <SynFormDefinitionPreview
-                definition={parsed.data}
-                description={message}
-                submitLabel={submitLabel}
-                cssOverrideSource={cssOverrideSource}
-              />
+              <SynFormDefinitionPreview definition={parsed.data} description={message} submitLabel={submitLabel} />
             </StackItem>
           </Stack>
         )}

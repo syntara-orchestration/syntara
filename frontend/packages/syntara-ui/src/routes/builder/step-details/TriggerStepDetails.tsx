@@ -205,7 +205,6 @@ function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: stri
         message: data.message,
         submit_label: data.submit_label,
         success_message: data.success_message,
-        css_override: data.css_override,
       }),
     }
   }
@@ -248,7 +247,6 @@ function mapFormTriggerInitialData(trigger: Trigger): TriggerFormData {
     message: (params.message as string | undefined) ?? '',
     submit_label: (params.submit_label as string | undefined) ?? '',
     success_message: (params.success_message as string | undefined) ?? '',
-    css_override: (params.css_override as string | undefined) ?? '',
   }
 }
 

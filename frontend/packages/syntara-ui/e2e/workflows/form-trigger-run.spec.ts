@@ -7,7 +7,7 @@
  * |------|----------|
  * | AC-1 | UI-6 / UI-8 — modal opens before execution starts |
  * | AC-2 | UI-4 — client required-field + server FORM_VALIDATION_ERROR mapping |
- * | AC-3 | UI-7 — submit label, CSS override, success message |
+ * | AC-3 | UI-7 — submit label, success message |
  * | AC-4 | UI-8 — submit navigates to execution; input_data matches form |
  * | AC-5 | execution:run — Run published version disabled for viewer |
  * | AC-6 | UI-4 pre-run — invalid form definition; no form-trigger run modal, no execution |
@@ -29,9 +29,6 @@ const CUSTOM_FORM_MESSAGE = 'Describe why you are starting this run.'
 const CUSTOM_SUBMIT_LABEL = 'Start workflow'
 const CUSTOM_SUCCESS_MESSAGE = 'Form trigger run accepted.'
 const SERVER_VALIDATION_MESSAGE = 'Rejected by server for E2E'
-/** Backend publish validation rejects attribute selectors in css_override. */
-const FORM_TRIGGER_CSS_OVERRIDE = '.form-step-response-form label { color: rgb(170, 0, 0) !important; }'
-
 const EXECUTIONS_POST_ROUTE = '**/api/v1/executions'
 
 test.describe('Form trigger — run from workflows list', { tag: '@pr-check' }, () => {
@@ -141,14 +138,13 @@ test.describe('Form trigger — run from workflows list', { tag: '@pr-check' }, 
     }
   })
 
-  test('AC-3 / UI-7: shows customized submit label, styling, and success message in the run modal', async ({ app }) => {
+  test('AC-3 / UI-7: shows customized submit label and success message in the run modal', async ({ app }) => {
     const created = await createPublishedFormTriggerWorkflow(app, {
       namePrefix: 'e2e-form-trigger-ui7',
       parameters: {
         message: CUSTOM_FORM_MESSAGE,
         submit_label: CUSTOM_SUBMIT_LABEL,
         success_message: CUSTOM_SUCCESS_MESSAGE,
-        css_override: FORM_TRIGGER_CSS_OVERRIDE,
       },
     })
 
@@ -160,9 +156,8 @@ test.describe('Form trigger — run from workflows list', { tag: '@pr-check' }, 
         message: CUSTOM_FORM_MESSAGE,
       })
       await expect(app.getByRole('button', { name: CUSTOM_SUBMIT_LABEL })).toBeVisible()
-      await expect(app.getByText('Summary', { exact: true })).toHaveCSS('color', 'rgb(170, 0, 0)')
 
-      await app.getByRole('textbox', { name: 'Summary' }).fill('Custom styling run')
+      await app.getByRole('textbox', { name: 'Summary' }).fill('Custom label run')
       await app.getByRole('button', { name: CUSTOM_SUBMIT_LABEL }).click()
 
       await expect(app.getByText(CUSTOM_SUCCESS_MESSAGE)).toBeVisible({ timeout: 15_000 })

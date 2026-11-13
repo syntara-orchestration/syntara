@@ -47,7 +47,6 @@ export function FormTriggerConfigurationFields({
   const formDefinition = useWatch({ control, name: 'form_definition' })
   const message = useWatch({ control, name: 'message' })
   const submitLabel = useWatch({ control, name: 'submit_label' })
-  const cssOverrideSource = useWatch({ control, name: 'css_override' })
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
 
   const registerBuilderCommit = useCallback(
@@ -123,7 +122,6 @@ export function FormTriggerConfigurationFields({
             registerCommit={registerBuilderCommit}
             isDisabled={isVersionView}
             previewSubmitLabel={submitLabel}
-            previewCssOverrideSource={cssOverrideSource}
             previewDescription={message}
           />
         </StackItem>
@@ -137,7 +135,6 @@ export function FormTriggerConfigurationFields({
         formDefinition={resolvedDefinition}
         message={message}
         submitLabel={submitLabel}
-        cssOverrideSource={cssOverrideSource}
       />
     </>
   )
