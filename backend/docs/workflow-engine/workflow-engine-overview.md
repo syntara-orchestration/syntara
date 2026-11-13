@@ -64,7 +64,7 @@ Completion happens out of band:
 
 AAP has no outbound webhook/callback mechanism to signal Temporal back, so the async-completion pattern above isn't available to it. `execute_aap_job_template_activity()` (`aap_job_template_activity.py`) instead launches the job, immediately sends a heartbeat carrying partial output — job ID and URL — so that data is durably recorded *before* polling starts, then calls `poll_until_complete()` (`aap_common.py`), which polls AAP's REST API and heartbeats periodically until a terminal status. This is a single long-running *synchronous* activity: Temporal heartbeats provide liveness and cancellation here, not async completion.
 
-## Three-Tier Live Status Sync: Temporal → DB → Redis → WebSocket
+## Three-Tier Live Status Sync: Temporal DB, Redis, and WebSocket
 
 ```mermaid
 flowchart LR

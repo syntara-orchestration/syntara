@@ -23,6 +23,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@ansible/md-link-lint": "0.1.0",
     "@types/node": "26.6.5",
     "graphql": "17.0.2",
     "msw": "3.0.3",
