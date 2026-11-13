@@ -378,6 +378,8 @@ export const handlers = [
     const fixtures: Record<string, FilteringAPI.components['schemas']['FilterResult']> = {
       true: { outcome: 'match' },
       false: { outcome: 'no_match' },
+      'input.missing': { outcome: 'no_match' },
+      input: { outcome: 'evaluation_error', error_code: 'filter_non_boolean' },
       'input.payload.state == "decoded" && input.payload.value.status == "ready"': { outcome: 'match' },
     }
     const fixture = Object.hasOwn(fixtures, expression.trim()) ? fixtures[expression.trim()] : undefined

@@ -72,6 +72,13 @@ describe('Kafka subscription preflight mock', () => {
 })
 
 describe('Kafka filter test mock', () => {
+  const sampleInput = {
+    key: { kind: 'text', text: 'order-42' },
+    headers: {},
+    metadata: { topic: 'orders' },
+    payload: { state: 'decoded', value: { status: 'ready' } },
+  }
+
   function testFilter(body: FilteringAPI.components['schemas']['FilterTestRequest']) {
     return fetch(`${baseUrl}/api/v1/filtering/test`, {
       method: 'POST',
@@ -83,18 +90,24 @@ describe('Kafka filter test mock', () => {
   it.each([
     ['true', 'match'],
     ['false', 'no_match'],
-    ['input.missing', 'evaluation_error'],
+    ['input.missing', 'no_match'],
     ['constructor', 'evaluation_error'],
     ['', 'match'],
     ['  \n', 'match'],
     [null, 'match'],
     [undefined, 'match'],
   ] as const)('returns the contracted outcome for fixture %s', async (expression, outcome) => {
-    const response = await testFilter({ expression, input: null })
+    const response = await testFilter({ expression, input: sampleInput })
     expect(response.status).toBe(200)
     expect(await response.json()).toStrictEqual(
       outcome === 'evaluation_error' ? { outcome, error_code: 'filter_evaluation_failed' } : { outcome }
     )
+  })
+
+  it('uses a non-boolean expression for the evaluation-error fixture', async () => {
+    const response = await testFilter({ expression: 'input', input: sampleInput })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toStrictEqual({ outcome: 'evaluation_error', error_code: 'filter_non_boolean' })
   })
 
   it('returns safe configuration errors with compiler locations', async () => {

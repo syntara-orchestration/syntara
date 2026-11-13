@@ -52,9 +52,13 @@ discards results, including pending responses. Server validation still runs on
 save/publication; a successful sample cannot bypass it, and rejected operations
 leave the expression available for correction.
 
-The mock API uses canned fixtures rather than a CEL engine: `true` matches,
-`false` does not match, `input.` returns a configuration error, and unsupported
-fixtures return an evaluation error. Component tests cover all outcomes, JSON and
+The mock API uses canned fixtures rather than a CEL engine: `true` matches;
+`false` and `input.missing` do not match. Missing map keys produce no match in the
+backend evaluator. With the Kafka-shaped sample, `input` returns an evaluation
+error (`filter_non_boolean`) because the input object is not boolean. `input.`
+returns a configuration error; unsupported mock fixtures return an evaluation
+error placeholder. Use the real backend for arbitrary CEL evaluation.
+Component tests cover all outcomes, JSON and
 length validation, safe errors, retry, stale responses and accessibility. The
 focused `e2e/kafka-subscribe-filter.spec.ts` covers unsaved testing, exact
 save/reopen preservation, unrelated edits and removal against the mock API.
