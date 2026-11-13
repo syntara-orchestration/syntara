@@ -15,7 +15,7 @@ import {
 } from '@patternfly/react-core'
 import { PlusCircleIcon, RhUiAddIcon } from '@patternfly/react-icons'
 import { useNavigate } from '@tanstack/react-router'
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { AppRoute } from '../../../app/AppRoute'
@@ -44,15 +44,56 @@ const AFFINITY_OPTIONS: Array<{ value: ScriptAffinity; label: string; descriptio
   },
 ]
 
-type AffinitySelectProps = {
+type AffinityMenuToggleProps = Readonly<{
+  toggleRef: React.Ref<MenuToggleElement>
+  isOpen: boolean
+  isDisabled?: boolean
+  label: string
+  onToggle: () => void
+}>
+
+function AffinityMenuToggle({ toggleRef, isOpen, isDisabled, label, onToggle }: AffinityMenuToggleProps) {
+  return (
+    <MenuToggle
+      ref={toggleRef}
+      onClick={onToggle}
+      isExpanded={isOpen}
+      isFullWidth
+      isDisabled={isDisabled}
+      aria-label="Affinity"
+    >
+      {label}
+    </MenuToggle>
+  )
+}
+
+function renderAffinityToggle(
+  toggleRef: React.Ref<MenuToggleElement>,
+  state: Omit<AffinityMenuToggleProps, 'toggleRef'>
+) {
+  return <AffinityMenuToggle toggleRef={toggleRef} {...state} />
+}
+
+type AffinitySelectProps = Readonly<{
   value: ScriptAffinity
   onChange: (value: ScriptAffinity) => void
   isDisabled?: boolean
-}
+}>
 
 function AffinitySelect({ value, onChange, isDisabled }: AffinitySelectProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const selectedLabel = AFFINITY_OPTIONS.find((option) => option.value === value)?.label
+  const selectedLabel = AFFINITY_OPTIONS.find((option) => option.value === value)?.label ?? value
+  const handleToggle = useCallback(() => setIsOpen((prev) => !prev), [])
+  const renderToggle = useCallback(
+    (toggleRef: React.Ref<MenuToggleElement>) =>
+      renderAffinityToggle(toggleRef, {
+        isOpen,
+        isDisabled,
+        label: selectedLabel,
+        onToggle: handleToggle,
+      }),
+    [handleToggle, isDisabled, isOpen, selectedLabel]
+  )
 
   return (
     <SynSelect
@@ -64,18 +105,7 @@ function AffinitySelect({ value, onChange, isDisabled }: AffinitySelectProps) {
         setIsOpen(false)
       }}
       onOpenChange={setIsOpen}
-      toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
-        <MenuToggle
-          ref={toggleRef}
-          onClick={() => setIsOpen((prev) => !prev)}
-          isExpanded={isOpen}
-          isFullWidth
-          isDisabled={isDisabled}
-          aria-label="Affinity"
-        >
-          {selectedLabel ?? value}
-        </MenuToggle>
-      )}
+      toggle={renderToggle}
     >
       <SelectList>
         {AFFINITY_OPTIONS.map((option) => (
@@ -93,14 +123,55 @@ function AffinitySelect({ value, onChange, isDisabled }: AffinitySelectProps) {
   )
 }
 
-type ExecutionTargetSelectProps = {
+type ExecutionTargetMenuToggleProps = Readonly<{
+  toggleRef: React.Ref<MenuToggleElement>
+  isOpen: boolean
+  isDisabled?: boolean
+  isLoading: boolean
+  hasError?: boolean
+  label: string
+  onToggle: () => void
+}>
+
+function ExecutionTargetMenuToggle({
+  toggleRef,
+  isOpen,
+  isDisabled,
+  isLoading,
+  hasError,
+  label,
+  onToggle,
+}: ExecutionTargetMenuToggleProps) {
+  return (
+    <MenuToggle
+      ref={toggleRef}
+      onClick={onToggle}
+      isExpanded={isOpen}
+      isFullWidth
+      isDisabled={isDisabled || isLoading}
+      status={hasError ? 'danger' : undefined}
+      aria-label="Execution target"
+    >
+      {isLoading ? <Spinner size="sm" aria-label="Loading execution targets" /> : label}
+    </MenuToggle>
+  )
+}
+
+function renderExecutionTargetToggle(
+  toggleRef: React.Ref<MenuToggleElement>,
+  state: Omit<ExecutionTargetMenuToggleProps, 'toggleRef'>
+) {
+  return <ExecutionTargetMenuToggle toggleRef={toggleRef} {...state} />
+}
+
+type ExecutionTargetSelectProps = Readonly<{
   value: string
   onChange: (value: string) => void
   targets: ExecutionTargetRead[]
   isLoading: boolean
   isDisabled?: boolean
   hasError?: boolean
-}
+}>
 
 function ExecutionTargetSelect({
   value,
@@ -111,7 +182,20 @@ function ExecutionTargetSelect({
   hasError,
 }: ExecutionTargetSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const selectedLabel = targets.find((target) => target.id === value)?.name
+  const selectedLabel = targets.find((target) => target.id === value)?.name ?? 'Select execution target'
+  const handleToggle = useCallback(() => setIsOpen((prev) => !prev), [])
+  const renderToggle = useCallback(
+    (toggleRef: React.Ref<MenuToggleElement>) =>
+      renderExecutionTargetToggle(toggleRef, {
+        isOpen,
+        isDisabled,
+        isLoading,
+        hasError,
+        label: selectedLabel,
+        onToggle: handleToggle,
+      }),
+    [handleToggle, hasError, isDisabled, isLoading, isOpen, selectedLabel]
+  )
 
   return (
     <SynSelect
@@ -123,23 +207,7 @@ function ExecutionTargetSelect({
         setIsOpen(false)
       }}
       onOpenChange={setIsOpen}
-      toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
-        <MenuToggle
-          ref={toggleRef}
-          onClick={() => setIsOpen((prev) => !prev)}
-          isExpanded={isOpen}
-          isFullWidth
-          isDisabled={isDisabled || isLoading}
-          status={hasError ? 'danger' : undefined}
-          aria-label="Execution target"
-        >
-          {isLoading ? (
-            <Spinner size="sm" aria-label="Loading execution targets" />
-          ) : (
-            (selectedLabel ?? 'Select execution target')
-          )}
-        </MenuToggle>
-      )}
+      toggle={renderToggle}
     >
       <SelectList>
         {targets.map((target) => (
@@ -152,7 +220,7 @@ function ExecutionTargetSelect({
   )
 }
 
-function NoExecutionTargetsGuidance({ canConfigure }: { canConfigure: boolean }) {
+function NoExecutionTargetsGuidance({ canConfigure }: Readonly<{ canConfigure: boolean }>) {
   const navigate = useNavigate()
 
   return (
@@ -181,7 +249,7 @@ function NoExecutionTargetsGuidance({ canConfigure }: { canConfigure: boolean })
  * Mounted only when Affinity is Required target so the targets list query
  * does not run on the default None path.
  */
-function RequiredTargetFields({ isDisabled }: { isDisabled: boolean }) {
+function RequiredTargetFields({ isDisabled }: Readonly<{ isDisabled: boolean }>) {
   const { targets, isLoading, isError, error, refetch } = useAllEnabledExecutionTargets()
   const permissions = useExecutionTargetPermissions()
 
