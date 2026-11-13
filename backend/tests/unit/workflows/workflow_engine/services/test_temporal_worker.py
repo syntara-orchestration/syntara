@@ -79,6 +79,8 @@ class TestTemporalWorkerServiceStart:
         mock_worker = MagicMock()
         mock_reconciler = MagicMock()
         mock_reconciler.stop = AsyncMock()
+        mock_cancellation_reconciler = MagicMock()
+        mock_cancellation_reconciler.stop = AsyncMock()
 
         # Create a simple coroutine for worker.run to avoid AsyncMock warnings
         async def mock_run() -> None:
@@ -110,6 +112,10 @@ class TestTemporalWorkerServiceStart:
                 "syntara.workflows.workflow_engine.services.temporal_worker.get_cluster_reconciliation_worker",
                 return_value=mock_reconciler,
             ) as get_reconciler,
+            patch(
+                "syntara.workflows.workflow_engine.services.temporal_worker.get_cancellation_reconciliation_worker",
+                return_value=mock_cancellation_reconciler,
+            ) as get_cancellation_reconciler,
             patch("asyncio.create_task", side_effect=mock_create_task),
         ):
             await service.start()
@@ -124,19 +130,25 @@ class TestTemporalWorkerServiceStart:
             assert create_task_called
 
             if ep_api_url:
+                get_cancellation_reconciler.assert_called_once_with()
+                mock_cancellation_reconciler.start.assert_called_once_with()
                 get_reconciler.assert_called_once_with()
                 mock_reconciler.start.assert_called_once_with()
             else:
+                get_cancellation_reconciler.assert_not_called()
                 get_reconciler.assert_not_called()
                 mock_reconciler.start.assert_not_called()
 
             await service.stop()
 
             if ep_api_url:
+                mock_cancellation_reconciler.stop.assert_awaited_once_with()
                 mock_reconciler.stop.assert_awaited_once_with()
             else:
+                mock_cancellation_reconciler.stop.assert_not_awaited()
                 mock_reconciler.stop.assert_not_awaited()
             assert service._cluster_reconciliation_worker is None
+            assert service._cancellation_reconciliation_worker is None
 
     @pytest.mark.asyncio
     async def test_start_with_custom_config(self) -> None:

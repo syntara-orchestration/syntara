@@ -20,6 +20,7 @@ from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.lib.encryption import key_from_string
 from syntara.core.tls.temporal import build_temporal_tls_config
 from syntara.execution_plane.integration_sync import get_cluster_reconciliation_worker
+from syntara.execution_plane.reconciliation import get_cancellation_reconciliation_worker
 from syntara.telemetry.client import flush_telemetry, initialize_telemetry
 from syntara.workflows.services.activity_update_publisher import ActivityUpdatePublisher
 from syntara.workflows.workflow_engine.activities.registry import ACTIVITY_REGISTRY
@@ -92,6 +93,7 @@ class TemporalWorkerService:
         self.worker: Worker | None = None
         self._worker_task: asyncio.Task[None] | None = None
         self._cluster_reconciliation_worker: PeriodicWorker | None = None
+        self._cancellation_reconciliation_worker: PeriodicWorker | None = None
         self.activity_sync_service: ActivitySyncService | None = None
 
     def _build_concurrency_config(self) -> dict[str, int]:
@@ -190,6 +192,8 @@ class TemporalWorkerService:
             if get_settings().ep_api_url:
                 self._cluster_reconciliation_worker = get_cluster_reconciliation_worker()
                 self._cluster_reconciliation_worker.start()
+                self._cancellation_reconciliation_worker = get_cancellation_reconciliation_worker()
+                self._cancellation_reconciliation_worker.start()
             concurrency = self._build_concurrency_config()
             logger.info("temporal_worker_started", task_queue=self.task_queue, **concurrency)
 
@@ -205,6 +209,10 @@ class TemporalWorkerService:
         if self._cluster_reconciliation_worker is not None:
             await self._cluster_reconciliation_worker.stop()
             self._cluster_reconciliation_worker = None
+
+        if self._cancellation_reconciliation_worker is not None:
+            await self._cancellation_reconciliation_worker.stop()
+            self._cancellation_reconciliation_worker = None
 
         # Shutdown activity sync service first
         if self.activity_sync_service:

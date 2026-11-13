@@ -8,14 +8,17 @@ from uuid import UUID
 import structlog
 from sqlmodel import col, or_, select
 
+from syntara.core.config.base import get_settings
+from syntara.core.database.session import AsyncSessionLocal
+from syntara.core.workers.periodic import PeriodicWorker
+from syntara.execution_plane.client import ExecutionPlaneHttpClient
 from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import async_sessionmaker
     from sqlmodel.ext.asyncio.session import AsyncSession
-
-    from syntara.execution_plane.client import ExecutionPlaneHttpClient
 
 logger = structlog.stdlib.get_logger(__name__)
 _CANCELLABLE_STATUSES = "pending,claimed,dispatched,running"
@@ -66,3 +69,20 @@ async def reconcile_work_item_cancellations(session: AsyncSession, client: Execu
             msg = "Execution Plane returned a repeated work-item cursor"
             raise ValueError(msg)
         cursor = next_cursor
+
+
+async def _reconcile_cancellations(session_factory: async_sessionmaker[AsyncSession]) -> None:
+    """Open resources for one coordinated reconciliation pass."""
+    async with session_factory() as session, ExecutionPlaneHttpClient() as client:
+        accepted = await reconcile_work_item_cancellations(session, client)
+    logger.info("Execution Plane cancellation reconciliation completed", accepted=accepted)
+
+
+def get_cancellation_reconciliation_worker() -> PeriodicWorker:
+    """Retry from existing execution state, coordinating replicas with an advisory lock."""
+    return PeriodicWorker(
+        name="execution-plane-cancellation-reconciliation",
+        interval_seconds=get_settings().ep_cancellation_reconciliation_interval_seconds,
+        session_factory=AsyncSessionLocal,
+        callback=_reconcile_cancellations,
+    )

@@ -70,3 +70,38 @@ async def test_unrelated_activity_identity_is_not_cancelled():
 
     assert await reconcile_work_item_cancellations(session, client) == 0
     client.cancel_work_item.assert_not_awaited()
+
+
+def test_periodic_cancellation_defaults_and_configuration(monkeypatch):
+    from syntara.core.config.base import get_settings
+    from syntara.execution_plane.reconciliation import get_cancellation_reconciliation_worker
+
+    monkeypatch.delenv("APP_EP_CANCELLATION_RECONCILIATION_INTERVAL_SECONDS", raising=False)
+    get_settings.cache_clear()
+    try:
+        worker = get_cancellation_reconciliation_worker()
+        assert worker._interval_seconds == 1800
+        assert worker._coordinate is True
+        monkeypatch.setenv("APP_EP_CANCELLATION_RECONCILIATION_INTERVAL_SECONDS", "3600")
+        get_settings.cache_clear()
+        assert get_cancellation_reconciliation_worker()._interval_seconds == 3600
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_periodic_callback_closes_session_and_client_on_failure(monkeypatch):
+    from syntara.execution_plane import reconciliation
+
+    session_context, client_context = AsyncMock(), AsyncMock()
+    session_factory = Mock(return_value=session_context)
+    monkeypatch.setattr(reconciliation, "ExecutionPlaneHttpClient", lambda: client_context)
+    reconcile = AsyncMock(side_effect=RuntimeError("EP unavailable"))
+    monkeypatch.setattr(reconciliation, "reconcile_work_item_cancellations", reconcile)
+
+    with pytest.raises(RuntimeError, match="EP unavailable"):
+        await reconciliation._reconcile_cancellations(session_factory)
+
+    reconcile.assert_awaited_once_with(session_context.__aenter__.return_value, client_context.__aenter__.return_value)
+    session_context.__aexit__.assert_awaited_once()
+    client_context.__aexit__.assert_awaited_once()

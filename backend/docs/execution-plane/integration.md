@@ -70,7 +70,11 @@ the cancellation race wins.
 `reconcile_work_item_cancellations` compares live EP work against existing
 cancelled AO executions and retries cancellation independently for each item.
 It uses existing execution/activity records; it does not create retry records.
-Periodic scheduling is intentionally deferred while this logic is validated.
+A coordinated periodic worker runs in the Temporal worker process when EP is
+configured. It waits 30 minutes before its first pass and between completed passes.
+Set `APP_EP_CANCELLATION_RECONCILIATION_INTERVAL_SECONDS` to override the default
+1800-second interval. PostgreSQL advisory locking prevents overlapping passes
+across worker replicas; failed cycles are retried on the next interval.
 
 Project and workflow deletion capture associated WorkItem IDs before cascading
 execution/activity deletion. After commit, a background task sends `work.delete`
