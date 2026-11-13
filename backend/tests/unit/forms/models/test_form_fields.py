@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from syntara.forms.models.form_fields import (
     CheckboxField,
     DateField,
+    DateValue,
     DropdownField,
     DynamicOptions,
     EmailField,
@@ -22,7 +23,9 @@ from syntara.forms.models.form_fields import (
     MaskedTextField,
     MultiSelectField,
     NumberField,
+    ResolvedOption,
     ResolvedOptions,
+    StaticOption,
     StaticOptions,
     TextAreaField,
     TextField,
@@ -84,6 +87,174 @@ class TestFormFieldBase:
         """Label must be non-empty."""
         with pytest.raises(ValidationError):
             TextField.model_validate(_text(label=""))
+
+
+class TestStringWhitespaceStripping:
+    """String model fields trim only outer whitespace before their constraints."""
+
+    def test_shared_field_strings_and_text_default_are_trimmed(self) -> None:
+        field = TextField.model_validate(
+            _text(
+                value_name=" username ",
+                label=" Name ",
+                placeholder=" Enter name ",
+                help_text=" Your name ",
+                default=" Ada ",
+            )
+        )
+
+        assert field.value_name == "username"
+        assert field.label == "Name"
+        assert field.placeholder == "Enter name"
+        assert field.help_text == "Your name"
+        assert field.default == "Ada"
+
+    @pytest.mark.parametrize(
+        ("field_type", "expected_cls"),
+        [
+            ("textarea", TextAreaField),
+            ("masked_text", MaskedTextField),
+            ("email", EmailField),
+        ],
+    )
+    def test_other_text_defaults_are_trimmed(self, field_type: str, expected_cls: type) -> None:
+        field = _form(_text(type=field_type, default="  value  ")).fields[0]
+
+        assert isinstance(field, expected_cls)
+        assert field.default == "value"
+
+    def test_whitespace_only_label_fails_minimum_length_after_trimming(self) -> None:
+        with pytest.raises(ValidationError):
+            TextField.model_validate(_text(label=" \t\n "))
+
+    def test_whitespace_only_static_option_label_fails_minimum_length_after_trimming(self) -> None:
+        with pytest.raises(ValidationError):
+            StaticOption.model_validate({"display_label": " \t ", "value": "a"})
+
+    def test_whitespace_only_resolved_option_label_fails_minimum_length_after_trimming(self) -> None:
+        with pytest.raises(ValidationError):
+            ResolvedOption.model_validate({"display_label": " \t ", "value": "a"})
+
+    def test_date_components_are_trimmed_before_constraints(self) -> None:
+        value = DateValue.model_validate(
+            {"date": " 2026-01-05 ", "time": " 14:30 ", "timezone": " America/New_York "}
+        )
+
+        assert value.date == "2026-01-05"
+        assert value.time == "14:30"
+        assert value.timezone == "America/New_York"
+
+    @pytest.mark.parametrize("component", ["date", "time", "timezone"])
+    def test_whitespace_only_date_default_component_is_rejected(self, component: str) -> None:
+        with pytest.raises(ValidationError):
+            DateValue.model_validate({component: " \t "})
+
+    def test_static_option_label_and_value_are_trimmed(self) -> None:
+        option = StaticOption.model_validate({"display_label": " Option A ", "value": " option_a "})
+
+        assert option.display_label == "Option A"
+        assert option.value == "option_a"
+
+    def test_whitespace_only_static_option_value_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="Option values cannot be empty"):
+            StaticOption.model_validate({"display_label": "Option A", "value": " \t "})
+
+    def test_dynamic_option_strings_are_trimmed(self) -> None:
+        options = DynamicOptions.model_validate(
+            {
+                "source": "dynamic",
+                "expression": " ${upstream.options} ",
+                "label_key": " display_label ",
+                "value_key": " value ",
+            }
+        )
+
+        assert options.expression == "${upstream.options}"
+        assert options.label_key == "display_label"
+        assert options.value_key == "value"
+
+    @pytest.mark.parametrize("key", ["label_key", "value_key"])
+    def test_whitespace_only_dynamic_key_is_rejected(self, key: str) -> None:
+        values = {
+            "source": "dynamic",
+            "expression": "${upstream.options}",
+            "label_key": "label",
+            "value_key": "value",
+            key: " \t ",
+        }
+
+        with pytest.raises(ValidationError):
+            DynamicOptions.model_validate(values)
+
+    def test_resolved_option_strings_are_trimmed_and_scalar_types_are_preserved(self) -> None:
+        string_option = ResolvedOption.model_validate({"display_label": " A ", "value": " a "})
+        numeric_option = ResolvedOption.model_validate({"display_label": " Five ", "value": 5})
+        float_option = ResolvedOption.model_validate({"display_label": " Five and a half ", "value": 5.5})
+        boolean_option = ResolvedOption.model_validate({"display_label": " True ", "value": True})
+
+        assert (string_option.display_label, string_option.value) == ("A", "a")
+        assert (numeric_option.display_label, numeric_option.value) == ("Five", 5)
+        assert type(numeric_option.value) is int
+        assert (float_option.display_label, float_option.value) == ("Five and a half", 5.5)
+        assert type(float_option.value) is float
+        assert (boolean_option.display_label, boolean_option.value) == ("True", True)
+        assert type(boolean_option.value) is bool
+
+    def test_whitespace_only_resolved_string_value_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="Option values cannot be empty"):
+            ResolvedOption.model_validate({"display_label": "A", "value": " \t "})
+
+    def test_dropdown_padded_option_and_default_match_after_trimming(self) -> None:
+        field = _form(
+            _text(
+                type="dropdown",
+                options={"source": "static", "values": [{"display_label": " A ", "value": " a "}]},
+                default=" a ",
+            )
+        ).fields[0]
+
+        assert isinstance(field, DropdownField)
+        assert field.options.values[0].value == "a"
+        assert field.default == "a"
+
+    def test_whitespace_only_dropdown_default_becomes_none(self) -> None:
+        field = _form(
+            _text(
+                type="dropdown",
+                options={"source": "static", "values": [{"display_label": "A", "value": "a"}]},
+                default=" \t ",
+            )
+        ).fields[0]
+
+        assert isinstance(field, DropdownField)
+        assert field.default is None
+
+    def test_whitespace_only_dropdown_option_value_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="Option values cannot be empty"):
+            _form(
+                _text(
+                    type="dropdown",
+                    options={"source": "static", "values": [{"display_label": "A", "value": " \t "}]},
+                )
+            )
+
+    def test_multi_select_default_trims_and_removes_blank_items(self) -> None:
+        field = _form(
+            _text(
+                type="multi_select",
+                options={
+                    "source": "static",
+                    "values": [
+                        {"display_label": "A", "value": " a "},
+                        {"display_label": "B", "value": " b "},
+                    ],
+                },
+                default=[" a ", " \t ", " b "],
+            )
+        ).fields[0]
+
+        assert isinstance(field, MultiSelectField)
+        assert field.default == ["a", "b"]
 
 
 class TestFieldDiscriminator:

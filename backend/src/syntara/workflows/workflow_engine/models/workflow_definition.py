@@ -20,7 +20,12 @@ from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC04
 from syntara.core.constants import FieldLimits, WebhookLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.core.utils.security import validate_css_security
-from syntara.forms.models.form_fields import FormDefinition, FormPromptDefinition, FormTriggerDefinition
+from syntara.forms.models.form_fields import (
+    FormDefinition,
+    FormPromptDefinition,
+    FormTriggerDefinition,
+    StrippedStr,
+)
 from syntara.forms.validators.form_definition import validate_form_definition
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.utils.iso8601_interval import parse_iso8601_repeating_interval
@@ -866,7 +871,7 @@ class BaseFormParameters(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    message: str | None = Field(
+    message: StrippedStr | None = Field(
         default=None,
         max_length=FieldLimits.DESCRIPTION_MAX_LENGTH,
         description="Message shown above the form. Supports ${...} template expressions.",
@@ -874,17 +879,17 @@ class BaseFormParameters(BaseModel):
     form_definition: FormDefinition = Field(
         description="Form definition describing the fields shown to responders.",
     )
-    submit_label: str | None = Field(
+    submit_label: StrippedStr | None = Field(
         default=None,
         max_length=FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH,
         description="Submit button label.",
     )
-    success_message: str | None = Field(
+    success_message: StrippedStr | None = Field(
         default=None,
         max_length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH,
         description="Shown after submission.",
     )
-    css_override: str | None = Field(
+    css_override: StrippedStr | None = Field(
         default=None,
         max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,
         description="Custom CSS applied to the form view.",

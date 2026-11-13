@@ -525,6 +525,29 @@ class TestFormPromptNodeParameters:
         assert p.response_window == 3600
         assert p.fallback_decision == "fallback"
 
+    def test_shared_form_strings_are_trimmed(self) -> None:
+        p = FormPromptNodeParameters(
+            form_definition=self.form_def,
+            message=" Please fill out the form ",
+            submit_label=" Send ",
+            success_message=" Thanks! ",
+            css_override=" .form { color: blue; } ",
+        )
+
+        assert p.message == "Please fill out the form"
+        assert p.submit_label == "Send"
+        assert p.success_message == "Thanks!"
+        assert p.css_override == ".form { color: blue; }"
+
+        empty = FormPromptNodeParameters(
+            form_definition=self.form_def,
+            message=" \t ",
+            submit_label=" \t ",
+            success_message=" \t ",
+            css_override=" \t ",
+        )
+        assert (empty.message, empty.submit_label, empty.success_message, empty.css_override) == ("", "", "", "")
+
     def test_missing_form_definition(self) -> None:
         """form_definition is required."""
         with pytest.raises(ValidationError):

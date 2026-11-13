@@ -99,6 +99,32 @@ class TestFormTriggerSubmissionCleaning:
         assert cleaned_input == {"confirmed": True}
         assert form_definition_metadata.field_types == ["checkbox"]
 
+    def test_padded_values_are_trimmed_on_form_trigger_submission(self) -> None:
+        trigger = _form_trigger(
+            _field("text", "name"),
+            _field("masked_text", "secret"),
+            _field("date", "start"),
+        )
+
+        cleaned_input, _metadata = validate_form_trigger_submission(
+            trigger,
+            {
+                "name": " Ada ",
+                "secret": " token ",
+                "start": {"date": " 2026-02-14 "},
+            },
+        )
+
+        assert cleaned_input == {"name": "Ada", "secret": "token", "start": "2026-02-14"}
+
+    def test_whitespace_only_required_value_is_rejected_on_form_trigger(self) -> None:
+        trigger = _form_trigger(_field("masked_text", "secret", required=True))
+
+        with pytest.raises(FormDataValidationError) as exc_info:
+            validate_form_trigger_submission(trigger, {"secret": " \t "})
+
+        assert [(error.field, error.code) for error in exc_info.value.errors] == [("secret", "required")]
+
     def test_submission_input_is_not_mutated(self) -> None:
         trigger = _form_trigger(_field("text", "name"), _field("text", "defaulted", default="default"))
         submitted = {"name": "Ada"}

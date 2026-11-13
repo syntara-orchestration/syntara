@@ -40,6 +40,18 @@ class TestResolveDynamicOptionValues:
         assert options.source == "dynamic_resolved"
         assert [(option.display_label, option.value) for option in options.values] == [("a", "a"), ("b", "b")]
 
+    def test_padded_labels_and_string_values_are_trimmed(self) -> None:
+        options = _resolve_values([{"display_label": " Region A ", "value": " region_a "}], "region")
+
+        assert [(option.display_label, option.value) for option in options.values] == [("Region A", "region_a")]
+
+    def test_label_length_limit_applies_after_trimming(self) -> None:
+        label = " " + ("x" * 200) + " "
+
+        options = _resolve_values([{"display_label": label, "value": "value"}], "region")
+
+        assert options.values[0].display_label == "x" * 200
+
     def test_duplicates_removed_first_wins(self) -> None:
         options = _resolve_values(
             [
@@ -143,6 +155,14 @@ class TestResolveDynamicOptionsRecords:
         with pytest.raises(ValueError, match=r"region.*index 0.*empty label"):
             _resolve_values([{"display_label": "", "value": ""}], "region")
 
+    def test_whitespace_only_label_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            _resolve_values([{"display_label": " \t ", "value": "value"}], "region")
+
+    def test_whitespace_only_string_value_rejected(self) -> None:
+        with pytest.raises(ValueError, match="empty string value"):
+            _resolve_values([{"display_label": "Label", "value": " \t "}], "region")
+
     def test_non_string_label_rejected(self) -> None:
         with pytest.raises(TypeError, match=r"region.*index 0.*non-string label.*int"):
             _resolve_values([{"display_label": 123, "value": "x"}], "region")
@@ -174,6 +194,17 @@ class TestResolveDynamicOptionsRecords:
         )
 
         assert [(option.display_label, option.value) for option in options.values] == [("First", "us")]
+
+    def test_values_that_match_after_trimming_are_deduplicated_first_wins(self) -> None:
+        options = _resolve_values(
+            [
+                {"display_label": "First", "value": "option_a"},
+                {"display_label": "Second", "value": " option_a "},
+            ],
+            "region",
+        )
+
+        assert [(option.display_label, option.value) for option in options.values] == [("First", "option_a")]
 
     def test_non_record_item_rejected(self) -> None:
         with pytest.raises(TypeError, match=r"region.*index 1.*object"):

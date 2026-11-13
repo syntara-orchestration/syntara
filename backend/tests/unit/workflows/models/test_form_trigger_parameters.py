@@ -40,6 +40,27 @@ class TestFormTriggerParameters:
         assert full.success_message == "Thanks for your response."
         assert full.css_override == ".form { color: blue; }"
 
+    def test_shared_form_strings_are_trimmed(self) -> None:
+        parameters = FormTriggerParameters.model_validate(
+            _parameters(
+                _text_field(),
+                message=" Please explain. ",
+                submit_label=" Send ",
+                success_message=" Thank you. ",
+                css_override=" .form { color: blue; } ",
+            )
+        )
+
+        assert parameters.message == "Please explain."
+        assert parameters.submit_label == "Send"
+        assert parameters.success_message == "Thank you."
+        assert parameters.css_override == ".form { color: blue; }"
+
+        empty = FormTriggerParameters.model_validate(
+            _parameters(_text_field(), message=" \t ", submit_label=" \t ", success_message=" \t ", css_override=" \t ")
+        )
+        assert (empty.message, empty.submit_label, empty.success_message, empty.css_override) == ("", "", "", "")
+
     def test_all_shared_field_types_are_accepted(self) -> None:
         fields: list[dict[str, object]] = [
             _text_field(),

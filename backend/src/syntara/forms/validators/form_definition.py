@@ -1,7 +1,7 @@
 """Form definition validation.
 
-Validates a form definition by checking that the form field
-default values can be submitted without error.
+Validates a form definition by checking that non-empty field defaults can be
+submitted without error.
 """
 
 from __future__ import annotations
@@ -30,9 +30,8 @@ def validate_form_definition(form: FormDefinition, form_id: str | None = None) -
     errors: list[FormFieldError] = []
 
     for field in form.fields:
-        # A checkbox default is a concrete bool, never None, and is covered by
-        # the model's own typing; every other field treats None as "no default".
-        if field.default is None:
+        # Match the submission path's empty-before-coercion behavior for defaults.
+        if field.default is None or field.default == "" or field.default == []:
             continue
 
         try:

@@ -433,6 +433,54 @@ class TestFormPromptSubmitAPI:
         assert response.json()["detail"] == "Form validation failed: reason: This field is required"
         assert "errors" not in response.json()
 
+    async def test_submit_whitespace_only_required_value_returns_422_detail(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_project_id: UUID,
+    ) -> None:
+        prompt = await _create_prompt(test_db_session, test_project_id)
+
+        response = await auth_client.post(
+            f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
+            json={"response_data": {"reason": " \t "}},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["detail"] == "Form validation failed: reason: This field is required"
+
+    async def test_submit_padded_text_and_masked_text_are_persisted_trimmed(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_project_id: UUID,
+    ) -> None:
+        prompt = await _create_prompt(
+            test_db_session,
+            test_project_id,
+            form_definition={
+                "fields": [
+                    {"value_name": "reason", "type": "text", "label": "Reason"},
+                    {"value_name": "secret", "type": "masked_text", "label": "Secret"},
+                ]
+            },
+        )
+
+        with patch("syntara.forms.clients.workflow_client.WorkflowApiClient") as client_class:
+            client_class.return_value.__aenter__.return_value.send_form_signal = AsyncMock()
+            response = await auth_client.post(
+                f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
+                json={"response_data": {"reason": "  approved  ", "secret": "  token  "}},
+            )
+
+        assert response.status_code == 200
+        expected_response = {"reason": "approved", "secret": "token"}
+        assert response.json()["response_data"] == expected_response
+
+        reread = await auth_client.get(f"{FORM_PROMPTS_URL}/{prompt.id}")
+        assert reread.status_code == 200
+        assert reread.json()["response_data"] == expected_response
+
     async def test_submit_wrong_field_type_returns_422(
         self,
         auth_client: AsyncClient,

@@ -105,6 +105,10 @@ def validate_form_submission(
     for field in form.fields:
         raw = submitted.get(field.value_name, _MISSING)
 
+        # Trim before defaults and required checks so whitespace-only input is empty.
+        if raw is not _MISSING:
+            raw = _strip_submitted_value(field, raw)
+
         # Step 2: Apply defaults only when the key is absent. An explicitly
         # submitted empty value clears the field instead of selecting its default.
         if raw is _MISSING and field.default is not None:
@@ -189,6 +193,24 @@ def _is_empty(value: Any) -> bool:  # noqa: ANN401
     them to a field-compatible output value; required fields reject them.
     """
     return value in ("", [], None)
+
+
+def _strip_submitted_value(field: FormField, raw: Any) -> Any:  # noqa: ANN401
+    """Trim submitted strings and normalize blank date/multi-select values."""
+    if isinstance(raw, str):
+        return raw.strip()
+
+    if isinstance(field, MultiSelectField) and isinstance(raw, list):
+        values = [item.strip() if isinstance(item, str) else item for item in raw]
+        return [item for item in values if item != ""]
+
+    if isinstance(field, DateField) and isinstance(raw, Mapping):
+        values = {key: value.strip() if isinstance(value, str) else value for key, value in raw.items()}
+        if all(value is None or (isinstance(value, str) and value == "") for value in values.values()):
+            return ""
+        return values
+
+    return raw
 
 
 def _empty_value_for_field(field: FormField) -> Any:  # noqa: ANN401

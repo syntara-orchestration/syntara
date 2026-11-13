@@ -27,6 +27,13 @@ _OptionScalar = str | int | float | bool
 def _validate_scalar(value: Any, field_name: str, index: int, *, key: str) -> _OptionScalar:  # noqa: ANN401
     """Validate one option value without including its contents in errors."""
     location = f" at key '{key}'"
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            msg = f"Dynamic options for field '{field_name}' at index {index}{location} has an empty string value"
+            raise ValueError(msg)
+        return value
+
     if not isinstance(value, (str, int, float, bool)):
         msg = (
             f"Dynamic options for field '{field_name}' at index {index}{location} "
@@ -62,6 +69,7 @@ def _record_option(
             f"label at key '{label_key}' ({type(label).__name__})"
         )
         raise TypeError(msg)
+    label = label.strip()
     if not label:
         msg = f"Dynamic options for field '{field_name}' at index {index} has an empty label at key '{label_key}'"
         raise ValueError(msg)

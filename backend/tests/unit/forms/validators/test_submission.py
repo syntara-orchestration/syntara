@@ -628,11 +628,9 @@ class TestDateFieldSubmission:
         assert [e.code for e in errors] == ["invalid_format"]
         assert "'offset' is not a date component" in errors[0].message
 
-    def test_blank_component_reads_as_absent(self) -> None:
-        """An untouched input posting "" is missing, not malformed."""
-        errors = _errors(self._date_form(), {"start": {"date": ""}})
-
-        assert "Missing required component: date" in errors[0].message
+    def test_blank_component_normalizes_optional_date_to_empty(self) -> None:
+        """An untouched date input with no nonblank components is an empty field."""
+        assert validate_form_submission(self._date_form(), {"start": {"date": ""}}) == {"start": ""}
 
     @pytest.mark.parametrize(
         ("bad", "expected_message"),
@@ -700,3 +698,217 @@ class TestDateFieldSubmission:
 
         errors = _errors(form, {"pick": "5"})
         assert [(error.field, error.code) for error in errors] == [("pick", "not_in_options")]
+
+
+class TestWhitespaceStripping:
+    """Outer whitespace is normalized before required checks and field coercion."""
+
+    @pytest.mark.parametrize("field_type", ["text", "textarea", "masked_text"])
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            (" value", "value"),
+            ("value ", "value"),
+            ("  value  ", "value"),
+            ("\tvalue\n", "value"),
+            ("\u00a0value\u00a0", "value"),
+            ("  left  middle right  ", "left  middle right"),
+        ],
+    )
+    def test_text_like_values_trim_outer_whitespace_only(self, field_type: str, raw: str, expected: str) -> None:
+        form = _form(_field(field_type, "answer"))
+
+        assert validate_form_submission(form, {"answer": raw}) == {"answer": expected}
+
+    @pytest.mark.parametrize("field_type", ["text", "textarea", "masked_text", "email"])
+    def test_whitespace_only_required_text_like_value_is_required(self, field_type: str) -> None:
+        form = _form(_field(field_type, "answer", required=True))
+
+        errors = _errors(form, {"answer": " \t\n\u00a0 "})
+
+        assert [(error.field, error.code) for error in errors] == [("answer", "required")]
+
+    @pytest.mark.parametrize("field_type", ["text", "textarea", "masked_text", "email"])
+    def test_whitespace_only_optional_text_like_value_is_empty(self, field_type: str) -> None:
+        form = _form(_field(field_type, "answer"))
+
+        assert validate_form_submission(form, {"answer": " \t\n\u00a0 "}) == {"answer": ""}
+
+    def test_padded_email_is_trimmed_before_email_validation(self) -> None:
+        form = _form(_field("email", "contact"))
+
+        assert validate_form_submission(form, {"contact": " \tuser@example.com\n "}) == {
+            "contact": "user@example.com"
+        }
+
+    @pytest.mark.parametrize(
+        ("field", "raw", "expected"),
+        [
+            (_field("checkbox", "answer"), " \ttrue\n", True),
+            (_field("number", "answer"), " 5 ", 5.0),
+            (
+                _field(
+                    "dropdown",
+                    "answer",
+                    options={"source": "static", "values": [{"display_label": "A", "value": " option_a "}]},
+                ),
+                " option_a ",
+                "option_a",
+            ),
+        ],
+    )
+    def test_padded_scalar_values_are_trimmed_before_coercion(
+        self,
+        field: dict[str, Any],
+        raw: str,
+        expected: Any,  # noqa: ANN401
+    ) -> None:
+        form = _form(field)
+
+        assert validate_form_submission(form, {"answer": raw}) == {"answer": expected}
+
+    @pytest.mark.parametrize(
+        ("field_type", "overrides", "empty"),
+        [
+            ("checkbox", {}, False),
+            ("number", {}, None),
+            ("dropdown", {"options": _STATIC_OPTIONS}, None),
+        ],
+    )
+    def test_whitespace_only_scalar_values_use_required_and_optional_semantics(
+        self,
+        field_type: str,
+        overrides: dict[str, Any],
+        empty: Any,  # noqa: ANN401
+    ) -> None:
+        optional = _form(_field(field_type, "answer", **overrides))
+        required = _form(_field(field_type, "answer", required=True, **overrides))
+
+        assert validate_form_submission(optional, {"answer": " \t "}) == {"answer": empty}
+        assert [error.code for error in _errors(required, {"answer": " \t "})] == ["required"]
+
+    @pytest.mark.parametrize(
+        ("toggles", "submitted", "expected"),
+        [
+            ({}, {"date": " 2026-01-05 "}, "2026-01-05"),
+            (
+                {"include_time": True},
+                {"date": " 2026-01-05 ", "time": " 14:30 "},
+                "2026-01-05T14:30:00",
+            ),
+            (
+                {"include_date": False, "include_time": True},
+                {"time": " 14:30 "},
+                "14:30:00",
+            ),
+            (
+                {"include_date": False, "include_timezone": True},
+                {"timezone": " America/New_York "},
+                "America/New_York",
+            ),
+            (
+                {"include_time": True, "include_timezone": True},
+                {"date": " 2026-01-05 ", "time": " 14:30 ", "timezone": " America/New_York "},
+                "2026-01-05T14:30:00-05:00",
+            ),
+        ],
+    )
+    def test_date_components_are_independently_trimmed(
+        self,
+        toggles: dict[str, bool],
+        submitted: dict[str, str],
+        expected: str,
+    ) -> None:
+        form = _form(_field("date", "start", **toggles))
+
+        assert validate_form_submission(form, {"start": submitted}) == {"start": expected}
+
+    @pytest.mark.parametrize(
+        ("required", "submitted", "expected"),
+        [
+            (False, {}, {"start": ""}),
+            (False, {"date": " \t\u00a0 ", "time": None}, {"start": ""}),
+        ],
+    )
+    def test_all_blank_date_mapping_is_empty(
+        self,
+        required: bool,
+        submitted: dict[str, Any],
+        expected: dict[str, str],
+    ) -> None:
+        form = _form(_field("date", "start", required=required, include_time=True))
+
+        assert validate_form_submission(form, {"start": submitted}) == expected
+
+    def test_empty_required_date_mapping_reports_required(self) -> None:
+        form = _form(_field("date", "start", required=True, include_time=True))
+
+        errors = _errors(form, {"start": {"date": " ", "time": "\t"}})
+
+        assert [(error.field, error.code) for error in errors] == [("start", "required")]
+
+    def test_partially_filled_date_mapping_remains_invalid(self) -> None:
+        form = _form(_field("date", "start", include_time=True))
+
+        errors = _errors(form, {"start": {"date": " 2026-01-05 ", "time": " \t "}})
+
+        assert [error.code for error in errors] == ["invalid_format"]
+        assert "Missing required component: time" in errors[0].message
+
+    def test_non_string_date_component_remains_invalid(self) -> None:
+        form = _form(_field("date", "start"))
+
+        assert [error.code for error in _errors(form, {"start": {"date": 20260105}})] == ["invalid_format"]
+
+    def test_date_submission_is_not_mutated(self) -> None:
+        form = _form(_field("date", "start"))
+        submitted = {"start": {"date": " 2026-01-05 "}}
+
+        validate_form_submission(form, submitted)
+
+        assert submitted == {"start": {"date": " 2026-01-05 "}}
+
+    def test_multi_select_items_are_trimmed_and_blank_items_removed(self) -> None:
+        options = {"source": "static", "values": [{"display_label": "A", "value": "a"}]}
+        form = _form(_field("multi_select", "picks", options=options))
+        submitted = {"picks": [" a ", " \t "]}
+
+        assert validate_form_submission(form, submitted) == {"picks": ["a"]}
+        assert submitted == {"picks": [" a ", " \t "]}
+
+    @pytest.mark.parametrize("required", [False, True])
+    def test_all_blank_multi_select_items_are_empty(self, required: bool) -> None:
+        options = {"source": "static", "values": [{"display_label": "A", "value": "a"}]}
+        form = _form(_field("multi_select", "picks", options=options, required=required))
+
+        if required:
+            assert [error.code for error in _errors(form, {"picks": [" ", "\t"]})] == ["required"]
+        else:
+            assert validate_form_submission(form, {"picks": [" ", "\t"]}) == {"picks": []}
+
+    def test_non_string_multi_select_item_remains_invalid(self) -> None:
+        form = _form(_field("multi_select", "picks", options=_STATIC_OPTIONS))
+
+        assert [error.code for error in _errors(form, {"picks": ["a", {"nested": True}]})] == ["type"]
+
+    def test_invalid_multi_select_item_is_checked_after_trimming(self) -> None:
+        form = _form(_field("multi_select", "picks", options=_STATIC_OPTIONS))
+
+        assert [error.code for error in _errors(form, {"picks": [" missing "]})] == ["not_in_options"]
+
+    def test_whitespace_only_composite_input_clears_instead_of_using_default(self) -> None:
+        options = {"source": "static", "values": [{"display_label": "A", "value": "a"}]}
+        form = _form(
+            _field("date", "start", default={"date": " 2026-01-05 "}),
+            _field("multi_select", "picks", options=options, default=[" a "]),
+        )
+
+        assert validate_form_submission(form, {"start": {"date": " "}, "picks": [" "]}) == {
+            "start": "",
+            "picks": [],
+        }
+
+    def test_missing_input_uses_trimmed_default(self) -> None:
+        form = _form(_field("masked_text", "secret", default="  secret  "))
+
+        assert validate_form_submission(form, {}) == {"secret": "secret"}

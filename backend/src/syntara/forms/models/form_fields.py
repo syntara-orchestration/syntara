@@ -6,12 +6,23 @@ from datetime import date as calendar_date
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Discriminator, Field, ValidationInfo, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Discriminator,
+    Field,
+    StringConstraints,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from syntara.core.constants import FieldLimits
 from syntara.core.exceptions import SafeValueError
 
 FIELD_NAME_PATTERN = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
+# Strip leading and trailing whitespace from form strings during validation.
+StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
 
 class FormFieldBase(BaseModel):
@@ -19,10 +30,10 @@ class FormFieldBase(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    value_name: str = Field(pattern=FIELD_NAME_PATTERN, max_length=64)
-    label: str = Field(min_length=1, max_length=200)
-    placeholder: str | None = None
-    help_text: str | None = None
+    value_name: StrippedStr = Field(pattern=FIELD_NAME_PATTERN, max_length=64)
+    label: StrippedStr = Field(min_length=1, max_length=200)
+    placeholder: StrippedStr | None = None
+    help_text: StrippedStr | None = None
     required: bool = False
 
 
@@ -30,28 +41,28 @@ class TextField(FormFieldBase):
     """Text field."""
 
     type: Literal["text"]
-    default: str | None = None
+    default: StrippedStr | None = None
 
 
 class TextAreaField(FormFieldBase):
     """Text area field."""
 
     type: Literal["textarea"]
-    default: str | None = None
+    default: StrippedStr | None = None
 
 
 class MaskedTextField(FormFieldBase):
     """Masked text field."""
 
     type: Literal["masked_text"]
-    default: str | None = None
+    default: StrippedStr | None = None
 
 
 class EmailField(FormFieldBase):
     """Email field."""
 
     type: Literal["email"]
-    default: str | None = None
+    default: StrippedStr | None = None
 
 
 class NumberField(FormFieldBase):
@@ -88,17 +99,17 @@ class DateValue(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    date: str | None = Field(
+    date: StrippedStr | None = Field(
         default=None,
         pattern=r"^\d{4}-\d{2}-\d{2}$",
         description="ISO 8601 calendar date in YYYY-MM-DD format.",
     )
-    time: str | None = Field(
+    time: StrippedStr | None = Field(
         default=None,
         pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$",
         description="24-hour time in HH:MM format.",
     )
-    timezone: str | None = Field(
+    timezone: StrippedStr | None = Field(
         default=None,
         max_length=FieldLimits.FORM_TIMEZONE_MAX_LENGTH,
         description="IANA timezone name, such as America/New_York.",
@@ -221,8 +232,17 @@ class StaticOption(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    display_label: str = Field(min_length=1, max_length=200)
-    value: str
+    display_label: StrippedStr = Field(min_length=1, max_length=200)
+    value: StrippedStr
+
+    @field_validator("value")
+    @classmethod
+    def _non_empty_value(cls, value: StrippedStr) -> StrippedStr:
+        """Reject option values that normalize to the empty selection value."""
+        if not value:
+            msg = "Option values cannot be empty"
+            raise SafeValueError(msg)
+        return value
 
 
 class StaticOptions(BaseModel):
@@ -244,17 +264,17 @@ class DynamicOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source: Literal["dynamic"]
-    expression: str = Field(
+    expression: StrippedStr = Field(
         description=(
             "Template expression resolving to a non-empty array of objects. Each object must contain a string label "
             "and scalar value at the required 'label_key' and 'value_key'."
         )
     )
-    label_key: str = Field(
+    label_key: StrippedStr = Field(
         min_length=1,
         description="Required object key containing the option label.",
     )
-    value_key: str = Field(
+    value_key: StrippedStr = Field(
         min_length=1,
         description="Required object key containing the typed option value.",
     )
@@ -270,8 +290,17 @@ class ResolvedOption(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    display_label: str = Field(min_length=1, max_length=200)
-    value: str | int | float | bool
+    display_label: StrippedStr = Field(min_length=1, max_length=200)
+    value: StrippedStr | int | float | bool
+
+    @field_validator("value")
+    @classmethod
+    def _non_empty_string_value(cls, value: StrippedStr | int | float | bool) -> StrippedStr | int | float | bool:
+        """Reject dynamic string options that normalize to the empty selection value."""
+        if isinstance(value, str) and not value:
+            msg = "Option values cannot be empty"
+            raise SafeValueError(msg)
+        return value
 
 
 class ResolvedOptions(BaseModel):
@@ -296,13 +325,21 @@ class DropdownField(FormFieldBase):
 
     type: Literal["dropdown"]
     options: OptionsSource
-    default: str | int | float | bool | None = None
+    default: StrippedStr | int | float | bool | None = None
+
+    @field_validator("default", mode="before")
+    @classmethod
+    def _empty_default_as_none(cls, default: object) -> object:
+        """Treat a whitespace-only string default as no selection."""
+        if isinstance(default, str) and not default.strip():
+            return None
+        return default
 
     @field_validator("default")
     @classmethod
     def _default_in_option_list(
         cls,
-        default: str | float | bool | None,  # noqa: FBT001
+        default: StrippedStr | int | float | bool | None,  # noqa: FBT001
         info: ValidationInfo,
     ) -> str | int | float | bool | None:
         """Require a static or resolved default to occur in this field's options."""
@@ -323,18 +360,22 @@ class MultiSelectField(FormFieldBase):
 
     type: Literal["multi_select"]
     options: OptionsSource
-    default: list[str | int | float | bool] | None = None
+    default: list[StrippedStr | int | float | bool] | None = None
 
     @field_validator("default")
     @classmethod
     def _defaults_in_option_list(
         cls,
-        defaults: list[str | int | float | bool] | None,
+        defaults: list[StrippedStr | int | float | bool] | None,
         info: ValidationInfo,
-    ) -> list[str | int | float | bool] | None:
+    ) -> list[StrippedStr | int | float | bool] | None:
         """Require multi-select defaults to occur in static or resolved options."""
+        if defaults is None:
+            return None
+
+        defaults = [value for value in defaults if value != ""]
         options = info.data.get("options")
-        if defaults is None or not isinstance(options, (StaticOptions, ResolvedOptions)):
+        if not isinstance(options, (StaticOptions, ResolvedOptions)):
             return defaults
 
         valid_values = {option.value for option in options.values}
