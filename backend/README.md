@@ -113,11 +113,18 @@ draining write is retried best effort; if PostgreSQL stays unavailable, peers mu
 wait for membership expiry. Unresolved work is retained, and shared clients close
 after bounded cleanup.
 
-Optional compose profiles run the existing Python worker entrypoint and provide
+The backend image includes `start-event-stream-worker` and exec probes
+`python -m syntara.eventstreams.consumer_health live|ready`. Probes use the worker's
+loopback listener; readiness closes during shutdown and liveness does not contact
+Kafka or Redis. Optional compose profiles use the launcher and provide
 a disposable local Kafka fixture; see [local Kafka examples](samples/kafka/README.md)
 and [runtime operating guidance](docs/kafka-worker-operations.md).
-Operator-managed deployment, container launchers and deployment health probes are
-deferred to M2. This local packaging adds no autoscaling or per-subscription deployments.
+The AO operator's optional `spec.eventStreamWorker` requires this backend-image
+packaging before enablement and supports independent sizing. No autoscaling or
+per-subscription deployments are added.
+Operator deployments and local compose pass `--termination-grace-period-seconds`
+to the launcher so it can validate the shutdown budget before startup. Worker
+tuning uses backend defaults rather than CRD fields.
 
 ### CEL Subscription Filters and Testing
 

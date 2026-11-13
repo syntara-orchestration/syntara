@@ -1,5 +1,11 @@
 # Kafka worker operations
 
+The backend image packages `start-event-stream-worker`, which execs
+`python -m syntara.eventstreams.consumer_entrypoint` independently of the API and
+workflow execution workers. The AO operator's optional `spec.eventStreamWorker`
+requires this launcher and `syntara.eventstreams.consumer_health` in the backend
+image before enablement.
+
 Kafka workers host subscriptions; existing Temporal workers execute workflows.
 The event worker uses four internal tables: subscriptions, immutable sources,
 worker membership and Kafka partition initial positions. Matching messages use
@@ -8,7 +14,7 @@ the existing normal Execution model.
 ## Configuration contract
 
 The worker is disabled by default. Local compose uses the `eventstream` profile
-and `python -m syntara.eventstreams.consumer_entrypoint`. The separate `kafka`
+and the `start-event-stream-worker` launcher. The separate `kafka`
 profile supplies an opt-in disposable broker; it does not provision customer Kafka.
 
 Worker tuning uses the defaults defined in code. The tuning values are not
@@ -42,6 +48,17 @@ Queue and processing bounds apply per worker or consumer as documented in
 settings. Inline limits include keys, duplicate headers and encoded arguments.
 Keep the container stop grace longer than the drain deadline plus membership
 and hint-listener shutdown time. The local compose grace is 60 seconds.
+The operator and local compose pass their pod/container grace through the
+`--termination-grace-period-seconds` launcher argument. Before dependency startup,
+the launcher checks that grace strictly exceeds the actual backend drain setting
+plus its minimum cleanup allowance (currently 20 + 6 seconds with code defaults).
+The allowance is minimum headroom rather than a measured worst-case shutdown bound.
+
+The operator exposes `enabled`, standard replica/resource/scheduling settings and
+`terminationGracePeriodSeconds`. Fetch, queue, processing, drain and retention
+tuning fields from the earlier alpha operator API are removed. Configuration-only
+changes use the normal rolling strategy; version upgrades drain the pool before
+database migrations. The operator does not inject worker-tuning environment values.
 
 There are no event delivery-retention, terminal-cache, cache-epoch or Temporal
 history-retention override settings. Temporal namespace retention and normal
@@ -59,6 +76,13 @@ the existing workers. Bootstrap and advertised broker connections use the
 Integration address policy. A successful connection test does not prove consumer
 group authorization or access to every advertised broker.
 
+Permit DNS, PostgreSQL, Temporal and optional Redis connectivity, plus every
+bootstrap and metadata-advertised Kafka broker address and port. Private broker
+hostnames also need the application's Integration SSRF allowlist. For
+operator-managed deployments, `spec.integrationURLAllowedHosts` supplies
+`APP_INTEGRATION_URL_ALLOWED_HOSTS` to the API and runtime workers. Include all
+private bootstrap and advertised broker hostnames.
+
 While a subscription is enabled and its placement is valid, connection and
 authentication failures retry automatically with exponential backoff and jitter.
 The calculated retry delay is capped at 30 seconds and has no attempt limit.
@@ -74,6 +98,33 @@ Shutdown closes new intake, drains admitted processing, stops Kafka clients and
 releases placement after confirmed local stop. An accepted Temporal run is never
 cancelled merely because persistence, shutdown or offset commit is uncertain.
 Unresolved Kafka records stay uncommitted.
+
+### Process-local probes
+
+`EventWorkerManager.ready` follows registration, heartbeat startup and the first
+successful authoritative reconciliation, including an empty subscription list or
+a zero placement target. Idle workers remain running. Customer broker connection
+failures stay within subscription retries and do not block readiness.
+
+The backend image provides these exec commands:
+
+```bash
+python -m syntara.eventstreams.consumer_health live
+python -m syntara.eventstreams.consumer_health ready
+```
+
+Each returns zero on success and nonzero on failure, using a fresh response from
+the worker event loop at `127.0.0.1:8768`, separate from the local MCP service ports.
+The listener uses an internal protocol,
+without an HTTP endpoint, Kubernetes Service or published container port. Probe
+clients import only the Python standard library. Liveness does not query Kafka,
+Redis, message traffic or subscription lag. Readiness reads the manager's current
+state and closes before shutdown drain and shared-client cleanup. An exited or
+stalled process cannot pass liveness through a stale health marker.
+
+Kubernetes startup/liveness probes use `live`; readiness and the local compose
+health check use `ready`. Metrics and customer-facing health presentation remain
+separate Visibility concerns.
 
 Hard deletion is allowed only for unused Kafka sources with no initialization
 history or retained Executions, after the existing lifecycle and lease checks.
@@ -153,3 +204,10 @@ See [record processing](kafka-record-runner.md) and
 boundaries. The local fixture instructions are in
 `backend/samples/kafka/README.md`. Unit adapters do not establish real broker,
 database, TLS or cross-process behavior.
+
+Probe tests cover readiness before and after empty reconciliation, shutdown,
+process-local responses and exec exit codes. Packaging tests check the executable
+launcher and Containerfile COPY instructions; they do not build or deploy the
+backend image. Operator schema, Deployment builders and reconciliation are
+verified separately in the AO operator repository. Live deployment, broker/TLS,
+scale/soak and restore verification remain separate work.

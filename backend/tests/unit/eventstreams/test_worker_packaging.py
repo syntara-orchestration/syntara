@@ -1,7 +1,10 @@
 """Local compose and configuration contracts; no live deployment or broker claims."""
 
+import asyncio
 import json
+import os
 import re
+import sys
 from pathlib import Path
 from uuid import UUID
 
@@ -9,12 +12,21 @@ import yaml
 
 from syntara.core.config.base import Settings
 from syntara.core.constants import EventWorkerDefaults
+from syntara.eventstreams.consumer_health import HEALTH_PORT
 from syntara.eventstreams.consumer_service import placement_targets
 from syntara.eventstreams.models.consumer_worker import EventConsumerWorker
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
 ROOT = Path(__file__).resolve().parents[4]
+
+
+def test_probe_listener_does_not_conflict_with_local_compose_ports():
+    compose = yaml.safe_load((ROOT / "podman-compose.yml").read_text())
+    for service in compose["services"].values():
+        for mapping in service.get("ports", []):
+            resolved = re.sub(r"\$\{\w+:-([^}]+)\}", r"\1", str(mapping))
+            assert int(resolved.rsplit(":", 2)[-2]) != HEALTH_PORT, mapping
 
 
 def test_environment_examples_omit_event_tuning_and_compose_uses_code_defaults():
@@ -36,13 +48,53 @@ def test_environment_examples_omit_event_tuning_and_compose_uses_code_defaults()
         assert match.group(1) == task_queue
     assert worker["profiles"] == ["eventstream"]
     assert worker["stop_grace_period"] == "60s"
-    cleanup_headroom = EventWorkerDefaults.PLACEMENT_TIMEOUT_SECONDS + EventWorkerDefaults.HINT_TIMEOUT_SECONDS
+    cleanup_headroom = EventWorkerDefaults.SHUTDOWN_CLEANUP_ALLOWANCE_SECONDS
     assert int(worker["stop_grace_period"].removesuffix("s")) > (
         Settings.model_fields["event_drain_timeout_seconds"].default + cleanup_headroom
     )
     assert "redis" not in worker["depends_on"]
     assert "kafka" not in worker["depends_on"]
-    assert worker["command"] == ["python", "-m", "syntara.eventstreams.consumer_entrypoint"]
+    assert worker["command"] == [
+        "start-event-stream-worker",
+        "--termination-grace-period-seconds",
+        worker["stop_grace_period"].removesuffix("s"),
+    ]
+    assert worker["healthcheck"]["test"] == ["CMD", "python", "-m", "syntara.eventstreams.consumer_health", "ready"]
+
+
+def test_backend_image_packages_executable_launcher_and_dependency_free_probes():
+    scripts = ROOT / "backend/containers/syntara/scripts"
+    launcher = scripts / "start-event-stream-worker"
+    assert launcher.stat().st_mode & 0o111
+    assert launcher.read_text() == '#!/bin/bash\nexec python -m syntara.eventstreams.consumer_entrypoint "$@"\n'
+    containerfile = (scripts.parent / "Containerfile").read_text()
+    assert (
+        "COPY containers/syntara/scripts/start-event-stream-worker /usr/local/bin/start-event-stream-worker"
+    ) in containerfile
+    assert "COPY src/ ./src/" in containerfile
+    assert "COPY --from=builder /opt/app-root/ /opt/app-root/" in containerfile
+    probe_module = ROOT / "backend/src/syntara/eventstreams/consumer_health.py"
+    assert "from syntara." not in probe_module.read_text()
+
+
+async def test_packaged_launcher_exits_cleanly_when_feature_is_disabled():
+    environment = dict(os.environ, APP_EVENTSTREAM_ENABLED="false")
+    environment["PATH"] = str(Path(sys.executable).parent) + os.pathsep + environment.get("PATH", "")
+    launcher = ROOT / "backend/containers/syntara/scripts/start-event-stream-worker"
+    process = await asyncio.create_subprocess_exec(
+        str(launcher),
+        "--termination-grace-period-seconds",
+        "60",
+        env=environment,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    try:
+        assert await asyncio.wait_for(process.wait(), timeout=15) == 0
+    finally:
+        if process.returncode is None:
+            process.kill()
+            await process.wait()
 
 
 def test_disposable_broker_has_no_persistent_storage_or_customer_credentials():
