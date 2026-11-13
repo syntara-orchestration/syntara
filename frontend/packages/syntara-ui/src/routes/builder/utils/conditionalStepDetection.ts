@@ -1,6 +1,6 @@
 /**
  * Utilities for detecting if a workflow step may not always execute
- * due to being inside a conditional, switch, or loop construct.
+ * due to being inside a conditional, switch, approval, or loop construct.
  */
 
 type Activity = {
@@ -11,9 +11,21 @@ type Activity = {
 type Edge = {
   source: string
   target: string
+  sourceHandle?: string | null
 }
 
-const CONDITIONAL_NODE_TYPES = new Set(['condition', 'switch', 'loop', 'loop_each'])
+type Graph = Map<string, Edge[]>
+type GuaranteeContext = {
+  stepId: string
+  graph: Graph
+  activityTypes: ReadonlyMap<string, string>
+  memo: Map<string, boolean>
+  visiting: Set<string>
+}
+
+const BRANCH_NODE_TYPES = new Set(['condition', 'switch', 'approval'])
+const LOOP_NODE_TYPES = new Set(['loop', 'loop_each'])
+const LOOP_DONE_HANDLE = 'done'
 
 /**
  * Extract step ID from a template expression like "${step.field}" or "${step}".
@@ -24,17 +36,84 @@ export function extractStepIdFromExpression(expression: string): string | null {
   return match ? match[1] : null
 }
 
+function buildGraph(edges: Edge[]): Graph {
+  const graph = new Map<string, Edge[]>()
+  for (const edge of edges) {
+    const outgoing = graph.get(edge.source) ?? []
+    outgoing.push(edge)
+    graph.set(edge.source, outgoing)
+  }
+  return graph
+}
+
+function canReachStep(startId: string, stepId: string, graph: Graph): boolean {
+  const visited = new Set<string>()
+  const queue = [startId]
+  let cursor = 0
+
+  while (cursor < queue.length) {
+    const currentId = queue[cursor]
+    cursor += 1
+    if (!currentId || visited.has(currentId)) continue
+    if (currentId === stepId) return true
+    visited.add(currentId)
+    for (const edge of graph.get(currentId) ?? []) queue.push(edge.target)
+  }
+
+  return false
+}
+
+function groupedBranchEdges(edges: Edge[]): Edge[][] {
+  const branches = new Map<string, Edge[]>()
+  for (const edge of edges) {
+    const branchKey = edge.sourceHandle ?? ''
+    const branch = branches.get(branchKey) ?? []
+    branch.push(edge)
+    branches.set(branchKey, branch)
+  }
+  return [...branches.values()]
+}
+
+function getGuaranteedEdges(nodeType: string | undefined, outgoing: Edge[]): Edge[][] {
+  if (LOOP_NODE_TYPES.has(nodeType ?? '')) {
+    const doneEdges = outgoing.filter((edge) => edge.sourceHandle === LOOP_DONE_HANDLE)
+    return doneEdges.length > 0 ? [doneEdges] : []
+  }
+  if (BRANCH_NODE_TYPES.has(nodeType ?? '')) return groupedBranchEdges(outgoing)
+  return [outgoing]
+}
+
+function stepIsGuaranteedFrom(currentId: string, context: GuaranteeContext): boolean {
+  const { stepId, graph, activityTypes, memo, visiting } = context
+  if (currentId === stepId) return true
+  const cached = memo.get(currentId)
+  if (cached !== undefined) return cached
+  if (visiting.has(currentId)) return false
+
+  const outgoing = graph.get(currentId) ?? []
+  if (outgoing.length === 0) {
+    memo.set(currentId, false)
+    return false
+  }
+
+  visiting.add(currentId)
+  const branchGroups = getGuaranteedEdges(activityTypes.get(currentId), outgoing)
+  const isGuaranteed =
+    branchGroups.length > 0 &&
+    branchGroups.every((branch) => branch.some((edge) => stepIsGuaranteedFrom(edge.target, context)))
+  visiting.delete(currentId)
+  memo.set(currentId, isGuaranteed)
+  return isGuaranteed
+}
+
 /**
- * Determine if a step may not always execute because it's inside a conditional construct.
+ * Determine whether a step can be skipped by choosing another workflow branch
+ * or by completing a loop without entering its body.
  *
- * A step is conditional if there exists a path from the trigger to the step that goes
- * through a conditional node (condition, switch, loop).
- *
- * @param stepId - The ID of the step to check
- * @param activities - All activities in the workflow
- * @param edges - All edges in the workflow
- * @param triggerIds - IDs of trigger nodes (starting points)
- * @returns true if the step may not execute, false if it always executes
+ * Regular nodes schedule all outgoing edges, so one successor path that
+ * guarantees the target is enough. Condition, switch, and approval nodes select
+ * one port, so every port must guarantee the target. Loop bodies are optional;
+ * only the `done` port is guaranteed to run.
  */
 export function isStepConditional(
   stepId: string,
@@ -42,40 +121,12 @@ export function isStepConditional(
   edges: Edge[],
   triggerIds: string[]
 ): boolean {
-  // Build adjacency list for graph traversal
-  const graph = new Map<string, string[]>()
-  for (const edge of edges) {
-    const neighbors = graph.get(edge.source) ?? []
-    graph.set(edge.source, [...neighbors, edge.target])
-  }
+  const graph = buildGraph(edges)
+  const activityTypes = new Map(activities.map((activity) => [activity.id, activity.type]))
 
-  // Build activity type lookup
-  const activityTypes = new Map(activities.map((a) => [a.id, a.type]))
-
-  // BFS from triggers to find all paths to the step
-  const visited = new Set<string>()
-  const queue = triggerIds.map((id) => ({ id, conditionalPath: false }))
-  let cursor = 0
-
-  while (cursor < queue.length) {
-    const current = queue[cursor]
-    cursor += 1
-    if (!current) continue
-    const key = `${current.id}:${current.conditionalPath}`
-
-    if (visited.has(key)) continue
-    visited.add(key)
-
-    const currentType = activityTypes.get(current.id)
-    const conditionalPath = current.conditionalPath || Boolean(currentType && CONDITIONAL_NODE_TYPES.has(currentType))
-
-    if (current.id === stepId && conditionalPath) return true
-
-    const neighbors = graph.get(current.id) ?? []
-    for (const neighbor of neighbors) {
-      queue.push({ id: neighbor, conditionalPath })
-    }
-  }
-
-  return false
+  return triggerIds.some((triggerId) => {
+    if (!canReachStep(triggerId, stepId, graph)) return false
+    const context: GuaranteeContext = { stepId, graph, activityTypes, memo: new Map(), visiting: new Set() }
+    return !stepIsGuaranteedFrom(triggerId, context)
+  })
 }
