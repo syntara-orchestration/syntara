@@ -9,7 +9,6 @@ on:
       - '*.markdown'
       - '**/*.markdown'
       - '.github/workflows/ci-markdown-links.yml'
-      - '.github/scripts/format-markdown-link-report.mjs'
       - '.github/scripts/package.json'
       - '.github/scripts/package-lock.json'
 
@@ -63,17 +62,9 @@ jobs:
           mv "$RUNNER_TEMP/frontend-docs" docs/frontend
 
       - name: Check local Markdown links
-        # Save the exit code so the report still appears when links fail.
-        # Check doc paths as MkDocs sees them.
-        run: |
-          report="$RUNNER_TEMP/md-link-lint-report.json"
-          if .github/scripts/node_modules/.bin/md-link-lint --exclude 'backend/docs/**' --exclude 'frontend/docs/**' --json > "$report"; then
-            status=0
-          else
-            status=$?
-          fi
-
-          node .github/scripts/format-markdown-link-report.mjs "$report"
-
-          # Return the link-check result after formatting the report.
-          exit "$status"
+        # The CLI's text report includes findings and a summary.
+        # Check paths as MkDocs sees them.
+        run: >-
+          .github/scripts/node_modules/.bin/md-link-lint
+          --exclude 'backend/docs/**'
+          --exclude 'frontend/docs/**'
