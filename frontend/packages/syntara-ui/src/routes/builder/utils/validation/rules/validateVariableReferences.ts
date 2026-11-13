@@ -9,37 +9,65 @@ import type { ValidationContext, ValidationError } from '../types'
 const KNOWN_NAMESPACES = new Set(['trigger', 'workflow_context', 'loop'])
 const VARIABLE_REF_PATTERN = /\$\{([^}]+)\}/g
 
+type LoopBodyGraph = {
+  adjacency: Map<string, string[]>
+  feedbackEdges: Set<string>
+  iterateSuccessorsByLoop: Map<string, string[]>
+}
+
+function buildLoopBodyGraph(edges: EdgeConnection[], loopNodeIds: Set<string>): LoopBodyGraph {
+  const adjacency = new Map<string, string[]>()
+  const feedbackEdges = new Set<string>()
+  const iterateSuccessorsByLoop = new Map<string, string[]>()
+
+  for (const edge of edges) {
+    if (edge.targetHandle === EdgeHandleEnum.END) {
+      feedbackEdges.add(`${edge.source}->${edge.target}`)
+      continue
+    }
+    adjacency.set(edge.source, [...(adjacency.get(edge.source) ?? []), edge.target])
+    if (loopNodeIds.has(edge.source) && edge.sourceHandle === EdgeHandleEnum.LOOP) {
+      iterateSuccessorsByLoop.set(edge.source, [...(iterateSuccessorsByLoop.get(edge.source) ?? []), edge.target])
+    }
+  }
+
+  return { adjacency, feedbackEdges, iterateSuccessorsByLoop }
+}
+
+function collectLoopBody(loopId: string, seeds: string[], graph: LoopBodyGraph, loopBodyNodeIds: Set<string>): void {
+  const queue = [...seeds]
+  while (queue.length > 0) {
+    const nodeId = queue.shift()
+    if (nodeId === undefined || loopBodyNodeIds.has(nodeId) || nodeId === loopId) continue
+    loopBodyNodeIds.add(nodeId)
+    for (const successor of graph.adjacency.get(nodeId) ?? []) {
+      if (!graph.feedbackEdges.has(`${nodeId}->${successor}`)) queue.push(successor)
+    }
+  }
+}
+
+/**
+ * Identifies nodes inside a loop body, mirroring the backend's
+ * `_identify_loop_body_nodes` in template_expressions.py: walks edges from each
+ * loop node's `loop` (iterate) handle via BFS, stopping at feedback edges back
+ * to the loop (`targetHandle === EdgeHandleEnum.END`).
+ */
+function identifyLoopBodyNodeIds(activities: Activity[], edges: EdgeConnection[]): Set<string> {
+  const loopNodeIds = new Set(activities.filter((a) => a.type === ActivityTypeEnum.LOOP).map((a) => a.id))
+  if (loopNodeIds.size === 0) return new Set()
+
+  const graph = buildLoopBodyGraph(edges, loopNodeIds)
+  const loopBodyNodeIds = new Set<string>()
+  for (const [loopId, seeds] of graph.iterateSuccessorsByLoop) {
+    collectLoopBody(loopId, seeds, graph, loopBodyNodeIds)
+  }
+
+  return loopBodyNodeIds
+}
+
 type VariableReference = {
   namespace: string
   fullRef: string
-}
-
-function getLoopBodyIds(activities: Activity[], edges: EdgeConnection[]): Set<string> {
-  const loopIds = new Set(
-    activities.filter((activity) => activity.type === ActivityTypeEnum.LOOP).map((loop) => loop.id)
-  )
-  const bodyIds = new Set<string>()
-  const queue: string[] = []
-
-  for (const edge of edges) {
-    if (loopIds.has(edge.source) && edge.sourceHandle === EdgeHandleEnum.LOOP) {
-      queue.push(edge.target)
-    }
-  }
-
-  while (queue.length > 0) {
-    const current = queue.shift()
-    if (!current || bodyIds.has(current)) continue
-
-    bodyIds.add(current)
-    for (const edge of edges) {
-      if (edge.source === current && edge.targetHandle !== EdgeHandleEnum.END && !bodyIds.has(edge.target)) {
-        queue.push(edge.target)
-      }
-    }
-  }
-
-  return bodyIds
 }
 
 function parseVariableReference(ref: string): VariableReference | null {
@@ -182,14 +210,17 @@ export function validateVariableReferences(
   const schemaFields = getWorkflowInputNames(context?.triggers)
   const available = [...schemaFields].sort((a, b) => a.localeCompare(b)).join(', ')
   const schemaSuggestion = available ? `Available fields: ${available}` : 'Define fields in the trigger configuration'
-  const loopBodyIds = getLoopBodyIds(activities, edges)
+  const loopBodyIds = identifyLoopBodyNodeIds(activities, edges)
 
   for (const activity of activities) {
     const paramStrings = collectStringValues(activity.parameters)
     const refs = paramStrings.flatMap(extractVariableReferences)
     if (refs.length === 0) continue
 
-    const needsUpstream = refs.some((ref) => !KNOWN_NAMESPACES.has(ref.namespace))
+    const inLoopBody = loopBodyIds.has(activity.id)
+    const needsUpstream = refs.some(
+      (ref) => !KNOWN_NAMESPACES.has(ref.namespace) && !(ref.namespace === 'loop' && inLoopBody)
+    )
     const upstreamIds = needsUpstream ? getUpstreamNodeIds(activity.id, edges) : new Set<string>()
     const ctx: RefContext = { schemaFields, schemaSuggestion, referenceTargetIds, upstreamIds, loopBodyIds }
 
