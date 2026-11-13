@@ -8,6 +8,7 @@ from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
     join_loop_iteration_id,
     loop_control_activity_id,
     loop_index_chain,
+    loop_iteration_indices,
     matches_loop_iteration_id,
     strip_loop_iteration_suffixes,
 )
@@ -159,3 +160,27 @@ def test_matches_loop_iteration_id() -> None:
     assert not matches_loop_iteration_id("approval_iter_notanumber", "approval")
     assert not matches_loop_iteration_id("other_iter_1", "approval")
     assert not matches_loop_iteration_id("approval_iter_0", "approval_iter_1")
+
+
+def test_loop_iteration_indices_no_suffix() -> None:
+    assert loop_iteration_indices("approval") == []
+
+
+def test_loop_iteration_indices_single_loop() -> None:
+    assert loop_iteration_indices("approval_iter_3") == [3]
+
+
+def test_loop_iteration_indices_nested_outermost_first() -> None:
+    assert loop_iteration_indices("approval_iter_1_iter_0") == [1, 0]
+    assert loop_iteration_indices("node-C_iter_2_iter_4_iter_1") == [2, 4, 1]
+
+
+def test_loop_iteration_indices_ignores_embedded_iter_in_node_id() -> None:
+    # ``_iter_5`` is part of the node name, not a trailing iteration suffix.
+    assert loop_iteration_indices("my_iter_5_node") == []
+    # Embedded name plus a real trailing chain: only the trailing chain counts.
+    assert loop_iteration_indices("my_iter_5_node_iter_0_iter_1") == [0, 1]
+
+
+def test_loop_iteration_indices_non_numeric_suffix_is_not_a_chain() -> None:
+    assert loop_iteration_indices("approval_iter_n") == []

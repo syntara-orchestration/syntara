@@ -126,6 +126,11 @@ class _MockExecResult:
         return self._value
 
 
+# AAP-95035: records every object the setup activity would persist, so a test
+# can assert the child Execution's created_by (DB-persisted initiator identity).
+_CAPTURED_ADDS: list[Any] = []
+
+
 class _MockSession:
     """Mock async DB session supporting exec/get/add/commit."""
 
@@ -156,7 +161,8 @@ class _MockSession:
         return None
 
     def add(self, _obj: object) -> None:
-        """No-op."""
+        """Record the object for assertions (previously a no-op)."""
+        _CAPTURED_ADDS.append(_obj)
 
     async def commit(self) -> None:
         """No-op."""
@@ -434,6 +440,26 @@ class TestSubWorkflowLifecycle:
         assert sub_wf_output["Result"]["child_workflow_id"] == str(_CHILD_WF_ID)
         assert sub_wf_output["Result"]["child_workflow_name"] == "test-child-workflow"
         assert sub_wf_output["Result"]["child_workflow_version"] == 1
+
+    async def test_child_execution_persists_parent_identity(self, temporal_env: object) -> None:
+        """Child Execution is owned by the top-level initiator, not the child's author.
+
+        AAP-95035: asserts the actual persisted Execution object (created_by /
+        updated_by / lineage), not a mocked helper call.
+        """
+        _CAPTURED_ADDS.clear()
+        await _run_parent_workflow(temporal_env)
+
+        children = [o for o in _CAPTURED_ADDS if getattr(o, "workflow_id", None) == _CHILD_WF_ID]
+        assert children, "setup activity did not persist a child Execution"
+        child = children[0]
+        # DB ownership fields are the parent's initiator, even though the child
+        # workflow's own author (_CHILD_CREATED_BY) is different.
+        assert str(child.created_by) == _PARENT_USER_ID
+        assert str(child.updated_by) == _PARENT_USER_ID
+        assert str(child.created_by) != str(_CHILD_CREATED_BY)
+        # Lineage metadata points back at the parent execution.
+        assert child.execution_metadata["parent_execution_id"] == _PARENT_EXECUTION_ID
 
     async def test_trigger_in_completed_activities(self, temporal_env: object) -> None:
         """The manual trigger node appears in completed_activities."""

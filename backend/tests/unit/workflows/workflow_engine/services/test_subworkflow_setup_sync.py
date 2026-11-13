@@ -101,12 +101,19 @@ def _row(node_id: str, **over: object) -> ActivityExecution:
     return ActivityExecution(**kwargs)
 
 
+def _nn(d: dict[str, Any] | None) -> dict[str, Any]:
+    """Narrow an optional dict so it can be indexed in assertions (mypy --strict)."""
+    assert d is not None
+    return d
+
+
 class TestSetupScheduled:
     """SCHEDULED → canvas-keyed pending entry marked as a sub-workflow setup."""
 
     def setup_method(self) -> None:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
+        self.session = Mock()
 
     def test_single_node_scheduled_keys_canvas_node(self) -> None:
         self.service._process_activity_scheduled(_scheduled(10, f"{_PREFIX}node-A"), self.metadata)
@@ -129,11 +136,15 @@ class TestSetupScheduled:
         assert u0["_subworkflow_iteration"] == 0
         assert u1["_subworkflow_iteration"] == 1
 
-    def test_nested_for_each_strips_to_canvas_node(self) -> None:
+    def test_nested_for_each_captures_full_iteration_chain(self) -> None:
+        # Nested for_each: the id carries the full outer/inner chain. The canvas
+        # id strips every suffix, and the FULL chain (not just the innermost
+        # index) is carried so nested iterations get distinct rows downstream.
         self.service._process_activity_scheduled(_scheduled(13, f"{_PREFIX}node-C_iter_1_iter_0"), self.metadata)
         update = self.metadata.pending_activity_updates[13]
         assert update["activity_id"] == "node-C"
-        assert update["_subworkflow_iteration"] == 0
+        assert update["_subworkflow_iteration_chain"] == [1, 0]
+        assert update["_subworkflow_iteration"] == 0  # innermost index (display only)
 
     def test_other_internal_activities_still_skipped(self) -> None:
         self.service._process_activity_scheduled(_scheduled(14, "__internal__register_monitoring"), self.metadata)
@@ -146,6 +157,7 @@ class TestSetupStartedRunning:
     def setup_method(self) -> None:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
+        self.session = Mock()
 
     def test_started_sets_running(self) -> None:
         self.service._process_activity_scheduled(_scheduled(10, f"{_PREFIX}node-A"), self.metadata)
@@ -161,6 +173,7 @@ class TestSetupCompleted:
     def setup_method(self) -> None:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
+        self.session = Mock()
 
     def _run(self, activity_id: str, result: dict[str, object] | None, sched_id: int = 10) -> dict[str, Any]:
         self.service._process_activity_scheduled(_scheduled(sched_id, activity_id), self.metadata)
@@ -186,10 +199,18 @@ class TestSetupCompleted:
         assert "workflow_definition" not in update["runtime_metadata"]
         assert "task_queue" not in update["runtime_metadata"]
 
-    def test_for_each_completion_does_not_populate_runtime_metadata(self) -> None:
+    def test_for_each_completion_populates_runtime_metadata_per_iteration(self) -> None:
+        # Each for_each iteration's setup result carries its own child link, so
+        # runtime_metadata is populated for every iteration (not only non-looped
+        # nodes); terminal status still stays owned by the finalizer.
         update = self._run(f"{_PREFIX}node-B_iter_0", _setup_result(), sched_id=20)
         assert update["status"] == ActivityStatus.RUNNING
-        assert "runtime_metadata" not in update
+        assert update["runtime_metadata"] == {
+            "child_execution_id": "child-exec-1",
+            "child_workflow_id": "wf-123",
+            "child_workflow_name": "demo-child",
+            "child_workflow_version": 2,
+        }
         assert "node-B" not in self.metadata.terminal_activity_ids
 
     def test_missing_payload_leaves_runtime_metadata_unset(self) -> None:
@@ -204,6 +225,7 @@ class TestSetupTerminalEventsDoNotTerminalize:
     def setup_method(self) -> None:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
+        self.session = Mock()
         self.service._process_activity_scheduled(_scheduled(10, f"{_PREFIX}node-A"), self.metadata)
         self.service._process_activity_started(_started(11, 10), self.metadata)
 
@@ -347,6 +369,7 @@ class TestSyncSubworkflowSetup:
     def setup_method(self) -> None:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
+        self.session = Mock()
 
     def _activity_data(self, **over: object) -> dict[str, object]:
         data: dict[str, object] = {
@@ -374,6 +397,7 @@ class TestSyncSubworkflowSetup:
             self._activity_data(runtime_metadata={"child_execution_id": "child-exec-1"}),
             {"node-A": row},
             self.metadata,
+            self.session,
         )
         assert result is not None
         activity, old_values, is_new = result
@@ -386,11 +410,14 @@ class TestSyncSubworkflowSetup:
         assert old_values["status"] == ActivityStatus.PENDING
 
     def test_missing_row_returns_none(self) -> None:
-        assert self.service._sync_subworkflow_setup(self._activity_data(), {}, self.metadata) is None
+        assert self.service._sync_subworkflow_setup(self._activity_data(), {}, self.metadata, self.session) is None
 
     def test_terminal_row_is_not_regressed(self) -> None:
         row = _row("node-A", status=ActivityStatus.COMPLETED)
-        assert self.service._sync_subworkflow_setup(self._activity_data(), {"node-A": row}, self.metadata) is None
+        result = self.service._sync_subworkflow_setup(
+            self._activity_data(), {"node-A": row}, self.metadata, self.session
+        )
+        assert result is None
         assert row.status == ActivityStatus.COMPLETED
 
 
@@ -446,6 +473,7 @@ class TestNormalActivityUnaffected:
     def setup_method(self) -> None:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
+        self.session = Mock()
 
     def test_normal_completed_terminalizes(self) -> None:
         self.service._process_activity_scheduled(_scheduled(10, "plain-node"), self.metadata)
@@ -469,6 +497,7 @@ class TestSetupSyncNoOutputDelta:
     def setup_method(self) -> None:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
+        self.session = Mock()
 
     def _activity_data(self, **over: object) -> dict[str, object]:
         data: dict[str, object] = {
@@ -494,6 +523,7 @@ class TestSetupSyncNoOutputDelta:
             self._activity_data(runtime_metadata={"child_execution_id": "child-exec-1"}),
             {"node-A": row},
             self.metadata,
+            self.session,
         )
         assert result is not None
         activity, old_values, _ = result
@@ -644,6 +674,7 @@ class TestSetupCompletedBuildsIo:
     def setup_method(self) -> None:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
+        self.session = Mock()
 
     def _run(self, activity_id: str, sched: int) -> dict[str, Any]:
         self.service._process_activity_scheduled(_scheduled(sched, activity_id), self.metadata)
@@ -658,10 +689,12 @@ class TestSetupCompletedBuildsIo:
         assert update["runtime_metadata"]["child_execution_id"] == "child-exec-1"
         assert update["status"] == ActivityStatus.RUNNING
 
-    def test_for_each_has_io_but_no_metadata(self) -> None:
+    def test_for_each_has_io_and_metadata(self) -> None:
+        # A for_each iteration carries both the I/O summary and its own
+        # per-iteration child link.
         update = self._run(f"{_PREFIX}node-B_iter_0", 20)
         assert "_subworkflow_io" in update
-        assert "runtime_metadata" not in update
+        assert update["runtime_metadata"]["child_execution_id"] == "child-exec-1"
 
 
 class TestSyncWritesIo:
@@ -670,6 +703,7 @@ class TestSyncWritesIo:
     def setup_method(self) -> None:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
+        self.session = Mock()
 
     def _data(self, *, io: bool, iteration: object = None, **over: object) -> dict[str, object]:
         data: dict[str, object] = {
@@ -695,6 +729,7 @@ class TestSyncWritesIo:
             self._data(io=True, runtime_metadata={"child_execution_id": "child-exec-1"}),
             {"node-A": row},
             self.metadata,
+            self.session,
         )
         assert row.input_data == {
             "execution_mode": "reference",
@@ -714,22 +749,33 @@ class TestSyncWritesIo:
 
     def test_started_only_preserves_io(self) -> None:
         row = _row("node-A", status=ActivityStatus.PENDING, input_data={"keep": 1}, output_data={"keep": 2})
-        self.service._sync_subworkflow_setup(self._data(io=False), {"node-A": row}, self.metadata)
+        self.service._sync_subworkflow_setup(self._data(io=False), {"node-A": row}, self.metadata, self.session)
         assert row.input_data == {"keep": 1}
         assert row.output_data == {"keep": 2}
         assert row.status == ActivityStatus.RUNNING
 
-    def test_for_each_last_iteration_wins(self) -> None:
+    def test_for_each_iterations_create_distinct_rows(self) -> None:
+        # Iteration 0 reuses the aggregate row; iteration 1 gets its own #iter-1
+        # row. Each keeps its own child execution id (no last-wins overwrite).
         row = _row("node-A", status=ActivityStatus.RUNNING, input_data={}, output_data=None)
+        existing = {"node-A": row}
         io0 = _EP._build_subworkflow_io(_setup_result(execution_id="child-0"))
         io1 = _EP._build_subworkflow_io(_setup_result(execution_id="child-1"))
-        d0 = self._data(io=False, iteration=0, _subworkflow_io=io0)
-        d1 = self._data(io=False, iteration=1, _subworkflow_io=io1)
-        self.service._sync_subworkflow_setup(d0, {"node-A": row}, self.metadata)
-        self.service._sync_subworkflow_setup(d1, {"node-A": row}, self.metadata)
-        assert row.output_data is not None
-        assert row.output_data["child_execution_id"] == "child-1"
-        assert row.runtime_metadata is None
+        d0 = self._data(io=False, iteration=0, _subworkflow_io=io0, runtime_metadata={"child_execution_id": "child-0"})
+        d1 = self._data(io=False, iteration=1, _subworkflow_io=io1, runtime_metadata={"child_execution_id": "child-1"})
+        r0 = self.service._sync_subworkflow_setup(d0, existing, self.metadata, self.session)
+        r1 = self.service._sync_subworkflow_setup(d1, existing, self.metadata, self.session)
+        assert r0 is not None
+        assert r1 is not None
+        assert r0[2] is False  # aggregate row reused for iteration 0
+        assert r1[2] is True  # new per-iteration row for iteration 1
+        assert set(existing) == {"node-A", "node-A#iter-1"}
+        assert _nn(existing["node-A"].output_data)["child_execution_id"] == "child-0"
+        assert existing["node-A"].iteration == 0
+        assert _nn(existing["node-A#iter-1"].output_data)["child_execution_id"] == "child-1"
+        assert existing["node-A#iter-1"].iteration == 1
+        assert existing["node-A"].runtime_metadata == {"child_execution_id": "child-0"}
+        assert existing["node-A#iter-1"].runtime_metadata == {"child_execution_id": "child-1"}
 
 
 class TestTerminalBackfill:
@@ -777,6 +823,7 @@ class TestSyncRoutesTerminalToBackfill:
     def setup_method(self) -> None:
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
+        self.session = Mock()
 
     def test_terminal_row_backfilled_not_regressed(self) -> None:
         row = _row("node-A", status=ActivityStatus.CANCELLED, input_data={}, output_data=None)
@@ -792,7 +839,7 @@ class TestSyncRoutesTerminalToBackfill:
             "iteration": None,
             "_subworkflow_io": _EP._build_subworkflow_io(_setup_result()),
         }
-        result = self.service._sync_subworkflow_setup(data, {"node-A": row}, self.metadata)
+        result = self.service._sync_subworkflow_setup(data, {"node-A": row}, self.metadata, self.session)
         assert result is not None
         assert row.status == ActivityStatus.CANCELLED
         assert row.output_data is not None
@@ -877,3 +924,331 @@ class TestBuildIoScrubsCredentials:
         res = _setup_result(input_data={"greeting": "hi"})
         io = ActivitySyncService._build_subworkflow_io(res)
         assert io["input"]["input_parameters"] == {"greeting": "hi"}
+
+
+# ===========================================================================
+# Sub-workflow nodes in a loop render one run-details row per iteration,
+# each linking to that iteration's distinct child execution.
+# ===========================================================================
+
+
+class TestSubworkflowIterationRecordResolution:
+    """Deterministic per-iteration row resolution (``_get_or_create_subworkflow_iteration_record``)."""
+
+    def setup_method(self) -> None:
+        self.metadata = create_test_metadata()
+        self.session = Mock()
+
+    def _agg(self) -> dict[str, ActivityExecution]:
+        return {"node-A": _row("node-A", status=ActivityStatus.PENDING)}
+
+    def _get(self, existing: dict[str, ActivityExecution], n: int | None) -> tuple[Any, bool]:
+        # A single-level chain reproduces the old int-based call exactly.
+        chain: list[int] = [] if n is None else [n]
+        return ActivityExecutionSyncMixin._get_or_create_subworkflow_iteration_record(
+            "node-A", chain, existing, self.metadata, self.session
+        )
+
+    def test_non_looped_uses_aggregate_row(self) -> None:
+        existing = self._agg()
+        row, is_new = self._get(existing, None)
+        assert is_new is False
+        assert row is existing["node-A"]
+        assert set(existing) == {"node-A"}
+
+    def test_iteration_zero_uses_aggregate_row_and_sets_index(self) -> None:
+        existing = self._agg()
+        row, is_new = self._get(existing, 0)
+        assert is_new is False
+        assert row is existing["node-A"]
+        assert existing["node-A"].iteration == 0
+        assert set(existing) == {"node-A"}
+
+    def test_one_iteration_single_row(self) -> None:
+        # A for_each that runs once still emits _iter_0 -> aggregate row, no composite.
+        existing = self._agg()
+        _row_obj, is_new = self._get(existing, 0)
+        assert set(existing) == {"node-A"}
+        assert is_new is False
+
+    def test_three_iterations_create_three_rows(self) -> None:
+        existing = self._agg()
+        flags = [self._get(existing, n)[1] for n in (0, 1, 2)]
+        assert flags == [False, True, True]
+        assert set(existing) == {"node-A", "node-A#iter-1", "node-A#iter-2"}
+        assert existing["node-A"].iteration == 0
+        assert existing["node-A#iter-1"].iteration == 1
+        assert existing["node-A#iter-2"].iteration == 2
+
+    def test_five_iterations_create_five_rows(self) -> None:
+        existing = self._agg()
+        for n in range(5):
+            self._get(existing, n)
+        assert set(existing) == {
+            "node-A",
+            "node-A#iter-1",
+            "node-A#iter-2",
+            "node-A#iter-3",
+            "node-A#iter-4",
+        }
+
+    def test_idempotent_repeat_same_iteration_no_duplicate(self) -> None:
+        existing = self._agg()
+        r1 = self._get(existing, 2)
+        r2 = self._get(existing, 2)
+        r3 = self._get(existing, 2)
+        assert (r1[1], r2[1], r3[1]) == (True, False, False)
+        assert r1[0] is r2[0] is r3[0]
+        assert set(existing) == {"node-A", "node-A#iter-2"}
+
+    def test_out_of_order_iterations_resolve_deterministically(self) -> None:
+        existing = self._agg()
+        self._get(existing, 2)
+        self._get(existing, 0)
+        self._get(existing, 1)
+        self._get(existing, 2)  # late duplicate event
+        assert set(existing) == {"node-A", "node-A#iter-1", "node-A#iter-2"}
+        assert existing["node-A#iter-1"].iteration == 1
+        assert existing["node-A#iter-2"].iteration == 2
+
+    def test_missing_aggregate_row_returns_none(self) -> None:
+        row, is_new = self._get({}, 1)
+        assert row is None
+        assert is_new is False
+
+    def test_new_row_registered_in_index_map(self) -> None:
+        existing = self._agg()
+        self.metadata.activity_index_map["node-A"] = 0
+        self.metadata.next_activity_index = 1
+        self._get(existing, 1)
+        assert self.metadata.activity_index_map["node-A#iter-1"] == 1
+        assert self.metadata.next_activity_index == 2
+
+
+class TestSubworkflowPerIterationSyncChildLinks:
+    """_sync_subworkflow_setup yields one row per iteration, each with its own child link."""
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.metadata = create_test_metadata()
+        self.session = Mock()
+
+    def _data(self, n: int, child: str) -> dict[str, Any]:
+        return {
+            "activity_id": "node-A",
+            "activity_name": "node-A",
+            "_subworkflow_setup": True,
+            "_subworkflow_iteration": n,
+            "status": ActivityStatus.RUNNING,
+            "started_at": datetime.now(UTC),
+            "completed_at": None,
+            "error_details": None,
+            "retry_count": 0,
+            "iteration": None,
+            "_subworkflow_io": _EP._build_subworkflow_io(_setup_result(execution_id=child)),
+            "runtime_metadata": {"child_execution_id": child, "child_workflow_name": "demo-child"},
+        }
+
+    def test_three_iterations_distinct_child_links(self) -> None:
+        existing = {"node-A": _row("node-A", status=ActivityStatus.PENDING)}
+        flags = []
+        for n, child in [(0, "child-0"), (1, "child-1"), (2, "child-2")]:
+            res = self.service._sync_subworkflow_setup(self._data(n, child), existing, self.metadata, self.session)
+            assert res is not None
+            flags.append(res[2])
+        assert flags == [False, True, True]
+        assert set(existing) == {"node-A", "node-A#iter-1", "node-A#iter-2"}
+        links = {k: _nn(v.runtime_metadata)["child_execution_id"] for k, v in existing.items()}
+        assert links == {"node-A": "child-0", "node-A#iter-1": "child-1", "node-A#iter-2": "child-2"}
+        assert len(set(links.values())) == 3  # distinct child executions
+        assert _nn(existing["node-A"].output_data)["child_execution_id"] == "child-0"
+        assert _nn(existing["node-A#iter-2"].output_data)["child_execution_id"] == "child-2"
+
+    def test_duplicate_completed_event_keeps_single_row_and_link(self) -> None:
+        existing = {"node-A": _row("node-A", status=ActivityStatus.PENDING)}
+        self.service._sync_subworkflow_setup(self._data(1, "child-1"), existing, self.metadata, self.session)
+        # replay the same iteration's completed event (idempotent)
+        self.service._sync_subworkflow_setup(self._data(1, "child-1"), existing, self.metadata, self.session)
+        assert set(existing) == {"node-A", "node-A#iter-1"}
+        assert _nn(existing["node-A#iter-1"].runtime_metadata)["child_execution_id"] == "child-1"
+
+
+class TestFinalizerOverPerIterationRows:
+    """Finalizer terminalizes each per-iteration row, preserving its child link.
+
+    Per-iteration rows take the node-level terminal status; each row's own child
+    link is never clobbered by finalization.
+    """
+
+    @staticmethod
+    def _act(name: str, iteration: int, child: str, status: ActivityStatus = ActivityStatus.RUNNING) -> Mock:
+        a = Mock()
+        a.status = status
+        a.activity_name = name
+        a.started_at = None
+        a.error_details = None
+        a.iteration = iteration
+        a.runtime_metadata = {"child_execution_id": child}
+        return a
+
+    def test_completed_node_marks_all_iterations_completed_preserving_links(self) -> None:
+        acts = [
+            self._act("node-A", 0, "child-0"),
+            self._act("node-A#iter-1", 1, "child-1"),
+            self._act("node-A#iter-2", 2, "child-2"),
+        ]
+        execution = Mock(spec=Execution)
+        execution.activities = acts
+        ActivitySyncService._finalize_non_terminal_activities(execution, uuid4(), None, {"node-A"})
+        assert [a.status for a in acts] == [ActivityStatus.COMPLETED] * 3
+        assert [a.runtime_metadata["child_execution_id"] for a in acts] == ["child-0", "child-1", "child-2"]
+
+    def test_failed_node_marks_all_iterations_failed_preserving_links(self) -> None:
+        acts = [self._act("node-A", 0, "child-0"), self._act("node-A#iter-1", 1, "child-1")]
+        execution = Mock(spec=Execution)
+        execution.activities = acts
+        ActivitySyncService._finalize_non_terminal_activities(execution, uuid4(), {"node-A": "boom"}, None)
+        assert all(a.status == ActivityStatus.FAILED for a in acts)
+        assert all(a.error_details == "boom" for a in acts)
+        assert [a.runtime_metadata["child_execution_id"] for a in acts] == ["child-0", "child-1"]
+
+    def test_already_terminal_iteration_row_not_regressed(self) -> None:
+        # A per-iteration row synced to a terminal status by its own events is left untouched
+        # even when the node-level resolution would say FAILED (mixed outcome across iterations).
+        running = self._act("node-A", 0, "child-0")
+        done = self._act("node-A#iter-1", 1, "child-1", status=ActivityStatus.COMPLETED)
+        execution = Mock(spec=Execution)
+        execution.activities = [running, done]
+        ActivitySyncService._finalize_non_terminal_activities(execution, uuid4(), {"node-A": "boom"}, None)
+        assert running.status == ActivityStatus.FAILED
+        assert done.status == ActivityStatus.COMPLETED  # untouched
+        assert done.runtime_metadata["child_execution_id"] == "child-1"
+
+
+class TestIterationAddOpIncludesRuntimeMetadata:
+    """A new per-iteration row's add-op carries its child link.
+
+    So the first patch already shows the per-iteration 'View sub-workflow run'
+    link.
+    """
+
+    def test_add_op_includes_runtime_metadata_and_resets_original(self) -> None:
+        row = _row(
+            "node-A#iter-1",
+            status=ActivityStatus.RUNNING,
+            iteration=1,
+            runtime_metadata={"child_execution_id": "child-1", "child_workflow_name": "demo-child"},
+        )
+        ops = ActivitySyncPublisherMixin._build_iteration_patch_ops([row], {"node-A": 0})
+        add_ops = [o for o in ops if o["op"] == "add"]
+        assert len(add_ops) == 1
+        assert add_ops[0]["value"]["runtime_metadata"] == {
+            "child_execution_id": "child-1",
+            "child_workflow_name": "demo-child",
+        }
+        assert add_ops[0]["value"]["iteration"] == 1
+        assert {"op": "replace", "path": "/activities/0/iteration", "value": 0} in ops
+
+
+class TestSubworkflowNestedIterationChildLinks:
+    """Regression for the nested-loop collision (PR #1276 / AAP-101640).
+
+    A sub-workflow node inside a 2x2 nested for_each schedules four setup
+    activities whose Temporal ids share innermost indices across outer indices
+    (child_iter_0_iter_1 and child_iter_1_iter_1 both end in _iter_1). Keying the
+    run-details row by the innermost index alone collapsed these to one row, so
+    the later child execution overwrote the earlier one's link / I/O. Keying by
+    the full chain keeps all four distinct.
+    """
+
+    def setup_method(self) -> None:
+        self.service = ActivitySyncService(Mock(), Mock())
+        self.metadata = create_test_metadata()
+        self.session = Mock()
+
+    def _data(self, chain: list[int], child: str) -> dict[str, Any]:
+        return {
+            "activity_id": "node-A",
+            "activity_name": "node-A",
+            "_subworkflow_setup": True,
+            "_subworkflow_iteration": chain[-1] if chain else None,
+            "_subworkflow_iteration_chain": chain,
+            "status": ActivityStatus.RUNNING,
+            "started_at": datetime.now(UTC),
+            "completed_at": None,
+            "error_details": None,
+            "retry_count": 0,
+            "iteration": None,
+            "_subworkflow_io": _EP._build_subworkflow_io(_setup_result(execution_id=child)),
+            "runtime_metadata": {"child_execution_id": child, "child_workflow_name": "demo-child"},
+        }
+
+    # outer/inner chain -> child execution id for a 2x2 loop
+    _CELLS: ClassVar[list[tuple[list[int], str]]] = [
+        ([0, 0], "child-00"),
+        ([0, 1], "child-01"),
+        ([1, 0], "child-10"),
+        ([1, 1], "child-11"),
+    ]
+
+    def _agg(self) -> dict[str, ActivityExecution]:
+        return {"node-A": _row("node-A", status=ActivityStatus.PENDING)}
+
+    def _drive(self, existing: dict[str, ActivityExecution], cells: list[tuple[list[int], str]]) -> None:
+        for chain, child in cells:
+            res = self.service._sync_subworkflow_setup(self._data(chain, child), existing, self.metadata, self.session)
+            assert res is not None
+
+    def test_four_nested_iterations_resolve_to_four_distinct_rows(self) -> None:
+        existing = self._agg()
+        self._drive(existing, self._CELLS)
+        # [0, 0] reuses the aggregate; the other three get full-chain composite keys.
+        assert set(existing) == {"node-A", "node-A#iter-0-1", "node-A#iter-1-0", "node-A#iter-1-1"}
+        links = {k: _nn(v.runtime_metadata)["child_execution_id"] for k, v in existing.items()}
+        assert links == {
+            "node-A": "child-00",
+            "node-A#iter-0-1": "child-01",
+            "node-A#iter-1-0": "child-10",
+            "node-A#iter-1-1": "child-11",
+        }
+        assert len(set(links.values())) == 4  # no child execution overwritten
+        # I/O follows the same routing as the child link.
+        assert _nn(existing["node-A"].output_data)["child_execution_id"] == "child-00"
+        assert _nn(existing["node-A#iter-1-0"].output_data)["child_execution_id"] == "child-10"
+        assert _nn(existing["node-A#iter-1-1"].output_data)["child_execution_id"] == "child-11"
+
+    def test_same_innermost_index_across_outer_indices_does_not_collide(self) -> None:
+        # The exact collision from the review: both chains end in innermost index 1.
+        existing = self._agg()
+        self._drive(existing, [([0, 1], "child-01"), ([1, 1], "child-11")])
+        assert set(existing) == {"node-A", "node-A#iter-0-1", "node-A#iter-1-1"}
+        assert _nn(existing["node-A#iter-0-1"].runtime_metadata)["child_execution_id"] == "child-01"
+        assert _nn(existing["node-A#iter-1-1"].runtime_metadata)["child_execution_id"] == "child-11"
+
+    def test_duplicate_nested_event_keeps_single_row_and_link(self) -> None:
+        existing = self._agg()
+        self._drive(existing, [([1, 1], "child-11"), ([1, 1], "child-11")])  # replay
+        assert set(existing) == {"node-A", "node-A#iter-1-1"}
+        assert _nn(existing["node-A#iter-1-1"].runtime_metadata)["child_execution_id"] == "child-11"
+
+    def test_out_of_order_nested_events_resolve_deterministically(self) -> None:
+        existing = self._agg()
+        # Deliberately reversed arrival order, plus a late duplicate.
+        self._drive(
+            existing,
+            [
+                ([1, 1], "child-11"),
+                ([1, 0], "child-10"),
+                ([0, 1], "child-01"),
+                ([0, 0], "child-00"),
+                ([1, 1], "child-11"),
+            ],
+        )
+        assert set(existing) == {"node-A", "node-A#iter-0-1", "node-A#iter-1-0", "node-A#iter-1-1"}
+        links = {k: _nn(v.runtime_metadata)["child_execution_id"] for k, v in existing.items()}
+        assert links == {
+            "node-A": "child-00",
+            "node-A#iter-0-1": "child-01",
+            "node-A#iter-1-0": "child-10",
+            "node-A#iter-1-1": "child-11",
+        }
