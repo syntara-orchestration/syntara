@@ -18,6 +18,7 @@ import type { ComponentType } from 'react'
 
 import AnsibleIcon from '../../../../assets/ansible-automation-platform.svg?react'
 import EdaIcon from '../../../../assets/eda.svg?react'
+import { WorkflowBuilderIcon } from '../../../../components/WorkflowBuilderIcon'
 
 export type NodeMetadata = {
   icon?: ComponentType<{ className?: string }>
@@ -55,7 +56,7 @@ export const nodeMetadata: Record<string, NodeMetadata> = {
     expandable: false,
   },
   subWorkflowTrigger: {
-    icon: RhUiNetworkIcon,
+    icon: WorkflowBuilderIcon,
     label: 'Trigger',
     disableTarget: true,
     expandable: false,

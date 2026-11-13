@@ -1,5 +1,5 @@
 import type { ProjectsAPI, WorkflowAPI } from '@syntara/contracts'
-import { useInfiniteQuery, useQueries } from '@tanstack/react-query'
+import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 
 import { workflowClient } from '../../../client'
@@ -27,6 +27,8 @@ export type ChildWorkflowOption = {
   label: string
   description?: string
   triggers: InvocationTrigger[]
+  publishedVersionId?: string
+  publishedVersion?: number
 }
 
 type SchemaQueryResult = {
@@ -34,6 +36,29 @@ type SchemaQueryResult = {
   error: unknown
   isError: boolean
   isPending: boolean
+}
+
+function usePinnedInvocationSchema(
+  workflowId: string | null,
+  versionId: string | null | undefined,
+  latestSchema: InvocationSchema | undefined,
+  latestQuery: SchemaQueryResult | undefined
+) {
+  const isPinnedVersionLookup = Boolean(workflowId && versionId && latestSchema?.published_version_id !== versionId)
+  const pinnedVersionQuery = useQuery({
+    queryKey: invocationSchemaQueryKey(workflowId ?? '', versionId),
+    queryFn: () => fetchInvocationSchema(workflowId ?? '', versionId),
+    enabled: isPinnedVersionLookup,
+  })
+
+  return {
+    schema: isPinnedVersionLookup ? pinnedVersionQuery.data : latestSchema,
+    query: isPinnedVersionLookup ? pinnedVersionQuery : latestQuery,
+    isPinnedVersionLookup,
+    hasError: isPinnedVersionLookup && pinnedVersionQuery.isError,
+    retry: pinnedVersionQuery.refetch,
+    isFetching: isPinnedVersionLookup && pinnedVersionQuery.isPending,
+  }
 }
 
 /**
@@ -63,6 +88,8 @@ function buildWorkflowOptions(
         label: workflow.name,
         description: versionDescription(invocationSchema) ?? workflow.description ?? undefined,
         triggers: invocationSchema.triggers ?? [],
+        publishedVersionId: invocationSchema.published_version_id,
+        publishedVersion: invocationSchema.published_version,
       },
     ]
   })
@@ -89,6 +116,8 @@ function selectedWorkflowOption({
     label: label ?? workflow.name,
     description: versionDescription(schema) ?? workflow.description ?? undefined,
     triggers: schema.triggers ?? [],
+    publishedVersionId: schema.published_version_id,
+    publishedVersion: schema.published_version,
   }
 }
 
@@ -165,9 +194,11 @@ export function isInvocationSchemaNotFound(error: unknown): error is ChildWorkfl
 export function useChildWorkflowSelector({
   projectId,
   selectedWorkflowId,
+  selectedVersionId,
 }: {
   projectId: string | null
   selectedWorkflowId: string | null
+  selectedVersionId?: string | null
 }) {
   const [searchTerm, setSearchTerm] = useState('')
   const nameFilter = searchTerm.trim()
@@ -236,18 +267,27 @@ export function useChildWorkflowSelector({
 
   const selectedOption = options.find((option) => option.value === selectedWorkflowId)
   const selectedSchemaQuery = selectedWorkflowId ? schemasByWorkflowId.get(selectedWorkflowId) : undefined
+  const latestSelectedSchema = selectedSchemaQuery?.data
+  const selectedInvocation = usePinnedInvocationSchema(
+    selectedWorkflowId,
+    selectedVersionId,
+    latestSelectedSchema,
+    selectedSchemaQuery
+  )
+  const selectedSchema = selectedInvocation.schema
+  const selectedSchemaState = selectedInvocation.query
   const selectedWorkflow = selectedWorkflowFromList ?? selectedWorkflowQuery.data
   const selectedWorkflowLabel = selectedWorkflow?.name
-  const selectedSchema = selectedSchemaQuery?.data
   const resolvedSelectedOption = selectedWorkflowOption({
-    existingOption: selectedOption,
+    existingOption: selectedInvocation.isPinnedVersionLookup ? undefined : selectedOption,
     workflowId: selectedWorkflowId,
     workflow: selectedWorkflow,
     schema: selectedSchema,
     label: selectedWorkflowLabel,
   })
   const schemaLookup = getSchemaLookupState(schemasByWorkflowId, selectedWorkflowId)
-  const hasError = workflowsQuery.isError || selectedWorkflowQuery.isError || schemaLookup.hasError
+  const hasError =
+    workflowsQuery.isError || selectedWorkflowQuery.isError || schemaLookup.hasError || selectedInvocation.hasError
   const errorMessage = getWorkflowErrorMessage({
     workflowsError: workflowsQuery.error,
     selectedWorkflowError: selectedWorkflowQuery.isError,
@@ -264,6 +304,7 @@ export function useChildWorkflowSelector({
     for (const query of queries) {
       if (query) detachPromise(query.refetch())
     }
+    if (selectedInvocation.hasError) detachPromise(selectedInvocation.retry())
   }
 
   return {
@@ -271,8 +312,9 @@ export function useChildWorkflowSelector({
     selectedOption: resolvedSelectedOption,
     selectedWorkflowLabel,
     selectedSchema,
-    selectedSchemaQuery,
-    selectedSchemaError: selectedSchemaQuery?.error,
+    latestSchema: latestSelectedSchema,
+    selectedSchemaQuery: selectedSchemaState,
+    selectedSchemaError: selectedSchemaState?.error,
     isLoading: workflowsQuery.isLoading || schemaLookup.isLoading,
     hasNextPage: workflowsQuery.hasNextPage,
     isFetchingNextPage: workflowsQuery.isFetchingNextPage,

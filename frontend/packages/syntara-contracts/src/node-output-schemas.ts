@@ -113,7 +113,7 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
     {
       name: 'Result',
       type: 'object',
-      description: 'Child execution metadata for Sub-workflow steps.',
+      description: 'Child execution metadata and the declared public output contract for Sub-workflow steps.',
       children: [
         {
           name: 'child_execution_id',
@@ -137,8 +137,7 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
           name: 'outputs',
           type: 'object',
           description:
-            'Child workflow step outputs. Keys are child step IDs, values are their output data as raw objects. May be null if authorization denied.',
-          additionalProperties: [],
+            "Values mapped to the selected SubWorkflow Trigger's declared public output contract. Internal child step names are not exposed.",
         },
       ],
     },

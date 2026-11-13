@@ -12,6 +12,8 @@ import type { InputSchemaPreviewNode } from '../views/InputSchemaPreview'
  */
 const MAPPED_OUTPUT_SCHEMA_MARKER = 'x-syntara-output-mapped'
 
+type OutputSchemaField = OutputFieldDef & { required?: boolean }
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -40,11 +42,36 @@ function schemaFieldType(schema: Record<string, unknown>): OutputFieldDef['type'
   }
 }
 
+function outputFieldsFromProperties(
+  properties: Record<string, unknown>,
+  requiredProperties: Set<string>
+): OutputSchemaField[] {
+  return Object.entries(properties).flatMap(([name, value]) => {
+    if (!isRecord(value)) return []
+    const nestedProperties = value['properties']
+    const nestedRequired = Array.isArray(value['required'])
+      ? value['required'].filter((field): field is string => typeof field === 'string')
+      : []
+    const children = isRecord(nestedProperties)
+      ? outputFieldsFromProperties(nestedProperties, new Set(nestedRequired))
+      : undefined
+    const type = schemaFieldType(value) ?? 'unknown'
+    const field: OutputSchemaField = {
+      name,
+      type,
+      description: typeof value['description'] === 'string' ? value['description'] : '',
+      required: requiredProperties.has(name),
+      ...(children && children.length > 0 ? { children } : {}),
+    }
+    return [field]
+  })
+}
+
 /** Convert the published node schema to picker fields, honoring mapped output names. */
 export function getChildStepOutputFields(
   stepType: string,
   outputSchema: Record<string, unknown> | null
-): OutputFieldDef[] | null {
+): OutputSchemaField[] | null {
   const knownFields = getNodeOutputSchema(stepType)
   if (!outputSchema) return null
 
@@ -59,21 +86,19 @@ export function getChildStepOutputFields(
   )
 
   const knownFieldsByName = new Map((knownFields ?? []).map((field) => [field.name, field]))
-  return Object.entries(properties).map(([name, value]) => {
-    const property = isRecord(value) ? value : {}
-    const knownField = knownFieldsByName.get(name)
-    const isMappedOutput = property[MAPPED_OUTPUT_SCHEMA_MARKER] === true
-    const type = isMappedOutput ? 'unknown' : (schemaFieldType(property) ?? knownField?.type ?? 'unknown')
-    const description =
-      typeof property['description'] === 'string' ? property['description'] : (knownField?.description ?? '')
-
+  return outputFieldsFromProperties(properties, requiredFields).map((field) => {
+    const property = properties[field.name]
+    const knownField = knownFieldsByName.get(field.name)
+    const isMappedOutput = isRecord(property) && property[MAPPED_OUTPUT_SCHEMA_MARKER] === true
+    let type = field.type
+    if (isMappedOutput) type = 'unknown'
+    else if (type === 'unknown') type = knownField?.type ?? 'unknown'
     return {
-      name,
+      ...field,
       type,
-      description,
-      required: requiredFields.has(name),
-      ...(!isMappedOutput && knownField?.children ? { children: knownField.children } : {}),
-      ...(!isMappedOutput && knownField?.additionalProperties
+      description: field.description || knownField?.description || '',
+      ...(!field.children && knownField?.children ? { children: knownField.children } : {}),
+      ...(!field.children && knownField?.additionalProperties
         ? { additionalProperties: knownField.additionalProperties }
         : {}),
     }

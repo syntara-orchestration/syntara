@@ -69,9 +69,8 @@ function ChildWorkflowOutputStatus({
 
   if (schema.isAccessDenied) {
     return (
-      <Alert variant="warning" isInline isPlain title="Child step outputs are unavailable">
-        You need permission to view the child workflow to browse its step outputs. Aggregate output fields remain
-        available.
+      <Alert variant="warning" isInline isPlain title="Declared child outputs are unavailable">
+        You need permission to view the child workflow's declared output contract. Execution metadata remains available.
       </Alert>
     )
   }
@@ -97,7 +96,7 @@ function ChildWorkflowOutputStatus({
   if (!schema.isEligible) {
     return (
       <Alert variant="warning" isInline isPlain title="Child workflow is not eligible">
-        Add a Sub-workflow Trigger to a published child workflow to browse its step outputs.
+        Add a Sub-workflow Trigger with declared outputs to a published child workflow.
       </Alert>
     )
   }
@@ -120,8 +119,8 @@ function ChildWorkflowOutputStatus({
 
   if (!schema.childSteps.some((step) => (step.outputFields?.length ?? 0) > 0)) {
     return (
-      <Alert variant="info" isInline isPlain title="No child step output schemas available">
-        The selected trigger has no terminal steps with known output fields.
+      <Alert variant="info" isInline isPlain title="No outputs declared for this trigger">
+        The parent can use child execution metadata, but this trigger does not expose business outputs.
       </Alert>
     )
   }
@@ -138,12 +137,14 @@ function ChildWorkflowOutputContent({
 }: Readonly<ChildWorkflowOutputContentProps>) {
   const childSchema = useChildWorkflowSchema({
     workflowId: upstreamNode.childWorkflowId ?? null,
+    workflowVersionId: upstreamNode.childWorkflowVersionId ?? null,
     triggerNodeId: upstreamNode.childTriggerNodeId ?? null,
   })
   const outputTree = useMemo(
     () => buildSubWorkflowOutputSchemaTree(childSchema.isLoading || childSchema.error ? [] : childSchema.childSteps),
     [childSchema.childSteps, childSchema.error, childSchema.isLoading]
   )
+  const hasDeclaredOutputs = childSchema.childSteps.some((step) => step.id === '__declared_outputs__')
 
   return (
     <Stack hasGutter>
@@ -160,6 +161,14 @@ function ChildWorkflowOutputContent({
       <StackItem>
         <ChildWorkflowOutputStatus childWorkflowId={upstreamNode.childWorkflowId} schema={childSchema} />
       </StackItem>
+      {hasDeclaredOutputs && (
+        <StackItem>
+          <Alert variant="info" isInline isPlain title="Declared outputs may be unavailable at runtime">
+            Required values fail the child run if their source is missing. Optional values are omitted when their source
+            step does not run.
+          </Alert>
+        </StackItem>
+      )}
       <StackItem>
         <InputSchemaPreview tree={outputTree} nodeId={expressionNodeId} searchTerm={searchTerm} />
       </StackItem>

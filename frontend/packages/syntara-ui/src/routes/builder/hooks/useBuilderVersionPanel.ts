@@ -11,6 +11,47 @@ import { useBuilderVersionHistory } from './useBuilderVersionHistory'
 
 type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
+type PublishVersionAction = (
+  version: number,
+  publishName?: string,
+  changeDescription?: string,
+  onSettled?: () => void
+) => void
+
+type PublishSelectedVersionArgs = {
+  version: number | null
+  publish: PublishVersionAction
+  closeDialog: () => void
+  publishName?: string
+  description?: string
+}
+
+function closeVersionPublishDialog(cancelWarning: () => void, closeDialog: () => void): void {
+  cancelWarning()
+  closeDialog()
+}
+
+function publishSelectedVersion({
+  version,
+  publish,
+  closeDialog,
+  publishName,
+  description,
+}: PublishSelectedVersionArgs): void {
+  if (version != null) publish(version, publishName, description, closeDialog)
+}
+
+function openVersionRunHistory(args: {
+  isViewingVersion: boolean
+  handleExitVersionView: () => void
+  dispatch: Dispatch<BuilderAction>
+  onOpenRunHistory: (versionNumber: number) => void
+  versionNumber: number
+}): void {
+  if (args.isViewingVersion) args.handleExitVersionView()
+  else args.dispatch({ type: 'SET_VERSION_HISTORY_OPEN', payload: false })
+  args.onOpenRunHistory(args.versionNumber)
+}
 
 type UseBuilderVersionPanelParams = {
   workflowId: string | null
@@ -62,6 +103,10 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     exportVersion,
     openInNewWindow,
     publishVersion,
+    isPublishingVersion,
+    breakingChanges,
+    confirmPublishVersion,
+    cancelBreakingChangeWarning,
     isViewingVersion,
     viewedVersionDate,
     viewedVersionStatus,
@@ -115,14 +160,8 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
   )
 
   const handleViewRunHistory = useCallback(
-    (versionNumber: number) => {
-      if (isViewingVersion) {
-        handleExitVersionView()
-      } else {
-        dispatch({ type: 'SET_VERSION_HISTORY_OPEN', payload: false })
-      }
-      onOpenRunHistory(versionNumber)
-    },
+    (versionNumber: number) =>
+      openVersionRunHistory({ isViewingVersion, handleExitVersionView, dispatch, onOpenRunHistory, versionNumber }),
     [isViewingVersion, handleExitVersionView, dispatch, onOpenRunHistory]
   )
 
@@ -209,13 +248,19 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
 
       publishDialog: {
         isOpen: versionPublishDialog.isOpen,
-        onClose: versionPublishDialog.close,
-        onPublish: (publishName?: string, description?: string) => {
-          if (versionPublishDialog.item != null) {
-            publishVersion(versionPublishDialog.item, publishName, description)
-            versionPublishDialog.close()
-          }
-        },
+        isPublishing: isPublishingVersion,
+        breakingChanges,
+        onClose: () => closeVersionPublishDialog(cancelBreakingChangeWarning, versionPublishDialog.close),
+        onConfirmBreakingChanges: confirmPublishVersion,
+        onCancelBreakingChanges: cancelBreakingChangeWarning,
+        onPublish: (publishName?: string, description?: string) =>
+          publishSelectedVersion({
+            version: versionPublishDialog.item,
+            publish: publishVersion,
+            closeDialog: versionPublishDialog.close,
+            publishName,
+            description,
+          }),
       },
 
       saveBeforeViewDialog: {

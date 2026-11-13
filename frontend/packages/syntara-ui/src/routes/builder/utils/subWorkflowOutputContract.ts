@@ -82,9 +82,99 @@ export function outputFieldsFromSchema(
   )
 }
 
-/**
- * Build the public JSON Schema from visual rows, retaining advanced-schema metadata where possible.
- */
+type ValidOutputRow = { field: SubWorkflowOutputField; segments: string[] }
+
+function getValidOutputRows(fields: SubWorkflowOutputField[]): ValidOutputRow[] {
+  return fields.flatMap((field) => {
+    const segments = field.path.split('.').map((segment) => segment.trim())
+    return segments.some((segment) => !segment) ? [] : [{ field, segments }]
+  })
+}
+
+function pruneUnusedProperties(
+  properties: Record<string, unknown>,
+  includedPaths: Set<string>,
+  prefix: string[] = []
+): void {
+  for (const [name, rawProperty] of Object.entries(properties)) {
+    const path = [...prefix, name]
+    if (!isRecord(rawProperty) || !isRecord(rawProperty.properties)) {
+      if (!includedPaths.has(path.join('.'))) delete properties[name]
+      continue
+    }
+    pruneUnusedProperties(rawProperty.properties, includedPaths, path)
+    if (Object.keys(rawProperty.properties).length === 0 && !includedPaths.has(path.join('.'))) delete properties[name]
+  }
+}
+
+function clearRequiredProperties(schema: Record<string, unknown>): void {
+  delete schema.required
+  if (!isRecord(schema.properties)) return
+  for (const property of Object.values(schema.properties)) {
+    if (isRecord(property)) clearRequiredProperties(property)
+  }
+}
+
+function setOutputLeaf(property: Record<string, unknown>, field: SubWorkflowOutputField): void {
+  const preservesInteger = field.type === 'number' && property.type === 'integer'
+  if (field.type !== 'unknown' && !preservesInteger) property.type = field.type
+  if (field.description?.trim()) property.description = field.description.trim()
+  else delete property.description
+}
+
+function nestedPropertiesFor(property: Record<string, unknown>): Record<string, unknown> {
+  property.type ??= 'object'
+  if (isRecord(property.properties)) return property.properties
+  const properties: Record<string, unknown> = {}
+  property.properties = properties
+  return properties
+}
+
+function addRequiredField(
+  requiredByParent: Map<string, Set<string>>,
+  segments: string[],
+  index: number,
+  segment: string
+): void {
+  const parentPath = segments.slice(0, index).join('.')
+  const required = requiredByParent.get(parentPath) ?? new Set<string>()
+  required.add(segment)
+  requiredByParent.set(parentPath, required)
+}
+
+function addOutputRows(rootProperties: Record<string, unknown>, validRows: ValidOutputRow[]): Map<string, Set<string>> {
+  const requiredByParent = new Map<string, Set<string>>()
+  for (const { field, segments } of validRows) {
+    let properties = rootProperties
+    for (const [index, segment] of segments.entries()) {
+      const existingProperty = properties[segment]
+      const property = isRecord(existingProperty) ? existingProperty : {}
+      properties[segment] = property
+      const isLeaf = index === segments.length - 1
+      if (isLeaf) setOutputLeaf(property, field)
+      else properties = nestedPropertiesFor(property)
+      if (field.required) addRequiredField(requiredByParent, segments, index, segment)
+    }
+  }
+  return requiredByParent
+}
+
+function findSchemaAtPath(schema: Record<string, unknown>, path: string): Record<string, unknown> | undefined {
+  if (!path) return schema
+  return path.split('.').reduce<Record<string, unknown> | undefined>((node, segment) => {
+    if (!node || !isRecord(node.properties) || !isRecord(node.properties[segment])) return undefined
+    return node.properties[segment]
+  }, schema)
+}
+
+function applyRequiredProperties(schema: Record<string, unknown>, requiredByParent: Map<string, Set<string>>): void {
+  for (const [path, required] of requiredByParent) {
+    const parent = findSchemaAtPath(schema, path)
+    if (parent) parent.required = [...required]
+  }
+}
+
+/** Build the public JSON Schema from visual rows, retaining advanced-schema metadata where possible. */
 export function outputSchemaFromFields(
   fields: SubWorkflowOutputField[],
   baseSchema?: unknown
@@ -92,92 +182,14 @@ export function outputSchemaFromFields(
   const schema = isRecord(baseSchema) ? (JSON.parse(JSON.stringify(baseSchema)) as Record<string, unknown>) : {}
   schema.type = 'object'
   if (!isRecord(schema.properties)) schema.properties = {}
-  const rootProperties = schema.properties as Record<string, unknown>
-
-  const validRows = fields.flatMap((field) => {
-    const rawSegments = field.path.split('.')
-    if (rawSegments.some((segment) => !segment.trim())) return []
-    return [{ field, segments: rawSegments.map((segment) => segment.trim()) }]
-  })
-
+  const rootProperties = isRecord(schema.properties) ? schema.properties : {}
+  schema.properties = rootProperties
+  const validRows = getValidOutputRows(fields)
   const includedPaths = new Set(validRows.map(({ segments }) => segments.join('.')))
-
-  // Prune properties not in the field list
-  const prune = (properties: Record<string, unknown>, prefix: string[]) => {
-    for (const [name, rawProperty] of Object.entries(properties)) {
-      const path = [...prefix, name]
-      if (isRecord(rawProperty) && isRecord(rawProperty.properties) && Object.keys(rawProperty.properties).length > 0) {
-        prune(rawProperty.properties, path)
-        if (Object.keys(rawProperty.properties).length === 0 && !includedPaths.has(path.join('.')))
-          delete properties[name]
-      } else if (!includedPaths.has(path.join('.'))) {
-        delete properties[name]
-      }
-    }
-  }
-  prune(rootProperties, [])
-
-  // Clear all required arrays
-  const clearRequired = (node: Record<string, unknown>) => {
-    delete node.required
-    if (!isRecord(node.properties)) return
-    Object.values(node.properties).forEach((property) => {
-      if (isRecord(property)) clearRequired(property)
-    })
-  }
-  clearRequired(schema)
-
-  // Track which fields are required at each level
-  const requiredByParent = new Map<string, Set<string>>()
-
-  // Build nested structure from flat rows
-  for (const { field, segments } of validRows) {
-    let properties = rootProperties
-    let property: Record<string, unknown> | undefined
-
-    for (const [index, segment] of segments.entries()) {
-      const existingProperty = properties[segment]
-      property = isRecord(existingProperty) ? existingProperty : {}
-      properties[segment] = property
-      const isLeaf = index === segments.length - 1
-
-      if (!isLeaf) {
-        property.type ??= 'object'
-        if (!isRecord(property.properties)) property.properties = {}
-        const nextProperties = property.properties
-        if (isRecord(nextProperties)) {
-          properties = nextProperties
-        }
-      } else {
-        // Leaf node - set type and description
-        if (field.type !== 'unknown' && !(field.type === 'number' && property.type === 'integer')) {
-          property.type = field.type
-        }
-        if (field.description?.trim()) property.description = field.description.trim()
-        else delete property.description
-      }
-
-      // Track required fields
-      if (field.required) {
-        const parentPath = segments.slice(0, index).join('.')
-        const required = requiredByParent.get(parentPath) ?? new Set<string>()
-        required.add(segment)
-        requiredByParent.set(parentPath, required)
-      }
-    }
-  }
-
-  // Apply required arrays
-  for (const [parentPath, required] of requiredByParent) {
-    const parent = parentPath
-      ? parentPath.split('.').reduce<Record<string, unknown> | undefined>((node, segment) => {
-          if (!node || !isRecord(node.properties) || !isRecord(node.properties[segment])) return undefined
-          return node.properties[segment]
-        }, schema)
-      : schema
-    if (parent) parent.required = [...required]
-  }
-
+  pruneUnusedProperties(rootProperties, includedPaths)
+  clearRequiredProperties(schema)
+  const requiredByParent = addOutputRows(rootProperties, validRows)
+  applyRequiredProperties(schema, requiredByParent)
   return Object.keys(rootProperties).length > 0 ? schema : undefined
 }
 

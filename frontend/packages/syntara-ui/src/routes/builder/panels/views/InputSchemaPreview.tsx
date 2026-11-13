@@ -1,4 +1,4 @@
-import { Content, ContentVariants, Label } from '@patternfly/react-core'
+import { Content, ContentVariants, Flex, FlexItem, Label } from '@patternfly/react-core'
 import { TreeView, type TreeViewDataItem } from '@patternfly/react-core'
 import { RhUiInformationIcon } from '@patternfly/react-icons'
 import type { OutputFieldDef } from '@syntara/contracts'
@@ -77,10 +77,12 @@ function PreviewField({
   )
 
   const label = (
-    <span className={styles.fieldLabel}>
-      <span>{`${typeLabel} ${name}`}</span>
-      {requiredBadge}
-    </span>
+    <Flex className={styles.fieldLabel} alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
+      <FlexItem>
+        <Content component={ContentVariants.small}>{`${typeLabel} ${name}`}</Content>
+      </FlexItem>
+      <FlexItem>{requiredBadge}</FlexItem>
+    </Flex>
   )
 
   return (

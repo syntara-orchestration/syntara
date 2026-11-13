@@ -1321,6 +1321,51 @@ class TestSubWorkflowOutputMappingValidation:
         with pytest.raises(SafeValueError, match="references unknown activity or scope 'unknown_step'"):
             validator.validate_workflow_definition(definition)
 
+    def test_required_output_must_have_mapping(self, validator: WorkflowValidator) -> None:
+        definition = {
+            "schema_version": "2.0.0",
+            "name": "required-output",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {"release_tag": {"type": "string"}},
+                            "required": ["release_tag"],
+                        },
+                    },
+                }
+            ],
+            "nodes": [{"id": "build", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "build"}],
+        }
+
+        with pytest.raises(SafeValueError, match="Required output 'release_tag' has no output mapping"):
+            validator.validate_workflow_definition(definition)
+
+    def test_mapping_key_must_be_declared(self, validator: WorkflowValidator) -> None:
+        definition = {
+            "schema_version": "2.0.0",
+            "name": "unknown-output",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {"type": "object", "properties": {"release_tag": {"type": "string"}}},
+                        "output_mapping": {"internal_name": "${build.stdout}"},
+                    },
+                }
+            ],
+            "nodes": [{"id": "build", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "build"}],
+        }
+
+        with pytest.raises(SafeValueError, match="not declared in output_schema"):
+            validator.validate_workflow_definition(definition)
+
     def test_output_mapping_multiple_fields_one_invalid(self, validator: WorkflowValidator) -> None:
         """output_mapping with one invalid reference raises error."""
         definition: dict[str, Any] = {

@@ -146,4 +146,19 @@ describe('isStepConditional', () => {
 
     expect(isStepConditional('deploy', activities, edges, triggerIds)).toBe(true)
   })
+
+  it('does not let a conditional sibling path mark an unconditional step conditional', () => {
+    const activities = [
+      { id: 'check', type: 'condition' },
+      { id: 'conditional_task', type: 'script' },
+      { id: 'always_task', type: 'script' },
+    ]
+    const edges = [
+      { source: 'trigger-0', target: 'check' },
+      { source: 'check', target: 'conditional_task' },
+      { source: 'trigger-0', target: 'always_task' },
+    ]
+
+    expect(isStepConditional('always_task', activities, edges, ['trigger-0'])).toBe(false)
+  })
 })

@@ -48,6 +48,30 @@ describe('getChildStepOutputFields', () => {
 
     expect(fields?.map((field) => field.name)).toEqual(['status'])
   })
+
+  it('preserves nested declared output fields and required metadata', () => {
+    const fields = getChildStepOutputFields('subworkflow_declared_outputs', {
+      type: 'object',
+      properties: {
+        intake: {
+          type: 'object',
+          properties: { status: { type: 'string', description: 'Intake status' } },
+          required: ['status'],
+        },
+      },
+      required: ['intake'],
+    })
+
+    expect(fields).toEqual([
+      {
+        name: 'intake',
+        type: 'object',
+        description: '',
+        required: true,
+        children: [{ name: 'status', type: 'string', description: 'Intake status', required: true }],
+      },
+    ])
+  })
 })
 
 describe('buildSubWorkflowOutputSchemaTree', () => {
@@ -107,6 +131,32 @@ describe('buildSubWorkflowOutputSchemaTree', () => {
       '${invoke_deploy.Result.outputs.deploy_app.image_tag}'
     )
     expect(childStep?.children?.some((field) => field.name === 'stdout')).toBe(false)
+  })
+
+  it('builds nested expressions for declared output paths', () => {
+    const outputFields = getChildStepOutputFields('subworkflow_declared_outputs', {
+      type: 'object',
+      properties: {
+        intake: { type: 'object', properties: { status: { type: 'string' } } },
+      },
+    })
+    const tree = buildSubWorkflowOutputSchemaTree([
+      {
+        id: '__declared_outputs__',
+        name: 'Declared Outputs',
+        type: 'subworkflow_declared_outputs',
+        outputSchema: { type: 'object' },
+        outputFields,
+      },
+    ])
+    const result = tree.find((field) => field.name === 'Result')
+    const outputs = result?.children?.find((field) => field.name === 'outputs')
+    const intake = outputs?.children?.find((field) => field.name === 'intake')
+    const status = intake?.children?.find((field) => field.name === 'status')
+
+    expect(buildExpression({ nodeId: 'invoke_child', fieldPath: status?.fieldPath ?? [] })).toBe(
+      '${invoke_child.Result.outputs.intake.status}'
+    )
   })
 
   it('exposes nested Sub-workflow step outputs with flat structure', () => {

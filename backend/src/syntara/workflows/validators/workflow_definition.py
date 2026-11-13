@@ -20,6 +20,7 @@ from referencing.jsonschema import DRAFT202012
 from syntara.core.constants import JsonbLimits
 from syntara.core.exceptions import SafeValueError
 from syntara.schemas import SCHEMA_DIR
+from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
@@ -567,6 +568,149 @@ def _check_output_mapping_references(  # noqa: C901
     return findings
 
 
+def _output_schema_paths(
+    schema: dict[str, Any], prefix: tuple[str, ...] = (), *, required_ancestors: bool = True
+) -> tuple[set[str], set[str]]:
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return set(), set()
+    required = schema.get("required", [])
+    required_names = set(required) if isinstance(required, list) else set()
+    all_paths: set[str] = set()
+    required_paths: set[str] = set()
+    for name, property_schema in properties.items():
+        if not isinstance(name, str) or not isinstance(property_schema, dict):
+            continue
+        path = (*prefix, name)
+        path_string = ".".join(path)
+        is_required = required_ancestors and name in required_names
+        all_paths.add(path_string)
+        if is_required:
+            required_paths.add(path_string)
+        nested_paths, nested_required = _output_schema_paths(property_schema, path, required_ancestors=is_required)
+        all_paths.update(nested_paths)
+        required_paths.update(nested_required)
+    return all_paths, required_paths
+
+
+def _check_required_output_mappings(
+    required_paths: set[str], mapping_paths: set[str], trigger_id: str | None
+) -> list[ValidationFinding]:
+    return [
+        ValidationFinding(
+            severity=ValidationSeverity.error,
+            category=ValidationCategory.missing_field,
+            message=f"Required output '{required_path}' has no output mapping.",
+            node_id=trigger_id,
+            field_path=f"parameters.output_mapping.{required_path}",
+        )
+        for required_path in sorted(required_paths)
+        if not any(
+            required_path == mapped_path or required_path.startswith(f"{mapped_path}.") for mapped_path in mapping_paths
+        )
+    ]
+
+
+def _check_output_trigger_contract(trigger: dict[str, Any]) -> list[ValidationFinding]:  # noqa: C901
+    findings: list[ValidationFinding] = []
+    trigger_id = trigger.get("id")
+    parameters = trigger.get("parameters", {})
+    if not isinstance(parameters, dict):
+        return []
+    schema = parameters.get("output_schema")
+    mapping = parameters.get("output_mapping")
+    if schema is None:
+        if mapping:
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.schema_violation,
+                    message="SubWorkflow Trigger output_mapping requires an output_schema.",
+                    node_id=trigger_id,
+                    field_path="parameters.output_mapping",
+                )
+            )
+        return findings
+    if not isinstance(schema, dict):
+        return [
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.schema_violation,
+                message="SubWorkflow Trigger output_schema must be a JSON object.",
+                node_id=trigger_id,
+                field_path="parameters.output_schema",
+            )
+        ]
+    try:
+        validate_json_schema_definition(schema)
+    except ValueError as exc:
+        return [
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.schema_violation,
+                message=f"Invalid SubWorkflow Trigger output_schema: {exc}",
+                node_id=trigger_id,
+                field_path="parameters.output_schema",
+            )
+        ]
+    if mapping is None:
+        mapping = {}
+    if not isinstance(mapping, dict):
+        return [
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.schema_violation,
+                message="SubWorkflow Trigger output_mapping must be an object.",
+                node_id=trigger_id,
+                field_path="parameters.output_mapping",
+            )
+        ]
+
+    property_paths, required_paths = _output_schema_paths(schema)
+    findings: list[ValidationFinding] = []
+    mapping_paths: set[str] = set()
+    for output_path, expression in mapping.items():
+        if not isinstance(output_path, str) or output_path not in property_paths:
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.invalid_reference,
+                    message=f"Output mapping path '{output_path}' is not declared in output_schema.",
+                    node_id=trigger_id,
+                    field_path=f"parameters.output_mapping.{output_path}",
+                )
+            )
+            continue
+        mapping_paths.add(output_path)
+        if not isinstance(expression, str) or not re.fullmatch(r"\$\{[^{}]+\}", expression.strip()):
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.schema_violation,
+                    message=(
+                        f"Output mapping for '{output_path}' must be a template expression such as '${{step.field}}'."
+                    ),
+                    node_id=trigger_id,
+                    field_path=f"parameters.output_mapping.{output_path}",
+                )
+            )
+    findings.extend(_check_required_output_mappings(required_paths, mapping_paths, trigger_id))
+    return findings
+
+
+def _check_output_contract_findings(workflow_definition: dict[str, Any]) -> list[ValidationFinding]:
+    """Validate each SubWorkflow Trigger's output schema and mapping contract."""
+    triggers = workflow_definition.get("triggers", [])
+    if not isinstance(triggers, list):
+        return []
+    return [
+        finding
+        for trigger in triggers
+        if isinstance(trigger, dict) and trigger.get("type") == "subworkflow_trigger"
+        for finding in _check_output_trigger_contract(trigger)
+    ]
+
+
 class WorkflowValidator:
     """Validator for V2 workflows and metadata.
 
@@ -744,6 +888,7 @@ class WorkflowValidator:
             findings.extend(check_template_expressions(workflow_definition, node_ids))
 
         findings.extend(collect_scheduled_trigger_config_findings(workflow_definition))
+        findings.extend(_check_output_contract_findings(workflow_definition))
 
         return findings
 
@@ -833,6 +978,9 @@ class WorkflowValidator:
             SafeValueError: If output_mapping references unknown steps
 
         """
-        findings = _check_output_mapping_references(workflow_definition, node_ids)
+        findings = [
+            *_check_output_mapping_references(workflow_definition, node_ids),
+            *_check_output_contract_findings(workflow_definition),
+        ]
         if findings:
             raise SafeValueError(findings[0].message)

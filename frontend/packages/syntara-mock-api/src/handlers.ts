@@ -1151,7 +1151,7 @@ export const handlers = [
       published_step_metadata: getPublishedStepMetadata(String(workflowId), body),
     })
   }),
-  http.get('/api/v1/workflows/:workflowId/invocation_schema', ({ params }) => {
+  http.get('/api/v1/workflows/:workflowId/invocation_schema', ({ params, request }) => {
     const workflowId = String(params.workflowId)
     const workflow = workflows.find((item) => item.id === workflowId)
     const instance = `/api/v1/workflows/${workflowId}/invocation_schema`
@@ -1169,20 +1169,27 @@ export const handlers = [
       )
     }
 
+    const requestedVersionId = new URL(request.url).searchParams.get('version_id')
+    const versions = getOrCreateVersionStore(workflowId, workflow)
     const publishedVersionId = workflow.published_version_id
-    const publishedVersion =
-      typeof publishedVersionId === 'string'
-        ? getOrCreateVersionStore(workflowId, workflow).find(
-            (version) => version.id === publishedVersionId && version.status === 'published'
-          )
+    const selectedVersion = requestedVersionId
+      ? versions.find(
+          (version) =>
+            version.id === requestedVersionId &&
+            (version.status === 'published' || version.status === 'previously_published')
+        )
+      : typeof publishedVersionId === 'string'
+        ? versions.find((version) => version.id === publishedVersionId && version.status === 'published')
         : undefined
-    if (!publishedVersion) {
+    if (!selectedVersion) {
       return HttpResponse.json(
         {
-          type: 'https://api.example.com/errors/workflow-not-published',
-          title: 'Workflow Not Published',
-          detail: 'Workflow has no published version',
-          code: 'WORKFLOW_NOT_PUBLISHED',
+          type: 'https://api.example.com/errors/version-not-found',
+          title: 'Published Version Not Found',
+          detail: requestedVersionId
+            ? 'The requested version was not published for this workflow'
+            : 'Workflow has no published version',
+          code: requestedVersionId ? 'VERSION_NOT_FOUND' : 'WORKFLOW_NOT_PUBLISHED',
           retryable: false,
           instance,
         },
@@ -1190,7 +1197,7 @@ export const handlers = [
       )
     }
 
-    const definition = publishedVersion.workflow_definition
+    const definition = selectedVersion.workflow_definition
     const triggerDefinitions: unknown[] =
       isRecord(definition) && Array.isArray(definition.triggers) ? definition.triggers : []
     const triggers: WorkflowInvocationSchemaTrigger[] = []
@@ -1199,17 +1206,21 @@ export const handlers = [
 
       const parameters = isRecord(trigger.parameters) ? trigger.parameters : {}
       const inputSchema = isRecord(parameters.input_schema) ? parameters.input_schema : {}
+      const outputSchema = isRecord(parameters.output_schema) ? parameters.output_schema : null
       triggers.push({
         trigger_node_id: trigger.id,
         name: typeof trigger.name === 'string' ? trigger.name : null,
         input_schema: inputSchema,
+        ...(outputSchema ? { output_schema: outputSchema } : {}),
       })
     }
 
     const response: WorkflowInvocationSchemaResponse = {
       workflow_id: workflowId,
-      published_version_id: publishedVersion.id,
-      published_version: publishedVersion.version,
+      published_version_id: selectedVersion.id,
+      published_version: selectedVersion.version,
+      published_version_name: selectedVersion.name,
+      published_version_created_at: selectedVersion.created_at,
       is_eligible: triggers.length > 0,
       triggers,
     }
@@ -1422,6 +1433,138 @@ export const handlers = [
         },
       ],
     })
+  }),
+
+  http.post('/api/v1/workflows/:workflowId/versions/:version/check-breaking-changes', async (request) => {
+    const workflowId = String(request.params.workflowId)
+    const workflow = workflows.find((item) => item.id === workflowId)
+    const body = (await request.request.json()) as { workflow_definition?: unknown }
+    const definition = body.workflow_definition
+    const publishedVersionId = workflow?.published_version_id
+    const previousVersion =
+      workflow && typeof publishedVersionId === 'string'
+        ? getOrCreateVersionStore(workflowId, workflow).find((version) => version.id === publishedVersionId)
+        : undefined
+    const oldDefinition = previousVersion?.workflow_definition
+    const oldTriggers = new Map<string, Record<string, unknown>>()
+    const newTriggers = new Map<string, Record<string, unknown>>()
+    if (isRecord(oldDefinition) && Array.isArray(oldDefinition.triggers)) {
+      for (const trigger of oldDefinition.triggers) {
+        if (isRecord(trigger) && trigger.type === 'subworkflow_trigger' && typeof trigger.id === 'string') {
+          oldTriggers.set(trigger.id, trigger)
+        }
+      }
+    }
+    if (isRecord(definition) && Array.isArray(definition.triggers)) {
+      for (const trigger of definition.triggers) {
+        if (isRecord(trigger) && trigger.type === 'subworkflow_trigger' && typeof trigger.id === 'string') {
+          newTriggers.set(trigger.id, trigger)
+        }
+      }
+    }
+
+    const flattenSchema = (schema: unknown) => {
+      const fields = new Map<string, { type: string; required: boolean }>()
+      const visit = (current: unknown, prefix: string[] = [], parentRequired = true) => {
+        if (!isRecord(current) || !isRecord(current.properties)) return
+        const required = new Set(
+          Array.isArray(current.required) ? current.required.filter((name) => typeof name === 'string') : []
+        )
+        for (const [name, property] of Object.entries(current.properties)) {
+          if (!isRecord(property)) continue
+          const path = [...prefix, name]
+          const isRequired = parentRequired && required.has(name)
+          fields.set(path.join('.'), {
+            type: typeof property.type === 'string' ? property.type : 'unknown',
+            required: isRequired,
+          })
+          visit(property, path, isRequired)
+        }
+      }
+      visit(schema)
+      return fields
+    }
+
+    const changesByTrigger: Array<{
+      trigger_id: string
+      trigger_name: string | null
+      changes: Array<{
+        change_type: string
+        field_path: string
+        old_type: string | null
+        new_type: string | null
+        description: string
+      }>
+    }> = []
+    for (const [triggerId, oldTrigger] of oldTriggers) {
+      const nextTrigger = newTriggers.get(triggerId)
+      const oldParameters = isRecord(oldTrigger.parameters) ? oldTrigger.parameters : {}
+      const oldFields = flattenSchema(oldParameters.output_schema)
+      const changes: (typeof changesByTrigger)[number]['changes'] = []
+      if (!nextTrigger) {
+        changes.push({
+          change_type: 'removed_trigger',
+          field_path: triggerId,
+          old_type: null,
+          new_type: null,
+          description: `Removed SubWorkflow Trigger: ${triggerId}`,
+        })
+      } else {
+        const newParameters = isRecord(nextTrigger.parameters) ? nextTrigger.parameters : {}
+        const newFields = flattenSchema(newParameters.output_schema)
+        for (const [path, oldField] of oldFields) {
+          const newField = newFields.get(path)
+          if (!newField) {
+            changes.push({
+              change_type: 'removed_output',
+              field_path: path,
+              old_type: oldField.type,
+              new_type: null,
+              description: `Removed output: ${path}`,
+            })
+          } else {
+            if (oldField.type !== newField.type) {
+              changes.push({
+                change_type: 'type_change',
+                field_path: path,
+                old_type: oldField.type,
+                new_type: newField.type,
+                description: `Type changed: ${path} (${oldField.type} → ${newField.type})`,
+              })
+            }
+            if (!oldField.required && newField.required) {
+              changes.push({
+                change_type: 'required_output',
+                field_path: path,
+                old_type: oldField.type,
+                new_type: newField.type,
+                description: `Output is now required: ${path}`,
+              })
+            }
+          }
+        }
+        for (const [path, newField] of newFields) {
+          if (newField.required && !oldFields.has(path)) {
+            changes.push({
+              change_type: 'new_required_output',
+              field_path: path,
+              old_type: null,
+              new_type: newField.type,
+              description: `New required output: ${path}`,
+            })
+          }
+        }
+      }
+      if (changes.length > 0) {
+        changesByTrigger.push({
+          trigger_id: triggerId,
+          trigger_name: typeof nextTrigger?.name === 'string' ? nextTrigger.name : null,
+          changes,
+        })
+      }
+    }
+
+    return HttpResponse.json({ has_breaking_changes: changesByTrigger.length > 0, triggers: changesByTrigger })
   }),
 
   http.post('/api/v1/workflows/:workflowId/versions/:version/publish', async (request) => {

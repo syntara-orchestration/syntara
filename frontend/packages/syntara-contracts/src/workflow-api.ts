@@ -101,7 +101,7 @@ export interface paths {
     }
     /**
      * Get workflow invocation schema
-     * @description Get the latest published Subworkflow Trigger schemas for a workflow.
+     * @description Get current or pinned published Subworkflow Trigger schemas for a workflow.
      */
     get: operations['get_workflow_invocation_schema']
     put?: never
@@ -190,6 +190,35 @@ export interface paths {
      * @description Publish a specific workflow version.
      */
     post: operations['publish_workflow_version']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/workflows/{workflow_id}/versions/{version}/check-breaking-changes': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Check for breaking changes before publishing
+     * @description Check for breaking changes in SubWorkflow output schemas.
+     *
+     *     Compares the new workflow definition against the currently published version
+     *     to detect breaking changes such as:
+     *     - Removed outputs
+     *     - Type changes
+     *     - New required outputs
+     *
+     *     This endpoint should be called before publishing to warn users about
+     *     breaking changes that may affect parent workflows.
+     */
+    post: operations['check_breaking_changes']
     delete?: never
     options?: never
     head?: never
@@ -581,13 +610,6 @@ export interface components {
       output_schema?: {
         [key: string]: unknown
       } | null
-      /**
-       * Output Mapping
-       * @description Template expressions mapping internal step outputs to declared output fields. Keys are dotted paths from output_schema; values are template expressions (e.g., '${step.field}').
-       */
-      output_mapping?: {
-        [key: string]: string
-      } | null
     }
     /**
      * WorkflowInvocationSchemaRead
@@ -779,6 +801,60 @@ export interface components {
        * @description Version the client was editing. If the server's current_version is higher, returns 409 Conflict.
        */
       expected_version?: number | null
+    }
+    /**
+     * BreakingChange
+     * @description A single breaking change detected in an output schema.
+     *
+     *     Attributes:
+     *         change_type: Type of breaking change (removed_output, type_change, new_required_output)
+     *         field_path: Dotted path to the affected field
+     *         old_type: Previous field type (for type changes)
+     *         new_type: New field type (for type changes and new required outputs)
+     *         description: Human-readable description
+     */
+    BreakingChange: {
+      /** Change Type */
+      change_type: string
+      /** Field Path */
+      field_path: string
+      /** Old Type */
+      old_type?: string | null
+      /** New Type */
+      new_type?: string | null
+      /** Description */
+      description: string
+    }
+    /**
+     * TriggerBreakingChanges
+     * @description Breaking changes for a single SubWorkflow Trigger.
+     *
+     *     Attributes:
+     *         trigger_id: ID of the trigger node
+     *         trigger_name: Name of the trigger (if available)
+     *         changes: List of breaking changes detected for this trigger
+     */
+    TriggerBreakingChanges: {
+      /** Trigger Id */
+      trigger_id: string
+      /** Trigger Name */
+      trigger_name?: string | null
+      /** Changes */
+      changes: components['schemas']['BreakingChange'][]
+    }
+    /**
+     * BreakingChangesResponse
+     * @description Response containing all detected breaking changes.
+     *
+     *     Attributes:
+     *         has_breaking_changes: True if any breaking changes were detected
+     *         triggers: List of triggers with breaking changes
+     */
+    BreakingChangesResponse: {
+      /** Has Breaking Changes */
+      has_breaking_changes: boolean
+      /** Triggers */
+      triggers: components['schemas']['TriggerBreakingChanges'][]
     }
     /**
      * WorkflowVersionUpdate
@@ -2056,14 +2132,15 @@ export interface components {
      * @description Parameters for Sub-workflow executor.
      *
      *     Defines the design-time configuration for invoking a child workflow from
-     *     a parent workflow. The Sub-workflow step always invokes the latest published
-     *     version of the selected target workflow in the same Project (V1).
+     *     a parent workflow. The Sub-workflow step invokes the published child
+     *     workflow version stored in workflow_version_id.
      *
      *     When a workflow has multiple Subworkflow Triggers, the calling step must
      *     select a specific trigger to invoke via the trigger_node_id field.
      *
      *     Attributes:
      *         workflow_id: UUID of the selected child workflow to invoke.
+     *         workflow_version_id: ID of the published child version to invoke.
      *         trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.
      *         input_mapping: Mapping of child workflow input field names to values.
      *             Values can be static (string, int, bool, dict, list) or template
@@ -2073,9 +2150,14 @@ export interface components {
       /**
        * Workflow Id
        * Format: uuid
-       * @description UUID of the selected child workflow in the same Project (latest published version).
+       * @description UUID of the selected child workflow in the same Project.
        */
       workflow_id: string
+      /**
+       * Workflow Version Id
+       * @description ID of the published child workflow version to invoke. Required before the parent can be published.
+       */
+      workflow_version_id?: string | null
       /**
        * Trigger Node Id
        * @description Graph node ID of the Subworkflow Trigger to invoke in the child workflow
@@ -2965,7 +3047,10 @@ export interface operations {
   }
   get_workflow_invocation_schema: {
     parameters: {
-      query?: never
+      query?: {
+        /** @description Published child version ID whose Subworkflow Trigger schemas should be returned. */
+        version_id?: string
+      }
       header?: never
       path: {
         workflow_id: string
@@ -3159,6 +3244,41 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['PublishWorkflowVersionResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  check_breaking_changes: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workflow_id: string
+        version: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WorkflowValidateRequest']
+      }
+    }
+    responses: {
+      /** @description Breaking changes detection result */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BreakingChangesResponse']
         }
       }
       400: components['responses']['BadRequestError']

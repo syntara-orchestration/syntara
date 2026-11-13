@@ -79,6 +79,39 @@ describe('PublishWorkflowDialog', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('shows breaking output changes and requires explicit publish confirmation', async () => {
+    const user = userEvent.setup()
+    const onConfirmBreakingChanges = vi.fn()
+    render(
+      <PublishWorkflowDialog
+        {...defaultProps}
+        breakingChanges={[
+          {
+            trigger_id: 'child-trigger',
+            trigger_name: 'Child trigger',
+            changes: [
+              {
+                change_type: 'removed_output',
+                field_path: 'release_tag',
+                old_type: 'string',
+                new_type: null,
+                description: 'Removed output: release_tag',
+              },
+            ],
+          },
+        ]}
+        onConfirmBreakingChanges={onConfirmBreakingChanges}
+      />
+    )
+
+    expect(screen.getByText('Breaking output contract changes')).toBeInTheDocument()
+    expect(screen.getByText('Removed output: release_tag')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Publish anyway' }))
+
+    expect(onConfirmBreakingChanges).toHaveBeenCalledOnce()
+    expect(defaultProps.onPublish).not.toHaveBeenCalled()
+  })
+
   it('disables buttons when publishing', () => {
     render(<PublishWorkflowDialog {...defaultProps} isPublishing={true} />)
 

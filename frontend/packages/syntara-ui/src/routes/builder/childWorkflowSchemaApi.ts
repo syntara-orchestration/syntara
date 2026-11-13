@@ -5,7 +5,6 @@ import { workflowFetchClient } from '../../client'
 export type InvocationSchema = WorkflowAPI.components['schemas']['WorkflowInvocationSchemaRead']
 export type InvocationTrigger = WorkflowAPI.components['schemas']['WorkflowInvocationTriggerSchema']
 export type ChildWorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
-export type ChildWorkflowDetail = WorkflowAPI.components['schemas']['WorkflowDetailRead']
 
 export class ChildWorkflowSchemaFetchError extends Error {
   readonly status: number
@@ -17,7 +16,8 @@ export class ChildWorkflowSchemaFetchError extends Error {
   }
 }
 
-export const invocationSchemaQueryKey = (workflowId: string) => ['workflow-invocation-schema', workflowId] as const
+export const invocationSchemaQueryKey = (workflowId: string, versionId?: string | null) =>
+  ['workflow-invocation-schema', workflowId, versionId ?? 'current'] as const
 
 export const childWorkflowVersionQueryKey = (
   workflowId: string,
@@ -25,12 +25,12 @@ export const childWorkflowVersionQueryKey = (
   publishedVersion: number
 ) => ['child-workflow-version', workflowId, publishedVersionId, publishedVersion] as const
 
-export const childWorkflowDetailQueryKey = (workflowId: string, publishedVersionId: string) =>
-  ['child-workflow-detail-metadata', workflowId, publishedVersionId] as const
-
-export async function fetchInvocationSchema(workflowId: string): Promise<InvocationSchema> {
+export async function fetchInvocationSchema(workflowId: string, versionId?: string | null): Promise<InvocationSchema> {
   const { data, error, response } = await workflowFetchClient.GET('/workflows/{workflow_id}/invocation_schema', {
-    params: { path: { workflow_id: workflowId } },
+    params: {
+      path: { workflow_id: workflowId },
+      ...(versionId ? { query: { version_id: versionId } } : {}),
+    },
   })
 
   if (error || !data) {
@@ -50,18 +50,6 @@ export async function fetchChildWorkflowVersion(
 
   if (error || !data) {
     throw new ChildWorkflowSchemaFetchError('Failed to load the published child workflow definition', response.status)
-  }
-
-  return data
-}
-
-export async function fetchChildWorkflowDetail(workflowId: string): Promise<ChildWorkflowDetail> {
-  const { data, error, response } = await workflowFetchClient.GET('/workflows/{workflow_id}', {
-    params: { path: { workflow_id: workflowId } },
-  })
-
-  if (error || !data) {
-    throw new ChildWorkflowSchemaFetchError('Failed to load published child workflow step metadata', response.status)
   }
 
   return data

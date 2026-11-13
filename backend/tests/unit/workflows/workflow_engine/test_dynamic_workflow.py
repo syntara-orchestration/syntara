@@ -1517,6 +1517,67 @@ class TestBuildResultStatus:
         assert "node_b" not in result["failed_activities"]
 
 
+class TestBuildDeclaredSubWorkflowOutputs:
+    """A child result exposes mapped public fields, never its internal namespaces."""
+
+    def test_builds_declared_output_payload(self) -> None:
+        wf = _make_workflow()
+        wf._workflow_definition = {
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "release": {
+                                    "type": "object",
+                                    "properties": {"url": {"type": "string"}},
+                                    "required": ["url"],
+                                }
+                            },
+                            "required": ["release"],
+                        },
+                        "output_mapping": {"release.url": "${deploy.url}"},
+                    },
+                }
+            ]
+        }
+        wf._trigger_node_id = "child_trigger"
+        wf.resolver.set_namespace("deploy", {"url": "https://example.test/app", "internal_token": "secret"})
+
+        result = wf._build_declared_outputs()
+
+        assert result == {"release": {"url": "https://example.test/app"}}
+        assert "internal_token" not in str(result)
+
+    def test_missing_required_value_fails_child_contract(self) -> None:
+        from temporalio.exceptions import ApplicationError
+
+        wf = _make_workflow()
+        wf._workflow_definition = {
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {"release_tag": {"type": "string"}},
+                            "required": ["release_tag"],
+                        },
+                        "output_mapping": {"release_tag": "${deploy.tag}"},
+                    },
+                }
+            ]
+        }
+        wf._trigger_node_id = "child_trigger"
+
+        with pytest.raises(ApplicationError, match="output contract violation"):
+            wf._build_declared_outputs()
+
+
 class TestHandleNodeFailureCancellation:
     """_handle_node_failure maps InvocationCancelledError to cancelled, not failed."""
 

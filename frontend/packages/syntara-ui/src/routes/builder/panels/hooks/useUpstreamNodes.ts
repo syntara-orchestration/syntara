@@ -11,6 +11,7 @@ export type UpstreamNodeInfo = {
   name?: string
   type: string
   childWorkflowId?: string
+  childWorkflowVersionId?: string
   childTriggerNodeId?: string
   icon?: ComponentType<{ className?: string }>
   iconId?: string
@@ -30,6 +31,9 @@ export function toUpstreamNodeInfo(activity: UpstreamActivity): UpstreamNodeInfo
     name: activity.name,
     type: activity.type,
     ...(typeof parameters?.['workflow_id'] === 'string' && { childWorkflowId: parameters['workflow_id'] }),
+    ...(typeof parameters?.['workflow_version_id'] === 'string' && {
+      childWorkflowVersionId: parameters['workflow_version_id'],
+    }),
     ...(typeof parameters?.['trigger_node_id'] === 'string' && { childTriggerNodeId: parameters['trigger_node_id'] }),
   }
 }

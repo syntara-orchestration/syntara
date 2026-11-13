@@ -116,6 +116,7 @@ export type CreateSubWorkflowActivityOptions = {
   id: string
   name: string
   workflowId: string
+  workflowVersionId?: string
   triggerNodeId: string
   inputMapping: Record<string, unknown>
   settings?: NodeSettings
@@ -123,7 +124,7 @@ export type CreateSubWorkflowActivityOptions = {
 
 /** Create a configured reference-mode sub-workflow activity (v2). */
 export function createSubWorkflowActivity(options: CreateSubWorkflowActivityOptions): Activity {
-  const { id, name, workflowId, triggerNodeId, inputMapping, settings } = options
+  const { id, name, workflowId, workflowVersionId, triggerNodeId, inputMapping, settings } = options
 
   return {
     id,
@@ -131,6 +132,7 @@ export function createSubWorkflowActivity(options: CreateSubWorkflowActivityOpti
     name,
     parameters: {
       workflow_id: workflowId,
+      ...(workflowVersionId && { workflow_version_id: workflowVersionId }),
       trigger_node_id: triggerNodeId,
       input_mapping: inputMapping,
     },

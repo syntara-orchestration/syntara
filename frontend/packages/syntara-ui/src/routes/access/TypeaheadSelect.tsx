@@ -4,6 +4,7 @@ import {
   FlexItem,
   Label,
   MenuToggle,
+  SelectGroup,
   SelectList,
   SelectOption,
   TextInputGroup,
@@ -24,6 +25,7 @@ export type TypeaheadOption = {
   value: string
   label: string
   description?: string
+  group?: string
   tag?: TypeaheadOptionTag
 }
 
@@ -32,6 +34,7 @@ type TypeaheadSelectProps = {
   ariaLabel: string
   options: TypeaheadOption[]
   selected: string
+  selectedLabel?: string
   onChange: (value: string) => void
   placeholder?: string
   hasError?: boolean
@@ -42,6 +45,32 @@ type TypeaheadSelectProps = {
   hasMore?: boolean
   /** Shows a loading indicator while fetching results. */
   isLoading?: boolean
+  /** Requires a search term before showing local results above this count. */
+  searchPromptThreshold?: number
+}
+
+function renderOption(option: TypeaheadOption, selected: string) {
+  return (
+    <SelectOption
+      key={option.value}
+      value={option.value}
+      isSelected={option.value === selected}
+      description={option.description}
+    >
+      {option.tag ? (
+        <Flex gap={{ default: 'gapSm' }} alignItems={{ default: 'alignItemsCenter' }}>
+          <FlexItem>
+            <Label isCompact color={option.tag.color}>
+              {option.tag.label}
+            </Label>
+          </FlexItem>
+          <FlexItem>{option.label}</FlexItem>
+        </Flex>
+      ) : (
+        option.label
+      )}
+    </SelectOption>
+  )
 }
 
 function renderOptions({
@@ -50,12 +79,14 @@ function renderOptions({
   selected,
   hasMore,
   isLoading,
+  shouldPromptForSearch,
 }: {
   options: TypeaheadOption[]
   filterValue: string
   selected: string
   hasMore?: boolean
   isLoading?: boolean
+  shouldPromptForSearch?: boolean
 }) {
   if (isLoading) {
     return <SelectOption isDisabled>Loading...</SelectOption>
@@ -63,29 +94,31 @@ function renderOptions({
   if (options.length === 0) {
     return <SelectOption isDisabled>No results match &quot;{filterValue}&quot;</SelectOption>
   }
+  if (shouldPromptForSearch && !filterValue.trim()) {
+    return <SelectOption isDisabled>Type to search step and output names...</SelectOption>
+  }
+  if (options.some((option) => option.group)) {
+    const groups = new Map<string, TypeaheadOption[]>()
+    for (const option of options) {
+      const groupLabel = option.group ?? 'Other outputs'
+      const groupOptions = groups.get(groupLabel)
+      if (groupOptions) groupOptions.push(option)
+      else groups.set(groupLabel, [option])
+    }
+    return (
+      <>
+        {[...groups].map(([groupLabel, groupOptions]) => (
+          <SelectGroup key={groupLabel} label={groupLabel}>
+            {groupOptions.map((option) => renderOption(option, selected))}
+          </SelectGroup>
+        ))}
+        {hasMore && <SelectOption isDisabled>Type to narrow results...</SelectOption>}
+      </>
+    )
+  }
   return (
     <>
-      {options.map((option) => (
-        <SelectOption
-          key={option.value}
-          value={option.value}
-          isSelected={option.value === selected}
-          description={option.description}
-        >
-          {option.tag ? (
-            <Flex gap={{ default: 'gapSm' }} alignItems={{ default: 'alignItemsCenter' }}>
-              <FlexItem>
-                <Label isCompact color={option.tag.color}>
-                  {option.tag.label}
-                </Label>
-              </FlexItem>
-              <FlexItem>{option.label}</FlexItem>
-            </Flex>
-          ) : (
-            option.label
-          )}
-        </SelectOption>
-      ))}
+      {options.map((option) => renderOption(option, selected))}
       {hasMore && <SelectOption isDisabled>Type to narrow results...</SelectOption>}
     </>
   )
@@ -96,6 +129,7 @@ export function TypeaheadSelect({
   ariaLabel,
   options,
   selected,
+  selectedLabel: selectedLabelOverride,
   onChange,
   placeholder = 'Select...',
   hasError,
@@ -103,12 +137,13 @@ export function TypeaheadSelect({
   onSearchChange,
   hasMore,
   isLoading,
+  searchPromptThreshold,
 }: Readonly<TypeaheadSelectProps>) {
   const [isOpen, setIsOpen] = useState(false)
   const [filterValue, setFilterValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const selectedLabel = options.find((o) => o.value === selected)?.label ?? ''
+  const selectedLabel = selectedLabelOverride ?? options.find((option) => option.value === selected)?.label ?? ''
 
   const isServerFiltered = !!onSearchChange
 
@@ -116,8 +151,12 @@ export function TypeaheadSelect({
     if (isServerFiltered) return options
     if (!filterValue) return options
     const term = filterValue.toLowerCase()
-    return options.filter((o) => o.label.toLowerCase().includes(term))
+    return options.filter((option) =>
+      [option.group, option.label, option.description].some((value) => value?.toLowerCase().includes(term))
+    )
   }, [options, filterValue, isServerFiltered])
+  const shouldPromptForSearch =
+    searchPromptThreshold !== undefined && options.length > searchPromptThreshold && !filterValue.trim()
 
   const handleFilterChange = (val: string) => {
     setFilterValue(val)
@@ -209,7 +248,7 @@ export function TypeaheadSelect({
       toggle={toggle}
     >
       <SelectList style={{ maxHeight: '200px', overflow: 'auto' }}>
-        {renderOptions({ options: filteredOptions, filterValue, selected, hasMore, isLoading })}
+        {renderOptions({ options: filteredOptions, filterValue, selected, hasMore, isLoading, shouldPromptForSearch })}
       </SelectList>
     </SynSelect>
   )

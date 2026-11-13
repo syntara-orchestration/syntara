@@ -788,14 +788,17 @@ class SubWorkflowExecutorParameters(BaseModel):
     """Parameters for Sub-workflow executor.
 
     Defines the design-time configuration for invoking a child workflow from
-    a parent workflow. The Sub-workflow step always invokes the latest published
-    version of the selected target workflow in the same Project (V1).
+    a parent workflow. New parent definitions pin the selected child version so
+    later child publications do not change the behavior of existing parents.
+    Draft definitions may be missing a pin while being configured, but every
+    published parent definition must contain one.
 
     When a workflow has multiple Subworkflow Triggers, the calling step must
     select a specific trigger to invoke via the trigger_node_id field.
 
     Attributes:
         workflow_id: UUID of the selected child workflow to invoke.
+        workflow_version_id: ID of the published child version to invoke.
         trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.
         input_mapping: Mapping of child workflow input field names to values.
             Values can be static (string, int, bool, dict, list) or template
@@ -808,7 +811,15 @@ class SubWorkflowExecutorParameters(BaseModel):
     workflow_id: str = Field(
         max_length=36,
         json_schema_extra={"format": "uuid"},
-        description="UUID of the selected child workflow in the same Project (latest published version).",
+        description="UUID of the selected child workflow in the same Project.",
+    )
+    workflow_version_id: str | None = Field(
+        default=None,
+        max_length=36,
+        json_schema_extra={"format": "uuid"},
+        description=(
+            "ID of the published child workflow version to invoke. Required before the parent can be published."
+        ),
     )
     trigger_node_id: str = Field(
         pattern=r"^[a-zA-Z_][a-zA-Z0-9_]*$",
@@ -840,6 +851,22 @@ class SubWorkflowExecutorParameters(BaseModel):
             )
             raise SafeValueError(msg)
         return v
+
+    @field_validator("workflow_version_id")
+    @classmethod
+    def validate_workflow_version_id_format(cls, value: str | None) -> str | None:
+        """Validate an optional child version UUID without accepting templates."""
+        if value is None:
+            return None
+        try:
+            parsed_uuid = uuid.UUID(value)
+        except ValueError as err:
+            msg = "Invalid UUID format for workflow_version_id. A published child version ID is required."
+            raise SafeValueError(msg) from err
+        if str(parsed_uuid) != value.lower():
+            msg = "Invalid UUID format for workflow_version_id. A canonical UUID is required."
+            raise SafeValueError(msg)
+        return value
 
 
 # ---------------------------------------------------------------------------
@@ -1114,8 +1141,8 @@ class StandardOutputWrapper(BaseModel):
 class SubWorkflowOutputResult(BaseModel):
     """Result payload for Sub-workflow steps containing child execution metadata.
 
-    This is the Result field of the StandardOutputWrapper structure.
-    Contains aggregate child execution metadata and flattened child step outputs.
+    This is the Result field of the StandardOutputWrapper structure. ``outputs``
+    contains only the selected SubWorkflow Trigger's declared public contract.
     """
 
     child_execution_id: str | None = None
@@ -1123,12 +1150,10 @@ class SubWorkflowOutputResult(BaseModel):
     child_workflow_name: str | None = Field(default=None, max_length=255)
     child_workflow_version: int | None = None
     child_status: WorkflowTerminalStatus | None = None
-    outputs: dict[str, dict[str, Any]] | None = Field(
+    outputs: dict[str, Any] | None = Field(
         default=None,
         max_length=1000,
-        description=(
-            "Child workflow step outputs. Keys are child step IDs, values are their output data as raw objects."
-        ),
+        description="Values mapped to the child workflow's declared public output contract.",
     )
 
 
@@ -1143,8 +1168,9 @@ class SubWorkflowOutput(StandardOutputWrapper, NodeOutput):
     existing NodeOutput models use flat structure, to align with the Step SDK
     specification and avoid future breaking changes.
 
-    The outputs field (nested in Result) is a dict where keys are child step IDs
-    and values are their raw output data as objects. The StandardOutputWrapper
+    The outputs field (nested in Result) contains only fields declared by the
+    selected SubWorkflow Trigger. Internal child step names are never exposed.
+    The StandardOutputWrapper
     envelope applies to the Sub-workflow step itself, while child outputs are
     exposed directly for simplified access.
 
