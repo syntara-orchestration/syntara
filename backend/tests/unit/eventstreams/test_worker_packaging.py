@@ -12,12 +12,21 @@ import yaml
 
 from syntara.core.config.base import Settings
 from syntara.core.constants import EventWorkerDefaults
+from syntara.eventstreams.consumer_health import HEALTH_PORT
 from syntara.eventstreams.consumer_service import placement_targets
 from syntara.eventstreams.models.consumer_worker import EventConsumerWorker
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
 ROOT = Path(__file__).resolve().parents[4]
+
+
+def test_probe_listener_does_not_conflict_with_local_compose_ports():
+    compose = yaml.safe_load((ROOT / "podman-compose.yml").read_text())
+    for service in compose["services"].values():
+        for mapping in service.get("ports", []):
+            resolved = re.sub(r"\$\{\w+:-([^}]+)\}", r"\1", str(mapping))
+            assert int(resolved.rsplit(":", 2)[-2]) != HEALTH_PORT, mapping
 
 
 def test_environment_examples_omit_event_tuning_and_compose_uses_code_defaults():
@@ -60,7 +69,7 @@ def test_backend_image_packages_executable_launcher_and_dependency_free_probes()
     assert launcher.read_text() == '#!/bin/bash\nexec python -m syntara.eventstreams.consumer_entrypoint "$@"\n'
     containerfile = (scripts.parent / "Containerfile").read_text()
     assert (
-        "COPY --chmod=755 containers/syntara/scripts/start-event-stream-worker /usr/local/bin/start-event-stream-worker"
+        "COPY containers/syntara/scripts/start-event-stream-worker /usr/local/bin/start-event-stream-worker"
     ) in containerfile
     assert "COPY src/ ./src/" in containerfile
     assert "COPY --from=builder /opt/app-root/ /opt/app-root/" in containerfile

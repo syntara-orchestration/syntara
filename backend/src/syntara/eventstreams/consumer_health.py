@@ -11,7 +11,7 @@ from collections.abc import Callable
 from contextlib import suppress
 
 HEALTH_HOST = "127.0.0.1"
-HEALTH_PORT = 8765
+HEALTH_PORT = 8768
 HEALTH_TIMEOUT_SECONDS = 2
 
 
