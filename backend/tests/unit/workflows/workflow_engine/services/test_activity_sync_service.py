@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, Mock, call, patch
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import Select
 from temporalio.api.enums.v1 import EventType
 from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedError
 from temporalio.exceptions import ApplicationError
@@ -5357,6 +5358,63 @@ class TestReconcileStaleExecutions:
             mock_snapshot.assert_not_awaited()
 
         mock_session.commit.assert_not_awaited()
+
+    def _make_paused_approval_execution(self) -> Mock:
+        """Create a mock execution PAUSED awaiting an approval decision."""
+        execution = Mock(spec=Execution)
+        execution.id = uuid4()
+        execution.temporal_workflow_id = f"workflow-{execution.id}"
+        execution.status = ExecutionStatus.PAUSED
+        execution.created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        execution.activities = []
+        return execution
+
+    @staticmethod
+    def _status_query_matches(stmt: Select[tuple[Execution]], status: ExecutionStatus) -> bool:
+        """Return True if a status-filtering ``select(Execution)`` statement matches ``status``.
+
+        Compiles the real statement with literal binds so this holds regardless
+        of whether the filter is a plain equality, an ``IN`` clause, or an
+        ``OR`` chain of equalities.
+        """
+        compiled = str(stmt.compile(compile_kwargs={"literal_binds": True})).lower()
+        return f"'{status.value}'" in compiled
+
+    @pytest.mark.asyncio
+    async def test_paused_approval_execution_is_reconciled_after_worker_restart(self) -> None:
+        """A worker restart must not leave an approval-paused execution stuck forever.
+
+        The underlying Temporal workflow can finish (the approval gets decided
+        and downstream nodes run) while the worker that was monitoring it is
+        down. Startup reconciliation must bring a PAUSED execution's DB status
+        in line with Temporal's terminal status, the same way it already does
+        for RUNNING (see test_completed_workflow_updates_db above) — otherwise
+        the run is stuck showing "Paused - Pending Approval" forever even
+        though it finished.
+        """
+        service, mock_session, mock_client = self._make_service()
+        execution = self._make_paused_approval_execution()
+
+        mock_event = Mock()
+        mock_event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+        mock_event.event_time = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)
+        mock_event.workflow_execution_completed_event_attributes = None
+        mock_client.get_workflow_handle = Mock(
+            return_value=self._make_temporal_handle("COMPLETED", events=[mock_event]),
+        )
+
+        async def _exec(stmt: Select[tuple[Execution]]) -> Mock:
+            result = Mock()
+            result.all.return_value = [execution] if self._status_query_matches(stmt, execution.status) else []
+            result.one_or_none.return_value = execution
+            return result
+
+        mock_session.exec = _exec
+
+        with patch.object(service, "_publish_snapshot", new_callable=AsyncMock):
+            await service.reconcile_stale_executions()
+
+        assert execution.status == ExecutionStatus.COMPLETED
 
 
 class TestQueryActivityIoOutputMerge:
