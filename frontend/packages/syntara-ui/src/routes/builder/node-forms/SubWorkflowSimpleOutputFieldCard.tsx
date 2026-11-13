@@ -32,6 +32,7 @@ type Props = Readonly<{
   isVersionView: boolean
   isSourceConditional: (expression: string) => boolean
   outputNameError?: string
+  onRowChange: (row: OutputField) => void
   onRemove: () => void
 }>
 
@@ -46,6 +47,7 @@ export function SubWorkflowSimpleOutputFieldCard({
   isVersionView,
   isSourceConditional,
   outputNameError,
+  onRowChange,
   onRemove,
 }: Props) {
   const { control, setValue, register } = useFormContext<TriggerFormData>()
@@ -65,9 +67,10 @@ export function SubWorkflowSimpleOutputFieldCard({
                       id={getFieldId(index, 'path')}
                       {...register(`outputFields.${index}.path` as const)}
                       value={row.path}
-                      onChange={(_event, value) =>
+                      onChange={(_event, value) => {
                         setValue(`outputFields.${index}.path`, value, { shouldDirty: true, shouldValidate: true })
-                      }
+                        onRowChange({ ...row, path: value })
+                      }}
                       placeholder="e.g. status"
                       isDisabled={isVersionView}
                       validated={outputNameError ? 'error' : 'default'}
@@ -126,6 +129,7 @@ export function SubWorkflowSimpleOutputFieldCard({
                             const option = sourceOptions.find((candidate) => candidate.expression === value)
                             if (!option) {
                               field.onChange('')
+                              onRowChange({ ...row, expression: '' })
                               return
                             }
                             field.onChange(value)
@@ -143,6 +147,13 @@ export function SubWorkflowSimpleOutputFieldCard({
                                 shouldValidate: true,
                               })
                             }
+                            onRowChange({
+                              ...row,
+                              expression: value,
+                              type: option.type,
+                              description: option.sourceDescription,
+                              ...(!row.path?.trim() ? { path: option.fieldName } : {}),
+                            })
                           }}
                           placeholder="Choose a step output…"
                           searchPromptThreshold={20}
@@ -190,7 +201,10 @@ export function SubWorkflowSimpleOutputFieldCard({
                           id={getFieldId(index, 'required')}
                           label="Required output"
                           isChecked={field.value}
-                          onChange={(_event, checked) => field.onChange(checked)}
+                          onChange={(_event, checked) => {
+                            field.onChange(checked)
+                            onRowChange({ ...row, required: checked })
+                          }}
                           isDisabled={isVersionView}
                         />
                       )}
@@ -201,6 +215,14 @@ export function SubWorkflowSimpleOutputFieldCard({
                       <TextInput
                         id={getFieldId(index, 'description')}
                         {...register(`outputFields.${index}.description` as const)}
+                        value={row.description ?? ''}
+                        onChange={(_event, value) => {
+                          setValue(`outputFields.${index}.description`, value, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          })
+                          onRowChange({ ...row, description: value })
+                        }}
                         placeholder="Help parent workflow authors understand this value"
                         isDisabled={isVersionView}
                       />

@@ -20,7 +20,12 @@ function TestWrapper() {
   const methods = useForm<TriggerFormData>({ defaultValues: { outputFields: [] } })
   return (
     <FormProvider {...methods}>
-      <SubWorkflowSimpleOutputFields triggerId="child-trigger" triggerIndex={0} isVersionView={false} />
+      <SubWorkflowSimpleOutputFields
+        triggerId="child-trigger"
+        triggerIndex={0}
+        isVersionView={false}
+        onRowsChange={vi.fn()}
+      />
     </FormProvider>
   )
 }

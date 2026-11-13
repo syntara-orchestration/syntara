@@ -9,7 +9,7 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from '@patternfly/react-core'
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useId, useMemo, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { FormLabelWithHelp } from '../../../components/FormLabelWithHelp'
@@ -20,6 +20,7 @@ import {
   outputFieldsFromSchema,
   outputMappingFromFields,
   outputSchemaFromFields,
+  type SubWorkflowOutputField,
 } from '../utils/subWorkflowOutputContract'
 import { useIsVersionView } from '../VersionViewContext'
 
@@ -27,6 +28,8 @@ import { SubWorkflowAdvancedMappings } from './SubWorkflowAdvancedMappings'
 import { SubWorkflowSimpleOutputFields } from './SubWorkflowSimpleOutputFields'
 import { DEFAULT_JSON_SCHEMA } from './triggerFormSchema'
 import type { TriggerFormData } from './triggerFormSchema'
+
+type OutputFieldRows = NonNullable<TriggerFormData['outputFields']>
 
 function withUpdatedOutputMapping(
   mapping: Record<string, string>,
@@ -46,6 +49,111 @@ function getAdvancedOutputMapping(
   const properties = schema?.properties
   if (typeof properties !== 'object' || properties === null || Array.isArray(properties)) return undefined
   return outputMappingFromFields(outputFieldsFromSchema(schema, currentMapping))
+}
+
+function AdvancedOutputEditor({
+  schemaText,
+  schemaError,
+  fields,
+  outputMapping,
+  triggerId,
+  triggerIndex,
+  isVersionView,
+  onSchemaChange,
+  onMappingChange,
+}: Readonly<{
+  schemaText: string
+  schemaError?: string
+  fields: SubWorkflowOutputField[]
+  outputMapping: Record<string, string>
+  triggerId: string
+  triggerIndex: number
+  isVersionView: boolean
+  onSchemaChange: (code: string) => void
+  onMappingChange: (path: string, expression: string) => void
+}>) {
+  return (
+    <StackItem>
+      <Stack hasGutter>
+        <StackItem>
+          <FormGroup
+            label={
+              <FormLabelWithHelp
+                label="Output schema"
+                helpText="Define the output schema as JSON. The schema describes which fields parent workflows can access."
+              />
+            }
+            fieldId="output-schema"
+          >
+            <Stack>
+              <StackItem>
+                <ExpandableCodeEditor
+                  code={schemaText}
+                  onCodeChange={onSchemaChange}
+                  language="json"
+                  height="150px"
+                  modalTitle="Edit output schema"
+                  ariaLabel="Output schema editor"
+                  additionalControls={
+                    <JsonEditorControls
+                      code={schemaText}
+                      onCodeChange={onSchemaChange}
+                      defaultCode={DEFAULT_JSON_SCHEMA}
+                      downloadFilename="output-schema.json"
+                      exampleCode={JSON.stringify(
+                        {
+                          type: 'object',
+                          properties: {
+                            artifact_url: { type: 'string', description: 'Build artifact URL' },
+                            release_tag: { type: 'string', description: 'Release version tag' },
+                          },
+                          required: ['artifact_url'],
+                        },
+                        null,
+                        2
+                      )}
+                    />
+                  }
+                />
+              </StackItem>
+              {!schemaError && (
+                <StackItem>
+                  <FormHelperText>
+                    <HelperText>
+                      <HelperTextItem>
+                        Define the public fields the parent workflow can use. Map each field to a child step output
+                        below.
+                      </HelperTextItem>
+                    </HelperText>
+                  </FormHelperText>
+                </StackItem>
+              )}
+              {schemaError && (
+                <StackItem>
+                  <FormHelperText>
+                    <HelperText>
+                      <HelperTextItem variant="error">{schemaError}</HelperTextItem>
+                    </HelperText>
+                  </FormHelperText>
+                </StackItem>
+              )}
+            </Stack>
+          </FormGroup>
+        </StackItem>
+
+        <StackItem>
+          <SubWorkflowAdvancedMappings
+            fields={fields}
+            outputMapping={outputMapping}
+            triggerId={triggerId}
+            triggerIndex={triggerIndex}
+            isVersionView={isVersionView}
+            onMappingChange={onMappingChange}
+          />
+        </StackItem>
+      </Stack>
+    </StackItem>
+  )
 }
 
 export function SubWorkflowOutputFields({
@@ -75,30 +183,34 @@ export function SubWorkflowOutputFields({
 
   const handleAdvancedMappingChange = useCallback(
     (path: string, expression: string) =>
-      setValue('outputMapping', withUpdatedOutputMapping(outputMapping, path, expression)),
+      setValue('outputMapping', withUpdatedOutputMapping(outputMapping, path, expression), {
+        shouldDirty: true,
+        shouldValidate: true,
+      }),
     [outputMapping, setValue]
   )
 
-  // Sync Simple mode changes to output_schema and output_mapping
-  useEffect(() => {
-    if (editorMode === 'simple') {
-      const schema = outputSchemaFromFields(outputRows, parsedSchema)
-      const mapping = outputMappingFromFields(outputRows)
-      const nextSchemaText = schema ? JSON.stringify(schema, null, 2) : ''
-      if (nextSchemaText !== schemaText) setValue('outputSchema', nextSchemaText)
-      if (JSON.stringify(mapping) !== JSON.stringify(outputMapping)) setValue('outputMapping', mapping)
-    }
-  }, [editorMode, outputRows, outputMapping, parsedSchema, schemaText, setValue])
+  const syncSimpleOutputContract = useCallback(
+    (rows: OutputFieldRows) => {
+      const schema = outputSchemaFromFields(rows, parsedSchema)
+      const mapping = outputMappingFromFields(rows)
+      setValue('outputSchema', schema ? JSON.stringify(schema, null, 2) : '', {
+        shouldDirty: true,
+        shouldValidate: true,
+      })
+      setValue('outputMapping', mapping, { shouldDirty: true, shouldValidate: true })
+    },
+    [parsedSchema, setValue]
+  )
 
-  // Keep Advanced mode mappings aligned with the schema while preserving matching paths.
-  useEffect(() => {
-    if (editorMode !== 'advanced') return
-    const nextMapping = getAdvancedOutputMapping(parsedSchema, outputMapping)
-    if (!nextMapping) return
-    if (JSON.stringify(nextMapping) !== JSON.stringify(outputMapping)) {
-      setValue('outputMapping', nextMapping, { shouldDirty: true, shouldValidate: true })
-    }
-  }, [editorMode, outputMapping, parsedSchema, setValue])
+  const handleAdvancedSchemaChange = useCallback(
+    (code: string) => {
+      setValue('outputSchema', code, { shouldDirty: true, shouldValidate: true })
+      const nextMapping = getAdvancedOutputMapping(parseJsonSchema(code), outputMapping)
+      if (nextMapping) setValue('outputMapping', nextMapping, { shouldDirty: true, shouldValidate: true })
+    },
+    [outputMapping, setValue]
+  )
 
   const selectSimpleMode = () => {
     if (editorMode === 'simple') return
@@ -118,9 +230,7 @@ export function SubWorkflowOutputFields({
     if (editorMode === 'advanced') return
 
     // Switching to Advanced - build JSON from Simple mode rows
-    const schema = outputSchemaFromFields(outputRows, parsedSchema)
-    setValue('outputSchema', schema ? JSON.stringify(schema, null, 2) : '')
-    setValue('outputMapping', outputMappingFromFields(outputRows))
+    syncSimpleOutputContract(outputRows)
     setModeError('')
     setEditorMode('advanced')
   }
@@ -177,88 +287,20 @@ export function SubWorkflowOutputFields({
           triggerId={triggerId}
           triggerIndex={triggerIndex}
           isVersionView={isVersionView}
+          onRowsChange={syncSimpleOutputContract}
         />
       ) : (
-        <StackItem>
-          <Stack hasGutter>
-            <StackItem>
-              <FormGroup
-                label={
-                  <FormLabelWithHelp
-                    label="Output schema"
-                    helpText="Define the output schema as JSON. The schema describes which fields parent workflows can access."
-                  />
-                }
-                fieldId="output-schema"
-              >
-                <Stack>
-                  <StackItem>
-                    <ExpandableCodeEditor
-                      code={schemaText}
-                      onCodeChange={(code) => setValue('outputSchema', code)}
-                      language="json"
-                      height="150px"
-                      modalTitle="Edit output schema"
-                      ariaLabel="Output schema editor"
-                      additionalControls={
-                        <JsonEditorControls
-                          code={schemaText}
-                          onCodeChange={(code) => setValue('outputSchema', code)}
-                          defaultCode={DEFAULT_JSON_SCHEMA}
-                          downloadFilename="output-schema.json"
-                          exampleCode={JSON.stringify(
-                            {
-                              type: 'object',
-                              properties: {
-                                artifact_url: { type: 'string', description: 'Build artifact URL' },
-                                release_tag: { type: 'string', description: 'Release version tag' },
-                              },
-                              required: ['artifact_url'],
-                            },
-                            null,
-                            2
-                          )}
-                        />
-                      }
-                    />
-                  </StackItem>
-                  {!errors.outputSchema?.message && (
-                    <StackItem>
-                      <FormHelperText>
-                        <HelperText>
-                          <HelperTextItem>
-                            Define the public fields the parent workflow can use. Map each field to a child step output
-                            below.
-                          </HelperTextItem>
-                        </HelperText>
-                      </FormHelperText>
-                    </StackItem>
-                  )}
-                  {errors.outputSchema?.message && (
-                    <StackItem>
-                      <FormHelperText>
-                        <HelperText>
-                          <HelperTextItem variant="error">{errors.outputSchema.message}</HelperTextItem>
-                        </HelperText>
-                      </FormHelperText>
-                    </StackItem>
-                  )}
-                </Stack>
-              </FormGroup>
-            </StackItem>
-
-            <StackItem>
-              <SubWorkflowAdvancedMappings
-                fields={advancedFields}
-                outputMapping={outputMapping}
-                triggerId={triggerId}
-                triggerIndex={triggerIndex}
-                isVersionView={isVersionView}
-                onMappingChange={handleAdvancedMappingChange}
-              />
-            </StackItem>
-          </Stack>
-        </StackItem>
+        <AdvancedOutputEditor
+          schemaText={schemaText}
+          schemaError={errors.outputSchema?.message}
+          fields={advancedFields}
+          outputMapping={outputMapping}
+          triggerId={triggerId}
+          triggerIndex={triggerIndex}
+          isVersionView={isVersionView}
+          onSchemaChange={handleAdvancedSchemaChange}
+          onMappingChange={handleAdvancedMappingChange}
+        />
       )}
     </Stack>
   )
