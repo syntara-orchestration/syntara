@@ -226,7 +226,7 @@ class TestSkipPropagation:
         assert "node_b" in wf.skipped_nodes
 
     def test_approval_rejoin_node_runs_after_approved_decision(self) -> None:
-        """AAP-96074: a join node with an unused incoming link must still run.
+        """A join node with an unused incoming link must still run.
 
         The condition takes the "true" port into the approval branch, which
         marks "shared"'s direct, non-taken-branch edge (from "false") as
