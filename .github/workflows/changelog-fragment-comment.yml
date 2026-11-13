@@ -1,0 +1,17 @@
+---
+# Walk phase: companion workflow for changelog fragment enforcement.
+# Consumes reusable workflow from ansible/actions.
+name: "OpenAPI: Changelog Fragment Comment"
+
+on:
+  workflow_run:
+    workflows: ["OpenAPI: Changelog Fragment Enforcement"]
+    types: [completed]
+
+permissions:
+  pull-requests: write
+  actions: read
+
+jobs:
+  comment:
+    uses: ansible/actions/.github/workflows/openapi-post-changelog-comment.yml@main
