@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -155,6 +155,35 @@ describe('SynPageBreadcrumbs', () => {
     await waitFor(() => {
       expect(screen.getByRole('tooltip')).toHaveTextContent(longLabel)
     })
+  })
+
+  it('wraps short linked labels in Truncate with the breadcrumb truncatedLabel class', async () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe = vi.fn()
+        disconnect = vi.fn()
+        unobserve = vi.fn()
+      }
+    )
+
+    const { default: breadcrumbStyles } = await import('./SynPageBreadcrumbs.module.css')
+
+    render(
+      <SynPageBreadcrumbs
+        items={[
+          { label: 'Access management', href: '/access-management' },
+          { label: 'Users', href: '/access-management/users' },
+          { label: 'Administrator' },
+        ]}
+      />
+    )
+
+    const usersLink = screen.getByRole('link', { name: 'Users' })
+    const shortLabel = within(usersLink).getByTestId('breadcrumb-truncated-label')
+    expect(shortLabel).toHaveClass('pf-v6-c-truncate')
+    // truncatedLabel zeros PF Truncate's 6ch min-width so short crumbs stay compact
+    expect(shortLabel).toHaveClass(breadcrumbStyles.truncatedLabel)
   })
 
   it('truncates a long linked middle segment on a wide viewport with four crumbs', () => {

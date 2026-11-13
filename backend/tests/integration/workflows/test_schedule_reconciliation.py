@@ -14,10 +14,10 @@ from uuid import uuid4
 import pytest
 
 from syntara.authz.models.project import Project
+from syntara.workflow_runtime.workers.schedule_reconciliation import reconcile_scheduled_triggers
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.workers.schedule_reconciliation import reconcile_scheduled_triggers
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
     from syntara.core.models import User
 
-_PATCH_SVC = "syntara.workflows.workers.schedule_reconciliation.ScheduledTriggerService"
+_PATCH_SVC = "syntara.workflow_runtime.workers.schedule_reconciliation.ScheduledTriggerService"
 
 
 def _workflow_definition_with_scheduled_trigger(trigger_id: str = "t_sched") -> dict[str, Any]:

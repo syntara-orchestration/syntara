@@ -1,2 +1,5 @@
 #!/bin/bash
+# Temporary compatibility path for the operator liveness probe. Remove this
+# shim and use syntara.workflow_runtime.workers.worker once the operator is
+# updated to recognize the new module path.
 exec python -m syntara.workflows.worker "$@"

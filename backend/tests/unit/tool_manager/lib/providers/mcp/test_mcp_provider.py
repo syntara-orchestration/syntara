@@ -421,6 +421,51 @@ class TestMCPProvider:
 
     @pytest.mark.asyncio
     @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    async def test_refresh_tools_retries_transient_timeout(self, mock_client_class: Mock) -> None:
+        """Tool discovery should tolerate the same transient timeout that validate_connection() retries.
+
+        validate_connection() retries on TimeoutError because the streamable-http
+        transport in FastMCP has a known race where the SSE stream handler fails
+        intermittently on the first attempt but succeeds right after. refresh_tools()
+        (used by the discover/"Test Connection" flow) hits the exact same transport
+        and so should not surface a transient first-attempt timeout as a hard failure
+        when a retry would succeed.
+        """
+        mock_tool = self._create_mock_langchain_tool("calculate_sum", "Calculate sum of two numbers")
+
+        mock_client = AsyncMock()
+        mock_client.get_tools.side_effect = [TimeoutError(), [mock_tool]]
+        mock_client_class.return_value = mock_client
+
+        provider = MCPProvider(base_url="http://localhost:8765/mcp", api_key="test-key")
+
+        tools = await provider.refresh_tools()
+
+        assert len(tools) == 1
+        assert tools[0].name == "calculate_sum"
+        assert mock_client_class.call_count == 2
+
+    @pytest.mark.asyncio
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
+    async def test_refresh_tools_retries_grouped_timeout(self, mock_client_class: Mock) -> None:
+        """A timeout member in a nested exception group triggers a retry."""
+        mock_tool = self._create_mock_langchain_tool("calculate_sum", "Calculate sum of two numbers")
+        mock_client = AsyncMock()
+        grouped_timeout = ExceptionGroup(
+            "MCP request failed", [ExceptionGroup("nested", [TimeoutError(), RuntimeError("transient failure")])]
+        )
+        mock_client.get_tools.side_effect = [grouped_timeout, [mock_tool]]
+        mock_client_class.return_value = mock_client
+
+        provider = MCPProvider(base_url="http://localhost:8765/mcp", api_key="test-key")
+
+        tools = await provider.refresh_tools()
+
+        assert [tool.name for tool in tools] == ["calculate_sum"]
+        assert mock_client.get_tools.call_count == 2
+
+    @pytest.mark.asyncio
+    @patch("syntara.tool_manager.lib.providers.mcp.mcp_provider.MultiServerMCPClient")
     async def test_refresh_tools_connection_error(self, mock_client_class: Mock) -> None:
         """Test tool refresh connection error handling."""
         # Setup
