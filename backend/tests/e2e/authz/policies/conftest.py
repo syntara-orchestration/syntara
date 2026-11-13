@@ -437,6 +437,10 @@ OWN_SCOPED_CASES: list[PolicyTestCase] = [
 # ---------------------------------------------------------------------------
 
 E2E_COVERAGE_EXEMPT: set[str] = {
+    # Execution Plane callback service policies — covered by callback bridge tests
+    "execution-plane-callback:complete:any",
+    "execution-plane-callback:resolve-credential:any",
+    "execution-plane-callback:resolve-credential-workload:any",
     # System-scoped CRUD policies that follow the same pattern as the
     # representative cases already tested e2e (create/read tested, so
     # update/delete for the same resource are unit-test-only).

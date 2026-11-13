@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import shutil
 import stat
-import sys
 from datetime import UTC, datetime, timedelta
 from ipaddress import IPv4Address
 from pathlib import Path
@@ -44,13 +43,14 @@ SERVICE_CERTS = [
     ("execution-plane", "execution-plane.ao.svc", ["execution-plane-worker", "execution-plane-api"]),
 ]
 
-# Validate against the canonical list in principal.py
+# Validate against the canonical list in principal.py. The certificate set may
+# contain additional deployment-specific identities, such as the local EP CN.
 from syntara.core.models.principal import KNOWN_SERVICE_CNS  # noqa: E402
 
 _cert_cns = {cn for _, cn, _ in SERVICE_CERTS}
 _expected = set(KNOWN_SERVICE_CNS)
-if _cert_cns != _expected:
-    msg = f"SERVICE_CERTS CNs {_cert_cns} do not match KNOWN_SERVICE_CNS {_expected}"
+if not _expected.issubset(_cert_cns):
+    msg = f"SERVICE_CERTS CNs {_cert_cns} do not cover KNOWN_SERVICE_CNS {_expected}"
     raise RuntimeError(msg)
 
 
@@ -250,4 +250,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(main() or 0)
+    main()
