@@ -110,7 +110,7 @@ Check whether the changes follow:
 | Inline style objects (`style={{ ... }}`)                       | #18 -- refactor to CSS module classes                                                                     |
 | `let` counter inside `.map()`                                  | #19 -- pre-compute indices immutably                                                                      |
 | `aria-label` on `<div>` (non-interactive)                      | span is ESLint; still flag `aria-label` on generic `<div>` (coding standards §27)                         |
-| Any `eslint-disable` or `eslint-disable-next-line`             | #20 -- never suppress rules; fix the code so it passes                                                    |
+| An `eslint-disable` outside a documented exception             | #20 -- fix the code; only the matching rule's configured exception may be used, with its required justification |
 | Hook called unconditionally but used conditionally             | #21 -- extract to a conditionally-rendered wrapper component                                              |
 | `useEffect` + `useState` for API calls                         | #22 -- use TanStack Query (`useQuery`/`useMutation`/`useQueries`)                                         |
 | Manual `Promise.all` + cancellation for parallel fetches       | #22 -- use `useQueries` from TanStack Query                                                               |
@@ -130,11 +130,11 @@ Check whether the changes follow:
 | New file that only re-exports from other files                 | #34 -- do not add a barrel file (coding standards §43); `barrel-files/avoid-barrel-files` is `warn`, not `error`, so also check the diff by eye |
 | New `type`/`interface` with the same members as an existing imported type | Not ESLint-enforceable (needs structural type comparison) -- flag manually; use `type X = Y` or extend the existing type instead of re-declaring it |
 
-### 3b. Rule Bypass Checks (BLOCKING -- do not approve if any are found)
+### 3b. Rule Bypass Checks (BLOCKING when no documented exception applies)
 
-AI agents and contributors sometimes bypass rules instead of fixing the underlying issue. The following patterns are **merge blockers** -- request changes immediately if any appear in the diff.
+AI agents and contributors sometimes bypass rules instead of fixing the underlying issue. The following patterns are **merge blockers** unless a documented exception below applies -- request changes immediately when a match is not permitted.
 
-**How to scan:** Run these searches against the PR diff. Any match in new or modified lines (not pre-existing context) must be resolved before approval.
+**How to scan:** Run these searches against the PR diff. Review every match in new or modified lines (not pre-existing context); resolve each one before approval unless it exactly meets a documented exception below.
 
 ```bash
 # Run against the PR diff to find bypass attempts
@@ -143,14 +143,14 @@ git diff main...HEAD -- '*.ts' '*.tsx' | grep '^+' | grep -v '^+++' | grep -iE '
 
 | Pattern in diff                                               | Why it blocks                                                                                          | What to do instead                                                                                                                    |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `eslint-disable` / `eslint-disable-next-line`                 | Suppresses a rule instead of fixing the code. The rule catches a real problem.                         | Fix the code so the rule passes. If genuinely unfixable, the reviewer (not the author) decides whether a suppression is warranted.    |
+| `eslint-disable` / `eslint-disable-next-line`                 | Suppresses a lint finding outside an exception documented by that rule's configuration.                 | Fix the code. The only current exception is strictly non-security `Math.random()` with a short justification, as documented in the UI ESLint configuration. Do not allow suppressions for accessibility, type-safety, test-quality, or other findings. |
 | `@ts-ignore` / `@ts-expect-error`                             | Suppresses a TypeScript error instead of fixing the type. Hides real bugs.                             | Fix the type, add a type guard, or update the contract.                                                                               |
 | `// TODO` / `// FIXME` / `// HACK` / `// XXX`                 | Deferred work buried in source. Invisible to sprint planning and never addressed.                      | Create an issue and reference it inline: `// Workaround until #12345 adds the endpoint`.                                              |
 | `rules: { 'rule-name': { enabled: false } }` in axe config    | Disables an accessibility rule to make a test pass instead of fixing the a11y bug.                     | Fix the component so it passes the axe rule. Only disable with a linked upstream PatternFly issue proving a false positive.           |
 | `useEffect` + `useState` for data that TanStack Query handles | Re-implements caching, dedup, retry, and error handling that `useQuery`/`useMutation` already provide. | Use the library API. See .agents/skills/frontend-coding-standards/SKILL.md "Prefer Library and Native Browser APIs Over Custom Code". |
 | Custom deep copy, URL parsing, UUID generation                | Re-implements what `structuredClone`, `URLSearchParams`, `generateUUID` already provide.               | Use the native API or existing project utility.                                                                                       |
 
-**Pre-existing suppressions:** If a suppression appears in the diff context but was not added by the PR (no `+` prefix), ignore it. Only flag new additions.
+**Pre-existing suppressions:** If a suppression appears in the diff context but was not added by the PR (no `+` prefix), ignore it. Only flag new additions; apply the configured exception above when reviewing them.
 
 **Also check these review-specific items:**
 
@@ -310,7 +310,7 @@ When reviewing your own implementation before committing, verify these gates pas
 2. All tests pass (`npm test`), new tests written for new features
 3. WCAG 2.1 AA accessibility standards met
 4. UI verified in browser for all states (loaded, empty, error, success)
-5. Zero `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, or `// TODO` in new code
+5. No `eslint-disable` outside the configured strictly non-security `Math.random()` exception; zero `@ts-ignore`, `@ts-expect-error`, or `// TODO` in new code
 6. Zero disabled axe rules in test files
 7. No re-implemented library functionality (TanStack Query, react-hook-form, Zod, PatternFly)
 8. New routes have `requiredPermissions` / `routePermission` set; new CRUD actions use `DisabledWithTooltip`
