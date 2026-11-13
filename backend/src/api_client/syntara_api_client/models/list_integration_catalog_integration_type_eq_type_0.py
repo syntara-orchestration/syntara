@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class ListIntegrationCatalogIntegrationTypeType0(str, Enum):
+class ListIntegrationCatalogIntegrationTypeEqType0(str, Enum):
     ANSIBLE_AUTOMATION_PLATFORM = "ansible_automation_platform"
     KAFKA = "kafka"
     LLM_PROVIDER = "llm_provider"

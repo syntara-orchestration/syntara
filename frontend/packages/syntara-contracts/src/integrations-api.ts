@@ -1949,17 +1949,32 @@ export interface operations {
         /** @description Include total count in response (expensive) */
         include_total?: components['parameters']['includeTotalParam']
         /** @description Filter by validation status */
-        validation_status?: components['schemas']['IntegrationStatus'] | null
+        validation_status?: (components['schemas']['IntegrationStatus'] | null) & {
+          /** @description Filter by validation status */
+          eq?: components['schemas']['IntegrationStatus'] | null
+        }
         /** @description Filter by enabled status */
-        enabled?: boolean | null
+        enabled?: (boolean | null) & {
+          /** @description Filter by enabled status */
+          eq?: boolean | null
+        }
         /** @description Filter by visibility scope */
-        scope?: components['schemas']['IntegrationScope'] | null
+        scope?: (components['schemas']['IntegrationScope'] | null) & {
+          /** @description Filter by visibility scope */
+          eq?: components['schemas']['IntegrationScope'] | null
+        }
         /** @description Filter by management credential ID (credential used for admin operations like validation and tool/model discovery) */
-        management_credential_id?: string | null
+        management_credential_id?: (string | null) & {
+          /** @description Filter by management credential ID */
+          eq?: string | null
+        }
         /** @description Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations. */
         project_id?: string | null
         /** @description Filter by integration type */
-        integration_type?: ('mcp_server' | 'llm_provider' | 'ansible_automation_platform' | 'kafka') | null
+        integration_type?: (('mcp_server' | 'llm_provider' | 'ansible_automation_platform' | 'kafka') | null) & {
+          /** @description Filter by integration type */
+          eq?: ('mcp_server' | 'llm_provider' | 'ansible_automation_platform' | 'kafka') | null
+        }
       }
       header?: never
       path?: never
