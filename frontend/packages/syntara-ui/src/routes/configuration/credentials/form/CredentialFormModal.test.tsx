@@ -6,7 +6,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { credentialsClient } from '../../../../client'
-import { AlertProvider } from '../../../../providers/alerts'
+import { AlertProvider } from '../../../../providers/alerts/AlertProvider'
 import { regExpPrefixMatch } from '../../../../utils/escapeRegExp'
 import { useSelectableProjects } from '../../../access/useAllProjects'
 

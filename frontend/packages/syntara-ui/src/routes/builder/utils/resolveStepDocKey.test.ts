@@ -2,7 +2,8 @@ import { ExecutorTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import type { Node } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 
-import { FlowNodeType, RegistryStepId } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
+import { RegistryStepId } from '../../../constants/registryStepIds'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 
 import { resolveStepDocKey } from './resolveStepDocKey'

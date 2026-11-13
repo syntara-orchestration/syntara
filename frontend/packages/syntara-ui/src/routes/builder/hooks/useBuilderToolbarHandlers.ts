@@ -3,7 +3,7 @@ import type { ReactFlowInstance } from '@xyflow/react'
 import { useCallback, type Dispatch } from 'react'
 
 import { workflowFetchClient } from '../../../client'
-import type { AlertMessage } from '../../../providers/alerts'
+import type { AlertMessage } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { getErrorMessage } from '../../../utils/apiErrors'
@@ -11,8 +11,8 @@ import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { BuilderAction } from '../builderReducer'
 import { DEFAULT_MAX_WAIT_SECONDS, fetchMaxWaitDuration } from '../step-forms/useMaxWaitDuration'
-import { validateWorkflow } from '../utils/validation'
 import { validateMinimumWorkflow } from '../utils/validation/rules/validateMinimumWorkflow'
+import { validateWorkflow } from '../utils/validation/validateWorkflow'
 import type { ConflictInfo } from '../VersionConflictDialog'
 
 type ShowAlert = (options: AlertMessage) => void

@@ -20,7 +20,7 @@ import {
   useFileStorageStatus,
 } from '../../../hooks/useFileStorageStatus'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { getErrorCode, isForbiddenError } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'

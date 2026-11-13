@@ -22,7 +22,7 @@ import { SynSelect } from '../../components/SynSelect'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import type { UseSynFormReturn } from '../../hooks/useSynForm'
 import { useSynForm } from '../../hooks/useSynForm'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 
 import { accessClient } from './accessClient'
 import { accessControlHelp } from './accessControlFieldHelp'

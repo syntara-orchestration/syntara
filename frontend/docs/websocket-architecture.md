@@ -104,7 +104,8 @@ The frontend architecture **mirrors the backend** - a singleton manager coordina
 ### Connect and Send Messages
 
 ```tsx
-import { useWebSocket, WebSocketChannel } from '../lib/websocket'
+import { useWebSocket } from '../lib/websocket/hooks'
+import { WebSocketChannel } from '../lib/websocket/channels'
 
 function ChatComponent() {
   const { sendRaw, isConnected, connectionState, connect, disconnect } = useWebSocket(
@@ -134,7 +135,8 @@ function ChatComponent() {
 
 ```tsx
 import { useState } from 'react'
-import { useWebSocket, WebSocketChannel } from '../lib/websocket'
+import { useWebSocket } from '../lib/websocket/hooks'
+import { WebSocketChannel } from '../lib/websocket/channels'
 
 function NotificationsComponent() {
   const [notifications, setNotifications] = useState([])
@@ -214,7 +216,6 @@ packages/syntara-ui/src/lib/websocket/
 ├── hooks.ts          # useWebSocket hook (single hook for all operations)
 ├── types.ts          # TypeScript type definitions
 ├── utils.ts          # UI helpers (getConnectionStateLabel, etc.)
-├── index.ts          # Public API exports
 └── __tests__/
     └── websocket.test.ts  # Unit tests
 ```
@@ -230,7 +231,8 @@ packages/syntara-ui/src/lib/websocket/
 Main hook for WebSocket connections.
 
 ```tsx
-import { useWebSocket, WebSocketChannel } from '../lib/websocket'
+import { useWebSocket } from '../lib/websocket/hooks'
+import { WebSocketChannel } from '../lib/websocket/channels'
 
 const {
   sendWrapped, // (message) => boolean - wrapped format { type, payload, timestamp }
@@ -254,7 +256,7 @@ const {
 Predefined channel configurations:
 
 ```tsx
-import { WebSocketChannel } from '../lib/websocket'
+import { WebSocketChannel } from '../lib/websocket/channels'
 
 // Demo/example channels
 WebSocketChannel.Coffee // { id: 'coffee', path: '/ws/example/v1/coffee' }
@@ -300,9 +302,9 @@ const { isConnected } = useWebSocket(buildExecutionChannelPath(executionId, last
 
 > 📚 **See [`docs/execution-visualizer-protocol.md`](./execution-visualizer-protocol.md) for the complete execution WebSocket protocol specification.**
 
-### Internal Hooks (Not Exported from Public API)
+### Connection State Hooks
 
-These hooks exist in `lib/websocket/hooks.ts` but are **not exported** from the public `lib/websocket/index.ts` API. They are used internally by the WebSocket infrastructure.
+These hooks are exported directly from `lib/websocket/hooks.ts`. They are used internally by the WebSocket infrastructure.
 
 #### `useWebSocketState(channelId)`
 
@@ -328,17 +330,17 @@ const isConnected = useIsWebSocketConnected('chat')
 
 ### Utility Functions
 
-Exported from the public API:
+Import these helpers from `lib/websocket/utils.ts`:
 
 ```tsx
-import { getConnectionStateLabel, getConnectionStateColor } from '../lib/websocket'
+import { getConnectionStateLabel, getConnectionStateColor } from '../lib/websocket/utils'
 
 // Display helpers
 getConnectionStateLabel('connected') // 'Connected'
 getConnectionStateColor('connected') // 'green'
 ```
 
-Additional utilities exist in `lib/websocket/utils.ts` (not exported from the public API):
+Additional utilities in `lib/websocket/utils.ts` include:
 
 ```tsx
 import { isActiveState, isConnectingState, isFailedState } from '../lib/websocket/utils'
@@ -375,17 +377,16 @@ useWebSocketStore.getState().updateConfig({
 })
 ```
 
-### Public API Summary
+### Module Entry Points
 
-The `lib/websocket/index.ts` exports only what most consumers need:
+Import each API from the file that defines it:
 
-| Export                    | Type       | Description                                                        |
-| ------------------------- | ---------- | ------------------------------------------------------------------ |
-| `useWebSocket`            | Hook       | Main hook for all WebSocket needs                                  |
-| `WebSocketChannel`        | Constant   | Predefined channel configurations                                  |
-| `getConnectionStateLabel` | Utility    | Human-readable state labels                                        |
-| `getConnectionStateColor` | Utility    | Color for connection state badges                                  |
-| Types                     | TypeScript | `ConnectionState`, `WebSocketMessage`, `UseWebSocketOptions`, etc. |
+| File          | Exports                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------- |
+| `hooks.ts`    | `useWebSocket`, connection state hooks, `UseWebSocketOptions`, and `UseWebSocketReturn` |
+| `channels.ts` | `WebSocketChannel` and `buildExecutionChannelPath`                                      |
+| `utils.ts`    | Connection state label, color, and state helpers                                        |
+| `types.ts`    | `ConnectionState`, `WebSocketMessage`, and other shared types                           |
 
 ---
 

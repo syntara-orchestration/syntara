@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react'
 
 import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import type { DialogState } from '../../hooks/useDialogState'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { detachPromise } from '../../utils/detachPromise'
 import type { ProjectRead } from '../access/types'
 import { ProjectFormModal } from '../access-management/ProjectFormModal'

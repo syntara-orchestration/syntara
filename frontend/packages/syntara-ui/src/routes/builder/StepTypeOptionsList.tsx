@@ -13,7 +13,7 @@ import {
 import type { CSSProperties } from 'react'
 
 import { SynPanel } from '../../components/layout/SynPanel'
-import { AAP_STEP_IDS, RegistryStepId } from '../../constants'
+import { AAP_STEP_IDS, RegistryStepId } from '../../constants/registryStepIds'
 import { renderStepIcon } from '../workflows/canvas/nodes/renderStepIcon'
 import { getAddStepPanelColor } from '../workflows/canvas/stepTypeColors'
 

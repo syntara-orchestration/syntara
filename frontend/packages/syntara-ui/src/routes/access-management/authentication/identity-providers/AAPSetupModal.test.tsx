@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { identityProvidersClient } from '../../../../client'
-import { AlertProvider } from '../../../../providers/alerts'
+import { AlertProvider } from '../../../../providers/alerts/AlertProvider'
 
 import { AAPSetupModal } from './AAPSetupModal'
 

@@ -3,7 +3,7 @@ import type { User } from '@syntara/contracts'
 import { adminClient } from '../../client'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useMutationErrorHandler } from '../../hooks/useMutationErrorHandler'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 
 export function useRevokeUserTokens() {
   const dialog = useDialogState<User>()

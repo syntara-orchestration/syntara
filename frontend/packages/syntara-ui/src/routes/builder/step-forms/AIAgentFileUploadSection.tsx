@@ -5,10 +5,10 @@ import {
   FILE_STORAGE_UNCONFIGURED_MESSAGE,
   useFileStorageStatus,
 } from '../../../hooks/useFileStorageStatus'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { detachPromise } from '../../../utils/detachPromise'
 import { downloadFileById } from '../../../utils/downloadFile'
-import { FileUpload } from '../components/file-upload'
+import { FileUpload } from '../components/file-upload/FileUpload'
 
 import stepFormStyles from './shared/stepFormStyles.module.css'
 import { useFileUploadState, type FileContextType } from './useFileUploadState'

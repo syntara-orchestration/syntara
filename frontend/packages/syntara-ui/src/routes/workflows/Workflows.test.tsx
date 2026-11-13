@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import { executionsFetchClient, workflowClient, workflowFetchClient } from '../../client'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { ColorSchemeProvider } from '../../providers/theme/ColorSchemeProvider'
 import { assertUrlParam, assertUrlParamIsNull } from '../../test/filter-test-helpers'
 import { expectPageTitle } from '../../test/pageTitle'

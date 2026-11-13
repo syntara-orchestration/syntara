@@ -6,7 +6,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { adminClient, authFetchClient } from '../../client'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { routerTestState, mockUseSearch } from '../../test/setup'
 import { accessClient } from '../access/accessClient'
 

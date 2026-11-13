@@ -2,7 +2,7 @@ import { RhUiCalendarIcon, RhUiLanguageIcon, RhUiPlayIcon } from '@patternfly/re
 import { type ScheduleType, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
 
 import EdaIcon from '../../../../assets/eda.svg?react'
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 import {
   createManualTrigger,
   createScheduledTrigger,

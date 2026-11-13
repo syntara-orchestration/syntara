@@ -18,7 +18,7 @@ vi.mock('../../hooks/useMutationErrorHandler', () => ({
 
 const mockShowSuccess = vi.fn()
 
-vi.mock('../../providers/alerts', () => ({
+vi.mock('../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showSuccess: mockShowSuccess }),
 }))
 

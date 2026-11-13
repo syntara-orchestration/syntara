@@ -48,7 +48,7 @@ vi.mock('../access/accessClient', () => ({
   accessFetchClient: { POST: vi.fn(() => Promise.resolve({ data: { allowed: true } })) },
 }))
 
-vi.mock('../../providers/alerts', () => ({
+vi.mock('../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({
     showAlert: mockShowAlert,
     showSuccess: mockShowSuccess,

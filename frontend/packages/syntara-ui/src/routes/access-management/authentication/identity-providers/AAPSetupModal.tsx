@@ -24,7 +24,7 @@ import { SynTextField } from '../../../../components/forms/SynTextField'
 import { SynSelect } from '../../../../components/SynSelect'
 import { useBlurOnOpen } from '../../../../hooks/useBlurOnOpen'
 import { useSynForm } from '../../../../hooks/useSynForm'
-import { useAlerts } from '../../../../providers/alerts'
+import { useAlerts } from '../../../../providers/alerts/AlertContext'
 
 import { aapSetupSchema, type AAPSetupFormData, type AuthMethod } from './aapSetupSchema'
 

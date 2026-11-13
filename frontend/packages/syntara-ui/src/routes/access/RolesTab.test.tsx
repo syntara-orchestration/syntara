@@ -7,7 +7,7 @@ import { axe } from 'vitest-axe'
 
 import { useQueryState } from '../../components/states/useQueryState'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { routerTestState } from '../../test/setup'
 
 import { accessClient } from './accessClient'

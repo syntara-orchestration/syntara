@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
 import { approvalsClient, executionsClient, workflowClient } from '../../client'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { FeatureFlagsProvider } from '../../providers/feature-flags-provider'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { routerTestState } from '../../test/setup'

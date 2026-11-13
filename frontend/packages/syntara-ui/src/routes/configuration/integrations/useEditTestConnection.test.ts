@@ -8,7 +8,7 @@ import { useEditTestConnection } from './useEditTestConnection'
 const mockShowAlert = vi.fn()
 const mockMutate = vi.fn()
 
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: vi.fn(() => ({ showAlert: mockShowAlert })),
 }))
 

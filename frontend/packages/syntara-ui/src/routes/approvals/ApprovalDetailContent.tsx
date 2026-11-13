@@ -26,7 +26,7 @@ import { permissionTooltip } from '../../hooks/permissionUtils'
 import { useMutationErrorHandler } from '../../hooks/useMutationErrorHandler'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useSynForm, type UseSynFormReturn } from '../../hooks/useSynForm'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { APPROVAL_NOTES_MAX_LENGTH } from '../executions/approvalDecisionSchema'
 
 import styles from './ApprovalDetailContent.module.css'

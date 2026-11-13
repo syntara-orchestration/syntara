@@ -1,6 +1,6 @@
 import { EdgeHandleEnum } from '@syntara/contracts'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 import type { ButtonEdgePlaceholderNode, NodeType } from '../../workflows/canvas/nodes/NodeType'
 import { isSwitchCasePort } from '../utils/switchCaseHelpers'
 

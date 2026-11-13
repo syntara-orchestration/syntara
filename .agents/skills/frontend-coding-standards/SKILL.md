@@ -2019,6 +2019,6 @@ import { bar } from './bar'
 import { foo, bar } from './index'
 ```
 
-**Enforcement:** `barrel-files/avoid-barrel-files` is set to `warn` in `eslint.config.js`, scoped to `src/**/*.{ts,tsx}` only. It fires when a file has more than 3 re-exports and few or no local declarations of its own. This is a warning, not an error, so existing barrel files are not a hard build break. New or changed `src/` code must not add a new warning — see the Zero New Warnings Policy in section 8.
+**Enforcement:** `barrel-files/avoid-barrel-files` is set to `error` in `eslint.config.js`, scoped to `src/**/*.{ts,tsx}` only. It fires when a file has more than 3 re-exports and few or no local declarations of its own. New or changed `src/` code must pass this rule.
 
 **This rule does not apply to `e2e/` or other non-production directories.** The tree-shaking, bundle-size, and circular-dependency concerns that motivate this rule are about code shipped to users; they don't apply to test-only helpers, where a grouped re-export can be a reasonable convenience. If you need to group many related helpers for import convenience in `src/`, don't use a barrel file there — ask the reviewer for the best pattern for that specific case first.

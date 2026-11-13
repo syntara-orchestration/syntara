@@ -7,7 +7,7 @@ import {
 } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
-import { useAlerts, type AlertMessage } from '../../../providers/alerts'
+import { useAlerts, type AlertMessage } from '../../../providers/alerts/AlertContext'
 import {
   detectTaskExecutorType,
   DetectedExecutorType,

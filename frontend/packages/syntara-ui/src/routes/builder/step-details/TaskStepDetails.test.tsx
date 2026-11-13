@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import * as workflowStore from '../../../stores/useWorkflowStore'
 import type { WorkflowStore } from '../../../stores/useWorkflowStore'
 
@@ -20,7 +20,7 @@ vi.spyOn(workflowStore, 'createAAPJobTemplateActivity')
 
 // Mock the alerts hook
 const mockShowError = vi.fn()
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: vi.fn(),
 }))
 

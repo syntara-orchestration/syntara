@@ -63,7 +63,7 @@ vi.mock('../../../hooks/useFileStorageStatus', async (importOriginal) => ({
 }))
 
 // Mock FileUpload component to expose file selection handler
-vi.mock('../components/file-upload', () => ({
+vi.mock('../components/file-upload/FileUpload', () => ({
   FileUpload: ({
     onFilesSelected,
     onFileRemove,

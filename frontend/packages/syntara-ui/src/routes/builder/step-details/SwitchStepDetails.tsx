@@ -2,7 +2,7 @@ import { EdgeHandleEnum, type SwitchActivity, type SwitchConfig } from '@syntara
 import { type ReactNode, useMemo } from 'react'
 import { z } from 'zod'
 
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import type { Expression } from '../../../utils/expressions/types'
 import { SwitchStepForm, type SwitchFormData } from '../step-forms/SwitchStepForm'

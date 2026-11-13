@@ -8,7 +8,7 @@ import { axe } from 'vitest-axe'
 
 import { workflowFetchClient } from '../../client'
 import type { DialogState } from '../../hooks/useDialogState'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { ColorSchemeProvider } from '../../providers/theme/ColorSchemeProvider'
 
 import { WorkflowDialogs } from './WorkflowDialogs'

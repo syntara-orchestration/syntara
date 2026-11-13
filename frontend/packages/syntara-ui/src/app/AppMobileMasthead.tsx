@@ -12,7 +12,7 @@ import {
 } from '@patternfly/react-core'
 import { Link } from '@tanstack/react-router'
 
-import { useBrand } from '../providers/brand'
+import { useBrand } from '../providers/brand/useBrand'
 
 import { useDockState } from './useDockState'
 

@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 
 import { SELECT_ALL_VALUE, type PolicySelectListItem } from './policySelectConstants'
 import { usePolicySelectAll } from './usePolicySelectAll'

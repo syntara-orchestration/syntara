@@ -29,7 +29,7 @@ import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useTableSort } from '../../../hooks/useTableSort'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { detachPromise } from '../../../utils/detachPromise'
 

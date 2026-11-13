@@ -4,7 +4,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { AppRoute } from '../../../app/AppRoute'
 import { integrationsClient } from '../../../client'
 import { useDialogState } from '../../../hooks/useDialogState'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 

@@ -3,7 +3,7 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback, useState } from 'react'
 
 import { workflowFetchClient } from '../../client'
-import type { useAlerts } from '../../providers/alerts'
+import type { useAlerts } from '../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../utils/apiErrors'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']

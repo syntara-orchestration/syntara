@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { credentialsClient } from '../../../../client'
 import { useSynForm } from '../../../../hooks/useSynForm'
-import { AlertProvider } from '../../../../providers/alerts'
+import { AlertProvider } from '../../../../providers/alerts/AlertProvider'
 import { useSelectableProjects } from '../../../access/useAllProjects'
 import type { Credential } from '../credentialConstants'
 

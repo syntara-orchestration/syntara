@@ -7,7 +7,7 @@
 import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-import * as websocketModule from '../../../lib/websocket'
+import * as websocketModule from '../../../lib/websocket/hooks'
 import type { ConnectionState } from '../../../lib/websocket/types'
 import type { ExecutionSnapshotMessage, ActivityPatchMessage, Execution } from '../execution/types'
 import { useExecutionStore } from '../stores/useExecutionStore'
@@ -18,7 +18,7 @@ import { useExecutionWebSocket } from './useExecutionWebSocket'
 // Mock Setup
 // ============================================================================
 
-vi.mock('../../../lib/websocket', () => ({
+vi.mock('../../../lib/websocket/hooks', () => ({
   useWebSocket: vi.fn(),
   buildExecutionChannelPath: (executionId: string, replay?: string) => ({
     id: `execution_${executionId}`,

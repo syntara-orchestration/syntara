@@ -1,7 +1,7 @@
 import type { UseFormSetError } from 'react-hook-form'
 
 import { useFormMutationErrorHandler } from '../../../hooks/useFormMutationErrorHandler'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useAuthStore } from '../../../stores/useAuthStore'
 import { accessClient } from '../../access/accessClient'
 import { logoutWithAlert } from '../logoutWithAlert'

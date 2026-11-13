@@ -21,7 +21,7 @@ vi.mock('../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
-vi.mock('../../providers/alerts', () => ({
+vi.mock('../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showError: mockShowError, showSuccess: mockShowSuccess }),
 }))
 
@@ -38,7 +38,7 @@ vi.mock('../../utils/apiErrors', () => ({
 const mockValidateWorkflow = vi.fn<() => { errors: Array<{ message: string; nodeId?: string; severity?: string }> }>()
 const mockValidateMinimum = vi.fn<() => Array<{ message: string; nodeId?: string; severity?: string }>>()
 
-vi.mock('./utils/validation', () => ({
+vi.mock('./utils/validation/validateWorkflow', () => ({
   validateWorkflow: () => mockValidateWorkflow(),
 }))
 

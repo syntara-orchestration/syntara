@@ -1,7 +1,7 @@
 import { useReactFlow, type OnNodeDrag } from '@xyflow/react'
 import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 import {
   useWorkflowStore,
   useWorkflowStoreActions,

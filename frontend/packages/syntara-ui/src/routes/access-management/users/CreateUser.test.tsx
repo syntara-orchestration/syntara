@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { usersClient } from '../../../client'
-import { AlertProvider } from '../../../providers/alerts'
+import { AlertProvider } from '../../../providers/alerts/AlertProvider'
 
 import { CreateUser } from './CreateUser'
 

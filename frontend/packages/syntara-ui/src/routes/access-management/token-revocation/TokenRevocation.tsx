@@ -20,7 +20,7 @@ import { permissionTooltip } from '../../../hooks/permissionUtils'
 import { useCanI } from '../../../hooks/useCanI'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useAuthStore } from '../../../stores/useAuthStore'
 import { detachPromise } from '../../../utils/detachPromise'
 

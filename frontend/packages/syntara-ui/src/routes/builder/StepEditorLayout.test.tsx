@@ -60,7 +60,7 @@ vi.mock('./panels/StepPanelNavigationArrow', () => ({
     ) : null,
 }))
 
-vi.mock('../../providers/alerts', () => ({
+vi.mock('../../providers/alerts/AlertContext', () => ({
   useAlerts: vi.fn(() => ({ showInfo: vi.fn() })),
 }))
 

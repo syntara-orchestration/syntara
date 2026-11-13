@@ -5,7 +5,7 @@ import type { CSSProperties } from 'react'
 
 import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { FlowNodeType } from '../../../../constants'
+import { FlowNodeType } from '../../../../constants/nodeTypes'
 import { parseTriggerIndex } from '../../../../utils/triggerNodeIds'
 import type { ActivityStatus } from '../../execution/types'
 import { semanticZoomActivityTitle } from '../semanticZoom'

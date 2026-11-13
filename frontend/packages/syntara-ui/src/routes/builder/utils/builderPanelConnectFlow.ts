@@ -1,7 +1,7 @@
 import { EdgeHandleEnum } from '@syntara/contracts'
 import type { Node, ReactFlowInstance } from '@xyflow/react'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { OnAddNodeFromEdge } from '../types'
 

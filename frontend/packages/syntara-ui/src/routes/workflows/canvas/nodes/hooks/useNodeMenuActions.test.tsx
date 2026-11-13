@@ -2,9 +2,10 @@ import { act, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { StepMenuCategory } from '../../../../../constants/nodeTypes'
 import { NodeActionsContext, type NodeActionsContextValue } from '../../../../../routes/builder/NodeActionsContext'
 
-import { StepMenuCategory, useNodeMenuActions } from './useNodeMenuActions'
+import { useNodeMenuActions } from './useNodeMenuActions'
 import { useStepMenuActions } from './useStepMenuActions'
 
 const mockDeleteElements = vi.fn()
@@ -14,7 +15,7 @@ vi.mock('@xyflow/react', () => ({
 }))
 
 const mockShowError = vi.fn()
-vi.mock('../../../../../providers/alerts', () => ({
+vi.mock('../../../../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showInfo: vi.fn(), showSuccess: vi.fn(), showError: mockShowError }),
 }))
 
