@@ -55,6 +55,10 @@ def test_router_only_exposes_the_command_ingress():
     assert {route.path for route in bridge.router.routes} == {"/api/execution_plane/v1/commands"}
 
 
+def test_command_ingress_is_not_published_in_openapi():
+    assert all(not route.include_in_schema for route in bridge.router.routes)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "outcome",

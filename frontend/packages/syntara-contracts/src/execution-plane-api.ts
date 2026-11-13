@@ -116,26 +116,6 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/api/execution_plane/v1/commands': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Receive an Execution Plane command
-     * @description Authenticate one command, dispatch it through the registry, and return its result.
-     */
-    post: operations['receive_execution_plane_command']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -146,59 +126,6 @@ export interface components {
      * @enum {string}
      */
     BackendType: 'kubernetes' | 'openshell'
-    /**
-     * Command
-     * @description One versioned operation; participants persist only its domain effects.
-     */
-    Command: {
-      /**
-       * Command Id
-       * Format: uuid
-       */
-      command_id: string
-      /** Parent Command Id */
-      parent_command_id?: string | null
-      /** Command Type */
-      command_type: string
-      /** Command Revision */
-      command_revision: number
-      /** Payload */
-      payload: {
-        [key: string]: unknown
-      }
-      /**
-       * Occurred At
-       * Format: date-time
-       */
-      occurred_at: string
-    }
-    /**
-     * CommandScope
-     * @description Initiating service client; project authorization belongs to the caller.
-     */
-    CommandScope: {
-      /** Client Id */
-      client_id: string
-    }
-    /**
-     * CredentialResolveCommandResult
-     * @description Typed result returned for a credential-resolution command.
-     */
-    CredentialResolveCommandResult: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      command_type: 'credential.resolve'
-      /**
-       * Command Revision
-       * @default 1
-       * @constant
-       */
-      command_revision?: 1
-      /** Credential */
-      credential: string
-    }
     /**
      * ExecutionTargetCreate
      * @description A Kubernetes target on the single cluster registered at installation.
@@ -394,39 +321,6 @@ export interface components {
       tolerations?: string[]
     }
     /**
-     * MessageEnvelope
-     * @description Participant identity around one logical command.
-     */
-    MessageEnvelope: {
-      /**
-       * Message Id
-       * Format: uuid
-       */
-      message_id: string
-      /**
-       * Message Type
-       * @default command.submit
-       * @constant
-       */
-      message_type?: 'command.submit'
-      /**
-       * Command Id
-       * Format: uuid
-       */
-      command_id: string
-      /**
-       * Sequence
-       * @default 0
-       */
-      sequence?: number
-      /** Source Id */
-      source_id: string
-      /** Destination Id */
-      destination_id: string
-      scope: components['schemas']['CommandScope']
-      command: components['schemas']['Command']
-    }
-    /**
      * RHELPlacement
      * @description Placeholder for RHEL-specific execution-target metadata.
      */
@@ -436,23 +330,6 @@ export interface components {
        * @enum {string}
        */
       type: 'rhel'
-    }
-    /**
-     * ResourceReference
-     * @description Safe reference from a command to a participant-owned resource.
-     */
-    ResourceReference: {
-      /** Kind */
-      kind: string
-      /**
-       * Resource Id
-       * Format: uuid
-       */
-      resource_id: string
-      /** Resource Key */
-      resource_key?: string | null
-      /** Revision */
-      revision?: number | null
     }
     /** ResourcesResponse[ExecutionTargetRead] */
     ResourcesResponse_ExecutionTargetRead_: {
@@ -477,59 +354,11 @@ export interface components {
       total?: number | null
     }
     /**
-     * TargetHealthCommandResult
-     * @description Typed result returned for an execution-target health command.
-     */
-    TargetHealthCommandResult: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      command_type: 'execution_target.health'
-      /**
-       * Command Revision
-       * @default 1
-       * @constant
-       */
-      command_revision?: 1
-      /** Healthy */
-      healthy: boolean
-      /** Message */
-      message?: string | null
-      /**
-       * Skipped
-       * @default false
-       */
-      skipped?: boolean
-    }
-    /**
      * TargetStatus
      * @description Lifecycle states of an execution target.
      * @enum {string}
      */
     TargetStatus: 'registering' | 'validating' | 'bootstrapping' | 'active' | 'degraded' | 'draining' | 'failed'
-    /**
-     * TransportReceipt
-     * @description Receipt of a handled request, without a persisted command record.
-     */
-    TransportReceipt: {
-      /**
-       * Received
-       * @default true
-       * @constant
-       */
-      received?: true
-      /**
-       * Message Id
-       * Format: uuid
-       */
-      message_id: string
-      resource?: components['schemas']['ResourceReference'] | null
-      /** Result */
-      result?:
-        | (components['schemas']['CredentialResolveCommandResult'] | components['schemas']['TargetHealthCommandResult'])
-        | null
-    }
     /** ValidationError */
     ValidationError: {
       /** Location */
@@ -1120,39 +949,6 @@ export interface operations {
           [name: string]: unknown
         }
         content?: never
-      }
-    }
-  }
-  receive_execution_plane_command: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['MessageEnvelope']
-      }
-    }
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['TransportReceipt']
-        }
-      }
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/problem+json': components['schemas']['HTTPValidationError']
-        }
       }
     }
   }
