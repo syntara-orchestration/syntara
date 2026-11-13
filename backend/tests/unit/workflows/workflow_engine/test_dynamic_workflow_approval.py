@@ -270,10 +270,6 @@ class TestPrepareApprovalArgs:
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
         with (
             patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute),
-            patch(
-                "syntara.workflow_runtime.engines.temporal.approval_mixin.use_unique_loop_iteration_ids",
-                return_value=False,
-            ),
             patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.patched", return_value=False),
         ):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
@@ -901,14 +897,6 @@ class TestDispatchApprovalNode:
         mock_activity = AsyncMock(return_value={"output": {"id": "apr-1", "decision": "approved"}})
         with (
             patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity),
-            patch(
-                "syntara.workflow_runtime.engines.temporal.approval_mixin.use_unique_loop_iteration_ids",
-                return_value=False,
-            ),
-            patch(
-                "syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
-                return_value=False,
-            ),
             patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.patched", return_value=False),
         ):
             await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)

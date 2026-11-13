@@ -183,7 +183,11 @@ class TestListCredentials:
 
     @pytest.mark.asyncio
     async def test_list_returns_masked_metadata(
-        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str
+        self,
+        auth_client: AsyncClient,
+        bearer_type: CredentialType,
+        test_project_id: str,
+        credential_project_admin: None,
     ) -> None:
         # Create two credentials
         credential_ids: list[str] = []
@@ -845,7 +849,11 @@ class TestEnabledFilter:
 
     @pytest.mark.asyncio
     async def test_filter_enabled_true(
-        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str
+        self,
+        auth_client: AsyncClient,
+        bearer_type: CredentialType,
+        test_project_id: str,
+        credential_project_admin: None,
     ) -> None:
         """Verify ?enabled=true returns only enabled credentials."""
         # Create enabled credential
@@ -886,7 +894,11 @@ class TestEnabledFilter:
 
     @pytest.mark.asyncio
     async def test_filter_enabled_false(
-        self, auth_client: AsyncClient, bearer_type: CredentialType, test_project_id: str
+        self,
+        auth_client: AsyncClient,
+        bearer_type: CredentialType,
+        test_project_id: str,
+        credential_project_admin: None,
     ) -> None:
         """Verify ?enabled=false returns only disabled credentials."""
         # Create and disable a credential
