@@ -4,9 +4,7 @@ import { useCallback, useMemo } from 'react'
 
 import { detachPromise } from '../../../../utils/detachPromise'
 import {
-  childWorkflowDetailQueryKey,
   childWorkflowVersionQueryKey,
-  fetchChildWorkflowDetail,
   fetchChildWorkflowVersion,
   fetchInvocationSchema,
   invocationSchemaQueryKey,
@@ -69,30 +67,6 @@ function parseChildWorkflowGraph(value: unknown): ChildWorkflowGraph | null {
   return { triggers, nodes, edges }
 }
 
-function getReachableStepIds(definition: ChildWorkflowGraph, triggerNodeId: string): Set<string> {
-  const outgoingEdges = new Map<string, string[]>()
-  for (const edge of definition.edges) {
-    const successors = outgoingEdges.get(edge.from) ?? []
-    successors.push(edge.to)
-    outgoingEdges.set(edge.from, successors)
-  }
-
-  const reachable = new Set<string>()
-  const pending = [...(outgoingEdges.get(triggerNodeId) ?? [])]
-  while (pending.length > 0) {
-    const stepId = pending.pop()
-    if (!stepId || reachable.has(stepId)) continue
-    reachable.add(stepId)
-    pending.push(...(outgoingEdges.get(stepId) ?? []))
-  }
-  return reachable
-}
-
-function getTerminalStepIds(definition: ChildWorkflowGraph): Set<string> {
-  const stepsWithSuccessors = new Set(definition.edges.map((edge) => edge.from))
-  return new Set(definition.nodes.filter((step) => !stepsWithSuccessors.has(step.id)).map((step) => step.id))
-}
-
 function getSelectedTriggerNodeId(
   triggers: WorkflowAPI.components['schemas']['WorkflowInvocationTriggerSchema'][],
   requestedTriggerNodeId: string | null
@@ -137,34 +111,32 @@ function isSelectedTriggerUnavailable(
 }
 
 function buildChildStepSchemas(
-  definition: ChildWorkflowGraph | null,
-  selectedTriggerNodeId: string | null,
-  stepMetadata: WorkflowAPI.components['schemas']['WorkflowStepMetadataRead'][] | null
+  invocationSchema: WorkflowAPI.components['schemas']['WorkflowInvocationSchemaRead'] | undefined,
+  selectedTriggerNodeId: string | null
 ): ChildWorkflowStepSchema[] {
-  if (
-    !definition ||
-    !selectedTriggerNodeId ||
-    !definition.triggers.some((trigger) => trigger.id === selectedTriggerNodeId)
-  ) {
+  if (!invocationSchema || !selectedTriggerNodeId) {
     return []
   }
 
-  const reachableStepIds = getReachableStepIds(definition, selectedTriggerNodeId)
-  const terminalStepIds = getTerminalStepIds(definition)
-  const stepMetadataById = new Map((stepMetadata ?? []).map((step) => [step.id, step]))
-  return definition.nodes
-    .filter((step) => reachableStepIds.has(step.id) && terminalStepIds.has(step.id))
-    .map((step) => {
-      const metadata = stepMetadataById.get(step.id)
-      const outputSchema = metadata?.output_schema ?? null
-      return {
-        id: step.id,
-        name: step.name?.trim() || step.id,
-        type: step.type,
-        outputSchema,
-        outputFields: getChildStepOutputFields(step.type, outputSchema),
-      }
-    })
+  // Find the selected trigger in the invocation schema
+  const selectedTrigger = invocationSchema.triggers.find((trigger) => trigger.trigger_node_id === selectedTriggerNodeId)
+
+  if (!selectedTrigger?.output_schema) {
+    // No declared output schema - return empty (parent sees no outputs)
+    return []
+  }
+
+  // Return a single synthetic "step" representing the declared output contract
+  // The output_schema is the contract exposed to parents
+  return [
+    {
+      id: '__declared_outputs__',
+      name: 'Declared Outputs',
+      type: 'subworkflow_declared_outputs',
+      outputSchema: selectedTrigger.output_schema,
+      outputFields: getChildStepOutputFields('subworkflow_declared_outputs', selectedTrigger.output_schema),
+    },
+  ]
 }
 
 function useInvocationSchemaQuery(workflowId: string | null) {
@@ -193,16 +165,6 @@ function usePublishedWorkflowMetadataQueries(
     enabled: shouldLoadDefinition,
     staleTime: 5 * 60 * 1000,
   })
-  const {
-    data: workflowDetail,
-    error: workflowDetailError,
-    isFetching: isFetchingWorkflowDetail,
-  } = useQuery({
-    queryKey: childWorkflowDetailQueryKey(workflowId ?? '', publishedVersionId ?? ''),
-    queryFn: () => fetchChildWorkflowDetail(workflowId ?? ''),
-    enabled: shouldLoadDefinition,
-    staleTime: 5 * 60 * 1000,
-  })
 
   return {
     publishedVersionId,
@@ -211,32 +173,7 @@ function usePublishedWorkflowMetadataQueries(
     publishedVersionRead,
     publishedVersionError,
     isFetchingPublishedVersion,
-    workflowDetail,
-    workflowDetailError,
-    isFetchingWorkflowDetail,
   }
-}
-
-function getPublishedStepMetadata(
-  workflowDetail: WorkflowAPI.components['schemas']['WorkflowDetailRead'] | undefined,
-  publishedVersionId: string | null
-): WorkflowAPI.components['schemas']['WorkflowStepMetadataRead'][] | null {
-  return workflowDetail?.published_step_metadata?.version_id === publishedVersionId
-    ? workflowDetail.published_step_metadata.steps
-    : null
-}
-
-function hasPublishedVersionMismatch(
-  workflowDetail: WorkflowAPI.components['schemas']['WorkflowDetailRead'] | undefined,
-  publishedVersionId: string | null,
-  shouldLoadDefinition: boolean
-): boolean {
-  return Boolean(
-    workflowDetail &&
-    shouldLoadDefinition &&
-    publishedVersionId &&
-    workflowDetail.published_step_metadata?.version_id !== publishedVersionId
-  )
 }
 
 function isSchemaLoading({
@@ -289,21 +226,17 @@ export function useChildWorkflowSchema({
     publishedVersionRead,
     publishedVersionError,
     isFetchingPublishedVersion,
-    workflowDetail,
-    workflowDetailError,
-    isFetchingWorkflowDetail,
   } = publishedWorkflowMetadata
 
   const needsTriggerSelection = requiresTriggerSelection(eligibleTriggers, selectedTriggerNodeId)
   const workflowDefinition = publishedVersionRead?.workflow_definition
   const childGraph = useMemo(() => parseChildWorkflowGraph(workflowDefinition), [workflowDefinition])
-  const publishedStepMetadata = getPublishedStepMetadata(workflowDetail, publishedVersionId)
   const childSteps = useMemo(
-    () => buildChildStepSchemas(childGraph, selectedTriggerNodeId, publishedStepMetadata),
-    [childGraph, publishedStepMetadata, selectedTriggerNodeId]
+    () => buildChildStepSchemas(invocationSchema, selectedTriggerNodeId),
+    [invocationSchema, selectedTriggerNodeId]
   )
 
-  const error = invocationSchemaError ?? workflowDetailError ?? publishedVersionError
+  const error = invocationSchemaError ?? publishedVersionError
   const isTriggerUnavailable = isSelectedTriggerUnavailable(triggerNodeId, selectedTriggerNodeId, childGraph)
   const retry = useCallback(() => {
     detachPromise(
@@ -319,22 +252,14 @@ export function useChildWorkflowSchema({
         const latestVersion = latestSchema.published_version
         if (!latestVersionId || latestVersion == null) return
 
-        await Promise.all([
-          queryClient.fetchQuery({
-            queryKey: childWorkflowVersionQueryKey(workflowId, latestVersionId, latestVersion),
-            queryFn: () => fetchChildWorkflowVersion(workflowId, latestVersion),
-            staleTime: 5 * 60 * 1000,
-          }),
-          queryClient.fetchQuery({
-            queryKey: childWorkflowDetailQueryKey(workflowId, latestVersionId),
-            queryFn: () => fetchChildWorkflowDetail(workflowId),
-            staleTime: 0,
-          }),
-        ])
+        await queryClient.fetchQuery({
+          queryKey: childWorkflowVersionQueryKey(workflowId, latestVersionId, latestVersion),
+          queryFn: () => fetchChildWorkflowVersion(workflowId, latestVersion),
+          staleTime: 5 * 60 * 1000,
+        })
       })()
     )
   }, [queryClient, refetchInvocationSchema, triggerNodeId, workflowId])
-  const isVersionMismatch = hasPublishedVersionMismatch(workflowDetail, publishedVersionId, shouldLoadDefinition)
 
   return {
     invocationSchema: invocationSchema ?? null,
@@ -343,14 +268,13 @@ export function useChildWorkflowSchema({
     selectedTriggerNodeId,
     needsTriggerSelection,
     isTriggerUnavailable,
-    isVersionMismatch,
     childSteps,
     isLoading: isSchemaLoading({
       workflowId,
       isFetchingInvocationSchema,
       shouldLoadDefinition,
       isFetchingPublishedVersion,
-      isFetchingWorkflowDetail,
+      isFetchingWorkflowDetail: false, // No longer fetching workflow detail
     }),
     error,
     isAccessDenied: isChildWorkflowAccessDenied(error),

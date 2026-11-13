@@ -13,6 +13,8 @@ class WorkflowInvocationTriggerSchema(SQLModel):
     trigger_node_id: str
     name: str | None = None
     input_schema: dict[str, Any] = Field(default_factory=dict)
+    output_schema: dict[str, Any] | None = None
+    output_mapping: dict[str, str] | None = None
 
 
 class WorkflowInvocationSchemaRead(SQLModel):

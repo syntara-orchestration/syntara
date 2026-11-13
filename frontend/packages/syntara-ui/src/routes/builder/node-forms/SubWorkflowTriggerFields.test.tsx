@@ -1,34 +1,68 @@
 import { render, screen } from '@testing-library/react'
+import { FormProvider, useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 
+import type { TriggerFormData } from './triggerFormSchema'
 import { SubWorkflowTriggerFields } from './SubWorkflowTriggerFields'
 
-// The payload section renders a heavy code editor and needs form context; mock it
-// so the test exercises SubWorkflowTriggerFields' own rendering and the error wiring.
-vi.mock('./PayloadValidationSection', () => ({
-  PayloadValidationSection: ({ error }: Readonly<{ error?: string }>) => (
-    <div data-testid="payload-validation-section">{error ?? 'no-error'}</div>
+// Mock the code editor to avoid Monaco setup in tests
+vi.mock('../components/ExpandableCodeEditor', () => ({
+  ExpandableCodeEditor: ({ code, ariaLabel }: { code: string; ariaLabel: string }) => (
+    <div data-testid="code-editor" aria-label={ariaLabel}>
+      {code || 'empty'}
+    </div>
   ),
 }))
 
+vi.mock('../components/JsonEditorToolbar', () => ({
+  JsonEditorControls: () => <div data-testid="json-editor-controls">Controls</div>,
+}))
+
+vi.mock('./SubWorkflowOutputFields', () => ({
+  SubWorkflowOutputFields: () => <div data-testid="subworkflow-output-fields">Output fields</div>,
+}))
+
+function TestWrapper({ children }: { children: React.ReactNode }) {
+  const methods = useForm<TriggerFormData>({
+    defaultValues: { inputSchema: '', outputSchema: '' },
+  })
+  return <FormProvider {...methods}>{children}</FormProvider>
+}
+
 describe('SubWorkflowTriggerFields', () => {
-  it('renders the info callout and passes no error when errors is empty', () => {
-    render(<SubWorkflowTriggerFields errors={{}} />)
+  it('renders the info callout and input schema editor', () => {
+    render(
+      <TestWrapper>
+        <SubWorkflowTriggerFields triggerId="trigger-0" triggerIndex={0} />
+      </TestWrapper>
+    )
 
     expect(screen.getByText(/can be called from another workflow/i)).toBeInTheDocument()
     expect(screen.getByText('Workflow trigger')).toBeInTheDocument()
-    expect(screen.getByTestId('payload-validation-section')).toHaveTextContent('no-error')
+    expect(screen.getByText('Input schema')).toBeInTheDocument()
+    expect(screen.getByTestId('code-editor')).toBeInTheDocument()
   })
 
-  it('passes the input-schema error message through to the payload section', () => {
-    render(<SubWorkflowTriggerFields errors={{ inputSchema: { message: 'Invalid schema' } }} />)
+  it('renders the returned outputs section', () => {
+    render(
+      <TestWrapper>
+        <SubWorkflowTriggerFields triggerId="trigger-0" triggerIndex={0} />
+      </TestWrapper>
+    )
 
-    expect(screen.getByTestId('payload-validation-section')).toHaveTextContent('Invalid schema')
+    expect(screen.getByText('Returned outputs')).toBeInTheDocument()
+    expect(
+      screen.getByText(/Define the values this workflow returns by mapping each public output field/)
+    ).toBeInTheDocument()
   })
 
-  it('handles an inputSchema error object without a message', () => {
-    render(<SubWorkflowTriggerFields errors={{ inputSchema: {} }} />)
+  it('renders the output fields component', () => {
+    render(
+      <TestWrapper>
+        <SubWorkflowTriggerFields triggerId="trigger-0" triggerIndex={0} />
+      </TestWrapper>
+    )
 
-    expect(screen.getByTestId('payload-validation-section')).toHaveTextContent('no-error')
+    expect(screen.getByTestId('subworkflow-output-fields')).toBeInTheDocument()
   })
 })

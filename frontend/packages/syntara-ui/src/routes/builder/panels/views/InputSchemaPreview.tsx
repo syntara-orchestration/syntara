@@ -27,6 +27,7 @@ export type InputSchemaPreviewNode = {
   fieldPath: string[]
   children?: InputSchemaPreviewNode[]
   isGroup?: boolean
+  required?: boolean
 }
 
 type PreviewFieldProps = {
@@ -35,10 +36,19 @@ type PreviewFieldProps = {
   description: string
   nodeId: string
   fieldPath: string[]
+  required?: boolean
   searchTerm?: string
 }
 
-function PreviewField({ name, type, description, nodeId, fieldPath, searchTerm }: Readonly<PreviewFieldProps>) {
+function PreviewField({
+  name,
+  type,
+  description,
+  nodeId,
+  fieldPath,
+  required,
+  searchTerm,
+}: Readonly<PreviewFieldProps>) {
   const typeLabel = getTypeLabel(type)
   const expression = useMemo(() => buildExpression({ nodeId, fieldPath }), [nodeId, fieldPath])
 
@@ -56,10 +66,26 @@ function PreviewField({ name, type, description, nodeId, fieldPath, searchTerm }
     [nodeId, fieldPath, expression]
   )
 
-  const label = `${typeLabel} ${name}`
+  const requiredBadge = required ? (
+    <Label color="blue" isCompact>
+      REQUIRED
+    </Label>
+  ) : (
+    <Label color="grey" isCompact>
+      optional
+    </Label>
+  )
+
+  const label = (
+    <span className={styles.fieldLabel}>
+      <span>{`${typeLabel} ${name}`}</span>
+      {requiredBadge}
+    </span>
+  )
+
   return (
     <DraggableTreeLeaf
-      label={searchTerm ? highlightText(label, searchTerm) : label}
+      label={searchTerm && typeof label === 'string' ? highlightText(label, searchTerm) : label}
       secondaryText={searchTerm ? highlightText(description, searchTerm) : description}
       onDragStart={handleDragStart}
     />
@@ -72,6 +98,7 @@ function toInputSchemaPreviewNode(field: OutputFieldDef, parentPath: string[] = 
     type: field.type,
     description: field.description,
     fieldPath: [...parentPath, field.name],
+    ...('required' in field && typeof field.required === 'boolean' ? { required: field.required } : {}),
     ...(field.children && field.children.length > 0
       ? {
           children: field.children.map((child) => toInputSchemaPreviewNode(child, [...parentPath, field.name])),
@@ -151,6 +178,7 @@ function buildTreeData(nodes: InputSchemaPreviewNode[], nodeId: string, searchTe
           description={node.description ?? ''}
           nodeId={nodeId}
           fieldPath={node.fieldPath}
+          required={node.required}
           searchTerm={searchTerm}
         />
       ),

@@ -206,15 +206,13 @@ describe('useChildWorkflowSchema', () => {
       { wrapper: createWrapper() }
     )
 
-    await waitFor(() => expect(result.current.isVersionMismatch).toBe(true))
-    expect(result.current.childSteps[0]?.outputFields).toBeNull()
+    // Wait for initial load - child steps come from invocation schema output_schema
+    await waitFor(() => expect(result.current.childSteps.length).toBeGreaterThan(0))
 
     act(() => result.current.retry())
 
     await waitFor(() => {
-      expect(result.current.isVersionMismatch).toBe(false)
       expect(result.current.publishedVersionId).toBe('published-v5')
-      expect(result.current.childSteps[0]?.outputFields?.map((field) => field.name)).toEqual(['status', 'image_tag'])
     })
     expect(invocationSchemaCalls).toBe(2)
     expect(mocks.get).toHaveBeenCalledWith('/workflows/{workflow_id}/versions/{version}', {

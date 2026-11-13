@@ -70,7 +70,16 @@ function resolveSchema(schema, root, resolving = new Set()) {
   let resolved = {}
   const reference = schema.$ref
   if (typeof reference === 'string' && reference.startsWith('#/$defs/')) {
-    if (resolving.has(reference)) return {}
+    if (resolving.has(reference)) {
+      // Circular reference detected - return a marker with the reference name
+      // instead of an empty object to preserve the schema intent
+      const definitionName = reference.slice('#/$defs/'.length).replace(/~1/g, '/').replace(/~0/g, '~')
+      return {
+        type: 'object',
+        description: `Circular reference to ${definitionName}`,
+        'x-syntara-circular-ref': reference,
+      }
+    }
     const definitionName = reference.slice('#/$defs/'.length).replace(/~1/g, '/').replace(/~0/g, '~')
     const definition = root.$defs?.[definitionName]
     if (definition) {

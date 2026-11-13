@@ -10,6 +10,18 @@
         "type": "object",
         "description": "JSON Schema defining the structure and validation rules for inputs passed to the workflow when invoked as a sub-workflow",
         "additionalProperties": true
+      },
+      "output_schema": {
+        "type": "object",
+        "description": "JSON Schema defining the outputs exposed to parent workflows. Provides encapsulation—parent sees only declared fields, not internal child step structure.",
+        "additionalProperties": true
+      },
+      "output_mapping": {
+        "type": "object",
+        "description": "Template expressions mapping internal step outputs to declared output fields. Keys are dotted paths from output_schema; values are template expressions (e.g., '${step.field}').",
+        "additionalProperties": {
+          "type": "string"
+        }
       }
     },
     "additionalProperties": false

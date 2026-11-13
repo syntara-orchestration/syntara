@@ -25,9 +25,12 @@ from syntara.workflows.error_handlers import build_validation_problem_response
 from syntara.workflows.exceptions import WorkflowDefinitionInvalidError
 from syntara.workflows.executions_router import get_temporal_execution_service
 from syntara.workflows.models import (
+    BreakingChange,
+    BreakingChangesResponse,
     DetailedValidationProblemDetail,
     PublishVersionRequest,
     PublishWorkflowVersionResponse,
+    TriggerBreakingChanges,
     ValidationCategory,
     ValidationFinding,
     ValidationResult,
@@ -51,6 +54,7 @@ from syntara.workflows.models import (
 from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreate
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
+from syntara.workflows.utils.schema_diff import detect_workflow_breaking_changes
 from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
@@ -526,6 +530,71 @@ async def get_workflow_version(
     ever_published, pub_ts = await service.get_publish_context([workflow_version.id])
 
     return await service.to_version_read(workflow_version, workflow.published_version_id, ever_published, pub_ts)
+
+
+@router.post(
+    "/{workflow_id}/versions/{version}/check-breaking-changes",
+    summary="Check for breaking changes before publishing",
+    response_model=BreakingChangesResponse,
+    dependencies=[Depends(_wf_perm_read)],
+    operation_id="check_breaking_changes",
+    response_description="Breaking changes detection result",
+)
+async def check_breaking_changes(
+    workflow_id: UUID,
+    version: int,  # noqa: ARG001
+    request: WorkflowValidateRequest,
+    service: Annotated[WorkflowService, Depends(get_workflow_service)],
+) -> BreakingChangesResponse:
+    """Check for breaking changes in SubWorkflow output schemas.
+
+    Compares the new workflow definition against the currently published version
+    to detect breaking changes such as:
+    - Removed outputs
+    - Type changes
+    - New required outputs
+
+    This endpoint should be called before publishing to warn users about
+    breaking changes that may affect parent workflows.
+    """
+    workflow = await service.get_workflow_by_id(workflow_id)
+
+    # Get the currently published definition (if any)
+    old_definition = None
+    if workflow.published_version_id:
+        result = await service.session.execute(
+            select(WorkflowVersion.workflow_definition).where(WorkflowVersion.id == workflow.published_version_id)
+        )
+        published_def = result.scalar_one_or_none()
+        if published_def:
+            old_definition = published_def
+
+    # Detect breaking changes
+    new_definition = request.workflow_definition
+    changes_by_trigger = detect_workflow_breaking_changes(old_definition, new_definition)
+
+    # Build response
+    triggers_with_changes: list[TriggerBreakingChanges] = []
+    for trigger_id, changes_list in changes_by_trigger.items():
+        # Get trigger name from new definition
+        trigger_name = None
+        for trigger in new_definition.get("triggers", []):
+            if isinstance(trigger, dict) and trigger.get("id") == trigger_id:
+                trigger_name = trigger.get("name")
+                break
+
+        triggers_with_changes.append(
+            TriggerBreakingChanges(
+                trigger_id=trigger_id,
+                trigger_name=trigger_name,
+                changes=[BreakingChange(**change) for change in changes_list],
+            )
+        )
+
+    return BreakingChangesResponse(
+        has_breaking_changes=len(triggers_with_changes) > 0,
+        triggers=triggers_with_changes,
+    )
 
 
 @router.post(
