@@ -436,7 +436,7 @@ paths:
       tags:
         - Execution Plane
       summary: List work items
-      description: Retrieve work items. Filters use field=value or field[operator]=value; comma-separated values within one field/operator use OR and different fields/operators use AND. EP validates fields and operators. Keep filters, sort, and limit unchanged when following opaque cursors.
+      description: Retrieve work items. Filters use field=value or field[operator]=value; comma-separated values within one field/operator use OR and different fields/operators use AND. runtime_context[key]=value matches exact JSON strings; empty values check key existence. Context keys are literal top-level keys, commas are literal, and multiple keys use AND. EP validates fields and operators. Keep filters, sort, and limit unchanged when following opaque cursors.
       operationId: list_work_items
       security:
         - bearerAuth: []
@@ -944,7 +944,12 @@ components:
           type: string
           format: uuid
           title: Id
-          description: Work item unique identifier
+          description: Primary key of this EP work item, equal to work.execute.payload.work_item_id supplied at creation. Use it to read or cancel this item and correlate completion or credential callbacks. Syntara uses ActivityExecution.id; runtime_context.execution_id identifies its containing execution.
+        runtime_context:
+          additionalProperties: true
+          type: object
+          title: Runtime Context
+          description: Optional caller-defined JSON object, defaulting to {}. Stored once, unencrypted, on the work item and passed to the plugin as context.runtime_context; also returned in work-item reads and completion notifications. Do not include secrets. Syntara supplies project_id (Project.id), workflow_id (Workflow.id), and execution_id (the containing Execution.id); EP does not require these keys. These values do not authorize access, select placement, identify the work item, or control its lifecycle. List filters runtime_context[key]=value match exact JSON strings at literal top-level keys; an empty value checks key existence and multiple keys use AND.
         status:
           $ref: '#/components/schemas/WorkItemStatus'
           description: Work item lifecycle status
