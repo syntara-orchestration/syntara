@@ -65,6 +65,7 @@ export function FormFieldBuilderCard({
       current.value_name === previousAuto ||
       current.value_name === slugifyLabelToValueNameBase(current.label)
 
+    setValue(`fields.${index}.label`, nextLabel, { shouldValidate: false })
     if (shouldAutoRename) {
       setValue(`fields.${index}.value_name`, labelToValueName(nextLabel, otherNames), { shouldValidate: false })
     }

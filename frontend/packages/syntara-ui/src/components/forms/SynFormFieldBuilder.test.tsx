@@ -93,10 +93,46 @@ describe('SynFormFieldBuilder', () => {
     await user.type(labelInputs[0], 'First')
     await user.clear(labelInputs[1])
     await user.type(labelInputs[1], 'Second')
-    expect(onChange).toHaveBeenCalled()
-    const lastCall = onChange.mock.calls.at(-1)?.[0] as FormDefinition
-    expect(lastCall.fields).toHaveLength(2)
-    expect(lastCall.fields[1]?.label).toBe('Second')
+    await waitFor(() => expect(labelInputs[1]).toHaveValue('Second'))
+    await waitFor(() => {
+      const lastCall = onChange.mock.calls.at(-1)?.[0] as FormDefinition
+      expect(lastCall.fields).toHaveLength(2)
+      expect(lastCall.fields[1]?.label).toBe('Second')
+    })
+  })
+
+  it('syncs value name from field label while the label still looks auto-generated', async () => {
+    const user = userEvent.setup()
+
+    renderBuilder(<ControlledSynFormFieldBuilder onChange={vi.fn()} />)
+
+    const labelInput = screen.getByRole('textbox', { name: 'Field label' })
+    const valueNameInput = screen.getByRole('textbox', { name: 'Value name' })
+
+    expect(valueNameInput).toHaveValue('field_1')
+
+    await user.clear(labelInput)
+    await user.type(labelInput, 'Customer Name')
+
+    expect(labelInput).toHaveValue('Customer Name')
+    expect(valueNameInput).toHaveValue('customer_name')
+  })
+
+  it('does not overwrite a manually edited value name when the label changes', async () => {
+    const user = userEvent.setup()
+
+    renderBuilder(<ControlledSynFormFieldBuilder onChange={vi.fn()} />)
+
+    const labelInput = screen.getByRole('textbox', { name: 'Field label' })
+    const valueNameInput = screen.getByRole('textbox', { name: 'Value name' })
+
+    await user.clear(valueNameInput)
+    await user.type(valueNameInput, 'custom_key')
+
+    await user.clear(labelInput)
+    await user.type(labelInput, 'Different label')
+
+    expect(valueNameInput).toHaveValue('custom_key')
   })
 
   it('keeps all nine field type choices in the builder menu', async () => {
