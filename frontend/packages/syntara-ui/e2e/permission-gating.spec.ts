@@ -983,25 +983,23 @@ test.describe('Permission gating — Execution target actions', () => {
       'Execution Plane API is not available in this environment (compose CI does not start execution-plane-api)'
     )
 
-    await auditorApp.goto(toAppUrl('/execution-plane'))
-    await expect(auditorApp.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+    // Toolbar Configure CTA only renders when the list has rows. Create a fixture so
+    // an empty live EP still exercises aria-disabled + tooltip (not empty-state gating).
+    const name = buildUniqueName('e2e-et-perm-configure')
+    const created = await createExecutionTargetViaApi(app, { name })
 
-    // Toolbar only renders when the list has rows (or active filters). Mock seed
-    // provides targets; on an empty real backend this falls back to empty-state
-    // gating (no create CTA when canConfigure is false).
-    const configureButton = auditorApp.getByRole('button', { name: 'Configure execution target' })
-    const emptyState = auditorApp.getByText('No execution targets yet')
-    await expect(configureButton.or(emptyState)).toBeVisible({ timeout: 15_000 })
+    try {
+      await auditorApp.goto(toAppUrl('/execution-plane'))
+      await expect(auditorApp.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
 
-    if (await emptyState.isVisible()) {
-      await expect(configureButton).toHaveCount(0)
-      return
+      const configureButton = auditorApp.getByRole('button', { name: 'Configure execution target' })
+      await expect(configureButton).toBeVisible({ timeout: 15_000 })
+      await expect(configureButton).toHaveAttribute('aria-disabled', 'true')
+      await configureButton.hover()
+      await expect(auditorApp.getByRole('tooltip').filter({ hasText: 'execution_target:create' })).toBeVisible()
+    } finally {
+      await deleteExecutionTargetViaApi(app, created.id)
     }
-
-    await expect(configureButton).toBeVisible()
-    await expect(configureButton).toHaveAttribute('aria-disabled', 'true')
-    await configureButton.hover()
-    await expect(auditorApp.getByRole('tooltip').filter({ hasText: 'execution_target:create' })).toBeVisible()
   })
 
   test('auditor: Edit and Delete execution target kebabs are aria-disabled', async ({ app, auditorApp }) => {
@@ -1010,30 +1008,30 @@ test.describe('Permission gating — Execution target actions', () => {
       'Execution Plane API is not available in this environment (compose CI does not start execution-plane-api)'
     )
 
-    const seededName = 'Staging OpenShift'
-    await auditorApp.goto(toAppUrl('/execution-plane'))
-    await expect(auditorApp.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+    const name = buildUniqueName('e2e-et-perm-kebab')
+    const created = await createExecutionTargetViaApi(app, { name })
 
-    const emptyState = auditorApp.getByText('No execution targets yet')
-    const row = auditorApp.getByRole('row', { name: new RegExp(seededName) })
-    await expect(row.or(emptyState)).toBeVisible({ timeout: 15_000 })
+    try {
+      await auditorApp.goto(toAppUrl('/execution-plane'))
+      await expect(auditorApp.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
 
-    if (await emptyState.isVisible()) {
-      return
+      await auditorApp.getByPlaceholder('Filter by name').fill(name)
+      await auditorApp.getByRole('button', { name: 'Apply filter' }).click()
+
+      const row = auditorApp.getByRole('row', { name: new RegExp(name) })
+      await expect(row).toBeVisible({ timeout: 15_000 })
+      await openRowKebab(row, /Edit execution target/i)
+      await expect(auditorApp.getByRole('menuitem', { name: /Edit execution target/i })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+      await expect(auditorApp.getByRole('menuitem', { name: /Delete execution target/i })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    } finally {
+      await deleteExecutionTargetViaApi(app, created.id)
     }
-
-    await auditorApp.getByPlaceholder('Filter by name').fill(seededName)
-    await auditorApp.getByRole('button', { name: 'Apply filter' }).click()
-    await expect(row).toBeVisible({ timeout: 15_000 })
-    await openRowKebab(row, /Edit execution target/i)
-    await expect(auditorApp.getByRole('menuitem', { name: /Edit execution target/i })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    )
-    await expect(auditorApp.getByRole('menuitem', { name: /Delete execution target/i })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    )
   })
 
   test('auditor: enable/disable toggle is aria-disabled with tooltip', async ({ app, auditorApp }) => {
@@ -1056,10 +1054,11 @@ test.describe('Permission gating — Execution target actions', () => {
       await expect(row).toBeVisible({ timeout: 15_000 })
 
       const toggle = row.getByRole('switch', { name: `Toggle ${name}` })
-      // Keep focusable (no native disabled) so the permission tooltip still receives hover/focus.
-      await expect(toggle).not.toBeDisabled()
+      // Permission gating uses aria-disabled (not native disabled) so tooltips still receive hover.
+      // Playwright's toBeDisabled() treats aria-disabled as disabled, so assert the attribute only.
+      // PF Switch hides the input behind a styled span — force hover like credential enable toggles.
       await expect(toggle).toHaveAttribute('aria-disabled', 'true')
-      await toggle.hover()
+      await toggle.hover({ force: true })
       await expect(auditorApp.getByRole('tooltip').filter({ hasText: 'execution_target:update' })).toBeVisible()
     } finally {
       await deleteExecutionTargetViaApi(app, created.id)

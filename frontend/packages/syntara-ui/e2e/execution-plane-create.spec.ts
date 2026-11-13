@@ -17,6 +17,7 @@ import { test, expect, toAppUrl, type Page } from './fixtures'
 import {
   createExecutionTargetViaApi,
   deleteExecutionTargetViaApi,
+  getSoleOpenShiftIntegrationName,
   hasSingleOpenShiftIntegration,
   isExecutionPlaneListReachable,
 } from './helpers/execution-plane'
@@ -42,13 +43,14 @@ test.describe('Execution Plane — configure execution target', { tag: '@pr-chec
   })
 
   test('toolbar CTA opens create form with readonly OpenShift cluster', async ({ app }) => {
-    test.skip(!(await hasSingleOpenShiftIntegration(app)), 'Requires exactly one OpenShift integration')
+    const clusterName = (await getSoleOpenShiftIntegrationName(app)) ?? ''
+    test.skip(!clusterName, 'Requires exactly one OpenShift integration')
 
     await openCreateForm(app)
 
     await expect(app.getByRole('textbox', { name: 'Execution target name' })).toBeVisible()
     await expect(app.getByRole('textbox', { name: 'Execution namespace' })).toBeVisible()
-    await expect(app.getByText('prod-openshift-west')).toBeVisible()
+    await expect(app.getByText(clusterName)).toBeVisible()
   })
 
   test('submits a valid target and navigates to detail', async ({ app }) => {
@@ -137,7 +139,7 @@ test.describe('Execution Plane — configure execution target', { tag: '@pr-chec
     await openCreateForm(app)
 
     await app.getByRole('textbox', { name: 'Execution target name' }).fill(buildUniqueName('e2e-et-dirty'))
-    await app.getByRole('link', { name: 'Cancel' }).click()
+    await app.getByRole('button', { name: 'Cancel' }).click()
 
     const dialog = app.getByRole('dialog')
     await expect(dialog).toBeVisible()
