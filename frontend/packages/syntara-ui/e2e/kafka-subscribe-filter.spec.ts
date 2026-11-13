@@ -41,8 +41,15 @@ test.describe('Kafka Subscribe CEL filter', () => {
     await app.getByRole('button', { name: TEST_FILTER, exact: true }).click()
     await expect(app.getByRole('heading', { name: 'Info alert: No match', exact: true })).toBeVisible()
     await editor.fill('input.missing')
+    await expect(app.getByRole('heading', { name: 'Info alert: No match', exact: true })).toBeHidden()
+    await app.getByRole('button', { name: TEST_FILTER, exact: true }).click()
+    await expect(app.getByRole('heading', { name: 'Info alert: No match', exact: true })).toBeVisible()
+    await editor.fill('input')
     await app.getByRole('button', { name: TEST_FILTER, exact: true }).click()
     await expect(app.getByRole('heading', { name: 'Warning alert: Evaluation error', exact: true })).toBeVisible()
+    await expect(
+      app.getByText('The expression could not evaluate to a boolean for this sample. Error code: filter_non_boolean')
+    ).toBeVisible()
     await editor.fill('input.')
     await app.getByRole('button', { name: TEST_FILTER, exact: true }).click()
     await expect(
