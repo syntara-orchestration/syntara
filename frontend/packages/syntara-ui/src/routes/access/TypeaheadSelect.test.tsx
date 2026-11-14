@@ -162,6 +162,21 @@ describe('TypeaheadSelect', () => {
       expect(onChange).toHaveBeenCalledWith('opt-2')
     })
 
+    it('allows selecting a full custom template expression when enabled', async () => {
+      const user = userEvent.setup()
+      const { container, onChange } = renderSelect({ allowCustomTemplate: true })
+
+      await user.click(getInput())
+      await user.paste('${script.stdout_json.release_tag}')
+      const customExpression = screen.getByRole('option', {
+        name: 'Use custom expression: ${script.stdout_json.release_tag}',
+      })
+      expect(await axe(container)).toHaveNoViolations()
+      await user.click(customExpression)
+
+      expect(onChange).toHaveBeenCalledWith('${script.stdout_json.release_tag}')
+    })
+
     it('closes dropdown after selecting an option', async () => {
       const user = userEvent.setup()
       renderSelect()

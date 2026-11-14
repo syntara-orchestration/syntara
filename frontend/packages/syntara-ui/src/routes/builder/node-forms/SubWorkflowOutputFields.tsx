@@ -17,6 +17,7 @@ import { parseJsonSchema } from '../../../utils/jsonSafeParse'
 import { ExpandableCodeEditor } from '../components/ExpandableCodeEditor'
 import { JsonEditorControls } from '../components/JsonEditorToolbar'
 import {
+  isSimpleOutputSchemaRepresentable,
   outputFieldsFromSchema,
   outputMappingFromFields,
   outputSchemaFromFields,
@@ -48,6 +49,7 @@ function getAdvancedOutputMapping(
 ): Record<string, string> | undefined {
   const properties = schema?.properties
   if (typeof properties !== 'object' || properties === null || Array.isArray(properties)) return undefined
+  if (!isSimpleOutputSchemaRepresentable(schema, currentMapping)) return undefined
   return outputMappingFromFields(outputFieldsFromSchema(schema, currentMapping))
 }
 
@@ -177,7 +179,13 @@ export function SubWorkflowOutputFields({
     () => outputFieldsFromSchema(parsedSchema, outputMapping),
     [parsedSchema, outputMapping]
   )
-  const [editorMode, setEditorMode] = useState<'simple' | 'advanced'>('simple')
+  const isSimpleModeRepresentable = useMemo(
+    () => !schemaText.trim() || isSimpleOutputSchemaRepresentable(parsedSchema, outputMapping),
+    [outputMapping, parsedSchema, schemaText]
+  )
+  const [editorMode, setEditorMode] = useState<'simple' | 'advanced'>(() =>
+    isSimpleModeRepresentable ? 'simple' : 'advanced'
+  )
   const [modeError, setModeError] = useState('')
   const modeId = useId()
 
@@ -221,6 +229,10 @@ export function SubWorkflowOutputFields({
       setModeError('Cannot switch to Simple mode: Invalid JSON schema. Fix errors in Advanced mode first.')
       return
     }
+    if (!isSimpleModeRepresentable) {
+      setModeError('This output schema or mapping cannot be represented in Simple mode. Continue in Advanced mode.')
+      return
+    }
     setModeError('')
     setValue('outputFields', advancedFields)
     setEditorMode('simple')
@@ -260,7 +272,7 @@ export function SubWorkflowOutputFields({
                   buttonId={`${modeId}-simple`}
                   isSelected={editorMode === 'simple'}
                   onChange={selectSimpleMode}
-                  isDisabled={isVersionView}
+                  isDisabled={isVersionView || (editorMode === 'advanced' && !isSimpleModeRepresentable)}
                 />
                 <ToggleGroupItem
                   text="Advanced"
@@ -275,6 +287,14 @@ export function SubWorkflowOutputFields({
               <StackItem>
                 <Alert variant="danger" isInline title="Mode switch error">
                   {modeError}
+                </Alert>
+              </StackItem>
+            )}
+            {editorMode === 'advanced' && schemaText.trim() && parsedSchema && !isSimpleModeRepresentable && (
+              <StackItem>
+                <Alert variant="info" isInline isPlain title="This schema requires Advanced mode">
+                  Simple mode cannot represent every schema feature or mapping in this definition. Keeping it in
+                  Advanced mode preserves the schema and mappings.
                 </Alert>
               </StackItem>
             )}

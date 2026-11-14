@@ -21,7 +21,7 @@ import type { Control, UseFormSetValue } from 'react-hook-form'
 
 import { TypeaheadSelect } from '../../access/TypeaheadSelect'
 
-import type { OutputSourceOption } from './SubWorkflowOutputSourceOptions'
+import { isDynamicOutputExpression, type OutputSourceOption } from './SubWorkflowOutputSourceOptions'
 import type { TriggerFormData } from './triggerFormSchema'
 
 type OutputField = NonNullable<TriggerFormData['outputFields']>[number]
@@ -42,13 +42,20 @@ function getFieldId(index: number, suffix: string) {
   return `subworkflow-output-${index}-${suffix}`
 }
 
-function getSelectedSourceLabel(source: OutputSourceOption | undefined, isUnavailable: boolean): string | undefined {
+function getSelectedSourceLabel(
+  source: OutputSourceOption | undefined,
+  expression: string,
+  isUnavailable: boolean,
+  isDynamic: boolean
+): string | undefined {
   if (source) return `${source.stepName} · ${source.fieldName}`
+  if (isDynamic) return `Dynamic path · ${expression}`
   return isUnavailable ? 'Unavailable in current workflow' : undefined
 }
 
 function getOutputSourceIssues({
   isConditional,
+  isDynamicSource,
   isRequired,
   isUnavailable,
   isTypeMismatch,
@@ -56,6 +63,7 @@ function getOutputSourceIssues({
   outputType,
 }: Readonly<{
   isConditional: boolean
+  isDynamicSource: boolean
   isRequired: boolean
   isUnavailable: boolean
   isTypeMismatch: boolean
@@ -74,6 +82,12 @@ function getOutputSourceIssues({
   if (isUnavailable) {
     issues.push({
       message: 'This saved source is unavailable. Choose an existing child step output.',
+      variant: 'warning',
+    })
+  }
+  if (isDynamicSource) {
+    issues.push({
+      message: 'This dynamic source path is checked when its step runs; a missing field fails the child run.',
       variant: 'warning',
     })
   }
@@ -114,14 +128,22 @@ function renderOutputMappingField({
 }: OutputMappingFieldProps) {
   const selectedSource = sourceOptions.find((source) => source.expression === row.expression?.trim())
   const isSourceUnavailable = Boolean(row.expression && !selectedSource)
+  const isDynamicSource = Boolean(row.expression && isDynamicOutputExpression(row.expression, sourceOptions))
+  const isConfirmedUnavailable = isSourceUnavailable && !isDynamicSource
   const isSourceTypeMismatch = Boolean(
     selectedSource && row.type !== 'unknown' && selectedSource.type !== 'unknown' && selectedSource.type !== row.type
   )
-  const selectedSourceLabel = getSelectedSourceLabel(selectedSource, isSourceUnavailable)
+  const selectedSourceLabel = getSelectedSourceLabel(
+    selectedSource,
+    row.expression ?? '',
+    isConfirmedUnavailable,
+    isDynamicSource
+  )
   const sourceIssues = getOutputSourceIssues({
     isConditional: Boolean(row.expression && isSourceConditional(row.expression)),
+    isDynamicSource,
     isRequired: row.required,
-    isUnavailable: isSourceUnavailable,
+    isUnavailable: isConfirmedUnavailable,
     isTypeMismatch: isSourceTypeMismatch,
     sourceType: selectedSource?.type,
     outputType: row.type,
@@ -149,6 +171,21 @@ function renderOutputMappingField({
                 onChange={(value) => {
                   const option = sourceOptions.find((candidate) => candidate.expression === value)
                   if (!option) {
+                    const expression = value.trim()
+                    if (/^\$\{[^{}]+\}$/.test(expression)) {
+                      const description = getInitialDescription(row, sourceOptions)
+                      field.onChange(expression)
+                      setValue(`outputFields.${index}.type`, 'unknown', {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                      setValue(`outputFields.${index}.description`, description, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                      onRowChange({ ...row, expression, type: 'unknown', description })
+                      return
+                    }
                     field.onChange('')
                     onRowChange({ ...row, expression: '' })
                     return
@@ -179,6 +216,7 @@ function renderOutputMappingField({
                 }}
                 placeholder="Choose a step output…"
                 searchPromptThreshold={20}
+                allowCustomTemplate
                 isRequired={row.required}
                 isDisabled={isVersionView}
               />

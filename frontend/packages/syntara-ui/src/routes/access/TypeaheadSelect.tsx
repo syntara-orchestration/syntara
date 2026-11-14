@@ -29,6 +29,9 @@ export type TypeaheadOption = {
   tag?: TypeaheadOptionTag
 }
 
+const CUSTOM_TEMPLATE_VALUE_PREFIX = '__typeahead_custom_template__:'
+const TEMPLATE_EXPRESSION_PATTERN = /^\$\{[^{}]+\}$/
+
 type TypeaheadSelectProps = {
   id: string
   ariaLabel: string
@@ -48,6 +51,8 @@ type TypeaheadSelectProps = {
   isLoading?: boolean
   /** Requires a search term before showing local results above this count. */
   searchPromptThreshold?: number
+  /** Allows selecting an exact template expression typed into the filter. */
+  allowCustomTemplate?: boolean
 }
 
 function renderOption(option: TypeaheadOption, selected: string) {
@@ -81,6 +86,7 @@ function renderOptions({
   hasMore,
   isLoading,
   shouldPromptForSearch,
+  allowCustomTemplate,
 }: {
   options: TypeaheadOption[]
   filterValue: string
@@ -88,15 +94,26 @@ function renderOptions({
   hasMore?: boolean
   isLoading?: boolean
   shouldPromptForSearch?: boolean
+  allowCustomTemplate?: boolean
 }) {
   if (isLoading) {
     return <SelectOption isDisabled>Loading...</SelectOption>
   }
-  if (options.length === 0) {
-    return <SelectOption isDisabled>No results match &quot;{filterValue}&quot;</SelectOption>
-  }
   if (shouldPromptForSearch && !filterValue.trim()) {
     return <SelectOption isDisabled>Type to search step and output names...</SelectOption>
+  }
+  const customTemplate = filterValue.trim()
+  const canUseCustomTemplate =
+    allowCustomTemplate === true &&
+    TEMPLATE_EXPRESSION_PATTERN.test(customTemplate) &&
+    !options.some((option) => option.value === customTemplate)
+  const customTemplateOption = canUseCustomTemplate ? (
+    <SelectOption key="custom-template" value={`${CUSTOM_TEMPLATE_VALUE_PREFIX}${customTemplate}`}>
+      Use custom expression: {customTemplate}
+    </SelectOption>
+  ) : null
+  if (options.length === 0) {
+    return customTemplateOption ?? <SelectOption isDisabled>No results match &quot;{filterValue}&quot;</SelectOption>
   }
   if (options.some((option) => option.group)) {
     const groups = new Map<string, TypeaheadOption[]>()
@@ -113,6 +130,7 @@ function renderOptions({
             {groupOptions.map((option) => renderOption(option, selected))}
           </SelectGroup>
         ))}
+        {customTemplateOption}
         {hasMore && <SelectOption isDisabled>Type to narrow results...</SelectOption>}
       </>
     )
@@ -120,6 +138,7 @@ function renderOptions({
   return (
     <>
       {options.map((option) => renderOption(option, selected))}
+      {customTemplateOption}
       {hasMore && <SelectOption isDisabled>Type to narrow results...</SelectOption>}
     </>
   )
@@ -140,6 +159,7 @@ export function TypeaheadSelect({
   hasMore,
   isLoading,
   searchPromptThreshold,
+  allowCustomTemplate = false,
 }: Readonly<TypeaheadSelectProps>) {
   const [isOpen, setIsOpen] = useState(false)
   const [filterValue, setFilterValue] = useState('')
@@ -169,7 +189,12 @@ export function TypeaheadSelect({
 
   const onSelect = (_event: React.MouseEvent<Element, MouseEvent> | undefined, value: string | number | undefined) => {
     if (value === undefined) return
-    onChange(String(value))
+    const selectedValue = String(value)
+    onChange(
+      allowCustomTemplate && selectedValue.startsWith(CUSTOM_TEMPLATE_VALUE_PREFIX)
+        ? selectedValue.slice(CUSTOM_TEMPLATE_VALUE_PREFIX.length)
+        : selectedValue
+    )
     setFilterValue('')
     if (onSearchChange) {
       onSearchChange('')
@@ -251,7 +276,15 @@ export function TypeaheadSelect({
       toggle={toggle}
     >
       <SelectList style={{ maxHeight: '200px', overflow: 'auto' }}>
-        {renderOptions({ options: filteredOptions, filterValue, selected, hasMore, isLoading, shouldPromptForSearch })}
+        {renderOptions({
+          options: filteredOptions,
+          filterValue,
+          selected,
+          hasMore,
+          isLoading,
+          shouldPromptForSearch,
+          allowCustomTemplate,
+        })}
       </SelectList>
     </SynSelect>
   )

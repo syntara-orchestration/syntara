@@ -24,8 +24,51 @@ const FIELD_TYPES: Record<string, OutputFieldDef['type']> = {
   array: 'array',
 }
 
+const UNSUPPORTED_SIMPLE_SCHEMA_KEYS = [
+  '$ref',
+  'allOf',
+  'anyOf',
+  'oneOf',
+  'not',
+  'if',
+  'then',
+  'else',
+  'patternProperties',
+  'unevaluatedProperties',
+  'dependentSchemas',
+  'dependentRequired',
+] as const
+
+const SIMPLE_PATH_SEGMENT = /^[a-zA-Z0-9_ -]+$/
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function hasUnsupportedSimpleSchemaFeatures(schema: Record<string, unknown>): boolean {
+  if (UNSUPPORTED_SIMPLE_SCHEMA_KEYS.some((key) => Object.hasOwn(schema, key))) return true
+
+  if (isRecord(schema.properties) && schema.type !== 'object') return true
+  const schemaType = schema.type
+  if (Array.isArray(schemaType)) return true
+
+  const additionalProperties = schema.additionalProperties
+  if (additionalProperties !== undefined && additionalProperties !== false) return true
+
+  if (isRecord(schema.items) && isRecord(schema.items.properties)) return true
+
+  const properties = schema.properties
+  if (!isRecord(properties)) return false
+  const required = Array.isArray(schema.required)
+    ? schema.required.filter((value): value is string => typeof value === 'string')
+    : []
+  if (required.some((name) => !Object.hasOwn(properties, name))) return true
+
+  return Object.entries(properties).some(([name, property]) => {
+    if (!name || name.includes('.') || !SIMPLE_PATH_SEGMENT.test(name) || !isRecord(property)) return true
+    if (isRecord(property.properties) && property.type !== 'object') return true
+    return hasUnsupportedSimpleSchemaFeatures(property)
+  })
 }
 
 /**
@@ -52,6 +95,17 @@ export function outputFieldsFromSchema(
 
       // If this property has nested properties, recurse
       if (isRecord(property.properties) && Object.keys(property.properties).length > 0) {
+        if (Object.hasOwn(mapping, pathString)) {
+          return [
+            {
+              path: pathString,
+              type: FIELD_TYPES[property.type ?? 'object'] ?? 'object',
+              required: isRequired,
+              description: property.description ?? '',
+              expression: mapping[pathString],
+            },
+          ]
+        }
         return visit(
           property.properties,
           path,
@@ -80,6 +134,18 @@ export function outputFieldsFromSchema(
     true,
     Array.isArray(schema.required) ? schema.required.filter((value): value is string => typeof value === 'string') : []
   )
+}
+
+/**
+ * Return whether the Simple editor can represent a schema and mapping without dropping information.
+ * Advanced-only JSON Schema constructs and mappings to nested object values have no Simple row equivalent.
+ */
+export function isSimpleOutputSchemaRepresentable(schema: unknown, mapping: Record<string, string> = {}): boolean {
+  if (!isRecord(schema) || schema.type !== 'object' || !isRecord(schema.properties)) return false
+  if (hasUnsupportedSimpleSchemaFeatures(schema)) return false
+
+  const simplePaths = new Set(outputFieldsFromSchema(schema).map((field) => field.path))
+  return Object.keys(mapping).every((path) => simplePaths.has(path))
 }
 
 type ValidOutputRow = { field: SubWorkflowOutputField; segments: string[] }

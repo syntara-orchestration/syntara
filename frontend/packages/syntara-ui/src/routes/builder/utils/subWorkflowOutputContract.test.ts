@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { outputFieldsFromSchema, outputMappingFromFields, outputSchemaFromFields } from './subWorkflowOutputContract'
+import {
+  isSimpleOutputSchemaRepresentable,
+  outputFieldsFromSchema,
+  outputMappingFromFields,
+  outputSchemaFromFields,
+} from './subWorkflowOutputContract'
 
 describe('SubWorkflow output contract visual representation', () => {
   it('builds nested JSON Schema from dotted Simple mode paths', () => {
@@ -54,5 +59,45 @@ describe('SubWorkflow output contract visual representation', () => {
     expect(fields.map((field) => field.path)).toEqual(['intake.status', 'intake.ticket_id'])
     expect(outputMappingFromFields(fields)).toEqual(mappings)
     expect(roundTripSchema).toEqual(schema)
+  })
+
+  it('rejects schemas with composition or dynamic properties from Simple mode', () => {
+    expect(
+      isSimpleOutputSchemaRepresentable({
+        allOf: [{ type: 'object', properties: { release: { type: 'string' } } }],
+        properties: { release: { type: 'string' } },
+      })
+    ).toBe(false)
+    expect(
+      isSimpleOutputSchemaRepresentable({
+        type: 'object',
+        properties: { metadata: { type: 'object', additionalProperties: { type: 'string' } } },
+      })
+    ).toBe(false)
+  })
+
+  it('rejects mappings to an object when Simple mode only represents its leaf paths', () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        release: {
+          type: 'object',
+          properties: { tag: { type: 'string' } },
+        },
+      },
+    }
+
+    expect(isSimpleOutputSchemaRepresentable(schema, { release: '${build.release}' })).toBe(false)
+    expect(isSimpleOutputSchemaRepresentable(schema, { 'release.tag': '${build.tag}' })).toBe(true)
+
+    expect(outputFieldsFromSchema(schema, { release: '${build.release}' })).toEqual([
+      {
+        path: 'release',
+        type: 'object',
+        required: false,
+        description: '',
+        expression: '${build.release}',
+      },
+    ])
   })
 })

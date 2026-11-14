@@ -705,8 +705,18 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 non_retryable=True,
             )
 
+        workflow_nodes = definition.get("nodes", []) if isinstance(definition, dict) else []
+        source_step_ids = {
+            node["id"] for node in workflow_nodes if isinstance(node, dict) and isinstance(node.get("id"), str)
+        }
         try:
-            return apply_declared_output_mapping(self.resolver, output_schema, output_mapping)
+            return apply_declared_output_mapping(
+                self.resolver,
+                output_schema,
+                output_mapping,
+                skipped_source_ids=self.skipped_nodes,
+                source_step_ids=source_step_ids,
+            )
         except DeclaredOutputContractError as exc:
             message = f"Sub-workflow output contract violation: {exc}"
             raise ApplicationError(

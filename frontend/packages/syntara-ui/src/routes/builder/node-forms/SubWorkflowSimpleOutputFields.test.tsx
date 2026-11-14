@@ -16,7 +16,13 @@ vi.mock('../../../stores/useWorkflowStore', () => ({
   useWorkflowStore: (selector: (state: typeof mockWorkflowState) => unknown) => selector(mockWorkflowState),
 }))
 
-function TestWrapper({ outputFields = [] }: Readonly<{ outputFields?: NonNullable<TriggerFormData['outputFields']> }>) {
+function TestWrapper({
+  outputFields = [],
+  onRowsChange = vi.fn(),
+}: Readonly<{
+  outputFields?: NonNullable<TriggerFormData['outputFields']>
+  onRowsChange?: (rows: NonNullable<TriggerFormData['outputFields']>) => void
+}>) {
   const methods = useForm<TriggerFormData>({ defaultValues: { outputFields } })
   return (
     <FormProvider {...methods}>
@@ -24,7 +30,7 @@ function TestWrapper({ outputFields = [] }: Readonly<{ outputFields?: NonNullabl
         triggerId="child-trigger"
         triggerIndex={0}
         isVersionView={false}
-        onRowsChange={vi.fn()}
+        onRowsChange={onRowsChange}
       />
     </FormProvider>
   )
@@ -72,6 +78,49 @@ describe('SubWorkflowSimpleOutputFields', () => {
 
     expect(screen.getByRole('textbox', { name: 'Type to filter' })).toHaveValue('Unavailable in current workflow')
     expect(screen.getByText(/This saved source is unavailable/)).toBeInTheDocument()
+  })
+
+  it('allows and identifies a dynamic nested source path', async () => {
+    const user = userEvent.setup()
+    const onRowsChange = vi.fn()
+    render(<TestWrapper onRowsChange={onRowsChange} />)
+
+    await user.click(screen.getByRole('button', { name: 'Add output field' }))
+    await user.type(screen.getByRole('textbox', { name: 'Output name' }), 'release.tag')
+    const source = screen.getByRole('textbox', { name: 'Type to filter' })
+    await user.click(source)
+    await user.paste('${deploy.stdout_json.release_tag}')
+    await user.click(screen.getByRole('option', { name: 'Use custom expression: ${deploy.stdout_json.release_tag}' }))
+
+    expect(onRowsChange).toHaveBeenLastCalledWith([
+      expect.objectContaining({
+        path: 'release.tag',
+        type: 'unknown',
+        expression: '${deploy.stdout_json.release_tag}',
+      }),
+    ])
+    expect(screen.getByText(/dynamic source path is checked when its step runs/)).toBeInTheDocument()
+  })
+
+  it('does not mark a saved nested dynamic source as definitely unavailable', () => {
+    render(
+      <TestWrapper
+        outputFields={[
+          {
+            path: 'release.tag',
+            type: 'string',
+            required: false,
+            description: '',
+            expression: '${deploy.stdout_json.release_tag}',
+          },
+        ]}
+      />
+    )
+
+    expect(screen.getByRole('textbox', { name: 'Type to filter' })).toHaveValue(
+      'Dynamic path · ${deploy.stdout_json.release_tag}'
+    )
+    expect(screen.queryByText(/This saved source is unavailable/)).not.toBeInTheDocument()
   })
 
   it('warns when a required output maps to a conditionally run step', () => {

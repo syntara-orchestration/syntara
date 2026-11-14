@@ -6,6 +6,7 @@ export type OutputSourceOption = {
   stepName: string
   type: OutputFieldDef['type']
   sourceDescription: string
+  allowsDynamicDescendants: boolean
 }
 
 type Activity = {
@@ -50,14 +51,29 @@ function flattenOutputFields(
     const path = [...prefix, field.name]
     const fieldName = path.join('.')
     const option: OutputSourceOption = {
-      expression: `\${${stepId}.${fieldName}}`,
+      expression: '${' + stepId + '.' + fieldName + '}',
       fieldName,
       stepName,
       type: field.type,
       sourceDescription: field.description,
+      allowsDynamicDescendants: field.type === 'unknown' || field.additionalProperties !== undefined,
     }
     return [option, ...(field.children ? flattenOutputFields(stepId, stepName, field.children, path) : [])]
   })
+}
+
+export function isDynamicOutputExpression(expression: string, sourceOptions: OutputSourceOption[]): boolean {
+  const match = /^\$\{([^{}]+)\}$/.exec(expression.trim())
+  if (!match) return false
+  const segments = match[1]?.split('.') ?? []
+  if (segments.length < 3) return false
+
+  for (let prefixLength = 2; prefixLength < segments.length; prefixLength += 1) {
+    const prefix = '${' + segments.slice(0, prefixLength).join('.') + '}'
+    if (sourceOptions.some((option) => option.expression === prefix && option.allowsDynamicDescendants)) return true
+  }
+
+  return false
 }
 
 function outputFieldsForActivity(activity: Activity): OutputFieldDef[] {

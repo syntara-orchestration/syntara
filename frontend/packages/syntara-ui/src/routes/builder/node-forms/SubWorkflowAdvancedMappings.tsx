@@ -18,7 +18,11 @@ import { TypeaheadSelect } from '../../access/TypeaheadSelect'
 import { extractStepIdFromExpression, isStepConditional } from '../utils/conditionalStepDetection'
 import type { SubWorkflowOutputField } from '../utils/subWorkflowOutputContract'
 
-import { getStepOutputChoices, type OutputSourceOption } from './SubWorkflowOutputSourceOptions'
+import {
+  getStepOutputChoices,
+  isDynamicOutputExpression,
+  type OutputSourceOption,
+} from './SubWorkflowOutputSourceOptions'
 
 type Props = Readonly<{
   fields: SubWorkflowOutputField[]
@@ -33,8 +37,14 @@ function getFieldId(index: number) {
   return `subworkflow-output-${index}-advanced-expression`
 }
 
-function getSourceLabel(source: OutputSourceOption | undefined, isUnavailable: boolean): string | undefined {
+function getSourceLabel(
+  source: OutputSourceOption | undefined,
+  expression: string,
+  isUnavailable: boolean,
+  isDynamic: boolean
+): string | undefined {
   if (source) return `${source.stepName} · ${source.fieldName}`
+  if (isDynamic) return `Dynamic path · ${expression}`
   return isUnavailable ? 'Unavailable in current workflow' : undefined
 }
 
@@ -78,7 +88,8 @@ export function SubWorkflowAdvancedMappings({
         const expression = outputMapping[field.path] ?? ''
         const isConditional = expression ? isSourceConditional(expression) : false
         const sourceOption = sourceOptions.find((option) => option.expression === expression.trim())
-        const isSourceUnavailable = Boolean(expression && !sourceOption)
+        const isDynamicSource = Boolean(expression && isDynamicOutputExpression(expression, sourceOptions))
+        const isSourceUnavailable = Boolean(expression && !sourceOption && !isDynamicSource)
         const isSourceTypeMismatch = Boolean(
           sourceOption &&
           field.type !== 'unknown' &&
@@ -99,10 +110,11 @@ export function SubWorkflowAdvancedMappings({
                   description: option.sourceDescription,
                 }))}
                 selected={expression}
-                selectedLabel={getSourceLabel(sourceOption, isSourceUnavailable)}
+                selectedLabel={getSourceLabel(sourceOption, expression, isSourceUnavailable, isDynamicSource)}
                 onChange={(value) => onMappingChange(field.path, value)}
                 placeholder="Choose a step output…"
                 searchPromptThreshold={20}
+                allowCustomTemplate
                 isRequired={field.required}
                 isDisabled={isVersionView}
               />
@@ -117,6 +129,11 @@ export function SubWorkflowAdvancedMappings({
                   {isSourceUnavailable && (
                     <HelperTextItem variant="warning" icon={<RhUiWarningIcon />}>
                       This saved source is unavailable in the current workflow. Choose an existing child step output.
+                    </HelperTextItem>
+                  )}
+                  {isDynamicSource && (
+                    <HelperTextItem variant="warning" icon={<RhUiWarningIcon />}>
+                      This dynamic source path is checked when its step runs; a missing field fails the child run.
                     </HelperTextItem>
                   )}
                   {isSourceTypeMismatch && sourceOption && (

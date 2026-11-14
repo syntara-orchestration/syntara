@@ -10,10 +10,17 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.utils.namespace_resolver import TEMPLATE_PATTERN
+from syntara.workflows.validators.workflow_definition import (
+    _known_node_output_schema,
+    _output_types_compatible,
+    _schema_type_at_path,
+)
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, SubWorkflowExecutorParameters
 
 NodeTarget = tuple[str | None, UUID, str, Mapping[str, Any]]
 TargetWorkflow = tuple[str | None, UUID, UUID | None, Mapping[str, Any] | None]
+_SUBWORKFLOW_OUTPUT_PATH_PREFIX = ("Result", "outputs")
 
 
 def _invalid_reference_finding(message: str, node_id: str | None, field_path: str) -> ValidationFinding:
@@ -144,6 +151,65 @@ def _required_trigger_input_names(trigger: Mapping[str, Any]) -> list[str]:
     return [name for name in required if isinstance(name, str)]
 
 
+def _declared_output_type_for_expression(
+    expression: str,
+    nodes_by_id: Mapping[str, dict[str, Any]],
+    subworkflow_output_schemas: Mapping[str, dict[str, Any]],
+) -> str | None:
+    match = TEMPLATE_PATTERN.fullmatch(expression.strip())
+    if match is None:
+        return None
+
+    source_id, separator, source_path = match.group(1).partition(".")
+    if not separator:
+        return None
+
+    source_segments = source_path.split(".")
+    prefix_length = len(_SUBWORKFLOW_OUTPUT_PATH_PREFIX)
+    if (
+        tuple(source_segments[:prefix_length]) == _SUBWORKFLOW_OUTPUT_PATH_PREFIX
+        and len(source_segments) > prefix_length
+    ):
+        output_schema = subworkflow_output_schemas.get(source_id)
+        is_missing, source_type = _schema_type_at_path(output_schema, ".".join(source_segments[prefix_length:]))
+        return None if is_missing else source_type
+
+    source_schema = _known_node_output_schema(nodes_by_id.get(source_id, {}))
+    is_missing, source_type = _schema_type_at_path(source_schema, source_path)
+    return None if is_missing else source_type
+
+
+def _parent_input_type_findings(
+    *,
+    node_id: str | None,
+    input_mapping: Mapping[str, Any],
+    input_schema: Mapping[str, Any],
+    nodes_by_id: Mapping[str, dict[str, Any]],
+    subworkflow_output_schemas: Mapping[str, dict[str, Any]],
+) -> list[ValidationFinding]:
+    findings: list[ValidationFinding] = []
+    for input_path, expression in input_mapping.items():
+        if not isinstance(input_path, str) or not isinstance(expression, str):
+            continue
+        _input_missing, input_type = _schema_type_at_path(dict(input_schema), input_path)
+        source_type = _declared_output_type_for_expression(expression, nodes_by_id, subworkflow_output_schemas)
+        if input_type is None or source_type is None or _output_types_compatible(source_type, input_type):
+            continue
+        findings.append(
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.schema_violation,
+                message=(
+                    f"Input mapping for '{input_path}' has source type '{source_type}', "
+                    f"but the child input expects '{input_type}'."
+                ),
+                node_id=node_id,
+                field_path=f"parameters.input_mapping.{input_path}",
+            )
+        )
+    return findings
+
+
 def _validate_target_workflow(
     target_workflow: TargetWorkflow | None,
     project_id: UUID,
@@ -210,14 +276,45 @@ async def validate_subworkflow_project_references(
     if not target_ids:
         return findings
     targets = await _load_target_workflows(session, node_targets)
+    nodes_by_id = {node["id"]: node for node in nodes if isinstance(node, dict) and isinstance(node.get("id"), str)}
+    subworkflow_output_schemas: dict[str, dict[str, Any]] = {}
+    for node_id, target_id, trigger_node_id, _ in node_targets:
+        target_workflow = targets.get(target_id)
+        if node_id is None or target_workflow is None:
+            continue
+        _, target_project_id, version_id, target_definition = target_workflow
+        if target_project_id != project_id or version_id is None:
+            continue
+        trigger = _get_selected_subworkflow_trigger(target_definition, trigger_node_id)
+        parameters = trigger.get("parameters") if isinstance(trigger, Mapping) else None
+        output_schema = parameters.get("output_schema") if isinstance(parameters, Mapping) else None
+        if isinstance(output_schema, dict):
+            subworkflow_output_schemas[node_id] = output_schema
+
     for node_id, target_id, trigger_node_id, input_mapping in node_targets:
+        target_workflow = targets.get(target_id)
         findings.extend(
             _validate_target_workflow(
-                targets.get(target_id),
+                target_workflow,
                 project_id,
                 trigger_node_id,
                 node_id,
                 input_mapping,
             )
         )
+        if target_workflow is None or target_workflow[1] != project_id or target_workflow[2] is None:
+            continue
+        trigger = _get_selected_subworkflow_trigger(target_workflow[3], trigger_node_id)
+        parameters = trigger.get("parameters") if isinstance(trigger, Mapping) else None
+        input_schema = parameters.get("input_schema") if isinstance(parameters, Mapping) else None
+        if isinstance(input_schema, Mapping):
+            findings.extend(
+                _parent_input_type_findings(
+                    node_id=node_id,
+                    input_mapping=input_mapping,
+                    input_schema=input_schema,
+                    nodes_by_id=nodes_by_id,
+                    subworkflow_output_schemas=subworkflow_output_schemas,
+                )
+            )
     return findings
