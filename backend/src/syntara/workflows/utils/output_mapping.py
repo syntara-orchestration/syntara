@@ -15,6 +15,7 @@ class DeclaredOutputErrorCode(StrEnum):
     MAPPING_TYPE = "mapping_type"
     INVALID_PATH = "invalid_path"
     UNDECLARED_PATH = "undeclared_path"
+    SOURCE_PATH_UNAVAILABLE = "source_path_unavailable"
     CONFLICTING_PATH = "conflicting_path"
     INVALID_SCHEMA = "invalid_schema"
     SCHEMA_VIOLATION = "schema_violation"
@@ -35,6 +36,7 @@ class DeclaredOutputContractError(ValueError):
             "mapping_type": "Output mappings must use string paths and expressions",
             "invalid_path": f"Invalid declared output path: {self.detail}",
             "undeclared_path": f"Output mapping path '{self.detail}' is not declared in output_schema",
+            "source_path_unavailable": f"Mapped source field '{self.detail}' was not found after its step ran",
             "conflicting_path": f"Conflicting output mapping paths near '{self.detail}'",
             "invalid_schema": f"Invalid declared output schema: {self.detail}",
             "schema_violation": f"Declared outputs do not satisfy the schema at {self.detail}",
@@ -74,6 +76,31 @@ def _set_declared_output(outputs: dict[str, Any], path: list[str], value: object
     if leaf_name in current and (isinstance(existing_value, dict) or isinstance(value, dict)):
         raise DeclaredOutputContractError(DeclaredOutputErrorCode.CONFLICTING_PATH, leaf_name)
     current[leaf_name] = value
+
+
+def _resolve_declared_source_value(
+    resolver: NamespaceResolver,
+    expression: str,
+    *,
+    skipped_source_ids: set[str] | None,
+    source_step_ids: set[str] | None,
+) -> tuple[bool, Any]:
+    match = TEMPLATE_PATTERN.fullmatch(expression.strip())
+    if match is None:
+        raise DeclaredOutputContractError(DeclaredOutputErrorCode.MAPPING_EXPRESSION)
+
+    source_id = match.group(1).split(".", 1)[0]
+    if not resolver.has_namespace(source_id) or (
+        skipped_source_ids is not None and source_id in skipped_source_ids and resolver.get_namespace(source_id) == {}
+    ):
+        return False, None
+
+    try:
+        return True, resolver.resolve_value(expression.strip())
+    except (KeyError, AttributeError, TypeError, IndexError) as exc:
+        if source_step_ids is None or source_id not in source_step_ids:
+            return False, None
+        raise DeclaredOutputContractError(DeclaredOutputErrorCode.SOURCE_PATH_UNAVAILABLE, expression.strip()) from exc
 
 
 def apply_output_mapping(result: dict[str, Any], output_config: dict[str, str] | None) -> dict[str, Any]:
@@ -124,12 +151,17 @@ def apply_declared_output_mapping(
     resolver: NamespaceResolver,
     output_schema: dict[str, Any],
     output_mapping: dict[str, str] | None,
+    *,
+    skipped_source_ids: set[str] | None = None,
+    source_step_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     """Resolve declared child outputs and enforce the JSON Schema contract.
 
-    Missing optional values are omitted. Missing required values, invalid types,
-    and malformed mappings fail the child workflow so a parent never receives a
-    successful result that violates the published contract.
+    Values from skipped steps are omitted when optional. If a source step ran but
+    its mapped path is missing, the mapping is stale and fails even when optional.
+    Missing required values, invalid types, and malformed mappings also fail the
+    child workflow so a parent never receives a successful result that violates
+    the published contract.
     """
     declared: dict[str, Any] = {}
     schema_paths = _declared_schema_paths(output_schema)
@@ -142,15 +174,14 @@ def apply_declared_output_mapping(
             raise DeclaredOutputContractError(DeclaredOutputErrorCode.INVALID_PATH, output_path)
         if output_path not in schema_paths:
             raise DeclaredOutputContractError(DeclaredOutputErrorCode.UNDECLARED_PATH, output_path)
-        if TEMPLATE_PATTERN.fullmatch(expression.strip()) is None:
-            raise DeclaredOutputContractError(DeclaredOutputErrorCode.MAPPING_EXPRESSION)
-
-        try:
-            value = resolver.resolve_value(expression.strip())
-        except (KeyError, AttributeError, TypeError, IndexError):
-            # Whether a missing value is acceptable is determined by the schema below.
+        is_available, value = _resolve_declared_source_value(
+            resolver,
+            expression,
+            skipped_source_ids=skipped_source_ids,
+            source_step_ids=source_step_ids,
+        )
+        if not is_available:
             continue
-
         _set_declared_output(declared, path, value)
 
     try:

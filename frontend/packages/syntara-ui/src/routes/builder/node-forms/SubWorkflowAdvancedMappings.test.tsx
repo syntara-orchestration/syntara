@@ -76,6 +76,25 @@ describe('SubWorkflowAdvancedMappings', () => {
     expect(screen.getByText(/This saved source is unavailable in the current workflow/)).toBeVisible()
   })
 
+  it('identifies nested dynamic source paths for runtime validation', () => {
+    render(
+      <SubWorkflowAdvancedMappings
+        fields={[{ path: 'release.tag', type: 'string', required: false }]}
+        outputMapping={{ 'release.tag': '${deploy.stdout_json.release_tag}' }}
+        triggerId="trigger-0"
+        triggerIndex={0}
+        isVersionView={false}
+        onMappingChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('textbox', { name: 'Type to filter' })).toHaveValue(
+      'Dynamic path · ${deploy.stdout_json.release_tag}'
+    )
+    expect(screen.queryByText(/This saved source is unavailable/)).not.toBeInTheDocument()
+    expect(screen.getByText(/dynamic source path is checked when its step runs/)).toBeVisible()
+  })
+
   it('has no accessibility violations in the empty state', async () => {
     const { container } = render(
       <SubWorkflowAdvancedMappings

@@ -11,7 +11,7 @@ from syntara.authz.models.project import Project
 from syntara.core.models import User
 from syntara.workflows.exceptions import WorkflowNotPublishedError, WorkflowPublishValidationError
 from syntara.workflows.models import Workflow
-from syntara.workflows.models.validation_finding import ValidationCategory, ValidationResult
+from syntara.workflows.models.validation_finding import ValidationCategory, ValidationResult, ValidationSeverity
 from syntara.workflows.models.workflow import WorkflowCreate
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.workflow_service import WorkflowService
@@ -72,6 +72,7 @@ async def _create_child_workflow(
     trigger_node_id: str = "child_entry",
     trigger_type: str = "subworkflow_trigger",
     input_schema: dict[str, Any] | None = None,
+    output_schema: dict[str, Any] | None = None,
     additional_triggers: list[dict[str, Any]] | None = None,
 ) -> Workflow:
     child = Workflow(
@@ -86,6 +87,8 @@ async def _create_child_workflow(
 
     if published:
         trigger_parameters = {"input_schema": input_schema} if input_schema is not None else {}
+        if output_schema is not None:
+            trigger_parameters["output_schema"] = output_schema
         triggers = [{"id": trigger_node_id, "type": trigger_type, "parameters": trigger_parameters}]
         triggers.extend(additional_triggers or [])
         version = WorkflowVersion(
@@ -383,6 +386,68 @@ async def test_missing_required_child_inputs_warn_on_save_and_block_publish(
 
     assert exc_info.value.validation_result.error_count == 0
     assert exc_info.value.validation_result.warning_count == 2
+
+
+@pytest.mark.asyncio
+async def test_parent_subworkflow_input_rejects_incompatible_upstream_declared_output(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    producer = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {"release": {"type": "object", "properties": {"id": {"type": "string"}}}},
+        },
+    )
+    consumer = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        input_schema={"type": "object", "properties": {"build_id": {"type": "number"}}},
+    )
+    parent_definition = {
+        "schema_version": "2.0.0",
+        "name": "typed-parent",
+        "triggers": [{"id": "parent_entry", "type": "manual_trigger", "parameters": {}}],
+        "nodes": [
+            {
+                "id": "invoke_release",
+                "type": "sub_workflow",
+                "parameters": {
+                    "workflow_id": str(producer.id),
+                    "trigger_node_id": "child_entry",
+                    "input_mapping": {},
+                },
+            },
+            {
+                "id": "consume_release",
+                "type": "sub_workflow",
+                "parameters": {
+                    "workflow_id": str(consumer.id),
+                    "trigger_node_id": "child_entry",
+                    "input_mapping": {"build_id": "${invoke_release.Result.outputs.release.id}"},
+                },
+            },
+        ],
+        "edges": [
+            {"from": "parent_entry", "to": "invoke_release"},
+            {"from": "invoke_release", "to": "consume_release"},
+        ],
+    }
+
+    findings = await validate_subworkflow_project_references(test_db_session, parent_definition, test_project_id)
+
+    type_findings = [finding for finding in findings if finding.field_path == "parameters.input_mapping.build_id"]
+    assert len(type_findings) == 1
+    assert type_findings[0].severity == ValidationSeverity.error
+    assert type_findings[0].category == ValidationCategory.schema_violation
+    assert type_findings[0].node_id == "consume_release"
+    assert "source type 'string'" in type_findings[0].message
+    assert "expects 'number'" in type_findings[0].message
 
 
 @pytest.mark.asyncio
