@@ -207,11 +207,10 @@ function WorkflowSelectionFields({
       {workflowId && isInvocationSchemaNotFound(invocation.selectedSchemaError) && (
         <StackItem>
           <Alert variant="warning" isInline title="This workflow has no published version available to invoke.">
-            Publish the child workflow, then{' '}
+            Publish the child workflow, then retry.{' '}
             <Button variant="link" type="button" onClick={() => invocation.retryFailedLookups(workflowId)}>
-              retry
+              Retry
             </Button>
-            .
           </Alert>
         </StackItem>
       )}
@@ -275,6 +274,36 @@ function WorkflowInputMapping({
   )
 }
 
+function WorkflowInputMappingSection({
+  canConfigure,
+  hasNoDeclaredInputs,
+  methods,
+  inputFields,
+  freeformJson,
+  isDisabled,
+}: Readonly<{
+  canConfigure: boolean
+  hasNoDeclaredInputs: boolean
+  methods: SubWorkflowMethods
+  inputFields: InvocationInputField[]
+  freeformJson: string
+  isDisabled: boolean
+}>) {
+  if (!canConfigure || hasNoDeclaredInputs) return null
+
+  return (
+    <StackItem>
+      <WorkflowInputMapping
+        methods={methods}
+        inputFields={inputFields}
+        sectionTitle="Inputs"
+        freeformJson={freeformJson}
+        isDisabled={isDisabled}
+      />
+    </StackItem>
+  )
+}
+
 /** Configure a child workflow, its Subworkflow Trigger, and input mappings. */
 export function SubWorkflowNodeForm({
   onSubmit,
@@ -312,12 +341,16 @@ export function SubWorkflowNodeForm({
     () => getInvocationInputFields(selectedTrigger?.input_schema),
     [selectedTrigger?.input_schema]
   )
-  const inputSectionTitle = 'Inputs'
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
 
   const submitForm = useCallback(
     (values: SubWorkflowFormValues) =>
-      submitSubWorkflowForm(values, { onSubmit, methods, selectedTrigger, inputFields }),
+      submitSubWorkflowForm(values, {
+        onSubmit,
+        methods,
+        selectedTrigger,
+        inputFields,
+      }),
     [inputFields, methods, onSubmit, selectedTrigger]
   )
   useRegisterAutoSubmit(autoSubmitRef, methods, submitForm)
@@ -359,17 +392,14 @@ export function SubWorkflowNodeForm({
           isVersionView={isVersionView}
         />
       </StackItem>
-      {canConfigureInputMapping && !hasNoDeclaredInputs && (
-        <StackItem>
-          <WorkflowInputMapping
-            methods={methods}
-            inputFields={inputFields}
-            sectionTitle={inputSectionTitle}
-            freeformJson={freeformJson}
-            isDisabled={isVersionView}
-          />
-        </StackItem>
-      )}
+      <WorkflowInputMappingSection
+        canConfigure={canConfigureInputMapping}
+        hasNoDeclaredInputs={hasNoDeclaredInputs}
+        methods={methods}
+        inputFields={inputFields}
+        freeformJson={freeformJson}
+        isDisabled={isVersionView}
+      />
     </Stack>
   )
 

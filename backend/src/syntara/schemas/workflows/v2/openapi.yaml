@@ -213,7 +213,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkflowReadWithVersion'
+                $ref: '#/components/schemas/WorkflowDetailRead'
         '400':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
         '401':
@@ -641,6 +641,71 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+  /workflows/{workflow_id}/versions/{version}/check-breaking-changes:
+    post:
+      summary: Check for breaking changes before publishing
+      description: |
+        Check for breaking changes in SubWorkflow output schemas.
+
+        Compares the new workflow definition against the currently published version
+        to detect breaking changes such as:
+        - Removed outputs
+        - Type changes
+        - New required outputs
+
+        This endpoint should be called before publishing to warn users about
+        breaking changes that may affect parent workflows.
+      operationId: check_breaking_changes
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: read
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+            title: Version
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowValidateRequest'
+      responses:
+        '200':
+          description: Breaking changes detection result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BreakingChangesResponse'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        '429':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError'
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
   /workflows/{workflow_id}/unpublish:
     post:
       summary: Unpublish workflow
@@ -919,6 +984,12 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowRead
     WorkflowReadWithVersion:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowReadWithVersion
+    WorkflowDetailRead:
+      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowDetailRead
+    PublishedWorkflowStepMetadataRead:
+      $ref: ./shared-schemas.yaml#/components/schemas/PublishedWorkflowStepMetadataRead
+    WorkflowStepMetadataRead:
+      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowStepMetadataRead
     WorkflowInvocationTriggerSchema:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowInvocationTriggerSchema
     WorkflowInvocationSchemaRead:
@@ -959,8 +1030,139 @@ components:
             - type: integer
             - type: 'null'
           title: Expected Version
-          description: >-
-            Version the client was editing. If the server's current_version is higher, returns 409 Conflict.
+          description: Version the client was editing. If the server's current_version is higher, returns 409 Conflict.
+
+    BreakingChange:
+      type: object
+      title: BreakingChange
+      description: |-
+        A single breaking change detected in an output schema.
+
+        Attributes:
+            change_type: Type of breaking change (removed_output, type_change, new_required_output)
+            field_path: Dotted path to the affected field
+            old_type: Previous field type (for type changes)
+            new_type: New field type (for type changes and new required outputs)
+            description: Human-readable description
+      required:
+        - change_type
+        - field_path
+        - description
+      additionalProperties: false
+      properties:
+        change_type:
+          type: string
+          title: Change Type
+        field_path:
+          type: string
+          title: Field Path
+        old_type:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Old Type
+        new_type:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: New Type
+        description:
+          type: string
+          title: Description
+        is_breaking:
+          type: boolean
+          title: Is Breaking
+          default: true
+
+    TriggerBreakingChanges:
+      type: object
+      title: TriggerBreakingChanges
+      description: |-
+        Breaking changes for a single SubWorkflow Trigger.
+
+        Attributes:
+            trigger_id: ID of the trigger node
+            trigger_name: Name of the trigger (if available)
+            changes: List of breaking changes detected for this trigger
+      required:
+        - trigger_id
+        - changes
+      additionalProperties: false
+      properties:
+        trigger_id:
+          type: string
+          title: Trigger Id
+        trigger_name:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Trigger Name
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BreakingChange'
+          title: Changes
+
+    BreakingChangesResponse:
+      type: object
+      title: BreakingChangesResponse
+      description: Response containing the output contract diff and current parent references.
+      required:
+        - has_breaking_changes
+        - triggers
+      additionalProperties: false
+      properties:
+        has_breaking_changes:
+          type: boolean
+          title: Has Breaking Changes
+        triggers:
+          type: array
+          items:
+            $ref: '#/components/schemas/TriggerBreakingChanges'
+          title: Triggers
+        has_contract_changes:
+          type: boolean
+          title: Has Contract Changes
+          default: false
+        contract_changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TriggerBreakingChanges'
+          title: Contract Changes
+        parent_workflows:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowReferenceRead'
+          title: Parent Workflows
+    WorkflowReferenceRead:
+      type: object
+      title: WorkflowReferenceRead
+      description: A currently published parent workflow step that references this child.
+      required:
+        - workflow_id
+        - workflow_name
+        - workflow_version
+        - step_id
+      additionalProperties: false
+      properties:
+        workflow_id:
+          type: string
+          format: uuid
+          title: Workflow Id
+        workflow_name:
+          type: string
+          title: Workflow Name
+        workflow_version:
+          type: integer
+          title: Workflow Version
+        step_id:
+          type: string
+          title: Step Id
+        step_name:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Step Name
     WorkflowVersionUpdate:
       type: object
       title: WorkflowVersionUpdate

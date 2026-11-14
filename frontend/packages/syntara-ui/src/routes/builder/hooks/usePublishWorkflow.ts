@@ -1,6 +1,7 @@
+import type { WorkflowAPI } from '@syntara/contracts'
 import type { Query } from '@tanstack/react-query'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 
 import { workflowClient } from '../../../client'
 import { useAlerts } from '../../../providers/alerts'
@@ -16,12 +17,12 @@ function isWorkflowQuery(query: Query): boolean {
   )
 }
 
-function getDirtyWorkflowDefinition(
+function getCurrentWorkflowDefinition(
   workflowName: string | undefined,
   workflowDescription: string | undefined
 ): Record<string, unknown> | undefined {
-  const { currentWorkflow, isDirty, edges, nodePositions } = useWorkflowStore.getState()
-  if (!isDirty || !currentWorkflow) return undefined
+  const { currentWorkflow, edges, nodePositions } = useWorkflowStore.getState()
+  if (!currentWorkflow) return undefined
   const wf = currentWorkflow.workflow as { name?: string; description?: string } | undefined
   return buildWorkflowDefinition({
     workflowName: workflowName || String(wf?.name ?? ''),
@@ -31,6 +32,19 @@ function getDirtyWorkflowDefinition(
     edges,
     nodePositions,
   })
+}
+
+type PendingPublish = {
+  publishName?: string
+  description?: string
+  onSettled?: () => void
+  version: number
+  expectedVersion?: number
+  workflowDefinition?: Record<string, unknown>
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 type UsePublishWorkflowOptions = {
@@ -54,10 +68,86 @@ export function usePublishWorkflow({
 }: UsePublishWorkflowOptions) {
   const queryClient = useQueryClient()
   const { showSuccess, showError, showWarning } = useAlerts()
+  const [breakingChanges, setBreakingChanges] = useState<WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]>(
+    []
+  )
+  const [contractChanges, setContractChanges] = useState<WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]>(
+    []
+  )
+  const [parentWorkflows, setParentWorkflows] = useState<WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]>(
+    []
+  )
+  const [pendingPublish, setPendingPublish] = useState<PendingPublish | null>(null)
 
   const { mutate: publishMutation, isPending: isPublishing } = workflowClient.useMutation(
     'post',
     '/workflows/{workflow_id}/versions/{version}/publish'
+  )
+
+  const { mutate: checkBreakingChangesMutation, isPending: isCheckingBreakingChanges } = workflowClient.useMutation(
+    'post',
+    '/workflows/{workflow_id}/versions/{version}/check-breaking-changes'
+  )
+
+  const reviewOutputContract = useCallback(
+    (workflowDefinition?: unknown) => {
+      const candidate = workflowDefinition ?? getCurrentWorkflowDefinition(workflowName, workflowDescription)
+      if (!workflowId || currentVersion == null || !isRecord(candidate)) return Promise.resolve(null)
+
+      return new Promise<WorkflowAPI.components['schemas']['BreakingChangesResponse'] | null>((resolve) => {
+        checkBreakingChangesMutation(
+          {
+            params: { path: { workflow_id: workflowId, version: currentVersion } },
+            body: { workflow_definition: candidate },
+          },
+          {
+            onSuccess: resolve,
+            onError: (error: unknown) => {
+              showError({ title: 'Could not check output contract changes', description: getErrorMessage(error) })
+              resolve(null)
+            },
+          }
+        )
+      })
+    },
+    [workflowId, currentVersion, workflowName, workflowDescription, checkBreakingChangesMutation, showError]
+  )
+
+  const publishNow = useCallback(
+    (pending: PendingPublish) => {
+      publishMutation(
+        {
+          params: { path: { workflow_id: workflowId ?? '', version: pending.version } },
+          body: {
+            name: pending.publishName ?? null,
+            change_description: pending.description ?? null,
+            ...(pending.workflowDefinition ? { workflow_definition: pending.workflowDefinition } : {}),
+            ...(pending.expectedVersion != null ? { expected_version: pending.expectedVersion } : {}),
+          },
+        },
+        {
+          onSuccess: (data) => {
+            if (data.warning) {
+              showWarning({ title: 'Workflow published with warnings', description: data.warning })
+            } else {
+              showSuccess({ title: 'Workflow published' })
+            }
+            if (useWorkflowStore.getState().isDirty) useWorkflowStore.getState().markClean()
+            if (data?.current_version != null) onVersionUpdated?.(data.current_version)
+            detachPromise(queryClient.invalidateQueries({ predicate: isWorkflowQuery }))
+          },
+          onError: (error: unknown) => {
+            if (isWorkflowVersionConflictError(error) && onConflict) {
+              onConflict(extractVersionConflictInfo(error))
+              return
+            }
+            showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
+          },
+          onSettled: pending.onSettled,
+        }
+      )
+    },
+    [workflowId, publishMutation, showWarning, showSuccess, onVersionUpdated, queryClient, onConflict, showError]
   )
 
   const publish = useCallback(
@@ -70,43 +160,39 @@ export function usePublishWorkflow({
       const versionToPublish = callOptions?.versionOverride ?? currentVersion
       if (!workflowId || versionToPublish == null) return
 
-      const workflowDefinition = getDirtyWorkflowDefinition(workflowName, workflowDescription)
+      const workflowDefinition = getCurrentWorkflowDefinition(workflowName, workflowDescription)
       const expectedVersion = callOptions?.expectedVersionOverride ?? optionsExpectedVersion
-      publishMutation(
-        {
-          params: { path: { workflow_id: workflowId, version: versionToPublish } },
-          body: {
-            name: publishName ?? null,
-            change_description: description ?? null,
-            ...(workflowDefinition ? { workflow_definition: workflowDefinition } : {}),
-            ...(expectedVersion != null ? { expected_version: expectedVersion } : {}),
-          },
-        },
-        {
-          onSuccess: (data) => {
-            if (data.warning) {
-              showWarning({
-                title: 'Workflow published with warnings',
-                description: data.warning,
-              })
-            } else {
-              showSuccess({ title: 'Workflow published' })
-            }
-            if (workflowDefinition) useWorkflowStore.getState().markClean()
-            if (data?.current_version != null) {
-              onVersionUpdated?.(data.current_version)
-            }
-            detachPromise(queryClient.invalidateQueries({ predicate: isWorkflowQuery }))
-          },
-          onError: (error: unknown) => {
-            if (isWorkflowVersionConflictError(error) && onConflict) {
-              onConflict(extractVersionConflictInfo(error))
-              return
-            }
-            showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
-          },
-          onSettled,
-        }
+      const pending: PendingPublish = {
+        publishName,
+        description,
+        onSettled,
+        version: versionToPublish,
+        workflowDefinition,
+        ...(expectedVersion != null ? { expectedVersion } : {}),
+      }
+      if (!workflowDefinition) {
+        publishNow(pending)
+        return
+      }
+      setBreakingChanges([])
+      setContractChanges([])
+      setParentWorkflows([])
+      setPendingPublish(pending)
+      detachPromise(
+        reviewOutputContract(workflowDefinition).then((response) => {
+          if (!response) {
+            setPendingPublish(null)
+            return
+          }
+          setBreakingChanges(response.triggers)
+          setContractChanges(response.contract_changes ?? [])
+          setParentWorkflows(response.parent_workflows ?? [])
+          if (response.has_breaking_changes || (response.has_contract_changes && response.parent_workflows?.length)) {
+            return
+          }
+          setPendingPublish(null)
+          publishNow(pending)
+        })
       )
     },
     [
@@ -115,17 +201,39 @@ export function usePublishWorkflow({
       workflowName,
       workflowDescription,
       optionsExpectedVersion,
-      onConflict,
-      onVersionUpdated,
-      publishMutation,
-      queryClient,
-      showSuccess,
-      showError,
-      showWarning,
+      reviewOutputContract,
+      publishNow,
     ]
   )
 
-  return { publish, isPublishing }
+  const confirmPublish = useCallback(() => {
+    if (!pendingPublish) return
+    const pending = pendingPublish
+    setBreakingChanges([])
+    setContractChanges([])
+    setParentWorkflows([])
+    setPendingPublish(null)
+    publishNow(pending)
+  }, [pendingPublish, publishNow])
+
+  const cancelBreakingChangeWarning = useCallback(() => {
+    setBreakingChanges([])
+    setContractChanges([])
+    setParentWorkflows([])
+    setPendingPublish(null)
+  }, [])
+
+  return {
+    publish,
+    isPublishing: isPublishing || isCheckingBreakingChanges,
+    isCheckingBreakingChanges,
+    breakingChanges,
+    contractChanges,
+    parentWorkflows,
+    confirmPublish,
+    cancelBreakingChangeWarning,
+    reviewOutputContract,
+  }
 }
 
 export function useUnpublishWorkflow(workflowId: string | null) {

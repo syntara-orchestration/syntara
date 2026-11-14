@@ -63,6 +63,32 @@ describe('useUpstreamNodes', () => {
     expect(result.current).toEqual([{ id: 'node-a', name: 'Upstream Script', type: 'script' }])
   })
 
+  it('includes the child workflow and selected trigger for an upstream Sub-workflow step', () => {
+    const subWorkflow = {
+      ...makeActivity('sub-workflow-1', 'sub_workflow', 'Call child'),
+      parameters: { workflow_id: 'child-workflow-1', trigger_node_id: 'child-entry' },
+    }
+    const target = makeActivity('node-b', 'script', 'Downstream Script')
+    const edge: EdgeConnection = { id: 'e1', source: subWorkflow.id, target: target.id }
+
+    useWorkflowStore.setState({
+      currentWorkflow: makeWorkflow([subWorkflow, target]),
+      edges: [edge],
+    })
+
+    const { result } = renderHook(() => useUpstreamNodes(target.id))
+
+    expect(result.current).toEqual([
+      {
+        id: 'sub-workflow-1',
+        name: 'Call child',
+        type: 'sub_workflow',
+        childWorkflowId: 'child-workflow-1',
+        childTriggerNodeId: 'child-entry',
+      },
+    ])
+  })
+
   it('returns upstream Trigger when a trigger is the source', () => {
     const trigger = makeActivity('trigger-real-id', 'manual_trigger', 'Manual Trigger')
     const target = makeActivity('node-1', 'script', 'My Script')

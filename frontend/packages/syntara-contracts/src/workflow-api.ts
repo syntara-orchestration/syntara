@@ -196,6 +196,35 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/workflows/{workflow_id}/versions/{version}/check-breaking-changes': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Check for breaking changes before publishing
+     * @description Check for breaking changes in SubWorkflow output schemas.
+     *
+     *     Compares the new workflow definition against the currently published version
+     *     to detect breaking changes such as:
+     *     - Removed outputs
+     *     - Type changes
+     *     - New required outputs
+     *
+     *     This endpoint should be called before publishing to warn users about
+     *     breaking changes that may affect parent workflows.
+     */
+    post: operations['check_breaking_changes']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/workflows/{workflow_id}/unpublish': {
     parameters: {
       query?: never
@@ -453,6 +482,115 @@ export interface components {
       version: components['schemas']['WorkflowVersionRead']
     }
     /**
+     * WorkflowDetailRead
+     * @description Workflow detail response with metadata for its published version.
+     */
+    WorkflowDetailRead: {
+      /**
+       * Name
+       * @description Workflow name
+       */
+      name: string
+      /**
+       * Description
+       * @description Workflow description
+       */
+      description?: string | null
+      /**
+       * Labels
+       * @description Workflow labels
+       */
+      labels?: {
+        [key: string]: string
+      }
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Current Version */
+      current_version: number
+      /**
+       * Is Builtin
+       * @default false
+       */
+      is_builtin?: boolean
+      /** Is Enabled */
+      is_enabled: boolean
+      /**
+       * Has Validation Issues
+       * @default false
+       */
+      has_validation_issues?: boolean
+      /**
+       * Created By
+       * @description User who created the workflow
+       */
+      readonly created_by?: components['schemas']['UserReference'] | null
+      /**
+       * Updated By
+       * @description User who last modified the workflow
+       */
+      readonly updated_by?: components['schemas']['UserReference'] | null
+      /**
+       * Project Id
+       * Format: uuid
+       */
+      project_id: string
+      /** Published Version Id */
+      published_version_id?: string | null
+      /** Published Version Number */
+      published_version_number?: number | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+      /** @description Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator. */
+      validation_result?: components['schemas']['ValidationResult'] | null
+      /** @description Current active version details */
+      version: components['schemas']['WorkflowVersionRead']
+      /** @description Step IDs, types, and output schemas from the exact published version, when one exists. */
+      published_step_metadata?: components['schemas']['PublishedWorkflowStepMetadataRead'] | null
+    }
+    /**
+     * PublishedWorkflowStepMetadataRead
+     * @description Step metadata tied to the exact published workflow version.
+     */
+    PublishedWorkflowStepMetadataRead: {
+      /**
+       * Version Id
+       * Format: uuid
+       */
+      version_id: string
+      /** Version */
+      version: number
+      /** Steps */
+      steps: components['schemas']['WorkflowStepMetadataRead'][]
+    }
+    /**
+     * WorkflowStepMetadataRead
+     * @description Published workflow step metadata used by the variable picker.
+     */
+    WorkflowStepMetadataRead: {
+      /** Id */
+      id: string
+      /** Type */
+      type: string
+      /**
+       * Output Schema
+       * @description JSON Schema for this step's output, or null when the step type has no output model.
+       */
+      output_schema?: {
+        [key: string]: unknown
+      } | null
+    }
+    /**
      * WorkflowInvocationTriggerSchema
      * @description One dedicated Subworkflow Trigger available for Reference mode.
      */
@@ -465,6 +603,13 @@ export interface components {
       input_schema?: {
         [key: string]: unknown
       }
+      /**
+       * Output Schema
+       * @description JSON Schema defining the outputs exposed to parent workflows. Provides encapsulation—parent sees only declared fields, not internal child step structure.
+       */
+      output_schema?: {
+        [key: string]: unknown
+      } | null
     }
     /**
      * WorkflowInvocationSchemaRead
@@ -656,6 +801,89 @@ export interface components {
        * @description Version the client was editing. If the server's current_version is higher, returns 409 Conflict.
        */
       expected_version?: number | null
+    }
+    /**
+     * BreakingChange
+     * @description A single breaking change detected in an output schema.
+     *
+     *     Attributes:
+     *         change_type: Type of breaking change (removed_output, type_change, new_required_output)
+     *         field_path: Dotted path to the affected field
+     *         old_type: Previous field type (for type changes)
+     *         new_type: New field type (for type changes and new required outputs)
+     *         description: Human-readable description
+     */
+    BreakingChange: {
+      /** Change Type */
+      change_type: string
+      /** Field Path */
+      field_path: string
+      /** Old Type */
+      old_type?: string | null
+      /** New Type */
+      new_type?: string | null
+      /** Description */
+      description: string
+      /**
+       * Is Breaking
+       * @default true
+       */
+      is_breaking?: boolean
+    }
+    /**
+     * TriggerBreakingChanges
+     * @description Breaking changes for a single SubWorkflow Trigger.
+     *
+     *     Attributes:
+     *         trigger_id: ID of the trigger node
+     *         trigger_name: Name of the trigger (if available)
+     *         changes: List of breaking changes detected for this trigger
+     */
+    TriggerBreakingChanges: {
+      /** Trigger Id */
+      trigger_id: string
+      /** Trigger Name */
+      trigger_name?: string | null
+      /** Changes */
+      changes: components['schemas']['BreakingChange'][]
+    }
+    /**
+     * BreakingChangesResponse
+     * @description Response containing the output contract diff and current parent references.
+     */
+    BreakingChangesResponse: {
+      /** Has Breaking Changes */
+      has_breaking_changes: boolean
+      /** Triggers */
+      triggers: components['schemas']['TriggerBreakingChanges'][]
+      /**
+       * Has Contract Changes
+       * @default false
+       */
+      has_contract_changes?: boolean
+      /** Contract Changes */
+      contract_changes?: components['schemas']['TriggerBreakingChanges'][]
+      /** Parent Workflows */
+      parent_workflows?: components['schemas']['WorkflowReferenceRead'][]
+    }
+    /**
+     * WorkflowReferenceRead
+     * @description A currently published parent workflow step that references this child.
+     */
+    WorkflowReferenceRead: {
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      workflow_id: string
+      /** Workflow Name */
+      workflow_name: string
+      /** Workflow Version */
+      workflow_version: number
+      /** Step Id */
+      step_id: string
+      /** Step Name */
+      step_name?: string | null
     }
     /**
      * WorkflowVersionUpdate
@@ -1933,8 +2161,9 @@ export interface components {
      * @description Parameters for Sub-workflow executor.
      *
      *     Defines the design-time configuration for invoking a child workflow from
-     *     a parent workflow. The Sub-workflow step always invokes the latest published
-     *     version of the selected target workflow in the same Project (V1).
+     *     a parent workflow. Each new invocation resolves the latest published child
+     *     version. The child execution record pins that version for the run so retries
+     *     keep using the same workflow definition.
      *
      *     When a workflow has multiple Subworkflow Triggers, the calling step must
      *     select a specific trigger to invoke via the trigger_node_id field.
@@ -1950,7 +2179,7 @@ export interface components {
       /**
        * Workflow Id
        * Format: uuid
-       * @description UUID of the selected child workflow in the same Project (latest published version).
+       * @description UUID of the selected child workflow in the same Project (latest published version per run).
        */
       workflow_id: string
       /**
@@ -2765,7 +2994,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['WorkflowReadWithVersion']
+          'application/json': components['schemas']['WorkflowDetailRead']
         }
       }
       400: components['responses']['BadRequestError']
@@ -3036,6 +3265,41 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['PublishWorkflowVersionResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  check_breaking_changes: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workflow_id: string
+        version: number
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WorkflowValidateRequest']
+      }
+    }
+    responses: {
+      /** @description Breaking changes detection result */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BreakingChangesResponse']
         }
       }
       400: components['responses']['BadRequestError']

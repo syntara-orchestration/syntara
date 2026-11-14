@@ -40,7 +40,7 @@ describe('InputSchemaView', () => {
         zip: '97201',
       },
     }
-    render(<InputSchemaView data={data} nodeId="http_request_1" />)
+    render(<InputSchemaView data={data} nodeId="http_request_1" hierarchical />)
 
     // Nested fields should be visible initially (expanded by default)
     expect(screen.getByText('T city')).toBeInTheDocument()
@@ -109,7 +109,7 @@ describe('InputSchemaView', () => {
 
   it('sets correct drag data for nested leaf nodes', () => {
     const data = { address: { city: 'Portland' } }
-    render(<InputSchemaView data={data} nodeId="fetch_order" />)
+    render(<InputSchemaView data={data} nodeId="fetch_order" hierarchical />)
 
     const setDataCalls: Array<[string, string]> = []
     const dataTransfer = {
@@ -128,6 +128,15 @@ describe('InputSchemaView', () => {
 
     expect(setDataCalls[1][0]).toBe('text/plain')
     expect(setDataCalls[1][1]).toBe('${fetch_order.address.city}')
+  })
+
+  it('flattens nested objects when hierarchical rendering is disabled', () => {
+    const data = { address: { city: 'Portland' } }
+    render(<InputSchemaView data={data} nodeId="fetch_order" hierarchical={false} />)
+
+    expect(screen.getByText('{} address')).toBeInTheDocument()
+    expect(screen.getByText('{"city":"Portland"}')).toBeInTheDocument()
+    expect(screen.queryByText('T city')).not.toBeInTheDocument()
   })
 
   it('renders nested output for UUID-derived activity ids without crashing', () => {

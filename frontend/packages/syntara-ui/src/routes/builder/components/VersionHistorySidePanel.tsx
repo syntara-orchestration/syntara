@@ -45,9 +45,14 @@ export function VersionHistorySidePanel({ sidePanel, isNodeEditorOpen, editPermi
 
       <PublishWorkflowDialog
         isOpen={sidePanel.publishDialog.isOpen}
-        isPublishing={false}
+        isPublishing={sidePanel.publishDialog.isPublishing}
         onClose={sidePanel.publishDialog.onClose}
         onPublish={sidePanel.publishDialog.onPublish}
+        breakingChanges={sidePanel.publishDialog.breakingChanges}
+        contractChanges={sidePanel.publishDialog.contractChanges}
+        parentWorkflows={sidePanel.publishDialog.parentWorkflows}
+        onConfirmContractChanges={sidePanel.publishDialog.onConfirmContractChanges}
+        onCancelBreakingChanges={sidePanel.publishDialog.onCancelBreakingChanges}
       />
 
       <SaveBeforeViewDialog

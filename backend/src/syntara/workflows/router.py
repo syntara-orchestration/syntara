@@ -25,15 +25,19 @@ from syntara.workflows.error_handlers import build_validation_problem_response
 from syntara.workflows.exceptions import WorkflowDefinitionInvalidError
 from syntara.workflows.executions_router import get_temporal_execution_service
 from syntara.workflows.models import (
+    BreakingChange,
+    BreakingChangesResponse,
     DetailedValidationProblemDetail,
     PublishVersionRequest,
     PublishWorkflowVersionResponse,
+    TriggerBreakingChanges,
     ValidationCategory,
     ValidationFinding,
     ValidationResult,
     ValidationSeverity,
     Workflow,
     WorkflowCreate,
+    WorkflowDetailRead,
     WorkflowInvocationSchemaRead,
     WorkflowListParams,
     WorkflowListResponse,
@@ -50,6 +54,7 @@ from syntara.workflows.models import (
 from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreate
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
+from syntara.workflows.utils.schema_diff import detect_workflow_breaking_changes, detect_workflow_contract_changes
 from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
@@ -336,15 +341,22 @@ async def list_workflows(
     dependencies=[Depends(_wf_perm_read)],
     operation_id="get_workflow",
     response_description="Workflow details",
-    response_model=WorkflowReadWithVersion,
+    response_model=WorkflowDetailRead,
 )
 async def get_workflow(
     workflow_id: UUID,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
-) -> WorkflowReadWithVersion:
+) -> WorkflowDetailRead:
     """Get a workflow by ID including its current active version."""
     workflow, current_version = await service.get_workflow_with_version(workflow_id)
-    return await _build_workflow_with_version_response(workflow, current_version, service)
+    response = await _build_workflow_with_version_response(workflow, current_version, service)
+    published_step_metadata = await service.get_published_step_metadata(workflow)
+    return WorkflowDetailRead.model_validate(
+        {
+            **response.model_dump(),
+            "published_step_metadata": published_step_metadata,
+        }
+    )
 
 
 @router.get(
@@ -518,6 +530,91 @@ async def get_workflow_version(
     ever_published, pub_ts = await service.get_publish_context([workflow_version.id])
 
     return await service.to_version_read(workflow_version, workflow.published_version_id, ever_published, pub_ts)
+
+
+@router.post(
+    "/{workflow_id}/versions/{version}/check-breaking-changes",
+    summary="Check for breaking changes before publishing",
+    response_model=BreakingChangesResponse,
+    dependencies=[Depends(_wf_perm_read)],
+    operation_id="check_breaking_changes",
+    response_description="Breaking changes detection result",
+)
+async def check_breaking_changes(
+    workflow_id: UUID,
+    version: int,  # noqa: ARG001
+    request: WorkflowValidateRequest,
+    service: Annotated[WorkflowService, Depends(get_workflow_service)],
+    visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("workflow", "read"))],
+) -> BreakingChangesResponse:
+    """Check for breaking changes in SubWorkflow output schemas.
+
+    Compares the new workflow definition against the currently published version
+    to detect breaking changes such as:
+    - Removed outputs
+    - Type changes
+    - New required outputs
+
+    This endpoint should be called before publishing to warn users about
+    breaking changes that may affect parent workflows.
+    """
+    workflow = await service.get_workflow_by_id(workflow_id)
+
+    # Get the currently published definition (if any)
+    old_definition = None
+    if workflow.published_version_id:
+        result = await service.session.execute(
+            select(WorkflowVersion.workflow_definition).where(WorkflowVersion.id == workflow.published_version_id)
+        )
+        published_def = result.scalar_one_or_none()
+        if published_def:
+            old_definition = published_def
+
+    # Detect breaking changes
+    new_definition = request.workflow_definition
+    contract_changes_by_trigger = detect_workflow_contract_changes(old_definition, new_definition)
+    changes_by_trigger = detect_workflow_breaking_changes(old_definition, new_definition)
+
+    def trigger_name_for(trigger_id: str) -> str | None:
+        # Get trigger name from new definition
+        for trigger in new_definition.get("triggers", []):
+            if isinstance(trigger, dict) and trigger.get("id") == trigger_id:
+                return trigger.get("name") if isinstance(trigger.get("name"), str) else None
+        if old_definition:
+            for trigger in old_definition.get("triggers", []):
+                if isinstance(trigger, dict) and trigger.get("id") == trigger_id:
+                    return trigger.get("name") if isinstance(trigger.get("name"), str) else None
+        return None
+
+    def build_trigger_changes(changes_by_id: dict[str, list[dict[str, Any]]]) -> list[TriggerBreakingChanges]:
+        return [
+            TriggerBreakingChanges(
+                trigger_id=trigger_id,
+                trigger_name=trigger_name_for(trigger_id),
+                changes=[BreakingChange(**change) for change in changes_list],
+            )
+            for trigger_id, changes_list in changes_by_id.items()
+        ]
+
+    triggers_with_changes = build_trigger_changes(changes_by_trigger)
+    all_contract_changes = build_trigger_changes(contract_changes_by_trigger)
+    parent_workflows = (
+        await service.get_published_parent_references(
+            workflow.id,
+            workflow.project_id,
+            visibility.to_allowed_projects(),
+        )
+        if all_contract_changes
+        else []
+    )
+
+    return BreakingChangesResponse(
+        has_breaking_changes=len(triggers_with_changes) > 0,
+        triggers=triggers_with_changes,
+        has_contract_changes=len(all_contract_changes) > 0,
+        contract_changes=all_contract_changes,
+        parent_workflows=parent_workflows,
+    )
 
 
 @router.post(

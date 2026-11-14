@@ -39,10 +39,22 @@ function parseManual(inputSchema?: string) {
   })
 }
 
-function parseSubworkflow(inputSchema?: string) {
+function parseSubworkflow(
+  inputSchema?: string,
+  outputSchema?: string,
+  outputMapping?: Record<string, string>,
+  outputFields?: Array<{
+    path: string
+    type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'unknown'
+    required: boolean
+  }>
+) {
   return triggerFormSchema.safeParse({
     triggerType: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
     inputSchema,
+    outputSchema,
+    outputMapping,
+    outputFields,
   })
 }
 
@@ -365,6 +377,53 @@ describe('triggerFormSchema — sub-workflow trigger inputSchema (permissive)', 
 
   it('rejects non-object JSON inputSchema', () => {
     expect(parseSubworkflow('"hello"').success).toBe(false)
+  })
+})
+
+describe('triggerFormSchema — sub-workflow output contract', () => {
+  const schema = JSON.stringify({
+    type: 'object',
+    properties: { release_tag: { type: 'string' } },
+    required: ['release_tag'],
+  })
+
+  it('accepts a valid schema with a mapping for its required output', () => {
+    expect(parseSubworkflow(undefined, schema, { release_tag: '${build.stdout}' }).success).toBe(true)
+  })
+
+  it('rejects invalid Advanced mode JSON instead of silently dropping it', () => {
+    const result = parseSubworkflow(undefined, '{bad}')
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.path.includes('outputSchema'))).toBe(true)
+    }
+  })
+
+  it('requires mappings for required declared outputs', () => {
+    const result = parseSubworkflow(undefined, schema)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('needs a mapping'))).toBe(true)
+    }
+  })
+
+  it('rejects mappings to undeclared schema paths', () => {
+    const result = parseSubworkflow(undefined, schema, { internal_step: '${build.stdout}' })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('not declared'))).toBe(true)
+    }
+  })
+
+  it('rejects overlapping dotted output names', () => {
+    const result = parseSubworkflow(undefined, undefined, undefined, [
+      { path: 'intake', type: 'object', required: false },
+      { path: 'intake.status', type: 'string', required: false },
+    ])
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('cannot overlap'))).toBe(true)
+    }
   })
 })
 

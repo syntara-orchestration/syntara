@@ -84,6 +84,33 @@ describe('TypeaheadSelect', () => {
       expect(getInput()).toHaveValue('Alpha Option')
     })
 
+    it('uses the supplied selected label for grouped output fields', () => {
+      renderSelect({
+        options: [{ value: 'build.tag', label: 'tag', group: 'Build' }],
+        selected: 'build.tag',
+        selectedLabel: 'Build · tag',
+      })
+      expect(getInput()).toHaveValue('Build · tag')
+    })
+
+    it('groups options and requests search when grouped results exceed the threshold', async () => {
+      const user = userEvent.setup()
+      renderSelect({
+        options: [
+          { value: 'build.tag', label: 'tag', group: 'Build' },
+          { value: 'deploy.url', label: 'url', group: 'Deploy' },
+        ],
+        searchPromptThreshold: 1,
+      })
+
+      await user.click(getInput())
+      expect(screen.getByText('Type to search step and output names...')).toBeInTheDocument()
+
+      await user.type(getInput(), 'Build')
+      expect(screen.getByRole('option', { name: /tag/i })).toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: /url/i })).not.toBeInTheDocument()
+    })
+
     it('shows clear button when a value is selected', () => {
       renderSelect({ selected: 'opt-2' })
       expect(screen.getByRole('button', { name: 'Clear selection' })).toBeInTheDocument()
@@ -107,6 +134,24 @@ describe('TypeaheadSelect', () => {
       expect(screen.getByRole('option', { name: /Gamma Option/i })).toBeInTheDocument()
     })
 
+    it('groups related choices and prompts to search when the list is large', async () => {
+      const user = userEvent.setup()
+      renderSelect({
+        options: [
+          { value: 'build.tag', label: 'tag', group: 'Build' },
+          { value: 'deploy.url', label: 'url', group: 'Deploy' },
+        ],
+        searchPromptThreshold: 1,
+      })
+
+      await user.click(getInput())
+
+      expect(screen.getByText('Type to search step and output names...')).toBeInTheDocument()
+      await user.type(getInput(), 'Build')
+      expect(screen.getByRole('option', { name: /tag/ })).toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: /url/ })).not.toBeInTheDocument()
+    })
+
     it('calls onChange with the selected value when an option is clicked', async () => {
       const user = userEvent.setup()
       const { onChange } = renderSelect()
@@ -115,6 +160,21 @@ describe('TypeaheadSelect', () => {
       await user.click(screen.getByRole('option', { name: /Beta Option/i }))
 
       expect(onChange).toHaveBeenCalledWith('opt-2')
+    })
+
+    it('allows selecting a full custom template expression when enabled', async () => {
+      const user = userEvent.setup()
+      const { container, onChange } = renderSelect({ allowCustomTemplate: true })
+
+      await user.click(getInput())
+      await user.paste('${script.stdout_json.release_tag}')
+      const customExpression = screen.getByRole('option', {
+        name: 'Use custom expression: ${script.stdout_json.release_tag}',
+      })
+      expect(await axe(container)).toHaveNoViolations()
+      await user.click(customExpression)
+
+      expect(onChange).toHaveBeenCalledWith('${script.stdout_json.release_tag}')
     })
 
     it('closes dropdown after selecting an option', async () => {

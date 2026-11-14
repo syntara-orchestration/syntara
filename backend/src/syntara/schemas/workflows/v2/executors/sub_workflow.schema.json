@@ -11,7 +11,7 @@
         "type": "string",
         "maxLength": 36,
         "format": "uuid",
-        "description": "UUID of the selected child workflow in the same Project (latest published version)."
+        "description": "UUID of the selected child workflow in the same Project (latest published version per run)."
       },
       "trigger_node_id": {
         "type": "string",
@@ -43,6 +43,8 @@
         },
         "StatusCode": {
           "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 255,
           "description": "Execution status code (0=success, non-zero=failure per POSIX convention)"
         },
         "StatusMessage": {
@@ -60,7 +62,7 @@
     },
     "SubWorkflowOutputResult": {
       "type": ["object", "null"],
-      "description": "Child execution metadata for Sub-workflow steps.",
+      "description": "Child execution metadata and the declared public output contract for Sub-workflow steps.",
       "properties": {
         "child_execution_id": {
           "type": ["string", "null"],
@@ -88,11 +90,9 @@
         },
         "outputs": {
           "type": ["object", "null"],
-          "description": "Child workflow terminal step outputs. Keys are child step IDs, values are StandardOutputWrapper envelopes. May be null if authorization denied.",
+          "description": "Values mapped to the selected SubWorkflow Trigger's declared public output contract. Internal child step names are not exposed.",
           "maxProperties": 1000,
-          "additionalProperties": {
-            "$ref": "#/$defs/StandardOutputWrapper"
-          }
+          "additionalProperties": true
         }
       },
       "additionalProperties": false
@@ -110,7 +110,9 @@
           "$ref": "#/$defs/SubWorkflowOutputResult"
         },
         "StatusCode": {
-          "type": ["integer", "null"]
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 255
         },
         "StatusMessage": {
           "type": ["string", "null"],

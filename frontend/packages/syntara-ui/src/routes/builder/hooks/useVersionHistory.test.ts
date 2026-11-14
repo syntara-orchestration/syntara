@@ -9,6 +9,7 @@ import { workflowClient } from '../../../client'
 import { isVersionStatus, useVersionHistory } from './useVersionHistory'
 
 const mockMutate = vi.fn()
+const mockCheckBreakingChangesMutate = vi.fn()
 const mockRefetch = vi.fn()
 const mockShowSuccess = vi.fn()
 const mockShowError = vi.fn()
@@ -49,8 +50,8 @@ vi.mock('../../../client', () => ({
       data: opts.enabled ? { resources: mockVersions, next: mockNextCursor, prev: null, total: mockTotal } : undefined,
       refetch: mockRefetch,
     })),
-    useMutation: vi.fn(() => ({
-      mutate: mockMutate,
+    useMutation: vi.fn((_method: string, path: string) => ({
+      mutate: path.includes('/check-breaking-changes') ? mockCheckBreakingChangesMutate : mockMutate,
       isPending: false,
     })),
   },
@@ -85,6 +86,14 @@ describe('useVersionHistory', () => {
     mockNextCursor = 'cursor-page-2'
     mockTotal = 45
     mockRefetch.mockResolvedValue({ data: { resources: mockVersions } })
+    mockCheckBreakingChangesMutate.mockImplementation(
+      (
+        _params: unknown,
+        callbacks?: {
+          onSuccess?: (response: { has_breaking_changes: boolean; triggers: [] }) => void
+        }
+      ) => callbacks?.onSuccess?.({ has_breaking_changes: false, triggers: [] })
+    )
     mockDownloadVersionExport.mockResolvedValue(undefined)
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     mockVersions = [
@@ -389,7 +398,7 @@ describe('useVersionHistory', () => {
   })
 
   describe('publishVersion', () => {
-    it('calls publish mutation with correct params', () => {
+    it('checks output contracts then publishes with the selected version definition', () => {
       const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
         wrapper: makeWrapper(queryClient),
       })
@@ -398,6 +407,13 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
+      expect(mockCheckBreakingChangesMutate).toHaveBeenCalledWith(
+        {
+          params: { path: { workflow_id: 'wf-1', version: 2 } },
+          body: { workflow_definition: { name: 'v2' } },
+        },
+        expect.objectContaining({ onSuccess: expect.any(Function) as unknown })
+      )
       expect(mockMutate).toHaveBeenCalledWith(
         {
           params: { path: { workflow_id: 'wf-1', version: 2 } },
@@ -422,13 +438,47 @@ describe('useVersionHistory', () => {
       expect(mockMutate).toHaveBeenCalledWith(
         {
           params: { path: { workflow_id: 'wf-1', version: 2 } },
-          body: { name: 'Release 1.0', change_description: 'First public release' },
+          body: {
+            name: 'Release 1.0',
+            change_description: 'First public release',
+          },
         },
         expect.objectContaining({
           onSuccess: expect.any(Function) as unknown,
           onError: expect.any(Function) as unknown,
         })
       )
+    })
+
+    it('waits for confirmation before publishing a breaking version', () => {
+      mockCheckBreakingChangesMutate.mockImplementation(
+        (
+          _params: unknown,
+          callbacks?: {
+            onSuccess?: (response: {
+              has_breaking_changes: boolean
+              triggers: [{ trigger_id: string; trigger_name: string; changes: [] }]
+            }) => void
+          }
+        ) =>
+          callbacks?.onSuccess?.({
+            has_breaking_changes: true,
+            triggers: [{ trigger_id: 'child-trigger', trigger_name: 'Child trigger', changes: [] }],
+          })
+      )
+
+      const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
+        wrapper: makeWrapper(queryClient),
+      })
+
+      act(() => result.current.publishVersion(2, 'Release'))
+
+      expect(result.current.breakingChanges).toHaveLength(1)
+      expect(mockMutate).not.toHaveBeenCalled()
+
+      act(() => result.current.confirmPublishVersion())
+
+      expect(mockMutate).toHaveBeenCalledOnce()
     })
 
     it('refetches versions and invalidates queries on publish success', () => {

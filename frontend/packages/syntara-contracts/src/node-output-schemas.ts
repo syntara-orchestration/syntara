@@ -9,6 +9,8 @@ export interface OutputFieldDef {
   name: string
   type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'unknown'
   description: string
+  children?: OutputFieldDef[]
+  additionalProperties?: OutputFieldDef[]
 }
 
 export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
@@ -60,7 +62,7 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
     { name: 'status', type: 'string', description: 'Execution succeeded' },
     { name: 'status_code', type: 'number', description: 'HTTP status code' },
     { name: 'body', type: 'unknown', description: 'Response body (parsed JSON or raw string)' },
-    { name: 'headers', type: 'object', description: 'Response headers' },
+    { name: 'headers', type: 'object', description: 'Response headers', additionalProperties: [] },
     { name: 'elapsed', type: 'number', description: 'Request duration in seconds' },
   ],
   agentic: [
@@ -77,10 +79,18 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
       name: 'structured_output_metadata',
       type: 'object',
       description: 'Metadata about structured output generation when response_schema is defined',
+      children: [
+        {
+          name: 'fallback_strategy_used',
+          type: 'string',
+          description:
+            "Which strategy was used for structured output generation. 'native': LLM provider's native structured output. 'pydantic': Pydantic validation/coercion fallback. 'structured_parser': output parsed with structured parser fallback. 'none': response_schema was not defined.",
+        },
+      ],
     },
     {
       name: 'integration_ids',
-      type: 'unknown',
+      type: 'array',
       description: 'UUIDs of integrations used during execution (captured at runtime from integration_connections)',
     },
   ],
@@ -99,6 +109,42 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
       description: "Optional notes provided by approver or system (e.g., 'Auto-rejected due to timeout')",
     },
   ],
+  sub_workflow: [
+    {
+      name: 'Result',
+      type: 'object',
+      description: 'Child execution metadata and the declared public output contract for Sub-workflow steps.',
+      children: [
+        {
+          name: 'child_execution_id',
+          type: 'string',
+          description: 'UUID of the child workflow execution instance (null if invocation failed)',
+        },
+        { name: 'child_workflow_id', type: 'string', description: 'UUID of the invoked child workflow definition' },
+        { name: 'child_workflow_name', type: 'string', description: 'Human-readable name of the child workflow' },
+        {
+          name: 'child_workflow_version',
+          type: 'number',
+          description: 'Version number of the child workflow that was invoked',
+        },
+        {
+          name: 'child_status',
+          type: 'string',
+          description:
+            'Terminal execution status of the child workflow (reference mode: parent blocks until child completes, so only terminal statuses are returned)',
+        },
+        {
+          name: 'outputs',
+          type: 'object',
+          description:
+            "Values mapped to the selected SubWorkflow Trigger's declared public output contract. Internal child step names are not exposed.",
+        },
+      ],
+    },
+    { name: 'StatusCode', type: 'number', description: '' },
+    { name: 'StatusMessage', type: 'string', description: '' },
+    { name: 'ErrorMessage', type: 'string', description: '' },
+  ],
   internal_activity: [{ name: 'status', type: 'string', description: 'Operation result status' }],
   condition: [
     { name: 'status', type: 'string', description: 'Condition evaluated successfully' },
@@ -112,6 +158,7 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
       type: 'object',
       description:
         'Aggregated variables from loop body iterations. Key = variable name with namespace (node_id.output_field), Value = list of values from each iteration.',
+      additionalProperties: [],
     },
   ],
   converge: [

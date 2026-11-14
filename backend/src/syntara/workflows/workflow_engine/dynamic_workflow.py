@@ -44,6 +44,7 @@ with workflow.unsafe.imports_passed_through():
     from syntara.workflows.workflow_engine.utils.timeout_messages import build_timeout_error_message
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+from syntara.workflows.utils.output_mapping import DeclaredOutputContractError, apply_declared_output_mapping
 from syntara.workflows.workflow_engine.approval_mixin import WorkflowApprovalMixin
 from syntara.workflows.workflow_engine.converge_mixin import WorkflowConvergeMixin
 from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
@@ -144,6 +145,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 stop_after_nodes=stop_after_nodes,
                 workflow_metadata=workflow_metadata,
             )
+            self._workflow_definition = workflow_definition
+            self._trigger_node_id = trigger_node_id
             self._runtime_settings = cast(
                 "dict[str, Any]",
                 await workflow.execute_local_activity(
@@ -647,7 +650,12 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             workflow_status = "completed_with_errors"
         else:
             workflow_status = "completed"
-        return {
+
+        declared_outputs = None
+        if workflow_status in {"completed", "completed_with_errors"}:
+            declared_outputs = self._build_declared_outputs()
+
+        result = {
             "status": workflow_status,
             "execution_id": execution_id,
             "activity_outputs": (
@@ -666,6 +674,56 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             "failed_activities": self.get_failed_nodes(),
             "cancelled_activities": self.get_cancelled_step_nodes(),
         }
+        if declared_outputs is not None:
+            result["declared_outputs"] = declared_outputs
+        return result
+
+    def _build_declared_outputs(self) -> dict[str, Any] | None:
+        """Resolve the selected SubWorkflow Trigger's public output contract."""
+        definition = getattr(self, "_workflow_definition", {})
+        trigger_id = getattr(self, "_trigger_node_id", None)
+        triggers = definition.get("triggers", []) if isinstance(definition, dict) else []
+        trigger = next(
+            (
+                item
+                for item in triggers
+                if isinstance(item, dict) and item.get("id") == trigger_id and item.get("type") == "subworkflow_trigger"
+            ),
+            None,
+        )
+        parameters = trigger.get("parameters", {}) if isinstance(trigger, dict) else {}
+        output_schema = parameters.get("output_schema") if isinstance(parameters, dict) else None
+        if not isinstance(output_schema, dict):
+            return None
+
+        output_mapping = parameters.get("output_mapping") if isinstance(parameters, dict) else None
+        if output_mapping is not None and not isinstance(output_mapping, dict):
+            message = "Sub-workflow output_mapping must be an object"
+            raise ApplicationError(
+                message,
+                type="SubWorkflowOutputContractError",
+                non_retryable=True,
+            )
+
+        workflow_nodes = definition.get("nodes", []) if isinstance(definition, dict) else []
+        source_step_ids = {
+            node["id"] for node in workflow_nodes if isinstance(node, dict) and isinstance(node.get("id"), str)
+        }
+        try:
+            return apply_declared_output_mapping(
+                self.resolver,
+                output_schema,
+                output_mapping,
+                skipped_source_ids=self.skipped_nodes,
+                source_step_ids=source_step_ids,
+            )
+        except DeclaredOutputContractError as exc:
+            message = f"Sub-workflow output contract violation: {exc}"
+            raise ApplicationError(
+                message,
+                type="SubWorkflowOutputContractError",
+                non_retryable=True,
+            ) from exc
 
     async def _schedule_successors(
         self,
@@ -1814,7 +1872,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         else:
             is_success = child_status == "completed"
         status_detail = child_status or "returned unexpected status"
-        output = self._build_sub_workflow_output(setup_result, child_status)
+        declared_outputs = child_result.get("declared_outputs") if isinstance(child_result, dict) else None
+        output = self._build_sub_workflow_output(setup_result, child_status, declared_outputs)
         if is_success:
             output["StatusCode"] = 0
             output["StatusMessage"] = (
@@ -1863,7 +1922,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         return "failed", "failed"
 
     @staticmethod
-    def _build_sub_workflow_output(setup_result: dict[str, Any], child_status: str | None) -> dict[str, Any]:
+    def _build_sub_workflow_output(
+        setup_result: dict[str, Any], child_status: str | None, outputs: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Build the M1 output dict from setup metadata and child status."""
         status_detail = child_status or "returned unexpected status"
         return {
@@ -1873,7 +1934,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 "child_workflow_name": setup_result.get("child_workflow_name"),
                 "child_workflow_version": setup_result.get("child_workflow_version"),
                 "child_status": child_status,
-                "outputs": None,
+                "outputs": outputs,
             },
             "StatusCode": 1,
             "StatusMessage": f"Sub-workflow {status_detail}",

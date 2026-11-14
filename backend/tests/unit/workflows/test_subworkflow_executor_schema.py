@@ -151,6 +151,8 @@ def test_subworkflow_result_schema_has_standard_wrapper_fields(subworkflow_schem
     assert "StatusCode" in properties
     assert "StatusMessage" in properties
     assert "ErrorMessage" in properties
+    assert properties["StatusCode"]["minimum"] == 0
+    assert properties["StatusCode"]["maximum"] == 255
 
 
 def test_subworkflow_result_has_child_execution_metadata(subworkflow_schema: dict[str, Any]) -> None:

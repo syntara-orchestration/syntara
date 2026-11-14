@@ -1,6 +1,6 @@
 import { Button, Flex, FlexItem, Icon, TextInput, TitleSizes, Tooltip } from '@patternfly/react-core'
 import { RhUiClockIcon, RhUiUndoIcon } from '@patternfly/react-icons'
-import type { ExecutionStatus } from '@syntara/contracts'
+import type { ExecutionStatus, WorkflowAPI } from '@syntara/contracts'
 import { type Dispatch, type ReactNode } from 'react'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
@@ -302,6 +302,11 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   publishedVersionId: string | null
   currentVersionId?: string | null
   isPublishing: boolean
+  breakingChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
+  contractChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
+  parentWorkflows?: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
+  onConfirmPublish?: () => void
+  onCancelBreakingChanges?: () => void
   isLiveRunActive?: boolean
   executionId?: string | null
   executionStatus?: ExecutionStatus | null
@@ -351,6 +356,11 @@ export function BuilderWorkflowPageHeader({
   publishedVersionId,
   currentVersionId,
   isPublishing,
+  breakingChanges,
+  contractChanges,
+  parentWorkflows,
+  onConfirmPublish,
+  onCancelBreakingChanges,
   isLiveRunActive,
   executionId,
   executionStatus,
@@ -478,7 +488,12 @@ export function BuilderWorkflowPageHeader({
       <PublishWorkflowDialog
         isOpen={publishDialog.isOpen}
         isPublishing={isPublishing}
+        breakingChanges={breakingChanges}
+        contractChanges={contractChanges}
+        parentWorkflows={parentWorkflows}
         onClose={publishDialog.close}
+        onConfirmContractChanges={onConfirmPublish}
+        onCancelBreakingChanges={onCancelBreakingChanges}
         onPublish={(publishName, description) => {
           onPublish(publishName, description, publishDialog.close)
         }}

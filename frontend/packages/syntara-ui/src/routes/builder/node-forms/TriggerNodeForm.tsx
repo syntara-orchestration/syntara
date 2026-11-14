@@ -276,6 +276,7 @@ function TriggerFormFields({
     interval?: { message?: string }
     cron?: { message?: string }
     inputSchema?: { message?: string }
+    outputSchema?: { message?: string }
     webhookPath?: { message?: string }
   }
 }>) {
@@ -288,6 +289,8 @@ function TriggerFormFields({
   const errors = validationErrors ?? contextErrors
   const triggerType = useWatch({ control, name: 'triggerType' })
   const scheduleType = useWatch({ control, name: 'scheduleType' })
+  const triggerId = useWatch({ control, name: 'triggerId' })
+  const triggerIndex = useWatch({ control, name: 'triggerIndex' })
 
   const isEndDateError = Boolean(errors.interval?.message?.toLowerCase().includes('end date'))
 
@@ -424,7 +427,7 @@ function TriggerFormFields({
 
       {triggerType === TriggerTypeEnum.SUBWORKFLOW_TRIGGER && (
         <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
-          <SubWorkflowTriggerFields errors={errors} />
+          <SubWorkflowTriggerFields triggerId={triggerId ?? 'trigger-0'} triggerIndex={triggerIndex ?? 0} />
         </fieldset>
       )}
     </Stack>
@@ -455,6 +458,9 @@ export function TriggerNodeForm(props: TriggerNodeFormProps) {
       name: data.name,
       triggerType: data.triggerType,
       inputSchema: isManual || isWebhookStyle || isSubworkflow ? data.inputSchema : undefined,
+      outputSchema: isSubworkflow ? data.outputSchema : undefined,
+      outputFields: isSubworkflow ? data.outputFields : undefined,
+      outputMapping: isSubworkflow ? data.outputMapping : undefined,
       scheduleType: isScheduled ? data.scheduleType : undefined,
       interval: isScheduled && data.scheduleType === ScheduleTypeEnum.INTERVAL ? data.interval : undefined,
       cron: isScheduled && data.scheduleType === ScheduleTypeEnum.CRON ? data.cron : undefined,

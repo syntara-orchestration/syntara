@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.models import Project
@@ -169,6 +170,60 @@ async def test_get_workflow_includes_only_published_subworkflow_trigger_schemas(
 
 
 @pytest.mark.asyncio
+async def test_workflow_detail_returns_output_schemas_for_the_exact_published_version(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: str,
+) -> None:
+    workflow = await _create_workflow(test_db_session, test_user, UUID(test_project_id), published=True)
+    assert workflow.published_version_id is not None
+    published_version = await test_db_session.get(WorkflowVersion, workflow.published_version_id)
+    draft_result = await test_db_session.exec(
+        select(WorkflowVersion).where(
+            WorkflowVersion.workflow_id == workflow.id,
+            WorkflowVersion.version == 2,
+        )
+    )
+    draft_version = draft_result.one()
+    assert published_version is not None
+
+    published_version.workflow_definition = {
+        **published_version.workflow_definition,
+        "nodes": [
+            {
+                "id": "published_script",
+                "type": "script",
+                "parameters": {},
+                "outputs": {"image_tag": "${result.stdout_json.tag}"},
+            },
+            {"id": "plain_script", "type": "script", "parameters": {}},
+        ],
+    }
+    draft_version.workflow_definition = {
+        **draft_version.workflow_definition,
+        "nodes": [{"id": "draft_script", "type": "script", "parameters": {}}],
+    }
+    await test_db_session.flush()
+
+    response = await auth_client.get(f"/api/v1/workflows/{workflow.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    metadata = body["published_step_metadata"]
+    assert metadata["version_id"] == str(workflow.published_version_id)
+    assert metadata["version"] == 1
+    assert body["version"]["workflow_definition"]["nodes"][0]["id"] == "draft_script"
+    assert [step["id"] for step in metadata["steps"]] == ["published_script", "plain_script"]
+    script_schema = metadata["steps"][0]["output_schema"]
+    assert set(script_schema["properties"]) == {"image_tag", "status"}
+    assert script_schema["properties"]["image_tag"]["x-syntara-output-mapped"] is True
+    assert script_schema["properties"]["status"]["type"] == "string"
+    plain_script_schema = metadata["steps"][1]["output_schema"]
+    assert "stdout" in plain_script_schema["properties"]
+
+
+@pytest.mark.asyncio
 async def test_invocation_schema_requires_a_published_version_but_plain_get_does_not(
     auth_client: AsyncClient,
     test_db_session: AsyncSession,
@@ -181,6 +236,7 @@ async def test_invocation_schema_requires_a_published_version_but_plain_get_does
     ordinary_response = await auth_client.get(path)
     assert ordinary_response.status_code == 200
     assert "invocation_schema" not in ordinary_response.json()
+    assert ordinary_response.json()["published_step_metadata"] is None
 
     schema_response = await auth_client.get(f"{path}/invocation_schema")
     assert schema_response.status_code == 404
@@ -217,6 +273,9 @@ async def test_invocation_schema_requires_workflow_read_permission(
 
     assert response.status_code == 403
 
+    detail_response = await auth_client.get(f"/api/v1/workflows/{workflow.id}")
+    assert detail_response.status_code == 403
+
 
 @pytest.mark.asyncio
 async def test_published_workflow_without_subworkflow_trigger_returns_empty_schema(
@@ -250,6 +309,102 @@ async def test_published_workflow_without_subworkflow_trigger_returns_empty_sche
         "published_version_name": None,
         "is_eligible": False,
         "triggers": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_workflow_invocation_schema_exposes_output_schema_without_internal_mapping(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: str,
+) -> None:
+    """The parent receives the public schema, not internal step-to-output mappings."""
+    workflow = Workflow(
+        name=f"test-output-schema-{uuid4().hex[:8]}",
+        created_by=test_user.id,
+        project_id=UUID(test_project_id),
+        current_version=1,
+        is_enabled=False,
+    )
+    test_db_session.add(workflow)
+    await test_db_session.flush()
+
+    published_version = WorkflowVersion(
+        workflow_id=workflow.id,
+        version=1,
+        schema_version="2.0.0",
+        workflow_definition={
+            "schema_version": "2.0.0",
+            "name": "test-output-contract",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "name": "Child Trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {"environment": {"type": "string"}},
+                        },
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "artifact_url": {"type": "string", "description": "Build artifact URL"},
+                                "release_tag": {"type": "string", "description": "Release version tag"},
+                            },
+                            "required": ["artifact_url"],
+                        },
+                        "output_mapping": {
+                            "artifact_url": "${deploy_app.artifact_url}",
+                            "release_tag": "${build_step.image_tag}",
+                        },
+                    },
+                },
+            ],
+            "nodes": [],
+            "edges": [],
+        },
+        created_by=test_user.id,
+    )
+    test_db_session.add(published_version)
+    await test_db_session.commit()
+
+    workflow.published_version_id = published_version.id
+    await test_db_session.commit()
+
+    response = await auth_client.get(f"/api/v1/workflows/{workflow.id}/invocation_schema")
+
+    assert response.status_code == 200
+    body = response.json()
+
+    # Remove dynamic timestamp for comparison
+    body.pop("published_version_created_at")
+
+    assert body == {
+        "workflow_id": str(workflow.id),
+        "published_version_id": str(published_version.id),
+        "published_version": 1,
+        "published_version_name": None,
+        "is_eligible": True,
+        "triggers": [
+            {
+                "trigger_node_id": "child_trigger",
+                "name": "Child Trigger",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {"environment": {"type": "string"}},
+                },
+                "output_schema": {
+                    "type": "object",
+                    "properties": {
+                        "artifact_url": {"type": "string", "description": "Build artifact URL"},
+                        "release_tag": {"type": "string", "description": "Release version tag"},
+                    },
+                    "required": ["artifact_url"],
+                },
+            },
+        ],
     }
 
 

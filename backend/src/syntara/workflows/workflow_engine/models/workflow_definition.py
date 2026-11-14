@@ -788,8 +788,9 @@ class SubWorkflowExecutorParameters(BaseModel):
     """Parameters for Sub-workflow executor.
 
     Defines the design-time configuration for invoking a child workflow from
-    a parent workflow. The Sub-workflow step always invokes the latest published
-    version of the selected target workflow in the same Project (V1).
+    a parent workflow. Each new invocation resolves the latest published child
+    version. The child execution record pins that version for the run so retries
+    keep using the same workflow definition.
 
     When a workflow has multiple Subworkflow Triggers, the calling step must
     select a specific trigger to invoke via the trigger_node_id field.
@@ -808,7 +809,7 @@ class SubWorkflowExecutorParameters(BaseModel):
     workflow_id: str = Field(
         max_length=36,
         json_schema_extra={"format": "uuid"},
-        description="UUID of the selected child workflow in the same Project (latest published version).",
+        description="UUID of the selected child workflow in the same Project (latest published version per run).",
     )
     trigger_node_id: str = Field(
         pattern=r"^[a-zA-Z_][a-zA-Z0-9_]*$",
@@ -1098,8 +1099,15 @@ class StandardOutputWrapper(BaseModel):
     to this pattern when the Step SDK is fully implemented.
     """
 
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
     Result: Any = None  # Type varies by step - validated by step-specific models
-    StatusCode: int | None = None
+    StatusCode: int | None = Field(
+        default=None,
+        ge=0,
+        le=255,
+        description="Execution status code (0=success, non-zero=failure per POSIX convention).",
+    )
     StatusMessage: str | None = Field(default=None, max_length=500)
     ErrorMessage: str | None = Field(default=None, max_length=10000)
 
@@ -1107,8 +1115,8 @@ class StandardOutputWrapper(BaseModel):
 class SubWorkflowOutputResult(BaseModel):
     """Result payload for Sub-workflow steps containing child execution metadata.
 
-    This is the Result field of the StandardOutputWrapper structure.
-    Contains aggregate child execution metadata and nested child step outputs.
+    This is the Result field of the StandardOutputWrapper structure. ``outputs``
+    contains only the selected SubWorkflow Trigger's declared public contract.
     """
 
     child_execution_id: str | None = None
@@ -1116,7 +1124,11 @@ class SubWorkflowOutputResult(BaseModel):
     child_workflow_name: str | None = Field(default=None, max_length=255)
     child_workflow_version: int | None = None
     child_status: WorkflowTerminalStatus | None = None
-    outputs: dict[str, StandardOutputWrapper] | None = Field(default=None, max_length=1000)
+    outputs: dict[str, Any] | None = Field(
+        default=None,
+        max_length=1000,
+        description="Values mapped to the child workflow's declared public output contract.",
+    )
 
 
 class SubWorkflowOutput(StandardOutputWrapper, NodeOutput):
@@ -1130,9 +1142,14 @@ class SubWorkflowOutput(StandardOutputWrapper, NodeOutput):
     existing NodeOutput models use flat structure, to align with the Step SDK
     specification and avoid future breaking changes.
 
-    The outputs field (nested in Result) is a dict where keys are child step IDs
-    and values are their StandardOutputWrapper outputs. This allows dotted-path
-    template expressions like: ${sub_workflow_step.Result.outputs.child_step_id.field}
+    The outputs field (nested in Result) contains only fields declared by the
+    selected SubWorkflow Trigger. Internal child step names are never exposed.
+    The StandardOutputWrapper
+    envelope applies to the Sub-workflow step itself, while child outputs are
+    exposed directly for simplified access.
+
+    This allows flat dotted-path template expressions like:
+    ${sub_workflow_step.Result.outputs.child_step_id.artifact_url}
     """
 
     Result: SubWorkflowOutputResult | None = None  # Override to specify concrete Result type

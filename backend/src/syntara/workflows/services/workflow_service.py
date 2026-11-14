@@ -7,7 +7,9 @@ HTTP/API concerns in the FastAPI endpoints.
 import asyncio
 import threading
 from collections.abc import Iterable
+from copy import deepcopy
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
@@ -53,11 +55,14 @@ from syntara.workflows.exceptions import (
     WorkflowVersionNotFoundError,
 )
 from syntara.workflows.models import (
+    PublishedWorkflowStepMetadataRead,
     Workflow,
     WorkflowInvocationSchemaRead,
     WorkflowInvocationTriggerSchema,
     WorkflowListResponse,
     WorkflowRead,
+    WorkflowReferenceRead,
+    WorkflowStepMetadataRead,
     WorkflowVersion,
 )
 from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution
@@ -78,7 +83,7 @@ from syntara.workflows.validators import (
     validate_workflow_references,
     workflow_validator,
 )
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+from syntara.workflows.workflow_engine.models.workflow_definition import NODE_OUTPUT_MODELS, NodeType
 
 if TYPE_CHECKING:
     from syntara.workflows.models import WorkflowVersionListResponse, WorkflowVersionRead
@@ -89,6 +94,88 @@ logger = structlog.stdlib.get_logger(__name__)
 # Strong refs so the event loop does not GC detached schedule-delete tasks.
 _pending_schedule_delete_tasks: set[asyncio.Task[None]] = set()
 _SCHEDULE_DELETE_TASK_PREFIX = "delete-scheduled-triggers-"
+
+
+@lru_cache(maxsize=32)
+def _output_schema_for_step(node_type: str) -> dict[str, Any] | None:
+    try:
+        output_model = NODE_OUTPUT_MODELS.get(NodeType(node_type))
+    except ValueError:
+        return None
+    if output_model is None:
+        return None
+
+    output_schema = output_model.model_json_schema()
+    properties = output_schema.setdefault("properties", {})
+    if isinstance(properties, dict):
+        properties.setdefault("status", {"type": "string", "description": "Node execution status."})
+    return output_schema
+
+
+def _effective_output_schema_for_node(node: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the node output schema after applying its configured output mapping.
+
+    Output mappings replace executor output fields with their configured keys.
+    Their expressions can combine or transform values, so the mapped fields have
+    unknown types until execution. The workflow engine's status field is added
+    independently of executor output mapping and remains available.
+    """
+    node_type = node.get("type")
+    if not isinstance(node_type, str):
+        return None
+
+    output_schema = _output_schema_for_step(node_type)
+    output_mapping = node.get("outputs")
+    if output_schema is None or output_mapping is None or not isinstance(output_mapping, dict):
+        return output_schema
+
+    properties = output_schema.get("properties")
+    if not isinstance(properties, dict):
+        return output_schema
+
+    effective_properties: dict[str, Any] = {
+        name: {
+            "description": "Output produced by a configured mapping; its type is not statically known.",
+            "x-syntara-output-mapped": True,
+        }
+        for name in output_mapping
+        if isinstance(name, str)
+    }
+    if "status" in properties:
+        effective_properties["status"] = properties["status"]
+
+    # Filter required array to only include fields that exist in effective_properties
+    effective_required = [field for field in output_schema.get("required", []) if field in effective_properties]
+
+    result = {**output_schema, "properties": effective_properties}
+    if effective_required:
+        result["required"] = effective_required
+    elif "required" in result:
+        # Remove required key if no fields are required after mapping
+        del result["required"]
+
+    return result
+
+
+def _step_metadata_for_nodes(nodes: object) -> list[WorkflowStepMetadataRead]:
+    if not isinstance(nodes, list):
+        return []
+
+    steps: list[WorkflowStepMetadataRead] = []
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        node_id = node.get("id")
+        node_type = node.get("type")
+        if isinstance(node_id, str) and isinstance(node_type, str):
+            steps.append(
+                WorkflowStepMetadataRead(
+                    id=node_id,
+                    type=node_type,
+                    output_schema=_effective_output_schema_for_node(node),
+                )
+            )
+    return steps
 
 
 def _on_schedule_delete_done(task: asyncio.Task[None]) -> None:
@@ -1039,17 +1126,69 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         return workflow, current_version
 
+    async def get_published_parent_references(
+        self,
+        child_workflow_id: UUID,
+        project_id: UUID,
+        allowed_projects: AllowedProjectsResult,
+    ) -> list[WorkflowReferenceRead]:
+        """Return visible, currently published parent steps that reference a child workflow."""
+        if not allowed_projects.all_projects and project_id not in allowed_projects.project_ids:
+            return []
+
+        result = await self.session.exec(
+            select(Workflow, WorkflowVersion)
+            .join(WorkflowVersion, col(WorkflowVersion.id) == col(Workflow.published_version_id))
+            .where(
+                col(Workflow.project_id) == project_id,
+                col(Workflow.id) != child_workflow_id,
+                col(Workflow.is_enabled).is_(True),
+            )
+        )
+        parent_versions = result.all()
+        matching_references: list[tuple[Workflow, WorkflowVersion, str, str | None]] = []
+
+        for parent, parent_version in parent_versions:
+            definition = parent_version.workflow_definition
+            nodes = definition.get("nodes", []) if isinstance(definition, dict) else []
+            if not isinstance(nodes, list):
+                continue
+            for node in nodes:
+                if not isinstance(node, dict) or node.get("type") != NodeType.SUB_WORKFLOW.value:
+                    continue
+                parameters = node.get("parameters")
+                if not isinstance(parameters, dict) or parameters.get("workflow_id") != str(child_workflow_id):
+                    continue
+                matching_references.append(
+                    (
+                        parent,
+                        parent_version,
+                        str(node.get("id", "")),
+                        node.get("name") if isinstance(node.get("name"), str) else None,
+                    )
+                )
+
+        return [
+            WorkflowReferenceRead(
+                workflow_id=parent.id,
+                workflow_name=parent.name,
+                workflow_version=parent_version.version,
+                step_id=step_id,
+                step_name=step_name,
+            )
+            for parent, parent_version, step_id, step_name in matching_references
+        ]
+
     async def get_workflow_invocation_schema(self, workflow: Workflow) -> WorkflowInvocationSchemaRead:
-        """Return eligible trigger schemas from a workflow's published version."""
+        """Return trigger schemas from the latest published version."""
         if workflow.published_version_id is None:
             raise WorkflowNotPublishedError(workflow.id)
-
-        published_version = await self.session.get(WorkflowVersion, workflow.published_version_id)
-        if published_version is None:
+        selected_version = await self.session.get(WorkflowVersion, workflow.published_version_id)
+        if selected_version is None:
             raise WorkflowVersionNotFoundError(workflow.id, workflow.current_version)
 
         invocation_triggers: list[WorkflowInvocationTriggerSchema] = []
-        trigger_definitions = published_version.workflow_definition.get("triggers", [])
+        trigger_definitions = selected_version.workflow_definition.get("triggers", [])
         if isinstance(trigger_definitions, list):
             for trigger in trigger_definitions:
                 if not isinstance(trigger, dict) or trigger.get("type") != NodeType.SUBWORKFLOW_TRIGGER:
@@ -1059,22 +1198,41 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     continue
                 parameters = trigger.get("parameters")
                 input_schema = parameters.get("input_schema") if isinstance(parameters, dict) else None
+                output_schema = parameters.get("output_schema") if isinstance(parameters, dict) else None
                 invocation_triggers.append(
                     WorkflowInvocationTriggerSchema(
                         trigger_node_id=trigger_node_id,
                         name=trigger.get("name") if isinstance(trigger.get("name"), str) else None,
                         input_schema=input_schema if isinstance(input_schema, dict) else {},
+                        output_schema=output_schema if isinstance(output_schema, dict) else None,
                     )
                 )
 
         return WorkflowInvocationSchemaRead(
             workflow_id=workflow.id,
-            published_version_id=published_version.id,
-            published_version=published_version.version,
-            published_version_name=published_version.name,
-            published_version_created_at=published_version.created_at,
+            published_version_id=selected_version.id,
+            published_version=selected_version.version,
+            published_version_name=selected_version.name,
+            published_version_created_at=selected_version.created_at,
             is_eligible=bool(invocation_triggers),
             triggers=invocation_triggers,
+        )
+
+    async def get_published_step_metadata(self, workflow: Workflow) -> PublishedWorkflowStepMetadataRead | None:
+        """Return step output schemas from the exact published workflow version."""
+        if workflow.published_version_id is None:
+            return None
+
+        published_version = await self.session.get(WorkflowVersion, workflow.published_version_id)
+        if published_version is None:
+            return None
+
+        definition = published_version.workflow_definition
+        steps = _step_metadata_for_nodes(definition.get("nodes") if isinstance(definition, dict) else None)
+        return PublishedWorkflowStepMetadataRead(
+            version_id=published_version.id,
+            version=published_version.version,
+            steps=steps,
         )
 
     async def get_version_for_export(
@@ -1414,9 +1572,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if not target_version:
             raise WorkflowVersionNotFoundError(workflow_id, version)
 
-        if workflow_definition is not None:
+        definition = deepcopy(
+            workflow_definition if workflow_definition is not None else target_version.workflow_definition
+        )
+        if workflow_definition is not None or definition != target_version.workflow_definition:
             target_version = await self._create_and_flush_version(
-                workflow, target_version, workflow_definition, change_description
+                workflow, target_version, definition, change_description
             )
 
         definition = target_version.workflow_definition

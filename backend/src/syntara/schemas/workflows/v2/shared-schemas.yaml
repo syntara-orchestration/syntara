@@ -201,6 +201,152 @@ components:
           $ref: '#/components/schemas/WorkflowVersionRead'
           description: Current active version details
 
+    WorkflowDetailRead:
+      type: object
+      title: WorkflowDetailRead
+      description: Workflow detail response with metadata for its published version.
+      required:
+        - name
+        - id
+        - current_version
+        - is_enabled
+        - project_id
+        - created_at
+        - updated_at
+        - version
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+          description: Workflow name
+        description:
+          anyOf:
+            - type: string
+              maxLength: 2000
+            - type: 'null'
+          title: Description
+          description: Workflow description
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+          description: Workflow labels
+        id:
+          type: string
+          format: uuid
+          title: Id
+        current_version:
+          type: integer
+          title: Current Version
+        is_builtin:
+          type: boolean
+          default: false
+          title: Is Builtin
+        is_enabled:
+          type: boolean
+          title: Is Enabled
+        has_validation_issues:
+          type: boolean
+          default: false
+          title: Has Validation Issues
+        created_by:
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: User who created the workflow
+          readOnly: true
+          title: Created By
+        updated_by:
+          anyOf:
+            - $ref: ../../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
+          description: User who last modified the workflow
+          readOnly: true
+          title: Updated By
+        project_id:
+          type: string
+          format: uuid
+          title: Project Id
+        published_version_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Published Version Id
+        published_version_number:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Published Version Number
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        validation_result:
+          anyOf:
+            - $ref: './openapi.yaml#/components/schemas/ValidationResult'
+            - type: 'null'
+          description: Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator.
+        version:
+          $ref: '#/components/schemas/WorkflowVersionRead'
+          description: Current active version details
+        published_step_metadata:
+          anyOf:
+            - $ref: '#/components/schemas/PublishedWorkflowStepMetadataRead'
+            - type: 'null'
+          description: Step IDs, types, and output schemas from the exact published version, when one exists.
+
+    PublishedWorkflowStepMetadataRead:
+      type: object
+      title: PublishedWorkflowStepMetadataRead
+      description: Step metadata tied to the exact published workflow version.
+      required:
+        - version_id
+        - version
+        - steps
+      properties:
+        version_id:
+          type: string
+          format: uuid
+          title: Version Id
+        version:
+          type: integer
+          title: Version
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowStepMetadataRead'
+          title: Steps
+
+    WorkflowStepMetadataRead:
+      type: object
+      title: WorkflowStepMetadataRead
+      description: Published workflow step metadata used by the variable picker.
+      required:
+        - id
+        - type
+      properties:
+        id:
+          type: string
+          title: Id
+        type:
+          type: string
+          title: Type
+        output_schema:
+          anyOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+          title: Output Schema
+          description: JSON Schema for this step's output, or null when the step type has no output model.
+
     WorkflowInvocationTriggerSchema:
       type: object
       title: WorkflowInvocationTriggerSchema
@@ -220,7 +366,13 @@ components:
           type: object
           additionalProperties: true
           title: Input Schema
-
+        output_schema:
+          anyOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+          title: Output Schema
+          description: JSON Schema defining the outputs exposed to parent workflows. Provides encapsulation—parent sees only declared fields, not internal child step structure.
     WorkflowInvocationSchemaRead:
       type: object
       title: WorkflowInvocationSchemaRead
@@ -2378,7 +2530,7 @@ components:
           maxLength: 36
           format: uuid
           title: Workflow Id
-          description: UUID of the selected child workflow in the same Project (latest published version).
+          description: UUID of the selected child workflow in the same Project (latest published version per run).
         trigger_node_id:
           type: string
           pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
@@ -2399,8 +2551,9 @@ components:
         Parameters for Sub-workflow executor.
 
         Defines the design-time configuration for invoking a child workflow from
-        a parent workflow. The Sub-workflow step always invokes the latest published
-        version of the selected target workflow in the same Project (V1).
+        a parent workflow. Each new invocation resolves the latest published child
+        version. The child execution record pins that version for the run so retries
+        keep using the same workflow definition.
 
         When a workflow has multiple Subworkflow Triggers, the calling step must
         select a specific trigger to invoke via the trigger_node_id field.

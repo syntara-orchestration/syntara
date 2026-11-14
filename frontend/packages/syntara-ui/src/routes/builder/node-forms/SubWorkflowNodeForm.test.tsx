@@ -158,6 +158,7 @@ describe('SubWorkflowNodeForm', () => {
         })
       )
     })
+    expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty('workflow_version_id')
   })
 
   it('fills the sole trigger when editing an older reference without a saved trigger ID', async () => {

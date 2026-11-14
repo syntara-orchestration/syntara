@@ -24,6 +24,7 @@ Usage:
 """
 
 from .activity_execution import ActivityExecution, ActivityExecutionListResponse, ActivityStatus
+from .breaking_changes import BreakingChange, BreakingChangesResponse, TriggerBreakingChanges, WorkflowReferenceRead
 from .execution import (
     TERMINAL_EXECUTION_STATUSES,
     ActivityData,
@@ -57,12 +58,15 @@ from .visualization import (
 from .webhook_trigger import WebhookTrigger, WebhookTriggerRead
 from .webhook_trigger_service_account import WebhookTriggerServiceAccount
 from .workflow import (
+    PublishedWorkflowStepMetadataRead,
     PublishWorkflowVersionResponse,
     Workflow,
     WorkflowCreate,
+    WorkflowDetailRead,
     WorkflowListResponse,
     WorkflowRead,
     WorkflowReadWithVersion,
+    WorkflowStepMetadataRead,
     WorkflowUpdate,
 )
 from .workflow_definition import WorkflowDefinition
@@ -88,6 +92,8 @@ __all__ = [
     "ActivityPatchMessage",
     "ActivitySignalPayload",
     "ActivityStatus",
+    "BreakingChange",
+    "BreakingChangesResponse",
     "ChildExecutionListParams",
     "DetailedValidationProblemDetail",
     "Execution",
@@ -102,7 +108,9 @@ __all__ = [
     "PublishAction",
     "PublishVersionRequest",
     "PublishWorkflowVersionResponse",
+    "PublishedWorkflowStepMetadataRead",
     "SignalResponse",
+    "TriggerBreakingChanges",
     "ValidationCategory",
     "ValidationFinding",
     "ValidationResult",
@@ -113,6 +121,7 @@ __all__ = [
     "Workflow",
     "WorkflowCreate",
     "WorkflowDefinition",
+    "WorkflowDetailRead",
     "WorkflowInvocationSchemaRead",
     "WorkflowInvocationTriggerSchema",
     "WorkflowListParams",
@@ -120,6 +129,8 @@ __all__ = [
     "WorkflowPublishEvent",
     "WorkflowRead",
     "WorkflowReadWithVersion",
+    "WorkflowReferenceRead",
+    "WorkflowStepMetadataRead",
     "WorkflowUpdate",
     "WorkflowValidateRequest",
     "WorkflowVersion",

@@ -1,71 +1,208 @@
-import { Content, ContentVariants } from '@patternfly/react-core'
+import { Content, ContentVariants, Flex, FlexItem, Label } from '@patternfly/react-core'
 import { TreeView, type TreeViewDataItem } from '@patternfly/react-core'
 import { RhUiInformationIcon } from '@patternfly/react-icons'
 import type { OutputFieldDef } from '@syntara/contracts'
 import { useCallback, useMemo } from 'react'
 
 import { buildExpression, canvasNodeIdForExpression } from '../../../../utils/expressions/templateBuilder'
+import { highlightText } from '../../../../utils/highlightText'
 import { CopyExpressionAction, DraggableTreeLeaf } from '../components/DraggableTreeLeaf'
 import { DRAG_TYPE_FIELD, type FieldDragData } from '../utils/dragTypes'
+import { toTreeItemId } from '../utils/treeHelpers'
 import { getTypeLabel } from '../utils/typeLabels'
 
 import styles from './InputSchemaPreview.module.css'
 
 export type InputSchemaPreviewProps = {
-  fields: OutputFieldDef[]
+  fields?: OutputFieldDef[]
+  tree?: InputSchemaPreviewNode[]
   nodeId: string
+  searchTerm?: string
+}
+
+export type InputSchemaPreviewNode = {
+  name: string
+  type: OutputFieldDef['type']
+  description?: string
+  fieldPath: string[]
+  children?: InputSchemaPreviewNode[]
+  isGroup?: boolean
+  required?: boolean
 }
 
 type PreviewFieldProps = {
-  field: OutputFieldDef
+  name: string
+  type: OutputFieldDef['type']
+  description: string
   nodeId: string
+  fieldPath: string[]
+  required?: boolean
+  searchTerm?: string
 }
 
-function PreviewField({ field, nodeId }: Readonly<PreviewFieldProps>) {
-  const typeLabel = getTypeLabel(field.type)
-  const expression = useMemo(() => buildExpression({ nodeId, fieldPath: [field.name] }), [nodeId, field.name])
+function PreviewField({
+  name,
+  type,
+  description,
+  nodeId,
+  fieldPath,
+  required,
+  searchTerm,
+}: Readonly<PreviewFieldProps>) {
+  const typeLabel = getTypeLabel(type)
+  const expression = useMemo(() => buildExpression({ nodeId, fieldPath }), [nodeId, fieldPath])
 
   const handleDragStart = useCallback(
     (e: React.DragEvent) => {
       const data: FieldDragData = {
         type: DRAG_TYPE_FIELD,
         nodeId,
-        fieldPath: [field.name],
+        fieldPath,
       }
       e.dataTransfer.setData('application/json', JSON.stringify(data))
       e.dataTransfer.setData('text/plain', expression)
       e.dataTransfer.effectAllowed = 'copy'
     },
-    [nodeId, field.name, expression]
+    [nodeId, fieldPath, expression]
+  )
+
+  const requiredBadge = required ? (
+    <Label color="blue" isCompact>
+      REQUIRED
+    </Label>
+  ) : (
+    <Label color="grey" isCompact>
+      optional
+    </Label>
+  )
+
+  const label = (
+    <Flex className={styles.fieldLabel} alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
+      <FlexItem>
+        <Content component={ContentVariants.small}>{`${typeLabel} ${name}`}</Content>
+      </FlexItem>
+      <FlexItem>{requiredBadge}</FlexItem>
+    </Flex>
   )
 
   return (
     <DraggableTreeLeaf
-      label={`${typeLabel} ${field.name}`}
-      secondaryText={field.description}
+      label={searchTerm && typeof label === 'string' ? highlightText(label, searchTerm) : label}
+      secondaryText={searchTerm ? highlightText(description, searchTerm) : description}
       onDragStart={handleDragStart}
     />
   )
 }
 
-export function InputSchemaPreview({ fields, nodeId }: Readonly<InputSchemaPreviewProps>) {
-  const expressionNodeId = canvasNodeIdForExpression(nodeId)
-  const treeData: TreeViewDataItem[] = useMemo(
-    () =>
-      fields.map((field) => ({
-        id: field.name,
-        name: <PreviewField field={field} nodeId={expressionNodeId} />,
-        action: (
-          <CopyExpressionAction
-            expressionText={buildExpression({ nodeId: expressionNodeId, fieldPath: [field.name] })}
-          />
+function toInputSchemaPreviewNode(field: OutputFieldDef, parentPath: string[] = []): InputSchemaPreviewNode {
+  return {
+    name: field.name,
+    type: field.type,
+    description: field.description,
+    fieldPath: [...parentPath, field.name],
+    ...('required' in field && typeof field.required === 'boolean' ? { required: field.required } : {}),
+    ...(field.children && field.children.length > 0
+      ? {
+          children: field.children.map((child) => toInputSchemaPreviewNode(child, [...parentPath, field.name])),
+          isGroup: true,
+        }
+      : {}),
+  }
+}
+
+/**
+ * Filter tree nodes based on search term, keeping ancestor groups visible when descendants match.
+ * Returns null if node and all descendants don't match the search.
+ */
+function filterTreeNode(node: InputSchemaPreviewNode, searchTerm: string): InputSchemaPreviewNode | null {
+  const lowerSearch = searchTerm.toLowerCase()
+  const nameMatches = node.name.toLowerCase().includes(lowerSearch)
+  const descriptionMatches = node.description?.toLowerCase().includes(lowerSearch) ?? false
+
+  // If this is a leaf node, return it only if it matches
+  if (!node.children || node.children.length === 0) {
+    return nameMatches || descriptionMatches ? node : null
+  }
+
+  // For group nodes, recursively filter children
+  const filteredChildren = node.children.map((child) => filterTreeNode(child, searchTerm)).filter(Boolean)
+
+  // Keep this group if it matches or has any matching descendants
+  if (nameMatches || descriptionMatches || filteredChildren.length > 0) {
+    return {
+      ...node,
+      children: filteredChildren as InputSchemaPreviewNode[],
+    }
+  }
+
+  return null
+}
+
+/**
+ * Filter tree nodes array based on search term.
+ */
+function filterTree(nodes: InputSchemaPreviewNode[], searchTerm: string): InputSchemaPreviewNode[] {
+  if (!searchTerm.trim()) return nodes
+  return nodes.map((node) => filterTreeNode(node, searchTerm)).filter(Boolean) as InputSchemaPreviewNode[]
+}
+
+function buildTreeData(nodes: InputSchemaPreviewNode[], nodeId: string, searchTerm?: string): TreeViewDataItem[] {
+  return nodes.map((node) => {
+    const id = toTreeItemId([nodeId, ...node.fieldPath])
+    const hasChildren = Boolean(node.children?.length)
+    if (node.isGroup || hasChildren) {
+      const groupLabel = `${getTypeLabel(node.type)} ${node.name}`
+      // Collapse nested child step groups by default (fieldPath depth >= 3 and parent is "outputs")
+      // Keep top-level structure expanded (Result, outputs) for easy navigation
+      const isChildStepGroup = node.fieldPath.length >= 3 && node.fieldPath[node.fieldPath.length - 2] === 'outputs'
+      const defaultExpanded = !isChildStepGroup
+
+      return {
+        id,
+        name: (
+          <Label isCompact color="grey">
+            {searchTerm ? highlightText(groupLabel, searchTerm) : groupLabel}
+          </Label>
         ),
+        defaultExpanded,
         hasBadge: false,
-      })),
-    [fields, expressionNodeId]
+        children: buildTreeData(node.children ?? [], nodeId, searchTerm),
+      }
+    }
+
+    const expression = buildExpression({ nodeId, fieldPath: node.fieldPath })
+    return {
+      id,
+      name: (
+        <PreviewField
+          name={node.name}
+          type={node.type}
+          description={node.description ?? ''}
+          nodeId={nodeId}
+          fieldPath={node.fieldPath}
+          required={node.required}
+          searchTerm={searchTerm}
+        />
+      ),
+      action: <CopyExpressionAction expressionText={expression} />,
+      hasBadge: false,
+    }
+  })
+}
+
+export function InputSchemaPreview({ fields = [], tree, nodeId, searchTerm }: Readonly<InputSchemaPreviewProps>) {
+  const expressionNodeId = canvasNodeIdForExpression(nodeId)
+  const treeNodes = tree ?? fields.map((field) => toInputSchemaPreviewNode(field))
+  const filteredNodes = useMemo(
+    () => (searchTerm ? filterTree(treeNodes, searchTerm) : treeNodes),
+    [treeNodes, searchTerm]
+  )
+  const treeData: TreeViewDataItem[] = useMemo(
+    () => buildTreeData(filteredNodes, expressionNodeId, searchTerm),
+    [filteredNodes, expressionNodeId, searchTerm]
   )
 
-  if (fields.length === 0) {
+  if (treeData.length === 0) {
     return null
   }
 
