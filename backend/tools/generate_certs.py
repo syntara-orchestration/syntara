@@ -40,7 +40,7 @@ SERVICE_CERTS = [
     ("worker", "worker.ao.svc", ["temporal-worker"]),
     ("background-worker", "background-worker.ao.svc", ["temporal-background-worker"]),
     ("temporal", "temporal.ao.svc", ["temporal"]),
-    ("execution-plane", "execution-plane.ao.svc", ["execution-plane-worker", "execution-plane-api"]),
+    ("execution-plane", "execution-plane-callback.ao.svc", ["execution-plane-worker", "execution-plane-api"]),
 ]
 
 # Validate against the canonical list in principal.py. The certificate set may
@@ -184,9 +184,24 @@ def _missing_service_certs() -> list[tuple[str, str, list[str]]]:
     for filename, cn, sans in SERVICE_CERTS:
         cert_path = CERTS_DIR / f"{filename}.crt"
         key_path = CERTS_DIR / f"{filename}.key"
-        if not cert_path.is_file() or not key_path.is_file() or not _has_expected_dns_sans(cert_path, sans):
+        if (
+            not cert_path.is_file()
+            or not key_path.is_file()
+            or not _has_expected_common_name(cert_path, cn)
+            or not _has_expected_dns_sans(cert_path, sans)
+        ):
             missing.append((filename, cn, sans))
     return missing
+
+
+def _has_expected_common_name(cert_path: Path, common_name: str) -> bool:
+    """Return whether an existing certificate retains its expected identity."""
+    try:
+        certificate = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        existing = certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+    except (OSError, ValueError):
+        return False
+    return bool(existing) and existing[0].value == common_name
 
 
 def _has_expected_dns_sans(cert_path: Path, dns_sans: list[str]) -> bool:
