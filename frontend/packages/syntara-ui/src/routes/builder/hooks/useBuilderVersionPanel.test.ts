@@ -36,6 +36,7 @@ vi.mock('./useBuilderVersionHistory', () => ({
     publishVersion: mockPublishVersion,
     isPublishingVersion: false,
     breakingChanges: [],
+    publishReview: { contractChanges: [], parentWorkflows: [] },
     confirmPublishVersion: mockConfirmPublishVersion,
     cancelBreakingChangeWarning: mockCancelBreakingChangeWarning,
     isViewingVersion: mockIsViewingVersion,

@@ -1151,7 +1151,7 @@ export const handlers = [
       published_step_metadata: getPublishedStepMetadata(String(workflowId), body),
     })
   }),
-  http.get('/api/v1/workflows/:workflowId/invocation_schema', ({ params, request }) => {
+  http.get('/api/v1/workflows/:workflowId/invocation_schema', ({ params }) => {
     const workflowId = String(params.workflowId)
     const workflow = workflows.find((item) => item.id === workflowId)
     const instance = `/api/v1/workflows/${workflowId}/invocation_schema`
@@ -1169,16 +1169,10 @@ export const handlers = [
       )
     }
 
-    const requestedVersionId = new URL(request.url).searchParams.get('version_id')
     const versions = getOrCreateVersionStore(workflowId, workflow)
     const publishedVersionId = workflow.published_version_id
-    const selectedVersion = requestedVersionId
-      ? versions.find(
-          (version) =>
-            version.id === requestedVersionId &&
-            (version.status === 'published' || version.status === 'previously_published')
-        )
-      : typeof publishedVersionId === 'string'
+    const selectedVersion =
+      typeof publishedVersionId === 'string'
         ? versions.find((version) => version.id === publishedVersionId && version.status === 'published')
         : undefined
     if (!selectedVersion) {
@@ -1186,10 +1180,8 @@ export const handlers = [
         {
           type: 'https://api.example.com/errors/version-not-found',
           title: 'Published Version Not Found',
-          detail: requestedVersionId
-            ? 'The requested version was not published for this workflow'
-            : 'Workflow has no published version',
-          code: requestedVersionId ? 'VERSION_NOT_FOUND' : 'WORKFLOW_NOT_PUBLISHED',
+          detail: 'Workflow has no published version',
+          code: 'WORKFLOW_NOT_PUBLISHED',
           retryable: false,
           instance,
         },
@@ -1496,6 +1488,18 @@ export const handlers = [
         description: string
       }>
     }> = []
+    const contractChangesByTrigger: Array<{
+      trigger_id: string
+      trigger_name: string | null
+      changes: Array<{
+        change_type: string
+        field_path: string
+        old_type: string | null
+        new_type: string | null
+        description: string
+        is_breaking: boolean
+      }>
+    }> = []
     for (const [triggerId, oldTrigger] of oldTriggers) {
       const nextTrigger = newTriggers.get(triggerId)
       const oldParameters = isRecord(oldTrigger.parameters) ? oldTrigger.parameters : {}
@@ -1562,9 +1566,52 @@ export const handlers = [
           changes,
         })
       }
+      const contractChanges = changes.map((change) => ({ ...change, is_breaking: true }))
+      if (nextTrigger) {
+        const newParameters = isRecord(nextTrigger.parameters) ? nextTrigger.parameters : {}
+        const newFields = flattenSchema(newParameters.output_schema)
+        const oldParameters = isRecord(oldTrigger.parameters) ? oldTrigger.parameters : {}
+        const oldFields = flattenSchema(oldParameters.output_schema)
+        for (const [path, newField] of newFields) {
+          if (!oldFields.has(path) && !newField.required) {
+            contractChanges.push({
+              change_type: 'added_output',
+              field_path: path,
+              old_type: null,
+              new_type: newField.type,
+              description: `Added optional output: ${path}`,
+              is_breaking: false,
+            })
+          }
+          const oldField = oldFields.get(path)
+          if (oldField?.required && !newField.required) {
+            contractChanges.push({
+              change_type: 'optional_output',
+              field_path: path,
+              old_type: oldField.type,
+              new_type: newField.type,
+              description: `Output is now optional: ${path}`,
+              is_breaking: false,
+            })
+          }
+        }
+      }
+      if (contractChanges.length > 0) {
+        contractChangesByTrigger.push({
+          trigger_id: triggerId,
+          trigger_name: typeof nextTrigger?.name === 'string' ? nextTrigger.name : null,
+          changes: contractChanges,
+        })
+      }
     }
 
-    return HttpResponse.json({ has_breaking_changes: changesByTrigger.length > 0, triggers: changesByTrigger })
+    return HttpResponse.json({
+      has_breaking_changes: changesByTrigger.length > 0,
+      triggers: changesByTrigger,
+      has_contract_changes: contractChangesByTrigger.length > 0,
+      contract_changes: contractChangesByTrigger,
+      parent_workflows: [],
+    })
   }),
 
   http.post('/api/v1/workflows/:workflowId/versions/:version/publish', async (request) => {

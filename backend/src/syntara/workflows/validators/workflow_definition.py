@@ -29,7 +29,11 @@ from syntara.workflows.models.validation_finding import (
 )
 from syntara.workflows.validators.template_expressions import check_template_expressions
 from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
+from syntara.workflows.workflow_engine.models.workflow_definition import (
+    NODE_OUTPUT_MODELS,
+    NodeType,
+    ScheduledTriggerConfig,
+)
 
 _SCHEMA_DIR = SCHEMA_DIR / "workflows" / "v2"
 _BASE_URI = "https://automation.example.com/schemas/workflows/v2/"
@@ -81,6 +85,102 @@ def _extract_node_ids(workflow_definition: dict[str, Any]) -> set[str]:
         if nid is not None:
             node_ids.add(nid)
     return node_ids
+
+
+def _known_node_output_schema(node: dict[str, Any]) -> dict[str, Any] | None:
+    """Return a static output schema for a node when its output model is known."""
+    node_type = node.get("type")
+    if not isinstance(node_type, str):
+        return None
+    try:
+        output_model = NODE_OUTPUT_MODELS.get(NodeType(node_type))
+    except ValueError:
+        return None
+    if output_model is None:
+        return None
+
+    schema = output_model.model_json_schema()
+    properties = schema.setdefault("properties", {})
+    if isinstance(properties, dict):
+        properties.setdefault("status", {"type": "string"})
+    schema.setdefault("additionalProperties", False)
+    output_mapping = node.get("outputs")
+    if not isinstance(output_mapping, dict):
+        return schema
+
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return schema
+    mapped_properties: dict[str, Any] = {str(name): {} for name in output_mapping}
+    if "status" in properties:
+        mapped_properties["status"] = properties["status"]
+    return {**schema, "properties": mapped_properties}
+
+
+def _schema_type_at_path(schema: dict[str, Any] | None, field_path: str) -> tuple[bool, str | None]:
+    """Return whether a path is statically missing and its known JSON Schema type."""
+    is_missing, property_schema = _schema_property_at_path(schema, field_path)
+    if is_missing or property_schema is None:
+        return is_missing, None
+    schema_type = property_schema.get("type")
+    if isinstance(schema_type, str):
+        return False, schema_type
+    if isinstance(schema_type, list) and all(isinstance(value, str) for value in schema_type):
+        non_null_types = [value for value in schema_type if value != "null"]
+        return False, non_null_types[0] if len(non_null_types) == 1 else None
+    variants = property_schema.get("anyOf")
+    if isinstance(variants, list):
+        variant_types = [
+            variant.get("type")
+            for variant in variants
+            if isinstance(variant, dict) and isinstance(variant.get("type"), str) and variant["type"] != "null"
+        ]
+        return False, variant_types[0] if len(variant_types) == 1 else None
+    return False, None
+
+
+def _allows_dynamic_properties(schema: dict[str, Any]) -> bool:
+    additional_properties = schema.get("additionalProperties")
+    return (
+        additional_properties is True
+        or isinstance(additional_properties, dict)
+        or (additional_properties is None and schema.get("type") in (None, "object"))
+    )
+
+
+def _schema_property_at_path(schema: dict[str, Any] | None, field_path: str) -> tuple[bool, dict[str, Any] | None]:
+    if schema is None:
+        return False, None
+    current = schema
+    segments = field_path.split(".")
+    property_schema: dict[str, Any] | None = None
+    is_missing = False
+    for index, segment in enumerate(segments):
+        properties = current.get("properties")
+        if not isinstance(properties, dict):
+            is_missing = not _allows_dynamic_properties(current)
+            break
+        candidate = properties.get(segment)
+        if not isinstance(candidate, dict):
+            is_missing = not _allows_dynamic_properties(current)
+            break
+        if index == len(segments) - 1:
+            property_schema = candidate
+            break
+        if isinstance(candidate.get("properties"), dict):
+            current = candidate
+        else:
+            is_missing = not _allows_dynamic_properties(candidate)
+            break
+    return is_missing, property_schema
+
+
+def _output_types_compatible(source_type: str | None, declared_type: str | None) -> bool:
+    if source_type is None or declared_type is None or source_type == "unknown" or declared_type == "unknown":
+        return True
+    if source_type == "integer" and declared_type == "number":
+        return True
+    return source_type == declared_type
 
 
 def _check_definition_limits(workflow_definition: dict[str, Any]) -> list[ValidationFinding]:
@@ -500,72 +600,101 @@ def collect_scheduled_trigger_config_findings(
     return findings
 
 
-def _check_output_mapping_references(  # noqa: C901
+def _output_mapping_reference_findings(
+    trigger: dict[str, Any],
+    output_path: object,
+    expression: object,
+    node_ids: set[str],
+    elements_by_id: dict[str, dict[str, Any]],
+) -> list[ValidationFinding]:
+    trigger_id = trigger.get("id")
+    expression_text = expression if isinstance(expression, str) else None
+    match = re.match(r"^\$\{([^.}]+)", expression_text) if expression_text is not None else None
+    if not match:
+        return []
+    referenced_step = match.group(1)
+    finding_path = f"parameters.output_mapping.{output_path}"
+    if referenced_step not in node_ids:
+        return [
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.invalid_reference,
+                message=(
+                    f"Output mapping for field '{output_path}' references unknown step '{referenced_step}'. "
+                    f"Expression: {expression}"
+                ),
+                node_id=trigger_id,
+                field_path=finding_path,
+            )
+        ]
+
+    expression_match = re.fullmatch(r"\$\{([^{}]+)\}", expression_text.strip()) if expression_text else None
+    if not expression_match:
+        return []
+    source_step_id, separator, source_field_path = expression_match.group(1).partition(".")
+    if not separator or source_step_id != referenced_step:
+        return []
+
+    source_schema = _known_node_output_schema(elements_by_id.get(referenced_step, {}))
+    source_is_missing, source_type = _schema_type_at_path(source_schema, source_field_path)
+    if source_is_missing:
+        return [
+            ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.invalid_reference,
+                message=(
+                    f"Output mapping for field '{output_path}' references unavailable child output "
+                    f"'{source_field_path}' on step '{referenced_step}'."
+                ),
+                node_id=trigger_id,
+                field_path=finding_path,
+            )
+        ]
+
+    parameters = trigger.get("parameters")
+    output_schema = parameters.get("output_schema") if isinstance(parameters, dict) else None
+    findings: list[ValidationFinding] = []
+    if isinstance(output_schema, dict):
+        _target_is_missing, declared_type = _schema_type_at_path(output_schema, str(output_path))
+        if not _output_types_compatible(source_type, declared_type):
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.schema_violation,
+                    message=(
+                        f"Output mapping for '{output_path}' has source type '{source_type}', "
+                        f"but the declared output type is '{declared_type}'."
+                    ),
+                    node_id=trigger_id,
+                    field_path=finding_path,
+                )
+            )
+    return findings
+
+
+def _check_output_mapping_references(
     workflow_definition: dict[str, Any], node_ids: set[str]
 ) -> list[ValidationFinding]:
-    """Validate that SubWorkflow Trigger output_mapping references existing steps.
-
-    Args:
-        workflow_definition: The workflow definition dictionary
-        node_ids: Set of all valid node IDs in the workflow
-
-    Returns:
-        List of validation findings for invalid step references in output_mapping
-
-    """
-    findings: list[ValidationFinding] = []
-
+    """Validate source step and statically known output references in output mappings."""
     triggers = workflow_definition.get("triggers", [])
     if not isinstance(triggers, list):
-        return findings
-
-    for trigger in triggers:
-        if not isinstance(trigger, dict):
-            continue
-
-        trigger_id = trigger.get("id")
-        trigger_type = trigger.get("type")
-
-        # Only validate SubWorkflow Triggers
-        if trigger_type != "subworkflow_trigger":
-            continue
-
-        parameters = trigger.get("parameters", {})
-        if not isinstance(parameters, dict):
-            continue
-
-        output_mapping = parameters.get("output_mapping", {})
-        if not isinstance(output_mapping, dict):
-            continue
-
-        # Check each mapping expression references a valid step
-        for field_path, expression in output_mapping.items():
-            if not isinstance(expression, str):
-                continue
-
-            # Extract step ID from template expression like "${step.field}" or "${step}"
-            match = re.match(r"^\$\{([^.}]+)", expression)
-            if not match:
-                continue
-
-            referenced_step = match.group(1)
-
-            # Check if the referenced step exists in the workflow
-            if referenced_step not in node_ids:
-                findings.append(
-                    ValidationFinding(
-                        severity=ValidationSeverity.error,
-                        category=ValidationCategory.invalid_reference,
-                        message=(
-                            f"Output mapping for field '{field_path}' references unknown step '{referenced_step}'. "
-                            f"Expression: {expression}"
-                        ),
-                        node_id=trigger_id,
-                        field_path=f"parameters.output_mapping.{field_path}",
-                    )
-                )
-
-    return findings
+        return []
+    elements = [*triggers, *workflow_definition.get("nodes", [])]
+    elements_by_id = {
+        element["id"]: element
+        for element in elements
+        if isinstance(element, dict) and isinstance(element.get("id"), str)
+    }
+    return [
+        finding
+        for trigger in triggers
+        if isinstance(trigger, dict)
+        and trigger.get("type") == "subworkflow_trigger"
+        and isinstance(trigger.get("parameters"), dict)
+        and isinstance(trigger["parameters"].get("output_mapping", {}), dict)
+        for output_path, expression in trigger["parameters"].get("output_mapping", {}).items()
+        for finding in _output_mapping_reference_findings(trigger, output_path, expression, node_ids, elements_by_id)
+    ]
 
 
 def _output_schema_paths(
@@ -670,7 +799,6 @@ def _check_output_trigger_contract(trigger: dict[str, Any]) -> list[ValidationFi
         ]
 
     property_paths, required_paths = _output_schema_paths(schema)
-    findings: list[ValidationFinding] = []
     mapping_paths: set[str] = set()
     for output_path, expression in mapping.items():
         if not isinstance(output_path, str) or output_path not in property_paths:

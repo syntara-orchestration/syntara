@@ -303,6 +303,8 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   currentVersionId?: string | null
   isPublishing: boolean
   breakingChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
+  contractChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
+  parentWorkflows?: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
   onConfirmPublish?: () => void
   onCancelBreakingChanges?: () => void
   isLiveRunActive?: boolean
@@ -355,6 +357,8 @@ export function BuilderWorkflowPageHeader({
   currentVersionId,
   isPublishing,
   breakingChanges,
+  contractChanges,
+  parentWorkflows,
   onConfirmPublish,
   onCancelBreakingChanges,
   isLiveRunActive,
@@ -485,8 +489,10 @@ export function BuilderWorkflowPageHeader({
         isOpen={publishDialog.isOpen}
         isPublishing={isPublishing}
         breakingChanges={breakingChanges}
+        contractChanges={contractChanges}
+        parentWorkflows={parentWorkflows}
         onClose={publishDialog.close}
-        onConfirmBreakingChanges={onConfirmPublish}
+        onConfirmContractChanges={onConfirmPublish}
         onCancelBreakingChanges={onCancelBreakingChanges}
         onPublish={(publishName, description) => {
           onPublish(publishName, description, publishDialog.close)

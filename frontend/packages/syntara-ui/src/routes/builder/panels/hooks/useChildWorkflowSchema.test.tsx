@@ -51,8 +51,24 @@ const invocationSchema = {
   published_version: 4,
   is_eligible: true,
   triggers: [
-    { trigger_node_id: 'deploy', name: 'Deploy', input_schema: {} },
-    { trigger_node_id: 'validate', name: 'Validate', input_schema: {} },
+    {
+      trigger_node_id: 'deploy',
+      name: 'Deploy',
+      input_schema: {},
+      output_schema: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', description: 'Deployment status' },
+          image_tag: { type: 'string', description: 'Published image tag' },
+        },
+      },
+    },
+    {
+      trigger_node_id: 'validate',
+      name: 'Validate',
+      input_schema: {},
+      output_schema: { type: 'object', properties: { validation_status: { type: 'string' } } },
+    },
   ],
 } satisfies WorkflowAPI.components['schemas']['WorkflowInvocationSchemaRead']
 
@@ -147,7 +163,7 @@ describe('useChildWorkflowSchema', () => {
     })
   })
 
-  it('loads the published graph and scopes child steps to the selected trigger', async () => {
+  it('loads the published graph and exposes the selected trigger’s declared outputs', async () => {
     const { result } = renderHook(
       () => useChildWorkflowSchema({ workflowId: 'child-workflow', triggerNodeId: 'deploy' }),
       { wrapper: createWrapper() }
@@ -157,17 +173,12 @@ describe('useChildWorkflowSchema', () => {
 
     expect(result.current.publishedVersionId).toBe('published-v4')
     expect(result.current.publishedVersion).toBe(4)
-    expect(result.current.childSteps.map((step) => step.id)).toEqual(['shared-script'])
+    expect(result.current.childSteps.map((step) => step.id)).toEqual(['__declared_outputs__'])
     expect(result.current.childSteps[0]?.outputSchema).toMatchObject({ type: 'object' })
     expect(result.current.childSteps[0]?.outputFields?.map((field) => field.name)).toEqual(['status', 'image_tag'])
-    expect(result.current.childSteps[0]?.outputFields?.find((field) => field.name === 'image_tag')?.type).toBe(
-      'unknown'
-    )
+    expect(result.current.childSteps[0]?.outputFields?.find((field) => field.name === 'image_tag')?.type).toBe('string')
     expect(mocks.get).toHaveBeenCalledWith('/workflows/{workflow_id}/versions/{version}', {
       params: { path: { workflow_id: 'child-workflow', version: 4 } },
-    })
-    expect(mocks.get).toHaveBeenCalledWith('/workflows/{workflow_id}', {
-      params: { path: { workflow_id: 'child-workflow' } },
     })
   })
 

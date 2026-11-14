@@ -105,6 +105,7 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     publishVersion,
     isPublishingVersion,
     breakingChanges,
+    publishReview,
     confirmPublishVersion,
     cancelBreakingChangeWarning,
     isViewingVersion,
@@ -250,8 +251,9 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
         isOpen: versionPublishDialog.isOpen,
         isPublishing: isPublishingVersion,
         breakingChanges,
+        ...publishReview,
         onClose: () => closeVersionPublishDialog(cancelBreakingChangeWarning, versionPublishDialog.close),
-        onConfirmBreakingChanges: confirmPublishVersion,
+        onConfirmContractChanges: confirmPublishVersion,
         onCancelBreakingChanges: cancelBreakingChangeWarning,
         onPublish: (publishName?: string, description?: string) =>
           publishSelectedVersion({

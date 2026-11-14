@@ -9,12 +9,12 @@ import type { ProjectRead } from '../access/types'
 import { ProjectFormModal } from '../access-management/ProjectFormModal'
 import { ProjectDeleteDialog } from '../access-management/projects/ProjectDeleteDialog'
 import { RunWorkflowModal } from '../builder/components/RunWorkflowModal'
-import { PublishWorkflowDialog } from '../builder/PublishWorkflowDialog'
 import { hasNonEmptyInputSchema } from '../builder/utils/triggerReferenceCheck'
 
 import { ImportWorkflowDialog } from './ImportWorkflowDialog'
 import { resolveWorkflowRunTrigger, type WorkflowRunTrigger } from './resolveWorkflowRunTrigger'
 import { WorkflowDeleteDialog } from './WorkflowDeleteDialog'
+import { WorkflowPublishDialog } from './WorkflowPublishDialog'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -88,7 +88,6 @@ export function WorkflowDialogs({
   const { showError } = useAlerts()
   const [isResolvingRun, setIsResolvingRun] = useState(false)
   const [pendingRunInput, setPendingRunInput] = useState<PendingRunInput | null>(null)
-
   const closeRunInput = useCallback(() => {
     setPendingRunInput(null)
   }, [])
@@ -185,15 +184,10 @@ export function WorkflowDialogs({
         onSuccess={onRefetchWorkflows}
       />
 
-      <PublishWorkflowDialog
-        isOpen={publishDialog.isOpen}
+      <WorkflowPublishDialog
+        publishDialog={publishDialog}
         isPublishing={isPublishing}
-        onClose={publishDialog.close}
-        onPublish={(publishName, description) => {
-          if (publishDialog.item) {
-            onPublishWorkflow(publishDialog.item, publishName, description)
-          }
-        }}
+        onPublishWorkflow={onPublishWorkflow}
       />
 
       <SynConfirmationDialog

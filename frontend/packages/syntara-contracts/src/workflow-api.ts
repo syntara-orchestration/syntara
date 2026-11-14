@@ -101,7 +101,7 @@ export interface paths {
     }
     /**
      * Get workflow invocation schema
-     * @description Get current or pinned published Subworkflow Trigger schemas for a workflow.
+     * @description Get the latest published Subworkflow Trigger schemas for a workflow.
      */
     get: operations['get_workflow_invocation_schema']
     put?: never
@@ -824,6 +824,11 @@ export interface components {
       new_type?: string | null
       /** Description */
       description: string
+      /**
+       * Is Breaking
+       * @default true
+       */
+      is_breaking?: boolean
     }
     /**
      * TriggerBreakingChanges
@@ -844,17 +849,41 @@ export interface components {
     }
     /**
      * BreakingChangesResponse
-     * @description Response containing all detected breaking changes.
-     *
-     *     Attributes:
-     *         has_breaking_changes: True if any breaking changes were detected
-     *         triggers: List of triggers with breaking changes
+     * @description Response containing the output contract diff and current parent references.
      */
     BreakingChangesResponse: {
       /** Has Breaking Changes */
       has_breaking_changes: boolean
       /** Triggers */
       triggers: components['schemas']['TriggerBreakingChanges'][]
+      /**
+       * Has Contract Changes
+       * @default false
+       */
+      has_contract_changes?: boolean
+      /** Contract Changes */
+      contract_changes?: components['schemas']['TriggerBreakingChanges'][]
+      /** Parent Workflows */
+      parent_workflows?: components['schemas']['WorkflowReferenceRead'][]
+    }
+    /**
+     * WorkflowReferenceRead
+     * @description A currently published parent workflow step that references this child.
+     */
+    WorkflowReferenceRead: {
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      workflow_id: string
+      /** Workflow Name */
+      workflow_name: string
+      /** Workflow Version */
+      workflow_version: number
+      /** Step Id */
+      step_id: string
+      /** Step Name */
+      step_name?: string | null
     }
     /**
      * WorkflowVersionUpdate
@@ -2132,15 +2161,15 @@ export interface components {
      * @description Parameters for Sub-workflow executor.
      *
      *     Defines the design-time configuration for invoking a child workflow from
-     *     a parent workflow. The Sub-workflow step invokes the published child
-     *     workflow version stored in workflow_version_id.
+     *     a parent workflow. Each new invocation resolves the latest published child
+     *     version. The child execution record pins that version for the run so retries
+     *     keep using the same workflow definition.
      *
      *     When a workflow has multiple Subworkflow Triggers, the calling step must
      *     select a specific trigger to invoke via the trigger_node_id field.
      *
      *     Attributes:
      *         workflow_id: UUID of the selected child workflow to invoke.
-     *         workflow_version_id: ID of the published child version to invoke.
      *         trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.
      *         input_mapping: Mapping of child workflow input field names to values.
      *             Values can be static (string, int, bool, dict, list) or template
@@ -2150,14 +2179,9 @@ export interface components {
       /**
        * Workflow Id
        * Format: uuid
-       * @description UUID of the selected child workflow in the same Project.
+       * @description UUID of the selected child workflow in the same Project (latest published version per run).
        */
       workflow_id: string
-      /**
-       * Workflow Version Id
-       * @description ID of the published child workflow version to invoke. Required before the parent can be published.
-       */
-      workflow_version_id?: string | null
       /**
        * Trigger Node Id
        * @description Graph node ID of the Subworkflow Trigger to invoke in the child workflow
@@ -3047,10 +3071,7 @@ export interface operations {
   }
   get_workflow_invocation_schema: {
     parameters: {
-      query?: {
-        /** @description Published child version ID whose Subworkflow Trigger schemas should be returned. */
-        version_id?: string
-      }
+      query?: never
       header?: never
       path: {
         workflow_id: string

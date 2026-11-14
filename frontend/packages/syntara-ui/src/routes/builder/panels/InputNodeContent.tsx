@@ -137,7 +137,6 @@ function ChildWorkflowOutputContent({
 }: Readonly<ChildWorkflowOutputContentProps>) {
   const childSchema = useChildWorkflowSchema({
     workflowId: upstreamNode.childWorkflowId ?? null,
-    workflowVersionId: upstreamNode.childWorkflowVersionId ?? null,
     triggerNodeId: upstreamNode.childTriggerNodeId ?? null,
   })
   const outputTree = useMemo(

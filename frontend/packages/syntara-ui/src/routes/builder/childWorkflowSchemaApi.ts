@@ -16,8 +16,7 @@ export class ChildWorkflowSchemaFetchError extends Error {
   }
 }
 
-export const invocationSchemaQueryKey = (workflowId: string, versionId?: string | null) =>
-  ['workflow-invocation-schema', workflowId, versionId ?? 'current'] as const
+export const invocationSchemaQueryKey = (workflowId: string) => ['workflow-invocation-schema', workflowId] as const
 
 export const childWorkflowVersionQueryKey = (
   workflowId: string,
@@ -25,12 +24,9 @@ export const childWorkflowVersionQueryKey = (
   publishedVersion: number
 ) => ['child-workflow-version', workflowId, publishedVersionId, publishedVersion] as const
 
-export async function fetchInvocationSchema(workflowId: string, versionId?: string | null): Promise<InvocationSchema> {
+export async function fetchInvocationSchema(workflowId: string): Promise<InvocationSchema> {
   const { data, error, response } = await workflowFetchClient.GET('/workflows/{workflow_id}/invocation_schema', {
-    params: {
-      path: { workflow_id: workflowId },
-      ...(versionId ? { query: { version_id: versionId } } : {}),
-    },
+    params: { path: { workflow_id: workflowId } },
   })
 
   if (error || !data) {

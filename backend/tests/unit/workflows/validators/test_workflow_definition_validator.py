@@ -1278,7 +1278,7 @@ class TestSubWorkflowOutputMappingValidation:
                             },
                         },
                         "output_mapping": {
-                            "artifact_url": "${deploy.url}",
+                            "artifact_url": "${deploy.stdout}",
                         },
                     },
                 }
@@ -1384,7 +1384,7 @@ class TestSubWorkflowOutputMappingValidation:
                             },
                         },
                         "output_mapping": {
-                            "artifact_url": "${deploy.url}",  # Valid
+                            "artifact_url": "${deploy.stdout}",  # Valid
                             "build_id": "${nonexistent.id}",  # Invalid
                         },
                     },
@@ -1398,3 +1398,65 @@ class TestSubWorkflowOutputMappingValidation:
         # Template expression validator catches this first
         with pytest.raises(SafeValueError, match="references unknown activity or scope 'nonexistent'"):
             validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_rejects_removed_step_output(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "missing-source-output",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {"type": "object", "properties": {"url": {"type": "string"}}},
+                        "output_mapping": {"url": "${build.url}"},
+                    },
+                }
+            ],
+            "nodes": [{"id": "build", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "build"}],
+        }
+
+        with pytest.raises(SafeValueError, match="references unavailable child output 'url'"):
+            validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_rejects_incompatible_static_types(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "incompatible-source-type",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {"type": "object", "properties": {"release_code": {"type": "string"}}},
+                        "output_mapping": {"release_code": "${build.return_code}"},
+                    },
+                }
+            ],
+            "nodes": [{"id": "build", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "build"}],
+        }
+
+        with pytest.raises(SafeValueError, match=r"source type 'integer'.*declared output type is 'string'"):
+            validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_allows_dynamic_step_output_fields(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "dynamic-source-output",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {"type": "object", "properties": {"release_tag": {"type": "string"}}},
+                        "output_mapping": {"release_tag": "${build.stdout_json.tag}"},
+                    },
+                }
+            ],
+            "nodes": [{"id": "build", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "build"}],
+        }
+
+        validator.validate_workflow_definition(definition)

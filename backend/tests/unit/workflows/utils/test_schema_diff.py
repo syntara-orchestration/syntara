@@ -4,7 +4,9 @@ from typing import Any
 
 from syntara.workflows.utils.schema_diff import (
     detect_output_schema_breaking_changes,
+    detect_output_schema_changes,
     detect_workflow_breaking_changes,
+    detect_workflow_contract_changes,
 )
 
 
@@ -21,6 +23,34 @@ class TestDetectOutputSchemaBreakingChanges:
         }
         changes = detect_output_schema_breaking_changes(None, new_schema)
         assert len(changes) == 0
+
+    def test_contract_diff_reports_optional_addition_without_marking_breaking(self) -> None:
+        old_schema = {"type": "object", "properties": {"status": {"type": "string"}}}
+        new_schema = {
+            "type": "object",
+            "properties": {"status": {"type": "string"}, "details": {"type": "object"}},
+        }
+
+        changes = detect_output_schema_changes(old_schema, new_schema)
+
+        assert len(changes) == 1
+        assert changes[0].change_type == "added_output"
+        assert changes[0].field_path == "details"
+        assert changes[0].is_breaking is False
+        assert detect_output_schema_breaking_changes(old_schema, new_schema) == []
+
+    def test_contract_diff_includes_new_required_output_on_first_declaration_as_nonbreaking(self) -> None:
+        new_schema = {
+            "type": "object",
+            "properties": {"status": {"type": "string"}},
+            "required": ["status"],
+        }
+
+        changes = detect_output_schema_changes(None, new_schema)
+
+        assert len(changes) == 1
+        assert changes[0].change_type == "new_required_output"
+        assert changes[0].is_breaking is False
 
     def test_removed_output_detected(self) -> None:
         """Detect when an output field is removed."""
@@ -219,6 +249,33 @@ class TestDetectOutputSchemaBreakingChanges:
 
 class TestDetectWorkflowBreakingChanges:
     """Test breaking change detection for entire workflow definitions."""
+
+    def test_contract_changes_include_nonbreaking_output_additions(self) -> None:
+        old_definition: dict[str, Any] = {
+            "triggers": [
+                {
+                    "id": "child-trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {"output_schema": {"type": "object", "properties": {}}},
+                }
+            ]
+        }
+        new_definition: dict[str, Any] = {
+            "triggers": [
+                {
+                    "id": "child-trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {"output_schema": {"type": "object", "properties": {"status": {"type": "string"}}}},
+                }
+            ]
+        }
+
+        contract_changes = detect_workflow_contract_changes(old_definition, new_definition)
+        breaking_changes = detect_workflow_breaking_changes(old_definition, new_definition)
+
+        assert contract_changes["child-trigger"][0]["change_type"] == "added_output"
+        assert contract_changes["child-trigger"][0]["is_breaking"] is False
+        assert breaking_changes == {}
 
     def test_no_breaking_changes_for_first_publish(self) -> None:
         """First publish has no breaking changes."""

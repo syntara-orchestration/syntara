@@ -788,17 +788,15 @@ class SubWorkflowExecutorParameters(BaseModel):
     """Parameters for Sub-workflow executor.
 
     Defines the design-time configuration for invoking a child workflow from
-    a parent workflow. New parent definitions pin the selected child version so
-    later child publications do not change the behavior of existing parents.
-    Draft definitions may be missing a pin while being configured, but every
-    published parent definition must contain one.
+    a parent workflow. Each new invocation resolves the latest published child
+    version. The child execution record pins that version for the run so retries
+    keep using the same workflow definition.
 
     When a workflow has multiple Subworkflow Triggers, the calling step must
     select a specific trigger to invoke via the trigger_node_id field.
 
     Attributes:
         workflow_id: UUID of the selected child workflow to invoke.
-        workflow_version_id: ID of the published child version to invoke.
         trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.
         input_mapping: Mapping of child workflow input field names to values.
             Values can be static (string, int, bool, dict, list) or template
@@ -811,15 +809,7 @@ class SubWorkflowExecutorParameters(BaseModel):
     workflow_id: str = Field(
         max_length=36,
         json_schema_extra={"format": "uuid"},
-        description="UUID of the selected child workflow in the same Project.",
-    )
-    workflow_version_id: str | None = Field(
-        default=None,
-        max_length=36,
-        json_schema_extra={"format": "uuid"},
-        description=(
-            "ID of the published child workflow version to invoke. Required before the parent can be published."
-        ),
+        description="UUID of the selected child workflow in the same Project (latest published version per run).",
     )
     trigger_node_id: str = Field(
         pattern=r"^[a-zA-Z_][a-zA-Z0-9_]*$",
@@ -851,22 +841,6 @@ class SubWorkflowExecutorParameters(BaseModel):
             )
             raise SafeValueError(msg)
         return v
-
-    @field_validator("workflow_version_id")
-    @classmethod
-    def validate_workflow_version_id_format(cls, value: str | None) -> str | None:
-        """Validate an optional child version UUID without accepting templates."""
-        if value is None:
-            return None
-        try:
-            parsed_uuid = uuid.UUID(value)
-        except ValueError as err:
-            msg = "Invalid UUID format for workflow_version_id. A published child version ID is required."
-            raise SafeValueError(msg) from err
-        if str(parsed_uuid) != value.lower():
-            msg = "Invalid UUID format for workflow_version_id. A canonical UUID is required."
-            raise SafeValueError(msg)
-        return value
 
 
 # ---------------------------------------------------------------------------
