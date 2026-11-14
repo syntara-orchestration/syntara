@@ -620,6 +620,10 @@ jobs:
           # The E2E MCP test server resolves to a private container IP; allowlist it so the
           # write-time integration SSRF check accepts base_url=http://mcp-server:.../mcp.
           APP_INTEGRATION_URL_ALLOWED_HOSTS: '["mcp-server"]'
+          # Keep each process's pool small so the API, both Temporal workers and
+          # the audit pools stay well below the database's connection limit.
+          APP_DB_POOL_SIZE: "5"
+          APP_DB_MAX_OVERFLOW: "5"
         run: |
           ulimit -n 65535
           # --no-deps: start all containers immediately without health dependency ordering.
