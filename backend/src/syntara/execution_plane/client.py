@@ -15,7 +15,7 @@ from uuid import UUID, uuid4
 
 import httpx
 import jwt
-from execution_plane_client.commands.control import CancelCommand
+from execution_plane_client.commands.control import WorkCancel
 from execution_plane_client.commands.results import TransportReceipt
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ EP_CLIENT_ID = "syntara-orchestration"
 EP_AUDIENCE = "execution-plane"
 EP_TOKEN_LIFETIME_SECONDS = 300
 EP_SCOPES = (
-    "work.execute command.cancel cluster.register cluster.update cluster.delete "
+    "work.execute work.cancel cluster.register cluster.update cluster.delete "
     "execution_target.register execution_target.update execution_target.delete "
     "execution_target.health "
     "work-items:read execution-targets:read clusters:read"
@@ -132,7 +132,7 @@ class ExecutionPlaneHttpClient:
 
     async def cancel_work_item(self, *, work_item_id: UUID) -> TransportReceipt:
         """Request cancellation through the shared command contract."""
-        message = CancelCommand(target_command_id=work_item_id).to_message(
+        message = WorkCancel(work_item_id=work_item_id).to_message(
             source_id=EP_CLIENT_ID,
             destination_id=EP_AUDIENCE,
             client_id=EP_CLIENT_ID,

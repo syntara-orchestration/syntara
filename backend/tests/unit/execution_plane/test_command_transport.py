@@ -5,14 +5,14 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from execution_plane_client.commands.control import CancelCommand
+from execution_plane_client.commands.control import WorkCancel
 
 from syntara.execution_plane import client as client_module
 from syntara.execution_plane.client import ExecutionPlaneHttpClient, ExecutionPlaneRejectedError
 
 
 def cancellation():
-    return CancelCommand(target_command_id=uuid4()).to_message(
+    return WorkCancel(work_item_id=uuid4()).to_message(
         source_id="syntara-orchestration", destination_id="execution-plane", client_id="syntara-orchestration"
     )
 
@@ -36,7 +36,7 @@ async def test_command_transport_sends_shared_envelope_and_checks_receipt(monkey
     assert requests[0].url.path == "/v1/commands"
     assert requests[0].headers["Authorization"] == "Bearer test-token"
     assert json.loads(requests[0].content) == message.model_dump(mode="json")
-    assert "command.cancel" in client_module.EP_SCOPES.split()
+    assert "work.cancel" in client_module.EP_SCOPES.split()
     assert "work.execute" in client_module.EP_SCOPES.split()
     assert {"cluster.register", "cluster.update", "cluster.delete"} <= set(client_module.EP_SCOPES.split())
     assert "clusters:read" in client_module.EP_SCOPES.split()

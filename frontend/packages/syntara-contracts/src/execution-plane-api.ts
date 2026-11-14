@@ -105,7 +105,7 @@ export interface paths {
     }
     /**
      * List work items
-     * @description Retrieve work items. Filters use field=value or field[operator]=value; comma-separated values within one field/operator use OR and different fields/operators use AND. EP validates fields and operators. Keep filters, sort, and limit unchanged when following opaque cursors.
+     * @description Retrieve work items. Filters use field=value or field[operator]=value; comma-separated values within one field/operator use OR and different fields/operators use AND. runtime_context[key]=value matches exact JSON strings; empty values check key existence. Context keys are literal top-level keys, commas are literal, and multiple keys use AND. EP validates fields and operators. Keep filters, sort, and limit unchanged when following opaque cursors.
      */
     get: operations['list_work_items']
     put?: never
@@ -380,9 +380,16 @@ export interface components {
       /**
        * Id
        * Format: uuid
-       * @description Work item unique identifier
+       * @description Caller-assigned work item identifier
        */
       id: string
+      /**
+       * Runtime Context
+       * @description Non-secret caller-owned runtime context, stored once with the work item and passed to the plugin. Available in reads, completion notifications, and runtime_context[key] filters. Execution Plane does not interpret these values for identity, authorization, placement, or lifecycle.
+       */
+      runtime_context?: {
+        [key: string]: unknown
+      }
       /** @description Work item lifecycle status */
       status: components['schemas']['WorkItemStatus']
       /**

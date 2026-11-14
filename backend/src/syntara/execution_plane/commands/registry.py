@@ -15,10 +15,10 @@ def build_ao_registry() -> CommandRegistry[AOCommandContext]:
     """Construct the stateless AO handler registry."""
     catalog = CommandCatalog()
     registry = CommandRegistry[AOCommandContext]()
-    registry.register(catalog.definition("work.execute.completed", 1), CompletionCommandHandler())
+    registry.register(catalog.definition("work.execute.completed", 2), CompletionCommandHandler())
     registry.register(catalog.definition("credential.resolve", 1), CredentialResolveCommandHandler())
     registry.register(
-        catalog.definition("credential.resolve.workload", 1),
+        catalog.definition("credential.resolve.workload", 2),
         CredentialResolveWorkloadCommandHandler(),
     )
     return registry

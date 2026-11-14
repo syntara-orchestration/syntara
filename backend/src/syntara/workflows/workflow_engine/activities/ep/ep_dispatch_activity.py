@@ -9,10 +9,12 @@ from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from execution_plane_client.commands.work import WorkExecute, WorkloadInvocation
+from sqlmodel import col, select
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
+from syntara.core.database.session import AsyncSessionLocal
 from syntara.execution_plane.client import (
     EP_AUDIENCE,
     EP_CLIENT_ID,
@@ -21,6 +23,7 @@ from syntara.execution_plane.client import (
     ExecutionPlaneUnavailableError,
 )
 from syntara.execution_plane.utils import execution_plane_container_image, execution_plane_work_item_id
+from syntara.workflows.models.execution import Execution
 from syntara.workflows.workflow_engine.activities.common import HEARTBEAT_STOP_MONITOR
 from syntara.workflows.workflow_engine.constants import ENGINE_TIMEOUT_SECONDS_KEY
 from syntara.workflows.workflow_engine.models.workflow_definition import (
@@ -49,17 +52,15 @@ _EXECUTION_TARGET_SELECTOR_FIELD = "_execution_target_id"
 _CREDENTIAL_BINDINGS_FIELD = "credential_bindings"
 
 
-def _build_invocation(input_config: dict[str, Any], info: Any) -> dict[str, Any]:  # noqa: ANN401
+def _build_invocation(input_config: dict[str, Any]) -> dict[str, Any]:
     """Build the versioned SDK request before AO freezes it for activity retries."""
     return {
-        "workflow_run_id": info.workflow_run_id,
         "step_revision_id": _STEP_REVISION_ID,
         "inputs": {
             key: value
             for key, value in input_config.items()
             if not key.startswith("_") and key not in {_EXECUTION_PROFILE_FIELD, _CREDENTIAL_BINDINGS_FIELD}
         },
-        "runtime_context": {},
         "credential_bindings": input_config.get(_CREDENTIAL_BINDINGS_FIELD, []),
         "timeout_seconds": int(
             input_config.get(
@@ -70,7 +71,27 @@ def _build_invocation(input_config: dict[str, Any], info: Any) -> dict[str, Any]
     }
 
 
-async def _submit_and_read_work(client: ExecutionPlaneHttpClient, message: MessageEnvelope) -> dict[str, Any]:
+async def _work_runtime_context(execution_id: uuid.UUID) -> dict[str, object]:
+    """Provide coherent AO execution context to EP and the plugin."""
+    async with AsyncSessionLocal() as session:
+        row = (
+            await session.exec(
+                select(Execution.project_id, Execution.workflow_id).where(col(Execution.id) == execution_id)
+            )
+        ).first()
+    if row is None:
+        message = "Execution does not exist"
+        raise ApplicationError(message, type="ContextError", non_retryable=True)
+    return {
+        "execution_id": str(execution_id),
+        "project_id": str(row[0]),
+        "workflow_id": str(row[1]),
+    }
+
+
+async def _submit_and_read_work(
+    client: ExecutionPlaneHttpClient, message: MessageEnvelope, work_item_id: uuid.UUID
+) -> dict[str, Any]:
     """Recover work after duplicate submission; receipts contain no work state."""
     try:
         receipt = await client.submit_command(message)
@@ -83,11 +104,11 @@ async def _submit_and_read_work(client: ExecutionPlaneHttpClient, message: Messa
         if (
             receipt.resource is None
             or receipt.resource.kind != "work_item"
-            or receipt.resource.resource_id != message.command_id
+            or receipt.resource.resource_id != work_item_id
         ):
             msg = "Execution Plane receipt does not identify the submitted work"
             raise ExecutionPlaneRejectedError(msg)
-    return await client.get_work_item(work_item_id=message.command_id)
+    return await client.get_work_item(work_item_id=work_item_id)
 
 
 def _build_work_execute_selectors(execution_target_id: uuid.UUID | None) -> dict[str, str]:
@@ -113,12 +134,6 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
     """Submit a stable work command and recover existing work after an ambiguous retry."""
     settings = get_settings()
     info = activity.info()
-    workflow_id = info.workflow_id
-    run_id = info.workflow_run_id
-    if workflow_id is None or run_id is None:
-        msg = "Temporal activity context is missing workflow or run identity"
-        raise ApplicationError(msg, type="ContextError", non_retryable=True)
-
     work_item_id = execution_plane_work_item_id(execution_id, info.activity_id)
     selectors = _build_work_execute_selectors(execution_target_id)
 
@@ -128,7 +143,9 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
         raise ApplicationError(msg, type="ConfigError", non_retryable=True)
     try:
         message = WorkExecute(
-            invocation=WorkloadInvocation.model_validate(_build_invocation(input_config, info)),
+            work_item_id=work_item_id,
+            runtime_context=await _work_runtime_context(execution_id),
+            invocation=WorkloadInvocation.model_validate(_build_invocation(input_config)),
             image=image,
             selectors=selectors,
             output_config=output_config,
@@ -136,7 +153,6 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
             source_id=EP_CLIENT_ID,
             destination_id=EP_AUDIENCE,
             client_id=EP_CLIENT_ID,
-            command_id=work_item_id,
         )
     except ValueError:
         msg = "Script invocation is invalid for the Execution Plane command protocol"
@@ -155,7 +171,7 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
 
         try:
             async with ExecutionPlaneHttpClient(timeout=min(settings.ep_request_timeout_seconds, remaining)) as client:
-                response = await _submit_and_read_work(client, message)
+                response = await _submit_and_read_work(client, message, work_item_id)
         except ExecutionPlaneRejectedError as exc:
             raise ApplicationError(str(exc), type="ExecutionPlaneRejected", non_retryable=True) from exc
         except ExecutionPlaneUnavailableError as exc:

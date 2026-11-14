@@ -55,18 +55,16 @@ def workload_command(
     credential_ref: UUID | None = None,
     credential_recipe_id: str = "acme.echo.api-token",
 ) -> tuple[MessageEnvelope, CredentialResolveWorkload]:
-    parent_command_id = uuid4()
     message = CredentialResolveWorkload(
+        work_item_id=uuid4(),
         attempt_id="attempt",
         credential_ref=credential_ref or uuid4(),
         credential_recipe_id=credential_recipe_id,
-        workflow_run_id="workflow-run",
         step_revision_id="step-revision",
     ).to_message(
         source_id="execution-plane",
         destination_id="syntara-orchestration",
         client_id="syntara-orchestration",
-        parent_command_id=parent_command_id,
     )
     return message, CredentialResolveWorkload.model_validate(message.command.payload)
 
@@ -140,7 +138,7 @@ async def test_workload_credential_command_resolves_bound_generic_node(
     resolved: dict[str, object] = {}
 
     async def load_activity(_handler: object, _session: AsyncMock, work_item_id: object) -> ActivityExecution:
-        assert work_item_id == message.command.parent_command_id
+        assert work_item_id == UUID(str(message.command.payload["work_item_id"]))
         return row
 
     async def resolve_document(
@@ -166,13 +164,13 @@ async def test_workload_credential_command_resolves_bound_generic_node(
         "message_id": str(message.message_id),
         "resource": {
             "kind": "work_item",
-            "resource_id": str(message.command.parent_command_id),
+            "resource_id": str(UUID(str(message.command.payload["work_item_id"]))),
             "resource_key": None,
             "revision": None,
         },
         "result": {
             "command_type": "credential.resolve.workload",
-            "command_revision": 1,
+            "command_revision": 2,
             "credential": {"token": "resolved-token"},
         },
     }
@@ -436,12 +434,11 @@ async def test_workload_credential_command_handler_rejects_unexpected_payload(
 
 
 @pytest.mark.asyncio
-async def test_workload_credential_command_handler_requires_a_parent_command(
-    command_context: AOCommandContext,
-) -> None:
-    handler = command_credentials.CredentialResolveWorkloadCommandHandler()
-    message, payload = workload_command()
-    message = message.model_copy(update={"command": message.command.model_copy(update={"parent_command_id": None})})
-
-    with pytest.raises(ProtocolConflict):
-        await handler.handle(message, payload, command_context)
+async def test_workload_credential_command_requires_explicit_work_item(callback) -> None:
+    app, _session = callback
+    message, _payload = workload_command()
+    body = message.model_dump(mode="json")
+    del body["command"]["payload"]["work_item_id"]
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=body)
+    assert response.status_code == 422
