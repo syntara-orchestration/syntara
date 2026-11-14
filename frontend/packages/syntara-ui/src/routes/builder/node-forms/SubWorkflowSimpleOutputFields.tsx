@@ -38,7 +38,7 @@ export function SubWorkflowSimpleOutputFields({
   )
 
   const isSourceConditional = (expression: string): boolean => {
-    const stepId = extractStepIdFromExpression(expression)
+    const stepId = extractStepIdFromExpression(expression.trim())
     return stepId ? isStepConditional(stepId, activities, edges, [triggerId, `trigger-${triggerIndex}`]) : false
   }
 

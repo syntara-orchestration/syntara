@@ -1,6 +1,6 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 
 import { workflowClient } from '../../../client'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
@@ -22,6 +22,32 @@ export function isVersionStatus(s: string): s is VersionStatus {
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 type TriggerBreakingChanges = WorkflowAPI.components['schemas']['TriggerBreakingChanges']
+type ContractReference = WorkflowAPI.components['schemas']['WorkflowReferenceRead']
+
+function updateContractReviewState(
+  response: WorkflowAPI.components['schemas']['BreakingChangesResponse'],
+  setBreakingChanges: Dispatch<SetStateAction<TriggerBreakingChanges[]>>,
+  setContractChanges: Dispatch<SetStateAction<TriggerBreakingChanges[]>>,
+  setParentWorkflows: Dispatch<SetStateAction<ContractReference[]>>
+): void {
+  setBreakingChanges(response.triggers)
+  setContractChanges(response.contract_changes ?? [])
+  setParentWorkflows(response.parent_workflows ?? [])
+}
+
+function clearContractReviewState(
+  setBreakingChanges: Dispatch<SetStateAction<TriggerBreakingChanges[]>>,
+  setContractChanges: Dispatch<SetStateAction<TriggerBreakingChanges[]>>,
+  setParentWorkflows: Dispatch<SetStateAction<ContractReference[]>>
+): void {
+  setBreakingChanges([])
+  setContractChanges([])
+  setParentWorkflows([])
+}
+
+function openWorkflowVersion(workflowId: string | null, version: number): void {
+  if (workflowId) window.open(`/workflow-builder/${workflowId}?version=${version}`, '_blank', 'noopener,noreferrer')
+}
 
 type PendingVersionPublish = {
   version: number
@@ -100,6 +126,8 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
   )
   const updateMetadataMutation = workflowClient.useMutation('patch', '/workflows/{workflow_id}/versions/{version}')
   const [breakingChanges, setBreakingChanges] = useState<TriggerBreakingChanges[]>([])
+  const [contractChanges, setContractChanges] = useState<TriggerBreakingChanges[]>([])
+  const [parentWorkflows, setParentWorkflows] = useState<ContractReference[]>([])
   const [pendingPublish, setPendingPublish] = useState<PendingVersionPublish | null>(null)
 
   const allVersions = versionsQuery.data?.resources
@@ -174,7 +202,7 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
         workflowDefinition,
         onSettled,
       }
-      setBreakingChanges([])
+      clearContractReviewState(setBreakingChanges, setContractChanges, setParentWorkflows)
       setPendingPublish(pending)
       checkBreakingChangesMutation.mutate(
         {
@@ -183,8 +211,8 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
         },
         {
           onSuccess: (response) => {
-            if (response.has_breaking_changes) {
-              setBreakingChanges(response.triggers)
+            updateContractReviewState(response, setBreakingChanges, setContractChanges, setParentWorkflows)
+            if (response.has_breaking_changes || (response.has_contract_changes && response.parent_workflows?.length)) {
               return
             }
             setPendingPublish(null)
@@ -203,23 +231,17 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
   const confirmPublishVersion = useCallback(() => {
     if (!pendingPublish) return
     const pending = pendingPublish
-    setBreakingChanges([])
+    clearContractReviewState(setBreakingChanges, setContractChanges, setParentWorkflows)
     setPendingPublish(null)
     publishVersionNow(pending)
   }, [pendingPublish, publishVersionNow])
 
   const cancelBreakingChangeWarning = useCallback(() => {
-    setBreakingChanges([])
+    clearContractReviewState(setBreakingChanges, setContractChanges, setParentWorkflows)
     setPendingPublish(null)
   }, [])
 
-  const openInNewWindow = useCallback(
-    (version: number) => {
-      if (!workflowId) return
-      window.open(`/workflow-builder/${workflowId}?version=${version}`, '_blank', 'noopener,noreferrer')
-    },
-    [workflowId]
-  )
+  const openInNewWindow = useCallback((version: number) => openWorkflowVersion(workflowId, version), [workflowId])
 
   const updateVersionMetadata = useCallback(
     (version: number, publishName: string | null, changeDescription: string | null) => {
@@ -255,6 +277,8 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
     publishVersion,
     isPublishingVersion: publishMutation.isPending || checkBreakingChangesMutation.isPending,
     breakingChanges,
+    contractChanges,
+    parentWorkflows,
     confirmPublishVersion,
     cancelBreakingChangeWarning,
     updateVersionMetadata,

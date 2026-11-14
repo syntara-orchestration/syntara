@@ -4,7 +4,7 @@ from typing import Any
 
 
 class OutputSchemaChange:
-    """Represents a breaking change in a SubWorkflow output schema."""
+    """Represents a change in a SubWorkflow output schema."""
 
     def __init__(
         self,
@@ -13,6 +13,8 @@ class OutputSchemaChange:
         old_type: str | None = None,
         new_type: str | None = None,
         description: str | None = None,
+        *,
+        is_breaking: bool = True,
     ) -> None:
         """Initialize an output schema change.
 
@@ -22,6 +24,7 @@ class OutputSchemaChange:
             old_type: Previous field type (for type changes)
             new_type: New field type (for type changes)
             description: Human-readable description of the change
+            is_breaking: Whether the change can break a parent contract
 
         """
         self.change_type = change_type
@@ -29,6 +32,7 @@ class OutputSchemaChange:
         self.old_type = old_type
         self.new_type = new_type
         self.description = description or self._build_description()
+        self.is_breaking = is_breaking
 
     def _build_description(self) -> str:
         """Build a human-readable description of the change."""
@@ -38,6 +42,10 @@ class OutputSchemaChange:
             return f"Type changed: {self.field_path} ({self.old_type} → {self.new_type})"
         if self.change_type == "new_required_output":
             return f"New required output: {self.field_path}"
+        if self.change_type == "added_output":
+            return f"Added optional output: {self.field_path}"
+        if self.change_type == "optional_output":
+            return f"Output is now optional: {self.field_path}"
         return f"Changed: {self.field_path}"
 
     def to_dict(self) -> dict[str, Any]:
@@ -48,6 +56,7 @@ class OutputSchemaChange:
             "old_type": self.old_type,
             "new_type": self.new_type,
             "description": self.description,
+            "is_breaking": self.is_breaking,
         }
 
 
@@ -103,166 +112,151 @@ def _extract_properties_flat(
     return result
 
 
-def detect_output_schema_breaking_changes(  # noqa: C901
+def _removed_output_changes(
+    old_fields: dict[str, tuple[str, bool]], new_fields: dict[str, tuple[str, bool]]
+) -> list[OutputSchemaChange]:
+    return [
+        OutputSchemaChange(change_type="removed_output", field_path=path, old_type=field_type)
+        for path, (field_type, _required) in old_fields.items()
+        if path not in new_fields
+    ]
+
+
+def _changed_output_changes(
+    old_fields: dict[str, tuple[str, bool]], new_fields: dict[str, tuple[str, bool]]
+) -> list[OutputSchemaChange]:
+    changes: list[OutputSchemaChange] = []
+    for path, (old_type, old_required) in old_fields.items():
+        new_field = new_fields.get(path)
+        if not new_field:
+            continue
+        new_type, new_required = new_field
+        if old_type != new_type:
+            changes.append(OutputSchemaChange("type_change", path, old_type=old_type, new_type=new_type))
+        if new_required and not old_required:
+            changes.append(
+                OutputSchemaChange(
+                    "required_output",
+                    path,
+                    old_type=old_type,
+                    new_type=new_type,
+                    description=f"Output is now required: {path}",
+                )
+            )
+        elif old_required and not new_required:
+            changes.append(
+                OutputSchemaChange("optional_output", path, old_type=old_type, new_type=new_type, is_breaking=False)
+            )
+    return changes
+
+
+def _added_output_changes(
+    old_fields: dict[str, tuple[str, bool]],
+    new_fields: dict[str, tuple[str, bool]],
+    *,
+    first_declaration: bool,
+) -> list[OutputSchemaChange]:
+    changes = []
+    for path, (new_type, is_required) in new_fields.items():
+        if path in old_fields:
+            continue
+        change_type = "new_required_output" if is_required else "added_output"
+        changes.append(
+            OutputSchemaChange(
+                change_type,
+                path,
+                new_type=new_type,
+                is_breaking=is_required and not first_declaration,
+            )
+        )
+    return changes
+
+
+def detect_output_schema_changes(
     old_schema: dict[str, Any] | None,
     new_schema: dict[str, Any] | None,
 ) -> list[OutputSchemaChange]:
-    """Detect breaking changes between two output schemas.
+    """Detect all public output contract changes between two schemas."""
+    old_fields = _extract_properties_flat(old_schema) if old_schema is not None else {}
+    new_fields = _extract_properties_flat(new_schema) if new_schema is not None else {}
+    first_declaration = old_schema is None
+    return [
+        *_removed_output_changes(old_fields, new_fields),
+        *_changed_output_changes(old_fields, new_fields),
+        *_added_output_changes(old_fields, new_fields, first_declaration=first_declaration),
+    ]
 
-    Breaking changes include:
-    - Removed outputs (fields present in old but not in new)
-    - Type changes (same field, different type)
-    - New required outputs (fields that are required in new but didn't exist in old)
 
-    Args:
-        old_schema: Previous output_schema (from published version)
-        new_schema: New output_schema (from version being published)
-
-    Returns:
-        List of detected breaking changes
-
-    """
-    changes: list[OutputSchemaChange] = []
-
-    # If old schema is None, this is the first publish - no breaking changes
-    if old_schema is None:
-        return changes
-
-    # If new schema is None but old existed, all outputs were removed
-    if new_schema is None:
-        old_fields = _extract_properties_flat(old_schema)
-        for field_path, (field_type, _) in old_fields.items():
-            changes.append(
-                OutputSchemaChange(
-                    change_type="removed_output",
-                    field_path=field_path,
-                    old_type=field_type,
-                )
-            )
-        return changes
-
-    old_fields = _extract_properties_flat(old_schema)
-    new_fields = _extract_properties_flat(new_schema)
-
-    # Check for removed outputs
-    for field_path in old_fields:
-        if field_path not in new_fields:
-            old_type, _ = old_fields[field_path]
-            changes.append(
-                OutputSchemaChange(
-                    change_type="removed_output",
-                    field_path=field_path,
-                    old_type=old_type,
-                )
-            )
-
-    # Check for type changes
-    for field_path in old_fields:
-        if field_path in new_fields:
-            old_type, old_required = old_fields[field_path]
-            new_type, new_required = new_fields[field_path]
-            if old_type != new_type:
-                changes.append(
-                    OutputSchemaChange(
-                        change_type="type_change",
-                        field_path=field_path,
-                        old_type=old_type,
-                        new_type=new_type,
-                    )
-                )
-            if new_required and not old_required:
-                changes.append(
-                    OutputSchemaChange(
-                        change_type="required_output",
-                        field_path=field_path,
-                        old_type=old_type,
-                        new_type=new_type,
-                        description=f"Output is now required: {field_path}",
-                    )
-                )
-
-    # Check for new required outputs
-    for field_path in new_fields:
-        if field_path not in old_fields:
-            _, is_required = new_fields[field_path]
-            if is_required:
-                new_type, _ = new_fields[field_path]
-                changes.append(
-                    OutputSchemaChange(
-                        change_type="new_required_output",
-                        field_path=field_path,
-                        new_type=new_type,
-                    )
-                )
-
-    return changes
+def detect_output_schema_breaking_changes(
+    old_schema: dict[str, Any] | None,
+    new_schema: dict[str, Any] | None,
+) -> list[OutputSchemaChange]:
+    """Detect only output schema changes that can break existing consumers."""
+    return [change for change in detect_output_schema_changes(old_schema, new_schema) if change.is_breaking]
 
 
 def detect_workflow_breaking_changes(
     old_definition: dict[str, Any] | None,
     new_definition: dict[str, Any],
 ) -> dict[str, list[dict[str, Any]]]:
-    """Detect all breaking changes in a workflow definition.
+    """Detect breaking output contract changes in a workflow definition."""
+    contract_changes = detect_workflow_contract_changes(old_definition, new_definition)
+    breaking_changes: dict[str, list[dict[str, Any]]] = {}
+    for trigger_id, changes in contract_changes.items():
+        breaking = [change for change in changes if change["is_breaking"]]
+        if breaking:
+            breaking_changes[trigger_id] = breaking
+    return breaking_changes
 
-    Compares SubWorkflow Trigger output schemas between old and new definitions.
 
-    Args:
-        old_definition: Previous workflow definition (from published version)
-        new_definition: New workflow definition (version being published)
-
-    Returns:
-        Dictionary mapping trigger IDs to lists of breaking changes
-
-    """
-    result: dict[str, list[dict[str, Any]]] = {}
-
-    if old_definition is None:
-        return result
-
-    # Extract triggers from both definitions
+def detect_workflow_contract_changes(
+    old_definition: dict[str, Any] | None,
+    new_definition: dict[str, Any],
+) -> dict[str, list[dict[str, Any]]]:
+    """Detect breaking and non-breaking output contract changes by trigger."""
     old_triggers = {
-        t.get("id"): t
-        for t in old_definition.get("triggers", [])
-        if isinstance(t, dict) and t.get("type") == "subworkflow_trigger" and t.get("id") is not None
+        trigger.get("id"): trigger
+        for trigger in (old_definition or {}).get("triggers", [])
+        if isinstance(trigger, dict) and trigger.get("type") == "subworkflow_trigger" and trigger.get("id") is not None
     }
-
     new_triggers = {
-        t.get("id"): t
-        for t in new_definition.get("triggers", [])
-        if isinstance(t, dict) and t.get("type") == "subworkflow_trigger" and t.get("id") is not None
+        trigger.get("id"): trigger
+        for trigger in new_definition.get("triggers", [])
+        if isinstance(trigger, dict) and trigger.get("type") == "subworkflow_trigger" and trigger.get("id") is not None
     }
 
-    # Check each new trigger against its old version
-    for trigger_id, new_trigger in new_triggers.items():
+    result: dict[str, list[dict[str, Any]]] = {}
+    for trigger_id in old_triggers.keys() | new_triggers.keys():
         old_trigger = old_triggers.get(trigger_id)
-        if old_trigger is None:
-            # New trigger - no breaking changes
-            continue
+        new_trigger = new_triggers.get(trigger_id)
+        old_params = old_trigger.get("parameters", {}) if old_trigger else {}
+        new_params = new_trigger.get("parameters", {}) if new_trigger else {}
+        old_schema = old_params.get("output_schema") if isinstance(old_params, dict) else None
+        new_schema = new_params.get("output_schema") if isinstance(new_params, dict) else None
 
-        old_params = old_trigger.get("parameters", {})
-        new_params = new_trigger.get("parameters", {})
-
-        old_output_schema = old_params.get("output_schema") if isinstance(old_params, dict) else None
-        new_output_schema = new_params.get("output_schema") if isinstance(new_params, dict) else None
-
-        changes = detect_output_schema_breaking_changes(old_output_schema, new_output_schema)
-
-        if changes:
-            result[trigger_id] = [change.to_dict() for change in changes]
-
-    for trigger_id, old_trigger in old_triggers.items():
-        if trigger_id in new_triggers:
-            continue
-        old_params = old_trigger.get("parameters", {})
-        old_output_schema = old_params.get("output_schema") if isinstance(old_params, dict) else None
-        changes = detect_output_schema_breaking_changes(old_output_schema, None)
-        changes.append(
-            OutputSchemaChange(
-                change_type="removed_trigger",
-                field_path=trigger_id,
-                description=f"Removed SubWorkflow Trigger: {trigger_id}",
+        changes = detect_output_schema_changes(old_schema, new_schema)
+        old_mapping = old_params.get("output_mapping", {}) if isinstance(old_params, dict) else {}
+        new_mapping = new_params.get("output_mapping", {}) if isinstance(new_params, dict) else {}
+        if isinstance(old_mapping, dict) and isinstance(new_mapping, dict):
+            for field_path in old_mapping.keys() | new_mapping.keys():
+                if old_mapping.get(field_path) != new_mapping.get(field_path):
+                    changes.append(
+                        OutputSchemaChange(
+                            change_type="mapping_changed",
+                            field_path=str(field_path),
+                            description=f"Changed the source mapping for output: {field_path}",
+                            is_breaking=False,
+                        )
+                    )
+        if old_trigger is not None and new_trigger is None:
+            changes.append(
+                OutputSchemaChange(
+                    change_type="removed_trigger",
+                    field_path=str(trigger_id),
+                    description=f"Removed SubWorkflow Trigger: {trigger_id}",
+                )
             )
-        )
-        result[trigger_id] = [change.to_dict() for change in changes]
+        if changes:
+            result[str(trigger_id)] = [change.to_dict() for change in changes]
 
     return result

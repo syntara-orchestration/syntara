@@ -1,4 +1,4 @@
-import { AlertActionLink, Flex, FlexItem, StackItem } from '@patternfly/react-core'
+import { AlertActionLink, Content, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 
 import { useUnsavedChanges } from '../../app/useUnsavedChanges'
 import { executionsClient, workflowClient } from '../../client'
+import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { SynPage } from '../../components/layout/SynPage'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
@@ -31,6 +32,7 @@ import { BuilderDialogs } from './components/BuilderDialogs'
 import { BuilderSidePanels } from './components/BuilderSidePanels'
 import { ExecutionDetailsPanelWrapper } from './components/ExecutionDetailsPanelWrapper'
 import { NodeEditorOverlay } from './components/NodeEditorOverlay'
+import { OutputContractChangeSummary } from './components/OutputContractChangeSummary'
 import { UnsavedStepEditorDialog } from './components/UnsavedStepEditorDialog'
 import { VersionHistorySidePanel } from './components/VersionHistorySidePanel'
 import { useBuilderApproval } from './hooks/useBuilderApproval'
@@ -65,6 +67,8 @@ import { VersionInfoCard } from './VersionInfoCard'
 import { VersionViewProvider } from './VersionViewProvider'
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
+type OutputContractReview = WorkflowAPI.components['schemas']['BreakingChangesResponse']
+type SaveOptions = { expectedVersionOverride?: number; blockOnWarnings?: boolean }
 /* eslint-disable max-lines */
 // eslint-disable-next-line max-lines-per-function, complexity
 export function BuilderContent(props: BuilderContentProps) {
@@ -80,6 +84,10 @@ export function BuilderContent(props: BuilderContentProps) {
   const { showAlert, showSuccess, showWarning, showError } = useAlerts()
   const [saveAttemptedWithoutProject, setSaveAttemptedWithoutProject] = useState(false)
   const [pendingDuplicateNavigation, setPendingDuplicateNavigation] = useState<string | null>(null)
+  const [pendingOutputContractSave, setPendingOutputContractSave] = useState<{
+    review: OutputContractReview
+    options?: SaveOptions
+  } | null>(null)
   const { selectedProject, stableProjectId, ProjectSelector } = useProjectSelector({
     requireProject: isNew,
     initialProjectId: isNew ? undefined : (workflow?.project_id ?? undefined),
@@ -260,20 +268,16 @@ export function BuilderContent(props: BuilderContentProps) {
     createWorkflow: createWorkflow,
     updateWorkflow,
   })
-  const guardedSaveWorkflow = useGuardedSaveWorkflow({
-    handleSaveWorkflow,
-    isNodeEditorOpen,
-    nodeEditorMode,
-    autoSubmitRef,
-    dispatch,
-  })
-
   const {
     publish: onPublish,
     isPublishing,
+    isCheckingBreakingChanges,
     breakingChanges,
+    contractChanges,
+    parentWorkflows,
     confirmPublish,
     cancelBreakingChangeWarning,
+    reviewOutputContract,
   } = usePublishWorkflow({
     workflowId,
     currentVersion,
@@ -283,6 +287,34 @@ export function BuilderContent(props: BuilderContentProps) {
     onConflict: handleConflict('publish'),
     onVersionUpdated,
   })
+
+  const handleSaveWithOutputContractReview = useCallback(
+    async (options?: SaveOptions): Promise<boolean> => {
+      if (isNew || !workflow?.published_version_id) return handleSaveWorkflow(options)
+      const review = await reviewOutputContract()
+      if (!review) return handleSaveWorkflow(options)
+      if (review.has_contract_changes || review.has_breaking_changes) {
+        setPendingOutputContractSave({ review, ...(options ? { options } : {}) })
+        return false
+      }
+      return handleSaveWorkflow(options)
+    },
+    [handleSaveWorkflow, isNew, reviewOutputContract, workflow?.published_version_id]
+  )
+  const guardedSaveWorkflow = useGuardedSaveWorkflow({
+    handleSaveWorkflow: handleSaveWithOutputContractReview,
+    isNodeEditorOpen,
+    nodeEditorMode,
+    autoSubmitRef,
+    dispatch,
+  })
+
+  const handleConfirmOutputContractSave = useCallback(() => {
+    const pending = pendingOutputContractSave
+    if (!pending) return
+    setPendingOutputContractSave(null)
+    detachPromise(handleSaveWorkflow(pending.options))
+  }, [handleSaveWorkflow, pendingOutputContractSave])
 
   const mostRecentExecution = mostRecentExecutionQuery.data
   const {
@@ -598,7 +630,7 @@ export function BuilderContent(props: BuilderContentProps) {
                   workflowDescription={workflowDescription}
                   isNew={isNew}
                   workflow={workflow?.id ? { id: workflow.id } : undefined}
-                  isPending={isCreating || isUpdating}
+                  isPending={isCreating || isUpdating || isCheckingBreakingChanges}
                   isDirty={isDirty}
                   lastSavedAt={workflow?.updated_at}
                   isKebabOpen={isKebabOpen}
@@ -606,6 +638,8 @@ export function BuilderContent(props: BuilderContentProps) {
                   currentVersionId={workflow?.version?.id}
                   isPublishing={isPublishing}
                   breakingChanges={breakingChanges}
+                  contractChanges={contractChanges}
+                  parentWorkflows={parentWorkflows}
                   onConfirmPublish={confirmPublish}
                   onCancelBreakingChanges={cancelBreakingChangeWarning}
                   ProjectSelector={ProjectSelector}
@@ -779,6 +813,32 @@ export function BuilderContent(props: BuilderContentProps) {
             </SynReactFlowViewportGuard>
 
             <BuilderDialogs {...dialogProps} conflictDialogProps={conflictDialogProps} />
+            <SynConfirmationDialog
+              isOpen={pendingOutputContractSave !== null}
+              onClose={() => setPendingOutputContractSave(null)}
+              onConfirm={handleConfirmOutputContractSave}
+              title="Save changes to sub-workflow?"
+              confirmLabel="Save changes"
+              confirmLoading={isCreating || isUpdating}
+            >
+              <Stack hasGutter>
+                <StackItem>
+                  <Content component="p">
+                    Saving updates this draft only. Parent workflows use the latest published child version on each run.
+                  </Content>
+                </StackItem>
+                {pendingOutputContractSave && (
+                  <StackItem>
+                    <OutputContractChangeSummary
+                      contractChanges={
+                        pendingOutputContractSave.review.contract_changes ?? pendingOutputContractSave.review.triggers
+                      }
+                      parentWorkflows={pendingOutputContractSave.review.parent_workflows ?? []}
+                    />
+                  </StackItem>
+                )}
+              </Stack>
+            </SynConfirmationDialog>
             <UnsavedStepEditorDialog
               isOpen={unsavedStepEditorDialogOpen}
               onClose={() => dispatch({ type: 'SET_UNSAVED_STEP_EDITOR_DIALOG', payload: false })}

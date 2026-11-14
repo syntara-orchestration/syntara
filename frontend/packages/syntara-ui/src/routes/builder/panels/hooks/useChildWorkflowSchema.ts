@@ -139,10 +139,10 @@ function buildChildStepSchemas(
   ]
 }
 
-function useInvocationSchemaQuery(workflowId: string | null, workflowVersionId: string | null) {
+function useInvocationSchemaQuery(workflowId: string | null) {
   return useQuery({
-    queryKey: invocationSchemaQueryKey(workflowId ?? '', workflowVersionId),
-    queryFn: () => fetchInvocationSchema(workflowId ?? '', workflowVersionId),
+    queryKey: invocationSchemaQueryKey(workflowId ?? ''),
+    queryFn: () => fetchInvocationSchema(workflowId ?? ''),
     enabled: Boolean(workflowId),
   })
 }
@@ -196,22 +196,21 @@ function isSchemaLoading({
 }
 
 /**
- * Fetches the selected child's invocation schema and its exact published graph.
+ * Fetches the selected child's latest invocation schema and its matching published graph.
  * The version detail is cached by workflow and published-version ID so a new
  * publication cannot reuse step metadata from the previous version.
  */
 export function useChildWorkflowSchema({
   workflowId,
-  workflowVersionId,
   triggerNodeId,
-}: Readonly<{ workflowId: string | null; workflowVersionId?: string | null; triggerNodeId: string | null }>) {
+}: Readonly<{ workflowId: string | null; triggerNodeId: string | null }>) {
   const queryClient = useQueryClient()
   const {
     data: invocationSchema,
     error: invocationSchemaError,
     isFetching: isFetchingInvocationSchema,
     refetch: refetchInvocationSchema,
-  } = useInvocationSchemaQuery(workflowId, workflowVersionId ?? null)
+  } = useInvocationSchemaQuery(workflowId)
 
   const eligibleTriggers = invocationSchema?.triggers ?? []
   const selectedTriggerNodeId = getSelectedTriggerNodeId(eligibleTriggers, triggerNodeId)

@@ -26,7 +26,6 @@ function buildInitialData(taskData: Activity): Partial<SubWorkflowFormData> {
   return {
     name: taskData.name ?? '',
     workflow_id: typeof parameters.workflow_id === 'string' ? parameters.workflow_id : '',
-    workflow_version_id: typeof parameters.workflow_version_id === 'string' ? parameters.workflow_version_id : '',
     trigger_node_id: typeof parameters.trigger_node_id === 'string' ? parameters.trigger_node_id : '',
     input_mapping: inputMapping,
     settings: taskData.settings,
@@ -51,7 +50,6 @@ export function SubWorkflowNodeDetails({
           id: nodeId,
           name: data.name,
           workflowId: data.workflow_id,
-          workflowVersionId: data.workflow_version_id,
           triggerNodeId: data.trigger_node_id,
           inputMapping: data.input_mapping,
           settings: data.settings,

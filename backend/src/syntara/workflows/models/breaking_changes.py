@@ -1,9 +1,10 @@
 """Models for SubWorkflow output schema breaking changes detection."""
 
 from typing import ClassVar
+from uuid import UUID
 
 from pydantic import ConfigDict
-from sqlmodel import SQLModel
+from sqlmodel import Field, SQLModel
 
 
 class BreakingChange(SQLModel):
@@ -23,6 +24,7 @@ class BreakingChange(SQLModel):
     old_type: str | None = None
     new_type: str | None = None
     description: str
+    is_breaking: bool = True
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
@@ -44,16 +46,25 @@ class TriggerBreakingChanges(SQLModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
 
+class WorkflowReferenceRead(SQLModel):
+    """A currently published parent workflow step that references this child."""
+
+    workflow_id: UUID
+    workflow_name: str
+    workflow_version: int
+    step_id: str
+    step_name: str | None = None
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
+
+
 class BreakingChangesResponse(SQLModel):
-    """Response containing all detected breaking changes.
-
-    Attributes:
-        has_breaking_changes: True if any breaking changes were detected
-        triggers: List of triggers with breaking changes
-
-    """
+    """Response containing the output contract diff and current parent references."""
 
     has_breaking_changes: bool
     triggers: list[TriggerBreakingChanges]
+    has_contract_changes: bool = False
+    contract_changes: list[TriggerBreakingChanges] = Field(default_factory=list)
+    parent_workflows: list[WorkflowReferenceRead] = Field(default_factory=list)
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]

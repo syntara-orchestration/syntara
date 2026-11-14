@@ -37082,7 +37082,7 @@
     "/workflows/{workflow_id}/invocation_schema": {
       "get": {
         "summary": "Get workflow invocation schema",
-        "description": "Get current or pinned published Subworkflow Trigger schemas for a workflow.",
+        "description": "Get the latest published Subworkflow Trigger schemas for a workflow.",
         "operationId": "get_workflow_invocation_schema",
         "tags": [
           "Workflows"
@@ -37106,16 +37106,6 @@
               "format": "uuid",
               "title": "Workflow Id"
             }
-          },
-          {
-            "name": "version_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Published child version ID whose Subworkflow Trigger schemas should be returned."
           }
         ],
         "responses": {
@@ -51899,6 +51889,11 @@
           "description": {
             "type": "string",
             "title": "Description"
+          },
+          "is_breaking": {
+            "type": "boolean",
+            "title": "Is Breaking",
+            "default": true
           }
         }
       },
@@ -51939,7 +51934,7 @@
       "BreakingChangesResponse": {
         "type": "object",
         "title": "BreakingChangesResponse",
-        "description": "Response containing all detected breaking changes.\n\nAttributes:\n    has_breaking_changes: True if any breaking changes were detected\n    triggers: List of triggers with breaking changes",
+        "description": "Response containing the output contract diff and current parent references.",
         "required": [
           "has_breaking_changes",
           "triggers"
@@ -51956,6 +51951,67 @@
               "$ref": "#/components/schemas/TriggerBreakingChanges"
             },
             "title": "Triggers"
+          },
+          "has_contract_changes": {
+            "type": "boolean",
+            "title": "Has Contract Changes",
+            "default": false
+          },
+          "contract_changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TriggerBreakingChanges"
+            },
+            "title": "Contract Changes"
+          },
+          "parent_workflows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowReferenceRead"
+            },
+            "title": "Parent Workflows"
+          }
+        }
+      },
+      "WorkflowReferenceRead": {
+        "type": "object",
+        "title": "WorkflowReferenceRead",
+        "description": "A currently published parent workflow step that references this child.",
+        "required": [
+          "workflow_id",
+          "workflow_name",
+          "workflow_version",
+          "step_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "workflow_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workflow Id"
+          },
+          "workflow_name": {
+            "type": "string",
+            "title": "Workflow Name"
+          },
+          "workflow_version": {
+            "type": "integer",
+            "title": "Workflow Version"
+          },
+          "step_id": {
+            "type": "string",
+            "title": "Step Id"
+          },
+          "step_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Name"
           }
         }
       },
@@ -54244,21 +54300,7 @@
             "maxLength": 36,
             "format": "uuid",
             "title": "Workflow Id",
-            "description": "UUID of the selected child workflow in the same Project."
-          },
-          "workflow_version_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 36,
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Workflow Version Id",
-            "description": "ID of the published child workflow version to invoke. Required before the parent can be published."
+            "description": "UUID of the selected child workflow in the same Project (latest published version per run)."
           },
           "trigger_node_id": {
             "type": "string",
@@ -54280,7 +54322,7 @@
           "trigger_node_id"
         ],
         "title": "SubWorkflowExecutorParameters",
-        "description": "Parameters for Sub-workflow executor.\n\nDefines the design-time configuration for invoking a child workflow from\na parent workflow. The Sub-workflow step invokes the published child\nworkflow version stored in workflow_version_id.\n\nWhen a workflow has multiple Subworkflow Triggers, the calling step must\nselect a specific trigger to invoke via the trigger_node_id field.\n\nAttributes:\n    workflow_id: UUID of the selected child workflow to invoke.\n    workflow_version_id: ID of the published child version to invoke.\n    trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.\n    input_mapping: Mapping of child workflow input field names to values.\n        Values can be static (string, int, bool, dict, list) or template\n        expressions (${step_id.field.path})."
+        "description": "Parameters for Sub-workflow executor.\n\nDefines the design-time configuration for invoking a child workflow from\na parent workflow. Each new invocation resolves the latest published child\nversion. The child execution record pins that version for the run so retries\nkeep using the same workflow definition.\n\nWhen a workflow has multiple Subworkflow Triggers, the calling step must\nselect a specific trigger to invoke via the trigger_node_id field.\n\nAttributes:\n    workflow_id: UUID of the selected child workflow to invoke.\n    trigger_node_id: Graph node ID of the Subworkflow Trigger to invoke.\n    input_mapping: Mapping of child workflow input field names to values.\n        Values can be static (string, int, bool, dict, list) or template\n        expressions (${step_id.field.path})."
       },
       "ConditionNodeParameters": {
         "properties": {

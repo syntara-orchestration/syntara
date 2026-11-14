@@ -319,7 +319,7 @@ paths:
   /workflows/{workflow_id}/invocation_schema:
     get:
       summary: Get workflow invocation schema
-      description: Get current or pinned published Subworkflow Trigger schemas for a workflow.
+      description: Get the latest published Subworkflow Trigger schemas for a workflow.
       operationId: get_workflow_invocation_schema
       tags:
         - Workflows
@@ -336,13 +336,6 @@ paths:
             type: string
             format: uuid
             title: Workflow Id
-        - name: version_id
-          in: query
-          required: false
-          schema:
-            type: string
-            format: uuid
-          description: Published child version ID whose Subworkflow Trigger schemas should be returned.
       responses:
         '200':
           description: Published Subworkflow Trigger schemas
@@ -1076,6 +1069,10 @@ components:
         description:
           type: string
           title: Description
+        is_breaking:
+          type: boolean
+          title: Is Breaking
+          default: true
 
     TriggerBreakingChanges:
       type: object
@@ -1109,12 +1106,7 @@ components:
     BreakingChangesResponse:
       type: object
       title: BreakingChangesResponse
-      description: |-
-        Response containing all detected breaking changes.
-
-        Attributes:
-            has_breaking_changes: True if any breaking changes were detected
-            triggers: List of triggers with breaking changes
+      description: Response containing the output contract diff and current parent references.
       required:
         - has_breaking_changes
         - triggers
@@ -1128,6 +1120,49 @@ components:
           items:
             $ref: '#/components/schemas/TriggerBreakingChanges'
           title: Triggers
+        has_contract_changes:
+          type: boolean
+          title: Has Contract Changes
+          default: false
+        contract_changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TriggerBreakingChanges'
+          title: Contract Changes
+        parent_workflows:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowReferenceRead'
+          title: Parent Workflows
+    WorkflowReferenceRead:
+      type: object
+      title: WorkflowReferenceRead
+      description: A currently published parent workflow step that references this child.
+      required:
+        - workflow_id
+        - workflow_name
+        - workflow_version
+        - step_id
+      additionalProperties: false
+      properties:
+        workflow_id:
+          type: string
+          format: uuid
+          title: Workflow Id
+        workflow_name:
+          type: string
+          title: Workflow Name
+        workflow_version:
+          type: integer
+          title: Workflow Version
+        step_id:
+          type: string
+          title: Step Id
+        step_name:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Step Name
     WorkflowVersionUpdate:
       type: object
       title: WorkflowVersionUpdate

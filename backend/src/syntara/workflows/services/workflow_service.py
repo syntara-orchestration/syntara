@@ -61,6 +61,7 @@ from syntara.workflows.models import (
     WorkflowInvocationTriggerSchema,
     WorkflowListResponse,
     WorkflowRead,
+    WorkflowReferenceRead,
     WorkflowStepMetadataRead,
     WorkflowVersion,
 )
@@ -78,7 +79,6 @@ from syntara.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_T
 from syntara.workflows.services.workflow_diff import generate_change_summary
 from syntara.workflows.validators import (
     get_system_continue_on_failure,
-    initialize_subworkflow_version_pins,
     validate_subworkflow_project_references,
     validate_workflow_references,
     workflow_validator,
@@ -120,11 +120,7 @@ def _effective_output_schema_for_node(node: dict[str, Any]) -> dict[str, Any] | 
     unknown types until execution. The workflow engine's status field is added
     independently of executor output mapping and remains available.
     """
-    if not isinstance(node, dict):
-        msg = f"Expected dict for node parameter, got {type(node).__name__}"
-        raise TypeError(msg)
-
-    node_type = node.get("type")  # type: ignore[unreachable]
+    node_type = node.get("type")
     if not isinstance(node_type, str):
         return None
 
@@ -1130,28 +1126,64 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         return workflow, current_version
 
-    async def get_workflow_invocation_schema(
+    async def get_published_parent_references(
         self,
-        workflow: Workflow,
-        version_id: UUID | None = None,
-    ) -> WorkflowInvocationSchemaRead:
-        """Return trigger schemas from the current or a pinned published version."""
-        if version_id is None:
-            if workflow.published_version_id is None:
-                raise WorkflowNotPublishedError(workflow.id)
-            selected_version = await self.session.get(WorkflowVersion, workflow.published_version_id)
-        else:
-            version_result = await self.session.exec(
-                select(WorkflowVersion).where(
-                    WorkflowVersion.id == version_id,
-                    WorkflowVersion.workflow_id == workflow.id,
-                )
+        child_workflow_id: UUID,
+        project_id: UUID,
+        allowed_projects: AllowedProjectsResult,
+    ) -> list[WorkflowReferenceRead]:
+        """Return visible, currently published parent steps that reference a child workflow."""
+        if not allowed_projects.all_projects and project_id not in allowed_projects.project_ids:
+            return []
+
+        result = await self.session.exec(
+            select(Workflow, WorkflowVersion)
+            .join(WorkflowVersion, col(WorkflowVersion.id) == col(Workflow.published_version_id))
+            .where(
+                col(Workflow.project_id) == project_id,
+                col(Workflow.id) != child_workflow_id,
+                col(Workflow.is_enabled).is_(True),
             )
-            selected_version = version_result.one_or_none()
-            if selected_version is not None and selected_version.id != workflow.published_version_id:
-                ever_published, _ = await self.get_publish_context([selected_version.id])
-                if selected_version.id not in ever_published:
-                    selected_version = None
+        )
+        parent_versions = result.all()
+        matching_references: list[tuple[Workflow, WorkflowVersion, str, str | None]] = []
+
+        for parent, parent_version in parent_versions:
+            definition = parent_version.workflow_definition
+            nodes = definition.get("nodes", []) if isinstance(definition, dict) else []
+            if not isinstance(nodes, list):
+                continue
+            for node in nodes:
+                if not isinstance(node, dict) or node.get("type") != NodeType.SUB_WORKFLOW.value:
+                    continue
+                parameters = node.get("parameters")
+                if not isinstance(parameters, dict) or parameters.get("workflow_id") != str(child_workflow_id):
+                    continue
+                matching_references.append(
+                    (
+                        parent,
+                        parent_version,
+                        str(node.get("id", "")),
+                        node.get("name") if isinstance(node.get("name"), str) else None,
+                    )
+                )
+
+        return [
+            WorkflowReferenceRead(
+                workflow_id=parent.id,
+                workflow_name=parent.name,
+                workflow_version=parent_version.version,
+                step_id=step_id,
+                step_name=step_name,
+            )
+            for parent, parent_version, step_id, step_name in matching_references
+        ]
+
+    async def get_workflow_invocation_schema(self, workflow: Workflow) -> WorkflowInvocationSchemaRead:
+        """Return trigger schemas from the latest published version."""
+        if workflow.published_version_id is None:
+            raise WorkflowNotPublishedError(workflow.id)
+        selected_version = await self.session.get(WorkflowVersion, workflow.published_version_id)
         if selected_version is None:
             raise WorkflowVersionNotFoundError(workflow.id, workflow.current_version)
 
@@ -1345,9 +1377,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             If identical, no new version is created (returns None).
 
         """
-        if workflow.project_id is not None:
-            await initialize_subworkflow_version_pins(self.session, workflow_definition, workflow.project_id)
-
         recorder = get_metrics_recorder()
         system_cof = await get_system_continue_on_failure()
 
@@ -1546,7 +1575,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         definition = deepcopy(
             workflow_definition if workflow_definition is not None else target_version.workflow_definition
         )
-        await initialize_subworkflow_version_pins(self.session, definition, workflow.project_id)
         if workflow_definition is not None or definition != target_version.workflow_definition:
             target_version = await self._create_and_flush_version(
                 workflow, target_version, definition, change_description
@@ -1571,7 +1599,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             )
 
         subworkflow_findings = await validate_subworkflow_project_references(
-            self.session, definition, workflow.project_id, require_version_pin=True
+            self.session, definition, workflow.project_id
         )
         result = ValidationResult.from_findings([*result.findings, *subworkflow_findings])
         if (result.error_count + result.warning_count) > 0:

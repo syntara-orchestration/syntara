@@ -380,3 +380,79 @@ class TestCheckBreakingChanges:
         """Return 404 when version does not exist."""
         response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/99999/check-breaking-changes")
         assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_lists_published_parent_references(
+        self,
+        jwt_client: AsyncClient,
+        test_workflow: Workflow,
+    ) -> None:
+        """The output contract review identifies published parents that will use the next child version."""
+        await _create_and_publish_version_with_output_schema(
+            jwt_client,
+            test_workflow.id,
+            {"artifact_url": {"type": "string"}, "build_id": {"type": "number"}},
+        )
+        parent_definition = {
+            "schema_version": "2.0.0",
+            "name": "Parent referencing child",
+            "triggers": [{"id": "parent_start", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [
+                {
+                    "id": "invoke_child",
+                    "type": "sub_workflow",
+                    "name": "Invoke child",
+                    "parameters": {
+                        "workflow_id": str(test_workflow.id),
+                        "trigger_node_id": "subworkflow_trigger",
+                        "input_mapping": {},
+                    },
+                }
+            ],
+            "edges": [{"from": "parent_start", "to": "invoke_child"}],
+        }
+        parent_response = await jwt_client.post(
+            "/workflows",
+            json={
+                "name": "Parent referencing child",
+                "project_id": str(test_workflow.project_id),
+                "workflow_definition": parent_definition,
+            },
+        )
+        assert parent_response.status_code == 201
+        parent = parent_response.json()
+        publish_response = await jwt_client.post(f"/workflows/{parent['id']}/versions/1/publish", json={})
+        assert publish_response.status_code == 200
+
+        draft_response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions")
+        assert draft_response.status_code == 200
+        new_version = draft_response.json()["version"]
+        changed_definition = {
+            "schema_version": "2.0.0",
+            "name": "Child",
+            "triggers": [
+                {
+                    "id": "subworkflow_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {"type": "object", "properties": {"artifact_url": {"type": "string"}}}
+                    },
+                }
+            ],
+            "nodes": [],
+            "edges": [],
+        }
+        response = await jwt_client.post(
+            f"/workflows/{test_workflow.id}/versions/{new_version}/check-breaking-changes",
+            json={"workflow_definition": changed_definition},
+        )
+
+        assert response.status_code == 200
+        result = response.json()
+        assert result["has_breaking_changes"] is True
+        assert len(result["parent_workflows"]) == 1
+        reference = result["parent_workflows"][0]
+        assert reference["workflow_id"] == parent["id"]
+        assert reference["workflow_name"] == parent["name"]
+        assert reference["step_name"] == "Invoke child"
+        assert "child_version_id" not in reference

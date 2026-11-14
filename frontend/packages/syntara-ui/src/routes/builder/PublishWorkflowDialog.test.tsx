@@ -81,7 +81,7 @@ describe('PublishWorkflowDialog', () => {
 
   it('shows breaking output changes and requires explicit publish confirmation', async () => {
     const user = userEvent.setup()
-    const onConfirmBreakingChanges = vi.fn()
+    const onConfirmContractChanges = vi.fn()
     render(
       <PublishWorkflowDialog
         {...defaultProps}
@@ -100,7 +100,7 @@ describe('PublishWorkflowDialog', () => {
             ],
           },
         ]}
-        onConfirmBreakingChanges={onConfirmBreakingChanges}
+        onConfirmContractChanges={onConfirmContractChanges}
       />
     )
 
@@ -108,8 +108,49 @@ describe('PublishWorkflowDialog', () => {
     expect(screen.getByText('Removed output: release_tag')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Publish anyway' }))
 
-    expect(onConfirmBreakingChanges).toHaveBeenCalledOnce()
+    expect(onConfirmContractChanges).toHaveBeenCalledOnce()
     expect(defaultProps.onPublish).not.toHaveBeenCalled()
+  })
+
+  it('shows published parent references for non-breaking output changes before publishing', async () => {
+    const user = userEvent.setup()
+    const onConfirmContractChanges = vi.fn()
+    render(
+      <PublishWorkflowDialog
+        {...defaultProps}
+        contractChanges={[
+          {
+            trigger_id: 'child-trigger',
+            trigger_name: 'Child trigger',
+            changes: [
+              {
+                change_type: 'added_output',
+                field_path: 'release.notes',
+                old_type: null,
+                new_type: 'string',
+                description: 'Added optional output: release.notes',
+                is_breaking: false,
+              },
+            ],
+          },
+        ]}
+        parentWorkflows={[
+          {
+            workflow_id: 'parent-id',
+            workflow_name: 'Deploy parent',
+            workflow_version: 2,
+            step_id: 'invoke_child',
+            step_name: 'Invoke child',
+          },
+        ]}
+        onConfirmContractChanges={onConfirmContractChanges}
+      />
+    )
+
+    expect(screen.getByText('Added optional output: release.notes')).toBeInTheDocument()
+    expect(screen.getByText(/Deploy parent \(parent v2\).*Invoke child/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Publish workflow' }))
+    expect(onConfirmContractChanges).toHaveBeenCalledOnce()
   })
 
   it('disables buttons when publishing', () => {

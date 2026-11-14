@@ -54,7 +54,7 @@ from syntara.workflows.models import (
 from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreate
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
-from syntara.workflows.utils.schema_diff import detect_workflow_breaking_changes
+from syntara.workflows.utils.schema_diff import detect_workflow_breaking_changes, detect_workflow_contract_changes
 from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
@@ -370,13 +370,12 @@ async def get_workflow(
 async def get_workflow_invocation_schema(
     workflow_id: UUID,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
-    version_id: UUID | None = None,
 ) -> WorkflowInvocationSchemaRead:
-    """Get current or pinned published Subworkflow Trigger schemas for a workflow."""
+    """Get the latest published Subworkflow Trigger schemas for a workflow."""
     workflow = await service.get_workflow_by_id(workflow_id)
-    if version_id is None and workflow.published_version_id is None:
+    if workflow.published_version_id is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow has no published version")
-    return await service.get_workflow_invocation_schema(workflow, version_id)
+    return await service.get_workflow_invocation_schema(workflow)
 
 
 @router.patch(
@@ -546,6 +545,7 @@ async def check_breaking_changes(
     version: int,  # noqa: ARG001
     request: WorkflowValidateRequest,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
+    visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("workflow", "read"))],
 ) -> BreakingChangesResponse:
     """Check for breaking changes in SubWorkflow output schemas.
 
@@ -572,29 +572,48 @@ async def check_breaking_changes(
 
     # Detect breaking changes
     new_definition = request.workflow_definition
+    contract_changes_by_trigger = detect_workflow_contract_changes(old_definition, new_definition)
     changes_by_trigger = detect_workflow_breaking_changes(old_definition, new_definition)
 
-    # Build response
-    triggers_with_changes: list[TriggerBreakingChanges] = []
-    for trigger_id, changes_list in changes_by_trigger.items():
+    def trigger_name_for(trigger_id: str) -> str | None:
         # Get trigger name from new definition
-        trigger_name = None
         for trigger in new_definition.get("triggers", []):
             if isinstance(trigger, dict) and trigger.get("id") == trigger_id:
-                trigger_name = trigger.get("name")
-                break
+                return trigger.get("name") if isinstance(trigger.get("name"), str) else None
+        if old_definition:
+            for trigger in old_definition.get("triggers", []):
+                if isinstance(trigger, dict) and trigger.get("id") == trigger_id:
+                    return trigger.get("name") if isinstance(trigger.get("name"), str) else None
+        return None
 
-        triggers_with_changes.append(
+    def build_trigger_changes(changes_by_id: dict[str, list[dict[str, Any]]]) -> list[TriggerBreakingChanges]:
+        return [
             TriggerBreakingChanges(
                 trigger_id=trigger_id,
-                trigger_name=trigger_name,
+                trigger_name=trigger_name_for(trigger_id),
                 changes=[BreakingChange(**change) for change in changes_list],
             )
+            for trigger_id, changes_list in changes_by_id.items()
+        ]
+
+    triggers_with_changes = build_trigger_changes(changes_by_trigger)
+    all_contract_changes = build_trigger_changes(contract_changes_by_trigger)
+    parent_workflows = (
+        await service.get_published_parent_references(
+            workflow.id,
+            workflow.project_id,
+            visibility.to_allowed_projects(),
         )
+        if all_contract_changes
+        else []
+    )
 
     return BreakingChangesResponse(
         has_breaking_changes=len(triggers_with_changes) > 0,
         triggers=triggers_with_changes,
+        has_contract_changes=len(all_contract_changes) > 0,
+        contract_changes=all_contract_changes,
+        parent_workflows=parent_workflows,
     )
 
 

@@ -38,6 +38,7 @@ type TypeaheadSelectProps = {
   onChange: (value: string) => void
   placeholder?: string
   hasError?: boolean
+  isRequired?: boolean
   isDisabled?: boolean
   /** When provided, filtering is delegated to the caller (server-side search). */
   onSearchChange?: (term: string) => void
@@ -133,6 +134,7 @@ export function TypeaheadSelect({
   onChange,
   placeholder = 'Select...',
   hasError,
+  isRequired,
   isDisabled,
   onSearchChange,
   hasMore,
@@ -207,6 +209,7 @@ export function TypeaheadSelect({
           }}
           placeholder={placeholder}
           autoComplete="off"
+          inputProps={{ 'aria-required': isRequired || undefined }}
           innerRef={inputRef}
         />
         {selected && (
