@@ -651,9 +651,9 @@ pypandoc==1.17 \
     --hash=sha256:01fdbffa61edb9f8e82e8faad6954efcb7b6f8f0634aead4d89e322a00225a67 \
     --hash=sha256:51179abfd6e582a25ed03477541b48836b5bba5a4c3b282a547630793934d799
     # via syntara
-pypdf==6.21.1 \
-    --hash=sha256:2d62c383acd6e0dff0a96322ba8b1135229343b084d73c6f6cfd947fd291afcb \
-    --hash=sha256:553e2d42f5bb3bb2a785a7d3de8ef90bb7df74b5413eff5a7b4388007ea9254b
+pypdf==6.21.4 \
+    --hash=sha256:33e4fb41ca352810eb4e9838aa0d82d6888a5f8bf682f43e99cce5faa666255c \
+    --hash=sha256:c8817e3f888d47a087872ded69812c1ef30cacb871d6e053e0c00bbaf0bc2163
     # via syntara
 python-dateutil==2.9.0.post0 \
     --hash=sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3 \
