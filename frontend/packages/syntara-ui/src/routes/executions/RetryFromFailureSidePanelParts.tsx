@@ -254,12 +254,7 @@ function RetryScopeSelector({
             </StackItem>
             {selectedPointIds.length > 0 && selectedPointIds.length < affectedPointCount && (
               <StackItem>
-                <Alert
-                  isInline
-                  variant="warning"
-                  title="Workflow may fail"
-                  data-testid="retry-partial-scope-warning"
-                >
+                <Alert isInline variant="warning" title="Workflow may fail" data-testid="retry-partial-scope-warning">
                   Skipped steps may leave downstream dependencies or the merge step without the inputs they need.
                 </Alert>
               </StackItem>

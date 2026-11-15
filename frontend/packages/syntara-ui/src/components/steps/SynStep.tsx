@@ -1,4 +1,4 @@
-import { Icon, Label } from '@patternfly/react-core'
+import { Icon, Label, Stack, StackItem } from '@patternfly/react-core'
 import { RhUiWarningFillIcon } from '@patternfly/react-icons'
 import type { NodeProps } from '@xyflow/react'
 import React, { useEffect, useMemo, useState } from 'react'
@@ -81,13 +81,15 @@ function ValidationErrorBadge() {
   )
 }
 
-/** Centred status markers under a step. Replayed output takes precedence over mock-pinned data. */
+/** Centred status markers under a step. Mock-pinned data keeps its existing precedence over reused output. */
 function StepBottomBadge({
   mockDataPinned,
   replayed,
   retainedFailure,
 }: Readonly<{ mockDataPinned: boolean; replayed: boolean; retainedFailure: boolean }>) {
-  if (mockDataPinned && !replayed && !retainedFailure) {
+  const showReplayedOutput = replayed && !mockDataPinned
+
+  if (mockDataPinned && !retainedFailure) {
     return (
       <div style={NODE_BOTTOM_BADGE_STYLE}>
         <Label isCompact color="purple">
@@ -96,25 +98,36 @@ function StepBottomBadge({
       </div>
     )
   }
-  if (!replayed && !retainedFailure) return null
+  if (!showReplayedOutput && !retainedFailure) return null
 
   return (
-    <div
+    <Stack
       style={{
         ...NODE_BOTTOM_BADGE_STYLE,
-        display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        gap: '4px',
+        gap: 'var(--pf-t--global--spacer--xs)',
       }}
     >
       {retainedFailure && (
-        <Label isCompact color="orange">
-          Retained failure
-        </Label>
+        <StackItem>
+          <Label isCompact color="orange">
+            Retained failure
+          </Label>
+        </StackItem>
       )}
-      {replayed && <ReplayedOutputBadge />}
-    </div>
+      {showReplayedOutput && (
+        <StackItem>
+          <ReplayedOutputBadge />
+        </StackItem>
+      )}
+      {mockDataPinned && retainedFailure && (
+        <StackItem>
+          <Label isCompact color="purple">
+            Mock data pinned
+          </Label>
+        </StackItem>
+      )}
+    </Stack>
   )
 }
 

@@ -35,7 +35,9 @@ describe('isReplayedStep', () => {
 
   it('flags a retained failure with reusable output', () => {
     expect(
-      isReplayedStep(SOURCE_RUN_START, RETRY_CREATED_AT, ACTIVITY_STATUS.FAILED, { partial_result: 'available' })
+      isReplayedStep(SOURCE_RUN_START, RETRY_CREATED_AT, ACTIVITY_STATUS.FAILED, {
+        outputData: { partial_result: 'available' },
+      })
     ).toBe(true)
   })
 

@@ -101,6 +101,7 @@ describe('ExecutionStateEnricher', () => {
         completed_at: undefined,
         error_details: undefined,
         replayed: false,
+        retainedFailure: false,
       })
     })
 
