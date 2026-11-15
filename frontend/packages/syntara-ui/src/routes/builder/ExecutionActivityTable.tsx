@@ -12,7 +12,7 @@ import type { ActivityState } from '../workflows/execution/types'
 
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
-import { isReplayedStep, isRetainedFailure } from './utils/replayedNodes'
+import { getRetryActivityMarkers } from './utils/replayedNodes'
 
 function parseTimeMs(value: string | null | undefined): number | null {
   if (value == null) return null
@@ -130,8 +130,7 @@ function ActivityRow({
   const displayName = name ?? id
   const jobUrl = isAAPNodeType(type) ? extractAAPJobUrl(state?.outputData) : null
   const columnCount = hasAAPColumn ? 6 : 5
-  const replayed = isReplayedStep(state?.startedAt, replayBaselineAt, state?.status, state?.outputData, type)
-  const retainedFailure = isRetainedFailure(state?.startedAt, replayBaselineAt, state?.status, type)
+  const { replayed, retainedFailure } = getRetryActivityMarkers(state, replayBaselineAt, type)
 
   return (
     <Fragment>
