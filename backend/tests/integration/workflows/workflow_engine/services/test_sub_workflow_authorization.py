@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4, uuid5
 
 import pytest
+from structlog.testing import capture_logs
 from temporalio.exceptions import ApplicationError
 
 from syntara.workflows.models.execution import Execution, ExecutionStatus
@@ -219,3 +220,51 @@ async def test_unauthorized_actor_denied_before_disabled_child_detail(
     # Nothing is persisted for an unauthorized caller.
     async with test_db_session_factory() as session:
         assert await session.get(Execution, _child_id(parent_exec)) is None
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_denied_message_is_sanitized_and_logs_diagnostics(
+    test_db_session: AsyncSession,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    """AAP-95043 (real DB): policy deny gives a sanitized message with diagnostics in the protected log.
+
+    The raised (and persisted) message discloses no child metadata in the message or on the error
+    details -- it is read by principals who may lack workflow:read on the child (SDP R5) -- while the
+    protected structured diagnostics (child id/name, project_id, normalized denial_reason) are emitted
+    to the authorization-denial log.
+    """
+    child_wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
+    parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
+    async with test_db_session_factory() as session:
+        child = await session.get(Workflow, child_wf_id)
+    assert child is not None
+    setup = SubWorkflowSetupActivity(
+        session_factory=test_db_session_factory, task_queue=_TASK_QUEUE, evaluator=_StubEvaluator(allow=False)
+    )
+
+    with capture_logs() as logs, pytest.raises(ApplicationError) as exc:
+        await setup.run(_params(child_wf_id), parent_exec, _NODE_ID, str(test_user.id), 0)
+
+    # Sanitized, viewer-independent message (persisted into the parent result; read by principals who
+    # may lack workflow:read on the child, so it must not disclose child metadata -- SDP R5).
+    assert exc.value.type == _AUTHZ_ERROR
+    assert exc.value.message == "Not authorized to run child workflow."
+    message = exc.value.message or ""
+    assert child.name not in message
+    assert str(child_wf_id) not in message
+    assert str(child.project_id) not in message
+    # Sensitive child metadata must not ride on the Temporal error details either.
+    details_text = str(exc.value.details)
+    assert child.name not in details_text
+    assert str(child.project_id) not in details_text
+
+    # Protected structured diagnostics are emitted (internal sink only).
+    entry = next(log for log in logs if log["event"] == "Sub-workflow invocation authorization denied")
+    assert entry["child_workflow_id"] == str(child_wf_id)
+    assert entry["child_workflow_name"] == child.name
+    assert entry["project_id"] == str(child.project_id)
+    assert entry["denial_reason"] == "policy_deny"
