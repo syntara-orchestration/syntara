@@ -248,7 +248,7 @@ async def test_authorized_invocation_creates_and_links_child_e2e(
     )
 
     assert result["status"] == "completed"
-    assert _NODE_ID in result["completed_activities"]
+    assert _NODE_ID in result["completed_nodes"]
     assert result["failed_activities"] == {}
 
     # Persisted application-level state: the child Execution row exists and is linked to the parent.
@@ -303,7 +303,7 @@ async def test_unauthorized_invocation_fails_parent_and_creates_no_child_e2e(
     # Orchestrator RESULT (Temporal workflow result, not a persisted parent-node row): node failed.
     assert result["status"] == "failed"
     assert _NODE_ID in result["failed_activities"]
-    assert _NODE_ID not in result["completed_activities"]
+    assert _NODE_ID not in result["completed_nodes"]
 
     # Persisted application-level state: authorization denial creates NO child Execution row.
     async with test_db_session_factory() as session:
