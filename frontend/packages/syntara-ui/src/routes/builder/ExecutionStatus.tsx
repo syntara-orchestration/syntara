@@ -83,7 +83,8 @@ export function ActivityStatusLabel({
   status,
   nodeType,
   replayed = false,
-}: Readonly<{ status: ActivityStatus; nodeType?: string; replayed?: boolean }>) {
+  retainedFailure = false,
+}: Readonly<{ status: ActivityStatus; nodeType?: string; replayed?: boolean; retainedFailure?: boolean }>) {
   if (nodeType === ActivityTypeEnum.WAIT && status === 'waiting') {
     return (
       <SynLabel variant="outline" status="custom" icon={<RhUiSyncIcon />}>
@@ -101,6 +102,14 @@ export function ActivityStatusLabel({
       <SynLabel variant="outline" status={variant} icon={<IconComponent />}>
         {displayLabel}
       </SynLabel>
+      {retainedFailure && (
+        <>
+          {' '}
+          <SynLabel variant="outline" status="warning">
+            Retained failure
+          </SynLabel>
+        </>
+      )}
       {replayed && (
         <>
           {' '}

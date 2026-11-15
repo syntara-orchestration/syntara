@@ -678,9 +678,16 @@ async def validate_retry_from_failure(
         reported_selection = normalized
     if snapshot is not None:
         retry_path = collect_downstream_node_ids(snapshot_def, reported_selection, successors)
+        trigger_ids = {
+            trigger["id"]
+            for trigger in (snapshot_def.get("triggers", []) or [])
+            if isinstance(trigger, dict) and isinstance(trigger.get("id"), str)
+        }
         step_counts, total_steps = _step_counts(snapshot_def, reported_selection, successors)
         retained_result_count = sum(
-            strip_all_iteration_suffixes(activity.activity_name) not in retry_path for activity in completed
+            strip_all_iteration_suffixes(activity.activity_name) not in retry_path
+            and strip_all_iteration_suffixes(activity.activity_name) not in trigger_ids
+            for activity in completed
         )
     else:
         step_counts, total_steps = {}, 0

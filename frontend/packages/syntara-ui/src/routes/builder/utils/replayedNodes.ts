@@ -11,7 +11,28 @@
  * behaviour.
  */
 
+import { TriggerTypeEnum } from '@syntara/contracts'
+
 import { ACTIVITY_STATUS } from './executionState/executionHelpers'
+
+const TRIGGER_TYPES = new Set<string>(Object.values(TriggerTypeEnum))
+
+function isTriggerNodeType(nodeType: string | null | undefined): boolean {
+  return nodeType != null && TRIGGER_TYPES.has(nodeType)
+}
+
+function predatesRetry(
+  startedAt: string | null | undefined,
+  replayBaselineAt: string | null | undefined
+): boolean {
+  if (!replayBaselineAt || !startedAt) return false
+
+  const started = Date.parse(startedAt)
+  const baseline = Date.parse(replayBaselineAt)
+  if (Number.isNaN(started) || Number.isNaN(baseline)) return false
+
+  return started < baseline
+}
 
 /**
  * The timestamp replayed steps predate, or `null` when this execution is not a
@@ -37,17 +58,29 @@ export function isReplayedStep(
   startedAt: string | null | undefined,
   replayBaselineAt: string | null | undefined,
   status: string | null | undefined,
-  outputData?: Record<string, unknown> | null
+  outputData?: Record<string, unknown> | null,
+  nodeType?: string | null
 ): boolean {
+  if (isTriggerNodeType(nodeType)) return false
+
   const hasReusableStatus =
     status === ACTIVITY_STATUS.COMPLETED ||
     (status === ACTIVITY_STATUS.FAILED && outputData != null && Object.keys(outputData).length > 0)
   if (!hasReusableStatus) return false
-  if (!replayBaselineAt || !startedAt) return false
 
-  const started = Date.parse(startedAt)
-  const baseline = Date.parse(replayBaselineAt)
-  if (Number.isNaN(started) || Number.isNaN(baseline)) return false
+  return predatesRetry(startedAt, replayBaselineAt)
+}
 
-  return started < baseline
+/** Whether a failed step still shows the failure from the source run. */
+export function isRetainedFailure(
+  startedAt: string | null | undefined,
+  replayBaselineAt: string | null | undefined,
+  status: string | null | undefined,
+  nodeType?: string | null
+): boolean {
+  return (
+    status === ACTIVITY_STATUS.FAILED &&
+    !isTriggerNodeType(nodeType) &&
+    predatesRetry(startedAt, replayBaselineAt)
+  )
 }

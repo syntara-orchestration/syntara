@@ -28,6 +28,8 @@ type ExecutionState = {
   retry_count?: number
   /** True when this step reused a previous run's output instead of executing. */
   replayed?: boolean
+  /** True when this failed step still shows the failure from the source run. */
+  retainedFailure?: boolean
 }
 
 const NODE_BOTTOM_BADGE_STYLE: React.CSSProperties = {
@@ -79,13 +81,13 @@ function ValidationErrorBadge() {
   )
 }
 
-/**
- * Centred pill under a step. Mock-pinned data and reused output are mutually
- * exclusive: a step replayed from a previous run carries real recorded output,
- * so the mock-pinned marker would be misleading.
- */
-function StepBottomBadge({ mockDataPinned, replayed }: Readonly<{ mockDataPinned: boolean; replayed: boolean }>) {
-  if (mockDataPinned) {
+/** Centred status markers under a step. Replayed output takes precedence over mock-pinned data. */
+function StepBottomBadge({
+  mockDataPinned,
+  replayed,
+  retainedFailure,
+}: Readonly<{ mockDataPinned: boolean; replayed: boolean; retainedFailure: boolean }>) {
+  if (mockDataPinned && !replayed && !retainedFailure) {
     return (
       <div style={NODE_BOTTOM_BADGE_STYLE}>
         <Label isCompact color="purple">
@@ -94,14 +96,26 @@ function StepBottomBadge({ mockDataPinned, replayed }: Readonly<{ mockDataPinned
       </div>
     )
   }
-  if (replayed) {
-    return (
-      <div style={NODE_BOTTOM_BADGE_STYLE}>
-        <ReplayedOutputBadge />
-      </div>
-    )
-  }
-  return null
+  if (!replayed && !retainedFailure) return null
+
+  return (
+    <div
+      style={{
+        ...NODE_BOTTOM_BADGE_STYLE,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '4px',
+      }}
+    >
+      {retainedFailure && (
+        <Label isCompact color="orange">
+          Retained failure
+        </Label>
+      )}
+      {replayed && <ReplayedOutputBadge />}
+    </div>
+  )
 }
 
 // eslint-disable-next-line complexity
@@ -295,11 +309,16 @@ export function SynStep(props: {
             retryCount={props.executionState?.retry_count}
             nodeType={props.nodeProps.type}
             replayed={props.executionState?.replayed ?? false}
+            retainedFailure={props.executionState?.retainedFailure ?? false}
             retryOrigin={props.nodeProps.data.__retryPreviewOrigin === true}
           />
         )}
         {!isSemanticZoom && (
-          <StepBottomBadge mockDataPinned={mockDataPinned} replayed={props.executionState?.replayed ?? false} />
+          <StepBottomBadge
+            mockDataPinned={mockDataPinned}
+            replayed={props.executionState?.replayed ?? false}
+            retainedFailure={props.executionState?.retainedFailure ?? false}
+          />
         )}
         {hasValidationError && <ValidationErrorBadge />}
         <SynStepConnectionHandles

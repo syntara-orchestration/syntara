@@ -3,7 +3,7 @@ import { ActivityTypeEnum, EdgeHandleEnum, type Activity } from '@syntara/contra
 import type { ActivityState } from '../../../workflows/execution/types'
 import { buildLatestIterationMap } from '../../../workflows/execution/utils/activityState'
 import type { EdgeConnection } from '../../types/edge'
-import { isReplayedStep } from '../replayedNodes'
+import { isReplayedStep, isRetainedFailure } from '../replayedNodes'
 
 import { ACTIVITY_STATUS, TERMINAL_ACTIVITY_STATUSES, isBranchHandle } from './executionHelpers'
 import { WorkflowTraversal } from './traversal'
@@ -18,6 +18,8 @@ export type ExecutionState = {
   error_details?: string
   /** True when this step reused a previous run's output instead of executing. */
   replayed?: boolean
+  /** True when this failed step still shows the failure from the source run. */
+  retainedFailure?: boolean
 }
 
 function isConvergeSource(edge: { source: string }, activities?: Activity[]): boolean {
@@ -229,7 +231,14 @@ export class ExecutionStateEnricher {
             activityState.startedAt,
             replayBaselineAt,
             activityState.status,
-            activityState.outputData
+            activityState.outputData,
+            activity.type
+          ),
+          retainedFailure: isRetainedFailure(
+            activityState.startedAt,
+            replayBaselineAt,
+            activityState.status,
+            activity.type
           ),
         },
       }
@@ -267,9 +276,9 @@ export class ExecutionStateEnricher {
   /**
    * Enrich trigger node data with execution state.
    *
-   * Trigger status and source timestamps are read from `activityStates` using
-   * the trigger's real ID. Triggers execute again for retries, so their preserved
-   * source timestamps must not mark them as reused output.
+   * Trigger status and timestamps are read from `activityStates` using the
+   * trigger's real ID. Triggers execute again for retries and are never marked
+   * as reused output or retained failures.
    *
    * @param options - Trigger data and execution context used to enrich it
    * @returns Trigger data enriched with execution metadata
@@ -312,6 +321,7 @@ export class ExecutionStateEnricher {
         completed_at: triggerState?.completedAt ?? undefined,
         error_details: triggerState?.errorDetails ?? undefined,
         replayed: false,
+        retainedFailure: false,
       },
     }
   }
