@@ -9,7 +9,7 @@ import styles from './CompactActivityList.module.css'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
-import { isReplayedStep } from './utils/replayedNodes'
+import { isReplayedStep, isRetainedFailure } from './utils/replayedNodes'
 
 export type CompactActivityListProps = {
   activityStates: Map<string, ActivityState>
@@ -59,7 +59,8 @@ export function CompactActivityList({
                 <ActivityStatusLabel
                   status={state?.status ?? ACTIVITY_STATUS.PENDING}
                   nodeType={type}
-                  replayed={isReplayedStep(state?.startedAt, replayBaselineAt, state?.status, state?.outputData)}
+                  replayed={isReplayedStep(state?.startedAt, replayBaselineAt, state?.status, state?.outputData, type)}
+                  retainedFailure={isRetainedFailure(state?.startedAt, replayBaselineAt, state?.status, type)}
                 />
               </Td>
             </Tr>
