@@ -69,7 +69,9 @@ def _child_def() -> dict[str, Any]:
     }
 
 
-async def _create_published_child(session: AsyncSession, *, created_by: UUID, project_id: UUID) -> UUID:
+async def _create_published_child(
+    session: AsyncSession, *, created_by: UUID, project_id: UUID, enabled: bool = True
+) -> UUID:
     workflow_id = uuid4()
     session.add(
         Workflow(id=workflow_id, name=f"child-{workflow_id.hex[:8]}", created_by=created_by, project_id=project_id)
@@ -89,7 +91,7 @@ async def _create_published_child(session: AsyncSession, *, created_by: UUID, pr
     await session.flush()
     workflow = await session.get(Workflow, workflow_id)
     assert workflow is not None
-    workflow.is_enabled = True
+    workflow.is_enabled = enabled
     workflow.published_version_id = version_id
     await session.commit()
     return workflow_id
@@ -146,5 +148,74 @@ async def test_unauthorized_actor_denied_before_child_creation(
 
     assert exc.value.type == _AUTHZ_ERROR
     assert exc.value.non_retryable is True
+    async with test_db_session_factory() as session:
+        assert await session.get(Execution, _child_id(parent_exec)) is None
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_authorized_actor_links_child_to_parent(
+    test_db_session: AsyncSession,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    """An allowed actor's child Execution carries parent lineage metadata (AC: authorized invocation links child)."""
+    child_wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
+    parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
+    setup = SubWorkflowSetupActivity(
+        session_factory=test_db_session_factory, task_queue=_TASK_QUEUE, evaluator=_StubEvaluator(allow=True)
+    )
+
+    result = await setup.run(_params(child_wf_id), parent_exec, _NODE_ID, str(test_user.id), 0)
+
+    async with test_db_session_factory() as session:
+        child = await session.get(Execution, UUID(result["execution_id"]))
+    assert child is not None
+    # Lineage points back at the authoritative parent execution + canvas node id.
+    metadata = child.execution_metadata
+    assert metadata is not None
+    assert metadata["parent_execution_id"] == parent_exec
+    assert metadata["parent_node_id"] == _NODE_ID
+    # DB ownership is the propagated top-level initiator (the authorized actor).
+    assert str(child.created_by) == str(test_user.id)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_unauthorized_actor_denied_before_disabled_child_detail(
+    test_db_session: AsyncSession,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    """Security-ordering regression: an unauthorized caller gets a generic authz denial, not disabled detail.
+
+    The child is BOTH disabled (``is_enabled=False``) and unauthorized (deny evaluator). Authorization
+    is enforced before the ``is_enabled`` check in the create path, so the caller must receive the
+    sanitized ``SubWorkflowAuthorizationError`` ("Not authorized to run child workflow.") and NOT the
+    ``WorkflowDisabledError`` detail that names the child workflow id. Reordering these checks would
+    leak child-workflow state to a caller who was never authorized to see it (AAP-91266, decision #3).
+    """
+    child_wf_id = await _create_published_child(
+        test_db_session, created_by=test_user.id, project_id=test_project_id, enabled=False
+    )
+    parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
+    setup = SubWorkflowSetupActivity(
+        session_factory=test_db_session_factory, task_queue=_TASK_QUEUE, evaluator=_StubEvaluator(allow=False)
+    )
+
+    with pytest.raises(ApplicationError) as exc:
+        await setup.run(_params(child_wf_id), parent_exec, _NODE_ID, str(test_user.id), 0)
+
+    # Authorization denial wins over the disabled-child error: the caller cannot distinguish a disabled
+    # child from an enabled one, nor learn the child workflow id.
+    assert exc.value.type == _AUTHZ_ERROR
+    assert exc.value.type != "WorkflowDisabledError"
+    assert exc.value.non_retryable is True
+    message = str(exc.value)
+    assert "disabled" not in message.lower()
+    assert str(child_wf_id) not in message
+    # Nothing is persisted for an unauthorized caller.
     async with test_db_session_factory() as session:
         assert await session.get(Execution, _child_id(parent_exec)) is None
