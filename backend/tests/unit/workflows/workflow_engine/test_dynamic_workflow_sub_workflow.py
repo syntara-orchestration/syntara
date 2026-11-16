@@ -381,19 +381,19 @@ class TestSetupActivityExecution:
 
         mock_version = MagicMock()
         mock_version.id = uuid4()
+        mock_version.workflow_id = child_wf_id
         mock_version.version = 2
         mock_version.workflow_definition = _make_child_workflow_def()
+        mock_workflow.published_version_id = mock_version.id
 
         mock_session_idempotency = AsyncMock()
         mock_session_idempotency.get = AsyncMock(return_value=None)
 
         mock_session_create = AsyncMock()
-        exec_result = MagicMock()
-        exec_result.first.return_value = (mock_workflow, mock_version)
-        mock_session_create.exec = AsyncMock(return_value=exec_result)
         mock_parent = MagicMock()
         mock_parent.project_id = mock_workflow.project_id
-        mock_session_create.get = AsyncMock(return_value=mock_parent)
+        mock_session_create.get = AsyncMock(side_effect=[mock_workflow, mock_version, mock_parent])
+        mock_session_create.add = MagicMock()
 
         mock_session_persist = AsyncMock()
         persist_result = MagicMock()
@@ -924,20 +924,25 @@ class TestSetupActivityDisabledWorkflow:
     async def test_disabled_workflow_raises_workflow_disabled_error(self) -> None:
         from unittest.mock import MagicMock
 
-        disabled_wf_id = str(uuid4())
+        disabled_wf_uuid = uuid4()
+        disabled_wf_id = str(disabled_wf_uuid)
 
-        mock_row = MagicMock()
         mock_workflow = MagicMock()
         mock_workflow.is_enabled = False
-        mock_workflow.id = disabled_wf_id
+        mock_workflow.id = disabled_wf_uuid
+        mock_workflow.project_id = uuid4()
+        mock_workflow.created_by = uuid4()
         mock_version = MagicMock()
-        mock_row.first.return_value = (mock_workflow, mock_version)
+        mock_version.id = uuid4()
+        mock_version.workflow_id = disabled_wf_uuid
+        mock_version.version = 1
+        mock_version.workflow_definition = _make_child_workflow_def()
+        mock_workflow.published_version_id = mock_version.id
 
         mock_parent = MagicMock()
         mock_parent.project_id = mock_workflow.project_id
         mock_session = AsyncMock()
-        mock_session.get = AsyncMock(side_effect=[None, mock_parent])
-        mock_session.exec = AsyncMock(return_value=mock_row)
+        mock_session.get = AsyncMock(side_effect=[None, mock_workflow, mock_version, mock_parent])
 
         @contextlib.asynccontextmanager
         async def mock_factory() -> AsyncIterator[AsyncMock]:

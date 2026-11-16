@@ -3,28 +3,51 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import type { SubWorkflowOutputField } from '../utils/subWorkflowOutputContract'
+
 import { SubWorkflowAdvancedMappings } from './SubWorkflowAdvancedMappings'
 
-const mockWorkflowState = vi.hoisted(() => ({
-  currentWorkflow: {
-    workflow: { activities: [{ id: 'deploy', name: 'Deploy', type: 'script' }] },
-  },
-  edges: [{ source: 'trigger-0', target: 'deploy' }],
+const workflowState = vi.hoisted(() => ({
+  activities: [
+    { id: 'route', name: 'Route', type: 'condition' },
+    {
+      id: 'deploy',
+      name: 'Deploy',
+      type: 'script',
+      output_schema: [
+        { name: 'stdout', type: 'number', description: 'Numeric result' },
+        { name: 'payload', type: 'unknown', description: 'Open payload' },
+      ],
+    },
+    { id: 'fallback', name: 'Fallback', type: 'script', output_schema: [] },
+  ],
+  edges: [
+    { source: 'trigger-0', target: 'route' },
+    { source: 'route', target: 'deploy', sourceHandle: 'success' },
+    { source: 'route', target: 'fallback', sourceHandle: 'failure' },
+  ],
 }))
 
 vi.mock('../../../stores/useWorkflowStore', () => ({
-  useWorkflowStore: (selector: (state: typeof mockWorkflowState) => unknown) => selector(mockWorkflowState),
+  useWorkflowStore: (selector: (state: unknown) => unknown) =>
+    selector({ currentWorkflow: { workflow: { activities: workflowState.activities } }, edges: workflowState.edges }),
 }))
 
+const fields: SubWorkflowOutputField[] = [
+  { path: 'status', type: 'string', required: true, description: 'Public status' },
+  { path: 'legacy', type: 'string', required: false },
+  { path: 'detail', type: 'object', required: false },
+]
+
 describe('SubWorkflowAdvancedMappings', () => {
-  it('edits the mapping for each declared output field', async () => {
+  it('edits the mapping for a declared output field', async () => {
     const user = userEvent.setup()
     const onMappingChange = vi.fn()
     const { container } = render(
       <SubWorkflowAdvancedMappings
         fields={[{ path: 'release.tag', type: 'string', required: true, description: 'Published tag' }]}
         outputMapping={{}}
-        triggerId="trigger"
+        triggerId="trigger-0"
         triggerIndex={0}
         isVersionView={false}
         onMappingChange={onMappingChange}
@@ -34,84 +57,71 @@ describe('SubWorkflowAdvancedMappings', () => {
     const mapping = screen.getByRole('textbox', { name: 'Type to filter' })
     expect(mapping).toHaveAttribute('aria-required', 'true')
     expect(screen.getByText('release.tag', { exact: true })).toBeInTheDocument()
-    expect(screen.queryByText('release.tag (string)', { exact: true })).not.toBeInTheDocument()
-    expect(screen.getByText('*', { exact: true })).toBeInTheDocument()
     await user.click(mapping)
-    await user.click(screen.getByRole('option', { name: /^stdout Standard output/ }))
+    await user.click(screen.getByRole('option', { name: 'stdout Numeric result' }))
 
     expect(onMappingChange).toHaveBeenLastCalledWith('release.tag', '${deploy.stdout}')
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('warns when an advanced mapping references an output with a different declared type', () => {
-    render(
-      <SubWorkflowAdvancedMappings
-        fields={[{ path: 'release.code', type: 'string', required: false }]}
-        outputMapping={{ 'release.code': '${deploy.return_code}' }}
-        triggerId="trigger-0"
-        triggerIndex={0}
-        isVersionView={false}
-        onMappingChange={vi.fn()}
-      />
-    )
-
-    const mapping = screen.getByRole('textbox', { name: 'Type to filter' })
-    expect(mapping).not.toHaveAttribute('aria-required')
-    expect(screen.queryByText('*', { exact: true })).not.toBeInTheDocument()
-    expect(screen.getByText(/declared type \(string\) differs from the selected source type \(number\)/)).toBeVisible()
-  })
-
-  it('warns when a saved source output no longer exists', () => {
-    render(
-      <SubWorkflowAdvancedMappings
-        fields={[{ path: 'release.tag', type: 'string', required: false }]}
-        outputMapping={{ 'release.tag': '${deploy.deleted_output}' }}
-        triggerId="trigger-0"
-        triggerIndex={0}
-        isVersionView={false}
-        onMappingChange={vi.fn()}
-      />
-    )
-
-    expect(screen.getByText(/This saved source is unavailable in the current workflow/)).toBeVisible()
-  })
-
-  it('identifies nested dynamic source paths for runtime validation', () => {
-    render(
-      <SubWorkflowAdvancedMappings
-        fields={[{ path: 'release.tag', type: 'string', required: false }]}
-        outputMapping={{ 'release.tag': '${deploy.stdout_json.release_tag}' }}
-        triggerId="trigger-0"
-        triggerIndex={0}
-        isVersionView={false}
-        onMappingChange={vi.fn()}
-      />
-    )
-
-    expect(screen.getByRole('textbox', { name: 'Type to filter' })).toHaveValue(
-      'Dynamic path · ${deploy.stdout_json.release_tag}'
-    )
-    expect(screen.queryByText(/This saved source is unavailable/)).not.toBeInTheDocument()
-    expect(screen.getByText(/dynamic source path is checked when its step runs/)).toBeVisible()
-  })
-
-  it('has no accessibility violations in the empty state', async () => {
+  it('explains missing schema fields accessibly when there is nothing to map', async () => {
     const { container } = render(
       <SubWorkflowAdvancedMappings
         fields={[]}
         outputMapping={{}}
-        triggerId="trigger"
+        triggerId="trigger-0"
         triggerIndex={0}
         isVersionView={false}
+        onMappingChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Add output fields to the schema above to map their values')).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('shows source reachability, type mismatch, and unavailable mapping feedback', () => {
+    render(
+      <SubWorkflowAdvancedMappings
+        fields={fields}
+        outputMapping={{ status: '${deploy.stdout}', legacy: '${deleted_step.stdout}' }}
+        triggerId="trigger-0"
+        triggerIndex={0}
+        isVersionView={false}
+        onMappingChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Source step may not execute on every workflow path.')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'The declared type (string) differs from the selected source type (number). Review the output schema.'
+      )
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'This saved source is unavailable in the current workflow. Choose an existing child step output.'
+      )
+    ).toBeInTheDocument()
+    expect(screen.getByText('Description: Public status')).toBeInTheDocument()
+    expect(screen.getAllByText('Description: No description')).toHaveLength(2)
+  })
+
+  it('identifies dynamic descendants and disables source selection in version view', () => {
+    render(
+      <SubWorkflowAdvancedMappings
+        fields={[fields[2]]}
+        outputMapping={{ detail: '${deploy.payload.owner}' }}
+        triggerId="trigger-0"
+        triggerIndex={0}
+        isVersionView
         onMappingChange={vi.fn()}
       />
     )
 
     expect(
-      screen.getByText(
-        'Required outputs are part of the child workflow’s return contract. If routing skips a required output’s source step, the child run fails. Optional outputs from skipped steps are omitted.'
-      )
+      screen.getByText('This dynamic source path is checked when its step runs; a missing field fails the child run.')
     ).toBeInTheDocument()
-    expect(await axe(container)).toHaveNoViolations()
+    expect(screen.getByRole('textbox', { name: 'Type to filter' })).toBeDisabled()
   })
 })

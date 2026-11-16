@@ -167,7 +167,7 @@ function validateOutputMappings(
     }
   }
   const mappedPaths = Object.keys(outputMapping).filter((path) => paths.has(path))
-  const sortedMappedPaths = [...mappedPaths].sort()
+  const sortedMappedPaths = [...mappedPaths].sort((left, right) => left.localeCompare(right))
   for (let index = 0; index < sortedMappedPaths.length; index += 1) {
     const path = sortedMappedPaths[index]
     if (!path) continue

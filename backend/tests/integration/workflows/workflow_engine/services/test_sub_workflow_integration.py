@@ -137,9 +137,13 @@ class _MockSession:
     def __init__(
         self,
         exec_results: list[object] | None = None,
+        child_workflow: object | None = None,
+        child_version: object | None = None,
     ) -> None:
         self._exec_results = list(exec_results or [])
         self._exec_idx = 0
+        self._child_workflow = child_workflow
+        self._child_version = child_version
 
     async def exec(self, _query: object) -> _MockExecResult:
         """Return next pre-configured result."""
@@ -149,14 +153,19 @@ class _MockSession:
             return _MockExecResult(val)
         return _MockExecResult(None)
 
-    async def get(self, _model: type, _id: object) -> object | None:
-        """Return a same-project parent for the parent-execution lookup; None otherwise.
+    async def get(self, model: type, _id: object) -> object | None:
+        """Return the configured child records, or a same-project parent execution.
 
         The idempotency check (``get(Execution, child_id)``) must see no existing record,
-        while the project-scope gate (``get(Execution, parent_id)``) needs the parent
-        execution to exist in the child's project.
+        the version-resolution path loads the child Workflow and published WorkflowVersion,
+        and the project-scope gate loads the parent Execution.
         """
-        if str(_id) == _PARENT_EXECUTION_ID:
+        model_name = model.__name__
+        if model_name == "Workflow" and str(_id) == str(_CHILD_WF_ID):
+            return self._child_workflow
+        if model_name == "WorkflowVersion" and str(_id) == str(_CHILD_VERSION_ID):
+            return self._child_version
+        if model_name == "Execution" and str(_id) == _PARENT_EXECUTION_ID:
             return SimpleNamespace(project_id=_CHILD_PROJECT_ID)
         return None
 
@@ -197,13 +206,15 @@ def _mock_session_factory() -> Callable[..., contextlib.AbstractAsyncContextMana
 
     ``_prepare_child_execution`` opens sessions in this order:
       Call 1 — idempotency check: ``session.get(Execution, id)`` only.
-      Call 2 — workflow resolution: ``session.exec(select(Workflow, Version))``,
-               ``resolve_user_display_name`` (exec), ``session.add/commit``.
+      Call 2 — workflow resolution: ``session.get(Workflow)``,
+               ``session.get(WorkflowVersion)``, parent/project checks, and
+               ``resolve_user_display_name`` (exec).
 
     (C3: the setup activity no longer persists the node row —
     ActivitySyncService reconstructs the I/O from the result — so there is no
-    third session.) Every 2nd call (2, 4, 6, …) carries ``exec_results`` for the
-    workflow query; all other calls return a bare session.
+    third session.) Every 2nd call (2, 4, 6, …) carries the child records and
+    an ``exec_results`` entry for the user display-name lookup; all other calls
+    return a bare session.
     """
     mock_workflow = SimpleNamespace(
         id=_CHILD_WF_ID,
@@ -215,6 +226,7 @@ def _mock_session_factory() -> Callable[..., contextlib.AbstractAsyncContextMana
     )
     mock_version = SimpleNamespace(
         id=_CHILD_VERSION_ID,
+        workflow_id=_CHILD_WF_ID,
         version=1,
         workflow_definition=_CHILD_WORKFLOW_DEF,
     )
@@ -226,7 +238,7 @@ def _mock_session_factory() -> Callable[..., contextlib.AbstractAsyncContextMana
         nonlocal call_count
         call_count += 1
         if call_count % 2 == 0:
-            yield _MockSession(exec_results=[(mock_workflow, mock_version), None])
+            yield _MockSession(exec_results=[None], child_workflow=mock_workflow, child_version=mock_version)
         else:
             yield _MockSession()
 
@@ -247,6 +259,7 @@ def _mock_session_factory_for_def(
     )
     mock_version = SimpleNamespace(
         id=_CHILD_VERSION_ID,
+        workflow_id=_CHILD_WF_ID,
         version=1,
         workflow_definition=child_def,
     )
@@ -258,7 +271,7 @@ def _mock_session_factory_for_def(
         nonlocal call_count
         call_count += 1
         if call_count % 2 == 0:
-            yield _MockSession(exec_results=[(mock_workflow, mock_version), None])
+            yield _MockSession(exec_results=[None], child_workflow=mock_workflow, child_version=mock_version)
         else:
             yield _MockSession()
 
@@ -780,7 +793,12 @@ def _recording_session_factory(
         published_version_id=_CHILD_VERSION_ID,
         is_enabled=True,
     )
-    mock_version = SimpleNamespace(id=_CHILD_VERSION_ID, version=1, workflow_definition=_CHILD_WORKFLOW_DEF)
+    mock_version = SimpleNamespace(
+        id=_CHILD_VERSION_ID,
+        workflow_id=_CHILD_WF_ID,
+        version=1,
+        workflow_definition=_CHILD_WORKFLOW_DEF,
+    )
 
     class _RecordingMockSession(_MockSession):
         def add(self, obj: object) -> None:
@@ -793,7 +811,11 @@ def _recording_session_factory(
         nonlocal call_count
         call_count += 1
         if call_count % 2 == 0:
-            yield _RecordingMockSession(exec_results=[(mock_workflow, mock_version), None])
+            yield _RecordingMockSession(
+                exec_results=[None],
+                child_workflow=mock_workflow,
+                child_version=mock_version,
+            )
         else:
             yield _RecordingMockSession()
 

@@ -164,7 +164,12 @@ async def test_get_workflow_includes_only_published_subworkflow_trigger_schemas(
                     "required": ["username"],
                 },
             },
-            {"trigger_node_id": "child_entry_secondary", "name": "Secondary Entry", "input_schema": {}},
+            {
+                "trigger_node_id": "child_entry_secondary",
+                "name": "Secondary Entry",
+                "input_schema": {},
+                "output_schema": None,
+            },
         ],
     }
 
@@ -371,6 +376,7 @@ async def test_workflow_invocation_schema_exposes_output_schema_without_internal
     await test_db_session.commit()
 
     workflow.published_version_id = published_version.id
+    workflow.is_enabled = True
     await test_db_session.commit()
 
     response = await auth_client.get(f"/api/v1/workflows/{workflow.id}/invocation_schema")
