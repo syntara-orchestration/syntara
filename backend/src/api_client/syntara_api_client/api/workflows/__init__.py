@@ -120,6 +120,14 @@ class WorkflowsApi:
         endpoint_module = self._load_endpoint_module("publish_workflow_version")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
 
+    def check_breaking_changes(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("check_breaking_changes")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_check_breaking_changes(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("check_breaking_changes")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
     def unpublish(self, **kwargs: Any) -> Response[Any]:
         endpoint_module = self._load_endpoint_module("unpublish_workflow")
         return endpoint_module.sync_detailed(client=self._client, **kwargs)

@@ -641,7 +641,7 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-  /workflows/{workflow_id}/versions/{version}/check-breaking-changes:
+  /workflows/{workflow_id}/versions/{version}/check_breaking_changes:
     post:
       summary: Check for breaking changes before publishing
       description: |

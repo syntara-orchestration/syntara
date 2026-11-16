@@ -26971,7 +26971,7 @@ paths:
                 detail: An unexpected error occurred
                 code: INTERNAL_ERROR
                 retryable: true
-  /workflows/{workflow_id}/versions/{version}/check-breaking-changes:
+  /workflows/{workflow_id}/versions/{version}/check_breaking_changes:
     post:
       summary: Check for breaking changes before publishing
       description: |

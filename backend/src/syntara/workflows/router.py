@@ -533,7 +533,7 @@ async def get_workflow_version(
 
 
 @router.post(
-    "/{workflow_id}/versions/{version}/check-breaking-changes",
+    "/{workflow_id}/versions/{version}/check_breaking_changes",
     summary="Check for breaking changes before publishing",
     response_model=BreakingChangesResponse,
     dependencies=[Depends(_wf_perm_read)],

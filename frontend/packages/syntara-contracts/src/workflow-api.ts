@@ -196,7 +196,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/workflows/{workflow_id}/versions/{version}/check-breaking-changes': {
+  '/workflows/{workflow_id}/versions/{version}/check_breaking_changes': {
     parameters: {
       query?: never
       header?: never

@@ -99,7 +99,7 @@ class TestCheckBreakingChanges:
         assert response.status_code == 200
 
         # Check breaking changes
-        response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/{version}/check-breaking-changes")
+        response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/{version}/check_breaking_changes")
 
         assert response.status_code == 200
         data = response.json()
@@ -160,7 +160,7 @@ class TestCheckBreakingChanges:
         assert response.status_code == 200
 
         # Check breaking changes
-        response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/{new_version}/check-breaking-changes")
+        response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/{new_version}/check_breaking_changes")
 
         assert response.status_code == 200
         data = response.json()
@@ -228,7 +228,7 @@ class TestCheckBreakingChanges:
         assert response.status_code == 200
 
         # Check breaking changes
-        response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/{new_version}/check-breaking-changes")
+        response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/{new_version}/check_breaking_changes")
 
         assert response.status_code == 200
         data = response.json()
@@ -294,7 +294,7 @@ class TestCheckBreakingChanges:
         assert response.status_code == 200
 
         # Check breaking changes
-        response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/{new_version}/check-breaking-changes")
+        response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/{new_version}/check_breaking_changes")
 
         assert response.status_code == 200
         data = response.json()
@@ -358,7 +358,7 @@ class TestCheckBreakingChanges:
         assert response.status_code == 200
 
         # Check breaking changes
-        response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/{new_version}/check-breaking-changes")
+        response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/{new_version}/check_breaking_changes")
 
         assert response.status_code == 200
         data = response.json()
@@ -368,7 +368,7 @@ class TestCheckBreakingChanges:
     @pytest.mark.asyncio
     async def test_404_when_workflow_not_found(self, jwt_client: AsyncClient) -> None:
         """Return 404 when workflow does not exist."""
-        response = await jwt_client.post("/workflows/99999/versions/1/check-breaking-changes")
+        response = await jwt_client.post("/workflows/99999/versions/1/check_breaking_changes")
         assert response.status_code == 404
 
     @pytest.mark.asyncio
@@ -378,7 +378,7 @@ class TestCheckBreakingChanges:
         test_workflow: Workflow,
     ) -> None:
         """Return 404 when version does not exist."""
-        response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/99999/check-breaking-changes")
+        response = await jwt_client.post(f"/workflows/{test_workflow.id}/versions/99999/check_breaking_changes")
         assert response.status_code == 404
 
     @pytest.mark.asyncio
@@ -443,7 +443,7 @@ class TestCheckBreakingChanges:
             "edges": [],
         }
         response = await jwt_client.post(
-            f"/workflows/{test_workflow.id}/versions/{new_version}/check-breaking-changes",
+            f"/workflows/{test_workflow.id}/versions/{new_version}/check_breaking_changes",
             json={"workflow_definition": changed_definition},
         )
 

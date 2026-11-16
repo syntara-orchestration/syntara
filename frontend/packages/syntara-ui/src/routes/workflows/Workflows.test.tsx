@@ -2226,7 +2226,7 @@ describe('Workflows Component', () => {
       publishMutate: ReturnType<typeof vi.fn>
     ) {
       vi.mocked(workflowClient.useMutation).mockImplementation((_method: string, path: string) => {
-        if (path.includes('/check-breaking-changes')) {
+        if (path.includes('/check_breaking_changes')) {
           return {
             ...defaultMutationReturn,
             mutate: (_params: unknown, callbacks?: { onSuccess?: (response: typeof noContractChanges) => void }) =>
