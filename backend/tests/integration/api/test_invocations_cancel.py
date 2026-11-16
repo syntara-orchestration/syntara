@@ -19,10 +19,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.agent_orchestrator.models.invocation import Invocation, InvocationStatus
 from syntara.core.models import User
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 from tests.integration.helpers.invocations import InvocationFactory
 from tests.integration.helpers.workflow import get_or_create_builtin_agent_workflow
 
