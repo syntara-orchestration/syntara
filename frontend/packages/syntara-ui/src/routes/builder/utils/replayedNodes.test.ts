@@ -1,3 +1,5 @@
+import { TriggerTypeEnum } from '@syntara/contracts'
+
 import { ACTIVITY_STATUS } from './executionState/executionHelpers'
 import { isReplayedStep, resolveRetryReplayBaseline } from './replayedNodes'
 
@@ -57,6 +59,14 @@ describe('isReplayedStep', () => {
 
   it('does not flag a completed step that started exactly when the retry was created', () => {
     expect(isReplayedStep(RETRY_CREATED_AT, RETRY_CREATED_AT, ACTIVITY_STATUS.COMPLETED)).toBe(false)
+  })
+
+  it('never flags a trigger node as reused output', () => {
+    expect(
+      isReplayedStep(SOURCE_RUN_START, RETRY_CREATED_AT, ACTIVITY_STATUS.COMPLETED, {
+        nodeType: TriggerTypeEnum.MANUAL_TRIGGER,
+      })
+    ).toBe(false)
   })
 
   it('does not flag anything without a baseline', () => {

@@ -418,6 +418,39 @@ describe('SynStep validation and interaction', () => {
     expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
   })
 
+  it('shows retained failure beside reused output for a failed retry step', () => {
+    renderWithFlow(
+      <SynStep
+        nodeProps={baseNodeProps}
+        executionState={{ status: 'failed', replayed: true, retainedFailure: true } as never}
+      >
+        <span>Content</span>
+      </SynStep>
+    )
+
+    expect(screen.getByText('Retained failure')).toBeInTheDocument()
+    expect(screen.getByTestId('replayed-output-badge')).toBeInTheDocument()
+  })
+
+  it('shows both retained failure and mock-pinned markers when both apply', () => {
+    const nodeProps = {
+      ...baseNodeProps,
+      data: { ...baseNodeProps.data, metadata: { __mockDataPinned: true } },
+    } as unknown as NodeProps
+    renderWithFlow(
+      <SynStep
+        nodeProps={nodeProps}
+        executionState={{ status: 'failed', replayed: true, retainedFailure: true } as never}
+      >
+        <span>Content</span>
+      </SynStep>
+    )
+
+    expect(screen.getByText('Retained failure')).toBeInTheDocument()
+    expect(screen.getByText('Mock data pinned')).toBeInTheDocument()
+    expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
+  })
+
   it('handles re-render with unchanged props', () => {
     const { rerender } = renderWithFlow(
       <SynStep nodeProps={baseNodeProps} rootTestId="node-panel">
