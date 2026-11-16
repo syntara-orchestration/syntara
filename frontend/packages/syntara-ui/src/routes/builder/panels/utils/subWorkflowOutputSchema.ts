@@ -3,15 +3,6 @@ import { ActivityTypeEnum, getNodeOutputSchema, type OutputFieldDef } from '@syn
 import type { ChildWorkflowStepSchema } from '../hooks/useChildWorkflowSchema'
 import type { InputSchemaPreviewNode } from '../views/InputSchemaPreview'
 
-/**
- * Backend schema marker for mapped outputs.
- * MUST match the marker key set by _effective_output_schema_for_node in
- * backend/src/syntara/workflows/services/workflow_service.py.
- * Mapped outputs have unknown types until execution because their values
- * come from template expressions.
- */
-const MAPPED_OUTPUT_SCHEMA_MARKER = 'x-syntara-output-mapped'
-
 type OutputSchemaField = OutputFieldDef & { required?: boolean }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -67,42 +58,20 @@ function outputFieldsFromProperties(
   })
 }
 
-/** Convert the published node schema to picker fields, honoring mapped output names. */
-export function getChildStepOutputFields(
-  stepType: string,
-  outputSchema: Record<string, unknown> | null
-): OutputSchemaField[] | null {
-  const knownFields = getNodeOutputSchema(stepType)
+/** Convert the selected trigger's declared output schema to picker fields. */
+export function getDeclaredOutputFields(outputSchema: Record<string, unknown> | null): OutputSchemaField[] | null {
   if (!outputSchema) return null
 
   const properties = outputSchema['properties']
-  if (!isRecord(properties)) return knownFields
+  if (!isRecord(properties)) return null
 
-  // Extract required fields from JSON Schema's required array
   const requiredFields = new Set(
     Array.isArray(outputSchema['required'])
       ? outputSchema['required'].filter((name): name is string => typeof name === 'string')
       : []
   )
 
-  const knownFieldsByName = new Map((knownFields ?? []).map((field) => [field.name, field]))
-  return outputFieldsFromProperties(properties, requiredFields).map((field) => {
-    const property = properties[field.name]
-    const knownField = knownFieldsByName.get(field.name)
-    const isMappedOutput = isRecord(property) && property[MAPPED_OUTPUT_SCHEMA_MARKER] === true
-    let type = field.type
-    if (isMappedOutput) type = 'unknown'
-    else if (type === 'unknown') type = knownField?.type ?? 'unknown'
-    return {
-      ...field,
-      type,
-      description: field.description || knownField?.description || '',
-      ...(!field.children && knownField?.children ? { children: knownField.children } : {}),
-      ...(!field.children && knownField?.additionalProperties
-        ? { additionalProperties: knownField.additionalProperties }
-        : {}),
-    }
-  })
+  return outputFieldsFromProperties(properties, requiredFields)
 }
 
 function toPreviewNode(field: OutputFieldDef, parentPath: string[]): InputSchemaPreviewNode {

@@ -350,13 +350,7 @@ async def get_workflow(
     """Get a workflow by ID including its current active version."""
     workflow, current_version = await service.get_workflow_with_version(workflow_id)
     response = await _build_workflow_with_version_response(workflow, current_version, service)
-    published_step_metadata = await service.get_published_step_metadata(workflow)
-    return WorkflowDetailRead.model_validate(
-        {
-            **response.model_dump(),
-            "published_step_metadata": published_step_metadata,
-        }
-    )
+    return WorkflowDetailRead.model_validate(response.model_dump())
 
 
 @router.get(

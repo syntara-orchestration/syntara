@@ -260,25 +260,6 @@ class WorkflowRead(UserReferenceFieldsMixin, WorkflowBase):
     updated_at: datetime
 
 
-class WorkflowStepMetadataRead(SQLModel):
-    """Published workflow step metadata used by the variable picker."""
-
-    id: str
-    type: str
-    output_schema: dict[str, Any] | None = Field(
-        default=None,
-        description="JSON Schema for this step's output, or null when the step type has no output model.",
-    )
-
-
-class PublishedWorkflowStepMetadataRead(SQLModel):
-    """Step metadata tied to the exact published workflow version."""
-
-    version_id: UUID
-    version: int
-    steps: list[WorkflowStepMetadataRead]
-
-
 class WorkflowReadWithVersion(WorkflowRead):
     """Schema for workflow response with current version details.
 
@@ -289,12 +270,7 @@ class WorkflowReadWithVersion(WorkflowRead):
 
 
 class WorkflowDetailRead(WorkflowReadWithVersion):
-    """Workflow detail response with metadata for its published version."""
-
-    published_step_metadata: PublishedWorkflowStepMetadataRead | None = Field(
-        default=None,
-        description="Step IDs, types, and output schemas from the exact published version, when one exists.",
-    )
+    """Workflow detail response."""
 
 
 class PublishWorkflowVersionResponse(WorkflowReadWithVersion):

@@ -12,7 +12,6 @@ from dateutil.parser import isoparse
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.published_workflow_step_metadata_read import PublishedWorkflowStepMetadataRead
     from ..models.user_reference import UserReference
     from ..models.validation_result import ValidationResult
     from ..models.workflow_detail_read_labels import WorkflowDetailReadLabels
@@ -45,8 +44,6 @@ class WorkflowDetailRead:
         published_version_number (int | None | Unset):
         validation_result (None | Unset | ValidationResult): Validation findings from the last save operation. Only
             included in create/update responses; use has_validation_issues for the durable indicator.
-        published_step_metadata (None | PublishedWorkflowStepMetadataRead | Unset): Step IDs, types, and output schemas
-            from the exact published version, when one exists.
     """
 
     name: str
@@ -66,11 +63,9 @@ class WorkflowDetailRead:
     published_version_id: None | Unset | UUID = UNSET
     published_version_number: int | None | Unset = UNSET
     validation_result: None | Unset | ValidationResult = UNSET
-    published_step_metadata: None | PublishedWorkflowStepMetadataRead | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.published_workflow_step_metadata_read import PublishedWorkflowStepMetadataRead
         from ..models.user_reference import UserReference
         from ..models.validation_result import ValidationResult
 
@@ -142,14 +137,6 @@ class WorkflowDetailRead:
         else:
             validation_result = self.validation_result
 
-        published_step_metadata: dict[str, Any] | None | Unset
-        if isinstance(self.published_step_metadata, Unset):
-            published_step_metadata = UNSET
-        elif isinstance(self.published_step_metadata, PublishedWorkflowStepMetadataRead):
-            published_step_metadata = self.published_step_metadata.to_dict()
-        else:
-            published_step_metadata = self.published_step_metadata
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -182,14 +169,11 @@ class WorkflowDetailRead:
             field_dict["published_version_number"] = published_version_number
         if validation_result is not UNSET:
             field_dict["validation_result"] = validation_result
-        if published_step_metadata is not UNSET:
-            field_dict["published_step_metadata"] = published_step_metadata
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.published_workflow_step_metadata_read import PublishedWorkflowStepMetadataRead
         from ..models.user_reference import UserReference
         from ..models.validation_result import ValidationResult
         from ..models.workflow_detail_read_labels import WorkflowDetailReadLabels
@@ -309,23 +293,6 @@ class WorkflowDetailRead:
 
         validation_result = _parse_validation_result(d.pop("validation_result", UNSET))
 
-        def _parse_published_step_metadata(data: object) -> None | PublishedWorkflowStepMetadataRead | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                published_step_metadata_type_0 = PublishedWorkflowStepMetadataRead.from_dict(data)
-
-                return published_step_metadata_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(None | PublishedWorkflowStepMetadataRead | Unset, data)
-
-        published_step_metadata = _parse_published_step_metadata(d.pop("published_step_metadata", UNSET))
-
         workflow_detail_read = cls(
             name=name,
             id=id,
@@ -344,7 +311,6 @@ class WorkflowDetailRead:
             published_version_id=published_version_id,
             published_version_number=published_version_number,
             validation_result=validation_result,
-            published_step_metadata=published_step_metadata,
         )
 
         workflow_detail_read.additional_properties = d

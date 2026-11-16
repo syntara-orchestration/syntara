@@ -12,7 +12,6 @@ import pytest
 from fastapi import HTTPException
 
 from syntara.workflows.models import (
-    PublishedWorkflowStepMetadataRead,
     WorkflowReadWithVersion,
     WorkflowVersionRead,
 )
@@ -87,8 +86,6 @@ class TestWorkflowEndpoints:
         mock_service.get_workflow_with_version.return_value = (mock_workflow, mock_version)
         now = datetime.now(UTC)
         workflow_id = uuid4()
-        published_step_metadata = PublishedWorkflowStepMetadataRead(version_id=uuid4(), version=1, steps=[])
-        mock_service.get_published_step_metadata.return_value = published_step_metadata
         version_read = WorkflowVersionRead.model_construct(
             id=uuid4(),
             workflow_id=workflow_id,
@@ -116,9 +113,9 @@ class TestWorkflowEndpoints:
             result = await get_workflow(workflow_id=workflow_id, service=mock_service)
 
         mock_service.get_workflow_with_version.assert_awaited_once_with(workflow_id)
-        mock_service.get_published_step_metadata.assert_awaited_once_with(mock_workflow)
         mock_build.assert_awaited_once_with(mock_workflow, mock_version, mock_service)
-        assert result.published_step_metadata == published_step_metadata
+        assert result.version == version_read
+        assert "published_step_metadata" not in result.model_dump()
 
     @pytest.mark.asyncio
     async def test_get_workflow_invocation_schema_delegates_to_service(self) -> None:

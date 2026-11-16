@@ -555,40 +555,6 @@ export interface components {
       validation_result?: components['schemas']['ValidationResult'] | null
       /** @description Current active version details */
       version: components['schemas']['WorkflowVersionRead']
-      /** @description Step IDs, types, and output schemas from the exact published version, when one exists. */
-      published_step_metadata?: components['schemas']['PublishedWorkflowStepMetadataRead'] | null
-    }
-    /**
-     * PublishedWorkflowStepMetadataRead
-     * @description Step metadata tied to the exact published workflow version.
-     */
-    PublishedWorkflowStepMetadataRead: {
-      /**
-       * Version Id
-       * Format: uuid
-       */
-      version_id: string
-      /** Version */
-      version: number
-      /** Steps */
-      steps: components['schemas']['WorkflowStepMetadataRead'][]
-    }
-    /**
-     * WorkflowStepMetadataRead
-     * @description Published workflow step metadata used by the variable picker.
-     */
-    WorkflowStepMetadataRead: {
-      /** Id */
-      id: string
-      /** Type */
-      type: string
-      /**
-       * Output Schema
-       * @description JSON Schema for this step's output, or null when the step type has no output model.
-       */
-      output_schema?: {
-        [key: string]: unknown
-      } | null
     }
     /**
      * WorkflowInvocationTriggerSchema

@@ -97,26 +97,7 @@ describe('workflow invocation schema mock', () => {
     expect(detailResponse.status).toBe(200)
     const detailResult: unknown = await detailResponse.json()
     if (!isRecord(detailResult)) throw new Error('workflow detail response was not an object')
-    expect(detailResult.published_step_metadata).toEqual({
-      version_id: expect.any(String),
-      version: 1,
-      steps: [
-        {
-          id: 'child_script',
-          type: 'script',
-          output_schema: {
-            type: 'object',
-            properties: {
-              image_tag: {
-                description: 'Output produced by a configured mapping; its type is not statically known.',
-                'x-syntara-output-mapped': true,
-              },
-              status: { type: 'string' },
-            },
-          },
-        },
-      ],
-    })
+    expect(detailResult).not.toHaveProperty('published_step_metadata')
 
     const response = await fetch(invocationSchemaUrl)
     expect(response.status).toBe(200)

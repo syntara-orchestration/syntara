@@ -11,7 +11,7 @@ import {
   isChildWorkflowAccessDenied,
   isChildWorkflowNotFound,
 } from '../../childWorkflowSchemaApi'
-import { getChildStepOutputFields } from '../utils/subWorkflowOutputSchema'
+import { getDeclaredOutputFields } from '../utils/subWorkflowOutputSchema'
 
 type ChildWorkflowStepNode = { id: string; name?: string | null; type: string }
 type ChildWorkflowGraph = {
@@ -134,7 +134,7 @@ function buildChildStepSchemas(
       name: 'Declared Outputs',
       type: 'subworkflow_declared_outputs',
       outputSchema: selectedTrigger.output_schema,
-      outputFields: getChildStepOutputFields('subworkflow_declared_outputs', selectedTrigger.output_schema),
+      outputFields: getDeclaredOutputFields(selectedTrigger.output_schema),
     },
   ]
 }

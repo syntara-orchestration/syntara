@@ -34920,7 +34920,7 @@ components:
     WorkflowDetailRead:
       type: object
       title: WorkflowDetailRead
-      description: Workflow detail response with metadata for its published version.
+      description: Workflow detail response.
       required:
         - name
         - id
@@ -35013,53 +35013,6 @@ components:
         version:
           $ref: '#/components/schemas/WorkflowVersionRead'
           description: Current active version details
-        published_step_metadata:
-          anyOf:
-            - $ref: '#/components/schemas/PublishedWorkflowStepMetadataRead'
-            - type: 'null'
-          description: Step IDs, types, and output schemas from the exact published version, when one exists.
-    PublishedWorkflowStepMetadataRead:
-      type: object
-      title: PublishedWorkflowStepMetadataRead
-      description: Step metadata tied to the exact published workflow version.
-      required:
-        - version_id
-        - version
-        - steps
-      properties:
-        version_id:
-          type: string
-          format: uuid
-          title: Version Id
-        version:
-          type: integer
-          title: Version
-        steps:
-          type: array
-          items:
-            $ref: '#/components/schemas/WorkflowStepMetadataRead'
-          title: Steps
-    WorkflowStepMetadataRead:
-      type: object
-      title: WorkflowStepMetadataRead
-      description: Published workflow step metadata used by the variable picker.
-      required:
-        - id
-        - type
-      properties:
-        id:
-          type: string
-          title: Id
-        type:
-          type: string
-          title: Type
-        output_schema:
-          anyOf:
-            - type: object
-              additionalProperties: true
-            - type: 'null'
-          title: Output Schema
-          description: JSON Schema for this step's output, or null when the step type has no output model.
     WorkflowInvocationTriggerSchema:
       type: object
       title: WorkflowInvocationTriggerSchema

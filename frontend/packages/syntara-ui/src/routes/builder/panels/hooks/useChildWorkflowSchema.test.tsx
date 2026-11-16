@@ -106,27 +106,6 @@ const workflowDetail = {
   published_version_id: 'published-v4',
   published_version_number: 4,
   version: publishedVersion,
-  published_step_metadata: {
-    version_id: 'published-v4',
-    version: 4,
-    steps: childDefinition.nodes.map((node) => ({
-      id: node.id,
-      type: node.type,
-      output_schema:
-        node.id === 'shared-script'
-          ? {
-              type: 'object',
-              properties: {
-                status: { type: 'string' },
-                image_tag: {
-                  description: 'Output produced by a configured mapping; its type is not statically known.',
-                  'x-syntara-output-mapped': true,
-                },
-              },
-            }
-          : { type: 'object', properties: { stdout: { type: 'string' } } },
-    })),
-  },
 } satisfies WorkflowAPI.components['schemas']['WorkflowDetailRead']
 
 const latestWorkflowDetail = {
@@ -135,11 +114,6 @@ const latestWorkflowDetail = {
   published_version_id: 'published-v5',
   published_version_number: 5,
   version: latestPublishedVersion,
-  published_step_metadata: {
-    ...workflowDetail.published_step_metadata,
-    version_id: 'published-v5',
-    version: 5,
-  },
 } satisfies WorkflowAPI.components['schemas']['WorkflowDetailRead']
 
 function createWrapper() {

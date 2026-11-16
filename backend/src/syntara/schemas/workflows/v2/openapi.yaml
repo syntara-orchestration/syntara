@@ -986,10 +986,6 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowReadWithVersion
     WorkflowDetailRead:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowDetailRead
-    PublishedWorkflowStepMetadataRead:
-      $ref: ./shared-schemas.yaml#/components/schemas/PublishedWorkflowStepMetadataRead
-    WorkflowStepMetadataRead:
-      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowStepMetadataRead
     WorkflowInvocationTriggerSchema:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowInvocationTriggerSchema
     WorkflowInvocationSchemaRead:

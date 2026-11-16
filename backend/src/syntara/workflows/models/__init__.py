@@ -58,7 +58,6 @@ from .visualization import (
 from .webhook_trigger import WebhookTrigger, WebhookTriggerRead
 from .webhook_trigger_service_account import WebhookTriggerServiceAccount
 from .workflow import (
-    PublishedWorkflowStepMetadataRead,
     PublishWorkflowVersionResponse,
     Workflow,
     WorkflowCreate,
@@ -66,7 +65,6 @@ from .workflow import (
     WorkflowListResponse,
     WorkflowRead,
     WorkflowReadWithVersion,
-    WorkflowStepMetadataRead,
     WorkflowUpdate,
 )
 from .workflow_definition import WorkflowDefinition
@@ -108,7 +106,6 @@ __all__ = [
     "PublishAction",
     "PublishVersionRequest",
     "PublishWorkflowVersionResponse",
-    "PublishedWorkflowStepMetadataRead",
     "SignalResponse",
     "TriggerBreakingChanges",
     "ValidationCategory",
@@ -130,7 +127,6 @@ __all__ = [
     "WorkflowRead",
     "WorkflowReadWithVersion",
     "WorkflowReferenceRead",
-    "WorkflowStepMetadataRead",
     "WorkflowUpdate",
     "WorkflowValidateRequest",
     "WorkflowVersion",
