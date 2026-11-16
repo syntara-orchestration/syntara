@@ -14,6 +14,8 @@ import { renderWithHeader } from './test-utils/renderWithHeader'
 import type { TriggerFormData } from './triggerFormSchema'
 import { TriggerNodeForm } from './TriggerNodeForm'
 
+vi.mock('../../../providers/theme/useColorScheme', () => ({ useColorScheme: () => ({ colorScheme: 'light' }) }))
+
 const mutate = vi.fn()
 vi.mock('../../../client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../client')>()),

@@ -6,10 +6,37 @@ import { expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { filteringFetchClient } from '../../../client'
+import { ColorSchemeProvider } from '../../../providers/theme/ColorSchemeProvider'
+import { WorkflowValidationContext } from '../WorkflowValidationContext'
 
 import { KafkaSubscribeFilter } from './KafkaSubscribeFilter'
 import { zodResolver } from './shared/formSchemaUtils'
 import { triggerFormSchema, type TriggerFormData } from './triggerFormSchema'
+
+vi.mock('@patternfly/react-code-editor', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@patternfly/react-code-editor')>()),
+  CodeEditor: ({
+    code,
+    onCodeChange,
+    customControls,
+    'aria-label': label,
+  }: {
+    code?: string
+    onCodeChange?: (value: string) => void
+    customControls?: React.ReactNode
+    'aria-label'?: string
+  }) => (
+    <>
+      <textarea aria-label={label} value={code} onChange={(event) => onCodeChange?.(event.target.value)} />
+      {customControls}
+    </>
+  ),
+  CodeEditorControl: ({ onClick, 'aria-label': label }: { onClick: () => void; 'aria-label'?: string }) => (
+    <button type="button" aria-label={label} onClick={onClick}>
+      Expand
+    </button>
+  ),
+}))
 
 const EXPRESSION_LABEL = 'Filter expression (CEL)'
 const SAMPLE_LABEL = 'Sample JSON'
@@ -32,7 +59,9 @@ function renderFilter(expression?: string, readOnly = false) {
   const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
-      <Harness expression={expression} readOnly={readOnly} />
+      <ColorSchemeProvider>
+        <Harness expression={expression} readOnly={readOnly} />
+      </ColorSchemeProvider>
     </QueryClientProvider>
   )
 }
@@ -70,7 +99,8 @@ it('provides accessible CEL guidance from the expression label help', async () =
   const user = userEvent.setup()
   renderFilter()
   await user.click(screen.getByRole('button', { name: 'More info for Filter expression (CEL)' }))
-  expect(await screen.findByRole('region', { name: 'CEL guidance and examples' })).toBeVisible()
+  expect(await screen.findByRole('link', { name: 'Kafka Subscribe documentation' })).toBeVisible()
+  expect(screen.getByText(/Return true to pass a message/)).toBeVisible()
   expect(await axe(screen.getByRole('dialog', { name: EXPRESSION_LABEL }))).toHaveNoViolations()
 })
 
@@ -124,12 +154,13 @@ it('blocks malformed JSON before any request and associates the error with the s
   await user.type(sample, 'invalid')
   await user.click(screen.getByRole('button', { name: TEST_LABEL }))
   expect(await screen.findByText('Enter valid JSON before testing the filter')).toBeInTheDocument()
-  expect(sample).toHaveAttribute('aria-invalid', 'true')
-  expect(sample).toHaveAccessibleDescription(/Enter valid JSON before testing the filter/)
+  expect(screen.getByRole('group', { name: SAMPLE_LABEL })).toHaveAccessibleDescription(
+    /Enter valid JSON before testing the filter/
+  )
   expect(post).not.toHaveBeenCalled()
 })
 
-it('surfaces safe compiler codes and locations without discarding source', async () => {
+it('surfaces readable compiler errors and locations without discarding source', async () => {
   vi.spyOn(filteringFetchClient, 'POST').mockResolvedValueOnce({
     error: {
       type: 'validation-error',
@@ -149,7 +180,7 @@ it('surfaces safe compiler codes and locations without discarding source', async
   expect(await screen.findByText('Filter configuration error')).toBeInTheDocument()
   const editor = screen.getByRole('textbox', { name: EXPRESSION_LABEL })
   expect(editor).toHaveValue(INITIAL_EXPRESSION)
-  expect(editor).toHaveAccessibleDescription(/filter_invalid_syntax · Line 2, column 5/)
+  expect(editor).toHaveAccessibleDescription(/Syntax error at line 2, column 5/)
   expect(await axe(container)).toHaveNoViolations()
   await user.type(editor, ' ')
   expect(screen.queryByText('Filter configuration error')).not.toBeInTheDocument()
@@ -168,7 +199,7 @@ it('retries request failures separately from configuration and evaluation errors
   await openFilterTest()
   await user.click(screen.getByRole('button', { name: TEST_LABEL }))
   expect(await screen.findByText('Filter test request failed')).toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'Retry' }))
+  await user.click(screen.getByRole('button', { name: TEST_LABEL }))
   expect(await screen.findByText('Match', { exact: true })).toBeInTheDocument()
 })
 
@@ -271,4 +302,57 @@ it('does not attach a stale compiler error to newer source', async () => {
   })
   expect(editor).toHaveAttribute('aria-invalid', 'false')
   expect(screen.queryByText('Filter configuration error')).not.toBeInTheDocument()
+})
+
+it('shows workflow Save/Verify findings beside the matching filter and hides them after correction', async () => {
+  const user = userEvent.setup()
+  const { container } = render(
+    <WorkflowValidationContext
+      value={{
+        nodeId: 'kafka',
+        errors: [
+          {
+            nodeId: 'another',
+            fieldPath: 'parameters.filter.expression',
+            message: 'Other trigger error',
+            filterExpression: 'input.',
+          },
+          {
+            nodeId: 'kafka',
+            fieldPath: 'parameters.filter.expression',
+            message: 'CEL filter: Syntax error at line 1, column 7.',
+            filterExpression: 'input.',
+          },
+        ],
+      }}
+    >
+      <Harness expression="input." />
+    </WorkflowValidationContext>
+  )
+  const editor = screen.getByRole('textbox', { name: EXPRESSION_LABEL })
+  expect(editor).toHaveAccessibleDescription(/CEL filter: Syntax error at line 1, column 7/)
+  expect(editor).toHaveAttribute('aria-invalid', 'true')
+  expect(screen.queryByText('Other trigger error')).not.toBeInTheDocument()
+  expect(await axe(container)).toHaveNoViolations()
+  await user.clear(editor)
+  await user.type(editor, 'true')
+  expect(editor).toHaveAttribute('aria-invalid', 'false')
+  expect(screen.queryByText('CEL filter: Syntax error at line 1, column 7.')).not.toBeInTheDocument()
+})
+
+it('keeps testing guidance in accessible help and retains the sample in the expanded JSON editor', async () => {
+  const user = userEvent.setup()
+  const { container } = renderFilter('true')
+  await openFilterTest()
+  expect(screen.queryByText(/Sample testing does not consume Kafka messages/)).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'More info for Test filter' }))
+  expect(await screen.findByText(/Sample testing does not consume Kafka messages/)).toBeVisible()
+  await user.keyboard('{Escape}')
+  await user.click(screen.getByRole('button', { name: 'Open in new window' }))
+  const expanded = screen.getByRole('textbox', { name: 'Sample JSON expanded' })
+  await user.clear(expanded)
+  await user.type(expanded, 'null')
+  await user.keyboard('{Escape}')
+  expect(screen.getByRole('textbox', { name: SAMPLE_LABEL })).toHaveValue('null')
+  expect(await axe(container)).toHaveNoViolations()
 })
