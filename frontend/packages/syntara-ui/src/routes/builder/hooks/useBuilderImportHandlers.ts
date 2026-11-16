@@ -18,12 +18,6 @@ export type UseBuilderImportHandlersParams = {
   showSuccess: (options: AlertMessage) => void
   showError: (options: AlertMessage) => void
   showInfo: (options: AlertMessage) => void
-  /**
-   * Refuse pasting an import onto the current canvas when it would introduce
-   * a step type the caller may not author. Returns the refusal message, or
-   * null to allow the import.
-   */
-  getImportRefusal?: (data: PendingImportData) => string | null
 }
 
 export function useBuilderImportHandlers(
@@ -41,19 +35,13 @@ export function useBuilderImportHandlers(
     showSuccess,
     showError,
     showInfo,
-    getImportRefusal,
   } = params
 
   const handleImportCurrent = useCallback(() => {
     if (!pendingImport) return
-    const refusal = getImportRefusal?.(pendingImport) ?? null
-    if (refusal) {
-      showError({ title: 'Cannot import into this workflow', description: refusal })
-      return
-    }
     applyImportToCanvas(pendingImport, dispatch, markDirty, showInfo)
     setPendingImport(null)
-  }, [pendingImport, dispatch, markDirty, showInfo, setPendingImport, showError, getImportRefusal])
+  }, [pendingImport, dispatch, markDirty, showInfo, setPendingImport])
 
   const handleImportNew = useCallback(() => {
     if (!pendingImport) return

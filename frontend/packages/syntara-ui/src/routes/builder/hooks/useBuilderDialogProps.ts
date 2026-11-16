@@ -27,8 +27,6 @@ export type BuilderDialogPropsParams = {
   createWorkflow: UseBuilderSaveWorkflowParams['createWorkflow']
   setLocation: (path: string) => void
   pinnedMockDataForDialog: Record<string, Record<string, unknown>> | undefined
-  /** Refuses pasting an import containing a blocked step type onto the canvas. */
-  getImportRefusal?: (data: PendingImportData) => string | null
 }
 
 export function useBuilderDialogProps(params: BuilderDialogPropsParams) {
@@ -51,7 +49,6 @@ export function useBuilderDialogProps(params: BuilderDialogPropsParams) {
     createWorkflow,
     setLocation,
     pinnedMockDataForDialog,
-    getImportRefusal,
   } = params
 
   const triggers = currentWorkflow?.triggers ?? []
@@ -87,7 +84,6 @@ export function useBuilderDialogProps(params: BuilderDialogPropsParams) {
       selectedProject: selectedProject?.id ? { id: selectedProject.id } : null,
       createWorkflow,
       setLocation,
-      getImportRefusal,
     },
     pinnedMockData: pinnedMockDataForDialog,
   }

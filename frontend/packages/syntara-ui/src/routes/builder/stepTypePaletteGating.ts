@@ -117,11 +117,3 @@ export function gatePaletteEntries<T extends GateablePaletteEntry>(
     }
   })
 }
-
-/**
- * Message shown when pasting or duplicating a blocked step type on the canvas
- * is refused. Same wording as the palette tooltip for the blocked kind.
- */
-export function stepTypeBlockedMessage(blockedBy: BlockedStepType): string {
-  return stepTypeBlockedTooltip(blockedBy)
-}
