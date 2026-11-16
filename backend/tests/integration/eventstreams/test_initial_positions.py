@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from unittest.mock import MagicMock
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import func, update
 from sqlalchemy.exc import DBAPIError, SQLAlchemyError
 from sqlmodel import col, select
 
@@ -28,6 +28,7 @@ from syntara.eventstreams.adapters.kafka_position_control import (
 )
 from syntara.eventstreams.adapters.kafka_position_store import KafkaInitialPositionStore
 from syntara.eventstreams.adapters.kafka_record_runner import KafkaRecordRunner
+from syntara.eventstreams.adapters.kafka_start_configuration import KafkaStartConfiguration
 from syntara.eventstreams.core.consumer import (
     CommittedPositionResult,
     IdentityObservation,
@@ -134,6 +135,96 @@ class Scenario:
         assert (await self.service.initialize(self.request())).status == PositionStatus.READY
         self.commits.clear()
         assert (await self.service.initialize(self.request())).status == PositionStatus.RECOVERY_GAP
+
+
+async def mark_source_established(context: DeliveryContext) -> None:
+    """Arrange missing history on an established source, rather than a brand-new source."""
+    async with context.session_factory() as session, session.begin():
+        await session.exec(
+            update(EventSubscriptionSource)
+            .where(col(EventSubscriptionSource.id) == context.snapshot.source_id)
+            .values(initialized_at=func.clock_timestamp())
+        )
+
+
+async def set_reading_settings(context: DeliveryContext, settings: dict[str, str]) -> None:
+    """Arrange persisted settings without broker I/O; publication has separate integration coverage."""
+    async with context.session_factory() as session, session.begin():
+        source = await session.get(EventSubscriptionSource, context.snapshot.source_id, with_for_update=True)
+        assert source is not None
+        source.configuration = source.configuration.model_copy(
+            update={"start": KafkaStartConfiguration.model_validate(settings)}
+        )
+
+
+@pytest.mark.parametrize("position", ["earliest", "latest"])
+@pytest.mark.parametrize("added_position", ["earliest", "latest"])
+async def test_persisted_reading_settings_control_first_and_added_partitions(
+    delivery_context: DeliveryContext, position: str, added_position: str
+) -> None:
+    await set_reading_settings(delivery_context, {"position": position, "added_partition_position": added_position})
+    scenario = Scenario(delivery_context)
+    first = await scenario.service.initialize(scenario.request())
+    assert first.next_offset == (0 if position == "earliest" else 100)
+    observation = scenario.client.observe_source_identity.return_value
+    scenario.client.observe_source_identity.return_value = observation.model_copy(
+        update={"partitions": PartitionSetObservation(status=PartitionSetStatus.VERIFIED, partition_ids=(0, 1, 2))}
+    )
+    scenario.client.assignment = frozenset({0, 1, 2})
+    scenario.beginnings[2], scenario.ends[2] = 10, 90
+
+    added = await scenario.service.initialize(scenario.request(2))
+
+    assert added.status == PositionStatus.READY
+    assert added.next_offset == (10 if added_position == "earliest" else 90)
+    saved = await scenario.store.read(scenario.request(2))
+    assert saved.configuration.initial_partition_ids == (0, 1)
+    assert saved.position is not None
+    assert saved.position.initialization_kind == InitializationKind.ADDED_PARTITION.value
+    assert saved.position.initial_commit_confirmed_at is not None
+    assert scenario.commits[0] == first.next_offset
+
+
+async def test_fresh_source_persists_existing_group_position_without_reset(delivery_context: DeliveryContext) -> None:
+    await set_reading_settings(delivery_context, {"position": "earliest"})
+    scenario = Scenario(delivery_context, commits={0: 75})
+
+    result = await scenario.service.initialize(scenario.request())
+
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == 75
+    saved = await scenario.store.read(scenario.request())
+    assert saved.position is not None
+    assert saved.position.initial_next_offset == 75
+    assert not saved.position.initial_metadata_missing
+    assert saved.position.initial_commit_confirmed_at is not None
+    scenario.client.commit.assert_not_awaited()
+
+
+@pytest.mark.parametrize("policy", ["fail", "earliest", "latest"])
+async def test_persisted_gap_policy_preserves_other_partition_progress(
+    delivery_context: DeliveryContext, policy: str
+) -> None:
+    scenario = Scenario(delivery_context)
+    for partition in (0, 1):
+        assert (await scenario.service.initialize(scenario.request(partition))).status == PositionStatus.READY
+    scenario.commits[1] = 115
+    scenario.commits.pop(0)
+    await set_reading_settings(delivery_context, {"offset_gap_policy": policy})
+    assert (await scenario.service.initialize(scenario.request())).status == PositionStatus.RECOVERY_GAP
+
+    result = await scenario.service.recover_automatically(scenario.request())
+
+    if policy == "fail":
+        assert result.status == PositionStatus.RECOVERY_GAP
+        assert 0 not in scenario.commits
+        saved = await scenario.store.read(scenario.request())
+        assert saved.position is not None
+        assert saved.position.recovery_token is None
+    else:
+        assert result.status == PositionStatus.READY
+        assert result.next_offset == (0 if policy == "earliest" else 100)
+    assert scenario.commits[1] == 115
 
 
 @pytest.mark.parametrize("missing_offset", [None, 101])
@@ -485,6 +576,7 @@ async def test_drain_interruption_does_not_move_selected_current_end(delivery_co
 async def test_missing_initial_metadata_persists_unknown_history_and_can_recover(
     delivery_context: DeliveryContext, policy: RecoveryPolicy
 ) -> None:
+    await mark_source_established(delivery_context)
     scenario = Scenario(delivery_context, commits={0: 75}, beginnings={0: 20})
     detected = await scenario.service.initialize(scenario.request())
     assert detected.status == PositionStatus.RECOVERY_GAP
@@ -521,6 +613,7 @@ async def test_missing_initial_metadata_persists_unknown_history_and_can_recover
 async def test_missing_metadata_storage_failure_returns_blocked_without_position_changes(
     delivery_context: DeliveryContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    await mark_source_established(delivery_context)
     scenario = Scenario(delivery_context, commits={0: 75})
     store = scenario.store
 

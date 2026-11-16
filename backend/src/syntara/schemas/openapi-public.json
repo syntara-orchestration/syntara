@@ -52971,6 +52971,45 @@
           }
         }
       },
+      "KafkaStartPosition": {
+        "type": "string",
+        "enum": [
+          "latest",
+          "earliest"
+        ],
+        "title": "KafkaStartPosition",
+        "description": "Positions available when a partition has no saved starting boundary."
+      },
+      "KafkaOffsetGapPolicy": {
+        "type": "string",
+        "enum": [
+          "fail",
+          "earliest",
+          "latest"
+        ],
+        "title": "KafkaOffsetGapPolicy",
+        "description": "Permitted responses to a missing or invalid established checkpoint."
+      },
+      "KafkaStartConfiguration": {
+        "properties": {
+          "position": {
+            "$ref": "#/components/schemas/KafkaStartPosition",
+            "default": "latest"
+          },
+          "added_partition_position": {
+            "$ref": "#/components/schemas/KafkaStartPosition",
+            "default": "earliest"
+          },
+          "offset_gap_policy": {
+            "$ref": "#/components/schemas/KafkaOffsetGapPolicy",
+            "default": "earliest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "KafkaStartConfiguration",
+        "description": "Reading defaults applied only when a new position decision is needed."
+      },
       "KafkaSubscribeParameters": {
         "properties": {
           "filter": {
@@ -53000,6 +53039,24 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "title": "Topic"
           },
+          "start": {
+            "$ref": "#/components/schemas/KafkaStartConfiguration"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "^[a-zA-Z0-9._-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id",
+            "default": null
+          },
           "input_schema": {
             "anyOf": [
               {
@@ -53021,7 +53078,7 @@
           "topic"
         ],
         "title": "KafkaSubscribeParameters",
-        "description": "One exact topic; consumer groups and connection settings are not inputs.\n\nTightens the transport-neutral ``topic`` with Kafka's naming constraints."
+        "description": "One exact topic and approved reading controls; no connection overrides."
       },
       "EventSubscriptionTestResponse": {
         "properties": {

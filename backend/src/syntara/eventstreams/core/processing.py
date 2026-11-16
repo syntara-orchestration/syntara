@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Literal, Protocol
 from pydantic import Field
 
 from syntara.eventstreams.core.deduplication import DeliveryIdentity, DeliveryValue
-from syntara.eventstreams.core.results import EventDecodeFailure
+from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCode
 from syntara.filtering.models.result import FilterErrorCode
 
 if TYPE_CHECKING:
@@ -67,12 +67,12 @@ class InspectedRecord(DeliveryValue):
 
 
 class SkippedRecord(DeliveryValue):
-    """Local CEL completion, never a durable delivery proof or cacheable outcome."""
+    """Local filter/content completion, never durable proof or a cacheable outcome."""
 
     identity: DeliveryIdentity
     configuration_revision: int
-    outcome: Literal["no_match", "evaluation_error"]
-    error_code: FilterErrorCode | None = None
+    outcome: Literal["no_match", "evaluation_error", "invalid_content"]
+    error_code: FilterErrorCode | EventFailureCode | None = None
 
 
 class PendingContentFailure(DeliveryValue):

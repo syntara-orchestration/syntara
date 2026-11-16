@@ -228,6 +228,29 @@ class TestStopAuditOutboxWorker:
 # ------------------------------------------------------------------ #
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fail_shutdown", [False, True])
+async def test_bounded_stop_resets_state_even_when_shutdown_fails(*, fail_shutdown: bool) -> None:
+    import syntara.audit.lifecycle as lifecycle_module
+
+    _reset_lifecycle_state()
+    worker = MagicMock()
+    worker.shutdown = AsyncMock(side_effect=OSError("audit unavailable") if fail_shutdown else None)
+    with patch("syntara.audit.lifecycle.get_outbox_worker", return_value=worker):
+        start_audit_outbox_worker()
+        if fail_shutdown:
+            with pytest.raises(OSError, match="audit unavailable"):
+                await stop_audit_outbox_worker(timeout_seconds=0.02)
+        else:
+            await stop_audit_outbox_worker(timeout_seconds=0.02)
+        worker.shutdown.assert_awaited_once_with(timeout_seconds=0.02)
+        worker.drain.assert_not_called()
+        assert lifecycle_module._state == AuditLifecycleState.STOPPED
+        start_audit_outbox_worker()
+        assert worker.start.call_count == 2
+    _reset_lifecycle_state()
+
+
 class TestRestartAuditOutboxWorker:
     """Test restarting the audit system after shutdown."""
 

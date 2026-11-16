@@ -111,10 +111,8 @@ def sync_detailed(
 
     Args:
         workflow_id (UUID):
-        body (KafkaSubscribeParameters): One exact topic; consumer groups and connection settings
-            are not inputs.
-
-            Tightens the transport-neutral ``topic`` with Kafka's naming constraints.
+        body (KafkaSubscribeParameters): One exact topic and approved reading controls; no
+            connection overrides.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -148,10 +146,8 @@ def sync(
 
     Args:
         workflow_id (UUID):
-        body (KafkaSubscribeParameters): One exact topic; consumer groups and connection settings
-            are not inputs.
-
-            Tightens the transport-neutral ``topic`` with Kafka's naming constraints.
+        body (KafkaSubscribeParameters): One exact topic and approved reading controls; no
+            connection overrides.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -180,10 +176,8 @@ async def asyncio_detailed(
 
     Args:
         workflow_id (UUID):
-        body (KafkaSubscribeParameters): One exact topic; consumer groups and connection settings
-            are not inputs.
-
-            Tightens the transport-neutral ``topic`` with Kafka's naming constraints.
+        body (KafkaSubscribeParameters): One exact topic and approved reading controls; no
+            connection overrides.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -215,10 +209,8 @@ async def asyncio(
 
     Args:
         workflow_id (UUID):
-        body (KafkaSubscribeParameters): One exact topic; consumer groups and connection settings
-            are not inputs.
-
-            Tightens the transport-neutral ``topic`` with Kafka's naming constraints.
+        body (KafkaSubscribeParameters): One exact topic and approved reading controls; no
+            connection overrides.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

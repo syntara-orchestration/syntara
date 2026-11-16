@@ -36,6 +36,7 @@ from syntara.eventstreams.adapters.kafka_position_store import (
     PositionContext,
 )
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
+from syntara.eventstreams.adapters.kafka_start_configuration import KafkaStartConfiguration
 from syntara.eventstreams.core.consumer import (
     CommittedPositionResult,
     IdentityObservation,
@@ -92,6 +93,8 @@ class Harness:
     held: bool = False
     initial_partition_ids: tuple[int, ...] | None = (0, 1)
     metadata_partition_ids: tuple[int, ...] = (0, 1)
+    start: KafkaStartConfiguration = field(default_factory=KafkaStartConfiguration)
+    source_initialized_at: datetime | None = NOW
     trace: list[str] = field(default_factory=list)
     client: MagicMock = field(default_factory=lambda: MagicMock(spec=KafkaPartitionConsumer))
     store: MagicMock = field(default_factory=lambda: MagicMock(spec=KafkaInitialPositionStore))
@@ -144,11 +147,15 @@ class Harness:
     async def read(self, _request: PositionRequest) -> PositionContext:
         return PositionContext(
             configuration=KafkaSourceConfiguration(
-                topic="orders", group_id="syntara.test", initial_partition_ids=self.initial_partition_ids
+                topic="orders",
+                group_id="syntara.test",
+                initial_partition_ids=self.initial_partition_ids,
+                start=self.start,
             ),
             position=self.position,
             active=True,
             recovery_held=self.held,
+            source_initialized_at=self.source_initialized_at,
         )
 
     async def read_commit(self, partitions: list[int], **_kwargs: object) -> dict[int, CommittedPositionResult]:
@@ -174,7 +181,7 @@ class Harness:
         if self.initial_partition_ids is None:
             self.initial_partition_ids = observation.partitions.partition_ids
         return KafkaSourceConfiguration(
-            topic="orders", group_id="syntara.test", initial_partition_ids=self.initial_partition_ids
+            topic="orders", group_id="syntara.test", initial_partition_ids=self.initial_partition_ids, start=self.start
         )
 
     async def choose(
@@ -184,8 +191,11 @@ class Harness:
         boundary: int,
         *,
         initialization_kind: InitializationKind,
+        existing_group_position: bool = False,
     ) -> KafkaPartitionInitialPosition:
         self.trace.append("save_initial")
+        if existing_group_position:
+            assert self.source_initialized_at is None
         self.position = row(confirmed=False, boundary=boundary)
         self.position.partition = value.partition
         self.position.initialization_kind = initialization_kind.value
@@ -303,6 +313,116 @@ async def test_initialization_persists_before_seek_and_confirms_before_permissio
     )
     assert h.trace[h.trace.index("commit") + 1] == "verify_commit"
     h.client.commit.assert_awaited_once_with({partition: 100}, expected_epoch=7)
+
+
+@pytest.mark.parametrize(("position", "boundary"), [("earliest", 20), ("latest", 100)])
+@pytest.mark.parametrize("added", [False, True])
+async def test_configured_initial_positions(position: str, boundary: int, *, added: bool) -> None:
+    settings = {"added_partition_position" if added else "position": position}
+    h = Harness(initial_partition_ids=(0,), start=KafkaStartConfiguration.model_validate(settings))
+
+    result = await h.service.initialize(request(1 if added else 0))
+
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == boundary
+    assert h.position is not None
+    assert h.position.initialization_kind == ("added_partition" if added else "first_activation")
+    assert h.position.initial_next_offset == boundary
+    assert h.position.initial_commit_confirmed_at is not None
+
+
+async def test_new_source_resumes_existing_group_without_overwriting_its_offset() -> None:
+    h = Harness(committed=75, initial_partition_ids=None, source_initialized_at=None)
+
+    result = await h.service.initialize(request())
+
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == 75
+    assert h.position is not None
+    assert h.position.initial_next_offset == 75
+    assert h.position.initial_commit_confirmed_at is not None
+    assert h.initial_partition_ids == (0, 1)
+    h.store.record_missing_initial.assert_not_awaited()
+    h.client.commit.assert_not_awaited()
+
+
+async def test_fail_policy_keeps_gap_unresolved_without_moving_position() -> None:
+    h = Harness(position=row(gap=True), start=KafkaStartConfiguration.model_validate({"offset_gap_policy": "fail"}))
+
+    result = await h.service.recover_automatically(request())
+
+    assert result.status == PositionStatus.RECOVERY_GAP
+    assert h.position is not None
+    assert h.position.recovery_token is None
+    h.store.begin_recovery.assert_not_awaited()
+    h.control.close_and_drain.assert_not_awaited()
+    h.client.seek.assert_not_awaited()
+    h.client.commit.assert_not_awaited()
+
+
+async def test_latest_gap_policy_commits_verified_visible_end() -> None:
+    h = Harness(position=row(gap=True), start=KafkaStartConfiguration.model_validate({"offset_gap_policy": "latest"}))
+
+    result = await h.service.recover_automatically(request())
+
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == 100
+    selected = h.store.begin_recovery.await_args.args[0]
+    assert isinstance(selected, AutomaticRecoveryRequest)
+    assert selected.policy == RecoveryPolicy.CURRENT_END
+    assert h.position is not None
+    assert h.position.recovery_policy == RecoveryPolicy.CURRENT_END.value
+    assert h.trace.index("hold_and_close") < h.trace.index("select_boundary") < h.trace.index("commit")
+    assert h.trace.index("commit") < h.trace.index("confirm_recovery")
+
+
+@pytest.mark.parametrize(("policy", "boundary"), [("earliest", 20), ("latest", 100)])
+async def test_pending_recovery_keeps_saved_policy_after_republish(policy: str, boundary: int) -> None:
+    h = Harness(position=row(gap=True), start=KafkaStartConfiguration.model_validate({"offset_gap_policy": policy}))
+    h.store.confirm_recovery.side_effect = SQLAlchemyError("unavailable")
+    assert (await h.service.recover_automatically(request())).status == PositionStatus.BLOCKED
+    assert h.position is not None
+    assert h.position.pending_boundary == boundary
+    h.start = KafkaStartConfiguration.model_validate({"offset_gap_policy": "fail"})
+    h.end = 150
+    h.store.confirm_recovery.side_effect = h.confirm_recovery
+
+    result = await h.service.recover_automatically(request())
+
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == boundary
+    assert h.client.commit.await_count == 1
+
+
+async def test_saved_initial_boundary_survives_changed_start_policy() -> None:
+    h = Harness(
+        position=row(confirmed=False, boundary=50),
+        start=KafkaStartConfiguration.model_validate({"position": "earliest"}),
+    )
+
+    result = await h.service.initialize(request())
+
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == 50
+    h.store.choose_initial.assert_not_awaited()
+
+
+async def test_expired_pending_latest_boundary_uses_saved_policy_after_republish() -> None:
+    h = Harness(position=row(gap=True), start=KafkaStartConfiguration.model_validate({"offset_gap_policy": "latest"}))
+    h.store.confirm_recovery.side_effect = SQLAlchemyError("unavailable")
+    assert (await h.service.recover_automatically(request())).status == PositionStatus.BLOCKED
+    assert h.position is not None
+    assert h.position.pending_boundary == 100
+    h.beginning, h.end = 120, 200
+    h.start = KafkaStartConfiguration.model_validate({"offset_gap_policy": "fail"})
+    h.store.confirm_recovery.side_effect = h.confirm_recovery
+
+    result = await h.service.recover_automatically(request())
+
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == 200
+    assert h.position.recovery_policy == RecoveryPolicy.CURRENT_END.value
+    assert h.store.replace_recovery.await_count == 1
 
 
 async def test_concurrent_initializer_uses_the_saved_winning_boundary() -> None:
