@@ -59,6 +59,7 @@ export type ResourceActionsResponse = AuthzAPI.components['schemas']['ResourceAc
 
 export type PermissionRow = {
   id: string
+  isBuiltin?: boolean
   principalType: RolePrincipalType
   principalId: string
   principalName: string

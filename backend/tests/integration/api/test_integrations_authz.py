@@ -10,8 +10,8 @@ Tests the permission matrix for the integrations resource:
 Users with the 'user' role see global-scoped integrations only (they have
 integration:read but not integration:read-all). Project-role users see global
 integrations plus project-scoped integrations assigned to their projects.
-Admins and auditors have unrestricted read access. Authenticated users with
-no roles are denied access (403).
+Admins and auditors have unrestricted read access. Users with only the implicit
+authenticated-group defaults are denied integration access (403).
 """
 
 from collections.abc import Awaitable, Callable
@@ -35,12 +35,12 @@ BASE_URL = "/api/v1/integrations"
 
 
 # ============================================================================
-# No role (authenticated only) — denied all access
+# No custom resource role (authenticated-group defaults only) — denied integration access
 # ============================================================================
 
 
 class TestNoRolePermissions:
-    """Authenticated user with no roles is denied all integration access."""
+    """Authenticated user with no custom resource role is denied integration access."""
 
     async def test_no_role_cannot_list(
         self,

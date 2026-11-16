@@ -234,7 +234,7 @@ class TestRoleBoundaries:
 
         # Filter to auditor-role-specific policies:
         # - scope=any (exclude project-scoped policies from authenticated group)
-        # - Exclude authenticated + user role policies (granted via authenticated group)
+        # - Exclude authenticated-group policies, including step-author
         non_auditor_policy_names = {
             "user:read:self",
             "user:update:self",
@@ -242,6 +242,7 @@ class TestRoleBoundaries:
             "user_identity:read:self",
             "user_identity:detach:self",
             "project:create:any",
+            "step_type:write:any",
             "user-directory:read:any",
             "group-directory:read:any",
         }
@@ -385,9 +386,10 @@ class TestGroupMembershipEdgeCases:
         assert resp.status_code == 200
         permissions = resp.json()["resources"]
 
-        # Should have only the authenticated role policies (not user role)
+        # Should have authenticated-group policies but not users-group policies
         policy_names = {p["policy_name"] for p in permissions}
         assert "user:read:self" in policy_names
+        assert "step_type:write:any" in policy_names
         assert "project:create:any" not in policy_names
 
     @pytest.mark.asyncio
@@ -410,7 +412,7 @@ class TestGroupMembershipEdgeCases:
 
         auth_as(user)
 
-        # workflow:create should be denied (only authenticated policies, no user role)
+        # workflow:create should be denied (the user has no users-group role)
         resp = await auth_client.post(
             "/api/v1/authz/can_i",
             json={"action": "create", "resource_type": "workflow"},

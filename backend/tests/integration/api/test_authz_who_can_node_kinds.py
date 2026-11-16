@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.engine import AuthzRequest, authorize
@@ -145,16 +146,18 @@ async def test_global_and_project_assignment_of_same_policy_are_distinct(
 
 
 @pytest.mark.asyncio
-async def test_who_can_excludes_explicit_and_implicit_denials_and_keeps_pagination(
+async def test_who_can_applies_default_allow_and_explicit_denial_with_pagination(
     admin_client: AsyncClient, test_db_session: AsyncSession, user_factory: Callable[..., Awaitable[User]]
 ) -> None:
     db = test_db_session
     allowed = await user_factory(username="step-allowed", email="step-allowed@example.com")
     denied = await user_factory(username="step-denied", email="step-denied@example.com")
-    implicit = await user_factory(username="step-no-allow", email="step-no-allow@example.com")
+    default_author = await user_factory(username="step-default-author", email="step-default-author@example.com")
     for user in (allowed, denied):
         await _assign_policy(db, user, f"allow-{user.username}", [_statement("allow")])
     await _assign_policy(db, denied, "deny-script", [_statement("deny", kind="script")])
+    enabled_users = await db.exec(select(User).where(User.is_enabled))
+    default_authors = {user.username for user in enabled_users.all()}
     for kind in ("script", "http_request"):
         usernames: list[str] = []
         cursor = None
@@ -172,12 +175,13 @@ async def test_who_can_excludes_explicit_and_implicit_denials_and_keeps_paginati
             assert response.status_code == 200, response.text
             data = response.json()
             usernames.extend(user["username"] for user in data["resources"])
-            assert data["total"] == (1 if kind == "script" else 2)
             cursor = data.get("next")
             if not cursor:
                 break
-        assert set(usernames) == ({allowed.username} if kind == "script" else {allowed.username, denied.username})
-        assert implicit.username not in usernames
+        expected = default_authors - ({denied.username} if kind == "script" else set())
+        assert data["total"] == len(expected)
+        assert set(usernames) == expected
+        assert default_author.username in usernames
 
 
 @pytest.mark.asyncio
@@ -199,7 +203,7 @@ async def test_who_can_keeps_existing_query_gate(
 
 
 @pytest.mark.asyncio
-async def test_missing_allow_is_reported_by_can_i(
+async def test_authenticated_default_step_allow_is_reported_by_can_i(
     auth_client: AsyncClient,
 ) -> None:
     response = await auth_client.post(
@@ -211,9 +215,9 @@ async def test_missing_allow_is_reported_by_can_i(
             "resource_project": "payments",
         },
     )
-    assert response.json()["allowed"] is False
+    assert response.json()["allowed"] is True
     assert response.json()["denied"] is False
-    assert response.json()["denied_by"] == ""
+    assert response.json()["matched_policy"] == "step_type:write:any"
 
 
 @pytest.mark.asyncio

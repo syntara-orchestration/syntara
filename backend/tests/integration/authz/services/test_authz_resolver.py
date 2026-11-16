@@ -14,6 +14,7 @@ from sqlalchemy import insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.authz.evaluator import evaluate_policy_input
 from syntara.authz.models.assignments import RoleAssignment
 from syntara.authz.models.policy import Policy
 from syntara.authz.models.project import Project
@@ -194,7 +195,7 @@ async def test_resolve_roles_to_policies_preserves_self_scope(seeded_db: AsyncSe
 
 @pytest.mark.asyncio
 async def test_resolve_builtin_role_preserves_self_scope(seeded_db: AsyncSession) -> None:
-    """Builtin roles with self-scoped policies preserve scope in project context."""
+    """Authenticated self-scoped policies stay separate from step authoring."""
     seen: set[str] = set()
     result: list[dict[str, object]] = []
     await _resolve_roles_to_policies(seeded_db, ["authenticated"], seen, result, project="my-project")
@@ -202,8 +203,14 @@ async def test_resolve_builtin_role_preserves_self_scope(seeded_db: AsyncSession
     assert len(result) >= 1
     self_stmts = [s for s in result if s.get("scope") == "self" and s.get("project") == "my-project"]
     assert len(self_stmts) >= 1
-    widened_stmts = [s for s in result if s.get("scope") == "project" and s.get("project") == "my-project"]
-    assert len(widened_stmts) == 0
+    assert not any(s.get("policy_name") == "step_type:write:any" for s in result)
+
+    author_seen: set[str] = set()
+    author_result: list[dict[str, object]] = []
+    await _resolve_roles_to_policies(seeded_db, ["step-author"], author_seen, author_result, project="my-project")
+    project_stmts = [s for s in author_result if s.get("scope") == "project"]
+    assert [s["policy_name"] for s in project_stmts] == ["step_type:write:any"]
+    assert project_stmts[0]["project"] == "my-project"
 
 
 @pytest.mark.asyncio
@@ -238,9 +245,49 @@ async def test_resolve_roles_to_policies_deduplication(seeded_db: AsyncSession) 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("scope", ["any", "project"])
+async def test_authenticated_step_baseline_and_scoped_deny(seeded_db: AsyncSession, scope: str) -> None:
+    """The authenticated group's step-author assignment grants steps; denies restrict it."""
+    user = User(username="plain-step-author", first_name="Step author")
+    project = Project(name="step-authoring-project")
+    seeded_db.add_all([user, project])
+    await seeded_db.commit()
+
+    async def evaluate(kind: str, project_name: str = project.name) -> dict[str, object]:
+        return evaluate_policy_input(
+            {
+                "user": {"id": str(user.id), "labels": {}},
+                "groups": [],
+                "action": "write",
+                "resource": {"type": "step_type", "project": project_name, "labels": {"kind": kind}},
+                "effective_policies": await resolve_effective_policies(seeded_db, user.id),
+            }
+        )
+
+    assert (await evaluate("script"))["allow"]
+    role = Role(
+        name="restrict-script",
+        policy_names=[f"step_type:write:{scope}:deny:script"],
+        scope="project" if scope == "project" else "system",
+        project_id=project.id if scope == "project" else None,
+    )
+    seeded_db.add(role)
+    seeded_db.add(RoleAssignment(principal_id=user.id, role_name=role.name, project_id=role.project_id))
+    await seeded_db.commit()
+
+    denied = await evaluate("script")
+    assert denied["deny"]
+    assert not denied["allow"]
+    assert (await evaluate("http_request"))["allow"]
+    outside = await evaluate("script", "other")
+    assert outside["deny"] is (scope == "any")
+    assert outside["allow"] is (scope == "project")
+
+
+@pytest.mark.asyncio
 async def test_resolve_effective_policies_global_group_roles(seeded_db: AsyncSession, test_user: User) -> None:
     """User gets policies from group role assignments (global scope)."""
-    # test_user is implicitly in authenticated group which has authenticated + user roles
+    # test_user is implicitly in authenticated, which also receives step-author.
     policies = await resolve_effective_policies(seeded_db, test_user.id)
     assert len(policies) > 0
     names = {p["name"] for p in policies}

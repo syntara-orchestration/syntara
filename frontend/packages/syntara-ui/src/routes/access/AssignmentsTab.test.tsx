@@ -198,6 +198,29 @@ describe('AssignmentsTab', () => {
     vi.mocked(accessFetchClient.GET).mockResolvedValue({ data: { resources: [] } } as never)
   })
 
+  it('protects the global built-in step-author assignment on authenticated', async () => {
+    setupAssignmentsQuery([
+      {
+        ...sampleAssignments[1],
+        id: 'builtin-step-author',
+        principal_name: 'authenticated',
+        role_name: 'step-author',
+        role_policies: ['step_type:write:any'],
+        project_id: null,
+        project_name: null,
+        is_builtin: true,
+      },
+    ])
+
+    const { container } = render(<AssignmentsTab />, { wrapper })
+
+    const row = screen.getByRole('row', { name: /authenticated.*step-author/ })
+    expect(within(row).getByText('System')).toBeInTheDocument()
+    expect(within(row).queryByRole('button', { name: 'Kebab toggle' })).not.toBeInTheDocument()
+    expect(mockDeleteMutate).not.toHaveBeenCalled()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
   describe('Empty State', () => {
     it('shows empty state when no rows and no active filters', () => {
       render(<AssignmentsTab />, { wrapper })

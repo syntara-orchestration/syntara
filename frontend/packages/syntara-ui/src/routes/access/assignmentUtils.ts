@@ -22,6 +22,7 @@ export function buildPermissionRow(a: RoleAssignmentRead): PermissionRow {
   const isProject = !!a.project_id
   return {
     id: a.id,
+    isBuiltin: a.is_builtin,
     principalType: derivePrincipalType(a),
     principalId: a.principal_id ?? a.group_id ?? '',
     principalName: a.principal_name,
