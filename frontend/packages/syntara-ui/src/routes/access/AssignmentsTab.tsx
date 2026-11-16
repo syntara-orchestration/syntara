@@ -11,6 +11,7 @@ import { IconLabel } from '../../components/IconLabel'
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynListPanelTable, SynListPanelToolbar, SynListPanelView } from '../../components/panels/list/SynListPanel'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
+import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useExpandableRowIds } from '../../hooks/useExpandableRowIds'
@@ -282,6 +283,7 @@ export function AssignmentsTab() {
     const onSuccess = () => {
       showSuccess({ title: 'Permission removed', description: `Removed ${row.assignmentName} from ${displayName}` })
       detachPromise(queryClient.invalidateQueries({ queryKey: ['role-assignments'] }))
+      invalidateAuthzCaches(queryClient)
       refetch()
     }
     const onError = (error: unknown) =>

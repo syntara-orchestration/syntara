@@ -12,6 +12,7 @@ import { NODE_KINDS_QUERY_PATH } from './useNodeKindsQuery'
 export function invalidateAuthzCaches(queryClient: QueryClient): void {
   detachPromise(queryClient.invalidateQueries({ queryKey: ['authz', 'can_i'] }))
   detachPromise(queryClient.invalidateQueries({ queryKey: ['all-permissions'] }))
-  // Step-type verdicts come from GET /node_kinds, keyed by project.
-  detachPromise(queryClient.invalidateQueries({ queryKey: [NODE_KINDS_QUERY_PATH] }))
+  // Step-type verdicts come from GET /node_kinds. openapi-react-query keys
+  // them as ['get', path, init], so the prefix must include the method.
+  detachPromise(queryClient.invalidateQueries({ queryKey: ['get', NODE_KINDS_QUERY_PATH] }))
 }

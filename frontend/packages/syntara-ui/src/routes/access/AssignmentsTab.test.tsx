@@ -83,6 +83,9 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   </QueryClientProvider>
 )
 
+const mockInvalidateAuthzCaches = vi.hoisted(() => vi.fn())
+vi.mock('../../hooks/invalidateAuthzCaches', () => ({ invalidateAuthzCaches: mockInvalidateAuthzCaches }))
+
 const mockRefetch = vi.fn().mockResolvedValue({})
 const mockDeleteMutate = vi.fn()
 
@@ -219,6 +222,25 @@ describe('AssignmentsTab', () => {
     expect(within(row).queryByRole('button', { name: 'Kebab toggle' })).not.toBeInTheDocument()
     expect(mockDeleteMutate).not.toHaveBeenCalled()
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('refreshes authz caches after deleting an assignment', async () => {
+    const user = userEvent.setup()
+    setupAssignmentsQuery(sampleAssignments)
+    render(<AssignmentsTab />, { wrapper })
+
+    const row = screen.getByRole('row', { name: /alice/ })
+    await user.click(within(row).getByRole('button', { name: 'Kebab toggle' }))
+    await user.click(await screen.findByRole('menuitem', { name: /Delete assignment/ }))
+    await user.click(await screen.findByRole('button', { name: 'Delete assignment' }))
+
+    expect(mockDeleteMutate).toHaveBeenCalledTimes(1)
+    const callbacks = mockDeleteMutate.mock.calls[0][1] as { onSuccess: () => void }
+    act(() => callbacks.onSuccess())
+
+    // Removing a role can revoke step-type grants: the add-step panel verdicts
+    // and can_i results must refetch, not wait for staleness.
+    expect(mockInvalidateAuthzCaches).toHaveBeenCalledTimes(1)
   })
 
   describe('Empty State', () => {
