@@ -5,7 +5,7 @@ API tests work with authorization always enabled, using the real rego policy
 instead of a Python reimplementation.
 """
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Generator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -215,8 +215,13 @@ async def test_project_id(test_db_session: AsyncSession) -> str:
 
 
 @pytest.fixture(autouse=True)
-def _mock_evaluator(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Replace the authz evaluator with one that uses regopy directly."""
+def _mock_evaluator(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    """Replace the authz evaluator with one that uses regopy directly.
+
+    The ``dependency_overrides`` entry is removed on teardown so the mock
+    cannot leak into later tests through route wiring that bypasses the
+    per-test setup.
+    """
     mock_evaluator = AsyncMock()
     mock_evaluator.evaluate = MagicMock(side_effect=_opa_evaluate_cli)
 
@@ -224,14 +229,14 @@ def _mock_evaluator(monkeypatch: pytest.MonkeyPatch) -> None:
         return mock_evaluator
 
     monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
     monkeypatch.setattr("syntara.authz.router.get_authz_evaluator", _mock_getter)
     monkeypatch.setattr("syntara.authz.role_assignment_router.get_authz_evaluator", _mock_getter)
     monkeypatch.setattr("syntara.workflows.executions_router.get_authz_evaluator", _mock_getter)
 
     # Also override via FastAPI dependency_overrides so Depends(...) resolves correctly.
     app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
-    app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
+    yield
+    app.dependency_overrides.pop(get_authz_evaluator, None)
 
 
 def mcp_payload(name: str | None = None, scope: str = "global") -> dict[str, object]:
