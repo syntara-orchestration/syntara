@@ -191,6 +191,7 @@ describe('useIntegrationActions', () => {
     it('patches only the name field and closes the dialog on success', () => {
       mockMutate.mockImplementation((_args: unknown, callbacks: MockMutationCallbacks) => {
         callbacks.onSuccess?.()
+        callbacks.onSettled?.()
       })
 
       const { result } = renderHook(() => useIntegrationActions(mockRefetch), { wrapper })
@@ -207,11 +208,13 @@ describe('useIntegrationActions', () => {
       )
       expect(mockRefetch).toHaveBeenCalled()
       expect(result.current.renameDialog.isOpen).toBe(false)
+      expect(result.current.isRenaming).toBe(false)
     })
 
     it('keeps the dialog open when rename fails', () => {
       mockMutate.mockImplementation((_args: unknown, callbacks: MockMutationCallbacks) => {
         callbacks.onError?.(new Error('duplicate name'))
+        callbacks.onSettled?.()
       })
 
       const { result } = renderHook(() => useIntegrationActions(mockRefetch), { wrapper })
@@ -220,6 +223,35 @@ describe('useIntegrationActions', () => {
       act(() => result.current.handleRename('taken-name'))
 
       expect(result.current.renameDialog.isOpen).toBe(true)
+      expect(result.current.isRenaming).toBe(false)
+    })
+
+    it('tracks rename pending state without coupling to enable/disable patches', () => {
+      let renameCallbacks: MockMutationCallbacks | undefined
+      mockMutate.mockImplementation((_args: unknown, callbacks: MockMutationCallbacks) => {
+        renameCallbacks = callbacks
+      })
+
+      const { result } = renderHook(() => useIntegrationActions(mockRefetch), { wrapper })
+
+      expect(result.current.isRenaming).toBe(false)
+
+      act(() => result.current.renameDialog.open(mockIntegration))
+      act(() => result.current.handleRename('renamed-integration'))
+      expect(result.current.isRenaming).toBe(true)
+
+      act(() => {
+        renameCallbacks?.onSuccess?.()
+        renameCallbacks?.onSettled?.()
+      })
+      expect(result.current.isRenaming).toBe(false)
+
+      mockMutate.mockImplementation((_args: unknown, callbacks: MockMutationCallbacks) => {
+        callbacks.onSuccess?.()
+        callbacks.onSettled?.()
+      })
+      act(() => result.current.handleToggleEnabled({ ...mockIntegration, enabled: false }))
+      expect(result.current.isRenaming).toBe(false)
     })
   })
 })

@@ -12,12 +12,13 @@ import {
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { Navigate, useNavigate, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef } from 'react'
 import { useWatch, type UseFormSetValue } from 'react-hook-form'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsIntegrationEdit } from '../../../app/breadcrumbBuilders'
+import type { AppBreadcrumbItem } from '../../../app/breadcrumbs/appBreadcrumbItem'
 import { integrationsClient } from '../../../client'
 import { SynDetail } from '../../../components/details/SynDetail'
 import { SynForm } from '../../../components/forms/SynForm'
@@ -39,7 +40,7 @@ import { CredentialSelector } from '../../builder/components/CredentialSelector'
 
 import styles from './EditIntegrationForm.module.css'
 import type { EditIntegrationFormValues, IntegrationRead } from './editIntegrationFormSchema'
-import { buildConfiguration, buildEditSchema, editIntegrationSchema } from './editIntegrationFormSchema'
+import { buildConfiguration, buildEditSchema } from './editIntegrationFormSchema'
 import { EditSecurityFields } from './EditSecurityFields'
 import { ScopeFields } from './form/ScopeFields'
 import { integrationHelp } from './integrationFieldHelp'
@@ -51,7 +52,7 @@ import {
   PROVIDERS_HIDING_BASE_URL,
   PROVIDERS_REQUIRING_BASE_URL,
 } from './integrationFilters'
-import { getProviderHint, isLLMProvider } from './integrationUtils'
+import { canEditIntegrationFully, getProviderHint, isLLMProvider } from './integrationUtils'
 import { useEditTestConnection } from './useEditTestConnection'
 import { useProjectAssignmentSync } from './useProjectAssignmentSync'
 
@@ -214,23 +215,30 @@ function EditFormFooter({ isSaving, onCancel }: Readonly<{ isSaving: boolean; on
   )
 }
 
-export function EditIntegrationForm() {
-  const { integrationId }: { integrationId: string } = useParams({ strict: false })
+type EditIntegrationFormContentProps = Readonly<{
+  integration: IntegrationRead
+  integrationId: string
+  detailPath: string
+  breadcrumbs: AppBreadcrumbItem[]
+  docLink: ReturnType<typeof useDocLink>
+}>
+
+function EditIntegrationFormContent({
+  integration,
+  integrationId,
+  detailPath,
+  breadcrumbs,
+  docLink,
+}: EditIntegrationFormContentProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showAlert } = useAlerts()
-  const docLink = useDocLink('integrations')
-
-  const query = integrationsClient.useQuery('get', '/integrations/{integration_id}', {
-    params: { path: { integration_id: integrationId ?? '' } },
-  })
-  const integration = query.data
 
   const assignmentsQuery = integrationsClient.useQuery(
     'get',
     '/integrations/{integration_id}/projects',
-    { params: { path: { integration_id: integrationId ?? '' } } },
-    { enabled: integration?.scope === 'project' }
+    { params: { path: { integration_id: integrationId } } },
+    { enabled: integration.scope === 'project' }
   )
   const initialProjectIds = useMemo(
     () => assignmentsQuery.data?.resources?.map((a) => a.project_id) ?? [],
@@ -240,12 +248,7 @@ export function EditIntegrationForm() {
 
   const { syncAssignments } = useProjectAssignmentSync()
 
-  const detailPath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId ?? '')
-  const breadcrumbs = breadcrumbsIntegrationEdit(integration?.name ?? 'Integration', detailPath)
-  const isOpenShift = integration?.integration_type === IntegrationTypeEnum.OPENSHIFT
-
   const schema = useMemo(() => {
-    if (!integration) return editIntegrationSchema
     const requiresBaseUrl = isLLMProvider(integration)
       ? PROVIDERS_REQUIRING_BASE_URL.has(getProviderHint(integration))
       : true
@@ -253,17 +256,11 @@ export function EditIntegrationForm() {
   }, [integration])
 
   useEffect(() => {
-    if (!isOpenShift) return
-    detachPromise(navigate({ to: detailPath, replace: true }))
-  }, [isOpenShift, detailPath, navigate])
-
-  useEffect(() => {
-    const projectIds = integration?.scope === 'project' ? initialProjectIds : []
+    const projectIds = integration.scope === 'project' ? initialProjectIds : []
     initialProjectIdsRef.current = projectIds
   }, [integration, initialProjectIds])
 
-  const formValues = useMemo<EditIntegrationFormValues | undefined>(() => {
-    if (!integration) return undefined
+  const formValues = useMemo<EditIntegrationFormValues>(() => {
     const config = integration.configuration
     const projectIds = integration.scope === 'project' ? initialProjectIds : []
     return {
@@ -325,8 +322,6 @@ export function EditIntegrationForm() {
   const { handleTestConnection, isTesting } = useEditTestConnection(integration, getValues)
 
   function onSubmit(values: EditIntegrationFormValues) {
-    if (!integrationId || !integration) return
-
     const integrationType = integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER
 
     const body: IntegrationsAPI.components['schemas']['IntegrationUpdate'] = {
@@ -375,25 +370,8 @@ export function EditIntegrationForm() {
       })()
     )
   }
-  const queryState = useQueryState(query, {
-    title: 'Error loading integration',
-    onRetry: () => detachPromise(query.refetch()),
-  })
-  if (!integrationId || queryState) {
-    return (
-      <SynPage>
-        <SynPageTitle segments={['Edit integration', 'Integrations']} />
-        <SynPageHeader title="Edit integration" breadcrumbs={breadcrumbs} docLink={docLink} />
-        <SynPageBody>
-          <SynPanel isFullHeight>
-            {queryState ?? <SynErrorState message="Missing integration ID" title="Error" />}
-          </SynPanel>
-        </SynPageBody>
-      </SynPage>
-    )
-  }
 
-  if (!integration || isOpenShift || (integration.scope === 'project' && assignmentsQuery.isPending)) return null
+  if (integration.scope === 'project' && assignmentsQuery.isPending) return null
 
   return (
     <SynPage>
@@ -428,5 +406,54 @@ export function EditIntegrationForm() {
         </SynPanel>
       </SynPageBody>
     </SynPage>
+  )
+}
+
+export function EditIntegrationForm() {
+  const { integrationId }: { integrationId: string } = useParams({ strict: false })
+  const docLink = useDocLink('integrations')
+
+  const query = integrationsClient.useQuery('get', '/integrations/{integration_id}', {
+    params: { path: { integration_id: integrationId ?? '' } },
+  })
+  const integration = query.data
+
+  const detailPath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId ?? '')
+  const breadcrumbs = breadcrumbsIntegrationEdit(integration?.name ?? 'Integration', detailPath)
+
+  const queryState = useQueryState(query, {
+    title: 'Error loading integration',
+    onRetry: () => detachPromise(query.refetch()),
+  })
+
+  if (!integrationId || queryState) {
+    return (
+      <SynPage>
+        <SynPageTitle segments={['Edit integration', 'Integrations']} />
+        <SynPageHeader title="Edit integration" breadcrumbs={breadcrumbs} docLink={docLink} />
+        <SynPageBody>
+          <SynPanel isFullHeight>
+            {queryState ?? <SynErrorState message="Missing integration ID" title="Error" />}
+          </SynPanel>
+        </SynPageBody>
+      </SynPage>
+    )
+  }
+
+  if (!integration?.id) return null
+
+  // OpenShift is name-only via the detail page modal — never mount the full edit form.
+  if (!canEditIntegrationFully(integration)) {
+    return <Navigate to={detailPath} replace />
+  }
+
+  return (
+    <EditIntegrationFormContent
+      integration={integration}
+      integrationId={integrationId}
+      detailPath={detailPath}
+      breadcrumbs={breadcrumbs}
+      docLink={docLink}
+    />
   )
 }

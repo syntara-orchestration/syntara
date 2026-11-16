@@ -61,7 +61,7 @@ export function EditIntegrationNameModal({
     onSave(data.name)
   }
 
-  const canSave = isDirty && nameValue.trim().length > 0 && !isSaving
+  const canSave = isDirty && editIntegrationNameSchema.safeParse({ name: nameValue ?? '' }).success && !isSaving
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} variant="small">

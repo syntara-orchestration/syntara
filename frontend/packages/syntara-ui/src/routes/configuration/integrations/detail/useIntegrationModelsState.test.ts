@@ -10,13 +10,13 @@ const mockModels = [
 
 const mockRegisterDirtyCheck = vi.fn(() => vi.fn())
 
-vi.mock('../../../app/useUnsavedChanges', () => ({
+vi.mock('../../../../app/useUnsavedChanges', () => ({
   useUnsavedChanges: () => ({ registerDirtyCheck: mockRegisterDirtyCheck }),
 }))
 
 const mockRefetch = vi.fn()
 
-vi.mock('./useAllIntegrationModels', () => ({
+vi.mock('../useAllIntegrationModels', () => ({
   useAllIntegrationModels: vi.fn(() => ({
     models: mockModels,
     isLoading: false,
@@ -66,7 +66,7 @@ vi.mock('./useModelSave', () => ({
   })),
 }))
 
-vi.mock('../../../utils/detachPromise', () => ({
+vi.mock('../../../../utils/detachPromise', () => ({
   detachPromise: (p: Promise<unknown>) => p,
 }))
 

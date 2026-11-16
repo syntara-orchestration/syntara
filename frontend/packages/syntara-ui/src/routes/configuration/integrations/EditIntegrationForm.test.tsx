@@ -48,11 +48,19 @@ const mockNavigate = vi.fn()
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router')
   const { MockLink } = await import('../../../test/setup')
+  const { useLayoutEffect } = await import('react')
   return {
     ...actual,
     Link: MockLink,
     useNavigate: () => mockNavigate,
     useParams: vi.fn(() => ({ integrationId: 'int-1' })),
+    // Tests have no RouterProvider; drive navigation through the same mock as useNavigate.
+    Navigate: ({ to, replace }: { to: string; replace?: boolean }) => {
+      useLayoutEffect(() => {
+        mockNavigate({ to, replace })
+      }, [to, replace])
+      return null
+    },
   }
 })
 

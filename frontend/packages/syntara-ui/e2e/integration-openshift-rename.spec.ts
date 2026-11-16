@@ -1,61 +1,18 @@
 /**
  * Execution plane (OpenShift) rename via Edit name modal, plus delete-then-recreate.
- * Relies on the mock API sole OpenShift seed (`prod-openshift-west`).
+ * Relies on the mock API sole OpenShift seed (see OPENSHIFT_SEED_NAME).
  */
 import { test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName } from './helpers/workflows'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
+import { findOpenShiftSeed, OPENSHIFT_SEED_NAME, restoreOpenShiftSeed } from './seeds/openshift'
 import { createCredentialForIntegrationType, deleteIntegrationViaApi, type SeededCredential } from './seeds/resources'
 import { apiRequest, deleteCredentialViaApi, getAuthToken } from './utils/api'
 
 const isRealBackend = isSkipWebServerForPlaywrightTests()
 
-const OPENSHIFT_SEED_ID = 'b1000000-0000-4000-8000-000000000001'
-const OPENSHIFT_SEED_NAME = 'prod-openshift-west'
-const OPENSHIFT_SEED_URL = 'https://api.west.openshift.example.com:6443'
 const WIZARD_URL = '/configuration/integrations/configure'
 const INTEGRATIONS_LIST_URL = '/configuration/integrations'
-
-async function listOpenShiftIntegrations(
-  app: Parameters<typeof getAuthToken>[0],
-  token: string
-): Promise<Array<{ id: string; name: string }>> {
-  const listResp = await apiRequest(app, 'get', '/integrations?integration_type=openshift&limit=10', { token })
-  if (!listResp.ok()) return []
-  const list = (await listResp.json()) as { resources?: Array<{ id: string; name: string }> }
-  return list.resources ?? []
-}
-
-async function restoreOpenShiftSeed(app: Parameters<typeof getAuthToken>[0]): Promise<void> {
-  const token = await getAuthToken(app)
-  if (!token) return
-
-  for (const resource of await listOpenShiftIntegrations(app, token)) {
-    if (resource.name !== OPENSHIFT_SEED_NAME) {
-      await deleteIntegrationViaApi(app, resource.id)
-    }
-  }
-
-  const remaining = await listOpenShiftIntegrations(app, token)
-  if (remaining.some((resource) => resource.name === OPENSHIFT_SEED_NAME)) return
-
-  await apiRequest(app, 'post', '/integrations', {
-    token,
-    data: {
-      name: OPENSHIFT_SEED_NAME,
-      integration_type: 'openshift',
-      configuration: {
-        integration_type: 'openshift',
-        base_url: OPENSHIFT_SEED_URL,
-        allow_http: false,
-        insecure_skip_tls_verify: false,
-        ca_certificate: null,
-      },
-      scope: 'global',
-      management_credential_id: 'cred-001',
-    },
-  })
-}
 
 test.describe('Execution plane integration rename', () => {
   // Shared sole OpenShift seed — must not run in parallel.
@@ -64,9 +21,12 @@ test.describe('Execution plane integration rename', () => {
 
   test('renames via Edit name modal and PATCHes only the name', async ({ app }) => {
     const updatedName = buildUniqueName('e2e-openshift-renamed')
+    const seed = await findOpenShiftSeed(app)
+    expect(seed, 'mock OpenShift seed should exist').toBeTruthy()
+    const seedId = seed!.id
 
     try {
-      await app.goto(toAppUrl(`${INTEGRATIONS_LIST_URL}/${OPENSHIFT_SEED_ID}`))
+      await app.goto(toAppUrl(`${INTEGRATIONS_LIST_URL}/${seedId}`))
       await expect(app.getByRole('heading', { name: OPENSHIFT_SEED_NAME })).toBeVisible({ timeout: 15_000 })
 
       await expect(app.getByRole('button', { name: 'Edit name' })).toBeVisible()
@@ -84,7 +44,7 @@ test.describe('Execution plane integration rename', () => {
       await expect(dialog.getByRole('button', { name: 'Save name' })).toBeDisabled()
 
       const patchPromise = app.waitForRequest(
-        (req) => req.method() === 'PATCH' && req.url().includes(`/integrations/${OPENSHIFT_SEED_ID}`)
+        (req) => req.method() === 'PATCH' && req.url().includes(`/integrations/${seedId}`)
       )
 
       await nameInput.clear()
@@ -97,10 +57,10 @@ test.describe('Execution plane integration rename', () => {
       await expect(app.getByText('Integration name updated')).toBeVisible({ timeout: 10_000 })
       await expect(app.getByRole('heading', { name: updatedName })).toBeVisible({ timeout: 10_000 })
     } finally {
-      const token = await getAuthToken(app)
-      if (token) {
-        await apiRequest(app, 'patch', `/integrations/${OPENSHIFT_SEED_ID}`, {
-          token,
+      const auth = await getAuthToken(app)
+      if (auth) {
+        await apiRequest(app, 'patch', `/integrations/${seedId}`, {
+          token: auth,
           data: { name: OPENSHIFT_SEED_NAME },
         })
       }
@@ -114,7 +74,10 @@ test.describe('Execution plane integration rename', () => {
     let createdIntegrationId: string | null = null
 
     try {
-      await app.goto(toAppUrl(`${INTEGRATIONS_LIST_URL}/${OPENSHIFT_SEED_ID}`))
+      const seed = await findOpenShiftSeed(app)
+      expect(seed, 'mock OpenShift seed should exist').toBeTruthy()
+
+      await app.goto(toAppUrl(`${INTEGRATIONS_LIST_URL}/${seed!.id}`))
       await expect(app.getByRole('heading', { name: OPENSHIFT_SEED_NAME })).toBeVisible({ timeout: 15_000 })
 
       await app.getByRole('button', { name: 'Integration actions' }).click()

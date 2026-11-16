@@ -1,8 +1,8 @@
 import type { Tool, IntegrationsAPI } from '@syntara/contracts'
 import { useQuery } from '@tanstack/react-query'
 
-import { integrationsFetchClient } from '../../../client'
-import { fetchAllPages, MAX_PAGE_SIZE } from '../../../utils/fetchAllPages'
+import { integrationsFetchClient } from '../../../../client'
+import { fetchAllPages, MAX_PAGE_SIZE } from '../../../../utils/fetchAllPages'
 
 type ToolWithParameters = IntegrationsAPI.components['schemas']['ToolWithParameters']
 

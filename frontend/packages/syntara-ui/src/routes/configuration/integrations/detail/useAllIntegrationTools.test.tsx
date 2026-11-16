@@ -3,11 +3,11 @@ import { renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { integrationsFetchClient } from '../../../client'
+import { integrationsFetchClient } from '../../../../client'
 
 import { useAllIntegrationTools } from './useAllIntegrationTools'
 
-vi.mock('../../../client', () => ({
+vi.mock('../../../../client', () => ({
   integrationsFetchClient: {
     GET: vi.fn(),
     use: vi.fn(),

@@ -5,12 +5,12 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { credentialsClient, integrationsClient } from '../../../client'
-import { AlertProvider } from '../../../providers/alerts'
+import { credentialsClient, integrationsClient } from '../../../../client'
+import { AlertProvider } from '../../../../providers/alerts'
 
 import { IntegrationDetail } from './IntegrationDetail'
 
-vi.mock('../../../client', () => ({
+vi.mock('../../../../client', () => ({
   integrationsClient: {
     useQuery: vi.fn(),
     useMutation: vi.fn(),
@@ -89,11 +89,11 @@ vi.mock('./IntegrationResourcesTab', () => ({
   IntegrationResourcesTab: () => <div data-testid="resources-tab-content">Resources tab content</div>,
 }))
 
-vi.mock('../../../hooks/useUrlTab', () => ({
+vi.mock('../../../../hooks/useUrlTab', () => ({
   useUrlTab: (): [string, (tab: string) => void] => ['details', vi.fn()],
 }))
 
-vi.mock('../../../app/useUnsavedChanges', () => ({
+vi.mock('../../../../app/useUnsavedChanges', () => ({
   useUnsavedChanges: () => ({
     requestNavigation: vi.fn(),
     registerSaveHandler: vi.fn(),
@@ -102,7 +102,7 @@ vi.mock('../../../app/useUnsavedChanges', () => ({
   }),
 }))
 
-vi.mock('./useIntegrationPermissions', () => ({
+vi.mock('../useIntegrationPermissions', () => ({
   useIntegrationPermissions: () => ({
     canCreate: true,
     canUpdate: true,

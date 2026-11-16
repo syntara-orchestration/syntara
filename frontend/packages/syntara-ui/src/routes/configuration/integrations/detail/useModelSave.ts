@@ -2,9 +2,9 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useRef, useState } from 'react'
 
-import { integrationsClient } from '../../../client'
-import { useAlerts } from '../../../providers/alerts'
-import { getErrorMessage } from '../../../utils/apiErrors'
+import { integrationsClient } from '../../../../client'
+import { useAlerts } from '../../../../providers/alerts'
+import { getErrorMessage } from '../../../../utils/apiErrors'
 
 type LLMModelRead = IntegrationsAPI.components['schemas']['LLMModelRead']
 type BulkUpdateResponse = IntegrationsAPI.components['schemas']['LLMModelBulkUpdateResponse']

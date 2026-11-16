@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react'
 
-import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
-import { detachPromise } from '../../../utils/detachPromise'
+import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
+import { detachPromise } from '../../../../utils/detachPromise'
+import { useAllIntegrationModels } from '../useAllIntegrationModels'
 
-import { useAllIntegrationModels } from './useAllIntegrationModels'
 import { useItemSelection } from './useItemSelection'
 import { useModelDefaultTracking } from './useModelDefaultTracking'
 import { useModelSave } from './useModelSave'

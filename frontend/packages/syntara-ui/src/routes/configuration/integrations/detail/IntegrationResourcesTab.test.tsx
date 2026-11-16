@@ -6,12 +6,12 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { integrationsClient } from '../../../client'
-import { AlertProvider } from '../../../providers/alerts'
+import { integrationsClient } from '../../../../client'
+import { AlertProvider } from '../../../../providers/alerts'
 
 import { IntegrationResourcesTab } from './IntegrationResourcesTab'
 
-vi.mock('../../../client', () => ({
+vi.mock('../../../../client', () => ({
   integrationsClient: {
     useMutation: vi.fn(),
   },

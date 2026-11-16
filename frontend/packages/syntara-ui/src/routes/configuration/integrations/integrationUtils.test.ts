@@ -2,12 +2,14 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import {
+  canEditIntegrationFully,
   getBaseUrl,
   getEnabledResourceCount,
   getProviderHint,
   getResourceNoun,
   getTotalResourceCount,
   isLLMProvider,
+  isOpenShiftIntegration,
 } from './integrationUtils'
 
 type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
@@ -56,6 +58,29 @@ describe('integrationUtils', () => {
 
     it('returns false for ansible_automation_platform integration', () => {
       expect(isLLMProvider(buildIntegration({ integration_type: 'ansible_automation_platform' }))).toBe(false)
+    })
+  })
+
+  describe('isOpenShiftIntegration / canEditIntegrationFully', () => {
+    it('identifies OpenShift as name-only edit', () => {
+      const openshift = buildIntegration({
+        integration_type: 'openshift',
+        configuration: {
+          integration_type: 'openshift',
+          base_url: 'https://api.openshift.example.com:6443',
+          allow_http: false,
+          insecure_skip_tls_verify: false,
+          ca_certificate: null,
+        },
+      })
+      expect(isOpenShiftIntegration(openshift)).toBe(true)
+      expect(canEditIntegrationFully(openshift)).toBe(false)
+    })
+
+    it('allows full edit for non-OpenShift integrations', () => {
+      expect(isOpenShiftIntegration(buildIntegration())).toBe(false)
+      expect(canEditIntegrationFully(buildIntegration())).toBe(true)
+      expect(canEditIntegrationFully(buildLLMIntegration())).toBe(true)
     })
   })
 

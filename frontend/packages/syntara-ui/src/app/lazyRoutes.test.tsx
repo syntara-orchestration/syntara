@@ -15,7 +15,7 @@ vi.mock('../routes/configuration/integrations/form/IntegrationForm', () => ({
   IntegrationForm: () => <div>IntegrationForm</div>,
 }))
 vi.mock('../routes/configuration/integrations/Integrations', () => ({ default: () => <div>Integrations</div> }))
-vi.mock('../routes/configuration/integrations/IntegrationDetail', () => ({
+vi.mock('../routes/configuration/integrations/detail/IntegrationDetail', () => ({
   IntegrationDetail: () => <div>IntegrationDetail</div>,
 }))
 vi.mock('../routes/configuration/integrations/EditIntegrationForm', () => ({

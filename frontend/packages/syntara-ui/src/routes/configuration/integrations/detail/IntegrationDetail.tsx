@@ -1,15 +1,17 @@
 import { useParams } from '@tanstack/react-router'
 
-import { AppRoute } from '../../../app/AppRoute'
-import { integrationsClient } from '../../../client'
-import { SynErrorState } from '../../../components/states/SynErrorState'
-import { useQueryState } from '../../../components/states/useQueryState'
-import { useUrlTab } from '../../../hooks/useUrlTab'
-import { detachPromise } from '../../../utils/detachPromise'
+import { AppRoute } from '../../../../app/AppRoute'
+import { integrationsClient } from '../../../../client'
+import { SynErrorState } from '../../../../components/states/SynErrorState'
+import { useQueryState } from '../../../../components/states/useQueryState'
+import { useUrlTab } from '../../../../hooks/useUrlTab'
+import { detachPromise } from '../../../../utils/detachPromise'
 
-import { IntegrationDetailContent, IntegrationDetailEarlyShell } from './IntegrationDetailContent'
-
-type IntegrationDetailTab = 'details' | 'resources' | 'edit'
+import {
+  IntegrationDetailContent,
+  IntegrationDetailEarlyShell,
+  type IntegrationDetailTab,
+} from './IntegrationDetailContent'
 
 export function IntegrationDetail() {
   const { integrationId }: { integrationId: string } = useParams({ strict: false })

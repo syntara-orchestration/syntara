@@ -1,6 +1,6 @@
 import type { IntegrationsAPI, Tool } from '@syntara/contracts'
 
-import { SynPanelContentStack } from '../../../components/layout/SynPanelContentStack'
+import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
 
 import styles from './IntegrationDetail.module.css'
 import { IntegrationModelsTab } from './IntegrationModelsTab'

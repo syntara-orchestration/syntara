@@ -7,13 +7,13 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { credentialsClient, integrationsClient } from '../../../client'
-import { AlertProvider } from '../../../providers/alerts'
-import { formatDateTime } from '../../../utils/dateUtils'
+import { credentialsClient, integrationsClient } from '../../../../client'
+import { AlertProvider } from '../../../../providers/alerts'
+import { formatDateTime } from '../../../../utils/dateUtils'
 
 import { IntegrationDetail } from './IntegrationDetail'
 
-vi.mock('../../../client', () => ({
+vi.mock('../../../../client', () => ({
   integrationsClient: {
     useQuery: vi.fn(),
     useMutation: vi.fn(),
@@ -85,7 +85,7 @@ vi.mock('./IntegrationResourcesTab', () => ({
 
 let mockActiveTab = 'details'
 
-vi.mock('../../../hooks/useUrlTab', () => ({
+vi.mock('../../../../hooks/useUrlTab', () => ({
   useUrlTab: (): [string, (tab: string) => void] => [mockActiveTab, vi.fn()],
 }))
 
@@ -93,7 +93,7 @@ const mockRegisterDirtyCheck: ReturnType<typeof vi.fn<(opts: Record<string, unkn
   () => () => {}
 )
 
-vi.mock('../../../app/useUnsavedChanges', () => ({
+vi.mock('../../../../app/useUnsavedChanges', () => ({
   useUnsavedChanges: () => ({
     requestNavigation: vi.fn(),
     registerSaveHandler: vi.fn(),
@@ -116,7 +116,7 @@ const mockPermissions = {
   },
 }
 
-vi.mock('./useIntegrationPermissions', () => ({
+vi.mock('../useIntegrationPermissions', () => ({
   useIntegrationPermissions: () => mockPermissions,
 }))
 

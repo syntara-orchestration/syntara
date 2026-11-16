@@ -1,6 +1,7 @@
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { integrationsClient } from '../../../client'
@@ -17,6 +18,7 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { showAlert } = useAlerts()
+  const [isRenaming, setIsRenaming] = useState(false)
 
   const validateDialog = useDialogState<IntegrationRead>()
   const deleteDialog = useDialogState<IntegrationRead>()
@@ -28,10 +30,7 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
     '/integrations/{integration_id}/validate'
   )
   const { mutate: deleteIntegration } = integrationsClient.useMutation('delete', '/integrations/{integration_id}')
-  const { mutate: patchIntegration, isPending: isPatching } = integrationsClient.useMutation(
-    'patch',
-    '/integrations/{integration_id}'
-  )
+  const { mutate: patchIntegration } = integrationsClient.useMutation('patch', '/integrations/{integration_id}')
 
   function handleValidate() {
     const item = validateDialog.item
@@ -151,6 +150,7 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
     const item = renameDialog.item
     if (!item?.id) return
 
+    setIsRenaming(true)
     patchIntegration(
       {
         params: { path: { integration_id: item.id } },
@@ -175,6 +175,7 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
             autoDismiss: true,
           })
         },
+        onSettled: () => setIsRenaming(false),
       }
     )
   }
@@ -184,7 +185,7 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
     deleteDialog,
     disableDialog,
     renameDialog,
-    isRenaming: isPatching,
+    isRenaming,
     handleValidate,
     handleDelete,
     handleToggleEnabled,

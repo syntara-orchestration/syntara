@@ -10,7 +10,9 @@ export const IntegrationForm = lazy(() =>
 )
 export const Integrations = lazy(() => import('../routes/configuration/integrations/Integrations'))
 export const IntegrationDetail = lazy(() =>
-  import('../routes/configuration/integrations/IntegrationDetail').then((m) => ({ default: m.IntegrationDetail }))
+  import('../routes/configuration/integrations/detail/IntegrationDetail').then((m) => ({
+    default: m.IntegrationDetail,
+  }))
 )
 export const EditIntegration = lazy(() =>
   import('../routes/configuration/integrations/EditIntegrationForm').then((m) => ({ default: m.EditIntegrationForm }))

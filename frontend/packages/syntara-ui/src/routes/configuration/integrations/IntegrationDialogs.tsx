@@ -3,6 +3,7 @@ import { IntegrationTypeEnum } from '@syntara/contracts'
 
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 
+import { EditIntegrationNameModal } from './EditIntegrationNameModal'
 import { getResourceNoun, getTotalResourceCount, isLLMProvider } from './integrationUtils'
 import type { useIntegrationActions } from './useIntegrationActions'
 
@@ -10,18 +11,24 @@ type IntegrationDialogsProps = Readonly<{
   validateDialog: ReturnType<typeof useIntegrationActions>['validateDialog']
   deleteDialog: ReturnType<typeof useIntegrationActions>['deleteDialog']
   disableDialog: ReturnType<typeof useIntegrationActions>['disableDialog']
+  renameDialog?: ReturnType<typeof useIntegrationActions>['renameDialog']
+  isRenaming?: boolean
   onValidate: () => void
   onDelete: () => void
   onDisable: () => void
+  onRename?: (name: string) => void
 }>
 
 export function IntegrationDialogs({
   validateDialog,
   deleteDialog,
   disableDialog,
+  renameDialog,
+  isRenaming = false,
   onValidate,
   onDelete,
   onDisable,
+  onRename,
 }: IntegrationDialogsProps) {
   const activeItem = disableDialog.item ?? deleteDialog.item
   const hasResources =
@@ -98,6 +105,16 @@ export function IntegrationDialogs({
           </Content>
         )}
       </SynConfirmationDialog>
+
+      {renameDialog && onRename && (
+        <EditIntegrationNameModal
+          isOpen={renameDialog.isOpen}
+          isSaving={isRenaming}
+          initialName={renameDialog.item?.name ?? ''}
+          onClose={renameDialog.close}
+          onSave={onRename}
+        />
+      )}
     </>
   )
 }

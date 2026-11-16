@@ -34,6 +34,16 @@ export function isLLMProvider(integration: IntegrationRead): boolean {
   return result.success && result.data.integration_type === IntegrationTypeEnum.LLM_PROVIDER
 }
 
+/** Execution plane (OpenShift) integrations — name-only edit via the detail modal. */
+export function isOpenShiftIntegration(integration: Pick<IntegrationRead, 'integration_type'>): boolean {
+  return integration.integration_type === IntegrationTypeEnum.OPENSHIFT
+}
+
+/** False for OpenShift: full `/edit` form is unavailable; use the rename modal instead. */
+export function canEditIntegrationFully(integration: Pick<IntegrationRead, 'integration_type'>): boolean {
+  return !isOpenShiftIntegration(integration)
+}
+
 export function getProviderHint(integration: IntegrationRead): string {
   const config = integration.configuration
   if (config && 'provider_hint' in config) return String(config.provider_hint ?? '')

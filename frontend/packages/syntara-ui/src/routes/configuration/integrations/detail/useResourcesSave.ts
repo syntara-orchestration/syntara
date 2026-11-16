@@ -2,11 +2,11 @@ import type { Tool } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useRef, useState } from 'react'
 
-import { integrationsClient } from '../../../client'
-import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
-import { useAlerts } from '../../../providers/alerts'
-import { getErrorMessage } from '../../../utils/apiErrors'
-import { detachPromise } from '../../../utils/detachPromise'
+import { integrationsClient } from '../../../../client'
+import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
+import { useAlerts } from '../../../../providers/alerts'
+import { getErrorMessage } from '../../../../utils/apiErrors'
+import { detachPromise } from '../../../../utils/detachPromise'
 
 export function useResourcesSave(opts: {
   integrationId: string
