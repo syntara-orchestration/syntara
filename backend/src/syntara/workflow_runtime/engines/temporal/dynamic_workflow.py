@@ -30,8 +30,6 @@ with workflow.unsafe.imports_passed_through():
         resolve_workflow_integration,
     )
     from syntara.workflows.models.activity_execution import ActivityStatus
-        resolve_workflow_integration,
-    )
     from syntara.workflow_runtime.engines.temporal.activities.integration_scope_activity import validate_node_references
     from syntara.workflow_runtime.engines.temporal.activities.wait_activity import complete_wait
     from syntara.workflow_runtime.engines.temporal.constants import (
