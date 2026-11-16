@@ -429,8 +429,40 @@ describe('date field submission', () => {
     ])
   })
 
-  it('treats a blank component as absent', () => {
-    expectValidationErrors(dateForm(), { start: { date: '' } }, [['start', 'invalid_format']])
+  it.each([
+    { date: '' },
+    { date: '   ' },
+    { date: null },
+    {},
+  ])('normalizes an all-blank date mapping to an empty optional value', (submitted) => {
+    expect(validateFormSubmission(dateForm(), { start: submitted })).toEqual({ start: '' })
+  })
+
+  it('normalizes all-blank collected date components to an empty optional value', () => {
+    const definition = dateForm({ include_time: true, include_timezone: true })
+
+    expect(validateFormSubmission(definition, { start: { date: '', time: ' ', timezone: null } })).toEqual({
+      start: '',
+    })
+  })
+
+  it.each([{ date: '', offset: '' }, { date: '', time: '' }])(
+    'rejects an all-blank date mapping with an unknown or uncollected component',
+    (submitted) => {
+      expectValidationErrors(dateForm(), { start: submitted }, [['start', 'invalid_format']])
+    }
+  )
+
+  it('reports a required error for an all-blank date mapping on a required field', () => {
+    expectValidationErrors(dateForm({ required: true }), { start: { date: '' } }, [['start', 'required']])
+  })
+
+  it('rejects a partially blank date mapping when an included component is missing', () => {
+    const definition = dateForm({ include_time: true })
+
+    expectValidationErrors(definition, { start: { date: '2026-01-05', time: '   ' } }, [
+      ['start', 'invalid_format'],
+    ])
   })
 
   it('rejects an unknown IANA timezone', () => {

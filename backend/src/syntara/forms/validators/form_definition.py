@@ -31,7 +31,7 @@ def validate_form_definition(form: FormDefinition, form_id: str | None = None) -
 
     for field in form.fields:
         # Match the submission path's empty-before-coercion behavior for defaults.
-        if field.default is None or field.default == "" or field.default == []:
+        if field.default is None or field.default in ("", []):
             continue
 
         try:

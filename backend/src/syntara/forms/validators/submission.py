@@ -27,6 +27,7 @@ from syntara.forms.exceptions import (
 from syntara.forms.models.api_models import TERMINAL_PROMPT_STATUSES, FormPromptStatus
 from syntara.forms.models.form_errors import FormFieldError
 from syntara.forms.models.form_fields import (
+    DATE_COMPONENTS,
     CheckboxField,
     DateField,
     DateValue,
@@ -206,7 +207,11 @@ def _strip_submitted_value(field: FormField, raw: Any) -> Any:  # noqa: ANN401
 
     if isinstance(field, DateField) and isinstance(raw, Mapping):
         values = {key: value.strip() if isinstance(value, str) else value for key, value in raw.items()}
-        if all(value is None or (isinstance(value, str) and value == "") for value in values.values()):
+        included = set(field.included_components())
+        has_only_included_components = set(values).issubset(included)
+        if has_only_included_components and all(
+            value is None or (isinstance(value, str) and value == "") for value in values.values()
+        ):
             return ""
         return values
 
@@ -449,6 +454,17 @@ def _parse_and_validate_date_value(field: DateField, raw: Any) -> DateValue:  # 
         msg = f"Must be an object with keys: {expected}; got {type(raw).__name__}"
         raise TypeError(msg)
 
+    included = set(field.included_components())
+    unknown = sorted(str(key) for key in raw if key not in DATE_COMPONENTS)
+    if unknown:
+        msg = "; ".join(f"'{key}' is not a date component" for key in unknown)
+        raise _FormatError(msg)
+
+    uncollected = sorted(str(key) for key in raw if key in DATE_COMPONENTS and key not in included)
+    if uncollected:
+        msg = f"This field does not collect: {', '.join(uncollected)}"
+        raise _FormatError(msg)
+
     # Drop blanks so an untouched input posting "" reads as absent, matching
     # _is_empty at the top level.
     present = {key: value for key, value in raw.items() if not _is_empty(value)}
@@ -458,7 +474,6 @@ def _parse_and_validate_date_value(field: DateField, raw: Any) -> DateValue:  # 
     except ValidationError as exc:
         raise _FormatError(_format_date_errors(exc)) from None
 
-    included = set(field.included_components())
     supplied = set(value.supplied_components())
 
     if missing := sorted(included - supplied):

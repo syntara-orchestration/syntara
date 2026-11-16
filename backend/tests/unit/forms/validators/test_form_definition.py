@@ -208,7 +208,7 @@ class TestWhitespaceDefaults:
     def test_padded_defaults_are_trimmed_and_validate(
         self,
         field_type: str,
-        default: Any,
+        default: Any,  # noqa: ANN401
         overrides: dict[str, Any],
         expected: Any,  # noqa: ANN401
     ) -> None:
@@ -245,7 +245,7 @@ class TestWhitespaceDefaults:
     def test_whitespace_only_defaults_normalize_to_empty(
         self,
         field_type: str,
-        default: Any,
+        default: Any,  # noqa: ANN401
         overrides: dict[str, Any],
         expected: Any,  # noqa: ANN401
     ) -> None:
@@ -269,7 +269,7 @@ class TestWhitespaceDefaults:
     def test_required_field_with_empty_default_still_requires_a_submission(
         self,
         field_type: str,
-        default: Any,
+        default: Any,  # noqa: ANN401
         overrides: dict[str, Any],
     ) -> None:
         from syntara.forms.validators.submission import validate_form_submission

@@ -295,7 +295,10 @@ class ResolvedOption(BaseModel):
 
     @field_validator("value")
     @classmethod
-    def _non_empty_string_value(cls, value: StrippedStr | int | float | bool) -> StrippedStr | int | float | bool:
+    def _non_empty_string_value(
+        cls,
+        value: StrippedStr | float | bool,  # noqa: FBT001
+    ) -> StrippedStr | int | float | bool:
         """Reject dynamic string options that normalize to the empty selection value."""
         if isinstance(value, str) and not value:
             msg = "Option values cannot be empty"
@@ -339,7 +342,7 @@ class DropdownField(FormFieldBase):
     @classmethod
     def _default_in_option_list(
         cls,
-        default: StrippedStr | int | float | bool | None,  # noqa: FBT001
+        default: StrippedStr | float | bool | None,  # noqa: FBT001
         info: ValidationInfo,
     ) -> str | int | float | bool | None:
         """Require a static or resolved default to occur in this field's options."""

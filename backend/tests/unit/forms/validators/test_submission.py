@@ -628,6 +628,23 @@ class TestDateFieldSubmission:
         assert [e.code for e in errors] == ["invalid_format"]
         assert "'offset' is not a date component" in errors[0].message
 
+    @pytest.mark.parametrize(
+        ("submitted", "expected_message"),
+        [
+            ({"date": "", "offset": ""}, "'offset' is not a date component"),
+            ({"date": "", "time": ""}, "This field does not collect: time"),
+        ],
+    )
+    def test_blank_unknown_or_uncollected_component_rejected(
+        self,
+        submitted: dict[str, str],
+        expected_message: str,
+    ) -> None:
+        errors = _errors(self._date_form(), {"start": submitted})
+
+        assert [error.code for error in errors] == ["invalid_format"]
+        assert expected_message in errors[0].message
+
     def test_blank_component_normalizes_optional_date_to_empty(self) -> None:
         """An untouched date input with no nonblank components is an empty field."""
         assert validate_form_submission(self._date_form(), {"start": {"date": ""}}) == {"start": ""}
@@ -737,9 +754,7 @@ class TestWhitespaceStripping:
     def test_padded_email_is_trimmed_before_email_validation(self) -> None:
         form = _form(_field("email", "contact"))
 
-        assert validate_form_submission(form, {"contact": " \tuser@example.com\n "}) == {
-            "contact": "user@example.com"
-        }
+        assert validate_form_submission(form, {"contact": " \tuser@example.com\n "}) == {"contact": "user@example.com"}
 
     @pytest.mark.parametrize(
         ("field", "raw", "expected"),
@@ -832,7 +847,7 @@ class TestWhitespaceStripping:
     )
     def test_all_blank_date_mapping_is_empty(
         self,
-        required: bool,
+        required: bool,  # noqa: FBT001
         submitted: dict[str, Any],
         expected: dict[str, str],
     ) -> None:
@@ -877,7 +892,7 @@ class TestWhitespaceStripping:
         assert submitted == {"picks": [" a ", " \t "]}
 
     @pytest.mark.parametrize("required", [False, True])
-    def test_all_blank_multi_select_items_are_empty(self, required: bool) -> None:
+    def test_all_blank_multi_select_items_are_empty(self, required: bool) -> None:  # noqa: FBT001
         options = {"source": "static", "values": [{"display_label": "A", "value": "a"}]}
         form = _form(_field("multi_select", "picks", options=options, required=required))
 

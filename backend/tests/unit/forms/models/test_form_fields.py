@@ -136,9 +136,7 @@ class TestStringWhitespaceStripping:
             ResolvedOption.model_validate({"display_label": " \t ", "value": "a"})
 
     def test_date_components_are_trimmed_before_constraints(self) -> None:
-        value = DateValue.model_validate(
-            {"date": " 2026-01-05 ", "time": " 14:30 ", "timezone": " America/New_York "}
-        )
+        value = DateValue.model_validate({"date": " 2026-01-05 ", "time": " 14:30 ", "timezone": " America/New_York "})
 
         assert value.date == "2026-01-05"
         assert value.time == "14:30"
