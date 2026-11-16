@@ -108,4 +108,11 @@ describe('ActivityStatusLabel', () => {
     render(<ActivityStatusLabel status="completed" replayed={false} />)
     expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
   })
+
+  it('labels a retained failure separately from the activity status', () => {
+    render(<ActivityStatusLabel status="failed" retainedFailure />)
+
+    expect(screen.getByText('Failed')).toBeInTheDocument()
+    expect(screen.getByText('Retained failure')).toBeInTheDocument()
+  })
 })

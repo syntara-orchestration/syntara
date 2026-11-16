@@ -155,5 +155,21 @@ describe('ExecutionStatusBadge', () => {
       const results = await axe(container)
       expect(results).toHaveNoViolations()
     })
+
+    it('identifies a retained failure in the accessible name and metadata', () => {
+      render(<ExecutionStatusBadge status="failed" retainedFailure />)
+
+      const badge = screen.getByLabelText('Error — Retained failure')
+      expect(badge).toHaveAttribute('data-retained-failure')
+      expect(badge).not.toHaveAttribute('data-replayed')
+    })
+
+    it('includes retained failure and reused output when both apply', () => {
+      render(<ExecutionStatusBadge status="failed" retainedFailure replayed />)
+
+      const badge = screen.getByLabelText('Error — Retained failure — reused output from a previous run')
+      expect(badge).toHaveAttribute('data-retained-failure')
+      expect(badge).toHaveAttribute('data-replayed')
+    })
   })
 })
