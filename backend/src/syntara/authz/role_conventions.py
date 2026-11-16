@@ -33,6 +33,7 @@ class PolicyInfo:
     roles: tuple[str, ...] = field(default=(), compare=False, hash=False)
     effect: Literal["allow", "deny"] = "allow"
     kind: str | None = None
+    description_override: str | None = field(default=None, compare=False, hash=False)
 
     @property
     def name(self) -> str:
@@ -43,6 +44,8 @@ class PolicyInfo:
     @property
     def description(self) -> str:
         """Human-readable description."""
+        if self.description_override is not None:
+            return self.description_override
         if self.effect == "deny" and self.kind is not None:
             scope_label = "all projects" if self.scope == "any" else "the assigned project"
             return f"Deny authoring {node_kind_display_label(self.kind)} steps in {scope_label}"
@@ -99,7 +102,15 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("user", "read", scope="self", roles=("admin", "authenticated")),
     PolicyInfo("user", "update", scope="self", roles=("admin", "authenticated")),
     # -- system-scoped (any) --
-    PolicyInfo(NODE_RESOURCE_TYPE, NODE_ACTION_WRITE, roles=("step-author",)),
+    PolicyInfo(
+        NODE_RESOURCE_TYPE,
+        NODE_ACTION_WRITE,
+        roles=("step-author",),
+        description_override=(
+            "Allow authoring every workflow step type. Step authoring depends on "
+            "this policy: restrict step types with deny policies instead of removing it."
+        ),
+    ),
     # credentials
     PolicyInfo("credential", "read", roles=("admin", "auditor")),
     PolicyInfo("credential", "create", roles=("admin",)),
@@ -274,7 +285,11 @@ BUILTIN_ROLES: list[RoleInfo] = [
         "authenticated",
         "Default permissions granted to all authenticated users",
     ),
-    RoleInfo("step-author", "Author all workflow step types"),
+    RoleInfo(
+        "step-author",
+        "Author all workflow step types. Step authoring depends on this role: "
+        "restrict step types with deny policies instead of removing it.",
+    ),
 ]
 
 

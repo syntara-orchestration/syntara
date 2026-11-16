@@ -86,7 +86,7 @@ Defined in `BUILTIN_ROLES` in `src/syntara/authz/role_conventions.py`:
 | `project-user` | yes | project | Standard access within a project | Read project, CRUD workflows, run executions |
 | `project-auditor` | yes | project | Read-only within a project | Read project, workflows, executions, roles, policies |
 | `authenticated` | yes | system | Default permissions for all authenticated users | Read/update self, read own role assignments, manage own identity links |
-| `step-author` | yes | system | Author all workflow step types | `step_type:write:any` |
+| `step-author` | yes | system | Author all workflow step types; restrict with deny policies, do not remove | `step_type:write:any` |
 
 ## Database Schema
 
