@@ -221,13 +221,17 @@ def _reset_opa_cache() -> Generator[None, None, None]:
 
 
 @pytest.fixture(autouse=True)
-def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
+def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
     """Replace authz evaluator with one that always allows requests.
 
     This is a lightweight fallback for integration tests that don't live
     under ``tests/integration/api/`` (those use the CLI-based mock).
     The ``api`` conftest's ``_mock_evaluator`` fixture overrides this one for
     tests in that directory because pytest uses the most-specific conftest.
+
+    The ``dependency_overrides`` entry is removed on teardown so the mock
+    cannot leak into later tests through route wiring that bypasses the
+    per-test setup.
     """
     from syntara.api.main import app
     from syntara.authz.dependencies import get_authz_evaluator
@@ -246,10 +250,11 @@ def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
         return mock_evaluator
 
     monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
     monkeypatch.setattr("syntara.workflows.executions_router.get_authz_evaluator", _mock_getter)
 
     app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
+    yield
+    app.dependency_overrides.pop(get_authz_evaluator, None)
 
 
 @pytest.fixture
