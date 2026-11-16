@@ -13,6 +13,7 @@ const STEPS_WITHOUT_DOCUMENTATION = new Set<string>([RegistryNodeId.ACTION_SCRIP
 
 /** Registry subtype / leaf ids → step-type documentation keys (must match docsUrls.json / overlay). */
 const REGISTRY_SUBTYPE_DOC_KEYS: Readonly<Record<string, string>> = {
+  [RegistryNodeId.TRIGGER_KAFKA]: 'kafkaSubscribeTrigger',
   [RegistryNodeId.TRIGGER_MANUAL]: 'manualTrigger',
   [RegistryNodeId.TRIGGER_SCHEDULED]: 'scheduleTrigger',
   [RegistryNodeId.TRIGGER_WEBHOOK]: 'webhookTrigger',
@@ -30,6 +31,7 @@ const REGISTRY_SUBTYPE_DOC_KEYS: Readonly<Record<string, string>> = {
 }
 
 const TRIGGER_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
+  [TriggerTypeEnum.EVENT_SUBSCRIBE]: 'kafkaSubscribeTrigger',
   [TriggerTypeEnum.MANUAL_TRIGGER]: 'manualTrigger',
   [TriggerTypeEnum.SCHEDULED]: 'scheduleTrigger',
   [TriggerTypeEnum.WEBHOOK_TRIGGER]: 'webhookTrigger',

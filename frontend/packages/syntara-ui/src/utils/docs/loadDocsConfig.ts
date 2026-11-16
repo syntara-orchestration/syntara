@@ -27,6 +27,7 @@ const docsUrlsOverlaySchema = z.record(z.string(), z.string())
 
 export type DocsConfig = {
   communityBaseUrl: string
+  communityPaths?: Readonly<Record<string, string>>
   productBaseUrl?: string
   version: string
 }
@@ -53,9 +54,10 @@ export function parseDocsUrlsOverlay(raw: unknown): Record<string, string> | und
  * Merge base + overlay. Overlay can add productBaseUrl and override version,
  * but cannot clobber communityBaseUrl.
  */
-export function mergeDocsConfig(base: typeof baseDocsConfig, overlay: DocsConfigOverlay | undefined): DocsConfig {
+export function mergeDocsConfig(base: DocsConfig, overlay: DocsConfigOverlay | undefined): DocsConfig {
   return {
     communityBaseUrl: base.communityBaseUrl,
+    ...(base.communityPaths ? { communityPaths: base.communityPaths } : {}),
     version: overlay?.version ?? base.version,
     ...(overlay?.productBaseUrl ? { productBaseUrl: overlay.productBaseUrl } : {}),
   }

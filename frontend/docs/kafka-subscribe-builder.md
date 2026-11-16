@@ -26,17 +26,53 @@ subscription on the next publication. Saved workflow version views show the
 expression read-only. Save/reopen, unrelated trigger edits and import/export use
 the same unchanged source text.
 
-The help icon beside **Filter expression (CEL)** describes `input.key`, case-sensitive header names
-whose duplicate values are ordered lists, Kafka `input.metadata`, and decoded
-`input.payload.state` / `input.payload.value`. Key/header values distinguish text,
-binary and null; payload values can also be null. Use presence and type/state
-guards before accessing optional content. Compose conditions explicitly using
-CEL operators. `matches()` uses RE2 search semantics; anchor with `^` and `$`
-for whole-string matching. Backreferences and lookarounds are unsupported.
-Examples wrap within the scrollable help popover. Clear the expression to remove
-the filter. The editor stays visible, preserving keyboard focus.
+The help icon beside **Filter expression (CEL)** gives a brief introduction, one example,
+and a documentation link. The step panel uses the same Kafka Subscribe documentation key.
+Clear the expression to remove the filter; the editor stays visible and retains focus.
 
-Expand **Test filter expression** to edit sample JSON, then choose **Test filter**.
+### Input fields and CEL reference
+
+The only root variable is `input`, bound directly to the supplied message object.
+A boolean `true` passes the message; `false` filters it out. Combine conditions
+explicitly with `&&`, `||`, `!`, and parentheses; the UI adds no implicit conditions.
+Supported comparisons include `==`, `!=`, `<`, `<=`, `>`, `>=`, and `in`.
+String methods include `contains()`, `startsWith()`, `endsWith()`, and `matches()`.
+
+- `input.key` and each header value have `kind` (`text`, `binary`, or `null`),
+  `base64`, and `text` when UTF-8 decoding succeeds.
+- `input.headers` uses case-sensitive names. Duplicate header values are lists in
+  occurrence order. An absent header is different from a present null value.
+- `input.metadata` includes `transport`, `topic`, `partition`, string `offset`,
+  `timestamp_ms`, and `timestamp_type`. Timestamps may be null.
+- `input.payload.state` is `decoded`, `not_decoded`, or `decode_error`. Decoded JSON
+  is in `input.payload.value`, which may be null. Check the state and value before
+  reading its properties.
+- After successful CloudEvents decoding, `input.cloudevents` contains normalized
+  attributes for Kafka binary and structured JSON modes, such as `type`, `source`,
+  and `extensions.priority`. It is null before decoding, on decode failure, and
+  for ordinary JSON. Guard attribute access with `input.cloudevents != null`;
+  event data remains under `input.payload.value`. The sample tester binds the
+  supplied JSON directly and does not perform CloudEvents decoding.
+
+Use `has()` or `in` to check presence. A present null still needs a null check;
+check value types before applying type-specific operations. Missing map keys
+produce No match, while incompatible types can produce Evaluation error.
+`matches()` uses RE2 search semantics: anchor with `^` and `$` for whole-string
+matching. Backreferences and lookarounds are unsupported.
+
+Each line below is a separate expression. Compose your complete condition explicitly:
+
+```cel
+input.key.kind == "text" && input.key.text.startsWith("order-")
+"region" in input.headers && input.headers["region"].exists(h, h.kind == "text" && h.text == "eu")
+input.metadata.topic == "orders" && input.metadata.partition == 0
+input.payload.state == "decoded" && input.payload.value != null && has(input.payload.value.status) && input.payload.value.status == "ready"
+input.key.kind == "text" && input.key.text.matches("^order-[0-9]+$")
+```
+
+### Sample testing
+
+Expand **Test filter expression** to edit sample JSON in the syntax-highlighted JSON code editor, then choose **Test filter**.
 Collapsing the tester preserves the sample. **Test filter** submits the current unsaved expression and editable sample JSON to
 `POST /api/v1/filtering/test` through the typed filtering client. No saved workflow,
 Integration, topic or credential selection is needed. The sample is bound directly
@@ -46,11 +82,10 @@ that every message will evaluate successfully. This action is separate from
 **Test runtime access**.
 
 Testing distinguishes **Match**, **No match**, **Evaluation error**, configuration
-errors (safe compiler codes and line/column when provided), and request failures
-with retry. Invalid JSON is rejected before submission. Editing either input
+errors (plain-language compiler messages and line/column when provided), and compact inline request failures
+retried with **Test filter**. The help icon beside **Test filter** explains its scope and limitations. Invalid JSON is rejected before submission. Editing either input
 discards results, including pending responses. Server validation still runs on
-save/publication; a successful sample cannot bypass it, and rejected operations
-leave the expression available for correction.
+Save, Verify, and publication; a successful sample cannot bypass it. CEL workflow findings identify `parameters.filter.expression`, appear beside the relevant trigger filter, and retain the expression for correction. Correcting the expression hides its previous field finding; rerun Save or Verify to refresh workflow findings. Existing draft-save and publication behavior is unchanged.
 
 The mock API uses canned fixtures rather than a CEL engine: `true` matches;
 `false` and `input.missing` do not match. Missing map keys produce no match in the
@@ -134,8 +169,8 @@ acceptance prerequisites for this frontend story.
 
 - Run `npm run check` and `TZ=UTC npm test` from `frontend/` for static analysis,
   UI tests, coverage, and mock API contract checks.
-- Four focused CEL browser scenarios cover outcomes, keyboard/accessibility,
-  rejected saves, exact persistence, unrelated edits, removal, stale responses,
+- Six focused CEL browser scenarios cover outcomes, keyboard/accessibility,
+  rejected saves, Verify field feedback, compact failure/retry, exact persistence, unrelated edits, removal, stale responses,
   and a browser export/import round trip.
 - Frontend `npm run check` and production build pass. Existing repository lint
   warnings remain; the Kafka files introduce no warnings.

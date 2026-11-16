@@ -6,10 +6,10 @@ import { z } from 'zod'
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
 import { FormFieldError } from '../../../components/FormFieldError'
 import { SynFormField } from '../../../components/forms/SynFormField'
+import { useDocLink } from '../../../utils/docs/useDocLink'
 import { WorkflowValidationContext } from '../WorkflowValidationContext'
 
 import { KafkaFilterTest } from './KafkaFilterTest'
-import styles from './KafkaSubscribeFilter.module.css'
 import { hasKafkaFilterExpression } from './kafkaSubscribeMapping'
 import { zodResolver } from './shared/formSchemaUtils'
 import type { TriggerFormData } from './triggerFormSchema'
@@ -49,34 +49,8 @@ const EXAMPLE_INPUT = JSON.stringify(
   2
 )
 
-const CEL_HELP = (
-  <Stack hasGutter className={styles.help} role="region" aria-label="CEL guidance and examples" tabIndex={0}>
-    <Content component="p">
-      The only root variable is input. Combine conditions explicitly with &amp;&amp;, ||, ! and parentheses. Use ==, !=,
-      &lt;, &lt;=, &gt;, &gt;= and in for comparisons. The result must be boolean. String methods include contains(),
-      startsWith(), endsWith() and matches(). matches() uses RE2 regular expressions and searches for a match; use ^ and
-      $ to match the whole string. Lookarounds and backreferences are not supported.
-    </Content>
-    <Content component="p">
-      key and each header value have kind (text, binary or null), base64, and text when UTF-8 decoding succeeds. Header
-      names are case-sensitive; duplicate values are lists in occurrence order. Use has() or in before accessing
-      optional fields. has() tests presence, so a present null value still needs a null check. metadata includes topic,
-      partition, string offset, timestamp_ms and timestamp_type. payload.state is decoded, not_decoded or decode_error;
-      decoded JSON is in payload.value and may be null. cloudevents is currently null.
-    </Content>
-    <Content
-      component="pre"
-      className={styles.examples}
-    >{`input.key.kind == "text" && input.key.text.startsWith("order-")
-"region" in input.headers && input.headers["region"].exists(h, h.kind == "text" && h.text == "eu")
-input.metadata.topic == "orders" && input.metadata.partition == 0
-input.payload.state == "decoded" && input.payload.value != null && has(input.payload.value.status) && input.payload.value.status == "ready"
-input.key.kind == "text" && input.key.text.matches("^order-[0-9]+$")`}</Content>
-    <Content component="p">Each line above is a separate example. Compose your complete expression explicitly.</Content>
-  </Stack>
-)
-
 export function KafkaSubscribeFilter({ isReadOnly }: Readonly<{ isReadOnly: boolean }>) {
+  const docsUrl = useDocLink('kafkaSubscribeTrigger')
   const validation = use(WorkflowValidationContext)
   const { control, setValue, clearErrors } = useFormContext<TriggerFormData>()
   const expression = useWatch({ control, name: 'filterExpression' }) ?? ''
@@ -102,7 +76,22 @@ export function KafkaSubscribeFilter({ isReadOnly }: Readonly<{ isReadOnly: bool
           name="filterExpression"
           label="Filter expression (CEL)"
           fieldId="kafka-filter-expression"
-          labelHelp={<FieldHelpPopover headerContent="Filter expression (CEL)" helpText={CEL_HELP} />}
+          labelHelp={
+            <FieldHelpPopover
+              headerContent="Filter expression (CEL)"
+              helpText={
+                <Content component="p">
+                  Write a CEL condition against input, the Kafka message object, for example{' '}
+                  <code>input.key.text.startsWith("order-")</code>. Return true to pass a message or false to filter it
+                  out. See the{' '}
+                  <a href={docsUrl} target="_blank" rel="noreferrer">
+                    Kafka Subscribe documentation
+                  </a>{' '}
+                  for available fields, syntax, and more examples.
+                </Content>
+              }
+            />
+          }
           hint={`${Array.from(expression).length.toLocaleString()} / 16,384 characters. ${hasFilter ? 'Enter a CEL condition that returns true or false.' : 'No filter: every otherwise valid message is accepted.'} Leave empty to disable CEL filtering.`}
         >
           {({ field, fieldState, describedBy }) => (

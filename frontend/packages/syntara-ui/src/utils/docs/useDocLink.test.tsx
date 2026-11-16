@@ -30,6 +30,24 @@ function wrapper({ children }: Readonly<{ children: ReactNode }>) {
 const allDocKeys = Object.keys(docsUrls) as DocKey[]
 
 describe('resolveDocUrl', () => {
+  it('links available community pages directly without changing other documentation links', () => {
+    const config = {
+      communityBaseUrl: COMMUNITY_README,
+      version: '2.5',
+      communityPaths: { kafkaSubscribeTrigger: 'frontend/docs/kafka-subscribe-builder.md' },
+    }
+    expect(resolveDocUrl('kafkaSubscribeTrigger', { mode: 'community', version: '2.5', config })).toBe(
+      'https://github.com/syntara-orchestration/syntara/blob/devel/frontend/docs/kafka-subscribe-builder.md'
+    )
+    expect(resolveDocUrl('workflows', { mode: 'community', version: '2.5', config })).toBe(COMMUNITY_README)
+    expect(
+      resolveDocUrl('kafkaSubscribeTrigger', {
+        mode: 'extended',
+        version: '2.5',
+        config: { ...config, productBaseUrl: PRODUCT_BASE },
+      })
+    ).toBe('https://example.invalid/docs/2.5/frontend/kafka-subscribe-builder/')
+  })
   it('returns community homepage in community mode', () => {
     expect(
       resolveDocUrl('workflows', {
