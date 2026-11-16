@@ -25,6 +25,7 @@ from syntara.credentials.models.credential import Credential, CredentialCreate, 
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.credentials.services.credential_service import (
     CredentialService,
+    _extract_credential_node_names,
     _get_secret_field_ids,
     _mask_all_secrets,
     _validate_field_constraints,
@@ -1625,3 +1626,29 @@ class TestFetchLatestExecutions:
         result = await service._fetch_latest_executions([uuid4()])
 
         assert result == {}
+
+
+def test_extract_credential_node_names_includes_credential_bindings() -> None:
+    credential_id = uuid4()
+    definition = {
+        "nodes": [
+            {
+                "id": "script",
+                "name": "Run Script",
+                "parameters": {
+                    "credential_bindings": [
+                        {"credential_recipe_id": "example.token", "credential_ref": str(credential_id)}
+                    ]
+                },
+            },
+            {
+                "id": "other",
+                "name": "Other",
+                "parameters": {
+                    "credential_bindings": [{"credential_recipe_id": "other.token", "credential_ref": str(uuid4())}]
+                },
+            },
+        ]
+    }
+
+    assert _extract_credential_node_names(definition, str(credential_id)) == ["Run Script"]
