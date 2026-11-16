@@ -219,6 +219,7 @@ class TestStringWhitespaceStripping:
         ).fields[0]
 
         assert isinstance(field, DropdownField)
+        assert isinstance(field.options, StaticOptions)
         assert field.options.values[0].value == "a"
         assert field.default == "a"
 

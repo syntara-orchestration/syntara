@@ -28,11 +28,11 @@ def _validate_scalar(value: Any, field_name: str, index: int, *, key: str) -> _O
     """Validate one option value without including its contents in errors."""
     location = f" at key '{key}'"
     if isinstance(value, str):
-        value = value.strip()
-        if not value:
+        stripped_value: str = value.strip()
+        if not stripped_value:
             msg = f"Dynamic options for field '{field_name}' at index {index}{location} has an empty string value"
             raise ValueError(msg)
-        return value
+        return stripped_value
 
     if not isinstance(value, (str, int, float, bool)):
         msg = (

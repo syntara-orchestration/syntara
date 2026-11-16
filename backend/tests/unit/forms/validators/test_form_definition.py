@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from syntara.forms.exceptions import FormDataValidationError, FormDefinitionError
-from syntara.forms.models.form_fields import FormDefinition
+from syntara.forms.models.form_fields import DateValue, FormDefinition
 from syntara.forms.validators.form_definition import validate_form_definition
 
 _STATIC_OPTIONS: dict[str, Any] = {
@@ -214,10 +214,12 @@ class TestWhitespaceDefaults:
 
         validate_form_definition(form)
 
+        default_value = form.fields[0].default
         if field_type == "date":
-            assert form.fields[0].default.model_dump(exclude_none=True) == expected
+            assert isinstance(default_value, DateValue)
+            assert default_value.model_dump(exclude_none=True) == expected
         else:
-            assert form.fields[0].default == expected
+            assert default_value == expected
 
     @pytest.mark.parametrize(
         ("field_type", "default", "overrides", "expected"),

@@ -204,14 +204,14 @@ def _strip_submitted_value(field: FormField, raw: Any) -> Any:  # noqa: ANN401
         return [item for item in values if item != ""]
 
     if isinstance(field, DateField) and isinstance(raw, Mapping):
-        values = {key: value.strip() if isinstance(value, str) else value for key, value in raw.items()}
+        date_values = {key: value.strip() if isinstance(value, str) else value for key, value in raw.items()}
         included = set(field.included_components())
-        has_only_included_components = set(values).issubset(included)
+        has_only_included_components = set(date_values).issubset(included)
         if has_only_included_components and all(
-            value is None or (isinstance(value, str) and value == "") for value in values.values()
+            value is None or (isinstance(value, str) and value == "") for value in date_values.values()
         ):
             return ""
-        return values
+        return date_values
 
     return raw
 
