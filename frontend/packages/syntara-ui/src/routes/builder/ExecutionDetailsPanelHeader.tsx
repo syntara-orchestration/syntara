@@ -4,11 +4,11 @@ import {
   ContentVariants,
   Flex,
   FlexItem,
+  Nav,
+  NavItem,
+  NavList,
   Stack,
   StackItem,
-  Tab,
-  Tabs,
-  TabTitleText,
   Title,
   TitleSizes,
 } from '@patternfly/react-core'
@@ -20,6 +20,7 @@ import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBad
 import { SynPanel } from '../../components/layout/SynPanel'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 
+import styles from './ExecutionDetailsPanelHeader.module.css'
 import { StatusLabel } from './ExecutionStatus'
 
 export type ViewMode = 'overview' | 'details'
@@ -64,11 +65,21 @@ export function HeaderMetadata({
               {title}
             </Title>
           </FlexItem>
-          <FlexItem>
-            <Tabs activeKey={viewMode} onSelect={(_e, key) => onViewModeChange(key as ViewMode)} variant="secondary">
-              <Tab eventKey="overview" title={<TabTitleText>Overview</TabTitleText>} />
-              <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
-            </Tabs>
+          <FlexItem className={styles.viewModeNav}>
+            <Nav
+              variant="horizontal-subnav"
+              aria-label="Run details views"
+              onSelect={(_event, selected) => onViewModeChange(String(selected.itemId) as ViewMode)}
+            >
+              <NavList>
+                <NavItem itemId="overview" isActive={viewMode === 'overview'} preventDefault>
+                  Overview
+                </NavItem>
+                <NavItem itemId="details" isActive={viewMode === 'details'} preventDefault>
+                  Details
+                </NavItem>
+              </NavList>
+            </Nav>
           </FlexItem>
         </Flex>
       </FlexItem>

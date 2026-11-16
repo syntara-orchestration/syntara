@@ -3,8 +3,17 @@
  */
 
 .header {
+  flex-shrink: 0;
   padding: var(--pf-t--global--spacer--sm) var(--pf-t--global--spacer--md);
-  padding-bottom: var(--pf-t--global--spacer--xs);
+  padding-bottom: var(--pf-t--global--spacer--sm);
+}
+
+.panelStack {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .contentFlex {
@@ -23,13 +32,39 @@
   flex-direction: column;
 }
 
+.activityListColumn {
+  height: 100%;
+  min-height: 0;
+}
+
+/* Keep filter row vertical rhythm identical in Overview (full width) and Details (left column). */
+.activityListFilter,
 .filterBarWrapper {
   flex-shrink: 0;
+  padding-inline: var(--pf-t--global--spacer--md);
+  padding-top: var(--pf-t--global--spacer--sm);
   padding-bottom: var(--pf-t--global--spacer--xs);
 }
 
-.filterBarWrapperInActivityList {
+.overviewBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   padding-inline: var(--pf-t--global--spacer--md);
+  padding-bottom: var(--pf-t--global--spacer--sm);
+}
+
+.overviewError {
+  flex-shrink: 0;
+  padding-bottom: var(--pf-t--global--spacer--sm);
+}
+
+.overviewTable {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .filterBar {
@@ -42,6 +77,8 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  /* Horizontal inset comes from DataList item-row tokens (matches filter column padding). */
+  padding-bottom: var(--pf-t--global--spacer--sm);
 }
 
 .stepDetailsPane {
