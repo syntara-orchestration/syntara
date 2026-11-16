@@ -85,7 +85,7 @@ export function SubWorkflowSimpleOutputFields({
       })}
       {!isVersionView && (
         <StackItem>
-          <Button variant="link" icon={<RhUiAddIcon />} onClick={handleAddField} isInline>
+          <Button variant="link" icon={<RhUiAddIcon />} onClick={handleAddField}>
             Add output field
           </Button>
         </StackItem>

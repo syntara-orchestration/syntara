@@ -7,7 +7,7 @@ import { useCallback, useMemo, useState, type Ref } from 'react'
 
 import { FlowNodeType } from '../../../constants/nodeTypes'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
-import { buildSwitchCasePort } from '../utils/switchCaseHelpers'
+import { buildSwitchCasePort, isValidSwitchPort } from '../utils/switchCaseHelpers'
 
 import styles from './RightSidePill.module.css'
 
@@ -45,14 +45,6 @@ function sanitizeLabel(label: string | undefined, maxLength = 100): string {
 }
 
 /**
- * Validates that a port value is a safe string identifier.
- * Defense-in-depth measure to prevent injection of unexpected characters.
- */
-function isValidPort(port: unknown): port is string {
-  return typeof port === 'string' && port.length > 0 && port.length <= 100 && /^[\w-]+$/.test(port)
-}
-
-/**
  * Builds branch handles for a switch node based on its case configuration.
  * Returns an array of handles with dynamic path labels from the switch cases,
  * plus a fallback/default handle if configured.
@@ -83,7 +75,7 @@ function buildSwitchBranchHandles(node: Node<NodeType['data']> | undefined): Bra
 
   const caseHandles = cases.map((c, i) => {
     // Validate and sanitize port identifier
-    const port = c.port && isValidPort(c.port) ? c.port : buildSwitchCasePort(i)
+    const port = isValidSwitchPort(c.port) ? c.port : buildSwitchCasePort(i)
 
     // Sanitize user-controlled label text
     const sanitizedLabel = sanitizeLabel(c.label)
@@ -93,8 +85,7 @@ function buildSwitchBranchHandles(node: Node<NodeType['data']> | undefined): Bra
   })
 
   // Add fallback/default handle
-  const defaultPort =
-    config.default_port && isValidPort(config.default_port) ? config.default_port : EdgeHandleEnum.DEFAULT
+  const defaultPort = isValidSwitchPort(config.default_port) ? config.default_port : EdgeHandleEnum.DEFAULT
   const fallbackHandle = [{ handle: defaultPort, label: 'Fallback' }]
 
   return [...caseHandles, ...fallbackHandle]

@@ -53,6 +53,10 @@ type TypeaheadSelectProps = {
   searchPromptThreshold?: number
   /** Allows selecting an exact template expression typed into the filter. */
   allowCustomTemplate?: boolean
+  /** Message to show when the option source has no choices before filtering. */
+  emptyOptionsMessage?: string
+  /** Message to show when a non-empty filter has no matching choices. */
+  noResultsMessage?: (query: string) => string
 }
 
 function renderOption(option: TypeaheadOption, selected: string) {
@@ -79,22 +83,46 @@ function renderOption(option: TypeaheadOption, selected: string) {
   )
 }
 
+function getNoOptionsMessage({
+  hasOptions,
+  filterValue,
+  emptyOptionsMessage,
+  noResultsMessage,
+}: {
+  hasOptions: boolean
+  filterValue: string
+  emptyOptionsMessage?: string
+  noResultsMessage?: (query: string) => string
+}): string {
+  const query = filterValue.trim()
+  const defaultMessage = `No results match "${filterValue}"`
+  if (query) return noResultsMessage?.(query) ?? defaultMessage
+  if (!hasOptions && emptyOptionsMessage) return emptyOptionsMessage
+  return noResultsMessage?.(query) ?? defaultMessage
+}
+
 function renderOptions({
   options,
+  hasOptions,
   filterValue,
   selected,
   hasMore,
   isLoading,
   shouldPromptForSearch,
   allowCustomTemplate,
+  emptyOptionsMessage,
+  noResultsMessage,
 }: {
   options: TypeaheadOption[]
+  hasOptions: boolean
   filterValue: string
   selected: string
   hasMore?: boolean
   isLoading?: boolean
   shouldPromptForSearch?: boolean
   allowCustomTemplate?: boolean
+  emptyOptionsMessage?: string
+  noResultsMessage?: (query: string) => string
 }) {
   if (isLoading) {
     return <SelectOption isDisabled>Loading...</SelectOption>
@@ -113,7 +141,12 @@ function renderOptions({
     </SelectOption>
   ) : null
   if (options.length === 0) {
-    return customTemplateOption ?? <SelectOption isDisabled>No results match &quot;{filterValue}&quot;</SelectOption>
+    if (customTemplateOption) return customTemplateOption
+    return (
+      <SelectOption isDisabled>
+        {getNoOptionsMessage({ hasOptions, filterValue, emptyOptionsMessage, noResultsMessage })}
+      </SelectOption>
+    )
   }
   if (options.some((option) => option.group)) {
     const groups = new Map<string, TypeaheadOption[]>()
@@ -160,6 +193,8 @@ export function TypeaheadSelect({
   isLoading,
   searchPromptThreshold,
   allowCustomTemplate = false,
+  emptyOptionsMessage,
+  noResultsMessage,
 }: Readonly<TypeaheadSelectProps>) {
   const [isOpen, setIsOpen] = useState(false)
   const [filterValue, setFilterValue] = useState('')
@@ -278,12 +313,15 @@ export function TypeaheadSelect({
       <SelectList style={{ maxHeight: '200px', overflow: 'auto' }}>
         {renderOptions({
           options: filteredOptions,
+          hasOptions: options.length > 0,
           filterValue,
           selected,
           hasMore,
           isLoading,
           shouldPromptForSearch,
           allowCustomTemplate,
+          emptyOptionsMessage,
+          noResultsMessage,
         })}
       </SelectList>
     </SynSelect>

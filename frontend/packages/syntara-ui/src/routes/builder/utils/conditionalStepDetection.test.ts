@@ -2,6 +2,7 @@
  * Tests for conditional step detection utilities.
  */
 
+import { ActivityTypeEnum, EdgeHandleEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { extractStepIdFromExpression, isStepConditional } from './conditionalStepDetection'
@@ -58,17 +59,63 @@ describe('isStepConditional', () => {
 
   it('returns true when step is inside a switch node', () => {
     const activities = [
-      { id: 'route', type: 'switch' },
+      { id: 'route', type: ActivityTypeEnum.SWITCH, parameters: { cases: [{ port: 'case_0' }] } },
       { id: 'deploy_prod', type: 'script' },
     ]
     const edges = [
       { source: 'trigger-0', target: 'route' },
       { source: 'route', target: 'deploy_prod', sourceHandle: 'case_0' },
-      { source: 'route', target: 'deploy_staging', sourceHandle: 'default' },
+      { source: 'route', target: 'deploy_staging', sourceHandle: EdgeHandleEnum.DEFAULT },
     ]
     const triggerIds = ['trigger-0']
 
     expect(isStepConditional('deploy_prod', activities, edges, triggerIds)).toBe(true)
+  })
+
+  it('treats an unconnected condition output as a path that can skip the mapped step', () => {
+    const activities = [
+      { id: 'check_env', type: ActivityTypeEnum.CONDITION },
+      { id: 'deploy', type: 'script' },
+    ]
+    const edges = [
+      { source: 'trigger-0', target: 'check_env' },
+      { source: 'check_env', target: 'deploy', sourceHandle: EdgeHandleEnum.TRUE },
+    ]
+
+    expect(isStepConditional('deploy', activities, edges, ['trigger-0'])).toBe(true)
+  })
+
+  it('treats unconnected switch cases and fallback as paths that can skip the mapped step', () => {
+    const activities = [
+      {
+        id: 'route',
+        type: ActivityTypeEnum.SWITCH,
+        parameters: {
+          cases: [{ port: 'case_0' }, { port: 'case_1' }],
+          default_port: 'fallback',
+        },
+      },
+      { id: 'deploy', type: 'script' },
+    ]
+    const edges = [
+      { source: 'trigger-0', target: 'route' },
+      { source: 'route', target: 'deploy', sourceHandle: 'case_0' },
+    ]
+
+    expect(isStepConditional('deploy', activities, edges, ['trigger-0'])).toBe(true)
+  })
+
+  it('treats an unconnected approval outcome as a path that can skip the mapped step', () => {
+    const activities = [
+      { id: 'approval', type: ActivityTypeEnum.APPROVAL },
+      { id: 'deploy', type: 'script' },
+    ]
+    const edges = [
+      { source: 'trigger-0', target: 'approval' },
+      { source: 'approval', target: 'deploy', sourceHandle: EdgeHandleEnum.APPROVED },
+    ]
+
+    expect(isStepConditional('deploy', activities, edges, ['trigger-0'])).toBe(true)
   })
 
   it('returns true when step is inside a loop', () => {

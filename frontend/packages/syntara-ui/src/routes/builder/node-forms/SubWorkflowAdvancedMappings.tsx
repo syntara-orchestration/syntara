@@ -19,7 +19,9 @@ import { extractStepIdFromExpression, isStepConditional } from '../utils/conditi
 import type { SubWorkflowOutputField } from '../utils/subWorkflowOutputContract'
 
 import {
+  getNoChildOutputMatchesMessage,
   getStepOutputChoices,
+  NO_CHILD_OUTPUTS_AVAILABLE_MESSAGE,
   isDynamicOutputExpression,
   type OutputSourceOption,
 } from './SubWorkflowOutputSourceOptions'
@@ -111,6 +113,8 @@ export function SubWorkflowAdvancedMappings({
                 }))}
                 selected={expression}
                 selectedLabel={getSourceLabel(sourceOption, expression, isSourceUnavailable, isDynamicSource)}
+                emptyOptionsMessage={NO_CHILD_OUTPUTS_AVAILABLE_MESSAGE}
+                noResultsMessage={getNoChildOutputMatchesMessage}
                 onChange={(value) => onMappingChange(field.path, value)}
                 placeholder="Choose a step output…"
                 searchPromptThreshold={20}

@@ -1,4 +1,4 @@
-import { AlertActionLink, Content, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
+import { AlertActionLink, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
@@ -822,14 +822,10 @@ export function BuilderContent(props: BuilderContentProps) {
               confirmLoading={isCreating || isUpdating}
             >
               <Stack hasGutter>
-                <StackItem>
-                  <Content component="p">
-                    Saving updates this draft only. Parent workflows use the latest published child version on each run.
-                  </Content>
-                </StackItem>
                 {pendingOutputContractSave && (
                   <StackItem>
                     <OutputContractChangeSummary
+                      context="save"
                       contractChanges={
                         pendingOutputContractSave.review.contract_changes ?? pendingOutputContractSave.review.triggers
                       }

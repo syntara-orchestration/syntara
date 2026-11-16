@@ -49,6 +49,9 @@ describe('SubWorkflowSimpleOutputFields', () => {
     await user.click(screen.getByRole('button', { name: 'Add output field' }))
 
     expect(screen.getByRole('textbox', { name: 'Output name' })).toBeInTheDocument()
+    expect(
+      screen.getByText('For nested outputs, separate each level with a period, e.g. release.url.')
+    ).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Required output' })).not.toBeChecked()
     expect(
       screen.getByText(
@@ -78,6 +81,34 @@ describe('SubWorkflowSimpleOutputFields', () => {
 
     expect(screen.getByRole('textbox', { name: 'Type to filter' })).toHaveValue('Unavailable in current workflow')
     expect(screen.getByText(/This saved source is unavailable/)).toBeInTheDocument()
+  })
+
+  it('explains how to configure child outputs when there are no source choices', async () => {
+    const user = userEvent.setup()
+    mockWorkflowState.currentWorkflow.workflow.activities = []
+    mockWorkflowState.edges = []
+    render(<TestWrapper />)
+
+    await user.click(screen.getByRole('button', { name: 'Add output field' }))
+    await user.click(screen.getByRole('textbox', { name: 'Type to filter' }))
+
+    expect(
+      screen.getByRole('option', {
+        name: 'No child step outputs are available yet. Add a reachable child step with outputs to map this field.',
+      })
+    ).toBeInTheDocument()
+  })
+
+  it('shows a query-specific empty state after searching available child outputs', async () => {
+    const user = userEvent.setup()
+    render(<TestWrapper />)
+
+    await user.click(screen.getByRole('button', { name: 'Add output field' }))
+    const sourcePicker = screen.getByRole('textbox', { name: 'Type to filter' })
+    await user.click(sourcePicker)
+    await user.type(sourcePicker, 'missing-output')
+
+    expect(screen.getByRole('option', { name: 'No child step outputs match "missing-output".' })).toBeInTheDocument()
   })
 
   it('allows and identifies a dynamic nested source path', async () => {
@@ -134,6 +165,28 @@ describe('SubWorkflowSimpleOutputFields', () => {
       { source: 'condition', target: 'deploy', sourceHandle: 'true' },
       { source: 'condition', target: 'skip', sourceHandle: 'false' },
     ]
+    render(
+      <TestWrapper
+        outputFields={[
+          { path: 'deployment.url', type: 'string', required: true, description: '', expression: '${deploy.stdout}' },
+        ]}
+      />
+    )
+
+    expect(screen.getByText(/This step may not run on every path/)).toBeInTheDocument()
+    expect(screen.getByText(/If this required value is missing, the child run fails/)).toBeInTheDocument()
+  })
+
+  it('warns when an unconnected condition branch can skip a required source step', () => {
+    mockWorkflowState.currentWorkflow.workflow.activities = [
+      { id: 'condition', name: 'Check condition', type: 'condition' },
+      { id: 'deploy', name: 'Deploy', type: 'script' },
+    ]
+    mockWorkflowState.edges = [
+      { source: 'trigger-0', target: 'condition' },
+      { source: 'condition', target: 'deploy', sourceHandle: 'true' },
+    ]
+
     render(
       <TestWrapper
         outputFields={[

@@ -215,6 +215,28 @@ describe('TypeaheadSelect', () => {
       expect(screen.getByText(/No results match/)).toBeInTheDocument()
     })
 
+    it('shows setup guidance before searching when no options exist', async () => {
+      const user = userEvent.setup()
+      renderSelect({ options: [], emptyOptionsMessage: 'No child outputs are available yet.' })
+
+      await user.click(getInput())
+
+      expect(screen.getByRole('option', { name: 'No child outputs are available yet.' })).toBeInTheDocument()
+    })
+
+    it('uses a query-specific message when the search has no matches', async () => {
+      const user = userEvent.setup()
+      renderSelect({
+        options: defaultOptions,
+        noResultsMessage: (query) => `No child outputs match "${query}".`,
+      })
+
+      await user.click(getInput())
+      await user.type(getInput(), 'deploy')
+
+      expect(screen.getByRole('option', { name: 'No child outputs match "deploy".' })).toBeInTheDocument()
+    })
+
     it('filter is case-insensitive', async () => {
       const user = userEvent.setup()
       renderSelect()

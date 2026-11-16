@@ -78,9 +78,13 @@ export function PublishWorkflowDialog({
             title={hasBreakingChanges ? 'Breaking output contract changes' : 'Output contract changes'}
           >
             <Content component="p">
-              Review the contract edits and the published parent workflows that reference it.
+              Review the contract edits and any visible published parent workflows that reference this child.
             </Content>
-            <OutputContractChangeSummary contractChanges={reviewedContractChanges} parentWorkflows={parentWorkflows} />
+            <OutputContractChangeSummary
+              context="publish"
+              contractChanges={reviewedContractChanges}
+              parentWorkflows={parentWorkflows}
+            />
           </Alert>
         )}
         <Form onSubmit={handleSubmit(onSubmit)} id="publish-workflow-form">

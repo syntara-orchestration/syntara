@@ -21,7 +21,12 @@ import type { Control, UseFormSetValue } from 'react-hook-form'
 
 import { TypeaheadSelect } from '../../access/TypeaheadSelect'
 
-import { isDynamicOutputExpression, type OutputSourceOption } from './SubWorkflowOutputSourceOptions'
+import {
+  getNoChildOutputMatchesMessage,
+  isDynamicOutputExpression,
+  NO_CHILD_OUTPUTS_AVAILABLE_MESSAGE,
+  type OutputSourceOption,
+} from './SubWorkflowOutputSourceOptions'
 import type { TriggerFormData } from './triggerFormSchema'
 
 type OutputField = NonNullable<TriggerFormData['outputFields']>[number]
@@ -168,6 +173,8 @@ function renderOutputMappingField({
                 }))}
                 selected={field.value ?? ''}
                 selectedLabel={selectedSourceLabel}
+                emptyOptionsMessage={NO_CHILD_OUTPUTS_AVAILABLE_MESSAGE}
+                noResultsMessage={getNoChildOutputMatchesMessage}
                 onChange={(value) => {
                   const option = sourceOptions.find((candidate) => candidate.expression === value)
                   if (!option) {
@@ -285,7 +292,9 @@ export function SubWorkflowSimpleOutputFieldCard({
                     {!outputNameError && (
                       <FormHelperText>
                         <HelperText>
-                          <HelperTextItem>Use dot notation for nested output objects.</HelperTextItem>
+                          <HelperTextItem>
+                            For nested outputs, separate each level with a period, e.g. release.url.
+                          </HelperTextItem>
                         </HelperText>
                       </FormHelperText>
                     )}

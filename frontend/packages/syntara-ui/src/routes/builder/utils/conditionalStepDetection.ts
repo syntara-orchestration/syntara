@@ -1,3 +1,7 @@
+import { ActivityTypeEnum, EdgeHandleEnum } from '@syntara/contracts'
+
+import { buildSwitchCasePort, isValidSwitchPort } from './switchCaseHelpers'
+
 /**
  * Utilities for detecting if a workflow step may not always execute
  * due to being inside a conditional, switch, approval, or loop construct.
@@ -6,6 +10,7 @@
 type Activity = {
   id: string
   type: string
+  parameters?: Record<string, unknown>
 }
 
 type Edge = {
@@ -18,14 +23,18 @@ type Graph = Map<string, Edge[]>
 type GuaranteeContext = {
   stepId: string
   graph: Graph
-  activityTypes: ReadonlyMap<string, string>
+  activitiesById: ReadonlyMap<string, Activity>
   memo: Map<string, boolean>
   visiting: Set<string>
 }
 
-const BRANCH_NODE_TYPES = new Set(['condition', 'switch', 'approval'])
+const BRANCH_NODE_TYPES: ReadonlySet<string> = new Set([
+  ActivityTypeEnum.CONDITION,
+  ActivityTypeEnum.SWITCH,
+  ActivityTypeEnum.APPROVAL,
+])
 const LOOP_NODE_TYPES = new Set(['loop', 'loop_each'])
-const LOOP_DONE_HANDLE = 'done'
+const LOOP_DONE_HANDLE = EdgeHandleEnum.DONE
 
 /**
  * Extract step ID from a template expression like "${step.field}" or "${step}".
@@ -46,6 +55,10 @@ function buildGraph(edges: Edge[]): Graph {
   return graph
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 function canReachStep(startId: string, stepId: string, graph: Graph): boolean {
   const visited = new Set<string>()
   const queue = [startId]
@@ -63,28 +76,41 @@ function canReachStep(startId: string, stepId: string, graph: Graph): boolean {
   return false
 }
 
-function groupedBranchEdges(edges: Edge[]): Edge[][] {
-  const branches = new Map<string, Edge[]>()
-  for (const edge of edges) {
-    const branchKey = edge.sourceHandle ?? ''
-    const branch = branches.get(branchKey) ?? []
-    branch.push(edge)
-    branches.set(branchKey, branch)
+function getPossibleBranchHandles(activity: Activity): string[] {
+  switch (activity.type) {
+    case ActivityTypeEnum.CONDITION:
+      return [EdgeHandleEnum.TRUE, EdgeHandleEnum.FALSE]
+    case ActivityTypeEnum.APPROVAL:
+      return [EdgeHandleEnum.APPROVED, EdgeHandleEnum.REJECTED]
+    case ActivityTypeEnum.SWITCH: {
+      const configuredCases = activity.parameters?.['cases']
+      const cases: unknown[] = Array.isArray(configuredCases) ? configuredCases : []
+      const caseHandles = cases.map((candidate, index) => {
+        if (isRecord(candidate) && isValidSwitchPort(candidate['port'])) return candidate['port']
+        return buildSwitchCasePort(index)
+      })
+      const configuredDefault = activity.parameters?.['default_port']
+      const defaultHandle = isValidSwitchPort(configuredDefault) ? configuredDefault : EdgeHandleEnum.DEFAULT
+      return [...caseHandles, defaultHandle]
+    }
+    default:
+      return []
   }
-  return [...branches.values()]
 }
 
-function getGuaranteedEdges(nodeType: string | undefined, outgoing: Edge[]): Edge[][] {
-  if (LOOP_NODE_TYPES.has(nodeType ?? '')) {
+function getGuaranteedEdges(activity: Activity | undefined, outgoing: Edge[]): Edge[][] {
+  if (LOOP_NODE_TYPES.has(activity?.type ?? '')) {
     const doneEdges = outgoing.filter((edge) => edge.sourceHandle === LOOP_DONE_HANDLE)
     return doneEdges.length > 0 ? [doneEdges] : []
   }
-  if (BRANCH_NODE_TYPES.has(nodeType ?? '')) return groupedBranchEdges(outgoing)
+  if (activity && BRANCH_NODE_TYPES.has(activity.type)) {
+    return getPossibleBranchHandles(activity).map((handle) => outgoing.filter((edge) => edge.sourceHandle === handle))
+  }
   return [outgoing]
 }
 
 function stepIsGuaranteedFrom(currentId: string, context: GuaranteeContext): boolean {
-  const { stepId, graph, activityTypes, memo, visiting } = context
+  const { stepId, graph, activitiesById, memo, visiting } = context
   if (currentId === stepId) return true
   const cached = memo.get(currentId)
   if (cached !== undefined) return cached
@@ -97,7 +123,7 @@ function stepIsGuaranteedFrom(currentId: string, context: GuaranteeContext): boo
   }
 
   visiting.add(currentId)
-  const branchGroups = getGuaranteedEdges(activityTypes.get(currentId), outgoing)
+  const branchGroups = getGuaranteedEdges(activitiesById.get(currentId), outgoing)
   const isGuaranteed =
     branchGroups.length > 0 &&
     branchGroups.every((branch) => branch.some((edge) => stepIsGuaranteedFrom(edge.target, context)))
@@ -112,8 +138,8 @@ function stepIsGuaranteedFrom(currentId: string, context: GuaranteeContext): boo
  *
  * Regular nodes schedule all outgoing edges, so one successor path that
  * guarantees the target is enough. Condition, switch, and approval nodes select
- * one port, so every port must guarantee the target. Loop bodies are optional;
- * only the `done` port is guaranteed to run.
+ * one port, so every defined port—including unconnected ports—must guarantee
+ * the target. Loop bodies are optional; only the `done` port is guaranteed to run.
  */
 export function isStepConditional(
   stepId: string,
@@ -122,11 +148,11 @@ export function isStepConditional(
   triggerIds: string[]
 ): boolean {
   const graph = buildGraph(edges)
-  const activityTypes = new Map(activities.map((activity) => [activity.id, activity.type]))
+  const activitiesById = new Map(activities.map((activity) => [activity.id, activity]))
 
   return triggerIds.some((triggerId) => {
     if (!canReachStep(triggerId, stepId, graph)) return false
-    const context: GuaranteeContext = { stepId, graph, activityTypes, memo: new Map(), visiting: new Set() }
+    const context: GuaranteeContext = { stepId, graph, activitiesById, memo: new Map(), visiting: new Set() }
     return !stepIsGuaranteedFrom(triggerId, context)
   })
 }

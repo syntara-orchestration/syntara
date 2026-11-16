@@ -9,6 +9,13 @@ export type OutputSourceOption = {
   allowsDynamicDescendants: boolean
 }
 
+export const NO_CHILD_OUTPUTS_AVAILABLE_MESSAGE =
+  'No child step outputs are available yet. Add a reachable child step with outputs to map this field.'
+
+export function getNoChildOutputMatchesMessage(query: string): string {
+  return `No child step outputs match "${query}".`
+}
+
 type Activity = {
   id: string
   name?: string | null

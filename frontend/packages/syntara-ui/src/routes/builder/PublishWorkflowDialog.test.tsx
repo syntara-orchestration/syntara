@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -105,6 +105,7 @@ describe('PublishWorkflowDialog', () => {
     )
 
     expect(screen.getByText('Breaking output contract changes')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'View details for 1 output changes' }))
     expect(screen.getByText('Removed output: release_tag')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Publish anyway' }))
 
@@ -148,7 +149,11 @@ describe('PublishWorkflowDialog', () => {
     )
 
     expect(screen.getByText('Added optional output: release.notes')).toBeInTheDocument()
-    expect(screen.getByText(/Deploy parent \(parent v2\).*Invoke child/)).toBeInTheDocument()
+    expect(screen.getByText('1 visible published parent workflows affected')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'View visible parent workflows' }))
+    const parentDialog = screen.getByRole('dialog', { name: 'Visible published parent workflows' })
+    expect(within(parentDialog).getByText(/Deploy parent \(parent v2\).*Invoke child/)).toBeInTheDocument()
+    await user.click(within(parentDialog).getByRole('button', { name: 'Done' }))
     await user.click(screen.getByRole('button', { name: 'Publish workflow' }))
     expect(onConfirmContractChanges).toHaveBeenCalledOnce()
   })

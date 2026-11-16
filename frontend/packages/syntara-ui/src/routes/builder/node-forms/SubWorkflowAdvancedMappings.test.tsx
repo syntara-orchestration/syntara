@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import type { SubWorkflowOutputField } from '../utils/subWorkflowOutputContract'
@@ -32,6 +32,27 @@ vi.mock('../../../stores/useWorkflowStore', () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({ currentWorkflow: { workflow: { activities: workflowState.activities } }, edges: workflowState.edges }),
 }))
+
+beforeEach(() => {
+  workflowState.activities = [
+    { id: 'route', name: 'Route', type: 'condition' },
+    {
+      id: 'deploy',
+      name: 'Deploy',
+      type: 'script',
+      output_schema: [
+        { name: 'stdout', type: 'number', description: 'Numeric result' },
+        { name: 'payload', type: 'unknown', description: 'Open payload' },
+      ],
+    },
+    { id: 'fallback', name: 'Fallback', type: 'script', output_schema: [] },
+  ]
+  workflowState.edges = [
+    { source: 'trigger-0', target: 'route' },
+    { source: 'route', target: 'deploy', sourceHandle: 'true' },
+    { source: 'route', target: 'fallback', sourceHandle: 'false' },
+  ]
+})
 
 const fields: SubWorkflowOutputField[] = [
   { path: 'status', type: 'string', required: true, description: 'Public status' },
@@ -78,6 +99,29 @@ describe('SubWorkflowAdvancedMappings', () => {
 
     expect(screen.getByText('Add output fields to the schema above to map their values')).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('explains how to configure child outputs when there are no source choices', async () => {
+    const user = userEvent.setup()
+    workflowState.activities = []
+    workflowState.edges = []
+    render(
+      <SubWorkflowAdvancedMappings
+        fields={[{ path: 'release.tag', type: 'string', required: true, description: '' }]}
+        outputMapping={{}}
+        triggerId="trigger-0"
+        triggerIndex={0}
+        isVersionView={false}
+        onMappingChange={vi.fn()}
+      />
+    )
+
+    await user.click(screen.getByRole('textbox', { name: 'Type to filter' }))
+    expect(
+      screen.getByRole('option', {
+        name: 'No child step outputs are available yet. Add a reachable child step with outputs to map this field.',
+      })
+    ).toBeInTheDocument()
   })
 
   it('shows source reachability, type mismatch, and unavailable mapping feedback', () => {
