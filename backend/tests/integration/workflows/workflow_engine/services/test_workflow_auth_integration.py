@@ -34,6 +34,7 @@ from syntara.workflow_runtime.engines.temporal.schedule_parser import build_sche
 from syntara.workflow_runtime.engines.temporal.scheduled_launcher import ScheduledWorkflowLauncher
 from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflow_runtime.engines.temporal.workflow_auth import build_auth_header, init_signing_key
+from syntara.workflows.models.execution import Execution
 
 TASK_QUEUE = "test-auth-queue"
 
@@ -177,14 +178,16 @@ class TestWorkflowAuthIntegration:
             launcher_result = await asyncio.wait_for(handle.result(), timeout=60)
             assert "execution_id" in launcher_result
 
-    async def test_schedule_baked_auth_header_accepted(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_schedule_baked_auth_header_accepted(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """A workflow submitted with build_auth_header (schedule path) must execute."""
         init_signing_key()
 
         workflow_id = f"sched-auth-test-{uuid4()}"
         workflow_args: list[object] = [
             SIMPLE_WORKFLOW,
-            str(uuid4()),
+            str(test_execution.id),
             "trigger_manual",
             {},
             False,
@@ -218,7 +221,9 @@ class TestWorkflowAuthIntegration:
             workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
             assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
-    async def test_authorized_workflow_succeeds(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_authorized_workflow_succeeds(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """A workflow submitted with valid HMAC header must execute."""
         init_signing_key()
 
@@ -241,10 +246,18 @@ class TestWorkflowAuthIntegration:
             )
 
             result = await service.start_workflow(
+                execution_id=str(test_execution.id),
                 workflow_def=SIMPLE_WORKFLOW,
                 workflow_name="auth-test",
                 trigger_node_id="trigger_manual",
-                workflow_metadata=TEST_WORKFLOW_METADATA,
+                workflow_metadata={
+                    "workflow_context": {
+                        "workflow": {
+                            "project_id": str(test_execution.project_id),
+                            "id": str(test_execution.workflow_id),
+                        }
+                    }
+                },
             )
 
             handle = authed_client.get_workflow_handle(result.temporal_workflow_id, run_id=result.temporal_run_id)

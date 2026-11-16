@@ -15,7 +15,6 @@ Story: AAP-74236 — E2E Testing for V2 Schema
 import asyncio
 from collections.abc import Callable, Sequence
 from typing import Any
-from uuid import uuid4
 
 import pytest
 from temporalio.testing import WorkflowEnvironment
@@ -32,6 +31,7 @@ from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activ
 from syntara.workflow_runtime.engines.temporal.activities.switch import switch
 from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflows.models.execution import Execution
 
 _V2_ACTIVITIES: Sequence[Callable[..., Any]] = [
     execute_script_activity,
@@ -49,11 +49,11 @@ def _manual_trigger() -> dict[str, Any]:
 
 
 _WORKFLOW_RESULT_TIMEOUT = 30
-_TEST_WORKFLOW_METADATA = {"workflow_context": {"workflow": {"project_id": str(uuid4())}}}
 
 
 async def _run_workflow(
     temporal_env: WorkflowEnvironment,
+    test_execution: Execution,
     task_queue: str,
     workflow_def: dict[str, Any],
 ) -> dict[str, Any]:
@@ -74,11 +74,16 @@ async def _run_workflow(
             task_queue=task_queue,
         )
         start = await svc.start_workflow(
+            execution_id=str(test_execution.id),
             workflow_def=workflow_def,
             workflow_name="v2-pattern-test",
             trigger_node_id="trigger",
             include_node_results=True,
-            workflow_metadata=_TEST_WORKFLOW_METADATA,
+            workflow_metadata={
+                "workflow_context": {
+                    "workflow": {"project_id": str(test_execution.project_id), "id": str(test_execution.workflow_id)}
+                }
+            },
         )
         handle = temporal_env.client.get_workflow_handle(start.temporal_workflow_id)
         raw: dict[str, Any] = await asyncio.wait_for(handle.result(), timeout=_WORKFLOW_RESULT_TIMEOUT)
@@ -90,10 +95,11 @@ async def _run_workflow(
 class TestConditionRouting:
     """Verify condition node evaluates expressions and routes to the correct branch."""
 
-    async def test_condition_true_branch(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_condition_true_branch(self, temporal_env: WorkflowEnvironment, test_execution: Execution) -> None:
         """When condition evaluates to true, the true-branch script runs and the false-branch is skipped."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-cond-true",
             {
                 "schema_version": "2.0.0",
@@ -127,10 +133,11 @@ class TestConditionRouting:
         assert "on_true" in result["completed_activities"]
         assert "on_false" not in result["completed_activities"]
 
-    async def test_condition_false_branch(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_condition_false_branch(self, temporal_env: WorkflowEnvironment, test_execution: Execution) -> None:
         """When condition evaluates to false, the false-branch script runs."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-cond-false",
             {
                 "schema_version": "2.0.0",
@@ -170,10 +177,11 @@ class TestConditionRouting:
 class TestLoopExecution:
     """Verify loop nodes iterate correctly through Temporal."""
 
-    async def test_for_each_loop(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_for_each_loop(self, temporal_env: WorkflowEnvironment, test_execution: Execution) -> None:
         """for_each loop iterates over items list and executes body for each item."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-foreach",
             {
                 "schema_version": "2.0.0",
@@ -210,10 +218,11 @@ class TestLoopExecution:
         loop_output = result["activity_outputs"].get("loop_node", {})
         assert loop_output.get("iteration_count") == 3
 
-    async def test_do_while_loop(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_do_while_loop(self, temporal_env: WorkflowEnvironment, test_execution: Execution) -> None:
         """do_while loop executes body at least once, then checks condition."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-dowhile",
             {
                 "schema_version": "2.0.0",
@@ -260,10 +269,13 @@ class TestLoopExecution:
 class TestSwitchRouting:
     """Verify switch node evaluates cases and routes to the matching port."""
 
-    async def test_switch_routes_to_matching_case(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_switch_routes_to_matching_case(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Switch evaluates cases in order and routes to the first match."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-switch",
             {
                 "schema_version": "2.0.0",
@@ -310,10 +322,11 @@ class TestSwitchRouting:
         assert "branch_a" not in result["completed_activities"]
         assert "branch_default" not in result["completed_activities"]
 
-    async def test_switch_routes_to_default(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_switch_routes_to_default(self, temporal_env: WorkflowEnvironment, test_execution: Execution) -> None:
         """Switch falls through to default port when no case matches."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-switch-default",
             {
                 "schema_version": "2.0.0",
@@ -358,10 +371,13 @@ class TestSwitchRouting:
 class TestConvergeStrategies:
     """Verify converge node strategies work through real Temporal execution."""
 
-    async def test_converge_all_waits_for_both_branches(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_converge_all_waits_for_both_branches(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Converge with default 'all' strategy waits for every branch to complete."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-converge-all",
             {
                 "schema_version": "2.0.0",
@@ -405,10 +421,13 @@ class TestConvergeStrategies:
         assert "join" in completed
         assert "final" in completed
 
-    async def test_converge_any_fires_after_n_required(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_converge_any_fires_after_n_required(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Converge with 'any' strategy and n_required=1 fires after the first branch completes."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-converge-any",
             {
                 "schema_version": "2.0.0",
@@ -450,7 +469,7 @@ class TestConvergeStrategies:
         assert "final" in result["completed_activities"]
 
     async def test_converge_any_off_section_node_does_not_cause_engine_error(
-        self, temporal_env: WorkflowEnvironment
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
     ) -> None:
         """Converge ANY must not crash the engine when a predecessor has off-section successors.
 
@@ -470,6 +489,7 @@ class TestConvergeStrategies:
         """
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-converge-any-off-section",
             {
                 "schema_version": "2.0.0",
@@ -527,10 +547,13 @@ class TestConvergeStrategies:
 class TestExpressionResolution:
     """Verify template expressions resolve upstream node outputs at runtime."""
 
-    async def test_downstream_node_receives_upstream_output(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_downstream_node_receives_upstream_output(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Script B references ${script_a.stdout} and receives the resolved value."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-expr-resolve",
             {
                 "schema_version": "2.0.0",
@@ -570,10 +593,13 @@ class TestExpressionResolution:
 class TestContinueOnFailure:
     """Verify continue_on_failure allows downstream execution after a node failure."""
 
-    async def test_continue_on_failure_executes_next_node(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_continue_on_failure_executes_next_node(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """When continue_on_failure is true, a failing node does not block downstream."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-cof",
             {
                 "schema_version": "2.0.0",
@@ -608,7 +634,9 @@ class TestContinueOnFailure:
 class TestLoopConvergeInteraction:
     """Verify converge waits for a loop predecessor to finish all iterations."""
 
-    async def test_loop_and_parallel_branch_converge_all(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_loop_and_parallel_branch_converge_all(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Converge ALL waits for a for_each loop to complete all iterations before firing.
 
         Graph:
@@ -618,6 +646,7 @@ class TestLoopConvergeInteraction:
         """
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-loop-converge-all",
             {
                 "schema_version": "2.0.0",
@@ -672,7 +701,7 @@ class TestLoopConvergeInteraction:
         loop_output = result["activity_outputs"].get("loop_node", {})
         assert loop_output.get("iteration_count") == 3
 
-    async def test_loop_converge_any(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_loop_converge_any(self, temporal_env: WorkflowEnvironment, test_execution: Execution) -> None:
         """Converge ANY with n_required=2 waits for both a loop and a parallel branch.
 
         The loop must fully complete (not just finish one iteration) before it
@@ -685,6 +714,7 @@ class TestLoopConvergeInteraction:
         """
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-loop-converge-any",
             {
                 "schema_version": "2.0.0",
@@ -735,7 +765,9 @@ class TestLoopConvergeInteraction:
         assert "join" in completed
         assert "final" in completed
 
-    async def test_converge_any_fires_without_waiting_for_loop(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_converge_any_fires_without_waiting_for_loop(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Converge ANY n_required=1 fires as soon as the fast branch completes.
 
         The loop is still iterating when the fast branch finishes, but the
@@ -749,6 +781,7 @@ class TestLoopConvergeInteraction:
         """
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-loop-converge-any-n1",
             {
                 "schema_version": "2.0.0",
@@ -798,7 +831,9 @@ class TestLoopConvergeInteraction:
         assert "join" in completed
         assert "final" in completed
 
-    async def test_empty_for_each_loop_converges(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_empty_for_each_loop_converges(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """A for_each loop over an empty list completes immediately and satisfies converge.
 
         With items=[], the loop activity returns next_port="complete" on its
@@ -811,6 +846,7 @@ class TestLoopConvergeInteraction:
         """
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-empty-loop-converge",
             {
                 "schema_version": "2.0.0",
@@ -865,7 +901,9 @@ class TestLoopConvergeInteraction:
         loop_output = result["activity_outputs"].get("loop_node", {})
         assert loop_output.get("iteration_count") == 0
 
-    async def test_loop_body_failure_blocks_converge(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_loop_body_failure_blocks_converge(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """When a loop body fails (no CoF), the loop fails and converge ALL does not fire.
 
         Graph:
@@ -875,6 +913,7 @@ class TestLoopConvergeInteraction:
         """
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-loop-fail-converge",
             {
                 "schema_version": "2.0.0",
@@ -929,10 +968,13 @@ class TestLoopConvergeInteraction:
 class TestMixedPatterns:
     """Verify combined execution patterns work together through Temporal."""
 
-    async def test_condition_then_parallel_converge(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_condition_then_parallel_converge(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Condition routes to true branch which fans out to parallel nodes, then converges."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-mixed",
             {
                 "schema_version": "2.0.0",
