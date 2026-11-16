@@ -261,6 +261,28 @@ async def test_published_only_denial_blocks_project_delete(test_db_session, test
     assert await db.get(Project, project.id) is not None
 
 
+async def test_published_only_denial_blocks_workflow_delete(test_db_session, test_user, test_project_id, evaluator):
+    db = test_db_session
+    project = await db.get(Project, test_project_id)
+    allowed_draft = create_minimal_workflow_definition(activity_type="wait")
+    denied_published = create_minimal_workflow_definition()
+    workflow, _ = await _stored_workflow(db, test_user, project.id, allowed_draft, target=denied_published)
+    published = (
+        await db.exec(
+            select(WorkflowVersion).where(WorkflowVersion.workflow_id == workflow.id, WorkflowVersion.version == 2)
+        )
+    ).one()
+    workflow.current_version = 1
+    workflow.published_version_id = published.id
+    workflow.is_enabled = True
+    await db.commit()
+    await _assign_policy(db, test_user, project, "global")
+    with pytest.raises(NodeKindWriteDeniedError) as raised:
+        await WorkflowService(db, test_user, evaluator).delete_workflow(workflow.id)
+    assert {b.kind for b in raised.value.blocked_step_types} == {"script"}
+    assert await db.get(Workflow, workflow.id) is not None
+
+
 async def test_selected_historical_definition_is_checked(test_db_session, test_user, test_project_id, evaluator):
     db = test_db_session
     project = await db.get(Project, test_project_id)

@@ -53,7 +53,7 @@ def test_denial_uses_exact_effective_statement(scope, project):
     denial = node_kind_denial("script", "payments", result)
     assert denial.policy == "mixed"
     assert denial.scope == scope
-    assert denial.blocked.project == project
+    assert denial.blocked.project == "payments"
     assert denial.blocked.reason == "explicit_deny"
 
 

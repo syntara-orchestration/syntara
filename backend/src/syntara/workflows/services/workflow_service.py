@@ -144,7 +144,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         *,
         include_published: bool = False,
     ) -> None:
-        """Check latest and submitted/selected definitions; include published for unpublish."""
+        """Check latest and submitted/selected definitions; include published for unpublish and delete."""
         current = await self._get_version_or_none(workflow.id, workflow.current_version)
         if current is None:
             raise WorkflowVersionNotFoundError(workflow.id, workflow.current_version)
@@ -1734,7 +1734,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if workflow.is_builtin:
             raise BuiltinWorkflowDeleteError(workflow.name)
 
-        await self._check_node_kind_write_permission(workflow, "delete workflow")
+        await self._check_node_kind_write_permission(workflow, "delete workflow", include_published=True)
         non_terminal_count = await self.session.scalar(
             select(func.count())
             .select_from(Execution)
