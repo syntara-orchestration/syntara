@@ -1,8 +1,15 @@
-import { Content, ContentVariants, Stack, StackItem } from '@patternfly/react-core'
-import { Tbody, Td, Tr } from '@patternfly/react-table'
+import {
+  Content,
+  ContentVariants,
+  DataList,
+  DataListCell,
+  DataListItem,
+  DataListItemCells,
+  DataListItemRow,
+} from '@patternfly/react-core'
+import { useCallback, useMemo, type KeyboardEvent, type MouseEvent } from 'react'
 
 import { ExecutionTimeRange } from '../../components/table/ExecutionTimestamp'
-import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import type { ActivityState } from '../workflows/execution/types'
 
 import styles from './CompactActivityList.module.css'
@@ -23,41 +30,64 @@ export function CompactActivityList({
   onRowClick,
   selectedNodeId,
 }: Readonly<CompactActivityListProps>) {
-  return (
-    <SynScrollableTableContainer caption="Activity list" useFixedLayout={false}>
-      <Tbody>
-        {activityOrder.map(({ id, name, type }) => {
-          const state = activityStates.get(id)
-          const hasTimeRange = Boolean(state?.startedAt)
-          const displayName = name ?? id
-          const isSelected = id === selectedNodeId
+  const displayNameById = useMemo(() => new Map(activityOrder.map(({ id, name }) => [id, name ?? id])), [activityOrder])
 
-          return (
-            <Tr
-              key={id}
-              className={styles.clickableRow}
-              onRowClick={onRowClick ? () => onRowClick(id, displayName) : undefined}
-              isRowSelected={isSelected}
-            >
-              <Td dataLabel="Name" className={styles.nameCell}>
-                <Stack>
-                  <StackItem>{displayName}</StackItem>
-                  {hasTimeRange && (
-                    <StackItem>
-                      <Content component={ContentVariants.small} className={styles.subtleText}>
-                        <ExecutionTimeRange startedAt={state?.startedAt} completedAt={state?.completedAt} />
+  const handleSelectDataListItem = useCallback(
+    (_event: MouseEvent | KeyboardEvent, itemId: string) => {
+      if (!onRowClick) return
+      onRowClick(itemId, displayNameById.get(itemId) ?? itemId)
+    },
+    [displayNameById, onRowClick]
+  )
+
+  const selectionProps = onRowClick
+    ? {
+        onSelectDataListItem: handleSelectDataListItem,
+        ...(selectedNodeId ? { selectedDataListItemId: selectedNodeId } : {}),
+      }
+    : {}
+
+  return (
+    <DataList
+      aria-label="Activity list"
+      isCompact
+      gridBreakpoint="none"
+      wrapModifier="breakWord"
+      className={styles.list}
+      {...selectionProps}
+    >
+      {activityOrder.map(({ id, name, type }) => {
+        const state = activityStates.get(id)
+        const hasTimeRange = Boolean(state?.startedAt)
+        const displayName = name ?? id
+        const titleId = `activity-list-item-${id}-title`
+
+        return (
+          <DataListItem key={id} id={id} aria-labelledby={titleId}>
+            <DataListItemRow>
+              <DataListItemCells
+                dataListCells={
+                  <DataListCell className={styles.rowMainCell}>
+                    <div className={styles.titleRow}>
+                      <Content id={titleId} component={ContentVariants.p} className={styles.primaryLine}>
+                        {displayName}
                       </Content>
-                    </StackItem>
-                  )}
-                </Stack>
-              </Td>
-              <Td dataLabel="Status" modifier="nowrap" className={styles.statusCell}>
-                <ActivityStatusLabel status={state?.status ?? ACTIVITY_STATUS.PENDING} nodeType={type} />
-              </Td>
-            </Tr>
-          )
-        })}
-      </Tbody>
-    </SynScrollableTableContainer>
+                      <div className={styles.statusCell}>
+                        <ActivityStatusLabel status={state?.status ?? ACTIVITY_STATUS.PENDING} nodeType={type} />
+                      </div>
+                      {hasTimeRange && (
+                        <Content component={ContentVariants.small} className={styles.subtleText}>
+                          <ExecutionTimeRange startedAt={state?.startedAt} completedAt={state?.completedAt} />
+                        </Content>
+                      )}
+                    </div>
+                  </DataListCell>
+                }
+              />
+            </DataListItemRow>
+          </DataListItem>
+        )
+      })}
+    </DataList>
   )
 }

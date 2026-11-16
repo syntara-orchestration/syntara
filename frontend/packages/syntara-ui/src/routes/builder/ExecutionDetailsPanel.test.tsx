@@ -102,6 +102,23 @@ function renderPanelWithClose(onClosePanel: () => void, headerLabel?: string) {
   )
 }
 
+const VIEW_MODE_NAV_LABEL = 'Run details views'
+
+function getViewModeNav() {
+  return screen.getByRole('navigation', { name: VIEW_MODE_NAV_LABEL })
+}
+
+/** PF NavItem with preventDefault renders anchor without href — not exposed as role "link". */
+function getViewModeControl(name: 'Overview' | 'Details') {
+  return within(getViewModeNav()).getByText(
+    (_content, element) => element?.tagName === 'A' && element.textContent?.trim() === name
+  )
+}
+
+async function selectViewMode(user: ReturnType<typeof userEvent.setup>, mode: 'Overview' | 'Details') {
+  await user.click(getViewModeControl(mode))
+}
+
 describe('ExecutionDetailsPanel', () => {
   beforeEach(() => vi.clearAllMocks())
 
@@ -185,12 +202,12 @@ describe('ExecutionDetailsPanel', () => {
       const user = userEvent.setup()
       renderPanel(WORKFLOW_DEF)
 
-      await user.click(screen.getByRole('tab', { name: 'Details' }))
+      await selectViewMode(user, 'Details')
 
-      const activityList = screen.getByRole('grid', { name: 'Activity list' })
-      const rows = within(activityList).getAllByRole('row')
-      expect(rows[0]).toHaveTextContent('Process data')
-      expect(rows[1]).toHaveTextContent('Send notification')
+      const activityList = screen.getByRole('list', { name: 'Activity list' })
+      const items = within(activityList).getAllByRole('listitem')
+      expect(items[0]).toHaveTextContent('Process data')
+      expect(items[1]).toHaveTextContent('Send notification')
     })
   })
 
@@ -342,18 +359,18 @@ describe('ExecutionDetailsPanel', () => {
   })
 
   describe('view mode toggle', () => {
-    it('renders Overview and Details tabs', () => {
+    it('renders Overview and Details nav links', () => {
       renderPanel(WORKFLOW_DEF)
 
-      expect(screen.getByRole('tab', { name: 'Overview' })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: 'Details' })).toBeInTheDocument()
+      expect(getViewModeControl('Overview')).toBeInTheDocument()
+      expect(getViewModeControl('Details')).toBeInTheDocument()
     })
 
     it('defaults to Overview mode with activity table visible', () => {
       renderPanel(WORKFLOW_DEF)
 
-      expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
-      expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'false')
+      expect(getViewModeControl('Overview')).toHaveAttribute('aria-current', 'page')
+      expect(getViewModeControl('Details')).not.toHaveAttribute('aria-current', 'page')
       expect(screen.getByText('Process data')).toBeInTheDocument()
     })
 
@@ -361,9 +378,9 @@ describe('ExecutionDetailsPanel', () => {
       const user = userEvent.setup()
       renderPanel(WORKFLOW_DEF)
 
-      await user.click(screen.getByRole('tab', { name: 'Details' }))
+      await selectViewMode(user, 'Details')
 
-      expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+      expect(getViewModeControl('Details')).toHaveAttribute('aria-current', 'page')
       expect(screen.queryByText(/Select a step/)).not.toBeInTheDocument()
       expect(screen.getAllByText('Process data').length).toBeGreaterThanOrEqual(1)
     })
@@ -372,13 +389,13 @@ describe('ExecutionDetailsPanel', () => {
       const user = userEvent.setup()
       renderPanel(WORKFLOW_DEF)
 
-      await user.click(screen.getByRole('tab', { name: 'Details' }))
+      await selectViewMode(user, 'Details')
 
-      const activityList = screen.getByRole('grid', { name: 'Activity list' })
+      const activityList = screen.getByRole('list', { name: 'Activity list' })
       await user.click(within(activityList).getByText('Send notification'))
 
-      await user.click(screen.getByRole('tab', { name: 'Overview' }))
-      await user.click(screen.getByRole('tab', { name: 'Details' }))
+      await selectViewMode(user, 'Overview')
+      await selectViewMode(user, 'Details')
 
       expect(screen.getAllByText('Send notification').length).toBeGreaterThanOrEqual(1)
       expect(screen.queryByText(/Select a step/)).not.toBeInTheDocument()
@@ -388,10 +405,10 @@ describe('ExecutionDetailsPanel', () => {
       const user = userEvent.setup()
       renderPanel(WORKFLOW_DEF)
 
-      await user.click(screen.getByRole('tab', { name: 'Details' }))
-      await user.click(screen.getByRole('tab', { name: 'Overview' }))
+      await selectViewMode(user, 'Details')
+      await selectViewMode(user, 'Overview')
 
-      expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+      expect(getViewModeControl('Overview')).toHaveAttribute('aria-current', 'page')
       expect(screen.getByText('Process data')).toBeInTheDocument()
     })
   })
@@ -408,7 +425,7 @@ describe('ExecutionDetailsPanel', () => {
       const user = userEvent.setup()
       renderPanel(WORKFLOW_DEF)
 
-      await user.click(screen.getByRole('tab', { name: 'Details' }))
+      await selectViewMode(user, 'Details')
 
       const region = screen.getByRole('region', { name: 'Activity filter' })
       expect(within(region).getByRole('search', { name: 'Filters' })).toBeInTheDocument()
@@ -447,17 +464,16 @@ describe('ExecutionDetailsPanel', () => {
       expect(screen.getByText('Process data')).toBeInTheDocument()
       expect(screen.queryByText('Send notification')).not.toBeInTheDocument()
 
-      await user.click(screen.getByRole('tab', { name: 'Details' }))
+      await selectViewMode(user, 'Details')
 
-      const activityList = screen.getByRole('grid', { name: 'Activity list' })
+      const activityList = screen.getByRole('list', { name: 'Activity list' })
       expect(within(activityList).getByText('Process data')).toBeInTheDocument()
       expect(within(activityList).queryByText('Send notification')).not.toBeInTheDocument()
     })
   })
 
   describe('accessibility (view mode toggle)', () => {
-    // PatternFly Tabs generates aria-controls with random IDs that don't match
-    // rendered panel IDs in happy-dom — a known upstream issue, not an application bug.
+    // PF Nav + panel regions — exclude known happy-dom false positives if needed.
     const axeTabRules = { rules: { 'aria-valid-attr-value': { enabled: false } } }
 
     it('has no violations in default state', async () => {

@@ -25,11 +25,6 @@
   padding-bottom: var(--pf-t--global--spacer--sm);
 }
 
-.dataPaneControlsWrap {
-  /* Must be >= toggle width + search min-width + gap so inner items never wrap while next to the title */
-  flex: 1 0 30rem;
-}
-
 .searchWrap {
   /* Forces vertical stacking at very narrow widths (title / search / toggle each on own row) */
   min-width: 8rem;
@@ -52,7 +47,11 @@
 
 .dataPaneHeaderRow {
   flex-shrink: 0;
-  padding-bottom: var(--pf-t--global--spacer--xs);
+  padding-bottom: var(--pf-t--global--spacer--sm);
+}
+
+.dataPaneControlsStacked {
+  width: 100%;
 }
 
 .scrollPane {

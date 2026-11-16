@@ -4,11 +4,11 @@ import {
   ContentVariants,
   Flex,
   FlexItem,
+  Nav,
+  NavItem,
+  NavList,
   Stack,
   StackItem,
-  Tab,
-  Tabs,
-  TabTitleText,
   Title,
   TitleSizes,
 } from '@patternfly/react-core'
@@ -24,7 +24,8 @@ import {
   type RunDetailsPanelExpandControl,
 } from '../executions/RunDetailsPanelExpandButton'
 
-import styles from './ExecutionDetailsPanel.module.css'
+import panelStyles from './ExecutionDetailsPanel.module.css'
+import styles from './ExecutionDetailsPanelHeader.module.css'
 import { StatusLabel } from './ExecutionStatus'
 
 export type ViewMode = 'overview' | 'details'
@@ -71,11 +72,21 @@ export function HeaderMetadata({
               {title}
             </Title>
           </FlexItem>
-          <FlexItem>
-            <Tabs activeKey={viewMode} onSelect={(_e, key) => onViewModeChange(key as ViewMode)} variant="secondary">
-              <Tab eventKey="overview" title={<TabTitleText>Overview</TabTitleText>} />
-              <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
-            </Tabs>
+          <FlexItem className={styles.viewModeNav}>
+            <Nav
+              variant="horizontal-subnav"
+              aria-label="Run details views"
+              onSelect={(_event, selected) => onViewModeChange(String(selected.itemId) as ViewMode)}
+            >
+              <NavList>
+                <NavItem itemId="overview" isActive={viewMode === 'overview'} preventDefault>
+                  Overview
+                </NavItem>
+                <NavItem itemId="details" isActive={viewMode === 'details'} preventDefault>
+                  Details
+                </NavItem>
+              </NavList>
+            </Nav>
           </FlexItem>
         </Flex>
       </FlexItem>
@@ -157,20 +168,20 @@ export function LoadingErrorState({ queryState }: Readonly<{ queryState: React.R
     <SynPanel
       hasNoPadding
       isFullHeight
-      className={styles.loadingErrorPanel}
+      className={panelStyles.loadingErrorPanel}
       data-testid="execution-details-query-fallback-panel"
     >
-      <Stack className={styles.loadingErrorStack}>
-        <StackItem className={styles.loadingErrorHeader}>
+      <Stack className={panelStyles.loadingErrorStack}>
+        <StackItem className={panelStyles.loadingErrorHeader}>
           <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
             Run details
           </Title>
         </StackItem>
-        <StackItem isFilled className={styles.loadingErrorBody}>
+        <StackItem isFilled className={panelStyles.loadingErrorBody}>
           <Flex
             justifyContent={{ default: 'justifyContentCenter' }}
             alignItems={{ default: 'alignItemsCenter' }}
-            className={styles.loadingErrorContent}
+            className={panelStyles.loadingErrorContent}
             data-testid="execution-details-query-state-region"
           >
             {queryState}
