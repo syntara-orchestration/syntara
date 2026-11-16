@@ -124,3 +124,41 @@ describe('Kafka filter test mock', () => {
     })
   })
 })
+
+it('returns the same safe CEL field finding on Save and Verify without rewriting source', async () => {
+  const source = 'input.'
+  const definition = {
+    schema_version: '2.0.0',
+    name: 'Filter validation',
+    triggers: [{ id: 'incoming', type: 'event_subscribe_trigger', parameters: { filter: { expression: source } } }],
+    nodes: [],
+    edges: [],
+  }
+  const headers = { 'Content-Type': 'application/json' }
+  const expected = {
+    message: 'CEL filter: Syntax error at line 1, column 7.',
+    node_id: 'incoming',
+    field_path: 'parameters.filter.expression',
+  }
+  const saved = await fetch(`${baseUrl}/api/v1/workflows`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name: 'Filter validation', project_id: 'p-001', workflow_definition: definition }),
+  })
+  expect(saved.status).toBe(422)
+  expect((await saved.json()).validation_result.findings).toContainEqual(expect.objectContaining(expected))
+  const verified = await fetch(`${baseUrl}/api/v1/workflows/validate`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ workflow_definition: definition }),
+  })
+  expect((await verified.json()).findings).toContainEqual(expect.objectContaining(expected))
+  const updated = await fetch(`${baseUrl}/api/v1/workflows/${workflow?.id}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ workflow_definition: definition }),
+  })
+  expect(updated.status).toBe(422)
+  expect((await updated.json()).validation_result.findings).toContainEqual(expect.objectContaining(expected))
+  expect(definition.triggers[0].parameters.filter.expression).toBe(source)
+})

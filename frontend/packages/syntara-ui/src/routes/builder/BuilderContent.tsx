@@ -63,6 +63,7 @@ import { buildWorkflowDefinition, transformNodeParameters } from './utils/workfl
 import { ValidationBanner } from './ValidationBanner'
 import { VersionInfoCard } from './VersionInfoCard'
 import { VersionViewProvider } from './VersionViewProvider'
+import { WorkflowValidationContext } from './WorkflowValidationContext'
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 /* eslint-disable max-lines */
@@ -745,26 +746,28 @@ export function BuilderContent(props: BuilderContentProps) {
                     }}
                   />
 
-                  <NodeEditorAutoSubmitContext.Provider value={autoSubmitRef}>
-                    <NodeEditorOverlay
-                      isOpen={isNodeEditorOpen}
-                      mode={nodeEditorMode}
-                      selectedNode={selectedNode}
-                      nodeTypeId={nodeEditorNodeTypeId}
-                      nodeSubtypeId={nodeEditorNodeSubtypeId}
-                      sourceNodeId={sourceNodeId}
-                      replacementNodeId={replacementNodeId}
-                      executionId={mostRecentExecutionId}
-                      workflowId={workflowId}
-                      onConnect={handleConnectFromPanel}
-                      onClose={handleCloseNodeEditor}
-                      onNavigateToNode={handleNavigateToNode}
-                      onAddStep={handleAddStepFromPanel}
-                      projectId={builderProjectId}
-                      workflowMetadata={workflowMetadata}
-                      onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
-                    />
-                  </NodeEditorAutoSubmitContext.Provider>
+                  <WorkflowValidationContext value={{ errors: state.validationErrors }}>
+                    <NodeEditorAutoSubmitContext.Provider value={autoSubmitRef}>
+                      <NodeEditorOverlay
+                        isOpen={isNodeEditorOpen}
+                        mode={nodeEditorMode}
+                        selectedNode={selectedNode}
+                        nodeTypeId={nodeEditorNodeTypeId}
+                        nodeSubtypeId={nodeEditorNodeSubtypeId}
+                        sourceNodeId={sourceNodeId}
+                        replacementNodeId={replacementNodeId}
+                        executionId={mostRecentExecutionId}
+                        workflowId={workflowId}
+                        onConnect={handleConnectFromPanel}
+                        onClose={handleCloseNodeEditor}
+                        onNavigateToNode={handleNavigateToNode}
+                        onAddStep={handleAddStepFromPanel}
+                        projectId={builderProjectId}
+                        workflowMetadata={workflowMetadata}
+                        onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
+                      />
+                    </NodeEditorAutoSubmitContext.Provider>
+                  </WorkflowValidationContext>
                 </Flex>
               </StackItem>
             </SynReactFlowViewportGuard>

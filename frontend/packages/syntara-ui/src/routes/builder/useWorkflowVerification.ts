@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import { workflowFetchClient } from '../../client'
 import { useAlerts } from '../../providers/alerts'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
+import type { Trigger } from '../../stores/workflowStoreTypes'
 import { getErrorMessage } from '../../utils/apiErrors'
 
 import type { BuilderAction, ValidationError, ValidationSeverity } from './builderReducer'
@@ -45,6 +46,20 @@ function mapFindings(findings: ValidationFinding[] | undefined): ValidationError
       severity,
       fieldPath: f.field_path ?? null,
     }
+  })
+}
+
+/** Bind findings to the submitted source, so delayed Save/Verify responses cannot label newer edits. */
+export function bindFilterValidationSources(
+  errors: ValidationError[],
+  triggers: readonly Trigger[] = []
+): ValidationError[] {
+  return errors.map((error) => {
+    if (error.fieldPath !== 'parameters.filter.expression') return error
+    const filter = triggers.find((trigger) => trigger.id === error.nodeId)?.parameters?.filter
+    if (!filter || typeof filter !== 'object' || !('expression' in filter) || typeof filter.expression !== 'string')
+      return error
+    return { ...error, filterExpression: filter.expression }
   })
 }
 
@@ -110,6 +125,7 @@ function processValidateResponse(
   dispatch: (action: BuilderAction) => void,
   callbacks: {
     frontendErrors: ValidationError[]
+    triggers: Trigger[]
     onValid?: () => void
     silent: boolean
     showSuccess: (opts: { title: string }) => void
@@ -134,7 +150,7 @@ function processValidateResponse(
     }
   }
 
-  const allIssues = [...callbacks.frontendErrors, ...backendErrors]
+  const allIssues = [...callbacks.frontendErrors, ...bindFilterValidationSources(backendErrors, callbacks.triggers)]
   applyValidationState(dispatch, allIssues)
 
   if (allIssues.length > 0) {
@@ -213,6 +229,7 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
         .then((resp) => {
           processValidateResponse(resp, dispatch, {
             frontendErrors: allFrontendErrors,
+            triggers,
             onValid,
             silent,
             showSuccess,

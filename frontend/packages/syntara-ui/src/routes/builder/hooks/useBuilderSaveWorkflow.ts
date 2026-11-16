@@ -4,10 +4,14 @@ import { useCallback } from 'react'
 
 import type { AlertMessage } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
-import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
+import type { Trigger, WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'
 import type { ValidationError } from '../builderReducer'
-import { extractValidationErrors, extractValidationErrorsFromUnknown } from '../useWorkflowVerification'
+import {
+  bindFilterValidationSources,
+  extractValidationErrors,
+  extractValidationErrorsFromUnknown,
+} from '../useWorkflowVerification'
 import { buildWorkflowDefinition } from '../utils/workflowDefinitionBuilder'
 import { DEFAULT_WORKFLOW_NAME, getNextDefaultWorkflowName } from '../utils/workflowNaming'
 import type { ConflictInfo } from '../VersionConflictDialog'
@@ -235,6 +239,7 @@ async function processSaveResult(
   saveResult: { data?: SaveResponseData; error?: unknown },
   ctx: {
     willPatchExisting: boolean
+    triggers: Trigger[] | undefined
     isNew: boolean
     nameToSave: string
     showError: (options: AlertMessage) => void
@@ -250,11 +255,8 @@ async function processSaveResult(
   }
 ): Promise<boolean> {
   if (saveResult.error) {
-    reportSaveError(
-      saveResult.error,
-      ctx.willPatchExisting ? 'update' : 'create',
-      ctx.showError,
-      ctx.onValidationFindings
+    reportSaveError(saveResult.error, ctx.willPatchExisting ? 'update' : 'create', ctx.showError, (findings) =>
+      ctx.onValidationFindings?.(bindFilterValidationSources(findings, ctx.triggers))
     )
     return false
   }
@@ -263,7 +265,11 @@ async function processSaveResult(
   const verb = ctx.isNew ? 'created' : 'saved'
   if (hasIssues) {
     ctx.showWarning({ title: `Workflow ${verb} with warnings`, description: `${ctx.nameToSave} has been saved.` })
-    reportSaveValidationIssues(saveResult.data, ctx.onValidationFindings, ctx.onSaveWithValidationIssues)
+    reportSaveValidationIssues(
+      saveResult.data,
+      (findings) => ctx.onValidationFindings?.(bindFilterValidationSources(findings, ctx.triggers)),
+      ctx.onSaveWithValidationIssues
+    )
     syncToolSelectionsFromResponse(saveResult.data)
   } else {
     ctx.showSuccess({ title: `Workflow ${verb}`, description: `${ctx.nameToSave} has been saved.` })
@@ -339,6 +345,7 @@ export function useBuilderSaveWorkflow(
           : workflowName
 
       const workflowDef = getWorkflowDefinition()
+      const submittedTriggers = useWorkflowStore.getState().currentWorkflow?.triggers
       workflowDef.name = nameToSave
       const { createPayload, patchPayload } = buildSavePayloads({
         nameToSave,
@@ -361,6 +368,7 @@ export function useBuilderSaveWorkflow(
 
       return processSaveResult(saveResult, {
         willPatchExisting,
+        triggers: submittedTriggers,
         isNew,
         nameToSave,
         showError,

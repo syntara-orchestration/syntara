@@ -1,3 +1,4 @@
+import { workflowFilterFindings, workflowFilterProblem } from './utils/workflowFilterFindings'
 import { http, HttpResponse } from 'msw'
 import { v4 as uuidv4 } from 'uuid'
 import { mockDate } from './resources/mockDates'
@@ -1041,6 +1042,8 @@ export const handlers = [
       labels?: Record<string, string>
       project_id?: string
     }
+    const filterProblem = workflowFilterProblem(body.workflow_definition)
+    if (filterProblem) return HttpResponse.json(filterProblem, { status: 422 })
     const now = new Date().toISOString()
     const workflowId = uuidv4()
     const labelRecord = body.labels ?? {}
@@ -1098,7 +1101,8 @@ export const handlers = [
       )
     }
 
-    const errors: Array<{ message: string; node_id: string | null }> = []
+    const errors: Array<{ message: string; node_id?: string | null; field_path?: string | null }> =
+      workflowFilterFindings(definition)
     if (!Array.isArray(definition.triggers) || definition.triggers.length === 0) {
       errors.push({ message: 'Workflow must have at least one trigger', node_id: null })
     }
@@ -1129,7 +1133,7 @@ export const handlers = [
         category: 'schema_violation' as const,
         message: e.message,
         node_id: e.node_id,
-        field_path: null,
+        field_path: e.field_path ?? null,
       }))
       return HttpResponse.json({
         is_valid: false,
@@ -1178,6 +1182,8 @@ export const handlers = [
     }
 
     const body = (await request.request.json()) as UpdateWorkflowBody & { expected_version?: number | null }
+    const filterProblem = workflowFilterProblem(body.workflow_definition)
+    if (filterProblem) return HttpResponse.json(filterProblem, { status: 422 })
     const now = new Date().toISOString()
     const currentVersionNum = workflow.version?.version ?? workflow.current_version ?? 1
 

@@ -1,10 +1,12 @@
 import { Content, ExpandableSection, Stack, StackItem, TextArea } from '@patternfly/react-core'
-import { useState } from 'react'
+import { use, useState } from 'react'
 import { useForm, useFormContext, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
+import { FormFieldError } from '../../../components/FormFieldError'
 import { SynFormField } from '../../../components/forms/SynFormField'
+import { WorkflowValidationContext } from '../WorkflowValidationContext'
 
 import { KafkaFilterTest } from './KafkaFilterTest'
 import styles from './KafkaSubscribeFilter.module.css'
@@ -75,9 +77,16 @@ input.key.kind == "text" && input.key.text.matches("^order-[0-9]+$")`}</Content>
 )
 
 export function KafkaSubscribeFilter({ isReadOnly }: Readonly<{ isReadOnly: boolean }>) {
+  const validation = use(WorkflowValidationContext)
   const { control, setValue, clearErrors } = useFormContext<TriggerFormData>()
   const expression = useWatch({ control, name: 'filterExpression' }) ?? ''
   const [isTesting, setTesting] = useState(false)
+  const workflowError = validation.errors.find(
+    (error) =>
+      error.nodeId === validation.nodeId &&
+      error.fieldPath === 'parameters.filter.expression' &&
+      error.filterExpression === expression
+  )?.message
   const sampleForm = useForm({
     resolver: zodResolver(sampleSchema, undefined, { mode: 'sync' }),
     defaultValues: { sample: EXAMPLE_INPUT },
@@ -109,13 +118,14 @@ export function KafkaSubscribeFilter({ isReadOnly }: Readonly<{ isReadOnly: bool
               ref={field.ref}
               readOnly={isReadOnly}
               rows={5}
-              validated={fieldState.error ? 'error' : 'default'}
-              aria-invalid={Boolean(fieldState.error)}
-              aria-describedby={describedBy}
+              validated={(fieldState.error ?? workflowError) ? 'error' : 'default'}
+              aria-invalid={Boolean(fieldState.error ?? workflowError)}
+              aria-describedby={workflowError && !fieldState.error ? 'kafka-filter-workflow-error' : describedBy}
               spellCheck={false}
             />
           )}
         </SynFormField>
+        {workflowError && <FormFieldError id="kafka-filter-workflow-error" message={workflowError} />}
       </StackItem>
       {!isReadOnly && (
         <StackItem>

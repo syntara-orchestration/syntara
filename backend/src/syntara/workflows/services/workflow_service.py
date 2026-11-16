@@ -54,6 +54,7 @@ from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowModifyError,
     ScheduledTriggerSyncError,
+    WorkflowDefinitionInvalidError,
     WorkflowHasActiveExecutionsError,
     WorkflowNameConflictError,
     WorkflowNotFoundError,
@@ -471,6 +472,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             workflow_definition, allow_incomplete=allow_incomplete_subscriptions
         )
         if findings:
+            if any(finding.field_path == "parameters.filter.expression" for finding in findings):
+                raise WorkflowDefinitionInvalidError(ValidationResult.from_findings(findings))
             raise SafeValueError(findings[0].message)
         credential_ids = self._extract_credential_ids(workflow_definition)
 

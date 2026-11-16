@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import {
   useWorkflowVerification,
   extractValidationErrors,
+  bindFilterValidationSources,
   extractValidationErrorsFromUnknown,
 } from './useWorkflowVerification'
 
@@ -1117,4 +1118,36 @@ describe('verification of incomplete nodes', () => {
       expect(mockSetValidationErrorCount).toHaveBeenCalledWith(3)
     })
   })
+})
+
+it('binds a workflow filter finding to the submitted source rather than newer store input', () => {
+  const expression = '  input.\n '
+  const submitted = [
+    { id: 'kafka', name: 'Orders', type: 'event_subscribe_trigger', parameters: { filter: { expression } } },
+  ]
+  mockGetState.mockReturnValue({
+    currentWorkflow: {
+      workflow: { activities: [] },
+      triggers: [{ ...submitted[0], parameters: { filter: { expression: 'true' } } }],
+    },
+  })
+  const findings = extractValidationErrors({
+    validation_result: {
+      findings: [
+        {
+          node_id: 'kafka',
+          field_path: 'parameters.filter.expression',
+          message: 'CEL filter: Syntax error at line 1, column 9.',
+          severity: 'error',
+        },
+      ],
+    },
+  })
+  expect(bindFilterValidationSources(findings ?? [], submitted)).toEqual([
+    expect.objectContaining({
+      nodeId: 'kafka',
+      fieldPath: 'parameters.filter.expression',
+      filterExpression: expression,
+    }),
+  ])
 })
