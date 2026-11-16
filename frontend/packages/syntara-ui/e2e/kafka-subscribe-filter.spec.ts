@@ -24,6 +24,30 @@ function filterExpression(payload: unknown): string {
 }
 
 test.describe('Kafka Subscribe CEL filter', () => {
+  test('describes the actual sample editor in inline and expanded modes', async ({ app }) => {
+    await app.goto(toAppUrl('/workflow-builder/new'))
+    await app.getByRole('button', { name: 'Kafka Subscribe trigger', exact: true }).click()
+    await app.getByRole('button', { name: 'Test filter expression', exact: true }).click()
+    const hint = /The sample is bound directly as input, without a wrapper or Kafka decoding/
+    const sample = app.getByRole('textbox', { name: /^Sample JSON/ })
+    await expect(sample).toHaveAccessibleDescription(hint)
+    await sample.focus()
+    await expect(sample).toBeFocused()
+    await app.getByRole('button', { name: 'Open in new window', exact: true }).click()
+    const dialog = app.getByRole('dialog', { name: 'Edit sample JSON modal', exact: true })
+    const expanded = dialog.getByRole('textbox', { name: /^Sample JSON expanded/ })
+    await expect(expanded).toHaveAccessibleDescription(hint)
+    await expanded.focus()
+    await expect(expanded).toBeFocused()
+    const results = await new AxeBuilder({ page: app })
+      .include('[role="dialog"]')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze()
+    expect(results.violations).toEqual([])
+    await app.keyboard.press('Escape')
+    await expect(sample).toHaveAccessibleDescription(hint)
+  })
+
   test('tests unsaved input without Kafka resources and distinguishes validation and evaluation outcomes', async ({
     app,
   }, testInfo) => {

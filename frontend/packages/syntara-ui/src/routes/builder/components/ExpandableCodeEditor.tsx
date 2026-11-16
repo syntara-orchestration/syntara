@@ -2,7 +2,7 @@ import { CodeEditor, CodeEditorControl, Language } from '@patternfly/react-code-
 import { Button, Content, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
 import { RhUiExternalLinkIcon } from '@patternfly/react-icons'
 import type { KeyboardEvent, Ref } from 'react'
-import { useCallback, useImperativeHandle, useState } from 'react'
+import { useCallback, useId, useImperativeHandle, useState } from 'react'
 
 import { useBlurOnOpen } from '../../../hooks/useBlurOnOpen'
 import { useDropTarget } from '../../../hooks/useDropTarget'
@@ -27,6 +27,12 @@ const languageMap: Record<CodeLanguage, Language> = {
  */
 function stopKeyboardPropagation(e: KeyboardEvent) {
   e.stopPropagation()
+}
+
+// Monaco owns the focused textbox; ARIA attributes on CodeEditor's wrapper do not reach it.
+function describeEditorInput(input: Element | null, descriptionId: string | undefined) {
+  if (descriptionId) input?.setAttribute('aria-describedby', descriptionId)
+  else input?.removeAttribute('aria-describedby')
 }
 
 export type ExpandableCodeEditorHandle = {
@@ -66,6 +72,10 @@ export type ExpandableCodeEditorProps = {
   isReadOnly?: boolean
   /** Accessible label for the editor */
   ariaLabel?: string
+  /** Helper or validation text announced when either editor receives focus. */
+  description?: string
+  /** Existing inline helper text ID; the expanded editor uses its own description inside the dialog. */
+  ariaDescribedBy?: string
   /** Whether to show line numbers (default: true) */
   isLineNumbersVisible?: boolean
   /**
@@ -92,6 +102,8 @@ export function ExpandableCodeEditor({
   modalTitle = 'Edit script',
   isReadOnly = false,
   ariaLabel = 'Code editor',
+  description,
+  ariaDescribedBy,
   isLineNumbersVisible = true,
   isDarkTheme,
   onBlur,
@@ -100,6 +112,9 @@ export function ExpandableCodeEditor({
   ref,
 }: ExpandableCodeEditorProps) {
   const { colorScheme } = useColorScheme()
+  const descriptionId = useId()
+  const inlineDescriptionId = ariaDescribedBy ?? (description ? `${descriptionId}-inline` : undefined)
+  const expandedDescriptionId = description ? `${descriptionId}-expanded` : undefined
 
   // Use prop if provided (for testing), otherwise use app theme
   const effectiveTheme = isDarkTheme ?? colorScheme === 'dark'
@@ -167,6 +182,11 @@ export function ExpandableCodeEditor({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onFocusCapture={(event) => {
+          if (event.target.matches('[role="textbox"], textarea')) {
+            describeEditorInput(event.target, inlineDescriptionId)
+          }
+        }}
         style={isDropTarget ? DROP_TARGET_OUTLINE : undefined}
       >
         <CodeEditor
@@ -175,7 +195,10 @@ export function ExpandableCodeEditor({
             setValue(value)
             onCodeChange(value)
           }}
-          onEditorDidMount={handleEditorDidMount}
+          onEditorDidMount={(editor) => {
+            handleEditorDidMount(editor)
+            describeEditorInput(editor.getDomNode()?.querySelector('[role="textbox"]') ?? null, inlineDescriptionId)
+          }}
           onKeyDown={stopKeyboardPropagation}
           language={monacoLanguage}
           height={height}
@@ -192,6 +215,11 @@ export function ExpandableCodeEditor({
           options={{ ariaLabel }}
         />
       </div>
+      {description && !ariaDescribedBy && (
+        <Content component="p" id={inlineDescriptionId} className="pf-v6-u-screen-reader">
+          {description}
+        </Content>
+      )}
 
       <Modal isOpen={isModalOpen} onClose={handleModalClose} variant="large" aria-label={`${modalTitle} modal`}>
         <ModalHeader
@@ -204,12 +232,25 @@ export function ExpandableCodeEditor({
           }
         />
         <ModalBody>
-          <div data-testid="modal-code-editor">
+          <div
+            data-testid="modal-code-editor"
+            onFocusCapture={(event) => {
+              if (event.target.matches('[role="textbox"], textarea')) {
+                describeEditorInput(event.target, expandedDescriptionId)
+              }
+            }}
+          >
             <CodeEditor
               code={code}
               onCodeChange={(value) => {
                 setValue(value)
                 onCodeChange(value)
+              }}
+              onEditorDidMount={(editor) => {
+                describeEditorInput(
+                  editor.getDomNode()?.querySelector('[role="textbox"]') ?? null,
+                  expandedDescriptionId
+                )
               }}
               onKeyDown={stopKeyboardPropagation}
               language={monacoLanguage}
@@ -221,6 +262,11 @@ export function ExpandableCodeEditor({
               options={{ ariaLabel: `${ariaLabel} expanded` }}
             />
           </div>
+          {description && (
+            <Content component="p" id={expandedDescriptionId} className="pf-v6-u-screen-reader">
+              {description}
+            </Content>
+          )}
         </ModalBody>
         <ModalFooter>
           <Button variant="primary" onClick={handleModalClose}>

@@ -344,14 +344,27 @@ it('keeps testing guidance in accessible help and retains the sample in the expa
   const user = userEvent.setup()
   const { container } = renderFilter('true')
   await openFilterTest()
+  const sample = screen.getByRole('textbox', { name: SAMPLE_LABEL })
+  await user.click(sample)
+  expect(sample).toHaveAccessibleDescription(
+    /The sample is bound directly as input, without a wrapper or Kafka decoding/
+  )
   expect(screen.queryByText(/Sample testing does not consume Kafka messages/)).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'More info for Test filter' }))
   expect(await screen.findByText(/Sample testing does not consume Kafka messages/)).toBeVisible()
   await user.keyboard('{Escape}')
   await user.click(screen.getByRole('button', { name: 'Open in new window' }))
   const expanded = screen.getByRole('textbox', { name: 'Sample JSON expanded' })
+  await user.click(expanded)
+  expect(expanded).toHaveAccessibleDescription(
+    /The sample is bound directly as input, without a wrapper or Kafka decoding/
+  )
   await user.clear(expanded)
+  expect(expanded).toHaveAccessibleDescription('Enter valid JSON before testing the filter')
   await user.type(expanded, 'null')
+  expect(expanded).toHaveAccessibleDescription(
+    /The sample is bound directly as input, without a wrapper or Kafka decoding/
+  )
   await user.keyboard('{Escape}')
   expect(screen.getByRole('textbox', { name: SAMPLE_LABEL })).toHaveValue('null')
   expect(await axe(container)).toHaveNoViolations()

@@ -15,6 +15,9 @@ import { hasKafkaFilterExpression } from './kafkaSubscribeMapping'
 import { zodResolver } from './shared/formSchemaUtils'
 import type { TriggerFormData } from './triggerFormSchema'
 
+const SAMPLE_HINT =
+  'The sample is bound directly as input, without a wrapper or Kafka decoding. Edit this Kafka-shaped example to try different messages.'
+
 const sampleSchema = z.object({
   sample: z.string().refine((value) => {
     try {
@@ -132,9 +135,9 @@ export function KafkaSubscribeFilter({ isReadOnly }: Readonly<{ isReadOnly: bool
                     control={sampleForm.control}
                     label="Sample JSON"
                     fieldId="kafka-filter-sample"
-                    hint="The sample is bound directly as input, without a wrapper or Kafka decoding. Edit this Kafka-shaped example to try different messages."
+                    hint={SAMPLE_HINT}
                   >
-                    {({ field, describedBy }) => (
+                    {({ field, fieldState, describedBy }) => (
                       <div
                         id="kafka-filter-sample"
                         role="group"
@@ -150,6 +153,8 @@ export function KafkaSubscribeFilter({ isReadOnly }: Readonly<{ isReadOnly: bool
                           height="240px"
                           modalTitle="Edit sample JSON"
                           ariaLabel="Sample JSON"
+                          ariaDescribedBy={describedBy}
+                          description={fieldState.error?.message ?? SAMPLE_HINT}
                         />
                       </div>
                     )}
