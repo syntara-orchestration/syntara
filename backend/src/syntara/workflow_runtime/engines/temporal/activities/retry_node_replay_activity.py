@@ -29,16 +29,12 @@ with workflow.unsafe.imports_passed_through():
     from syntara.core.constants import JsonbLimits
     from syntara.core.database.session import get_db
     from syntara.core.exceptions import SafeValueError
-    from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
     from syntara.workflow_core.models import NodeType
-    from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
     from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
         join_loop_iteration_id,
         strip_loop_iteration_suffixes,
     )
-        join_loop_iteration_id,
-        strip_loop_iteration_suffixes,
-    )
+    from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 
 logger = structlog.stdlib.get_logger(__name__)
 
