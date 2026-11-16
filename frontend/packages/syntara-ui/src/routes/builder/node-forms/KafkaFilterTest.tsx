@@ -2,6 +2,7 @@ import { Alert, Button, Content, Stack, StackItem } from '@patternfly/react-core
 import { useFormContext } from 'react-hook-form'
 
 import { filteringClient } from '../../../client'
+import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { detachPromise } from '../../../utils/detachPromise'
 
@@ -84,14 +85,10 @@ export function KafkaFilterTest({
         >
           Test filter
         </Button>
-      </StackItem>
-      <StackItem>
-        <Content component="p">
-          Test the unsaved expression without saving or selecting Kafka resources. This is separate from Test runtime
-          access. Sample testing does not consume Kafka messages, validate the payload schema, or trigger workflows. One
-          successful sample does not guarantee successful evaluation for every message. Saving and publication still use
-          server validation.
-        </Content>
+        <FieldHelpPopover
+          headerContent="Test filter"
+          helpText="Test the unsaved expression without saving or selecting Kafka resources. This is separate from Test runtime access. Sample testing does not consume Kafka messages, validate the payload schema, or trigger workflows. One successful sample does not guarantee successful evaluation for every message. Saving and publication still use server validation."
+        />
       </StackItem>
     </Stack>
   )
