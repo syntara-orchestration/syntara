@@ -23,7 +23,7 @@ T = TypeVar("T", bound="WorkflowDetailRead")
 
 @_attrs_define
 class WorkflowDetailRead:
-    """Workflow detail response with metadata for its published version.
+    """Workflow detail response.
 
     Attributes:
         name (str): Workflow name

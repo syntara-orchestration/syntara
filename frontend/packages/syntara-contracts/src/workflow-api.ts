@@ -483,7 +483,7 @@ export interface components {
     }
     /**
      * WorkflowDetailRead
-     * @description Workflow detail response with metadata for its published version.
+     * @description Workflow detail response.
      */
     WorkflowDetailRead: {
       /**
