@@ -36133,7 +36133,6 @@ components:
               pattern: ^[a-zA-Z0-9._-]+$
             - type: 'null'
           title: Group Id
-          default: null
         input_schema:
           anyOf:
             - additionalProperties: true

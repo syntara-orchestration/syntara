@@ -358,10 +358,7 @@ export interface components {
       /** Topic */
       topic: string
       start?: components['schemas']['KafkaStartConfiguration']
-      /**
-       * Group Id
-       * @default null
-       */
+      /** Group Id */
       group_id?: string | null
       /** Input Schema */
       input_schema?: {
