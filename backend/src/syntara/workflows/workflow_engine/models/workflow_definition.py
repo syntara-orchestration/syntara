@@ -826,20 +826,26 @@ class SubWorkflowExecutorParameters(BaseModel):
         ),
     )
 
+    @staticmethod
+    def parse_workflow_id(v: str) -> uuid.UUID:
+        """Parse a canonical workflow UUID, rejecting template expressions."""
+        msg = (
+            f"Invalid UUID format for workflow_id: '{v}'. Must be a canonical UUID; "
+            "template expressions are not supported for V1 sub-workflow references."
+        )
+        try:
+            parsed_uuid = uuid.UUID(v)
+        except ValueError as exc:
+            raise SafeValueError(msg) from exc
+        if str(parsed_uuid) != v.lower():
+            raise SafeValueError(msg)
+        return parsed_uuid
+
     @field_validator("workflow_id")
     @classmethod
     def validate_workflow_id_format(cls, v: str) -> str:
         """Validate that workflow_id is a selected workflow UUID, never an expression."""
-        try:
-            parsed_uuid = uuid.UUID(v)
-        except ValueError:
-            parsed_uuid = None
-        if parsed_uuid is None or str(parsed_uuid) != v.lower():
-            msg = (
-                f"Invalid UUID format for workflow_id: '{v}'. Must be a canonical UUID; "
-                "template expressions are not supported for V1 sub-workflow references."
-            )
-            raise SafeValueError(msg)
+        cls.parse_workflow_id(v)
         return v
 
 

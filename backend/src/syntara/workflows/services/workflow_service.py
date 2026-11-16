@@ -1131,8 +1131,9 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         child_workflow_id: UUID,
         project_id: UUID,
         allowed_projects: AllowedProjectsResult,
+        changed_trigger_ids: set[str],
     ) -> list[WorkflowReferenceRead]:
-        """Return visible, currently published parent steps that reference a child workflow."""
+        """Return visible, published parent steps referencing changed child triggers."""
         if not allowed_projects.all_projects and project_id not in allowed_projects.project_ids:
             return []
 
@@ -1159,6 +1160,9 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 parameters = node.get("parameters")
                 if not isinstance(parameters, dict) or parameters.get("workflow_id") != str(child_workflow_id):
                     continue
+                selected_trigger_id = parameters.get("trigger_node_id")
+                if isinstance(selected_trigger_id, str) and selected_trigger_id not in changed_trigger_ids:
+                    continue
                 matching_references.append(
                     (
                         parent,
@@ -1181,11 +1185,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
     async def get_workflow_invocation_schema(self, workflow: Workflow) -> WorkflowInvocationSchemaRead:
         """Return trigger schemas from the latest published version."""
-        if workflow.published_version_id is None:
+        published_version_id = workflow.published_version_id
+        if published_version_id is None:
             raise WorkflowNotPublishedError(workflow.id)
-        selected_version = await self.session.get(WorkflowVersion, workflow.published_version_id)
+        selected_version = await self.session.get(WorkflowVersion, published_version_id)
         if selected_version is None:
-            raise WorkflowVersionNotFoundError(workflow.id, workflow.current_version)
+            raise WorkflowVersionNotFoundError(workflow.id, published_version_id)
 
         invocation_triggers: list[WorkflowInvocationTriggerSchema] = []
         trigger_definitions = selected_version.workflow_definition.get("triggers", [])

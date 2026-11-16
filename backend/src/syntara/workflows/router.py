@@ -603,6 +603,7 @@ async def check_breaking_changes(
             workflow.id,
             workflow.project_id,
             visibility.to_allowed_projects(),
+            set(contract_changes_by_trigger),
         )
         if all_contract_changes
         else []

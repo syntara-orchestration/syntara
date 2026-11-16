@@ -96,6 +96,38 @@ class TestDetectOutputSchemaBreakingChanges:
         assert changes[0].old_type == "string"
         assert changes[0].new_type == "object"
 
+    def test_validation_constraint_changes_are_reported_as_breaking(self) -> None:
+        old_schema = {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {"status": {"type": "string", "enum": ["ready", "complete"], "minLength": 3}},
+        }
+        new_schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {"status": {"type": "string", "enum": ["ready"], "minLength": 5}},
+        }
+
+        changes = detect_output_schema_breaking_changes(old_schema, new_schema)
+
+        assert {(change.change_type, change.field_path) for change in changes} == {
+            ("constraint_change", "outputs"),
+            ("constraint_change", "status"),
+        }
+        assert all(change.is_breaking for change in changes)
+
+    def test_description_changes_and_unordered_enum_values_are_not_contract_changes(self) -> None:
+        old_schema = {
+            "type": "object",
+            "properties": {"status": {"type": "string", "enum": ["ready", "complete"], "description": "Old"}},
+        }
+        new_schema = {
+            "type": "object",
+            "properties": {"status": {"type": "string", "enum": ["complete", "ready"], "description": "New"}},
+        }
+
+        assert detect_output_schema_changes(old_schema, new_schema) == []
+
     def test_new_required_output_detected(self) -> None:
         """Detect when a new required field is added."""
         old_schema = {

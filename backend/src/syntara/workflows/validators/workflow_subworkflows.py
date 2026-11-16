@@ -63,8 +63,7 @@ def _collect_subworkflow_targets(
             )
         else:
             try:
-                SubWorkflowExecutorParameters.validate_workflow_id_format(workflow_id)
-                target_id = UUID(workflow_id)
+                target_id = SubWorkflowExecutorParameters.parse_workflow_id(workflow_id)
             except ValueError as exc:
                 findings.append(_invalid_reference_finding(str(exc), node_id, "parameters.workflow_id"))
 

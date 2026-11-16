@@ -194,6 +194,12 @@ describe('InputSchemaPreview', () => {
     expect(marks.length).toBeGreaterThan(0)
   })
 
+  it('highlights a field-name match when its description does not match', () => {
+    render(<InputSchemaPreview fields={sampleFields} nodeId="step-1" searchTerm="exit_code" />)
+
+    expect(screen.getByText('exit_code', { selector: 'mark' })).toBeInTheDocument()
+  })
+
   it('shows all fields when searchTerm is empty', () => {
     render(<InputSchemaPreview fields={sampleFields} nodeId="step-1" searchTerm="" />)
 

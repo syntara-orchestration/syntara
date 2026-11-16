@@ -76,10 +76,13 @@ function PreviewField({
     </Label>
   )
 
+  const fieldLabel = `${typeLabel} ${name}`
   const label = (
     <Flex className={styles.fieldLabel} alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
       <FlexItem>
-        <Content component={ContentVariants.small}>{`${typeLabel} ${name}`}</Content>
+        <Content component={ContentVariants.small}>
+          {searchTerm ? highlightText(fieldLabel, searchTerm) : fieldLabel}
+        </Content>
       </FlexItem>
       <FlexItem>{requiredBadge}</FlexItem>
     </Flex>
@@ -87,7 +90,7 @@ function PreviewField({
 
   return (
     <DraggableTreeLeaf
-      label={searchTerm && typeof label === 'string' ? highlightText(label, searchTerm) : label}
+      label={label}
       secondaryText={searchTerm ? highlightText(description, searchTerm) : description}
       onDragStart={handleDragStart}
     />

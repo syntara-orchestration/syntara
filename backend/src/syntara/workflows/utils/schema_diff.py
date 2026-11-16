@@ -1,6 +1,63 @@
 """Utilities for detecting breaking changes in SubWorkflow output schemas."""
 
+import json
 from typing import Any
+
+_SCHEMA_ANNOTATION_KEYS = frozenset(
+    {
+        "$comment",
+        "$id",
+        "$schema",
+        "default",
+        "deprecated",
+        "description",
+        "examples",
+        "readOnly",
+        "title",
+        "writeOnly",
+    }
+)
+_SCHEMA_STRUCTURE_KEYS = frozenset({"properties", "required", "type"})
+_ORDER_INSENSITIVE_SCHEMA_ARRAYS = frozenset({"allOf", "anyOf", "enum", "oneOf", "required", "type"})
+
+
+def _normalize_schema_constraint(value: object, keyword: str | None = None) -> object:
+    if isinstance(value, dict):
+        return {
+            key: _normalize_schema_constraint(item, key)
+            for key, item in value.items()
+            if isinstance(key, str) and key not in _SCHEMA_ANNOTATION_KEYS
+        }
+    if isinstance(value, list):
+        normalized = [_normalize_schema_constraint(item) for item in value]
+        if keyword in _ORDER_INSENSITIVE_SCHEMA_ARRAYS:
+            return sorted(normalized, key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":")))
+        return normalized
+    return value
+
+
+def _validation_constraints(schema: dict[str, Any], *, include_type: bool = False) -> dict[str, object]:
+    structure_keys = _SCHEMA_STRUCTURE_KEYS - ({"type"} if include_type else set())
+    return {
+        key: _normalize_schema_constraint(value, key)
+        for key, value in schema.items()
+        if key not in _SCHEMA_ANNOTATION_KEYS and key not in structure_keys
+    }
+
+
+def _extract_validation_constraints_flat(schema: dict[str, Any], prefix: str = "") -> dict[str, dict[str, object]]:
+    """Extract validation keywords by output path, including root-level constraints."""
+    result = {prefix or "outputs": _validation_constraints(schema, include_type=not prefix)}
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return result
+
+    for field_name, field_schema in properties.items():
+        if not isinstance(field_name, str) or not isinstance(field_schema, dict):
+            continue
+        field_path = f"{prefix}.{field_name}" if prefix else field_name
+        result.update(_extract_validation_constraints_flat(field_schema, field_path))
+    return result
 
 
 class OutputSchemaChange:
@@ -36,17 +93,16 @@ class OutputSchemaChange:
 
     def _build_description(self) -> str:
         """Build a human-readable description of the change."""
-        if self.change_type == "removed_output":
-            return f"Removed output: {self.field_path}"
         if self.change_type == "type_change":
             return f"Type changed: {self.field_path} ({self.old_type} → {self.new_type})"
-        if self.change_type == "new_required_output":
-            return f"New required output: {self.field_path}"
-        if self.change_type == "added_output":
-            return f"Added optional output: {self.field_path}"
-        if self.change_type == "optional_output":
-            return f"Output is now optional: {self.field_path}"
-        return f"Changed: {self.field_path}"
+        descriptions = {
+            "removed_output": f"Removed output: {self.field_path}",
+            "new_required_output": f"New required output: {self.field_path}",
+            "added_output": f"Added optional output: {self.field_path}",
+            "optional_output": f"Output is now optional: {self.field_path}",
+            "constraint_change": f"Output validation constraints changed: {self.field_path}",
+        }
+        return descriptions.get(self.change_type, f"Changed: {self.field_path}")
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
@@ -180,11 +236,24 @@ def detect_output_schema_changes(
     old_fields = _extract_properties_flat(old_schema) if old_schema is not None else {}
     new_fields = _extract_properties_flat(new_schema) if new_schema is not None else {}
     first_declaration = old_schema is None
-    return [
+    changes = [
         *_removed_output_changes(old_fields, new_fields),
         *_changed_output_changes(old_fields, new_fields),
         *_added_output_changes(old_fields, new_fields, first_declaration=first_declaration),
     ]
+    if old_schema is not None and new_schema is not None:
+        old_constraints = _extract_validation_constraints_flat(old_schema)
+        new_constraints = _extract_validation_constraints_flat(new_schema)
+        changes.extend(
+            OutputSchemaChange(
+                change_type="constraint_change",
+                field_path=field_path,
+                description=f"Output validation constraints changed: {field_path}",
+            )
+            for field_path in old_constraints.keys() & new_constraints.keys()
+            if old_constraints[field_path] != new_constraints[field_path]
+        )
+    return changes
 
 
 def detect_output_schema_breaking_changes(
