@@ -132,7 +132,7 @@ test.describe('UI-12: Manual group mapping — configuration screen', () => {
       await saveGroupMapping(app)
 
       await expect(app.getByText('Group mapping saved')).toBeVisible()
-      await expect(app.getByRole('button', { name: /Edit group mapping/i })).toBeVisible()
+      await expect(app.getByRole('link', { name: /Edit group mapping/i })).toBeVisible()
       await expect(app.getByText(idpGroupValue)).toBeVisible()
       await expect(app.getByText('admins', { exact: true })).toBeVisible()
     } finally {
