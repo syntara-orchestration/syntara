@@ -112,3 +112,31 @@ def test_conflicting_nested_paths_fail_contract() -> None:
             schema,
             {"release": "${deploy.url}", "release.url": "${deploy.url}"},
         )
+
+
+@pytest.mark.parametrize(
+    "output_mapping",
+    [
+        {"release": "${deploy.result}", "release.url": "${deploy.url}"},
+        {"release.url": "${deploy.url}", "release": "${deploy.result}"},
+    ],
+)
+def test_overlapping_parent_and_child_mappings_fail_regardless_of_order(
+    output_mapping: dict[str, str],
+) -> None:
+    resolver = NamespaceResolver()
+    resolver.set_namespace("deploy", {"result": {"url": "from parent"}, "url": "from child"})
+    schema = {
+        "type": "object",
+        "properties": {"release": {"type": "object", "properties": {"url": {"type": "string"}}}},
+    }
+
+    with pytest.raises(DeclaredOutputContractError, match="Conflicting"):
+        apply_declared_output_mapping(resolver, schema, output_mapping)
+
+
+def test_dotted_schema_property_name_fails_contract() -> None:
+    schema = {"type": "object", "properties": {"release.tag": {"type": "string"}}}
+
+    with pytest.raises(DeclaredOutputContractError, match="Invalid declared output path"):
+        apply_declared_output_mapping(_resolver(), schema, {"release.tag": "${deploy.url}"})

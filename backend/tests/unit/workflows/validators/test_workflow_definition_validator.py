@@ -1290,6 +1290,90 @@ class TestSubWorkflowOutputMappingValidation:
         }
         validator.validate_workflow_definition(definition)
 
+    def test_output_mapping_rejects_step_unreachable_from_selected_trigger(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "trigger-scoped-output-mapping",
+            "triggers": [
+                {
+                    "id": "deploy_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {"type": "object", "properties": {"url": {"type": "string"}}},
+                        "output_mapping": {"url": "${deploy.stdout}"},
+                    },
+                },
+                {"id": "audit_trigger", "type": "subworkflow_trigger", "parameters": {}},
+            ],
+            "nodes": [
+                {"id": "deploy", "type": "script", "parameters": {"language": "python", "code": "print(1)"}},
+                {"id": "audit", "type": "script", "parameters": {"language": "python", "code": "print(2)"}},
+            ],
+            "edges": [
+                {"from": "deploy_trigger", "to": "audit"},
+                {"from": "audit_trigger", "to": "deploy"},
+            ],
+        }
+
+        with pytest.raises(SafeValueError, match="not reachable from Subworkflow Trigger 'deploy_trigger'"):
+            validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_rejects_overlapping_parent_and_child_paths(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "overlapping-output-mapping",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "release": {
+                                    "type": "object",
+                                    "properties": {"url": {"type": "string"}},
+                                }
+                            },
+                        },
+                        "output_mapping": {
+                            "release": "${deploy.stdout_json}",
+                            "release.url": "${deploy.stdout}",
+                        },
+                    },
+                }
+            ],
+            "nodes": [{"id": "deploy", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "deploy"}],
+        }
+
+        with pytest.raises(SafeValueError, match=r"Output mappings 'release' and 'release\.url' overlap"):
+            validator.validate_workflow_definition(definition)
+
+    def test_output_schema_rejects_property_names_containing_dots(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "dotted-output-property",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {"release.tag": {"type": "string"}},
+                        },
+                        "output_mapping": {"release.tag": "${deploy.stdout}"},
+                    },
+                }
+            ],
+            "nodes": [{"id": "deploy", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "deploy"}],
+        }
+
+        with pytest.raises(SafeValueError, match="contains a dot, which is reserved for nested output paths"):
+            validator.validate_workflow_definition(definition)
+
     def test_output_mapping_references_unknown_step(self, validator: WorkflowValidator) -> None:
         """output_mapping referencing unknown step raises error."""
         definition: dict[str, Any] = {

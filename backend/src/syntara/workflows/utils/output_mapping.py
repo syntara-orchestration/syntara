@@ -54,6 +54,11 @@ def _declared_schema_paths(schema: dict[str, Any], prefix: tuple[str, ...] = ())
     for name, property_schema in properties.items():
         if not isinstance(name, str) or not isinstance(property_schema, dict):
             continue
+        if "." in name:
+            raise DeclaredOutputContractError(
+                DeclaredOutputErrorCode.INVALID_PATH,
+                ".".join((*prefix, name)),
+            )
         path = (*prefix, name)
         paths.add(".".join(path))
         paths.update(_declared_schema_paths(property_schema, path))
@@ -72,8 +77,7 @@ def _set_declared_output(outputs: dict[str, Any], path: list[str], value: object
         current = child
 
     leaf_name = path[-1]
-    existing_value = current.get(leaf_name)
-    if leaf_name in current and (isinstance(existing_value, dict) or isinstance(value, dict)):
+    if leaf_name in current:
         raise DeclaredOutputContractError(DeclaredOutputErrorCode.CONFLICTING_PATH, leaf_name)
     current[leaf_name] = value
 
@@ -101,6 +105,23 @@ def _resolve_declared_source_value(
         if source_step_ids is None or source_id not in source_step_ids:
             return False, None
         raise DeclaredOutputContractError(DeclaredOutputErrorCode.SOURCE_PATH_UNAVAILABLE, expression.strip()) from exc
+
+
+def _validate_declared_mapping_paths(output_mapping: dict[str, str] | None) -> dict[str, str]:
+    mappings = output_mapping or {}
+    mapping_paths: list[str] = []
+    for output_path, expression in mappings.items():
+        if not isinstance(output_path, str) or not isinstance(expression, str):
+            raise DeclaredOutputContractError(DeclaredOutputErrorCode.MAPPING_TYPE)
+        if any(not segment for segment in output_path.split(".")):
+            raise DeclaredOutputContractError(DeclaredOutputErrorCode.INVALID_PATH, output_path)
+        mapping_paths.append(output_path)
+
+    for index, path in enumerate(mapping_paths):
+        for other_path in mapping_paths[index + 1 :]:
+            if other_path.startswith(f"{path}.") or path.startswith(f"{other_path}."):
+                raise DeclaredOutputContractError(DeclaredOutputErrorCode.CONFLICTING_PATH, other_path)
+    return mappings
 
 
 def apply_output_mapping(result: dict[str, Any], output_config: dict[str, str] | None) -> dict[str, Any]:
@@ -163,15 +184,12 @@ def apply_declared_output_mapping(
     child workflow so a parent never receives a successful result that violates
     the published contract.
     """
+    mappings = _validate_declared_mapping_paths(output_mapping)
     declared: dict[str, Any] = {}
     schema_paths = _declared_schema_paths(output_schema)
 
-    for output_path, expression in (output_mapping or {}).items():
-        if not isinstance(output_path, str) or not isinstance(expression, str):
-            raise DeclaredOutputContractError(DeclaredOutputErrorCode.MAPPING_TYPE)
+    for output_path, expression in mappings.items():
         path = output_path.split(".")
-        if any(not segment for segment in path):
-            raise DeclaredOutputContractError(DeclaredOutputErrorCode.INVALID_PATH, output_path)
         if output_path not in schema_paths:
             raise DeclaredOutputContractError(DeclaredOutputErrorCode.UNDECLARED_PATH, output_path)
         is_available, value = _resolve_declared_source_value(

@@ -415,6 +415,38 @@ describe('triggerFormSchema — sub-workflow output contract', () => {
     }
   })
 
+  it('rejects overlapping Advanced mode mappings', () => {
+    const nestedSchema = JSON.stringify({
+      type: 'object',
+      properties: {
+        release: { type: 'object', properties: { url: { type: 'string' } } },
+      },
+    })
+    const result = parseSubworkflow(undefined, nestedSchema, {
+      release: '${build.stdout_json}',
+      'release.url': '${build.stdout}',
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('overlap'))).toBe(true)
+    }
+  })
+
+  it('rejects output schema property names containing dots', () => {
+    const dottedSchema = JSON.stringify({
+      type: 'object',
+      properties: { 'release.tag': { type: 'string' } },
+    })
+    const result = parseSubworkflow(undefined, dottedSchema, { 'release.tag': '${build.stdout}' })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      const dottedPropertyIssue = result.error.issues.find((issue) => issue.message.includes('cannot contain dots'))
+      expect(dottedPropertyIssue?.path).toEqual(['outputSchema', 'properties', 'release.tag'])
+    }
+  })
+
   it('rejects overlapping dotted output names', () => {
     const result = parseSubworkflow(undefined, undefined, undefined, [
       { path: 'intake', type: 'object', required: false },

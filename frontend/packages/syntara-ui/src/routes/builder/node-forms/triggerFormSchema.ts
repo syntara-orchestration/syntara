@@ -124,6 +124,27 @@ function getOutputSchemaPaths(schema: Record<string, unknown>) {
   return { paths, requiredPaths }
 }
 
+function validateOutputSchemaPropertyNames(
+  schema: Record<string, unknown>,
+  ctx: z.RefinementCtx,
+  prefix: string[] = []
+) {
+  const properties = schema['properties']
+  if (!isRecord(properties)) return
+
+  for (const [name, rawProperty] of Object.entries(properties)) {
+    if (!isRecord(rawProperty)) continue
+    if (name.includes('.')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Output property names cannot contain dots; use nested properties instead.',
+        path: ['outputSchema', 'properties', ...prefix, name],
+      })
+    }
+    validateOutputSchemaPropertyNames(rawProperty, ctx, [...prefix, name])
+  }
+}
+
 function validateOutputMappings(
   outputMapping: Record<string, string>,
   paths: Set<string>,
@@ -145,7 +166,20 @@ function validateOutputMappings(
       })
     }
   }
-  const mappedPaths = Object.keys(outputMapping)
+  const mappedPaths = Object.keys(outputMapping).filter((path) => paths.has(path))
+  const sortedMappedPaths = [...mappedPaths].sort()
+  for (let index = 0; index < sortedMappedPaths.length; index += 1) {
+    const path = sortedMappedPaths[index]
+    if (!path) continue
+    const nestedPath = sortedMappedPaths.slice(index + 1).find((candidate) => candidate.startsWith(`${path}.`))
+    if (nestedPath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Output mappings "${path}" and "${nestedPath}" overlap. Map either the object or its child fields, not both.`,
+        path: ['outputMapping', nestedPath],
+      })
+    }
+  }
   for (const path of requiredPaths) {
     const hasMapping = mappedPaths.some(
       (mappedPath) => path === mappedPath || path.startsWith(`${mappedPath}.`) || mappedPath.startsWith(`${path}.`)
@@ -205,6 +239,7 @@ function validateOutputContract(data: z.infer<typeof triggerFormSchemaBase>, ctx
   }
   const schema = parseOutputSchemaJson(text, ctx)
   if (!schema) return
+  validateOutputSchemaPropertyNames(schema, ctx)
   const { paths, requiredPaths } = getOutputSchemaPaths(schema)
   validateOutputMappings(outputMapping, paths, requiredPaths, ctx)
 }

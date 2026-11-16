@@ -600,11 +600,33 @@ def collect_scheduled_trigger_config_findings(
     return findings
 
 
+def _reachable_node_ids_from_trigger(trigger_id: object, edges: object) -> set[str]:
+    """Return nodes reachable from a trigger in the workflow graph."""
+    if not isinstance(trigger_id, str) or not isinstance(edges, list):
+        return set()
+
+    successors: dict[str, list[str]] = defaultdict(list)
+    for edge in edges:
+        if isinstance(edge, dict) and isinstance(edge.get("from"), str) and isinstance(edge.get("to"), str):
+            successors[edge["from"]].append(edge["to"])
+
+    reachable = {trigger_id}
+    pending = deque([trigger_id])
+    while pending:
+        current_id = pending.popleft()
+        for successor in successors.get(current_id, []):
+            if successor not in reachable:
+                reachable.add(successor)
+                pending.append(successor)
+    return reachable
+
+
 def _output_mapping_reference_findings(
     trigger: dict[str, Any],
     output_path: object,
     expression: object,
     node_ids: set[str],
+    reachable_node_ids: set[str],
     elements_by_id: dict[str, dict[str, Any]],
 ) -> list[ValidationFinding]:
     trigger_id = trigger.get("id")
@@ -614,15 +636,22 @@ def _output_mapping_reference_findings(
         return []
     referenced_step = match.group(1)
     finding_path = f"parameters.output_mapping.{output_path}"
-    if referenced_step not in node_ids:
+    if referenced_step not in node_ids or referenced_step not in reachable_node_ids:
+        if referenced_step not in node_ids:
+            message = (
+                f"Output mapping for field '{output_path}' references unknown step '{referenced_step}'. "
+                f"Expression: {expression}"
+            )
+        else:
+            message = (
+                f"Output mapping for field '{output_path}' references step '{referenced_step}', "
+                f"which is not reachable from Subworkflow Trigger '{trigger_id}'."
+            )
         return [
             ValidationFinding(
                 severity=ValidationSeverity.error,
                 category=ValidationCategory.invalid_reference,
-                message=(
-                    f"Output mapping for field '{output_path}' references unknown step '{referenced_step}'. "
-                    f"Expression: {expression}"
-                ),
+                message=message,
                 node_id=trigger_id,
                 field_path=finding_path,
             )
@@ -685,16 +714,31 @@ def _check_output_mapping_references(
         for element in elements
         if isinstance(element, dict) and isinstance(element.get("id"), str)
     }
-    return [
-        finding
-        for trigger in triggers
-        if isinstance(trigger, dict)
-        and trigger.get("type") == "subworkflow_trigger"
-        and isinstance(trigger.get("parameters"), dict)
-        and isinstance(trigger["parameters"].get("output_mapping", {}), dict)
-        for output_path, expression in trigger["parameters"].get("output_mapping", {}).items()
-        for finding in _output_mapping_reference_findings(trigger, output_path, expression, node_ids, elements_by_id)
-    ]
+    edges = workflow_definition.get("edges", [])
+    findings: list[ValidationFinding] = []
+    for trigger in triggers:
+        if (
+            not isinstance(trigger, dict)
+            or trigger.get("type") != "subworkflow_trigger"
+            or not isinstance(trigger.get("parameters"), dict)
+        ):
+            continue
+        output_mapping = trigger["parameters"].get("output_mapping", {})
+        if not isinstance(output_mapping, dict):
+            continue
+        reachable_node_ids = _reachable_node_ids_from_trigger(trigger.get("id"), edges)
+        for output_path, expression in output_mapping.items():
+            findings.extend(
+                _output_mapping_reference_findings(
+                    trigger,
+                    output_path,
+                    expression,
+                    node_ids,
+                    reachable_node_ids,
+                    elements_by_id,
+                )
+            )
+    return findings
 
 
 def _output_schema_paths(
@@ -720,6 +764,57 @@ def _output_schema_paths(
         all_paths.update(nested_paths)
         required_paths.update(nested_required)
     return all_paths, required_paths
+
+
+def _dotted_output_schema_property_findings(
+    schema: dict[str, Any], trigger_id: str | None, prefix: tuple[str, ...] = ()
+) -> list[ValidationFinding]:
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return []
+
+    findings: list[ValidationFinding] = []
+    for name, property_schema in properties.items():
+        if not isinstance(name, str) or not isinstance(property_schema, dict):
+            continue
+        property_path = (*prefix, name)
+        if "." in name:
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.schema_violation,
+                    message=(
+                        f"Output schema property '{'.'.join(property_path)}' contains a dot, "
+                        "which is reserved for nested output paths."
+                    ),
+                    node_id=trigger_id,
+                    field_path=f"parameters.output_schema.properties.{'.'.join(property_path)}",
+                )
+            )
+        findings.extend(_dotted_output_schema_property_findings(property_schema, trigger_id, property_path))
+    return findings
+
+
+def _overlapping_output_mapping_findings(mapping_paths: set[str], trigger_id: str | None) -> list[ValidationFinding]:
+    findings: list[ValidationFinding] = []
+    sorted_paths = sorted(mapping_paths)
+    for index, path in enumerate(sorted_paths):
+        for nested_path in sorted_paths[index + 1 :]:
+            if not nested_path.startswith(f"{path}."):
+                continue
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.schema_violation,
+                    message=(
+                        f"Output mappings '{path}' and '{nested_path}' overlap. "
+                        "Map either the object or its child fields, not both."
+                    ),
+                    node_id=trigger_id,
+                    field_path=f"parameters.output_mapping.{nested_path}",
+                )
+            )
+    return findings
 
 
 def _check_required_output_mappings(
@@ -785,6 +880,7 @@ def _check_output_trigger_contract(trigger: dict[str, Any]) -> list[ValidationFi
                 field_path="parameters.output_schema",
             )
         ]
+    findings.extend(_dotted_output_schema_property_findings(schema, trigger_id))
     if mapping is None:
         mapping = {}
     if not isinstance(mapping, dict):
@@ -826,6 +922,7 @@ def _check_output_trigger_contract(trigger: dict[str, Any]) -> list[ValidationFi
                 )
             )
     findings.extend(_check_required_output_mappings(required_paths, mapping_paths, trigger_id))
+    findings.extend(_overlapping_output_mapping_findings(mapping_paths, trigger_id))
     return findings
 
 
