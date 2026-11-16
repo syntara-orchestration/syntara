@@ -1,32 +1,16 @@
-"""Temporal-backed end-to-end authorization tests for Sub-workflow Reference Mode (AAP-91266).
+"""End-to-end authorization tests for sub-workflow reference mode.
 
-Unlike ``test_sub_workflow_authorization.py`` (which drives the setup activity directly against
-the real DB) and ``test_sub_workflow_integration.py`` (which runs the full parent orchestrator with
-a *mocked* session), these tests run the **full parent ``OrchestratorWorkflow`` through a real
-``WorkflowEnvironment``** while the setup activity is wired to the **real integration DB** and a
-stubbed authorization evaluator. They prove the complete runtime path end to end:
+These run the full parent ``OrchestratorWorkflow`` in a real ``WorkflowEnvironment`` with the setup
+activity wired to the real integration DB and a stubbed authorization evaluator, so the whole runtime
+path is exercised: parent orchestrator -> sub_workflow node -> setup activity -> authz engine -> DB.
 
-    parent orchestrator -> sub_workflow node -> setup activity -> real authz engine (stubbed decision)
-    -> real DB side effects.
+- Authorized: the parent completes and a child ``Execution`` row is created and linked to the parent.
+- Unauthorized: the parent run fails and no child ``Execution`` row is created. The run failure is read
+  from the orchestrator result (not a persisted parent-node row); the persisted check here is the
+  absence of the child row.
 
-What they validate, as *persisted application-level state* rather than mere Temporal completion:
-
-* Authorized invocation: the parent completes, the sub_workflow node succeeds, and a child
-  ``Execution`` row is created in the DB and linked to the parent execution (lineage metadata).
-* Unauthorized invocation: the parent run fails -- run status ``failed`` and the sub_workflow node
-  in ``failed_activities`` -- and **no child ``Execution`` row exists** in the DB after the denial.
-  Note on what is asserted: the parent-node failure is read from the orchestrator *result*
-  (``_build_result``), i.e. the Temporal workflow result, not a DB-persisted parent activity row --
-  this harness seeds the parent as RUNNING and does not run the parent-node status finalizer (that
-  path is covered directly in ``test_finalize_sub_workflow_status.py``). The *persisted*
-  application-level assertion here is specifically the **absence of the child Execution row**, which
-  is the authoritative DB side effect a denial must prevent.
-
-Scope: these require the integration DB harness **and** a Temporal test server, so they do not run
-in the plain unit venv or without Docker; they execute in CI / on a machine with both available.
-The evaluator decision is stubbed so the test does not depend on seeded role assignments; the
-missing/disabled-principal and generic-deny ordering are covered at the activity level in
-``test_sub_workflow_authorization.py``.
+These need the integration DB harness and a Temporal test server, so they run in CI, not the plain
+unit venv.
 """
 
 from __future__ import annotations
@@ -273,18 +257,10 @@ async def test_unauthorized_invocation_fails_parent_and_creates_no_child_e2e(
 ) -> None:
     """Unauthorized E2E: the parent run fails and no child Execution row is created.
 
-    Drives the full parent orchestrator through a real Temporal environment with a deny evaluator.
-    The non-retryable authorization error raised by the setup activity propagates to the node
-    framework, so the parent run status is ``failed`` and the sub_workflow node is recorded in
-    ``failed_activities``.
-
-    What this asserts, precisely: the parent-node failure (``status`` / ``failed_activities``) is read
-    from the orchestrator *result* -- the Temporal workflow result produced by ``_build_result`` -- and
-    is NOT a DB-persisted parent activity-execution row. This harness seeds the parent as RUNNING and
-    does not run the parent-node status finalizer, so it does not claim persisted parent-node status;
-    DB persistence of the sub_workflow node status is covered separately in
-    ``test_finalize_sub_workflow_status.py``. The *persisted* application-level state verified here is
-    the **absence of a child Execution row** after denial, asserted directly against the real database.
+    The non-retryable authz error from the setup activity propagates to the node framework, so the
+    parent run status is ``failed`` and the node is in ``failed_activities``. That failure is read from
+    the orchestrator result, not a persisted parent-node row; the persisted check is the absence of the
+    child Execution row after denial.
     """
     child_wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
     parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))

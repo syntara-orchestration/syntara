@@ -134,7 +134,7 @@ async def test_disabled_principal_fails_closed_without_calling_engine() -> None:
 
 
 # ---------------------------------------------------------------------------
-# AAP-95043: authorization error diagnostics + sanitized, viewer-independent message
+# Authorization denial: sanitized message, child details only in diagnostics
 # ---------------------------------------------------------------------------
 
 _SANITIZED_DENY = "Not authorized to run child workflow."
@@ -142,12 +142,12 @@ _DENIAL_EVENT = "Sub-workflow invocation authorization denied"
 
 
 def _assert_message_hides_child_metadata(exc: ApplicationError, child: MagicMock) -> None:
-    """The raised (and later persisted) message must not disclose child metadata (SDP R5)."""
+    """The raised message must not disclose child metadata to the caller."""
     message = exc.message or ""
     assert child.name not in message
     assert str(child.id) not in message
     assert str(child.project_id) not in message
-    # AAP-95043 #3: sensitive child metadata must not ride on the Temporal error details either.
+    # Child metadata must not ride on the error details either.
     details_text = str(exc.details)
     assert child.name not in details_text
     assert str(child.project_id) not in details_text

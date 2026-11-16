@@ -190,17 +190,14 @@ async def test_unauthorized_actor_denied_before_trigger_validation_detail(
 ) -> None:
     """Security-ordering regression: an unauthorized caller gets a generic authz denial, not trigger detail.
 
-    The child is published and enabled, but the invocation targets a trigger node that does not exist. If
-    trigger validation ran before authorization, the caller would receive ``TriggerNotFoundError`` naming
-    the missing trigger. Authorization is enforced first (in the create path authz precedes
-    ``_validate_trigger`` / ``_validate_input``), so the caller must receive the sanitized
-    ``SubWorkflowAuthorizationError`` and learn nothing child-specific (AAP-91266 decision #3).
+    The child is published and enabled, but the invocation targets a trigger that does not exist. If
+    trigger validation ran first, the caller would get ``TriggerNotFoundError`` naming it. Authz runs
+    before trigger/input validation, so the caller gets the sanitized ``SubWorkflowAuthorizationError``
+    and learns nothing child-specific.
 
-    Note: a "published but disabled" child cannot exist -- the
-    ``ck_workflows_is_enabled_published_version_id`` constraint ties ``is_enabled`` to having a published
-    version, and the setup activity's resolution joins on ``published_version_id`` (an unpublished/disabled
-    child fails earlier with ``WorkflowNotPublishedError``). The reachable child-detail disclosures after
-    authorization are therefore trigger and input validation.
+    A published-but-disabled child cannot exist (an enabled workflow must have a published version, and
+    the setup activity resolves the child via that published version), so the reachable child-detail
+    disclosures after authz are trigger and input validation.
     """
     child_wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
     parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
@@ -239,12 +236,11 @@ async def test_denied_message_is_sanitized_and_logs_diagnostics(
     test_user: User,
     test_project_id: UUID,
 ) -> None:
-    """AAP-95043 (real DB): policy deny gives a sanitized message with diagnostics in the protected log.
+    """Policy deny (real DB): sanitized message, with child details only in the protected log.
 
-    The raised (and persisted) message discloses no child metadata in the message or on the error
-    details -- it is read by principals who may lack workflow:read on the child (SDP R5) -- while the
-    protected structured diagnostics (child id/name, project_id, normalized denial_reason) are emitted
-    to the authorization-denial log.
+    The raised and persisted message discloses no child metadata, in the message or on the error
+    details. The structured diagnostics (child id/name, project_id, denial_reason) go to the
+    authorization-denial log.
     """
     child_wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
     parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
@@ -258,8 +254,8 @@ async def test_denied_message_is_sanitized_and_logs_diagnostics(
     with capture_logs() as logs, pytest.raises(ApplicationError) as exc:
         await setup.run(_params(child_wf_id), parent_exec, _NODE_ID, str(test_user.id), 0)
 
-    # Sanitized, viewer-independent message (persisted into the parent result; read by principals who
-    # may lack workflow:read on the child, so it must not disclose child metadata -- SDP R5).
+    # Sanitized message: no child metadata, since it is persisted and may be read by callers
+    # who are not allowed to see the child.
     assert exc.value.type == _AUTHZ_ERROR
     assert exc.value.message == "Not authorized to run child workflow."
     message = exc.value.message or ""
