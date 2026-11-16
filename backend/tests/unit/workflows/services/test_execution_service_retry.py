@@ -11,6 +11,7 @@ from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.emitter import request_id_context_var
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
+from syntara.workflow_core.models import NodeType
 from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.exceptions import (
     ExecutionNotFoundError,
@@ -21,7 +22,6 @@ from syntara.workflows.models.execution import Execution, ExecutionMode, Executi
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.execution_service import ExecutionService
-from syntara.workflow_core.models import NodeType
 
 
 def _make_execution(

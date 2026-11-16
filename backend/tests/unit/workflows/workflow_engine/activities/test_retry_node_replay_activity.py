@@ -10,7 +10,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity import (
     _result_digest,
     fetch_retry_converge_metadata_activity,
@@ -18,6 +17,7 @@ from syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_acti
     retry_control_ports,
 )
 from syntara.workflow_runtime.engines.temporal.constants import RESTORABLE_SOURCE_STATUSES
+from syntara.workflows.models.activity_execution import ActivityStatus
 
 
 class _Row:
