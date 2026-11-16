@@ -8,7 +8,6 @@ import json
 import re
 import uuid
 from enum import Enum, IntEnum, StrEnum
-from types import NoneType
 from typing import Annotated, Any, ClassVar, Literal
 from urllib.parse import urlparse
 from zoneinfo import available_timezones
@@ -38,16 +37,10 @@ from syntara.workflows.workflow_engine.models.aap_types import AAPResourceType
 
 logger = structlog.stdlib.get_logger(__name__)
 
-JSONFloat = Annotated[StrictFloat, Field(allow_inf_nan=False)]
-type JSONValue = (
-    NoneType
-    | StrictBool
-    | StrictInt
-    | JSONFloat
-    | StrictStr
-    | Annotated[list[JSONValue], Field(strict=True)]
-    | Annotated[dict[StrictStr, JSONValue], Field(strict=True)]
-)
+type JSONFloat = Annotated[StrictFloat, Field(allow_inf_nan=False)]
+type JSONList = Annotated[list[JSONValue], Field(strict=True)]
+type JSONObject = Annotated[dict[StrictStr, JSONValue], Field(strict=True)]
+type JSONValue = StrictBool | StrictInt | JSONFloat | StrictStr | JSONList | JSONObject | None
 
 # Template expression pattern - matches ${...} expressions
 TEMPLATE_PATTERN = re.compile(r"\$\{[^}]+\}")

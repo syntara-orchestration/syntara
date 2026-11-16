@@ -175,25 +175,29 @@ def test_subworkflow_result_has_child_execution_metadata(subworkflow_schema: dic
 
 def test_subworkflow_outputs_allow_recursive_json_values(subworkflow_schema: dict[str, Any]) -> None:
     """Declared outputs support JSON scalars, arrays, and recursively nested objects."""
-    value_schema = subworkflow_schema["$defs"]["JSONValue"]
+    definitions = subworkflow_schema["$defs"]
+    value_schema = definitions["JSONValue"]
     variants = value_schema["anyOf"]
 
-    assert SubWorkflowOutput.model_json_schema()["$defs"]["JSONValue"] == value_schema
-    assert {variant.get("type") for variant in variants} == {
+    model_definitions = SubWorkflowOutput.model_json_schema()["$defs"]
+    assert model_definitions["JSONValue"] == value_schema
+    assert model_definitions["JSONFloat"] == definitions["JSONFloat"]
+    assert model_definitions["JSONList"] == definitions["JSONList"]
+    assert model_definitions["JSONObject"] == definitions["JSONObject"]
+    assert {variant["$ref"] for variant in variants if "$ref" in variant} == {
+        "#/$defs/JSONFloat",
+        "#/$defs/JSONList",
+        "#/$defs/JSONObject",
+    }
+    assert {variant.get("type") for variant in variants if "type" in variant} == {
         "boolean",
         "integer",
-        "number",
         "string",
-        "array",
-        "object",
         "null",
     }
-    assert next(variant for variant in variants if variant.get("type") == "array")["items"] == {
-        "$ref": "#/$defs/JSONValue"
-    }
-    assert next(variant for variant in variants if variant.get("type") == "object")["additionalProperties"] == {
-        "$ref": "#/$defs/JSONValue"
-    }
+    assert definitions["JSONFloat"]["type"] == "number"
+    assert definitions["JSONList"]["items"] == {"$ref": "#/$defs/JSONValue"}
+    assert definitions["JSONObject"]["additionalProperties"] == {"$ref": "#/$defs/JSONValue"}
 
 
 def test_subworkflow_executor_in_node_type_catalog() -> None:

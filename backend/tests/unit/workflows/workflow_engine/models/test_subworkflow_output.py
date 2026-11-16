@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 
 from syntara.workflows.workflow_engine.models.workflow_definition import (
+    JSONValue,
     NodeOutput,
     StandardOutputWrapper,
     SubWorkflowOutput,
@@ -190,7 +191,7 @@ class TestSubWorkflowOutputPopulated:
 
     def test_outputs_support_declared_json_values_without_wrappers(self) -> None:
         """Declared outputs retain nested JSON values without per-field wrappers."""
-        outputs_data = {
+        outputs_data: dict[str, JSONValue] = {
             "release_tag": "v3.2.1",
             "published": True,
             "build_number": 42,
@@ -219,7 +220,7 @@ class TestSubWorkflowOutputPopulated:
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
-            SubWorkflowOutputResult(outputs={"release": invalid_value})
+            SubWorkflowOutputResult.model_validate({"outputs": {"release": invalid_value}})
 
 
 class TestSubWorkflowOutputNullabilitySemantics:
@@ -282,7 +283,7 @@ class TestSubWorkflowOutputSecurityConstraints:
         import pytest
         from pydantic import ValidationError
 
-        large_outputs = {f"field_{i}": f"value_{i}" for i in range(1001)}
+        large_outputs: dict[str, JSONValue] = {f"field_{i}": f"value_{i}" for i in range(1001)}
         with pytest.raises(ValidationError) as exc_info:
             SubWorkflowOutputResult(outputs=large_outputs)
         assert "at most 1000" in str(exc_info.value).lower() or "1,000" in str(exc_info.value)

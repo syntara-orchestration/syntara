@@ -34,20 +34,29 @@
     "$ref": "#/$defs/SubWorkflowOutput"
   },
   "$defs": {
+    "JSONFloat": {
+      "type": "number"
+    },
+    "JSONList": {
+      "items": {
+        "$ref": "#/$defs/JSONValue"
+      },
+      "type": "array"
+    },
+    "JSONObject": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JSONValue"
+      },
+      "type": "object"
+    },
     "JSONValue": {
       "anyOf": [
         { "type": "boolean" },
         { "type": "integer" },
-        { "type": "number" },
+        { "$ref": "#/$defs/JSONFloat" },
         { "type": "string" },
-        {
-          "type": "array",
-          "items": { "$ref": "#/$defs/JSONValue" }
-        },
-        {
-          "type": "object",
-          "additionalProperties": { "$ref": "#/$defs/JSONValue" }
-        },
+        { "$ref": "#/$defs/JSONList" },
+        { "$ref": "#/$defs/JSONObject" },
         { "type": "null" }
       ]
     },
