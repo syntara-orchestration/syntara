@@ -5,6 +5,8 @@ import signal
 
 import structlog
 
+from syntara.audit.lifecycle import start_audit_outbox_worker, stop_audit_outbox_worker
+from syntara.audit.registration import discover_and_register_all_handlers
 from syntara.core.config.base import get_encryption_key, get_settings, validate_encryption_key_at_startup
 from syntara.core.constants import EventWorkerDefaults
 from syntara.core.database.session import AsyncSessionLocal, engine
@@ -92,6 +94,11 @@ async def main() -> None:
         if not get_settings().eventstream_enabled:
             logger.info("event_worker_disabled")
             return
+        try:
+            discover_and_register_all_handlers()
+            start_audit_outbox_worker()
+        except Exception:
+            logger.exception("event_worker_audit_start_unavailable")
         validate_encryption_key_at_startup()
         encryptor = SecretEncryptor(key_from_string(get_encryption_key().get_secret_value()))
         resources = EventWorkerResources()
@@ -112,7 +119,12 @@ async def main() -> None:
         # Release the composition only after consumers and recovery have drained.
         temporal = None
         try:
-            await engine.dispose()
+            try:
+                await stop_audit_outbox_worker(timeout_seconds=EventWorkerDefaults.HINT_TIMEOUT_SECONDS)
+            except Exception:  # noqa: BLE001 - optional audit cleanup cannot skip database disposal
+                logger.warning("event_worker_audit_close_incomplete")
+            finally:
+                await engine.dispose()
         finally:
             for sig in installed:
                 loop.remove_signal_handler(sig)

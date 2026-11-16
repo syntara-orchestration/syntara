@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from syntara.audit import lifecycle as audit_module
+from syntara.audit.outbox.worker import AuditOutboxWorker
 from syntara.core.config.base import get_settings
 from syntara.core.constants import EventWorkerDefaults
 from syntara.core.lib.encryption import SecretEncryptor
@@ -23,6 +25,16 @@ from tests.unit.eventstreams.test_connection_provider import connection_context
 from tests.unit.eventstreams.test_consumer_service import eventually
 
 manager_context = consumer_tests.manager_context
+
+
+@pytest.fixture(autouse=True)
+def audit_lifecycle(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
+    """Isolate process-owned audit startup and draining from external services."""
+    audit = SimpleNamespace(register=MagicMock(), start=MagicMock(), stop=AsyncMock())
+    monkeypatch.setattr(entrypoint, "discover_and_register_all_handlers", audit.register)
+    monkeypatch.setattr(entrypoint, "start_audit_outbox_worker", audit.start)
+    monkeypatch.setattr(entrypoint, "stop_audit_outbox_worker", audit.stop)
+    return audit
 
 
 async def test_composition_shares_one_client_factory_and_resource_limits(monkeypatch):
@@ -96,7 +108,7 @@ async def test_shutdown_cancels_pending_shared_client_connection(monkeypatch):
     assert cancelled.is_set()
 
 
-async def test_main_uses_existing_signed_tls_client_and_disposes_database_after_drain(monkeypatch):
+async def test_main_uses_existing_signed_tls_client_and_disposes_database_after_drain(monkeypatch, audit_lifecycle):
     settings = get_settings().model_copy(update={"eventstream_enabled": True})
     monkeypatch.setattr(entrypoint, "get_settings", lambda: settings)
     monkeypatch.setattr(entrypoint, "validate_encryption_key_at_startup", MagicMock())
@@ -117,6 +129,11 @@ async def test_main_uses_existing_signed_tls_client_and_disposes_database_after_
     async def dispose() -> None:
         trace.append("database_closed")
 
+    async def stop_audit(*, timeout_seconds: float) -> None:
+        assert timeout_seconds == EventWorkerDefaults.HINT_TIMEOUT_SECONDS
+        trace.append("audit_closed")
+
+    audit_lifecycle.stop.side_effect = stop_audit
     monkeypatch.setattr(entrypoint, "_run_connected", run)
     monkeypatch.setattr(entrypoint, "engine", SimpleNamespace(dispose=AsyncMock(side_effect=dispose)))
     await entrypoint.main()
@@ -124,8 +141,73 @@ async def test_main_uses_existing_signed_tls_client_and_disposes_database_after_
     assert connect.call_args.kwargs["tls"] is tls
     assert len(connect.call_args.kwargs["interceptors"]) == 1
     assert type(connect.call_args.kwargs["interceptors"][0]).__name__ == "WorkflowAuthClientInterceptor"
-    assert trace == ["drained", "database_closed"]
+    assert trace == ["drained", "audit_closed", "database_closed"]
+    audit_lifecycle.register.assert_called_once()
+    audit_lifecycle.start.assert_called_once()
+    audit_lifecycle.stop.assert_awaited_once_with(timeout_seconds=EventWorkerDefaults.HINT_TIMEOUT_SECONDS)
     stop_logs.assert_called_once()
+
+
+async def test_audit_start_failure_does_not_prevent_consumption(monkeypatch, audit_lifecycle):
+    settings = get_settings().model_copy(update={"eventstream_enabled": True})
+    monkeypatch.setattr(entrypoint, "get_settings", lambda: settings)
+    monkeypatch.setattr(entrypoint, "validate_encryption_key_at_startup", MagicMock())
+    monkeypatch.setattr(entrypoint, "start_loggers", MagicMock())
+    monkeypatch.setattr(entrypoint, "stop_loggers", MagicMock())
+    monkeypatch.setattr(entrypoint, "_connect_temporal", AsyncMock(return_value=MagicMock()))
+    run = AsyncMock()
+    monkeypatch.setattr(entrypoint, "_run_connected", run)
+    dispose = AsyncMock()
+    monkeypatch.setattr(entrypoint, "engine", SimpleNamespace(dispose=dispose))
+    audit_lifecycle.start.side_effect = RuntimeError("audit unavailable")
+
+    await entrypoint.main()
+
+    run.assert_awaited_once()
+    audit_lifecycle.stop.assert_awaited_once()
+    dispose.assert_awaited_once()
+
+
+@pytest.mark.parametrize("audit_failure", ["stalled_drain", "shutdown_error"])
+async def test_audit_shutdown_cannot_prevent_database_and_logger_cleanup(monkeypatch, audit_failure):
+    settings = get_settings().model_copy(update={"eventstream_enabled": True})
+    monkeypatch.setattr(entrypoint, "get_settings", lambda: settings)
+    monkeypatch.setattr(entrypoint, "validate_encryption_key_at_startup", MagicMock())
+    monkeypatch.setattr(entrypoint, "start_loggers", MagicMock())
+    stop_logs = MagicMock()
+    monkeypatch.setattr(entrypoint, "stop_loggers", stop_logs)
+    monkeypatch.setattr(entrypoint, "_connect_temporal", AsyncMock(return_value=MagicMock()))
+    monkeypatch.setattr(entrypoint, "_run_connected", AsyncMock())
+    dispose = AsyncMock()
+    monkeypatch.setattr(entrypoint, "engine", SimpleNamespace(dispose=dispose))
+    monkeypatch.setattr(EventWorkerDefaults, "HINT_TIMEOUT_SECONDS", 0.02)
+    cancelled = asyncio.Event()
+
+    async def stalled_drain() -> None:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    worker = AuditOutboxWorker(name="consumer-audit-shutdown", interval_seconds=1, coordinate=False)
+    stop = AsyncMock()
+    monkeypatch.setattr(worker, "drain", stalled_drain)
+    monkeypatch.setattr(worker, "stop", stop)
+    monkeypatch.setattr(audit_module, "get_outbox_worker", lambda: worker)
+    monkeypatch.setattr(audit_module, "_state", audit_module.AuditLifecycleState.RUNNING)
+    monkeypatch.setattr(entrypoint, "stop_audit_outbox_worker", audit_module.stop_audit_outbox_worker)
+    if audit_failure == "shutdown_error":
+        monkeypatch.setattr(worker, "shutdown", AsyncMock(side_effect=OSError("audit unavailable")))
+
+    async with asyncio.timeout(1):
+        await entrypoint.main()
+
+    dispose.assert_awaited_once()
+    stop_logs.assert_called_once()
+    assert audit_module._state == audit_module.AuditLifecycleState.STOPPED
+    if audit_failure == "stalled_drain":
+        assert cancelled.is_set()
+        stop.assert_awaited_once()
 
 
 @pytest.mark.parametrize("sig", [signal.SIGINT, signal.SIGTERM])

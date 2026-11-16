@@ -10,6 +10,7 @@ import pytest
 
 from syntara.core.exceptions import SafeValueError
 from syntara.eventstreams.adapters.kafka_metadata import KafkaSourceMetadata
+from syntara.eventstreams.adapters.kafka_parameters import KafkaSubscribeParameters
 from syntara.eventstreams.adapters.subscribe_parameters import validate_event_subscribe_parameters
 from syntara.eventstreams.core.envelope import RawEvent, RawEventHeader
 from syntara.eventstreams.core.filter_input import EventFilterInput
@@ -105,7 +106,15 @@ async def test_definition_to_envelope_output_mapping(
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("group_id", "caller-group"),
+        ("group_id", ""),
+        ("group_id", "a" * 513),
+        ("group_id", 123),
+        ("start", None),
+        ("start", {"position": "invalid"}),
+        ("start", {"added_partition_position": "fail"}),
+        ("start", {"offset_gap_policy": "ignore"}),
+        ("start", {"enable_auto_commit": True}),
+        ("enable_auto_commit", True),
         ("source", {"topic": "nested"}),
         ("execution_account_id", "selected"),
         ("service_account_id", "selected"),
@@ -138,6 +147,35 @@ def test_definition_boundaries_reject_invalid_parameters(
     assert validator.collect_findings(definition).error_count > 0
     with pytest.raises(SafeValueError):
         validator.validate_workflow_definition(definition)
+
+
+@pytest.mark.parametrize("group_id", [None, "caller-group"])
+@pytest.mark.parametrize("position", ["latest", "earliest"])
+@pytest.mark.parametrize("added_partition_position", ["latest", "earliest"])
+@pytest.mark.parametrize("offset_gap_policy", ["fail", "earliest", "latest"])
+def test_definition_accepts_approved_consumption_controls(
+    definition: dict[str, Any],
+    group_id: str | None,
+    position: str,
+    added_partition_position: str,
+    offset_gap_policy: str,
+) -> None:
+    settings = {
+        "position": position,
+        "added_partition_position": added_partition_position,
+        "offset_gap_policy": offset_gap_policy,
+    }
+    parameters = definition["triggers"][0]["parameters"]
+    parameters.update(start=settings, group_id=group_id)
+
+    validator = WorkflowValidator()
+    validator.validate_workflow_definition(definition)
+
+    assert validator.collect_findings(definition).error_count == 0
+    config = validate_event_subscribe_parameters(parameters)
+    assert isinstance(config, KafkaSubscribeParameters)
+    assert config.start.model_dump(mode="json") == settings
+    assert config.group_id == group_id
 
 
 @pytest.mark.parametrize("field", ["integration_id", "credential_id", "topic"])

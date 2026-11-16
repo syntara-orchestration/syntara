@@ -238,6 +238,28 @@ async def test_first_full_topic_capture_is_saved_once_and_later_metadata_cannot_
     history.assert_awaited_once()
 
 
+async def test_group_offset_adoption_rechecks_source_initialization_under_lock(monkeypatch: pytest.MonkeyPatch) -> None:
+    factory, sessions = session_factory()
+    repository = KafkaInitialPositionStore(factory)
+    subscription, source = lifecycle()
+    subscription.desired_enabled = True
+    source.initialized_at = NOW
+    source.configuration = source.configuration.model_copy(update={"initial_partition_ids": (0, 1, 2)})
+    monkeypatch.setattr(repository, "_locked", AsyncMock(return_value=(subscription, source, None)))
+    monkeypatch.setattr(repository, "_held", AsyncMock(return_value=False))
+
+    with pytest.raises(KafkaPositionError, match=GapReason.INITIAL_METADATA_MISSING.value):
+        await repository.choose_initial(
+            position_request(),
+            observation(),
+            75,
+            initialization_kind=InitializationKind.FIRST_ACTIVATION,
+            existing_group_position=True,
+        )
+
+    sessions[0].execute.assert_not_awaited()
+
+
 async def test_capture_reloads_a_winning_set_that_differs_from_current_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

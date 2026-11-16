@@ -6,14 +6,22 @@ exact topic, and an optional payload JSON Schema. The schema controls validate
 the message payload. Publishing activates the subscription; later changes take effect on the next publish.
 
 Kafka credentials authenticate to the broker. Workflow execution identity is
-provided by the platform. The UI does not offer or serialize an execution-account
-selector, webhook authorization, group IDs, offset overrides, tuning, filters, or
+provided by the platform. The UI does not offer an execution-account selector,
+webhook authorization, group-ID editing, offset overrides, tuning, filters, or
 CloudEvents controls. The Integration's management credential is never used as a
 fallback for a missing runtime credential.
 
 Save/reopen uses flat `event_subscribe_trigger` parameters: `integration_id`,
 `credential_id`, `topic`, and optional `input_schema`. Leaving the schema blank
 omits it instead of inserting an empty schema or a default.
+
+Editing the same Kafka source preserves backend-configured `start` and `group_id`
+values, including partial reading settings and an explicit null group. Changing
+the topic or Integration preserves `start` but resets a saved `group_id` to null,
+requesting an auto-generated group for the replacement source. Credential-only
+changes preserve the group. The form does not expose these controls or add them
+when omitted. Clearing the payload schema still removes `input_schema`;
+unrelated consumer properties are not copied from the previous trigger.
 
 ## Backend dependency and requirement differences
 
@@ -53,10 +61,11 @@ Topic READ and consumer-group access remain unverified even after connectivity
 succeeds. Raw broker errors are not rendered. Editing configuration discards old
 results, including pending results for an earlier configuration.
 
-## Fixed reading behavior
+## Default reading behavior
 
-The platform manages a separate group for each subscription and fixes its reading
-policies:
+The platform generates a separate group for each source when no custom group is
+supplied. The form does not expose the optional backend consumption controls;
+their defaults are:
 
 - Partitions in the saved first-activation set start with new messages at their
   saved visible-end boundary. Each boundary is selected when that partition
@@ -67,11 +76,21 @@ policies:
   happens while first activation is still incomplete. The earliest retained offset
   can be greater than zero.
 - Initialized partitions resume from valid committed group offsets on restart,
-  re-enable, or republish. Missing or invalid established checkpoints block reading
-  and require recovery; they never trigger an automatic reset to latest or earliest.
+  re-enable, or republish. Missing or invalid established checkpoints recover from
+  retained beginning under the normal source, assignment, and drain safeguards.
 
-Auto-commit is disabled. Offsets are committed after durable workflow scheduling
-or another durable resolution, without waiting for workflow completion.
+The backend API supports `start.position`, `start.added_partition_position`,
+`start.offset_gap_policy`, and an optional `group_id`. Initial and added-partition
+positions accept `earliest` or `latest`; gap policy also accepts `fail`, which
+holds only the affected partition. Valid group progress and previously saved
+position decisions take precedence over new settings. The group is fixed at
+the first successful publication. See the
+[backend settings contract](../../backend/docs/event-subscription-controls.md).
+
+Auto-commit is disabled. Matching records commit after verified Temporal
+acceptance and normal Execution persistence, without waiting for workflow
+completion. Filter skips and audited invalid-content skips complete locally
+under the offset-safety checks; logging alone never authorizes a commit.
 
 ## Validation
 

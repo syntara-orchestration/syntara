@@ -9,6 +9,7 @@ from syntara.eventstreams.core.envelope import RawEvent, RawEventHeader
 from syntara.eventstreams.core.handler import ResolvedDelivery
 from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.core.processing import HeldRecord, SkippedRecord
+from syntara.eventstreams.core.results import EventFailureCode
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.eventstreams.services import record_processing_service as module
 from syntara.filtering import evaluator as filter_evaluator
@@ -187,8 +188,9 @@ async def test_attribute_filter_keeps_invalid_cloud_event_in_content_failure_pat
     )
     event = event.model_copy(update={"headers": (RawEventHeader(name="ce_id", value=b"incomplete"),)})
     result = await service.process(context.snapshot, context.identity, event)
-    assert isinstance(result, HeldRecord)
-    assert result.permanent_content_error
+    assert isinstance(result, SkippedRecord)
+    assert result.outcome == "invalid_content"
+    assert result.error_code == EventFailureCode.malformed_cloudevents
     admission.schedule.assert_not_awaited()
     logs.info.assert_not_called()
     logs.error.assert_not_called()
