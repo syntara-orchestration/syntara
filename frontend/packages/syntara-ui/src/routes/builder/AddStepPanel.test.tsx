@@ -25,6 +25,7 @@ vi.mock('../../hooks/useNodeKindsQuery', () => ({
     query: { isPending: false },
     nodeKinds: [],
     nodeKindByKind: new Map(),
+    isLoading: false,
     isUnavailable: false,
   }),
 }))

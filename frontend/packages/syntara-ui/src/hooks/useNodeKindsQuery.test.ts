@@ -13,8 +13,11 @@ vi.mock('../client', () => ({
 
 const mockUseQuery = vi.mocked(nodeKindsClient.useQuery)
 
-function mockResponse(data: unknown, { isSuccess = true }: { isSuccess?: boolean } = {}) {
-  mockUseQuery.mockReturnValue({ data, isSuccess })
+function mockResponse(
+  data: unknown,
+  { isSuccess = true, isPending = false }: { isSuccess?: boolean; isPending?: boolean } = {}
+) {
+  mockUseQuery.mockReturnValue({ data, isSuccess, isPending })
 }
 
 const scriptKind = {
@@ -94,6 +97,24 @@ describe('useNodeKindsQuery', () => {
     const { result } = renderHook(() => useNodeKindsQuery('project-1'))
 
     expect(result.current.isUnavailable).toBe(true)
+  })
+
+  it('is loading, not unavailable, while the first request is in flight', () => {
+    mockResponse(undefined, { isSuccess: false, isPending: true })
+
+    const { result } = renderHook(() => useNodeKindsQuery('project-1'))
+
+    expect(result.current.isLoading).toBe(true)
+    expect(result.current.isUnavailable).toBe(false)
+  })
+
+  it('is neither loading nor unavailable while no project is selected', () => {
+    mockResponse(undefined, { isSuccess: false, isPending: true })
+
+    const { result } = renderHook(() => useNodeKindsQuery(null))
+
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.isUnavailable).toBe(false)
   })
 
   it('is available when the endpoint returns verdicts', () => {

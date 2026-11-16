@@ -1,4 +1,15 @@
-import { Button, Flex, FlexItem, Icon, Stack, StackItem, Title, TitleSizes } from '@patternfly/react-core'
+import {
+  Button,
+  Content,
+  Flex,
+  FlexItem,
+  Icon,
+  Spinner,
+  Stack,
+  StackItem,
+  Title,
+  TitleSizes,
+} from '@patternfly/react-core'
 import { RhUiCloseIcon, RhUiArrowLeftIcon, RhUiAddSquareIcon } from '@patternfly/react-icons'
 import { useMemo, useState, type ReactNode } from 'react'
 
@@ -86,7 +97,7 @@ type AddStepPanelProps = {
 
 export function AddStepPanel(props: AddStepPanelProps) {
   const [selectedStepType, setSelectedStepType] = useState<string | null>(null)
-  const { nodeKindByKind, isUnavailable } = useNodeKindsQuery(props.projectId)
+  const { nodeKindByKind, isLoading, isUnavailable } = useNodeKindsQuery(props.projectId)
 
   // Registered step types from StepRegistry
   // Omit triggers when adding from an edge (sourceNodeId) or replacing a generic step (replacementNodeId)
@@ -136,6 +147,32 @@ export function AddStepPanel(props: AddStepPanelProps) {
       )
     : []
 
+  let listContent: ReactNode
+  if (isLoading) {
+    // First verdict request for this project: a loading state, not a palette
+    // that flashes every entry as disabled.
+    listContent = (
+      <StackItem>
+        <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
+          <Spinner size="md" aria-label="Checking step permissions" />
+          <Content component="p">Checking step permissions…</Content>
+        </Flex>
+      </StackItem>
+    )
+  } else if (selectedStep?.subtypes?.length) {
+    listContent = (
+      <StepTypeOptionsList
+        stepTypes={gatedSubtypes}
+        onSelect={(subtypeId) => {
+          props.onSelectStep(selectedStep.id, subtypeId)
+          setSelectedStepType(null)
+        }}
+      />
+    )
+  } else {
+    listContent = <StepTypeOptionsList stepTypes={stepTypes} onSelect={handleStepClick} />
+  }
+
   const panelTitle =
     isShowingSubtypeList && selectedStep ? (selectedStep.selectionTitle ?? 'Select a step') : 'Add step'
 
@@ -172,19 +209,7 @@ export function AddStepPanel(props: AddStepPanelProps) {
             paddingBottom: 'var(--pf-t--global--spacer--md)',
           }}
         >
-          <Stack hasGutter>
-            {selectedStep?.subtypes?.length ? (
-              <StepTypeOptionsList
-                stepTypes={gatedSubtypes}
-                onSelect={(subtypeId) => {
-                  props.onSelectStep(selectedStep.id, subtypeId)
-                  setSelectedStepType(null)
-                }}
-              />
-            ) : (
-              <StepTypeOptionsList stepTypes={stepTypes} onSelect={handleStepClick} />
-            )}
-          </Stack>
+          <Stack hasGutter>{listContent}</Stack>
         </StackItem>
       </Stack>
     </SynPanel>

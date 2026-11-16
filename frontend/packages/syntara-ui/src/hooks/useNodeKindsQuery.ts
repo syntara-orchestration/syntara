@@ -31,7 +31,7 @@ type UseNodeKindsQueryOptions = {
  *
  * @example
  * ```ts
- * const { nodeKindByKind, isUnavailable } = useNodeKindsQuery(projectId)
+ * const { nodeKindByKind, isLoading, isUnavailable } = useNodeKindsQuery(projectId)
  * const script = nodeKindByKind.get('script')
  * const canAddScript = script?.can_write === true
  * ```
@@ -50,9 +50,13 @@ export function useNodeKindsQuery(projectId: string | null | undefined, options?
 
   const nodeKindByKind = useMemo(() => new Map(nodeKinds.map((entry) => [entry.kind, entry])), [nodeKinds])
 
+  // First request for this project still in flight: callers show a loading
+  // state rather than flashing every entry as disabled.
+  const isLoading = enabled && query.isPending
+
   // Fail closed: when the endpoint fails or returns nothing, the panel must
   // not claim everything is allowed. The server still rejects the save.
-  const isUnavailable = enabled && (!query.isSuccess || nodeKinds.length === 0)
+  const isUnavailable = enabled && !query.isPending && (!query.isSuccess || nodeKinds.length === 0)
 
-  return { query, nodeKinds, nodeKindByKind, isUnavailable }
+  return { query, nodeKinds, nodeKindByKind, isLoading, isUnavailable }
 }

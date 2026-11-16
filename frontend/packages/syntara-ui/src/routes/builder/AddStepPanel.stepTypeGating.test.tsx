@@ -6,12 +6,14 @@ import type { NodeKind } from '../../hooks/useNodeKindsQuery'
 
 import { AddStepPanel } from './AddStepPanel'
 
-const { mockStepRegistryGetAll, mockStepRegistryGet, mockNodeKindByKind, mockIsUnavailable } = vi.hoisted(() => ({
-  mockStepRegistryGetAll: vi.fn(),
-  mockStepRegistryGet: vi.fn(),
-  mockNodeKindByKind: { current: new Map<string, unknown>() },
-  mockIsUnavailable: { current: false },
-}))
+const { mockStepRegistryGetAll, mockStepRegistryGet, mockNodeKindByKind, mockIsUnavailable, mockIsLoading } =
+  vi.hoisted(() => ({
+    mockStepRegistryGetAll: vi.fn(),
+    mockStepRegistryGet: vi.fn(),
+    mockNodeKindByKind: { current: new Map<string, unknown>() },
+    mockIsUnavailable: { current: false },
+    mockIsLoading: { current: false },
+  }))
 
 vi.mock('./registry/StepRegistry', () => ({
   StepRegistry: {
@@ -26,6 +28,7 @@ vi.mock('../../hooks/useNodeKindsQuery', () => ({
     nodeKinds: [],
     nodeKindByKind: mockNodeKindByKind.current,
     isUnavailable: mockIsUnavailable.current,
+    isLoading: mockIsLoading.current,
   }),
 }))
 
@@ -89,6 +92,7 @@ describe('AddStepPanel step-type gating', () => {
       [scriptEntry, apiEntry, agentEntry].find((entry) => entry.id === id)
     )
     mockIsUnavailable.current = false
+    mockIsLoading.current = false
     setNodeKinds(kind({ kind: 'script' }), kind({ kind: 'http_request' }), kind({ kind: 'agentic' }))
   })
 
@@ -165,6 +169,15 @@ describe('AddStepPanel step-type gating', () => {
     expect(screen.getByRole('button', { name: 'Script' })).toHaveAttribute('aria-disabled', 'true')
     expect(screen.getByRole('button', { name: 'REST API' })).toHaveAttribute('aria-disabled', 'true')
     expect(screen.getByRole('button', { name: 'Task Agent' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('shows a loading state instead of disabling every entry while verdicts load', () => {
+    mockIsLoading.current = true
+
+    render(<AddStepPanel onClose={vi.fn()} onSelectStep={vi.fn()} projectId="project-1" />)
+
+    expect(screen.getByText('Checking step permissions…')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Script' })).not.toBeInTheDocument()
   })
 
   it('explains a missing allow instead of naming a denying policy', async () => {
