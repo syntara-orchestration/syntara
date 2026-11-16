@@ -1,12 +1,7 @@
 import { MissedSchedulePolicyEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
-import {
-  AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE,
-  isValidWebhookPath,
-  normalizeWebhookPath,
-  triggerFormSchema,
-} from './triggerFormSchema'
+import { isValidWebhookPath, normalizeWebhookPath, triggerFormSchema } from './triggerFormSchema'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -404,34 +399,29 @@ describe('triggerFormSchema — missed schedule policy (overlap)', () => {
 // ---------------------------------------------------------------------------
 
 describe('triggerFormSchema — authorized service account validation', () => {
-  it('rejects webhook trigger without service accounts', () => {
+  it('allows webhook trigger draft without service accounts', () => {
     const result = triggerFormSchema.safeParse({
       triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER,
       webhookPath: 'test-hook',
     })
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.error.issues.find((i) => i.path.includes('authorizedServiceAccountIds'))?.message).toBe(
-        AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE
-      )
-    }
+    expect(result.success).toBe(true)
   })
 
-  it('rejects webhook trigger with empty service accounts', () => {
+  it('allows webhook trigger draft with empty service accounts', () => {
     const result = triggerFormSchema.safeParse({
       triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER,
       webhookPath: 'test-hook',
       authorizedServiceAccountIds: [],
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
-  it('rejects EDA trigger without service accounts', () => {
+  it('allows EDA trigger draft without service accounts', () => {
     const result = triggerFormSchema.safeParse({
       triggerType: TriggerTypeEnum.EDA_TRIGGER,
       webhookPath: 'eda-events',
     })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
   it('accepts webhook trigger with service accounts', () => {

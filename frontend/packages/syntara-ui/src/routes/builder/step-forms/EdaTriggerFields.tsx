@@ -57,6 +57,7 @@ export function EdaFields() {
           name="authorizedServiceAccountIds"
           label="Authorized service accounts"
           fieldId="eda-authorized-service-accounts"
+          isRequired
           labelHelp={
             <FieldHelpPopover
               headerContent="Authorized service accounts"
