@@ -123,7 +123,7 @@ class TestConditionRouting:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         assert "on_true" in result["completed_activities"]
         assert "on_false" not in result["completed_activities"]
 
@@ -160,7 +160,7 @@ class TestConditionRouting:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         assert "on_false" in result["completed_activities"]
         assert "on_true" not in result["completed_activities"]
 
@@ -203,7 +203,7 @@ class TestLoopExecution:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         assert "after_loop" in result["completed_activities"]
         assert "body" in result["completed_activities"]
 
@@ -247,7 +247,7 @@ class TestLoopExecution:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         assert "body" in result["completed_activities"]
         assert "after_loop" in result["completed_activities"]
 
@@ -305,7 +305,7 @@ class TestSwitchRouting:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         assert "branch_b" in result["completed_activities"]
         assert "branch_a" not in result["completed_activities"]
         assert "branch_default" not in result["completed_activities"]
@@ -348,7 +348,7 @@ class TestSwitchRouting:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         assert "branch_default" in result["completed_activities"]
         assert "branch_a" not in result["completed_activities"]
 
@@ -398,7 +398,7 @@ class TestConvergeStrategies:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         completed = result["completed_activities"]
         assert "branch_a" in completed
         assert "branch_b" in completed
@@ -445,7 +445,7 @@ class TestConvergeStrategies:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         assert "join" in result["completed_activities"]
         assert "final" in result["completed_activities"]
 
@@ -516,7 +516,7 @@ class TestConvergeStrategies:
         # on whether branch_b completes before or after converge fires — that race is
         # timing-dependent and not what this test verifies. The engine must not crash
         # and must not report side_action as failed regardless of outcome.
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         assert "join" in result["completed_activities"]
         assert "final" in result["completed_activities"]
         assert "side_action" not in result.get("failed_activities", {})
@@ -557,7 +557,7 @@ class TestExpressionResolution:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         assert "script_a" in result["completed_activities"]
         assert "script_b" in result["completed_activities"]
 
@@ -598,7 +598,7 @@ class TestContinueOnFailure:
             },
         )
 
-        assert result["status"] == "completed_with_errors"
+        assert result["status"] == "completed_with_errors", result
         assert "failing_node" in result["failed_activities"]
         assert "next_node" in result["completed_activities"]
 
@@ -661,7 +661,7 @@ class TestLoopConvergeInteraction:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         completed = result["completed_activities"]
         assert "loop_node" in completed
         assert "body" in completed
@@ -728,7 +728,7 @@ class TestLoopConvergeInteraction:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         completed = result["completed_activities"]
         assert "loop_node" in completed
         assert "branch_b" in completed
@@ -792,7 +792,7 @@ class TestLoopConvergeInteraction:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         completed = result["completed_activities"]
         assert "fast_branch" in completed
         assert "join" in completed
@@ -854,7 +854,7 @@ class TestLoopConvergeInteraction:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         completed = result["completed_activities"]
         assert "loop_node" in completed
         assert "branch_b" in completed
@@ -918,7 +918,7 @@ class TestLoopConvergeInteraction:
             },
         )
 
-        assert result["status"] == "failed"
+        assert result["status"] == "failed", result
         assert "failing_body" in result.get("failed_activities", {})
         assert "loop_node" in result.get("failed_activities", {})
         assert "final" not in result.get("completed_activities", [])
@@ -981,7 +981,7 @@ class TestMixedPatterns:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", result
         completed = result["completed_activities"]
         assert "cond" in completed
         assert "para_a" in completed
