@@ -5,7 +5,7 @@ import { filteringClient } from '../../../client'
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
 import { detachPromise } from '../../../utils/detachPromise'
 
-import { filterConfigurationError } from './filterConfigurationError'
+import { filterConfigurationError, filterEvaluationError } from './filterConfigurationError'
 import type { TriggerFormData } from './triggerFormSchema'
 
 const OUTCOME_TITLES = { match: 'Match', no_match: 'No match', evaluation_error: 'Evaluation error' } as const
@@ -62,7 +62,7 @@ export function KafkaFilterTest({
             component="h4"
           >
             {mutation.data.outcome === 'evaluation_error' ? (
-              `The expression could not evaluate to a boolean for this sample. Error code: ${mutation.data.error_code ?? 'filter_evaluation_failed'}`
+              filterEvaluationError(mutation.data.error_code)
             ) : (
               <Content component="p">
                 {mutation.data.outcome === 'match'
