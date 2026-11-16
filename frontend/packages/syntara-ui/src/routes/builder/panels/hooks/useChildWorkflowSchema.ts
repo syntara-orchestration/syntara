@@ -196,9 +196,9 @@ function isSchemaLoading({
 }
 
 /**
- * Fetches the selected child's latest invocation schema and its matching published graph.
- * The version detail is cached by workflow and published-version ID so a new
- * publication cannot reuse step metadata from the previous version.
+ * Fetches the selected child's invocation schema and matching published definition.
+ * The invocation schema supplies public outputs; the versioned definition verifies
+ * trigger availability without reusing data from a different publication.
  */
 export function useChildWorkflowSchema({
   workflowId,

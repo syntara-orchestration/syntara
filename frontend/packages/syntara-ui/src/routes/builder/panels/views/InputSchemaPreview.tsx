@@ -155,10 +155,9 @@ function buildTreeData(nodes: InputSchemaPreviewNode[], nodeId: string, searchTe
     const hasChildren = Boolean(node.children?.length)
     if (node.isGroup || hasChildren) {
       const groupLabel = `${getTypeLabel(node.type)} ${node.name}`
-      // Collapse nested child step groups by default (fieldPath depth >= 3 and parent is "outputs")
-      // Keep top-level structure expanded (Result, outputs) for easy navigation
-      const isChildStepGroup = node.fieldPath.length >= 3 && node.fieldPath[node.fieldPath.length - 2] === 'outputs'
-      const defaultExpanded = !isChildStepGroup
+      // Collapse nested declared-output groups, while keeping Result and outputs open.
+      const isNestedOutputGroup = node.fieldPath.length >= 3 && node.fieldPath[node.fieldPath.length - 2] === 'outputs'
+      const defaultExpanded = !isNestedOutputGroup
 
       return {
         id,
