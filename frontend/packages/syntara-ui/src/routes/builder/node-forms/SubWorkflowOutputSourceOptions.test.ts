@@ -62,6 +62,39 @@ describe('getStepOutputChoices', () => {
     )
     expect(choices.every((choice) => choice.sourceDescription.length > 0)).toBe(true)
   })
+
+  it('preserves generated output metadata for existing node types in the picker', () => {
+    const choices = getStepOutputChoices(
+      [
+        { id: 'request', name: 'Request', type: ActivityTypeEnum.HTTP_REQUEST },
+        { id: 'agent', name: 'Agent', type: ActivityTypeEnum.AGENTIC },
+        { id: 'loop', name: 'Loop', type: ActivityTypeEnum.LOOP },
+      ],
+      [
+        { source: 'trigger-0', target: 'request' },
+        { source: 'trigger-0', target: 'agent' },
+        { source: 'trigger-0', target: 'loop' },
+      ],
+      'trigger-0',
+      0
+    )
+
+    const requestHeaders = choices.find((choice) => choice.expression === '${request.headers}')
+    expect(requestHeaders).toMatchObject({ type: 'object', allowsDynamicDescendants: true })
+    expect(isDynamicOutputExpression('${request.headers.content_type}', choices)).toBe(true)
+
+    expect(
+      choices.find((choice) => choice.expression === '${agent.structured_output_metadata.fallback_strategy_used}')
+    ).toMatchObject({ type: 'string', allowsDynamicDescendants: false })
+    expect(choices.find((choice) => choice.expression === '${agent.integration_ids}')).toMatchObject({
+      type: 'array',
+      allowsDynamicDescendants: false,
+    })
+
+    const loopResults = choices.find((choice) => choice.expression === '${loop.iteration_results}')
+    expect(loopResults).toMatchObject({ type: 'object', allowsDynamicDescendants: true })
+    expect(isDynamicOutputExpression('${loop.iteration_results.task.stdout}', choices)).toBe(true)
+  })
 })
 
 describe('isDynamicOutputExpression', () => {

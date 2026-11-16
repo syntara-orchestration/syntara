@@ -86,18 +86,18 @@ export function usePublishWorkflow({
 
   const { mutate: checkBreakingChangesMutation, isPending: isCheckingBreakingChanges } = workflowClient.useMutation(
     'post',
-    '/workflows/{workflow_id}/versions/{version}/check_breaking_changes'
+    '/workflows/{workflow_id}/check_breaking_changes'
   )
 
   const reviewOutputContract = useCallback(
     (workflowDefinition?: unknown) => {
       const candidate = workflowDefinition ?? getCurrentWorkflowDefinition(workflowName, workflowDescription)
-      if (!workflowId || currentVersion == null || !isRecord(candidate)) return Promise.resolve(null)
+      if (!workflowId || !isRecord(candidate)) return Promise.resolve(null)
 
       return new Promise<WorkflowAPI.components['schemas']['BreakingChangesResponse'] | null>((resolve) => {
         checkBreakingChangesMutation(
           {
-            params: { path: { workflow_id: workflowId, version: currentVersion } },
+            params: { path: { workflow_id: workflowId } },
             body: { workflow_definition: candidate },
           },
           {
@@ -110,7 +110,7 @@ export function usePublishWorkflow({
         )
       })
     },
-    [workflowId, currentVersion, workflowName, workflowDescription, checkBreakingChangesMutation, showError]
+    [workflowId, workflowName, workflowDescription, checkBreakingChangesMutation, showError]
   )
 
   const publishNow = useCallback(

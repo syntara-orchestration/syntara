@@ -409,7 +409,7 @@ describe('useVersionHistory', () => {
 
       expect(mockCheckBreakingChangesMutate).toHaveBeenCalledWith(
         {
-          params: { path: { workflow_id: 'wf-1', version: 2 } },
+          params: { path: { workflow_id: 'wf-1' } },
           body: { workflow_definition: { name: 'v2' } },
         },
         expect.objectContaining({ onSuccess: expect.any(Function) as unknown })

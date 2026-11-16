@@ -38258,10 +38258,10 @@
         }
       }
     },
-    "/workflows/{workflow_id}/versions/{version}/check_breaking_changes": {
+    "/workflows/{workflow_id}/check_breaking_changes": {
       "post": {
         "summary": "Check for breaking changes before publishing",
-        "description": "Check for breaking changes in SubWorkflow output schemas.\n\nCompares the new workflow definition against the currently published version\nto detect breaking changes such as:\n- Removed outputs\n- Type changes\n- New required outputs\n\nThis endpoint should be called before publishing to warn users about\nbreaking changes that may affect parent workflows.\n",
+        "description": "Check a candidate workflow definition for SubWorkflow output contract changes.\n\nCompares the submitted candidate definition against the currently published version\nto detect breaking changes such as:\n- Removed outputs\n- Type changes\n- New required outputs\n\nThis endpoint does not publish the candidate definition. It should be called before\npublishing to warn users about breaking changes that may affect parent workflows.\n",
         "operationId": "check_breaking_changes",
         "tags": [
           "Workflows"
@@ -38284,15 +38284,6 @@
               "type": "string",
               "format": "uuid",
               "title": "Workflow Id"
-            }
-          },
-          {
-            "name": "version",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Version"
             }
           }
         ],

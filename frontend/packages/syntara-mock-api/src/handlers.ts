@@ -1376,7 +1376,7 @@ export const handlers = [
     })
   }),
 
-  http.post('/api/v1/workflows/:workflowId/versions/:version/check_breaking_changes', async (request) => {
+  http.post('/api/v1/workflows/:workflowId/check_breaking_changes', async (request) => {
     const workflowId = String(request.params.workflowId)
     const workflow = workflows.find((item) => item.id === workflowId)
     const body = (await request.request.json()) as { workflow_definition?: unknown }

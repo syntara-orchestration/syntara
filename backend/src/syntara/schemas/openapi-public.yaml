@@ -26326,20 +26326,20 @@ paths:
                 detail: An unexpected error occurred
                 code: INTERNAL_ERROR
                 retryable: true
-  /workflows/{workflow_id}/versions/{version}/check_breaking_changes:
+  /workflows/{workflow_id}/check_breaking_changes:
     post:
       summary: Check for breaking changes before publishing
       description: |
-        Check for breaking changes in SubWorkflow output schemas.
+        Check a candidate workflow definition for SubWorkflow output contract changes.
 
-        Compares the new workflow definition against the currently published version
+        Compares the submitted candidate definition against the currently published version
         to detect breaking changes such as:
         - Removed outputs
         - Type changes
         - New required outputs
 
-        This endpoint should be called before publishing to warn users about
-        breaking changes that may affect parent workflows.
+        This endpoint does not publish the candidate definition. It should be called before
+        publishing to warn users about breaking changes that may affect parent workflows.
       operationId: check_breaking_changes
       tags:
         - Workflows
@@ -26356,12 +26356,6 @@ paths:
             type: string
             format: uuid
             title: Workflow Id
-        - name: version
-          in: path
-          required: true
-          schema:
-            type: integer
-            title: Version
       requestBody:
         required: true
         content:

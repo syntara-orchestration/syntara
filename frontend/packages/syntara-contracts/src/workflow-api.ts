@@ -196,7 +196,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/workflows/{workflow_id}/versions/{version}/check_breaking_changes': {
+  '/workflows/{workflow_id}/check_breaking_changes': {
     parameters: {
       query?: never
       header?: never
@@ -207,16 +207,16 @@ export interface paths {
     put?: never
     /**
      * Check for breaking changes before publishing
-     * @description Check for breaking changes in SubWorkflow output schemas.
+     * @description Check a candidate workflow definition for SubWorkflow output contract changes.
      *
-     *     Compares the new workflow definition against the currently published version
+     *     Compares the submitted candidate definition against the currently published version
      *     to detect breaking changes such as:
      *     - Removed outputs
      *     - Type changes
      *     - New required outputs
      *
-     *     This endpoint should be called before publishing to warn users about
-     *     breaking changes that may affect parent workflows.
+     *     This endpoint does not publish the candidate definition. It should be called before
+     *     publishing to warn users about breaking changes that may affect parent workflows.
      */
     post: operations['check_breaking_changes']
     delete?: never
@@ -3249,7 +3249,6 @@ export interface operations {
       header?: never
       path: {
         workflow_id: string
-        version: number
       }
       cookie?: never
     }

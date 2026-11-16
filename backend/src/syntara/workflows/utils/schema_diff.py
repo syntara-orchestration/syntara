@@ -298,6 +298,16 @@ def detect_workflow_contract_changes(
     for trigger_id in old_triggers.keys() | new_triggers.keys():
         old_trigger = old_triggers.get(trigger_id)
         new_trigger = new_triggers.get(trigger_id)
+        if old_trigger is not None and new_trigger is None:
+            result[str(trigger_id)] = [
+                OutputSchemaChange(
+                    change_type="removed_trigger",
+                    field_path=str(trigger_id),
+                    description=f"Removed SubWorkflow Trigger: {trigger_id}",
+                ).to_dict()
+            ]
+            continue
+
         old_params = old_trigger.get("parameters", {}) if old_trigger else {}
         new_params = new_trigger.get("parameters", {}) if new_trigger else {}
         old_schema = old_params.get("output_schema") if isinstance(old_params, dict) else None
@@ -317,14 +327,6 @@ def detect_workflow_contract_changes(
                             is_breaking=False,
                         )
                     )
-        if old_trigger is not None and new_trigger is None:
-            changes.append(
-                OutputSchemaChange(
-                    change_type="removed_trigger",
-                    field_path=str(trigger_id),
-                    description=f"Removed SubWorkflow Trigger: {trigger_id}",
-                )
-            )
         if changes:
             result[str(trigger_id)] = [change.to_dict() for change in changes]
 

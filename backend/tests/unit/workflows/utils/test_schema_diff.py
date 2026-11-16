@@ -382,6 +382,44 @@ class TestDetectWorkflowBreakingChanges:
         assert len(changes["subworkflow_trigger"]) == 1
         assert changes["subworkflow_trigger"][0]["change_type"] == "removed_output"
 
+    def test_removed_trigger_reports_only_trigger_removal(self) -> None:
+        """Removing a trigger subsumes its output and mapping removals."""
+        old_definition: dict[str, Any] = {
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "release": {"type": "object", "properties": {"url": {"type": "string"}}},
+                                "checksum": {"type": "string"},
+                            },
+                        },
+                        "output_mapping": {
+                            "release.url": "${build.stdout_json.url}",
+                            "checksum": "${build.stdout_json.checksum}",
+                        },
+                    },
+                }
+            ]
+        }
+
+        contract_changes = detect_workflow_contract_changes(old_definition, {"triggers": []})
+        breaking_changes = detect_workflow_breaking_changes(old_definition, {"triggers": []})
+
+        expected_change = {
+            "change_type": "removed_trigger",
+            "field_path": "child_trigger",
+            "old_type": None,
+            "new_type": None,
+            "description": "Removed SubWorkflow Trigger: child_trigger",
+            "is_breaking": True,
+        }
+        assert contract_changes == {"child_trigger": [expected_change]}
+        assert breaking_changes == {"child_trigger": [expected_change]}
+
     def test_non_subworkflow_triggers_ignored(self) -> None:
         """Non-SubWorkflow triggers are not checked."""
         old_definition: dict[str, Any] = {

@@ -31,6 +31,7 @@ type ParentWorkflowGroup = {
 }
 
 const CHANGE_TYPE_LABELS: Record<string, string> = {
+  removed_trigger: 'Sub-workflow triggers removed',
   removed_output: 'Outputs removed',
   type_change: 'Output types changed',
   new_required_output: 'Required outputs added',

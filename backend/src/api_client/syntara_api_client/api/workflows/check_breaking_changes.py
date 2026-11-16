@@ -14,7 +14,6 @@ from ...types import Response
 
 def _get_kwargs(
     workflow_id: UUID,
-    version: int,
     *,
     body: WorkflowValidateRequest,
 ) -> dict[str, Any]:
@@ -22,7 +21,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": f"/workflows/{workflow_id}/versions/{version}/check_breaking_changes",
+        "url": f"/workflows/{workflow_id}/check_breaking_changes",
     }
 
     _kwargs["json"] = body.to_dict()
@@ -102,27 +101,25 @@ def _build_response(
 
 def sync_detailed(
     workflow_id: UUID,
-    version: int,
     *,
     client: AuthenticatedClient,
     body: WorkflowValidateRequest,
 ) -> Response[BreakingChangesResponse | ErrorData]:
     """Check for breaking changes before publishing
 
-     Check for breaking changes in SubWorkflow output schemas.
+     Check a candidate workflow definition for SubWorkflow output contract changes.
 
-    Compares the new workflow definition against the currently published version
+    Compares the submitted candidate definition against the currently published version
     to detect breaking changes such as:
     - Removed outputs
     - Type changes
     - New required outputs
 
-    This endpoint should be called before publishing to warn users about
-    breaking changes that may affect parent workflows.
+    This endpoint does not publish the candidate definition. It should be called before
+    publishing to warn users about breaking changes that may affect parent workflows.
 
     Args:
         workflow_id (UUID):
-        version (int):
         body (WorkflowValidateRequest): Request body for the workflow validation endpoint.
 
             The definition is accepted as a raw dict so that structurally invalid
@@ -139,7 +136,6 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         workflow_id=workflow_id,
-        version=version,
         body=body,
     )
 
@@ -152,27 +148,25 @@ def sync_detailed(
 
 def sync(
     workflow_id: UUID,
-    version: int,
     *,
     client: AuthenticatedClient,
     body: WorkflowValidateRequest,
 ) -> BreakingChangesResponse | ErrorData | None:
     """Check for breaking changes before publishing
 
-     Check for breaking changes in SubWorkflow output schemas.
+     Check a candidate workflow definition for SubWorkflow output contract changes.
 
-    Compares the new workflow definition against the currently published version
+    Compares the submitted candidate definition against the currently published version
     to detect breaking changes such as:
     - Removed outputs
     - Type changes
     - New required outputs
 
-    This endpoint should be called before publishing to warn users about
-    breaking changes that may affect parent workflows.
+    This endpoint does not publish the candidate definition. It should be called before
+    publishing to warn users about breaking changes that may affect parent workflows.
 
     Args:
         workflow_id (UUID):
-        version (int):
         body (WorkflowValidateRequest): Request body for the workflow validation endpoint.
 
             The definition is accepted as a raw dict so that structurally invalid
@@ -189,7 +183,6 @@ def sync(
 
     return sync_detailed(
         workflow_id=workflow_id,
-        version=version,
         client=client,
         body=body,
     ).parsed
@@ -197,27 +190,25 @@ def sync(
 
 async def asyncio_detailed(
     workflow_id: UUID,
-    version: int,
     *,
     client: AuthenticatedClient,
     body: WorkflowValidateRequest,
 ) -> Response[BreakingChangesResponse | ErrorData]:
     """Check for breaking changes before publishing
 
-     Check for breaking changes in SubWorkflow output schemas.
+     Check a candidate workflow definition for SubWorkflow output contract changes.
 
-    Compares the new workflow definition against the currently published version
+    Compares the submitted candidate definition against the currently published version
     to detect breaking changes such as:
     - Removed outputs
     - Type changes
     - New required outputs
 
-    This endpoint should be called before publishing to warn users about
-    breaking changes that may affect parent workflows.
+    This endpoint does not publish the candidate definition. It should be called before
+    publishing to warn users about breaking changes that may affect parent workflows.
 
     Args:
         workflow_id (UUID):
-        version (int):
         body (WorkflowValidateRequest): Request body for the workflow validation endpoint.
 
             The definition is accepted as a raw dict so that structurally invalid
@@ -234,7 +225,6 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         workflow_id=workflow_id,
-        version=version,
         body=body,
     )
 
@@ -245,27 +235,25 @@ async def asyncio_detailed(
 
 async def asyncio(
     workflow_id: UUID,
-    version: int,
     *,
     client: AuthenticatedClient,
     body: WorkflowValidateRequest,
 ) -> BreakingChangesResponse | ErrorData | None:
     """Check for breaking changes before publishing
 
-     Check for breaking changes in SubWorkflow output schemas.
+     Check a candidate workflow definition for SubWorkflow output contract changes.
 
-    Compares the new workflow definition against the currently published version
+    Compares the submitted candidate definition against the currently published version
     to detect breaking changes such as:
     - Removed outputs
     - Type changes
     - New required outputs
 
-    This endpoint should be called before publishing to warn users about
-    breaking changes that may affect parent workflows.
+    This endpoint does not publish the candidate definition. It should be called before
+    publishing to warn users about breaking changes that may affect parent workflows.
 
     Args:
         workflow_id (UUID):
-        version (int):
         body (WorkflowValidateRequest): Request body for the workflow validation endpoint.
 
             The definition is accepted as a raw dict so that structurally invalid
@@ -283,7 +271,6 @@ async def asyncio(
     return (
         await asyncio_detailed(
             workflow_id=workflow_id,
-            version=version,
             client=client,
             body=body,
         )

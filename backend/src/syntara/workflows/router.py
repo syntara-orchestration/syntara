@@ -527,7 +527,7 @@ async def get_workflow_version(
 
 
 @router.post(
-    "/{workflow_id}/versions/{version}/check_breaking_changes",
+    "/{workflow_id}/check_breaking_changes",
     summary="Check for breaking changes before publishing",
     response_model=BreakingChangesResponse,
     dependencies=[Depends(_wf_perm_read)],
@@ -536,21 +536,20 @@ async def get_workflow_version(
 )
 async def check_breaking_changes(
     workflow_id: UUID,
-    version: int,  # noqa: ARG001
     request: WorkflowValidateRequest,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("workflow", "read"))],
 ) -> BreakingChangesResponse:
-    """Check for breaking changes in SubWorkflow output schemas.
+    """Check a candidate workflow definition for SubWorkflow output contract changes.
 
-    Compares the new workflow definition against the currently published version
+    Compares the submitted candidate definition against the currently published version
     to detect breaking changes such as:
     - Removed outputs
     - Type changes
     - New required outputs
 
-    This endpoint should be called before publishing to warn users about
-    breaking changes that may affect parent workflows.
+    This endpoint does not publish the candidate definition. It should be called before
+    publishing to warn users about breaking changes that may affect parent workflows.
     """
     workflow = await service.get_workflow_by_id(workflow_id)
 

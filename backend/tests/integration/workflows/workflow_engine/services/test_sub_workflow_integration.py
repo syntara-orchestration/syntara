@@ -294,8 +294,64 @@ def _build_activities(child_def: dict[str, Any] | None = None) -> Sequence[Calla
     ]
 
 
-def _parent_workflow_def_with_downstream() -> dict[str, Any]:
+def _child_workflow_def_with_declared_outputs() -> dict[str, Any]:
+    """Child workflow that maps nested public outputs from a script result."""
+    return {
+        "schema_version": "2.0.0",
+        "triggers": [
+            {
+                "id": "child_trigger",
+                "type": "subworkflow_trigger",
+                "parameters": {
+                    "output_schema": {
+                        "type": "object",
+                        "properties": {
+                            "release": {
+                                "type": "object",
+                                "properties": {
+                                    "url": {"type": "string"},
+                                    "labels": {"type": "array", "items": {"type": "string"}},
+                                },
+                                "required": ["url", "labels"],
+                            }
+                        },
+                        "required": ["release"],
+                    },
+                    "output_mapping": {
+                        "release.url": "${child_script.stdout_json.url}",
+                        "release.labels": "${child_script.stdout_json.labels}",
+                    },
+                },
+            }
+        ],
+        "nodes": [
+            {
+                "id": "child_script",
+                "type": "script",
+                "parameters": {
+                    "language": "python",
+                    "code": (
+                        "import json\n"
+                        "print(json.dumps({'url': 'https://example.test/release', "
+                        "'labels': ['stable', 'linux'], 'internal_token': 'do-not-expose'}))"
+                    ),
+                },
+            },
+        ],
+        "edges": [{"from": "child_trigger", "to": "child_script"}],
+    }
+
+
+def _parent_workflow_def_with_downstream(downstream_code: str | None = None) -> dict[str, Any]:
     """Parent workflow with a downstream script that consumes sub-workflow output."""
+    if downstream_code is None:
+        downstream_code = (
+            "import json, sys\n"
+            'sys.stdout.write(json.dumps({"child_id": "${sub_wf_node.Result.child_execution_id}",'
+            ' "child_status": "${sub_wf_node.Result.child_status}",'
+            ' "child_wf_name": "${sub_wf_node.Result.child_workflow_name}",'
+            ' "status_code": "${sub_wf_node.StatusCode}"}))'
+        )
     return {
         "schema_version": "2.0.0",
         "triggers": [
@@ -316,13 +372,7 @@ def _parent_workflow_def_with_downstream() -> dict[str, Any]:
                 "type": "script",
                 "parameters": {
                     "language": "python",
-                    "code": (
-                        "import json, sys\n"
-                        'sys.stdout.write(json.dumps({"child_id": "${sub_wf_node.Result.child_execution_id}",'
-                        ' "child_status": "${sub_wf_node.Result.child_status}",'
-                        ' "child_wf_name": "${sub_wf_node.Result.child_workflow_name}",'
-                        ' "status_code": "${sub_wf_node.StatusCode}"}))'
-                    ),
+                    "code": downstream_code,
                 },
             },
         ],
@@ -521,6 +571,33 @@ class TestSubWorkflowLifecycle:
 @pytest.mark.asyncio
 class TestSubWorkflowDownstreamOutputConsumption:
     """Prove downstream parent nodes consume SubWorkflowOutput via template resolution."""
+
+    async def test_declared_outputs_round_trip_through_temporal_to_parent(self, temporal_env: object) -> None:
+        """Declared nested child values survive the Temporal boundary and resolve in the parent."""
+        release_url = "https://example.test/release"
+        downstream_code = (
+            "import json, sys\n"
+            'sys.stdout.write(json.dumps({"release_url": "${sub_wf_node.Result.outputs.release.url}"}))'
+        )
+        result = await _run_parent_workflow(
+            temporal_env,
+            workflow_def=_parent_workflow_def_with_downstream(downstream_code),
+            workflow_name="sub-wf-declared-output-integration",
+            child_workflow_def=_child_workflow_def_with_declared_outputs(),
+        )
+
+        assert result["status"] == "completed"
+        sub_workflow_output = SubWorkflowOutput.model_validate(result["activity_outputs"]["sub_wf_node"])
+        assert sub_workflow_output.Result is not None
+        assert sub_workflow_output.Result.outputs == {
+            "release": {"url": release_url, "labels": ["stable", "linux"]},
+        }
+        assert "internal_token" not in str(sub_workflow_output.Result.outputs)
+
+        downstream_input = result["activity_inputs"]["downstream_script"]["code"]
+        assert "${sub_wf_node.Result.outputs.release.url}" not in downstream_input
+        assert release_url in downstream_input
+        assert result["activity_outputs"]["downstream_script"]["stdout_json"]["release_url"] == release_url
 
     async def test_downstream_node_receives_resolved_child_execution_id(self, temporal_env: object) -> None:
         """The downstream script's parameters contain the actual UUID, not the raw template."""

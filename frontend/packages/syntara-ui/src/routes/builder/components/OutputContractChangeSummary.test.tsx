@@ -81,6 +81,34 @@ describe('OutputContractChangeSummary', () => {
     expect(screen.queryByText(/Deploy parent/)).not.toBeInTheDocument()
   })
 
+  it('labels a removed trigger without implying that its outputs were removed separately', async () => {
+    const user = userEvent.setup()
+    render(
+      <OutputContractChangeSummary
+        context="publish"
+        contractChanges={[
+          {
+            trigger_id: 'child_trigger',
+            trigger_name: 'Child trigger',
+            changes: [
+              {
+                change_type: 'removed_trigger',
+                field_path: 'child_trigger',
+                description: 'Removed SubWorkflow Trigger: child_trigger',
+                is_breaking: true,
+              },
+            ],
+          },
+        ]}
+        parentWorkflows={[]}
+      />
+    )
+
+    expect(screen.getByText('Sub-workflow triggers removed: 1')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'View details for 1 output changes' }))
+    expect(screen.getByText('Removed SubWorkflow Trigger: child_trigger')).toBeInTheDocument()
+  })
+
   it('uses visibility-scoped copy when no parent references are returned', () => {
     render(<OutputContractChangeSummary context="publish" contractChanges={contractChanges} parentWorkflows={[]} />)
 
