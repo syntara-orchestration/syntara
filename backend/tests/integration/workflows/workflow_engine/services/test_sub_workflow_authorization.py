@@ -70,9 +70,7 @@ def _child_def() -> dict[str, Any]:
     }
 
 
-async def _create_published_child(
-    session: AsyncSession, *, created_by: UUID, project_id: UUID, enabled: bool = True
-) -> UUID:
+async def _create_published_child(session: AsyncSession, *, created_by: UUID, project_id: UUID) -> UUID:
     workflow_id = uuid4()
     session.add(
         Workflow(id=workflow_id, name=f"child-{workflow_id.hex[:8]}", created_by=created_by, project_id=project_id)
@@ -92,7 +90,7 @@ async def _create_published_child(
     await session.flush()
     workflow = await session.get(Workflow, workflow_id)
     assert workflow is not None
-    workflow.is_enabled = enabled
+    workflow.is_enabled = True
     workflow.published_version_id = version_id
     await session.commit()
     return workflow_id
@@ -184,38 +182,49 @@ async def test_authorized_actor_links_child_to_parent(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_unauthorized_actor_denied_before_disabled_child_detail(
+async def test_unauthorized_actor_denied_before_trigger_validation_detail(
     test_db_session: AsyncSession,
     test_db_session_factory: async_sessionmaker[AsyncSession],
     test_user: User,
     test_project_id: UUID,
 ) -> None:
-    """Security-ordering regression: an unauthorized caller gets a generic authz denial, not disabled detail.
+    """Security-ordering regression: an unauthorized caller gets a generic authz denial, not trigger detail.
 
-    The child is BOTH disabled (``is_enabled=False``) and unauthorized (deny evaluator). Authorization
-    is enforced before the ``is_enabled`` check in the create path, so the caller must receive the
-    sanitized ``SubWorkflowAuthorizationError`` ("Not authorized to run child workflow.") and NOT the
-    ``WorkflowDisabledError`` detail that names the child workflow id. Reordering these checks would
-    leak child-workflow state to a caller who was never authorized to see it (AAP-91266, decision #3).
+    The child is published and enabled, but the invocation targets a trigger node that does not exist. If
+    trigger validation ran before authorization, the caller would receive ``TriggerNotFoundError`` naming
+    the missing trigger. Authorization is enforced first (in the create path authz precedes
+    ``_validate_trigger`` / ``_validate_input``), so the caller must receive the sanitized
+    ``SubWorkflowAuthorizationError`` and learn nothing child-specific (AAP-91266 decision #3).
+
+    Note: a "published but disabled" child cannot exist -- the
+    ``ck_workflows_is_enabled_published_version_id`` constraint ties ``is_enabled`` to having a published
+    version, and the setup activity's resolution joins on ``published_version_id`` (an unpublished/disabled
+    child fails earlier with ``WorkflowNotPublishedError``). The reachable child-detail disclosures after
+    authorization are therefore trigger and input validation.
     """
-    child_wf_id = await _create_published_child(
-        test_db_session, created_by=test_user.id, project_id=test_project_id, enabled=False
-    )
+    child_wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
     parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
     setup = SubWorkflowSetupActivity(
         session_factory=test_db_session_factory, task_queue=_TASK_QUEUE, evaluator=_StubEvaluator(allow=False)
     )
+    # Target a trigger that does not exist: trigger validation would raise TriggerNotFoundError naming it.
+    missing_trigger = "nonexistent_trigger"
+    bad_params: dict[str, Any] = {
+        "workflow_id": str(child_wf_id),
+        "trigger_node_id": missing_trigger,
+        "input_mapping": {},
+    }
 
     with pytest.raises(ApplicationError) as exc:
-        await setup.run(_params(child_wf_id), parent_exec, _NODE_ID, str(test_user.id), 0)
+        await setup.run(bad_params, parent_exec, _NODE_ID, str(test_user.id), 0)
 
-    # Authorization denial wins over the disabled-child error: the caller cannot distinguish a disabled
-    # child from an enabled one, nor learn the child workflow id.
+    # Authorization denial wins over the trigger-not-found detail: the caller cannot learn whether the
+    # trigger exists, nor the child workflow id.
     assert exc.value.type == _AUTHZ_ERROR
-    assert exc.value.type != "WorkflowDisabledError"
+    assert exc.value.type != "TriggerNotFoundError"
     assert exc.value.non_retryable is True
     message = str(exc.value)
-    assert "disabled" not in message.lower()
+    assert missing_trigger not in message
     assert str(child_wf_id) not in message
     # Nothing is persisted for an unauthorized caller.
     async with test_db_session_factory() as session:
