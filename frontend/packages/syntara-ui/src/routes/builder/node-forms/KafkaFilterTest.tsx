@@ -3,7 +3,6 @@ import { useFormContext } from 'react-hook-form'
 
 import { filteringClient } from '../../../client'
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
-import { SynErrorState } from '../../../components/states/SynErrorState'
 import { detachPromise } from '../../../utils/detachPromise'
 
 import { filterConfigurationError } from './filterConfigurationError'
@@ -51,11 +50,9 @@ export function KafkaFilterTest({
           </Alert>
         )}
         {mutation.isError && !configurationMessage && (
-          <SynErrorState
-            title="Filter test request failed"
-            message={error}
-            onRetry={() => detachPromise(testFilter())}
-          />
+          <Alert variant="danger" isInline title="Filter test request failed" component="h4">
+            Unable to test the filter. Check your connection and use Test filter to try again.
+          </Alert>
         )}
         {mutation.isSuccess && mutation.data && (
           <Alert
