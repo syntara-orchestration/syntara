@@ -85,7 +85,7 @@ positions accept `earliest` or `latest`; gap policy also accepts `fail`, which
 holds only the affected partition. Valid group progress and previously saved
 position decisions take precedence over new settings. The group is fixed at
 the first successful publication. See the
-[backend settings contract](../../backend/docs/event-subscription-controls.md).
+[backend settings contract](../backend/event-subscription-controls.md).
 
 Auto-commit is disabled. Matching records commit after verified Temporal
 acceptance and normal Execution persistence, without waiting for workflow
