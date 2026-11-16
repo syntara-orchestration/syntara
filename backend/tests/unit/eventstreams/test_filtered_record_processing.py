@@ -1,10 +1,11 @@
 """CEL skips preserve accepted runs and do not create execution or audit work."""
 
+import json
 from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
-from syntara.eventstreams.core.envelope import RawEvent
+from syntara.eventstreams.core.envelope import RawEvent, RawEventHeader
 from syntara.eventstreams.core.handler import ResolvedDelivery
 from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.core.processing import HeldRecord, SkippedRecord
@@ -142,3 +143,52 @@ async def test_preparation_does_not_recompile_loaded_filters(monkeypatch) -> Non
     context, _service, _admission, _event, _logs = filtered_context(monkeypatch, {"expression": "true"})
     monkeypatch.setattr(filter_evaluator, "compile_expression", Mock(side_effect=AssertionError("recompiled")))
     assert isinstance(await context.prepare(), PreparedExecution)
+
+
+@pytest.mark.parametrize("structured", [False, True])
+@pytest.mark.parametrize("event_type", ["order.created", "order.cancelled"])
+async def test_runtime_filters_cloudevents_before_scheduling(monkeypatch, structured, event_type) -> None:
+    expression = (
+        'input.key.text == "order-123" && input.headers.routing.exists(h, h.text == "orders") && '
+        'input.cloudevents.type == "order.created" && input.cloudevents.extensions.priority == "3" && '
+        "input.payload.value.count == 2"
+    )
+    context, service, admission, event, logs = filtered_context(monkeypatch, {"expression": expression})
+    attributes = {"specversion": "1.0", "id": "event-123", "source": "/orders", "type": event_type, "priority": "3"}
+    headers = [RawEventHeader(name="routing", value=b"orders")]
+    if structured:
+        value = json.dumps({**attributes, "data": {"count": 2}}).encode()
+        headers.append(RawEventHeader(name="content-type", value=b"application/cloudevents+json"))
+    else:
+        value = b'{"count":2}'
+        headers.extend(RawEventHeader(name="ce_" + name, value=text.encode()) for name, text in attributes.items())
+    event = event.model_copy(update={"value": value, "key": b"order-123", "headers": tuple(headers)})
+    before = event.model_copy(deep=True)
+    result = await service.process(context.snapshot, context.identity, event)
+    admission.recover_accepted.assert_awaited_once_with(context.identity)
+    if event_type == "order.created":
+        assert isinstance(result, ResolvedDelivery)
+        prepared = admission.schedule.call_args.args[0]
+        assert isinstance(prepared, PreparedExecution)
+        assert prepared.input_data["payload"] == {"count": 2}
+        assert prepared.input_data["cloudevents"]["type"] == "order.created"
+        assert prepared.input_data["cloudevents"]["extensions"] == {"priority": "3"}
+        logs.info.assert_not_called()
+    else:
+        assert isinstance(result, SkippedRecord)
+        assert result.outcome == "no_match"
+        admission.schedule.assert_not_awaited()
+    assert event == before
+
+
+async def test_attribute_filter_keeps_invalid_cloud_event_in_content_failure_path(monkeypatch) -> None:
+    context, service, admission, event, logs = filtered_context(
+        monkeypatch, {"expression": "input.cloudevents == null"}
+    )
+    event = event.model_copy(update={"headers": (RawEventHeader(name="ce_id", value=b"incomplete"),)})
+    result = await service.process(context.snapshot, context.identity, event)
+    assert isinstance(result, HeldRecord)
+    assert result.permanent_content_error
+    admission.schedule.assert_not_awaited()
+    logs.info.assert_not_called()
+    logs.error.assert_not_called()
