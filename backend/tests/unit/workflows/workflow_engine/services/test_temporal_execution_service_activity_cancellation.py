@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from temporalio.client import AsyncActivityHandle, Client
 
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 
 
 @pytest.mark.asyncio

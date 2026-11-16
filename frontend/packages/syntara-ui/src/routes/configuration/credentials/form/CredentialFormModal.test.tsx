@@ -7,6 +7,7 @@ import { axe } from 'vitest-axe'
 
 import { credentialsClient } from '../../../../client'
 import { AlertProvider } from '../../../../providers/alerts'
+import { regExpPrefixMatch } from '../../../../utils/escapeRegExp'
 import { useSelectableProjects } from '../../../access/useAllProjects'
 
 import { CredentialFormModal } from './CredentialFormModal'
@@ -96,6 +97,11 @@ const mockProjects = [
   { id: 'proj-3', name: 'Project Gamma' },
 ]
 
+/** PatternFly SelectOption descriptions are included in the option accessible name. */
+function credentialTypeOption(name: string) {
+  return { name: regExpPrefixMatch(name) }
+}
+
 let typesQueryState: CredentialTypesQueryMock
 
 const mockCredential = {
@@ -162,6 +168,22 @@ describe('CredentialFormModal', () => {
     expect(screen.getByLabelText('Credential description')).toBeInTheDocument()
   })
 
+  it('uses a label help popover for credential type instead of an inline type list', async () => {
+    const user = userEvent.setup()
+    render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
+
+    expect(screen.queryByText(/For SSH connections to remote servers/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/For APIs using bearer token authentication/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'More info for Credential type' }))
+    expect(await screen.findByText(/Choose how this credential authenticates\./)).toBeInTheDocument()
+  })
+
+  it('shows the selected credential type description as field helper text', () => {
+    render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
+    expect(screen.getByText('Bearer token authentication for HTTP APIs')).toBeInTheDocument()
+  })
+
   it('renders credential type dropdown with types', async () => {
     const user = userEvent.setup()
     render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
@@ -175,6 +197,7 @@ describe('CredentialFormModal', () => {
     const listbox = screen.getByRole('listbox', { name: 'Credential type options' })
     expect(within(listbox).getByText('HTTP Bearer Token')).toBeInTheDocument()
     expect(within(listbox).getByText('HTTP Basic Auth')).toBeInTheDocument()
+    expect(within(listbox).getByText('Bearer token authentication for HTTP APIs')).toBeInTheDocument()
   })
 
   it('portals the credential type menu outside the modal (avoids modal body scroll)', async () => {
@@ -219,7 +242,7 @@ describe('CredentialFormModal', () => {
 
     // Open dropdown and select HTTP Basic Auth
     await user.click(screen.getByLabelText('Credential type'))
-    await user.click(screen.getByRole('option', { name: 'HTTP Basic Auth' }))
+    await user.click(screen.getByRole('option', credentialTypeOption('HTTP Basic Auth')))
 
     expect(screen.getByLabelText('Username', { selector: 'input' })).toBeInTheDocument()
     expect(screen.getByLabelText('Password', { selector: 'input' })).toBeInTheDocument()
@@ -402,7 +425,7 @@ describe('CredentialFormModal', () => {
 
     // Change to second type via PF6 Select
     await user.click(screen.getByLabelText('Credential type'))
-    await user.click(screen.getByRole('option', { name: 'HTTP Basic Auth' }))
+    await user.click(screen.getByRole('option', credentialTypeOption('HTTP Basic Auth')))
     expect(screen.getByLabelText('Username', { selector: 'input' })).toBeInTheDocument()
     expect(screen.getByLabelText('Password', { selector: 'input' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Token', { selector: 'input' })).not.toBeInTheDocument()
@@ -474,9 +497,11 @@ describe('CredentialFormModal', () => {
 
     await user.click(screen.getByLabelText('Credential type'))
     const listbox = screen.getByRole('listbox', { name: 'Credential type options' })
-    expect(within(listbox).getByRole('option', { name: 'HTTP Bearer Token' })).toBeInTheDocument()
-    expect(within(listbox).getByRole('option', { name: 'HTTP Basic Auth' })).toBeInTheDocument()
-    expect(within(listbox).queryByRole('option', { name: 'Ansible Automation Platform' })).not.toBeInTheDocument()
+    expect(within(listbox).getByRole('option', credentialTypeOption('HTTP Bearer Token'))).toBeInTheDocument()
+    expect(within(listbox).getByRole('option', credentialTypeOption('HTTP Basic Auth'))).toBeInTheDocument()
+    expect(
+      within(listbox).queryByRole('option', credentialTypeOption('Ansible Automation Platform'))
+    ).not.toBeInTheDocument()
   })
 
   it('shows placeholder when no defaultProjectId is provided', () => {
@@ -587,7 +612,7 @@ describe('CredentialFormModal', () => {
   describe('mutually exclusive field groups', () => {
     async function selectAAPType(user: ReturnType<typeof userEvent.setup>) {
       await user.click(screen.getByLabelText('Credential type'))
-      await user.click(screen.getByRole('option', { name: 'Ansible Automation Platform' }))
+      await user.click(screen.getByRole('option', credentialTypeOption('Ansible Automation Platform')))
     }
 
     async function selectAuthMethod(user: ReturnType<typeof userEvent.setup>, optionName: string) {

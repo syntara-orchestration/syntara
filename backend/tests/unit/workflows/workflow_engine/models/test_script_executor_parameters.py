@@ -4,7 +4,10 @@ from uuid import uuid4
 
 import pytest
 
-from syntara.workflows.workflow_engine.models.workflow_definition import ScriptExecutorParameters, ScriptLanguage
+from syntara.workflow_core.models import (
+    ScriptExecutorParameters,
+    ScriptLanguage,
+)
 
 
 class TestScriptExecutorParametersEnvironmentCoercion:

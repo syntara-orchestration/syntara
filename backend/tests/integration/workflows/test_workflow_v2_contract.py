@@ -16,10 +16,8 @@ import pytest
 from pydantic import ValidationError
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.validators.workflow_definition import WorkflowValidator
-from syntara.workflows.workflow_engine.graph import WorkflowGraph
-from syntara.workflows.workflow_engine.models.responses import WorkflowResultResponse
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_core.graph import WorkflowGraph
+from syntara.workflow_core.models import (
     AAPJobTemplateExecutorParameters,
     AgenticExecutorParameters,
     APIExecutorParameters,
@@ -27,6 +25,8 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     ScriptExecutorParameters,
     ScriptLanguage,
 )
+from syntara.workflow_runtime.engines.models.responses import WorkflowResultResponse
+from syntara.workflows.validators.workflow_definition import WorkflowValidator
 
 # ---------------------------------------------------------------------------
 # Helpers

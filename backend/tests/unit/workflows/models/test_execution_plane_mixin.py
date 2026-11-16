@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_core.models import (
     ExecutionTargetProfile,
     ScriptExecutorParameters,
     ScriptLanguage,

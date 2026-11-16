@@ -21,10 +21,10 @@ from temporalio.exceptions import ApplicationError
 from syntara.execution_plane import cancellation
 from syntara.execution_plane.commands.completion import CompletionCommandHandler
 from syntara.execution_plane.commands.context import AOCommandContext
+from syntara.workflow_runtime.engines.temporal.activities.ep import ep_dispatch_activity as dispatch
+from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import ActivitySyncService
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution
-from syntara.workflows.workflow_engine.activities.ep import ep_dispatch_activity as dispatch
-from syntara.workflows.workflow_engine.services.activity_sync_service import ActivitySyncService
 
 _NODE_ID = "test_activity"
 _DEFINITIONS = {

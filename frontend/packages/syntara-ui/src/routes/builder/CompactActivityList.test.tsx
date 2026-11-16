@@ -77,6 +77,27 @@ describe('CompactActivityList', () => {
     expect(rows[1]).not.toHaveClass('pf-m-selected')
   })
 
+  it('highlights only the selected loop iteration', () => {
+    const loopOrder: ActivityOrderItem[] = [
+      { id: 'task-1', name: 'Fetch Data (iter 0)' },
+      { id: 'task-1#iter-1', name: 'Fetch Data (iter 1)' },
+      { id: 'task-1#iter-2', name: 'Fetch Data (iter 2)' },
+    ]
+
+    render(
+      <CompactActivityList
+        activityStates={new Map(loopOrder.map(({ id }) => state(id)))}
+        activityOrder={loopOrder}
+        selectedNodeId="task-1#iter-1"
+      />
+    )
+
+    const rows = screen.getAllByRole('row')
+    expect(rows[0]).not.toHaveClass('pf-m-selected')
+    expect(rows[1]).toHaveClass('pf-m-selected')
+    expect(rows[2]).not.toHaveClass('pf-m-selected')
+  })
+
   it('shows pending status when activity state is missing', () => {
     const emptyStates = new Map<string, ActivityState>()
     render(<CompactActivityList activityStates={emptyStates} activityOrder={[{ id: 'x', name: 'X' }]} />)

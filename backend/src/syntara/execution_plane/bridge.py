@@ -23,10 +23,10 @@ from syntara.execution_plane.commands.errors import (
     CommandResourceStateError,
 )
 from syntara.execution_plane.commands.registry import build_ao_registry
-from syntara.workflows.executions_router import get_temporal_execution_service
-from syntara.workflows.workflow_engine.services.temporal_execution_service import (
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import (
     TemporalExecutionService,  # noqa: TC001 — FastAPI resolves dependency annotations
 )
+from syntara.workflows.executions_router import get_temporal_execution_service
 
 if TYPE_CHECKING:
     from execution_plane_client.handlers import HandlingResult
