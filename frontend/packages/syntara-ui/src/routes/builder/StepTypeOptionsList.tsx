@@ -40,7 +40,7 @@ export function StepTypeOptionsList(props: StepTypeOptionsListProps) {
     const isDisabled = stepType.isDisabled === true
     const { icon, id } = resolveIconForType({ stepTypeId: stepType.id })
     const accentColor = getAddStepPanelColor(stepType.id)
-    // AAP steps use gray icon (no color tint)
+    // AAP steps use gray icons (no color tint)
     const isAAPStep = AAP_STEP_IDS.has(stepType.id as (typeof RegistryStepId)[keyof typeof RegistryStepId])
     const iconColor = isAAPStep ? undefined : accentColor
     const stepIcon = renderStepIcon(icon, id, 'list', iconColor)
