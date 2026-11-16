@@ -37,24 +37,28 @@ const TEST_FILES = ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}']
 /** Glob pattern for end-to-end test files. */
 const E2E_FILES = ['e2e/**']
 /** Import restrictions shared by TypeScript source files. */
+const SHARED_RESTRICTED_IMPORT_PATTERNS = [
+  {
+    regex: '(?:\\.{1,2}/)*(?:hooks/)?routing/(?:useNavigate|useParams|useSearch|useLocation|navigate|Link)$',
+    message: 'Deprecated bridge hook. Use @tanstack/react-router primitives directly.',
+  },
+  {
+    group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
+    message:
+      "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
+  },
+]
+const TANSTACK_LINK_RESTRICTION = {
+  group: ['@tanstack/react-router'],
+  importNames: ['Link'],
+  message:
+    'Use SynLink from components/SynLink instead of TanStack Link directly. SynLink provides consistent PatternFly styling.',
+}
 const SHARED_RESTRICTED_IMPORT_OPTIONS = {
-  patterns: [
-    {
-      regex: '(?:\\.{1,2}/)*(?:hooks/)?routing/(?:useNavigate|useParams|useSearch|useLocation|navigate|Link)$',
-      message: 'Deprecated bridge hook. Use @tanstack/react-router primitives directly.',
-    },
-    {
-      group: ['@tanstack/react-router'],
-      importNames: ['Link'],
-      message:
-        'Use SynLink from components/SynLink instead of TanStack Link directly. SynLink provides consistent PatternFly styling.',
-    },
-    {
-      group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
-      message:
-        "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
-    },
-  ],
+  patterns: [...SHARED_RESTRICTED_IMPORT_PATTERNS, TANSTACK_LINK_RESTRICTION],
+}
+const LINK_ALLOWED_RESTRICTED_IMPORT_OPTIONS = {
+  patterns: SHARED_RESTRICTED_IMPORT_PATTERNS,
 }
 
 const MATH_RANDOM_RESTRICTION = {
@@ -85,6 +89,16 @@ export default tseslint.config(
       // alongside other packages trips typescript-eslint's multi-tsconfigRootDir check.
       'eslint.config.js',
     ],
+  },
+  {
+    languageOptions: {
+      parserOptions: {
+        tsconfigRootDir: __dirname,
+      },
+    },
+  },
+  {
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -185,8 +199,8 @@ export default tseslint.config(
       ],
     },
   },
-  // Deprecate bridge hooks in favor of direct @tanstack/react-router imports.
-  // useSearchParams is exempt — it is a supported utility, not a deprecated bridge.
+  // Reject banned imports and direct TanStack Link usage. Bridge hooks are deprecated in favor of direct
+  // @tanstack/react-router imports. useSearchParams is exempt — it is a supported utility, not a deprecated bridge.
   {
     files: ['**/*.{ts,tsx}'],
     ignores: ['**/hooks/routing/*.{ts,tsx}', '**/hooks/routing/*.test.{ts,tsx}'],
@@ -199,18 +213,24 @@ export default tseslint.config(
       ],
     },
   },
-  // SynLink.tsx wraps TanStack Link for general use. SynPageBreadcrumbs,
-  // HistoryListItemLink, and masthead logo links import Link directly because
-  // SynLink renders a PF6 Button (wrong for breadcrumb items, list-row overlays,
-  // and MastheadLogo's component prop which expects an anchor wrapper).
+  // SynLink.tsx wraps TanStack Link for general use. These components use raw Link where
+  // SynLink's PF6 Button styling is wrong for breadcrumbs, row overlays, or MastheadLogo anchors.
+  // Keep the bridge-hook and internal-contract restrictions active in these files.
   {
     files: [
       '**/components/SynLink.tsx',
       '**/components/layout/SynPageBreadcrumbs.tsx',
       '**/routes/builder/HistoryListItemLink.tsx',
+      '**/app/AppDockedNav.tsx',
+      '**/app/AppMobileMasthead.tsx',
     ],
     rules: {
-      '@typescript-eslint/no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          ...LINK_ALLOWED_RESTRICTED_IMPORT_OPTIONS,
+        },
+      ],
     },
   },
   {
@@ -220,7 +240,6 @@ export default tseslint.config(
       globals: globals.browser,
       parserOptions: {
         project: ['./tsconfig.app.json', './tsconfig.node.json', './tsconfig.e2e.json', './tsconfig.storybook.json'],
-        tsconfigRootDir: __dirname,
       },
     },
     settings: {
@@ -326,7 +345,7 @@ export default tseslint.config(
       'import-x/no-cycle': ['error', { maxDepth: 2 }],
       'import-x/no-self-import': 'error',
       // TypeScript resolves source extensions automatically; JSON imports need `.json`.
-      'import-x/extensions': ['warn', 'never', { json: 'always' }],
+      'import-x/extensions': ['error', 'never', { json: 'always' }],
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       // -- syntara custom rules (PR checklist + UX design system enforcement) --
       // no-switch-is-reversed, require-alert-object-param, and require-query-state-object

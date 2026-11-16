@@ -10,13 +10,15 @@ import structlog
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from syntara.workflows.workflow_engine.activities.condition import condition
-from syntara.workflows.workflow_engine.activities.converge import converge
-from syntara.workflows.workflow_engine.activities.ep.ep_dispatch_activity import execute_script_activity
-from syntara.workflows.workflow_engine.activities.internal_activity import execute_internal_activity
-from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
-from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.activities.condition import condition
+from syntara.workflow_runtime.engines.temporal.activities.converge import converge
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import execute_script_activity
+from syntara.workflow_runtime.engines.temporal.activities.internal_activity import execute_internal_activity
+from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
+from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
+    fetch_workflow_runtime_settings,
+)
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from tests.fixtures.fake_execution_plane import FakeExecutionPlaneHttpClient
 from tests.fixtures.settings import FakeSettingsCache
 
@@ -82,7 +84,7 @@ async def temporal_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[WorkflowEnvironment, None]:
     """Pair Temporal with a test double for the independently deployed EP API."""
-    from syntara.workflows.workflow_engine.activities.ep import ep_dispatch_activity
+    from syntara.workflow_runtime.engines.temporal.activities.ep import ep_dispatch_activity
 
     database_url = test_db_engine.url
     monkeypatch.setenv("APP_DATABASE_URL", database_url.render_as_string(hide_password=False))

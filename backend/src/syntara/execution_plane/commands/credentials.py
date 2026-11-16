@@ -30,7 +30,7 @@ from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow_definition import WorkflowDefinition, WorkflowNode
 
 if TYPE_CHECKING:
-    from syntara.workflows.workflow_engine.models.workflow_definition import CredentialBinding
+    from syntara.workflow_core.models import CredentialBinding
 
 
 class CredentialResolveCommandHandler:

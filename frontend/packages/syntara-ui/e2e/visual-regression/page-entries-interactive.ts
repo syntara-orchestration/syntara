@@ -10,6 +10,7 @@ import { expect, type Page } from '@playwright/test'
 import { AppRoute } from '../../src/app/AppRoute'
 import { toAppUrl } from '../fixtures'
 import { clickCanvasStepToOpenEditor } from '../helpers/canvas-interaction'
+import { credentialTypeOptionName } from '../helpers/credentials'
 
 import { MOCK_IDENTITY_PROVIDER_ID } from './mock-ids'
 import type { CanvasPageEntry, PageEntry } from './page-registry'
@@ -1191,7 +1192,7 @@ export const credentialEditPages: PageEntry[] = [
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await dialog.getByRole('button', { name: 'Credential type', exact: true }).click()
-      await page.getByRole('option', { name: 'Ansible Automation Platform' }).click()
+      await page.getByRole('option', { name: credentialTypeOptionName('Ansible Automation Platform') }).click()
       await expect(dialog.getByText('Auth method')).toBeVisible()
     },
   },

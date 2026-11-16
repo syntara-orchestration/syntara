@@ -31,12 +31,12 @@ from syntara.telemetry.events.workflow_execution import (
     WorkflowExecutionStartEvent,
 )
 from syntara.telemetry.handlers.node_execution import NodeExecutedTelemetryHandler
-from syntara.workflows.audit.node_execution import NodeExecutedEvent
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_core.models import (
     ActivityTerminalStatus,
     NodeType,
     WorkflowTerminalStatus,
 )
+from syntara.workflows.audit.node_execution import NodeExecutedEvent
 from tests.fixtures.fake_execution_plane import execute_fixture_script
 
 logger = structlog.stdlib.get_logger(__name__)

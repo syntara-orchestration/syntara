@@ -22,11 +22,11 @@ from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.execution_plane.commands.errors import CommandResourceStateError
 from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
+from syntara.workflow_core.models import ConditionNodeParameters
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow_definition import ConditionNode
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.workflow_engine.models.workflow_definition import ConditionNodeParameters
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable

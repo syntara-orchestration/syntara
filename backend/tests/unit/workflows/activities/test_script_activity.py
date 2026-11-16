@@ -12,9 +12,9 @@ from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
 from syntara.execution_plane.client import ExecutionPlaneRejectedError, ExecutionPlaneUnavailableError
-from syntara.workflows.workflow_engine.activities.ep import ep_dispatch_activity as activity_module
+from syntara.workflow_runtime.engines.temporal.activities.ep import ep_dispatch_activity as activity_module
 
-ACTIVITY_INFO_PATH = "syntara.workflows.workflow_engine.activities.ep.ep_dispatch_activity.activity.info"
+ACTIVITY_INFO_PATH = "syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity.activity.info"
 EXECUTION_ID = "00000000-0000-0000-0000-000000000010"
 WORK_ITEM_ID = uuid5(UUID(EXECUTION_ID), "unit-activity")
 EXECUTION_TARGET_ID = UUID("00000000-0000-0000-0000-000000000030")

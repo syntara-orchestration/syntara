@@ -81,6 +81,15 @@ tests/
 - Unit-only fixtures and mocks (e.g. `MockMCPProvider`) live in `tests/unit/fixtures/`
 - Reusable test utilities go in `tests/helpers/`
 
+The workflow runtime extraction is being completed incrementally. Until the
+remaining test modules are relocated, tests under
+`tests/unit/workflows/workflow_engine/` and
+`tests/integration/workflows/workflow_engine/` mirror
+`src/syntara/workflow_runtime/` rather than a source directory with the same
+name. New runtime tests should use `tests/unit/workflow_runtime/` or
+`tests/integration/workflow_runtime/`; existing legacy paths remain supported
+to avoid a large, unrelated test-only move in this refactoring.
+
 ## File Naming
 
 - Test files MUST use `test_*.py` prefix pattern exclusively

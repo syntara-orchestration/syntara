@@ -201,9 +201,11 @@ To use the real backend instead of the mock API:
 3. Export the backend URL and start the UI:
 
 ```bash
-export VITE_API_URL=http://localhost:8000
+export VITE_API_URL=https://localhost:8000
 npm start
 ```
+
+`make dev` from the repository root sets `VITE_API_URL` for you. The backend dev server uses HTTPS with a self-signed certificate, which the Vite proxy accepts (`secure: false`). Use `http://` only if you run the backend with `APP_S2S_TLS_ENABLED=false`, as in the [Windows setup guide](../docs/windows-setup-guide.md).
 
 ## Architecture Documentation
 
