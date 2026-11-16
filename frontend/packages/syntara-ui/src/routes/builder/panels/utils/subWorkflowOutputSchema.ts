@@ -119,32 +119,10 @@ function toPreviewNode(field: OutputFieldDef, parentPath: string[]): InputSchema
   }
 }
 
-function buildChildStepGroup(step: ChildWorkflowStepSchema, outputsPath: string[]): InputSchemaPreviewNode {
-  const stepPath = [...outputsPath, step.id]
-
-  // Child step outputs are exposed as flat objects - no StandardOutputWrapper at this level
-  const children = (step.outputFields ?? []).map((field) => toPreviewNode(field, stepPath))
-
-  return {
-    name: step.name,
-    type: 'object',
-    description: `Outputs from ${step.name}`,
-    fieldPath: stepPath,
-    isGroup: true,
-    children,
-  }
-}
-
-/** Build the Sub-workflow output tree from declared outputs or legacy terminal steps. */
+/** Build the Sub-workflow output tree from the selected trigger's declared outputs. */
 export function buildSubWorkflowOutputSchemaTree(childSteps: ChildWorkflowStepSchema[]): InputSchemaPreviewNode[] {
   const outputFields = getNodeOutputSchema(ActivityTypeEnum.SUB_WORKFLOW) ?? []
-
-  // Check if we have declared outputs (new contract) vs legacy terminal steps
-  const hasDeclaredOutputs = childSteps.length === 1 && childSteps[0]?.id === '__declared_outputs__'
-  const declaredStep = hasDeclaredOutputs ? childSteps[0] : null
-  const childStepsWithFields = hasDeclaredOutputs
-    ? []
-    : childSteps.filter((step) => (step.outputFields?.length ?? 0) > 0)
+  const declaredStep = childSteps.find((step) => step.id === '__declared_outputs__')
 
   const buildField = (field: OutputFieldDef, parentPath: string[]): InputSchemaPreviewNode => {
     const fieldPath = [...parentPath, field.name]
@@ -163,20 +141,7 @@ export function buildSubWorkflowOutputSchemaTree(childSteps: ChildWorkflowStepSc
         }
       }
 
-      if (childStepsWithFields.length === 0) {
-        // No outputs declared
-        return { name: field.name, type: field.type, description: field.description, fieldPath }
-      }
-
-      // Legacy terminal steps: nest under step IDs
-      return {
-        name: field.name,
-        type: field.type,
-        description: field.description,
-        fieldPath,
-        isGroup: true,
-        children: childStepsWithFields.map((step) => buildChildStepGroup(step, fieldPath)),
-      }
+      return { name: field.name, type: field.type, description: field.description, fieldPath }
     }
 
     return {

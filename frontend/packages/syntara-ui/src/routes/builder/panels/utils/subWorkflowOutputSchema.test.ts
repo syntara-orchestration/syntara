@@ -75,62 +75,67 @@ describe('getChildStepOutputFields', () => {
 })
 
 describe('buildSubWorkflowOutputSchemaTree', () => {
-  it('builds an expression path from the current published output schema', () => {
-    const childOutputFields = getNodeOutputSchema(ActivityTypeEnum.SCRIPT)
-    expect(childOutputFields).not.toBeNull()
-
+  it('builds a direct expression path from the declared output schema', () => {
+    const childOutputFields = getChildStepOutputFields('subworkflow_declared_outputs', {
+      type: 'object',
+      properties: { artifact_url: { type: 'string' } },
+      required: ['artifact_url'],
+    })
     const tree = buildSubWorkflowOutputSchemaTree([
       {
-        id: 'deploy_app',
-        name: 'Deploy application',
-        type: ActivityTypeEnum.SCRIPT,
-        outputSchema: { type: 'object' },
+        id: '__declared_outputs__',
+        name: 'Declared Outputs',
+        type: 'subworkflow_declared_outputs',
+        outputSchema: { type: 'object', properties: { artifact_url: { type: 'string' } } },
         outputFields: childOutputFields,
       },
     ])
     const result = tree.find((field) => field.name === 'Result')
     const outputs = result?.children?.find((field) => field.name === 'outputs')
-    const childStep = outputs?.children?.find((field) => field.fieldPath.at(-1) === 'deploy_app')
-    const stdout = childStep?.children?.find((field) => field.name === 'stdout')
+    const artifactUrl = outputs?.children?.find((field) => field.name === 'artifact_url')
 
-    expect(stdout).toBeDefined()
-    expect(buildExpression({ nodeId: 'invoke_deploy', fieldPath: stdout?.fieldPath ?? [] })).toBe(
-      '${invoke_deploy.Result.outputs.deploy_app.stdout}'
+    expect(artifactUrl).toBeDefined()
+    expect(buildExpression({ nodeId: 'invoke_child', fieldPath: artifactUrl?.fieldPath ?? [] })).toBe(
+      '${invoke_child.Result.outputs.artifact_url}'
     )
   })
 
-  it('builds expression paths from mapped child output names', () => {
-    const outputFields = getChildStepOutputFields('script', {
+  it('builds direct expression paths from mapped public output names', () => {
+    const outputSchema = {
       type: 'object',
       properties: {
         status: { type: 'string' },
+        stdout: {
+          description: 'Output produced by a configured mapping; its type is not statically known.',
+          'x-syntara-output-mapped': true,
+        },
         image_tag: {
           description: 'Output produced by a configured mapping; its type is not statically known.',
           'x-syntara-output-mapped': true,
         },
       },
-    })
+    }
+    const outputFields = getChildStepOutputFields('subworkflow_declared_outputs', outputSchema)
     expect(outputFields).not.toBeNull()
 
     const tree = buildSubWorkflowOutputSchemaTree([
       {
-        id: 'deploy_app',
-        name: 'Deploy application',
-        type: ActivityTypeEnum.SCRIPT,
-        outputSchema: { type: 'object' },
+        id: '__declared_outputs__',
+        name: 'Declared Outputs',
+        type: 'subworkflow_declared_outputs',
+        outputSchema,
         outputFields,
       },
     ])
     const result = tree.find((field) => field.name === 'Result')
     const outputs = result?.children?.find((field) => field.name === 'outputs')
-    const childStep = outputs?.children?.find((field) => field.fieldPath.at(-1) === 'deploy_app')
-    const imageTag = childStep?.children?.find((field) => field.name === 'image_tag')
+    const imageTag = outputs?.children?.find((field) => field.name === 'image_tag')
 
     expect(imageTag).toBeDefined()
     expect(buildExpression({ nodeId: 'invoke_deploy', fieldPath: imageTag?.fieldPath ?? [] })).toBe(
-      '${invoke_deploy.Result.outputs.deploy_app.image_tag}'
+      '${invoke_deploy.Result.outputs.image_tag}'
     )
-    expect(childStep?.children?.some((field) => field.name === 'stdout')).toBe(false)
+    expect(outputs?.children?.some((field) => field.name === 'stdout')).toBe(true)
   })
 
   it('builds nested expressions for declared output paths', () => {
@@ -159,27 +164,20 @@ describe('buildSubWorkflowOutputSchemaTree', () => {
     )
   })
 
-  it('exposes nested Sub-workflow step outputs with flat structure', () => {
-    const nestedOutputFields = getNodeOutputSchema(ActivityTypeEnum.SUB_WORKFLOW)
-    expect(nestedOutputFields).not.toBeNull()
-
+  it('does not expose internal child step outputs without a declared contract', () => {
+    const internalOutputFields = getNodeOutputSchema(ActivityTypeEnum.SCRIPT)
+    expect(internalOutputFields).not.toBeNull()
     const tree = buildSubWorkflowOutputSchemaTree([
       {
-        id: 'nested_call',
-        name: 'Call nested workflow',
-        type: ActivityTypeEnum.SUB_WORKFLOW,
+        id: 'deploy_app',
+        name: 'Deploy application',
+        type: ActivityTypeEnum.SCRIPT,
         outputSchema: { type: 'object' },
-        outputFields: nestedOutputFields,
+        outputFields: internalOutputFields,
       },
     ])
     const result = tree.find((field) => field.name === 'Result')
     const outputs = result?.children?.find((field) => field.name === 'outputs')
-    const nestedStep = outputs?.children?.find((field) => field.fieldPath.at(-1) === 'nested_call')
-    const nestedResult = nestedStep?.children?.find((field) => field.name === 'Result')
-    const childExecutionId = nestedResult?.children?.find((field) => field.name === 'child_execution_id')
-
-    expect(buildExpression({ nodeId: 'invoke_parent', fieldPath: childExecutionId?.fieldPath ?? [] })).toBe(
-      '${invoke_parent.Result.outputs.nested_call.Result.child_execution_id}'
-    )
+    expect(outputs?.children).toBeUndefined()
   })
 })

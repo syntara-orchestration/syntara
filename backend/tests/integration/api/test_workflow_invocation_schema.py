@@ -163,6 +163,7 @@ async def test_get_workflow_includes_only_published_subworkflow_trigger_schemas(
                     },
                     "required": ["username"],
                 },
+                "output_schema": None,
             },
             {
                 "trigger_node_id": "child_entry_secondary",

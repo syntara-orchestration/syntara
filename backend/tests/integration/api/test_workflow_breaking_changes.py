@@ -8,8 +8,6 @@ from uuid import uuid4
 import pytest
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
     from httpx import AsyncClient
 
     from syntara.workflows.models import Workflow
@@ -17,14 +15,15 @@ if TYPE_CHECKING:
 
 async def _create_and_publish_version_with_output_schema(
     jwt_client: AsyncClient,
-    workflow_id: int | UUID,
+    project_id: str,
     properties: dict[str, Any],
     required: list[str] | None = None,
-) -> int:
-    """Update and publish a version with output_schema."""
+) -> tuple[str, int]:
+    """Create and publish a workflow version with output_schema."""
+    workflow_name = f"child-contract-{uuid4().hex[:8]}"
     definition: dict[str, Any] = {
         "schema_version": "2.0.0",
-        "name": "Child workflow",
+        "name": workflow_name,
         "triggers": [
             {
                 "id": "subworkflow_trigger",
@@ -49,14 +48,39 @@ async def _create_and_publish_version_with_output_schema(
         "edges": [{"from": "subworkflow_trigger", "to": "produce"}],
     }
 
-    response = await jwt_client.patch(f"/workflows/{workflow_id}", json={"workflow_definition": definition})
-    assert response.status_code == 200
-    version: int = response.json()["version"]["version"]
+    response = await jwt_client.post(
+        "/api/v1/workflows",
+        json={"name": workflow_name, "project_id": project_id, "workflow_definition": definition},
+    )
+    assert response.status_code == 201
+    workflow_id = str(response.json()["id"])
+    version = 1
 
-    response = await jwt_client.post(f"/workflows/{workflow_id}/versions/{version}/publish", json={})
+    response = await jwt_client.post(f"/api/v1/workflows/{workflow_id}/versions/{version}/publish", json={})
     assert response.status_code == 200
 
-    return version
+    return workflow_id, version
+
+
+async def _create_unpublished_workflow(jwt_client: AsyncClient, project_id: str) -> str:
+    """Create a draft workflow without publishing it."""
+    workflow_name = f"unpublished-child-{uuid4().hex[:8]}"
+    response = await jwt_client.post(
+        "/api/v1/workflows",
+        json={
+            "name": workflow_name,
+            "project_id": project_id,
+            "workflow_definition": {
+                "schema_version": "2.0.0",
+                "name": workflow_name,
+                "triggers": [{"id": "start", "type": "manual_trigger", "parameters": {}}],
+                "nodes": [],
+                "edges": [],
+            },
+        },
+    )
+    assert response.status_code == 201
+    return str(response.json()["id"])
 
 
 class TestCheckBreakingChanges:
@@ -66,9 +90,9 @@ class TestCheckBreakingChanges:
     async def test_no_breaking_changes_when_no_published_version(
         self,
         jwt_client: AsyncClient,
-        test_workflow_minimal: Workflow,
+        test_workflow: Workflow,
     ) -> None:
-        """First publish has no breaking changes."""
+        """A candidate has no breaking changes when the workflow has no published version."""
         # Compare a candidate definition before publishing its first version.
         definition: dict[str, Any] = {
             "schema_version": "2.0.0",
@@ -91,8 +115,9 @@ class TestCheckBreakingChanges:
         }
 
         # Check breaking changes
+        workflow_id = await _create_unpublished_workflow(jwt_client, str(test_workflow.project_id))
         response = await jwt_client.post(
-            f"/workflows/{test_workflow_minimal.id}/versions/1/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/versions/1/check_breaking_changes",
             json={"workflow_definition": definition},
         )
 
@@ -109,9 +134,9 @@ class TestCheckBreakingChanges:
     ) -> None:
         """Detect when an output field is removed."""
         # Create and publish a version with output_schema
-        published_version = await _create_and_publish_version_with_output_schema(
+        workflow_id, published_version = await _create_and_publish_version_with_output_schema(
             jwt_client,
-            test_workflow.id,
+            str(test_workflow.project_id),
             {
                 "artifact_url": {"type": "string"},
                 "build_id": {"type": "number"},
@@ -147,7 +172,7 @@ class TestCheckBreakingChanges:
 
         # Check breaking changes
         response = await jwt_client.post(
-            f"/workflows/{test_workflow.id}/versions/{new_version}/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/versions/{new_version}/check_breaking_changes",
             json={"workflow_definition": definition},
         )
 
@@ -171,9 +196,9 @@ class TestCheckBreakingChanges:
         test_workflow: Workflow,
     ) -> None:
         """Detect when a field's type changes."""
-        published_version = await _create_and_publish_version_with_output_schema(
+        workflow_id, published_version = await _create_and_publish_version_with_output_schema(
             jwt_client,
-            test_workflow.id,
+            str(test_workflow.project_id),
             {
                 "artifact_url": {"type": "string"},
                 "build_id": {"type": "number"},
@@ -209,7 +234,7 @@ class TestCheckBreakingChanges:
 
         # Check breaking changes
         response = await jwt_client.post(
-            f"/workflows/{test_workflow.id}/versions/{new_version}/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/versions/{new_version}/check_breaking_changes",
             json={"workflow_definition": definition},
         )
 
@@ -230,9 +255,9 @@ class TestCheckBreakingChanges:
         test_workflow: Workflow,
     ) -> None:
         """Detect when a new required field is added."""
-        published_version = await _create_and_publish_version_with_output_schema(
+        workflow_id, published_version = await _create_and_publish_version_with_output_schema(
             jwt_client,
-            test_workflow.id,
+            str(test_workflow.project_id),
             {
                 "artifact_url": {"type": "string"},
                 "build_id": {"type": "number"},
@@ -269,7 +294,7 @@ class TestCheckBreakingChanges:
 
         # Check breaking changes
         response = await jwt_client.post(
-            f"/workflows/{test_workflow.id}/versions/{new_version}/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/versions/{new_version}/check_breaking_changes",
             json={"workflow_definition": definition},
         )
 
@@ -288,9 +313,9 @@ class TestCheckBreakingChanges:
         test_workflow: Workflow,
     ) -> None:
         """Adding a new optional field is not a breaking change."""
-        published_version = await _create_and_publish_version_with_output_schema(
+        workflow_id, published_version = await _create_and_publish_version_with_output_schema(
             jwt_client,
-            test_workflow.id,
+            str(test_workflow.project_id),
             {
                 "artifact_url": {"type": "string"},
                 "build_id": {"type": "number"},
@@ -327,7 +352,7 @@ class TestCheckBreakingChanges:
 
         # Check breaking changes
         response = await jwt_client.post(
-            f"/workflows/{test_workflow.id}/versions/{new_version}/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/versions/{new_version}/check_breaking_changes",
             json={"workflow_definition": definition},
         )
 
@@ -340,26 +365,27 @@ class TestCheckBreakingChanges:
     async def test_404_when_workflow_not_found(self, jwt_client: AsyncClient) -> None:
         """Return 404 when workflow does not exist."""
         response = await jwt_client.post(
-            f"/workflows/{uuid4()}/versions/1/check_breaking_changes",
+            f"/api/v1/workflows/{uuid4()}/versions/1/check_breaking_changes",
             json={"workflow_definition": {"schema_version": "2.0.0", "triggers": [], "nodes": [], "edges": []}},
         )
         assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_check_uses_candidate_definition_before_a_version_is_saved(
+    async def test_check_uses_candidate_definition_when_path_version_is_unavailable(
         self,
         jwt_client: AsyncClient,
         test_workflow: Workflow,
     ) -> None:
-        """The candidate definition is checked directly without requiring a saved draft version."""
+        """The candidate definition is checked without looking up a matching path version."""
         candidate = {
             "schema_version": "2.0.0",
             "triggers": [{"id": "start", "type": "manual_trigger", "parameters": {}}],
             "nodes": [],
             "edges": [],
         }
+        workflow_id = await _create_unpublished_workflow(jwt_client, str(test_workflow.project_id))
         response = await jwt_client.post(
-            f"/workflows/{test_workflow.id}/versions/99999/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/versions/99999/check_breaking_changes",
             json={"workflow_definition": candidate},
         )
         assert response.status_code == 200
@@ -371,9 +397,9 @@ class TestCheckBreakingChanges:
         test_workflow: Workflow,
     ) -> None:
         """The output contract review identifies published parents that will use the next child version."""
-        published_version = await _create_and_publish_version_with_output_schema(
+        workflow_id, published_version = await _create_and_publish_version_with_output_schema(
             jwt_client,
-            test_workflow.id,
+            str(test_workflow.project_id),
             {"artifact_url": {"type": "string"}, "build_id": {"type": "number"}},
         )
         parent_definition = {
@@ -386,7 +412,7 @@ class TestCheckBreakingChanges:
                     "type": "sub_workflow",
                     "name": "Invoke child",
                     "parameters": {
-                        "workflow_id": str(test_workflow.id),
+                        "workflow_id": workflow_id,
                         "trigger_node_id": "subworkflow_trigger",
                         "input_mapping": {},
                     },
@@ -395,7 +421,7 @@ class TestCheckBreakingChanges:
             "edges": [{"from": "parent_start", "to": "invoke_child"}],
         }
         parent_response = await jwt_client.post(
-            "/workflows",
+            "/api/v1/workflows",
             json={
                 "name": "Parent referencing child",
                 "project_id": str(test_workflow.project_id),
@@ -404,7 +430,7 @@ class TestCheckBreakingChanges:
         )
         assert parent_response.status_code == 201
         parent = parent_response.json()
-        publish_response = await jwt_client.post(f"/workflows/{parent['id']}/versions/1/publish", json={})
+        publish_response = await jwt_client.post(f"/api/v1/workflows/{parent['id']}/versions/1/publish", json={})
         assert publish_response.status_code == 200
 
         new_version = published_version + 1
@@ -424,7 +450,7 @@ class TestCheckBreakingChanges:
             "edges": [],
         }
         response = await jwt_client.post(
-            f"/workflows/{test_workflow.id}/versions/{new_version}/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/versions/{new_version}/check_breaking_changes",
             json={"workflow_definition": changed_definition},
         )
 

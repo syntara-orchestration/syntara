@@ -1,4 +1,4 @@
-import { ActivityTypeEnum, getNodeOutputSchema } from '@syntara/contracts'
+import { ActivityTypeEnum } from '@syntara/contracts'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -55,13 +55,13 @@ function renderInputNodeContent() {
   )
 }
 
-function childStep(): ChildWorkflowStepSchema {
+function declaredOutputs(): ChildWorkflowStepSchema {
   return {
-    id: 'deploy_app',
-    name: 'Deploy application',
-    type: ActivityTypeEnum.SCRIPT,
-    outputSchema: { type: 'object' },
-    outputFields: getNodeOutputSchema(ActivityTypeEnum.SCRIPT),
+    id: '__declared_outputs__',
+    name: 'Declared Outputs',
+    type: 'subworkflow_declared_outputs',
+    outputSchema: { type: 'object', properties: { status: { type: 'string' } } },
+    outputFields: [{ name: 'status', type: 'string', description: 'Public status' }],
   }
 }
 
@@ -94,7 +94,7 @@ describe('InputNodeContent for Sub-workflow steps', () => {
       makeSchemaState({
         selectedTriggerNodeId: 'child-entry',
         isEligible: true,
-        childSteps: [childStep()],
+        childSteps: [declaredOutputs()],
       })
     )
 
@@ -104,45 +104,44 @@ describe('InputNodeContent for Sub-workflow steps', () => {
     expect(screen.getByText('T child_workflow_id')).toBeInTheDocument()
     expect(screen.getByRole('tree', { name: 'Schema preview' })).toBeInTheDocument()
 
-    // Child step group should be present (collapsed by default for scannability)
-    // Groups have type prefix: {} for objects
-    expect(screen.getByText('{} Deploy application')).toBeInTheDocument()
-
-    // Expand the child step group to access its fields
-    const childStepToggle = screen.getByRole('button', { name: /Deploy application/i })
-    const user = userEvent.setup()
-    await user.click(childStepToggle)
-
-    // Now the child fields should be visible
-    expect(screen.getByText('T stdout')).toBeInTheDocument()
+    // Only declared public outputs are listed; internal step names stay hidden.
+    expect(screen.getByText('T status')).toBeInTheDocument()
+    expect(screen.queryByText('{} Deploy application')).not.toBeInTheDocument()
 
     const dragCalls: Array<[string, string]> = []
-    fireEvent.dragStart(screen.getByText('T stdout'), {
+    fireEvent.dragStart(screen.getByText('T status'), {
       dataTransfer: {
         setData: (format: string, value: string) => dragCalls.push([format, value]),
         effectAllowed: '',
       },
     })
-    expect(dragCalls.find(([format]) => format === 'text/plain')?.[1]).toBe(
-      '${invoke_child.Result.outputs.deploy_app.stdout}'
-    )
+    expect(dragCalls.find(([format]) => format === 'text/plain')?.[1]).toBe('${invoke_child.Result.outputs.status}')
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('renders output groups for a 64-step child workflow', () => {
-    const scriptOutputFields = getNodeOutputSchema(ActivityTypeEnum.SCRIPT)
-    expect(scriptOutputFields).not.toBeNull()
+  it('renders a large declared output contract without exposing internal step groups', () => {
+    const outputFields = Array.from({ length: 64 }, (_, index) => ({
+      name: `public_output_${index}`,
+      type: 'string' as const,
+      description: `Public field ${index}`,
+    }))
+    const outputSchema = {
+      type: 'object',
+      properties: Object.fromEntries(outputFields.map((field) => [field.name, { type: field.type }])),
+    }
     vi.mocked(useChildWorkflowSchema).mockReturnValue(
       makeSchemaState({
         selectedTriggerNodeId: 'child-entry',
         isEligible: true,
-        childSteps: Array.from({ length: 64 }, (_, index) => ({
-          id: `child_step_${index}`,
-          name: `Child step ${index}`,
-          type: ActivityTypeEnum.SCRIPT,
-          outputSchema: { type: 'object' },
-          outputFields: scriptOutputFields,
-        })),
+        childSteps: [
+          {
+            id: '__declared_outputs__',
+            name: 'Declared Outputs',
+            type: 'subworkflow_declared_outputs',
+            outputSchema,
+            outputFields,
+          },
+        ],
       })
     )
 
@@ -153,10 +152,10 @@ describe('InputNodeContent for Sub-workflow steps', () => {
     const tree = screen.getByRole('tree', { name: 'Schema preview' })
     expect(tree).toBeInTheDocument()
 
-    // Verify tree items are rendered (collapsed groups + top-level aggregate fields)
     const treeItems = screen.getAllByRole('treeitem')
-    // Should have Result, child_execution_id, child_workflow_id, child_workflow_name, child_workflow_version, child_status, outputs, and 64 child step groups
     expect(treeItems.length).toBeGreaterThan(64)
+    expect(screen.getByText('T public_output_0')).toBeInTheDocument()
+    expect(screen.queryByText('{} Child step 0')).not.toBeInTheDocument()
   })
 
   it('shows aggregate fields only and an access message after a 403', () => {
