@@ -138,6 +138,7 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
           type: 'object',
           description:
             "Values mapped to the selected SubWorkflow Trigger's declared public output contract. Internal child step names are not exposed.",
+          additionalProperties: [],
         },
       ],
     },

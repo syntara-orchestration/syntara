@@ -34,6 +34,23 @@
     "$ref": "#/$defs/SubWorkflowOutput"
   },
   "$defs": {
+    "JSONValue": {
+      "anyOf": [
+        { "type": "boolean" },
+        { "type": "integer" },
+        { "type": "number" },
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/JSONValue" }
+        },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/JSONValue" }
+        },
+        { "type": "null" }
+      ]
+    },
     "StandardOutputWrapper": {
       "type": "object",
       "description": "Standard output envelope for Step SDK. All step outputs follow this structure.",
@@ -92,7 +109,7 @@
           "type": ["object", "null"],
           "description": "Values mapped to the selected SubWorkflow Trigger's declared public output contract. Internal child step names are not exposed.",
           "maxProperties": 1000,
-          "additionalProperties": true
+          "additionalProperties": { "$ref": "#/$defs/JSONValue" }
         }
       },
       "additionalProperties": false

@@ -13,6 +13,8 @@ from typing import Any
 import jsonschema
 import pytest
 
+from syntara.workflows.workflow_engine.models.workflow_definition import SubWorkflowOutput
+
 SCHEMA_DIR = Path(__file__).resolve().parents[3] / "src" / "syntara" / "schemas" / "workflows" / "v2"
 VALID_UUID = "550e8400-e29b-41d4-a716-446655440000"
 
@@ -168,6 +170,30 @@ def test_subworkflow_result_has_child_execution_metadata(subworkflow_schema: dic
     assert "child_workflow_version" in properties
     assert "child_status" in properties
     assert "outputs" in properties
+    assert properties["outputs"]["additionalProperties"] == {"$ref": "#/$defs/JSONValue"}
+
+
+def test_subworkflow_outputs_allow_recursive_json_values(subworkflow_schema: dict[str, Any]) -> None:
+    """Declared outputs support JSON scalars, arrays, and recursively nested objects."""
+    value_schema = subworkflow_schema["$defs"]["JSONValue"]
+    variants = value_schema["anyOf"]
+
+    assert SubWorkflowOutput.model_json_schema()["$defs"]["JSONValue"] == value_schema
+    assert {variant.get("type") for variant in variants} == {
+        "boolean",
+        "integer",
+        "number",
+        "string",
+        "array",
+        "object",
+        "null",
+    }
+    assert next(variant for variant in variants if variant.get("type") == "array")["items"] == {
+        "$ref": "#/$defs/JSONValue"
+    }
+    assert next(variant for variant in variants if variant.get("type") == "object")["additionalProperties"] == {
+        "$ref": "#/$defs/JSONValue"
+    }
 
 
 def test_subworkflow_executor_in_node_type_catalog() -> None:

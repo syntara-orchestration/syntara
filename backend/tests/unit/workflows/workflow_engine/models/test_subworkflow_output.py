@@ -158,11 +158,7 @@ class TestSubWorkflowOutputPopulated:
                     "child_workflow_name": "Deploy Application",
                     "child_workflow_version": 3,
                     "child_status": WorkflowTerminalStatus.COMPLETED,
-                    "outputs": {
-                        "step_1": StandardOutputWrapper(
-                            Result={"status": "ok"}, StatusCode=0, StatusMessage="Step completed"
-                        )
-                    },
+                    "outputs": {"release": {"url": "https://example.test/app", "tags": ["stable", "v3"]}},
                 },
                 {"StatusCode": 0, "StatusMessage": "Sub-workflow completed successfully"},
                 0,
@@ -192,33 +188,38 @@ class TestSubWorkflowOutputPopulated:
         assert output.Result is not None
         assert output.Result.child_workflow_id == result_data["child_workflow_id"]
 
-    def test_outputs_multi_terminal_structure(self) -> None:
-        """Outputs dict supports multiple child step outputs (multi-terminal scenario)."""
+    def test_outputs_support_declared_json_values_without_wrappers(self) -> None:
+        """Declared outputs retain nested JSON values without per-field wrappers."""
         outputs_data = {
-            "deploy_us": StandardOutputWrapper(
-                Result={"region": "us-east-1"}, StatusCode=0, StatusMessage="US deployed"
-            ),
-            "deploy_eu": StandardOutputWrapper(
-                Result={"region": "eu-west-1"}, StatusCode=0, StatusMessage="EU deployed"
-            ),
-            "deploy_ap": StandardOutputWrapper(
-                Result={"region": "ap-south-1"}, StatusCode=0, StatusMessage="AP deployed"
-            ),
+            "release_tag": "v3.2.1",
+            "published": True,
+            "build_number": 42,
+            "artifacts": [{"url": "https://example.test/app", "labels": ["stable", "linux"]}],
+            "metadata": {"optional": None},
         }
         result = SubWorkflowOutputResult(
             child_workflow_id="wf-id",
-            child_workflow_name="Multi-Region",
+            child_workflow_name="Release",
             child_workflow_version=1,
             outputs=outputs_data,
         )
         output = SubWorkflowOutput(Result=result, StatusCode=0)
 
         assert output.Result is not None
+        assert output.Result.outputs == outputs_data
         assert output.Result.outputs is not None
-        assert len(output.Result.outputs) == 3
-        assert all(key in output.Result.outputs for key in ["deploy_us", "deploy_eu", "deploy_ap"])
-        # Verify they're StandardOutputWrapper instances
-        assert all(isinstance(v, StandardOutputWrapper) for v in output.Result.outputs.values())
+        assert not isinstance(output.Result.outputs["release_tag"], StandardOutputWrapper)
+        assert output.model_dump()["Result"]["outputs"] == outputs_data
+
+    @pytest.mark.parametrize(
+        "invalid_value",
+        [StandardOutputWrapper(), {"nested": b"not-json"}, float("nan")],
+    )
+    def test_outputs_reject_non_json_values(self, invalid_value: object) -> None:
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            SubWorkflowOutputResult(outputs={"release": invalid_value})
 
 
 class TestSubWorkflowOutputNullabilitySemantics:
@@ -281,7 +282,7 @@ class TestSubWorkflowOutputSecurityConstraints:
         import pytest
         from pydantic import ValidationError
 
-        large_outputs = {f"step_{i}": StandardOutputWrapper() for i in range(1001)}
+        large_outputs = {f"field_{i}": f"value_{i}" for i in range(1001)}
         with pytest.raises(ValidationError) as exc_info:
             SubWorkflowOutputResult(outputs=large_outputs)
         assert "at most 1000" in str(exc_info.value).lower() or "1,000" in str(exc_info.value)
@@ -368,7 +369,7 @@ class TestSubWorkflowOutputInheritanceAndSerialization:
             child_workflow_name="Deploy",
             child_workflow_version=3,
             child_status=WorkflowTerminalStatus.COMPLETED,
-            outputs={"step_1": StandardOutputWrapper(Result={"status": "ok"}, StatusCode=0, StatusMessage="Completed")},
+            outputs={"release_tag": "v3.2.1"},
         )
         output = SubWorkflowOutput(
             Result=result,

@@ -1552,30 +1552,76 @@ class TestBuildDeclaredSubWorkflowOutputs:
         assert result == {"release": {"url": "https://example.test/app"}}
         assert "internal_token" not in str(result)
 
-    def test_missing_required_value_fails_child_contract(self) -> None:
+    @pytest.mark.parametrize(
+        ("output_schema", "output_mapping", "nodes", "namespaces"),
+        [
+            pytest.param(
+                {
+                    "type": "object",
+                    "properties": {"release_tag": {"type": "string"}},
+                    "required": ["release_tag"],
+                },
+                {"release_tag": "${deploy.tag}"},
+                [],
+                {},
+                id="missing-required-output",
+            ),
+            pytest.param(
+                {
+                    "type": "object",
+                    "properties": {"build_number": {"type": "integer"}},
+                    "required": ["build_number"],
+                },
+                {"build_number": "${deploy.number}"},
+                [],
+                {"deploy": {"number": "not-an-integer"}},
+                id="output-type-mismatch",
+            ),
+            pytest.param(
+                {
+                    "type": "object",
+                    "properties": {"release_tag": {"type": "string"}},
+                    "required": ["release_tag"],
+                },
+                {"release_tag": "${deploy.missing}"},
+                [{"id": "deploy"}],
+                {"deploy": {}},
+                id="stale-source-mapping",
+            ),
+        ],
+    )
+    def test_output_contract_violations_fail_non_retryably(
+        self,
+        output_schema: dict[str, Any],
+        output_mapping: dict[str, str],
+        nodes: list[dict[str, str]],
+        namespaces: dict[str, dict[str, Any]],
+    ) -> None:
         from temporalio.exceptions import ApplicationError
 
         wf = _make_workflow()
         wf._workflow_definition = {
+            "nodes": nodes,
             "triggers": [
                 {
                     "id": "child_trigger",
                     "type": "subworkflow_trigger",
                     "parameters": {
-                        "output_schema": {
-                            "type": "object",
-                            "properties": {"release_tag": {"type": "string"}},
-                            "required": ["release_tag"],
-                        },
-                        "output_mapping": {"release_tag": "${deploy.tag}"},
+                        "output_schema": output_schema,
+                        "output_mapping": output_mapping,
                     },
                 }
-            ]
+            ],
         }
         wf._trigger_node_id = "child_trigger"
+        for namespace_id, values in namespaces.items():
+            wf.resolver.set_namespace(namespace_id, values)
 
-        with pytest.raises(ApplicationError, match="output contract violation"):
+        with pytest.raises(ApplicationError, match="output contract violation") as exc_info:
             wf._build_declared_outputs()
+
+        assert exc_info.value.type == "SubWorkflowOutputContractError"
+        assert exc_info.value.non_retryable is True
 
 
 class TestHandleNodeFailureCancellation:

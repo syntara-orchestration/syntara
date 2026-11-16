@@ -8,12 +8,24 @@ import json
 import re
 import uuid
 from enum import Enum, IntEnum, StrEnum
-from typing import Any, ClassVar, Literal
+from types import NoneType
+from typing import Annotated, Any, ClassVar, Literal
 from urllib.parse import urlparse
 from zoneinfo import available_timezones
 
 import structlog
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictFloat,
+    StrictInt,
+    StrictStr,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 from pydantic.functional_validators import ModelWrapValidatorHandler
 
 from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC0414
@@ -25,6 +37,17 @@ from syntara.workflows.utils.output_mapping import apply_output_mapping
 from syntara.workflows.workflow_engine.models.aap_types import AAPResourceType
 
 logger = structlog.stdlib.get_logger(__name__)
+
+JSONFloat = Annotated[StrictFloat, Field(allow_inf_nan=False)]
+type JSONValue = (
+    NoneType
+    | StrictBool
+    | StrictInt
+    | JSONFloat
+    | StrictStr
+    | Annotated[list[JSONValue], Field(strict=True)]
+    | Annotated[dict[StrictStr, JSONValue], Field(strict=True)]
+)
 
 # Template expression pattern - matches ${...} expressions
 TEMPLATE_PATTERN = re.compile(r"\$\{[^}]+\}")
@@ -1130,9 +1153,10 @@ class SubWorkflowOutputResult(BaseModel):
     child_workflow_name: str | None = Field(default=None, max_length=255)
     child_workflow_version: int | None = None
     child_status: WorkflowTerminalStatus | None = None
-    outputs: dict[str, Any] | None = Field(
+    outputs: dict[StrictStr, JSONValue] | None = Field(
         default=None,
         max_length=1000,
+        strict=True,
         description="Values mapped to the child workflow's declared public output contract.",
     )
 
@@ -1154,8 +1178,9 @@ class SubWorkflowOutput(StandardOutputWrapper, NodeOutput):
     envelope applies to the Sub-workflow step itself, while child outputs are
     exposed directly for simplified access.
 
-    This allows flat dotted-path template expressions like:
-    ${sub_workflow_step.Result.outputs.child_step_id.artifact_url}
+    This allows template expressions that address declared public outputs:
+    ${sub_workflow_step.Result.outputs.artifact_url}
+    ${sub_workflow_step.Result.outputs.release.url}
     """
 
     Result: SubWorkflowOutputResult | None = None  # Override to specify concrete Result type
