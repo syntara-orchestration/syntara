@@ -1,11 +1,48 @@
-import { describe, expect, it } from 'vitest'
+import { ActivityTypeEnum } from '@syntara/contracts'
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { useWorkflowStore } from '../../../../stores/useWorkflowStore'
+import type { WorkflowDefinition } from '../../../../stores/workflowStoreTypes'
 
 import {
   countBlockingValidationErrors,
   filterFrontendFormDefinitionErrorsCoveredByBackend,
+  lookupFormFieldLabel,
   mapUtilsValidationErrorsToBanner,
 } from './mapFrontendValidationErrorsToBanner'
 import type { ValidationError as UtilsValidationError } from './types'
+
+beforeEach(() => {
+  useWorkflowStore.getState().setWorkflow(null)
+})
+
+describe('lookupFormFieldLabel', () => {
+  it('looks up the authored label for a form-definition field path', () => {
+    const workflow: WorkflowDefinition = {
+      schema_version: '2.0.0',
+      name: 'Test workflow',
+      description: '',
+      triggers: [],
+      workflow: {
+        activities: [
+          {
+            id: 'form-1',
+            type: ActivityTypeEnum.FORM_PROMPT,
+            name: 'Intake form',
+            parameters: {
+              form_definition: {
+                fields: [{ type: 'text', value_name: 'notes', label: 'Deployment notes' }],
+              },
+            },
+          },
+        ],
+      },
+    }
+    useWorkflowStore.getState().setWorkflow(workflow)
+
+    expect(lookupFormFieldLabel('form-1', 'parameters.form_definition.fields.0.type')).toBe('Deployment notes')
+  })
+})
 
 describe('mapUtilsValidationErrorsToBanner', () => {
   it('maps utils validation errors to banner shape', () => {

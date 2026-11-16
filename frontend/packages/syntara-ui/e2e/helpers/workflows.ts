@@ -550,9 +550,8 @@ export async function createBasicWorkflow(page: Page, workflowName: string, acti
 export async function startWorkflowWithTrigger(page: Page) {
   await ensureProject(page)
   await page.goto(toAppUrl('/workflow-builder/new'))
-  await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
-
   await selectProjectIfRequired(page)
+  await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Manual trigger' }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')

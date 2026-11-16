@@ -10,10 +10,8 @@ if TYPE_CHECKING:
     from ..models.date_field import DateField
     from ..models.dropdown_field import DropdownField
     from ..models.email_field import EmailField
-    from ..models.masked_text_field import MaskedTextField
     from ..models.multi_select_field import MultiSelectField
     from ..models.number_field import NumberField
-    from ..models.text_area_field import TextAreaField
     from ..models.text_field import TextField
 
 
@@ -25,40 +23,24 @@ class FormDefinition:
     """Complete form definition with fields and metadata.
 
     Attributes:
-        fields (list[CheckboxField | DateField | DropdownField | EmailField | MaskedTextField | MultiSelectField |
-            NumberField | TextAreaField | TextField]):
+        fields (list[CheckboxField | DateField | DropdownField | EmailField | MultiSelectField | NumberField |
+            TextField]):
     """
 
-    fields: list[
-        CheckboxField
-        | DateField
-        | DropdownField
-        | EmailField
-        | MaskedTextField
-        | MultiSelectField
-        | NumberField
-        | TextAreaField
-        | TextField
-    ]
+    fields: list[CheckboxField | DateField | DropdownField | EmailField | MultiSelectField | NumberField | TextField]
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.checkbox_field import CheckboxField
         from ..models.date_field import DateField
         from ..models.dropdown_field import DropdownField
         from ..models.email_field import EmailField
-        from ..models.masked_text_field import MaskedTextField
         from ..models.number_field import NumberField
-        from ..models.text_area_field import TextAreaField
         from ..models.text_field import TextField
 
         fields = []
         for fields_item_data in self.fields:
             fields_item: dict[str, Any]
             if isinstance(fields_item_data, TextField):
-                fields_item = fields_item_data.to_dict()
-            elif isinstance(fields_item_data, TextAreaField):
-                fields_item = fields_item_data.to_dict()
-            elif isinstance(fields_item_data, MaskedTextField):
                 fields_item = fields_item_data.to_dict()
             elif isinstance(fields_item_data, EmailField):
                 fields_item = fields_item_data.to_dict()
@@ -91,10 +73,8 @@ class FormDefinition:
         from ..models.date_field import DateField
         from ..models.dropdown_field import DropdownField
         from ..models.email_field import EmailField
-        from ..models.masked_text_field import MaskedTextField
         from ..models.multi_select_field import MultiSelectField
         from ..models.number_field import NumberField
-        from ..models.text_area_field import TextAreaField
         from ..models.text_field import TextField
 
         d = dict(src_dict)
@@ -104,17 +84,7 @@ class FormDefinition:
 
             def _parse_fields_item(
                 data: object,
-            ) -> (
-                CheckboxField
-                | DateField
-                | DropdownField
-                | EmailField
-                | MaskedTextField
-                | MultiSelectField
-                | NumberField
-                | TextAreaField
-                | TextField
-            ):
+            ) -> CheckboxField | DateField | DropdownField | EmailField | MultiSelectField | NumberField | TextField:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
@@ -126,7 +96,7 @@ class FormDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    fields_item_type_1 = TextAreaField.from_dict(data)
+                    fields_item_type_1 = EmailField.from_dict(data)
 
                     return fields_item_type_1
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -134,7 +104,7 @@ class FormDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    fields_item_type_2 = MaskedTextField.from_dict(data)
+                    fields_item_type_2 = NumberField.from_dict(data)
 
                     return fields_item_type_2
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -142,7 +112,7 @@ class FormDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    fields_item_type_3 = EmailField.from_dict(data)
+                    fields_item_type_3 = CheckboxField.from_dict(data)
 
                     return fields_item_type_3
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -150,7 +120,7 @@ class FormDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    fields_item_type_4 = NumberField.from_dict(data)
+                    fields_item_type_4 = DateField.from_dict(data)
 
                     return fields_item_type_4
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -158,32 +128,16 @@ class FormDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    fields_item_type_5 = CheckboxField.from_dict(data)
+                    fields_item_type_5 = DropdownField.from_dict(data)
 
                     return fields_item_type_5
                 except (TypeError, ValueError, AttributeError, KeyError):
                     pass
-                try:
-                    if not isinstance(data, dict):
-                        raise TypeError()
-                    fields_item_type_6 = DateField.from_dict(data)
-
-                    return fields_item_type_6
-                except (TypeError, ValueError, AttributeError, KeyError):
-                    pass
-                try:
-                    if not isinstance(data, dict):
-                        raise TypeError()
-                    fields_item_type_7 = DropdownField.from_dict(data)
-
-                    return fields_item_type_7
-                except (TypeError, ValueError, AttributeError, KeyError):
-                    pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                fields_item_type_8 = MultiSelectField.from_dict(data)
+                fields_item_type_6 = MultiSelectField.from_dict(data)
 
-                return fields_item_type_8
+                return fields_item_type_6
 
             fields_item = _parse_fields_item(fields_item_data)
 

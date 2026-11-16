@@ -1,3 +1,4 @@
+import { parseFormDefinitionErrorLocation } from '../../../../forms'
 import { useWorkflowStore } from '../../../../stores/useWorkflowStore'
 import type { ValidationError as BuilderValidationError, ValidationSeverity } from '../../builderReducer'
 
@@ -10,6 +11,32 @@ type LookupNodeNameOptions = Readonly<{
 
 /** Canvas rules that overlap backend workflow validate for form definitions. */
 const FORM_DEFINITION_FRONTEND_RULES = FORM_DEFINITION_CANVAS_VALIDATION_RULES
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Look up the authored field label for a backend validation path, when available. */
+export function lookupFormFieldLabel(nodeId: string | null, fieldPath: string | null | undefined): string | undefined {
+  if (!nodeId) return undefined
+  const location = parseFormDefinitionErrorLocation(fieldPath)
+  if (!location) return undefined
+
+  const currentWorkflow = useWorkflowStore.getState().currentWorkflow
+  const activity = currentWorkflow?.workflow?.activities?.find((item) => item.id === nodeId)
+  const trigger = currentWorkflow?.triggers?.find((item) => item.id === nodeId)
+  const parameters = activity?.parameters ?? trigger?.parameters
+  if (!isRecord(parameters)) return undefined
+
+  const formDefinition = parameters.form_definition
+  if (!isRecord(formDefinition) || !Array.isArray(formDefinition.fields)) return undefined
+  const field: unknown = formDefinition.fields[location.fieldIndex]
+  if (!isRecord(field)) return undefined
+
+  if (typeof field.label === 'string' && field.label.trim()) return field.label.trim()
+  if (typeof field.value_name === 'string' && field.value_name.trim()) return field.value_name.trim()
+  return undefined
+}
 
 /**
  * Backend validate returns the same form-definition issues with field paths.

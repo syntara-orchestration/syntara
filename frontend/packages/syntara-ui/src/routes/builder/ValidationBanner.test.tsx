@@ -1,7 +1,11 @@
+import { ActivityTypeEnum } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
+
+import { useWorkflowStore } from '../../stores/useWorkflowStore'
+import type { WorkflowDefinition } from '../../stores/workflowStoreTypes'
 
 import type { ValidationError } from './builderReducer'
 import { AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE } from './step-forms/triggerFormSchema'
@@ -182,6 +186,10 @@ describe('mergeHumanizedMessages', () => {
 describe('ValidationBanner', () => {
   const mockDispatch = vi.fn()
 
+  afterEach(() => {
+    useWorkflowStore.getState().setWorkflow(null)
+  })
+
   it('renders nothing when errors is empty', () => {
     const { container } = render(<ValidationBanner errors={[]} dismissed={false} dispatch={mockDispatch} />)
 
@@ -223,6 +231,49 @@ describe('ValidationBanner', () => {
     render(<ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} source="save" />)
 
     expect(screen.getByText('Saved with 1 warning')).toBeInTheDocument()
+  })
+
+  it('uses the authored field label for form-definition findings', async () => {
+    const workflow: WorkflowDefinition = {
+      schema_version: '2.0.0',
+      name: 'Test workflow',
+      description: '',
+      triggers: [],
+      workflow: {
+        activities: [
+          {
+            id: 'form-1',
+            type: ActivityTypeEnum.FORM_PROMPT,
+            name: 'Intake form',
+            parameters: {
+              form_definition: {
+                fields: [{ type: 'text', value_name: 'notes', label: 'Deployment notes' }],
+              },
+            },
+          },
+        ],
+      },
+    }
+    useWorkflowStore.getState().setWorkflow(workflow)
+
+    render(
+      <ValidationBanner
+        errors={[
+          {
+            message: "Invalid field type 'textarea' in form prompt field definition",
+            nodeId: 'form-1',
+            fieldPath: 'parameters.form_definition.fields.0.type',
+          },
+        ]}
+        dismissed={false}
+        dispatch={mockDispatch}
+      />
+    )
+    await expandAlert()
+
+    expect(
+      screen.getByText("Deployment notes — Invalid field type 'textarea' in form prompt field definition")
+    ).toBeInTheDocument()
   })
 
   it('dispatches DISMISS_VALIDATION_BANNER when close button is clicked', async () => {

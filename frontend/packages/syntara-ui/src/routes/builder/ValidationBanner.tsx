@@ -13,6 +13,7 @@ import {
 import { useMemo } from 'react'
 
 import type { BuilderAction, ValidationError, ValidationSource } from './builderReducer'
+import { lookupFormFieldLabel } from './utils/validation/mapFrontendValidationErrorsToBanner'
 import {
   humanizeValidationMessage,
   mergeHumanizedMessages,
@@ -37,7 +38,8 @@ function groupErrors(errors: ValidationError[]): ErrorGroup[] {
   for (const error of errors) {
     const parsed = parseValidationMessage(error.message)
     const groupKey = error.nodeId ?? parsed.key
-    const humanized = parsed.messages.map((msg) => humanizeValidationMessage(msg, error.fieldPath))
+    const fieldLabel = lookupFormFieldLabel(error.nodeId, error.fieldPath)
+    const humanized = parsed.messages.map((msg) => humanizeValidationMessage(msg, error.fieldPath, fieldLabel))
     const existing = groups.get(groupKey)
     if (existing) {
       existing.messages.push(...humanized)

@@ -1,4 +1,4 @@
-import type { FormDefinition } from '@syntara/contracts'
+import { FormFieldDisplayEnum, type FormDefinition } from '@syntara/contracts'
 import { z } from 'zod'
 
 import { isValidIsoCalendarDate } from '../utils/isoCalendarDate'
@@ -67,16 +67,7 @@ const optionsSourceSchema = z.discriminatedUnion('source', [
 
 const textFieldSchema = formFieldBaseSchema.extend({
   type: z.literal(FormFieldTypeEnum.TEXT),
-  default: z.string().nullable().optional(),
-})
-
-const textAreaFieldSchema = formFieldBaseSchema.extend({
-  type: z.literal(FormFieldTypeEnum.TEXTAREA),
-  default: z.string().nullable().optional(),
-})
-
-const maskedTextFieldSchema = formFieldBaseSchema.extend({
-  type: z.literal(FormFieldTypeEnum.MASKED_TEXT),
+  display: z.enum(FormFieldDisplayEnum).default(FormFieldDisplayEnum.SINGLE_LINE),
   default: z.string().nullable().optional(),
 })
 
@@ -194,8 +185,6 @@ const multiSelectFieldSchema = formFieldBaseSchema.extend({
 
 export const formFieldSchema = z.discriminatedUnion('type', [
   textFieldSchema,
-  textAreaFieldSchema,
-  maskedTextFieldSchema,
   emailFieldSchema,
   numberFieldSchema,
   checkboxFieldSchema,

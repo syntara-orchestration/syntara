@@ -1,4 +1,4 @@
-import type { FormsAPI } from '@syntara/contracts'
+import { FormFieldDisplayEnum, type FormsAPI } from '@syntara/contracts'
 
 import { executions } from './executions'
 import { mockDate } from './mockDates'
@@ -64,7 +64,8 @@ const textAndTextareaFormDefinition: FormsAPI.components['schemas']['FormDefinit
     },
     {
       value_name: 'details',
-      type: 'textarea',
+      type: 'text',
+      display: FormFieldDisplayEnum.MULTI_LINE,
       label: 'Details',
       required: false,
       placeholder: 'Additional context',

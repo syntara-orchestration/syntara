@@ -109,17 +109,19 @@ function humanizeCoreMessage(raw: string, propertyKey?: string): string {
   return raw
 }
 
-function formatLocationPrefix(location: FormDefinitionErrorLocation): string {
-  const fieldLabel = `Field ${location.fieldIndex + 1}`
+function formatLocationPrefix(location: FormDefinitionErrorLocation, fieldLabel?: string): string {
+  const resolvedFieldLabel = fieldLabel?.trim() || `Field ${location.fieldIndex + 1}`
   if (location.optionIndex !== undefined) {
-    return `${fieldLabel} — Option ${location.optionIndex + 1}`
+    return `${resolvedFieldLabel} — Option ${location.optionIndex + 1}`
   }
-  return fieldLabel
+  return resolvedFieldLabel
 }
 
 export type HumanizeFormDefinitionIssueMessageOptions = Readonly<{
   /** When false, omit "Field N" / "Option N" prefixes (messages beside the matching input). Default true. */
   includeFieldLocation?: boolean
+  /** Authored field label to use instead of the numeric row fallback. */
+  fieldLabel?: string
 }>
 
 /**
@@ -139,5 +141,5 @@ export function humanizeFormDefinitionIssueMessage(
     return core
   }
 
-  return `${formatLocationPrefix(location)} — ${core}`
+  return `${formatLocationPrefix(location, options?.fieldLabel)} — ${core}`
 }

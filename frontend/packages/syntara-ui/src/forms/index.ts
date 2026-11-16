@@ -7,7 +7,16 @@ export {
   FORM_STATIC_OPTIONS_MAX_LENGTH,
   isValidFormFieldValueName,
 } from './formConstants'
-export { FormFieldTypeEnum, FORM_FIELD_TYPE_VALUES, type FormFieldType } from './formFieldTypeEnum'
+export { FormFieldTypeEnum, type FormFieldType } from './formFieldTypeEnum'
+export {
+  FormFieldUiKindEnum,
+  FORM_FIELD_UI_KIND_VALUES,
+  type FormFieldUiKind,
+  type TextFormFieldUiKind,
+  isFormFieldUiKind,
+  uiKindForField,
+  applyUiKind,
+} from './formFieldUiKind'
 export { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE } from './dateFieldValidationMessages'
 export {
   humanizeFormDefinitionIssueMessage,

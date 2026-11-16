@@ -11,9 +11,7 @@ if TYPE_CHECKING:
     from ..models.email_field import EmailField
     from ..models.form_prompt_dropdown_field import FormPromptDropdownField
     from ..models.form_prompt_multi_select_field import FormPromptMultiSelectField
-    from ..models.masked_text_field import MaskedTextField
     from ..models.number_field import NumberField
-    from ..models.text_area_field import TextAreaField
     from ..models.text_field import TextField
 
 
@@ -26,7 +24,7 @@ class FormPromptDefinition:
 
     Attributes:
         fields (list[CheckboxField | DateField | EmailField | FormPromptDropdownField | FormPromptMultiSelectField |
-            MaskedTextField | NumberField | TextAreaField | TextField]):
+            NumberField | TextField]):
     """
 
     fields: list[
@@ -35,9 +33,7 @@ class FormPromptDefinition:
         | EmailField
         | FormPromptDropdownField
         | FormPromptMultiSelectField
-        | MaskedTextField
         | NumberField
-        | TextAreaField
         | TextField
     ]
 
@@ -46,19 +42,13 @@ class FormPromptDefinition:
         from ..models.date_field import DateField
         from ..models.email_field import EmailField
         from ..models.form_prompt_dropdown_field import FormPromptDropdownField
-        from ..models.masked_text_field import MaskedTextField
         from ..models.number_field import NumberField
-        from ..models.text_area_field import TextAreaField
         from ..models.text_field import TextField
 
         fields = []
         for fields_item_data in self.fields:
             fields_item: dict[str, Any]
             if isinstance(fields_item_data, TextField):
-                fields_item = fields_item_data.to_dict()
-            elif isinstance(fields_item_data, TextAreaField):
-                fields_item = fields_item_data.to_dict()
-            elif isinstance(fields_item_data, MaskedTextField):
                 fields_item = fields_item_data.to_dict()
             elif isinstance(fields_item_data, EmailField):
                 fields_item = fields_item_data.to_dict()
@@ -92,9 +82,7 @@ class FormPromptDefinition:
         from ..models.email_field import EmailField
         from ..models.form_prompt_dropdown_field import FormPromptDropdownField
         from ..models.form_prompt_multi_select_field import FormPromptMultiSelectField
-        from ..models.masked_text_field import MaskedTextField
         from ..models.number_field import NumberField
-        from ..models.text_area_field import TextAreaField
         from ..models.text_field import TextField
 
         d = dict(src_dict)
@@ -110,9 +98,7 @@ class FormPromptDefinition:
                 | EmailField
                 | FormPromptDropdownField
                 | FormPromptMultiSelectField
-                | MaskedTextField
                 | NumberField
-                | TextAreaField
                 | TextField
             ):
                 try:
@@ -126,7 +112,7 @@ class FormPromptDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    fields_item_type_1 = TextAreaField.from_dict(data)
+                    fields_item_type_1 = EmailField.from_dict(data)
 
                     return fields_item_type_1
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -134,7 +120,7 @@ class FormPromptDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    fields_item_type_2 = MaskedTextField.from_dict(data)
+                    fields_item_type_2 = NumberField.from_dict(data)
 
                     return fields_item_type_2
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -142,7 +128,7 @@ class FormPromptDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    fields_item_type_3 = EmailField.from_dict(data)
+                    fields_item_type_3 = CheckboxField.from_dict(data)
 
                     return fields_item_type_3
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -150,7 +136,7 @@ class FormPromptDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    fields_item_type_4 = NumberField.from_dict(data)
+                    fields_item_type_4 = DateField.from_dict(data)
 
                     return fields_item_type_4
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -158,32 +144,16 @@ class FormPromptDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    fields_item_type_5 = CheckboxField.from_dict(data)
+                    fields_item_type_5 = FormPromptDropdownField.from_dict(data)
 
                     return fields_item_type_5
                 except (TypeError, ValueError, AttributeError, KeyError):
                     pass
-                try:
-                    if not isinstance(data, dict):
-                        raise TypeError()
-                    fields_item_type_6 = DateField.from_dict(data)
-
-                    return fields_item_type_6
-                except (TypeError, ValueError, AttributeError, KeyError):
-                    pass
-                try:
-                    if not isinstance(data, dict):
-                        raise TypeError()
-                    fields_item_type_7 = FormPromptDropdownField.from_dict(data)
-
-                    return fields_item_type_7
-                except (TypeError, ValueError, AttributeError, KeyError):
-                    pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                fields_item_type_8 = FormPromptMultiSelectField.from_dict(data)
+                fields_item_type_6 = FormPromptMultiSelectField.from_dict(data)
 
-                return fields_item_type_8
+                return fields_item_type_6
 
             fields_item = _parse_fields_item(fields_item_data)
 

@@ -3,6 +3,8 @@
  *
  * Covers form field builder scenarios UI-1 through UI-3 on the form_trigger trigger.
  */
+import { FormFieldDisplayEnum } from '@syntara/contracts'
+
 import { test, expect } from '../fixtures'
 import {
   FORM_FIELD_TYPE_MENU_LABELS,
@@ -91,16 +93,22 @@ test.describe('Form trigger — form field builder', { tag: '@pr-check' }, () =>
       const stored = await readFormTriggerDefinitionFromApi(app, workflowId)
       expect(stored.fields).toHaveLength(UI1_FIELD_SPECS.length)
       expect(stored.fields.map((field) => field.label)).toEqual(UI1_FIELD_SPECS.map((spec) => spec.label))
-      expect(stored.fields.map((field) => field.type)).toEqual([
-        'text',
-        'textarea',
-        'masked_text',
-        'email',
-        'number',
-        'checkbox',
-        'date',
-        'dropdown',
-        'multi_select',
+      expect(
+        stored.fields.map((field) =>
+          field.type === 'text'
+            ? { type: field.type, display: field.display ?? FormFieldDisplayEnum.SINGLE_LINE }
+            : { type: field.type }
+        )
+      ).toEqual([
+        { type: 'text', display: FormFieldDisplayEnum.SINGLE_LINE },
+        { type: 'text', display: FormFieldDisplayEnum.MULTI_LINE },
+        { type: 'text', display: FormFieldDisplayEnum.MASKED },
+        { type: 'email' },
+        { type: 'number' },
+        { type: 'checkbox' },
+        { type: 'date' },
+        { type: 'dropdown' },
+        { type: 'multi_select' },
       ])
       expect(stored.fields[0]?.required).toBe(true)
 

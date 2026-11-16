@@ -53,12 +53,12 @@ function humanizeNonEmptyMessage(fieldPath?: string | null): string {
   return 'This field must not be empty'
 }
 
-export function humanizeValidationMessage(raw: string, fieldPath?: string | null): string {
+export function humanizeValidationMessage(raw: string, fieldPath?: string | null, fieldLabel?: string): string {
   if (
     fieldPath &&
     (fieldPath.includes('form_definition.fields') || fieldPath.startsWith('fields[') || fieldPath.startsWith('fields.'))
   ) {
-    return humanizeFormDefinitionIssueMessage(raw, fieldPath)
+    return humanizeFormDefinitionIssueMessage(raw, fieldPath, { fieldLabel })
   }
 
   const idMatch = ID_PATTERN.exec(raw)

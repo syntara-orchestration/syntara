@@ -1,6 +1,13 @@
-import type { FormDefinition, FormField, FormFieldType } from '@syntara/contracts'
+import type { FormDefinition, FormField } from '@syntara/contracts'
 
-import { FORM_FIELD_TYPE_VALUES, FormFieldTypeEnum, labelToValueName } from '../../../forms'
+import { FormFieldTypeEnum, labelToValueName } from '../../../forms'
+import {
+  applyUiKind,
+  FORM_FIELD_UI_KIND_VALUES,
+  FormFieldUiKindEnum,
+  type FormFieldUiKind,
+  uiKindForField,
+} from '../../../forms/formFieldUiKind'
 
 const DEFAULT_STATIC_OPTION = {
   display_label: 'Option 1',
@@ -42,7 +49,7 @@ export function createEmptyFormDefinition(): FormDefinition {
 }
 
 export function createDefaultField(
-  type: FormFieldType = FormFieldTypeEnum.TEXT,
+  type: FormFieldUiKind = FormFieldUiKindEnum.TEXT,
   takenNames: ReadonlyArray<string> = []
 ): FormField {
   const label = takenNames.length === 0 ? 'Field 1' : `Field ${takenNames.length + 1}`
@@ -55,19 +62,17 @@ export function createDefaultField(
   }
 
   switch (type) {
-    case FormFieldTypeEnum.TEXT:
-      return { ...base, type: FormFieldTypeEnum.TEXT }
-    case FormFieldTypeEnum.TEXTAREA:
-      return { ...base, type: FormFieldTypeEnum.TEXTAREA }
-    case FormFieldTypeEnum.MASKED_TEXT:
-      return { ...base, type: FormFieldTypeEnum.MASKED_TEXT }
-    case FormFieldTypeEnum.EMAIL:
+    case FormFieldUiKindEnum.TEXT:
+    case FormFieldUiKindEnum.TEXTAREA:
+    case FormFieldUiKindEnum.MASKED_TEXT:
+      return applyUiKind(base, type)
+    case FormFieldUiKindEnum.EMAIL:
       return { ...base, type: FormFieldTypeEnum.EMAIL }
-    case FormFieldTypeEnum.NUMBER:
+    case FormFieldUiKindEnum.NUMBER:
       return { ...base, type: FormFieldTypeEnum.NUMBER, default: null }
-    case FormFieldTypeEnum.CHECKBOX:
+    case FormFieldUiKindEnum.CHECKBOX:
       return { ...base, type: FormFieldTypeEnum.CHECKBOX, default: false }
-    case FormFieldTypeEnum.DATE:
+    case FormFieldUiKindEnum.DATE:
       return {
         ...base,
         type: FormFieldTypeEnum.DATE,
@@ -76,52 +81,56 @@ export function createDefaultField(
         include_time: false,
         include_timezone: false,
       }
-    case FormFieldTypeEnum.DROPDOWN:
+    case FormFieldUiKindEnum.DROPDOWN:
       return {
         ...base,
         type: FormFieldTypeEnum.DROPDOWN,
         options: defaultStaticOptionsSource(),
         default: null,
       }
-    case FormFieldTypeEnum.MULTI_SELECT:
+    case FormFieldUiKindEnum.MULTI_SELECT:
       return {
         ...base,
         type: FormFieldTypeEnum.MULTI_SELECT,
         options: defaultStaticOptionsSource(),
         default: null,
       }
-    default:
-      return { ...base, type: FormFieldTypeEnum.TEXT }
+    default: {
+      const exhaustive: never = type
+      return exhaustive
+    }
   }
 }
 
-export const FORM_FIELD_TYPE_SELECT_OPTIONS = FORM_FIELD_TYPE_VALUES.map((value) => ({
+export const FORM_FIELD_TYPE_SELECT_OPTIONS = FORM_FIELD_UI_KIND_VALUES.map((value) => ({
   value,
   label: fieldTypeLabel(value),
 }))
 
-export function fieldTypeLabel(type: FormFieldType): string {
+export function fieldTypeLabel(type: FormFieldUiKind): string {
   switch (type) {
-    case FormFieldTypeEnum.TEXT:
+    case FormFieldUiKindEnum.TEXT:
       return 'Text'
-    case FormFieldTypeEnum.TEXTAREA:
+    case FormFieldUiKindEnum.TEXTAREA:
       return 'Text area'
-    case FormFieldTypeEnum.MASKED_TEXT:
+    case FormFieldUiKindEnum.MASKED_TEXT:
       return 'Masked text'
-    case FormFieldTypeEnum.EMAIL:
+    case FormFieldUiKindEnum.EMAIL:
       return 'Email'
-    case FormFieldTypeEnum.NUMBER:
+    case FormFieldUiKindEnum.NUMBER:
       return 'Number'
-    case FormFieldTypeEnum.CHECKBOX:
+    case FormFieldUiKindEnum.CHECKBOX:
       return 'Checkbox'
-    case FormFieldTypeEnum.DATE:
+    case FormFieldUiKindEnum.DATE:
       return 'Date'
-    case FormFieldTypeEnum.DROPDOWN:
+    case FormFieldUiKindEnum.DROPDOWN:
       return 'Dropdown'
-    case FormFieldTypeEnum.MULTI_SELECT:
+    case FormFieldUiKindEnum.MULTI_SELECT:
       return 'Multi-select'
-    default:
-      return type
+    default: {
+      const exhaustive: never = type
+      return exhaustive
+    }
   }
 }
 
@@ -130,10 +139,10 @@ export function fieldTypeLabel(type: FormFieldType): string {
  */
 export function replaceFieldType(
   field: FormField,
-  newType: FormFieldType,
+  newType: FormFieldUiKind,
   takenNames: ReadonlyArray<string>
 ): FormField {
-  if (field.type === newType) {
+  if (uiKindForField(field) === newType) {
     return field
   }
 

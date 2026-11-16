@@ -99,6 +99,26 @@ describe('SynFormFieldBuilder', () => {
     expect(lastCall.fields[1]?.label).toBe('Second')
   })
 
+  it('keeps all nine field type choices in the builder menu', async () => {
+    const user = userEvent.setup()
+
+    renderBuilder(<SynFormFieldBuilder designOnly value={createEmptyFormDefinition()} onChange={vi.fn()} />)
+    await user.click(screen.getByRole('button', { name: 'Text' }))
+
+    const options = within(screen.getByRole('listbox')).getAllByRole('option')
+    expect(options.map((option) => option.textContent)).toEqual([
+      'Text',
+      'Text area',
+      'Masked text',
+      'Email',
+      'Number',
+      'Checkbox',
+      'Date',
+      'Dropdown',
+      'Multi-select',
+    ])
+  })
+
   it('keeps focus when parent controls value from onChange (form prompt node form)', async () => {
     const user = userEvent.setup()
 

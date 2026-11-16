@@ -461,7 +461,7 @@ class TestFormPromptSubmitAPI:
             form_definition={
                 "fields": [
                     {"value_name": "reason", "type": "text", "label": "Reason"},
-                    {"value_name": "secret", "type": "masked_text", "label": "Secret"},
+                    {"value_name": "secret", "type": "text", "display": "masked", "label": "Secret"},
                 ]
             },
         )

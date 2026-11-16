@@ -1,3 +1,4 @@
+import { FormFieldDisplayEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE } from './dateFieldValidationMessages'
@@ -37,6 +38,19 @@ describe('formDefinitionSchema', () => {
     })
 
     expect(data.fields).toHaveLength(3)
+    expect(data.fields[0]).toMatchObject({ display: FormFieldDisplayEnum.SINGLE_LINE })
+  })
+
+  it.each(Object.values(FormFieldDisplayEnum))('accepts text display %s', (display) => {
+    const data = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'value', label: 'Value', display }],
+    })
+
+    expect(data.fields[0]).toMatchObject({ type: FormFieldTypeEnum.TEXT, display })
+  })
+
+  it.each(['textarea', 'masked_text'])('rejects the removed field type %s', (type) => {
+    expect(safeParseFormDefinition({ fields: [{ type, value_name: 'value', label: 'Value' }] }).success).toBe(false)
   })
 
   it('requires non-empty label and value keys for dynamic options', () => {

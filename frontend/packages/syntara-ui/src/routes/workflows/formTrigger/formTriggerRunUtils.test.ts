@@ -1,4 +1,4 @@
-import { TriggerTypeEnum } from '@syntara/contracts'
+import { FormFieldDisplayEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import type { WorkflowRunTrigger } from '../resolveWorkflowRunTrigger'
@@ -45,7 +45,15 @@ describe('formTriggerRunUtils', () => {
 
       expect(result).toEqual({
         definition: {
-          fields: [{ type: 'text', value_name: 'notes', label: 'Notes', required: false }],
+          fields: [
+            {
+              type: 'text',
+              display: FormFieldDisplayEnum.SINGLE_LINE,
+              value_name: 'notes',
+              label: 'Notes',
+              required: false,
+            },
+          ],
         },
         message: 'Please complete',
         submitLabel: 'Go',

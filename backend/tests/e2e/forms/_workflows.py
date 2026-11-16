@@ -10,9 +10,9 @@ DEFAULT_CONSUMER_CODE = 'print("submitted path executed")'
 
 ALL_SUPPORTED_FORM_FIELDS: list[dict[str, Any]] = [
     {"type": "text", "value_name": "text_value", "label": "Text", "required": True},
-    {"type": "textarea", "value_name": "textarea_value", "label": "Textarea", "required": True},
+    {"type": "text", "display": "multi_line", "value_name": "textarea_value", "label": "Textarea", "required": True},
     {"type": "number", "value_name": "number_value", "label": "Number", "required": True},
-    {"type": "masked_text", "value_name": "masked_value", "label": "Masked text", "required": True},
+    {"type": "text", "display": "masked", "value_name": "masked_value", "label": "Masked text", "required": True},
     {
         "type": "dropdown",
         "value_name": "dropdown_value",

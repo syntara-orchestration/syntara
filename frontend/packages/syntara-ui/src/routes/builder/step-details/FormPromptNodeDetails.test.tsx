@@ -1,3 +1,4 @@
+import { FormFieldDisplayEnum } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -11,7 +12,14 @@ import { FormPromptNodeDetails } from './FormPromptNodeDetails'
 const mockUpdateActivity = vi.fn()
 
 const validStoredDefinition = {
-  fields: [{ type: FormFieldTypeEnum.TEXT, value_name: 'name', label: 'Name' }],
+  fields: [
+    {
+      type: FormFieldTypeEnum.TEXT,
+      display: FormFieldDisplayEnum.SINGLE_LINE,
+      value_name: 'name',
+      label: 'Name',
+    },
+  ],
 }
 
 function buildStoreState(activityParameters?: Record<string, unknown>) {

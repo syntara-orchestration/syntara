@@ -22,6 +22,7 @@ from syntara.workflows.workflow_engine.activities.approver_resolution_activity i
 from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
 from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
 from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.workflow_engine.models.form_prompt import FormPromptActivityInput
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
@@ -33,25 +34,10 @@ _RESULT_TIMEOUT_S = 60
 
 
 @activity.defn(name=ActivityName.FORM_PROMPT)
-async def _test_form_prompt_activity(
-    execution_id: str,
-    prompt_node_id: str,
-    name: str,
-    form_definition: dict[str, Any],
-    timeout_at: str | None = None,
-    responder_user_ids: list[str] | None = None,
-    responder_group_ids: list[str] | None = None,
-    project_id: str = "",
-    loop_iteration_path: list[int] | None = None,
-    temporal_activity_id: str | None = None,
-    message: str | None = None,
-    submit_label: str | None = None,
-    success_message: str | None = None,
-    css_override: str | None = None,
-) -> dict[str, Any]:
+async def _test_form_prompt_activity(activity_input: FormPromptActivityInput) -> dict[str, Any]:
     """Stand-in for create_form_prompt_activity: suspends without calling the Forms API."""
     _pending_activity_ids.append(activity.info().activity_id)
-    _captured_form_definitions.append(form_definition)
+    _captured_form_definitions.append(activity_input["form_definition"])
     activity.raise_complete_async()
 
 

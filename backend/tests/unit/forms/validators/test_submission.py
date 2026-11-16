@@ -21,7 +21,7 @@ _STATIC_OPTIONS: dict[str, Any] = {
 
 # Every field type that coerce_field routes through _coerce_string.
 # "email" is excluded: it adds a format check on top (see TestEmailField).
-_STRING_FIELD_TYPES = ["text", "textarea", "masked_text"]
+_STRING_FIELD_TYPES = ["text"]
 
 _DYNAMIC_OPTIONS: dict[str, Any] = {
     "source": "dynamic",
@@ -84,8 +84,6 @@ class TestSubmissionFlow:
         ("field_type", "overrides", "expected"),
         [
             ("text", {}, ""),
-            ("textarea", {}, ""),
-            ("masked_text", {}, ""),
             ("email", {}, ""),
             ("date", {}, ""),
             ("number", {}, None),
@@ -118,8 +116,8 @@ class TestSubmissionFlow:
         ("field_type", "empty", "overrides", "expected"),
         [
             ("text", "", {"default": "prefilled"}, ""),
-            ("textarea", [], {"default": "prefilled"}, ""),
-            ("masked_text", None, {"default": "prefilled"}, ""),
+            ("text", [], {"default": "prefilled", "display": "multi_line"}, ""),
+            ("text", None, {"default": "prefilled", "display": "masked"}, ""),
             ("email", "", {"default": "user@example.com"}, ""),
             ("date", "", {"default": {"date": "2026-01-05"}}, ""),
             ("number", "", {"default": 7}, None),
@@ -720,7 +718,7 @@ class TestDateFieldSubmission:
 class TestWhitespaceStripping:
     """Outer whitespace is normalized before required checks and field coercion."""
 
-    @pytest.mark.parametrize("field_type", ["text", "textarea", "masked_text"])
+    @pytest.mark.parametrize("display", ["single_line", "multi_line", "masked"])
     @pytest.mark.parametrize(
         ("raw", "expected"),
         [
@@ -732,12 +730,12 @@ class TestWhitespaceStripping:
             ("  left  middle right  ", "left  middle right"),
         ],
     )
-    def test_text_like_values_trim_outer_whitespace_only(self, field_type: str, raw: str, expected: str) -> None:
-        form = _form(_field(field_type, "answer"))
+    def test_text_like_values_trim_outer_whitespace_only(self, display: str, raw: str, expected: str) -> None:
+        form = _form(_field("text", "answer", display=display))
 
         assert validate_form_submission(form, {"answer": raw}) == {"answer": expected}
 
-    @pytest.mark.parametrize("field_type", ["text", "textarea", "masked_text", "email"])
+    @pytest.mark.parametrize("field_type", ["text", "email"])
     def test_whitespace_only_required_text_like_value_is_required(self, field_type: str) -> None:
         form = _form(_field(field_type, "answer", required=True))
 
@@ -745,7 +743,7 @@ class TestWhitespaceStripping:
 
         assert [(error.field, error.code) for error in errors] == [("answer", "required")]
 
-    @pytest.mark.parametrize("field_type", ["text", "textarea", "masked_text", "email"])
+    @pytest.mark.parametrize("field_type", ["text", "email"])
     def test_whitespace_only_optional_text_like_value_is_empty(self, field_type: str) -> None:
         form = _form(_field(field_type, "answer"))
 
@@ -924,6 +922,6 @@ class TestWhitespaceStripping:
         }
 
     def test_missing_input_uses_trimmed_default(self) -> None:
-        form = _form(_field("masked_text", "secret", default="  secret  "))
+        form = _form(_field("text", "secret", display="masked", default="  secret  "))
 
         assert validate_form_submission(form, {}) == {"secret": "secret"}

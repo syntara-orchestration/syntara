@@ -46,7 +46,8 @@ Key properties:
   resolved options, and presentation shown to the responder. Later workflow edits do not
   change an in-flight prompt.
 - **Forms collect structured values only.** File uploads and encrypted-secret fields are not
-  supported; `masked_text` masks display but is not encrypted at rest.
+  supported; `display: "masked"` masks the input while it is being entered but does not encrypt
+  or redact values.
 - Temporal tracks whether the step is waiting; Postgres stores the prompt and its response.
   Signal delivery and cleanup are best-effort; see [Current Limitations](#current-limitations).
 
@@ -260,8 +261,8 @@ on a form prompt URN:
 | `form_prompt_expired` | WARNING | SYSTEM | `expired_at`, `timeout_at` |
 
 Submission audit events contain metadata, not submitted field values. Values are stored with
-the prompt and protected by normal form-prompt read permissions. `masked_text` is masked in
-the UI but is not encrypted at rest.
+the prompt and protected by normal form-prompt read permissions. `display: "masked"` is a
+rendering hint; submitted values are not encrypted or redacted.
 
 Telemetry errors are swallowed so they cannot affect a submission.
 

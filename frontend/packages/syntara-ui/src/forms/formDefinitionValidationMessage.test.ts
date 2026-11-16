@@ -40,6 +40,16 @@ describe('humanizeFormDefinitionIssueMessage', () => {
     )
   })
 
+  it('uses the authored field label instead of the field number when available', () => {
+    expect(
+      humanizeFormDefinitionIssueMessage(
+        "Invalid field type 'textarea' in form prompt field definition",
+        'parameters.form_definition.fields.2.type',
+        { fieldLabel: 'Release notes' }
+      )
+    ).toBe("Release notes — Invalid field type 'textarea' in form prompt field definition")
+  })
+
   it('includes field and option row for empty option labels', () => {
     expect(
       humanizeFormDefinitionIssueMessage(

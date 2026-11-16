@@ -102,7 +102,7 @@ class TestFormTriggerSubmissionCleaning:
     def test_padded_values_are_trimmed_on_form_trigger_submission(self) -> None:
         trigger = _form_trigger(
             _field("text", "name"),
-            _field("masked_text", "secret"),
+            _field("text", "secret", display="masked"),
             _field("date", "start"),
         )
 
@@ -118,7 +118,7 @@ class TestFormTriggerSubmissionCleaning:
         assert cleaned_input == {"name": "Ada", "secret": "token", "start": "2026-02-14"}
 
     def test_whitespace_only_required_value_is_rejected_on_form_trigger(self) -> None:
-        trigger = _form_trigger(_field("masked_text", "secret", required=True))
+        trigger = _form_trigger(_field("text", "secret", display="masked", required=True))
 
         with pytest.raises(FormDataValidationError) as exc_info:
             validate_form_trigger_submission(trigger, {"secret": " \t "})

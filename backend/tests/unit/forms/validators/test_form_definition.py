@@ -46,8 +46,6 @@ class TestValidDefinitions:
         ("field_type", "default"),
         [
             ("text", "anon"),
-            ("textarea", "notes"),
-            ("masked_text", "secret"),
             ("email", "bob@example.com"),
             ("number", 42),
             ("number", 3.5),
@@ -187,8 +185,8 @@ class TestWhitespaceDefaults:
         ("field_type", "default", "overrides", "expected"),
         [
             ("text", "  hello  ", {}, "hello"),
-            ("textarea", "  notes  ", {}, "notes"),
-            ("masked_text", "  secret  ", {}, "secret"),
+            ("text", "  notes  ", {"display": "multi_line"}, "notes"),
+            ("text", "  secret  ", {"display": "masked"}, "secret"),
             ("email", "  user@example.com  ", {}, "user@example.com"),
             ("date", {"date": " 2026-01-05 "}, {}, {"date": "2026-01-05"}),
             (
@@ -225,8 +223,8 @@ class TestWhitespaceDefaults:
         ("field_type", "default", "overrides", "expected"),
         [
             ("text", " \t ", {}, ""),
-            ("textarea", " \t ", {}, ""),
-            ("masked_text", " \t ", {}, ""),
+            ("text", " \t ", {"display": "multi_line"}, ""),
+            ("text", " \t ", {"display": "masked"}, ""),
             ("email", " \t ", {}, ""),
             (
                 "dropdown",
@@ -259,8 +257,8 @@ class TestWhitespaceDefaults:
         ("field_type", "default", "overrides"),
         [
             ("text", " \t ", {}),
-            ("textarea", " \t ", {}),
-            ("masked_text", " \t ", {}),
+            ("text", " \t ", {"display": "multi_line"}),
+            ("text", " \t ", {"display": "masked"}),
             ("email", " \t ", {}),
             ("dropdown", " \t ", {"options": _STATIC_OPTIONS}),
             ("multi_select", [" \t "], {"options": _STATIC_OPTIONS}),
