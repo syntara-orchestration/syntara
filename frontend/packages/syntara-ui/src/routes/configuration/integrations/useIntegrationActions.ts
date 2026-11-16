@@ -21,13 +21,17 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
   const validateDialog = useDialogState<IntegrationRead>()
   const deleteDialog = useDialogState<IntegrationRead>()
   const disableDialog = useDialogState<IntegrationRead>()
+  const renameDialog = useDialogState<IntegrationRead>()
 
   const { mutate: validateIntegration } = integrationsClient.useMutation(
     'post',
     '/integrations/{integration_id}/validate'
   )
   const { mutate: deleteIntegration } = integrationsClient.useMutation('delete', '/integrations/{integration_id}')
-  const { mutate: patchIntegration } = integrationsClient.useMutation('patch', '/integrations/{integration_id}')
+  const { mutate: patchIntegration, isPending: isPatching } = integrationsClient.useMutation(
+    'patch',
+    '/integrations/{integration_id}'
+  )
 
   function handleValidate() {
     const item = validateDialog.item
@@ -143,13 +147,48 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
     )
   }
 
+  function handleRename(name: string) {
+    const item = renameDialog.item
+    if (!item?.id) return
+
+    patchIntegration(
+      {
+        params: { path: { integration_id: item.id } },
+        body: { name },
+      },
+      {
+        onSuccess: () => {
+          showAlert({
+            title: 'Integration name updated',
+            description: `Server name / ID changed to "${name}".`,
+            variant: 'success',
+            autoDismiss: true,
+          })
+          detachPromise(refetch())
+          renameDialog.close()
+        },
+        onError: (error: unknown) => {
+          showAlert({
+            title: 'Failed to update integration',
+            description: `Failed to rename "${item.name}": ${getErrorMessage(error)}`,
+            variant: 'danger',
+            autoDismiss: true,
+          })
+        },
+      }
+    )
+  }
+
   return {
     validateDialog,
     deleteDialog,
     disableDialog,
+    renameDialog,
+    isRenaming: isPatching,
     handleValidate,
     handleDelete,
     handleToggleEnabled,
     handleDisable,
+    handleRename,
   }
 }

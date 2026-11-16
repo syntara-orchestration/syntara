@@ -505,6 +505,62 @@ describe('IntegrationDetail', () => {
       expect(mockNavigate).toHaveBeenCalledWith({ to: '/configuration/integrations/int-1/edit' })
     })
 
+    it('shows Edit name for OpenShift integrations instead of Edit integration', () => {
+      setupDefaultMocks({
+        integration: {
+          name: 'prod-openshift-west',
+          integration_type: 'openshift',
+          configuration: {
+            integration_type: 'openshift',
+            base_url: 'https://api.openshift.example.com:6443',
+            allow_http: false,
+            insecure_skip_tls_verify: false,
+            ca_certificate: null,
+          },
+        },
+      })
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.getByRole('button', { name: 'Edit name' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Edit integration' })).not.toBeInTheDocument()
+    })
+
+    it('opens the rename modal for OpenShift and PATCHes only the name', async () => {
+      const user = userEvent.setup()
+      setupDefaultMocks({
+        integration: {
+          name: 'prod-openshift-west',
+          integration_type: 'openshift',
+          configuration: {
+            integration_type: 'openshift',
+            base_url: 'https://api.openshift.example.com:6443',
+            allow_http: false,
+            insecure_skip_tls_verify: false,
+            ca_certificate: null,
+          },
+        },
+      })
+      render(<IntegrationDetail />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Edit name' }))
+
+      expect(screen.getByText('Edit integration name')).toBeInTheDocument()
+      expect(mockNavigate).not.toHaveBeenCalled()
+
+      const nameInput = screen.getByRole('textbox', { name: /Server name \/ ID/i })
+      await user.clear(nameInput)
+      await user.type(nameInput, 'renamed-openshift')
+      await user.click(screen.getByRole('button', { name: 'Save name' }))
+
+      expect(mockMutate).toHaveBeenCalledWith(
+        {
+          params: { path: { integration_id: 'int-1' } },
+          body: { name: 'renamed-openshift' },
+        },
+        expect.any(Object)
+      )
+    })
+
     it('shows kebab menu', () => {
       render(<IntegrationDetail />, { wrapper })
 

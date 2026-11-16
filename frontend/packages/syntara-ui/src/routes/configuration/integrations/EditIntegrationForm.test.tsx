@@ -223,6 +223,32 @@ describe('EditIntegrationForm', () => {
 
       expect(screen.getAllByText('Error loading integration').length).toBeGreaterThanOrEqual(1)
     })
+
+    it('redirects OpenShift integrations away from the full edit form', async () => {
+      setupMocks({
+        integration: {
+          name: 'prod-openshift-west',
+          integration_type: 'openshift',
+          configuration: {
+            integration_type: 'openshift',
+            base_url: 'https://api.openshift.example.com:6443',
+            allow_http: false,
+            insecure_skip_tls_verify: false,
+            ca_certificate: null,
+          },
+        },
+      })
+      render(<EditIntegrationForm />, { wrapper })
+
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith({
+          to: '/configuration/integrations/int-1',
+          replace: true,
+        })
+      })
+      expect(screen.queryByRole('heading', { name: 'Edit integration' })).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/Server name \/ ID/i)).not.toBeInTheDocument()
+    })
   })
 
   describe('Field population', () => {

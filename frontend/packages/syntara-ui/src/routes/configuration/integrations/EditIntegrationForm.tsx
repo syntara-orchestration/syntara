@@ -242,6 +242,7 @@ export function EditIntegrationForm() {
 
   const detailPath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId ?? '')
   const breadcrumbs = breadcrumbsIntegrationEdit(integration?.name ?? 'Integration', detailPath)
+  const isOpenShift = integration?.integration_type === IntegrationTypeEnum.OPENSHIFT
 
   const schema = useMemo(() => {
     if (!integration) return editIntegrationSchema
@@ -250,6 +251,11 @@ export function EditIntegrationForm() {
       : true
     return buildEditSchema(requiresBaseUrl)
   }, [integration])
+
+  useEffect(() => {
+    if (!isOpenShift) return
+    detachPromise(navigate({ to: detailPath, replace: true }))
+  }, [isOpenShift, detailPath, navigate])
 
   useEffect(() => {
     const projectIds = integration?.scope === 'project' ? initialProjectIds : []
@@ -387,7 +393,7 @@ export function EditIntegrationForm() {
     )
   }
 
-  if (!integration || (integration.scope === 'project' && assignmentsQuery.isPending)) return null
+  if (!integration || isOpenShift || (integration.scope === 'project' && assignmentsQuery.isPending)) return null
 
   return (
     <SynPage>

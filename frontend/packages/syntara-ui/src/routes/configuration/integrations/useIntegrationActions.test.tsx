@@ -186,4 +186,40 @@ describe('useIntegrationActions', () => {
       expect(mockMutate).toHaveBeenCalledWith(expect.objectContaining({ body: { enabled: false } }), expect.any(Object))
     })
   })
+
+  describe('handleRename', () => {
+    it('patches only the name field and closes the dialog on success', () => {
+      mockMutate.mockImplementation((_args: unknown, callbacks: MockMutationCallbacks) => {
+        callbacks.onSuccess?.()
+      })
+
+      const { result } = renderHook(() => useIntegrationActions(mockRefetch), { wrapper })
+
+      act(() => result.current.renameDialog.open(mockIntegration))
+      act(() => result.current.handleRename('renamed-integration'))
+
+      expect(mockMutate).toHaveBeenCalledWith(
+        {
+          params: { path: { integration_id: 'int-1' } },
+          body: { name: 'renamed-integration' },
+        },
+        expect.any(Object)
+      )
+      expect(mockRefetch).toHaveBeenCalled()
+      expect(result.current.renameDialog.isOpen).toBe(false)
+    })
+
+    it('keeps the dialog open when rename fails', () => {
+      mockMutate.mockImplementation((_args: unknown, callbacks: MockMutationCallbacks) => {
+        callbacks.onError?.(new Error('duplicate name'))
+      })
+
+      const { result } = renderHook(() => useIntegrationActions(mockRefetch), { wrapper })
+
+      act(() => result.current.renameDialog.open(mockIntegration))
+      act(() => result.current.handleRename('taken-name'))
+
+      expect(result.current.renameDialog.isOpen).toBe(true)
+    })
+  })
 })
