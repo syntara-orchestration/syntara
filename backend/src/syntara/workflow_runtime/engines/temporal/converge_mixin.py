@@ -11,21 +11,22 @@ from typing import Any
 
 from temporalio import workflow
 
+# Passed through for the reason given in dynamic_workflow.py: a module the
+# sandbox reloads per run is never freed.
 with workflow.unsafe.imports_passed_through():
+    from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+    from syntara.workflow_core.models import (
+        NODE_OUTPUT_MODELS,
+        ConvergeStrategy,
+        NodeOutput,
+        NodeType,
+    )
     from syntara.workflow_core.output_mapping import OutputMappingError
+    from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
     from syntara.workflow_runtime.engines.temporal.node_settings_resolver import (
         resolve_continue_on_failure,
         resolve_wait_duration,
     )
-
-from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
-from syntara.workflow_core.models import (
-    NODE_OUTPUT_MODELS,
-    ConvergeStrategy,
-    NodeOutput,
-    NodeType,
-)
-from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 
 
 class WorkflowConvergeMixin:

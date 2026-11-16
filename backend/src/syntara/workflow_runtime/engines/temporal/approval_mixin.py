@@ -15,29 +15,30 @@ from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 
+# Passed through for the reason given in dynamic_workflow.py: a module the
+# sandbox reloads per run is never freed.
 with workflow.unsafe.imports_passed_through():
     from syntara.core.constants import FieldLimits
     from syntara.core.exceptions import SafeValueError
+    from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
     from syntara.workflow_core.models import (
         ActivityName,
         ActivityTerminalStatus,
         ApprovalOutput,
         NodeType,
     )
+    from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
     from syntara.workflow_runtime.engines.temporal.activities.approval_activity import fail_detached_approval_activity
     from syntara.workflow_runtime.engines.temporal.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
     from syntara.workflow_runtime.engines.temporal.node_settings_resolver import (
         resolve_decision_window,
         resolve_retry_policy,
     )
-
-from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
-from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
-from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
-    approval_temporal_activity_id,
-    loop_index_chain,
-    use_unique_loop_iteration_ids,
-)
+    from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
+        approval_temporal_activity_id,
+        loop_index_chain,
+        use_unique_loop_iteration_ids,
+    )
 
 _APPROVAL_COMMENTS_MAX_LENGTH = FieldLimits.DESCRIPTION_MAX_LENGTH
 _APPROVAL_PROMPT_PATCH = "persist-approval-prompt"
