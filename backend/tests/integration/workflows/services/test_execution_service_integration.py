@@ -98,7 +98,7 @@ edges:
         workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
 
         # Verify completion (activity_outputs are empty when include_node_results=False)
-        assert workflow_result["status"] == "completed", workflow_result
+        assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
     async def test_start_workflow_with_custom_id(self, execution_service: TemporalExecutionService) -> None:
         """Test starting a workflow with a custom workflow ID."""
@@ -139,7 +139,7 @@ edges:
             result.temporal_workflow_id, run_id=result.temporal_run_id
         )
         workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
-        assert workflow_result["status"] == "completed", workflow_result
+        assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
     async def test_start_workflow_with_inputs(self, execution_service: TemporalExecutionService) -> None:
         """Test starting a workflow with input parameters."""
@@ -180,7 +180,7 @@ edges:
         workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
 
         # Verify workflow completed (activity_outputs are empty when include_node_results=False)
-        assert workflow_result["status"] == "completed", workflow_result
+        assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
     async def test_invalid_workflow_definition_raises_validation_error(
         self, execution_service: TemporalExecutionService
@@ -321,4 +321,4 @@ edges:
                 result.temporal_workflow_id, run_id=result.temporal_run_id
             )
             workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
-            assert workflow_result["status"] == "completed", workflow_result
+            assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"

@@ -211,7 +211,7 @@ class TestTemporalWorkerServiceIntegration:
             workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
 
             # Verify workflow was processed successfully
-            assert workflow_result["status"] == "completed", workflow_result
+            assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
     async def test_multiple_workers_different_queues(self, temporal_env: WorkflowEnvironment) -> None:
         """Test running multiple workers on different queues simultaneously."""
@@ -269,8 +269,8 @@ class TestTemporalWorkerServiceIntegration:
             )
             workflow_result2 = await asyncio.wait_for(handle2.result(), timeout=30)
 
-            assert workflow_result1["status"] == "completed", workflow_result1
-            assert workflow_result2["status"] == "completed", workflow_result2
+            assert workflow_result1["status"] == "completed", f"Unexpected workflow result: {workflow_result1!r}"
+            assert workflow_result2["status"] == "completed", f"Unexpected workflow result: {workflow_result2!r}"
 
         # Verify both workers stopped
         worker1_stopped = worker1._worker_task is None
@@ -365,7 +365,7 @@ class TestWorkerServiceConfiguration:
                 result.temporal_workflow_id, run_id=result.temporal_run_id
             )
             workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
-            assert workflow_result["status"] == "completed", workflow_result
+            assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
 
 @pytest.mark.integration

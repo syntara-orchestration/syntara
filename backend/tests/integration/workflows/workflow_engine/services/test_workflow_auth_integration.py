@@ -216,7 +216,7 @@ class TestWorkflowAuthIntegration:
             )
 
             workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
-            assert workflow_result["status"] == "completed", workflow_result
+            assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
     async def test_authorized_workflow_succeeds(self, temporal_env: WorkflowEnvironment) -> None:
         """A workflow submitted with valid HMAC header must execute."""
@@ -249,4 +249,4 @@ class TestWorkflowAuthIntegration:
 
             handle = authed_client.get_workflow_handle(result.temporal_workflow_id, run_id=result.temporal_run_id)
             workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
-            assert workflow_result["status"] == "completed", workflow_result
+            assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
