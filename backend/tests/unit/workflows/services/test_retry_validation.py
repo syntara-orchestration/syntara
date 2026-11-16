@@ -39,6 +39,20 @@ def _definition(
     }
 
 
+def _loop_definition() -> dict[str, Any]:
+    return {
+        "triggers": TRIGGERS,
+        "nodes": [
+            {"id": "loop_1", "type": "loop", "parameters": {}},
+            {"id": "body_step", "type": "script", "parameters": {"code": "exit 1"}},
+        ],
+        "edges": [
+            {"from": "trigger_1", "to": "loop_1"},
+            {"from": "loop_1", "to": "body_step"},
+        ],
+    }
+
+
 def test_strip_iteration_suffix() -> None:
     assert strip_iteration_suffix("step_2#iter-3") == "step_2"
     assert strip_iteration_suffix("step_2") == "step_2"
@@ -828,6 +842,46 @@ async def test_validate_retry_empty_selection_defaults_to_all_failed() -> None:
     assert verdict.eligible is True
     assert verdict.eligible_point_ids == ["step_2"]
     assert verdict.auto_included_node_ids == []
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_rejects_loop_control_as_explicit_start_point() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    verdict = await validate_retry_from_failure(
+        _run_session(execution, _loop_definition(), failed=[_make_activity("loop_1")]),
+        execution.id,
+        ["loop_1"],
+    )
+    assert verdict.eligible is False
+    assert "loop control nodes cannot be selected as retry start points" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_default_skips_loop_control_and_keeps_failed_body_selectable() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    verdict = await validate_retry_from_failure(
+        _run_session(
+            execution,
+            _loop_definition(),
+            failed=[_make_activity("loop_1"), _make_activity("body_step")],
+        ),
+        execution.id,
+        [],
+    )
+    assert verdict.eligible is True
+    assert verdict.eligible_point_ids == ["body_step"]
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_default_rejects_when_only_loop_control_failed() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    verdict = await validate_retry_from_failure(
+        _run_session(execution, _loop_definition(), failed=[_make_activity("loop_1")]),
+        execution.id,
+        [],
+    )
+    assert verdict.eligible is False
+    assert "loop control nodes cannot be selected as retry start points" in (verdict.reason or "")
 
 
 @pytest.mark.asyncio

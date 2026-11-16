@@ -14,16 +14,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.models.activity_execution import ActivityStatus
-from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
 from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 from syntara.workflow_core.models import ActivityName
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflow_runtime.engines.temporal.retry_mixin import (
     _INFERABLE_CONTROL_NODE_TYPES,
     _MIN_BRANCHES_FOR_INFERENCE,
     WorkflowRetryMixin,
 )
+from syntara.workflows.models.activity_execution import ActivityStatus
 
 from .conftest import init_workflow_runtime
 
@@ -47,7 +47,7 @@ def mock_wf() -> Generator[MagicMock, None, None]:
 
 def _make_workflow(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     """Create an OrchestratorWorkflow with initialized state, bypassing __init__."""
-    from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+    from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.skipped_nodes = set()
@@ -403,7 +403,7 @@ async def test_restoring_a_condition_needs_no_manually_initialised_retry_state(
     of these tests passed. This one builds the workflow the way ``__init__`` does
     — nothing seeded by hand — so an uninitialised field fails loudly here.
     """
-    from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+    from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.retry_context = {"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_true"]}

@@ -15,16 +15,16 @@ import pytest
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.models.activity_execution import ActivityStatus
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflow_runtime.engines.temporal.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
 from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
 from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 from syntara.workflow_core.models import ActivityName, NodeType
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
 from syntara.workflow_runtime.engines.temporal.retry_mixin import (
     _CONTROL_NODE_TYPES_FOR_RETRY,
     WorkflowRetryMixin,
 )
+from syntara.workflows.models.activity_execution import ActivityStatus
 
 from .conftest import init_workflow_runtime
 
