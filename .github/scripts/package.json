@@ -10,21 +10,13 @@
     "check:pr-title": "tsx src/check-pr-title.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "notify:dequeue-burst": "tsx src/dequeue-burst-alert.ts",
-    "notify:queue-health": "tsx src/queue-health-poll.ts",
     "notify:visual-regression-pr": "tsx src/visual-regression-pr-notification.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "tsc": "tsc --noEmit"
   },
-  "dependencies": {
-    "@octokit/graphql": "9.0.5",
-    "@octokit/rest": "22.0.1",
-    "zod": "4.6.7"
-  },
   "devDependencies": {
     "@types/node": "26.6.5",
-    "graphql": "17.0.2",
     "msw": "3.0.3",
     "prettier": "3.9.10",
     "tsx": "4.23.15",
