@@ -284,5 +284,6 @@ class TestWhitespaceDefaults:
 
     @pytest.mark.parametrize("component", ["date", "time", "timezone"])
     def test_whitespace_only_date_default_component_is_rejected(self, component: str) -> None:
+        data = _field("date", "start", default={component: " \t "})
         with pytest.raises(ValidationError):
-            _form(_field("date", "start", default={component: " \t "}))
+            _form(data)

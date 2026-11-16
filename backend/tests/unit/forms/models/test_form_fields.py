@@ -131,16 +131,19 @@ class TestStringWhitespaceStripping:
         assert field.default == "value"
 
     def test_whitespace_only_label_fails_minimum_length_after_trimming(self) -> None:
+        data = _text(label=" \t\n ")
         with pytest.raises(ValidationError):
-            TextField.model_validate(_text(label=" \t\n "))
+            TextField.model_validate(data)
 
     def test_whitespace_only_static_option_label_fails_minimum_length_after_trimming(self) -> None:
+        data = {"display_label": " \t ", "value": "a"}
         with pytest.raises(ValidationError):
-            StaticOption.model_validate({"display_label": " \t ", "value": "a"})
+            StaticOption.model_validate(data)
 
     def test_whitespace_only_resolved_option_label_fails_minimum_length_after_trimming(self) -> None:
+        data = {"display_label": " \t ", "value": "a"}
         with pytest.raises(ValidationError):
-            ResolvedOption.model_validate({"display_label": " \t ", "value": "a"})
+            ResolvedOption.model_validate(data)
 
     def test_date_components_are_trimmed_before_constraints(self) -> None:
         value = DateValue.model_validate({"date": " 2026-01-05 ", "time": " 14:30 ", "timezone": " America/New_York "})
@@ -151,8 +154,9 @@ class TestStringWhitespaceStripping:
 
     @pytest.mark.parametrize("component", ["date", "time", "timezone"])
     def test_whitespace_only_date_default_component_is_rejected(self, component: str) -> None:
+        data = {component: " \t "}
         with pytest.raises(ValidationError):
-            DateValue.model_validate({component: " \t "})
+            DateValue.model_validate(data)
 
     def test_static_option_label_and_value_are_trimmed(self) -> None:
         option = StaticOption.model_validate({"display_label": " Option A ", "value": " option_a "})
@@ -236,13 +240,12 @@ class TestStringWhitespaceStripping:
         assert field.default is None
 
     def test_whitespace_only_dropdown_option_value_is_rejected(self) -> None:
+        data = _text(
+            type="dropdown",
+            options={"source": "static", "values": [{"display_label": "A", "value": " \t "}]},
+        )
         with pytest.raises(ValidationError, match="Option values cannot be empty"):
-            _form(
-                _text(
-                    type="dropdown",
-                    options={"source": "static", "values": [{"display_label": "A", "value": " \t "}]},
-                )
-            )
+            _form(data)
 
     def test_multi_select_default_trims_and_removes_blank_items(self) -> None:
         field = _form(
