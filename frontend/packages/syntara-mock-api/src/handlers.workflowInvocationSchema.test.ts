@@ -125,6 +125,8 @@ describe('workflow invocation schema mock', () => {
       workflow_id: workflowId,
       published_version_id: expect.any(String),
       published_version: 1,
+      published_version_name: null,
+      published_version_created_at: expect.any(String),
       is_eligible: true,
       triggers: [
         {

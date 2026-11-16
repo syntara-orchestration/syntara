@@ -634,12 +634,12 @@ describe('InputPanel', () => {
   })
 
   describe('Search filtering', () => {
-    it('does not show search input when no data exists', () => {
+    it('shows search input for upstream nodes even when execution data is unavailable', () => {
       mockUseUpstreamNodes.mockReturnValue(upstreamNodes)
 
       render(<InputPanel nodeId="node-1" />)
 
-      expect(screen.queryByPlaceholderText('Search fields')).not.toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Search input fields' })).toBeInTheDocument()
     })
 
     it('shows search input when execution data exists', () => {
