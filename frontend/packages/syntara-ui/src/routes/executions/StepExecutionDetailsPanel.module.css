@@ -2,6 +2,8 @@
   font-weight: var(--pf-t--global--font--weight--body--bold);
   /* Must match the wider title ("Parameters") so both panes wrap at the same threshold */
   min-width: 5.5rem;
+  margin: 0;
+  line-height: var(--pf-t--global--font--line-height--heading);
 }
 
 .auditStrip {
@@ -48,6 +50,22 @@
 .dataPaneHeaderRow {
   flex-shrink: 0;
   padding-bottom: var(--pf-t--global--spacer--sm);
+}
+
+.dataPaneHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--sm);
+}
+
+.dataPaneTitleRow {
+  width: 100%;
+}
+
+/* PF plain icon buttons keep block padding that reads as extra space under the label row */
+.dataPaneTitleRow :global(.pf-v6-c-button.pf-m-plain) {
+  --pf-v6-c-button--PaddingBlockStart: 0;
+  --pf-v6-c-button--PaddingBlockEnd: 0;
 }
 
 .dataPaneControlsStacked {
