@@ -1,4 +1,4 @@
-"""Use real AO state to scope cancellation and snapshot deletion before cascades."""
+"""Use real AO state to scope cancellation and schedule EP cleanup after owner deletion."""
 
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4, uuid5
@@ -6,7 +6,6 @@ from uuid import UUID, uuid4, uuid5
 import pytest
 from sqlmodel import select
 
-from syntara.execution_plane import deletion
 from syntara.execution_plane.reconciliation import reconcile_work_item_cancellations
 from syntara.projects.service import ProjectService
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
@@ -57,17 +56,7 @@ async def test_reconciliation_only_cancels_work_for_cancelled_executions(test_db
 
 
 @pytest.mark.parametrize("scope", ["project", "workflow"])
-async def test_deletion_collects_base_identities_independent_of_current_images(test_db_session, test_execution, scope):
-    item_id = await _seed_activities(test_db_session, test_execution)
-    owner_id = test_execution.project_id if scope == "project" else test_execution.workflow_id
-    assert await deletion.collect_execution_plane_work_items(test_db_session, **{f"{scope}_id": owner_id}) == sorted(
-        [item_id, uuid5(test_execution.id, "http-node")]
-    )
-    assert await deletion.collect_execution_plane_work_items(test_db_session, **{f"{scope}_id": uuid4()}) == []
-
-
-@pytest.mark.parametrize("scope", ["project", "workflow"])
-async def test_owner_deletion_schedules_captured_work_only_after_commit(
+async def test_owner_deletion_schedules_ep_lookup_only_after_commit(
     test_db_session,
     test_execution,
     test_user,
@@ -75,7 +64,7 @@ async def test_owner_deletion_schedules_captured_work_only_after_commit(
     scope,
 ):
     item_id = await _seed_activities(test_db_session, test_execution)
-    work_item_ids = sorted([item_id, uuid5(test_execution.id, "http-node")])
+    owner_id = test_execution.project_id if scope == "project" else test_execution.workflow_id
     test_execution.status = ExecutionStatus.CANCELLED
     await test_db_session.commit()
     execution_id = test_execution.id
@@ -87,14 +76,14 @@ async def test_owner_deletion_schedules_captured_work_only_after_commit(
         await original_commit()
         committed = True
 
-    def schedule(ids) -> None:
+    def schedule(**kwargs: object) -> None:
         assert committed is True
-        assert ids == work_item_ids
+        assert kwargs == {"owner_field": f"{scope}_id", "owner_id": owner_id}
 
     scheduled = Mock(side_effect=schedule)
     monkeypatch.setattr(test_db_session, "commit", commit)
     schedule_module = (
-        "syntara.execution_plane.deletion" if scope == "project" else "syntara.workflows.services.workflow_service"
+        "syntara.projects.service" if scope == "project" else "syntara.workflows.services.workflow_service"
     )
     monkeypatch.setattr(f"{schedule_module}.schedule_work_item_deletion", scheduled)
     if scope == "project":
@@ -106,7 +95,7 @@ async def test_owner_deletion_schedules_captured_work_only_after_commit(
         service = WorkflowService(test_db_session, test_user)
         monkeypatch.setattr(service, "_schedule_trigger_deletion", Mock())
         await service.delete_workflow(test_execution.workflow_id)
-    scheduled.assert_called_once_with(work_item_ids)
+    scheduled.assert_called_once_with(owner_field=f"{scope}_id", owner_id=owner_id)
     assert (await test_db_session.exec(select(Execution.id).where(Execution.id == execution_id))).first() is None
     assert (
         await test_db_session.exec(select(ActivityExecution.id).where(ActivityExecution.id == item_id))
@@ -122,7 +111,7 @@ async def test_failed_commit_does_not_schedule_ep_deletion(
     await test_db_session.commit()
     scheduled = Mock()
     schedule_module = (
-        "syntara.execution_plane.deletion" if scope == "project" else "syntara.workflows.services.workflow_service"
+        "syntara.projects.service" if scope == "project" else "syntara.workflows.services.workflow_service"
     )
     monkeypatch.setattr(f"{schedule_module}.schedule_work_item_deletion", scheduled)
     monkeypatch.setattr(test_db_session, "commit", AsyncMock(side_effect=RuntimeError("commit failed")))
