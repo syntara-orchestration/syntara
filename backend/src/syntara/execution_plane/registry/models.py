@@ -44,6 +44,6 @@ class ExecutionPlanePlugin(BaseResource, table=True):
 
     image_reference: str = Field(
         min_length=1,
-        sa_type=Text(),
+        sa_type=Text(),  # type: ignore[call-overload]
         description="Fully qualified workload image reference",
     )
