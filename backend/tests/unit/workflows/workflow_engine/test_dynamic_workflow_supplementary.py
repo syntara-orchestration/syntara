@@ -534,7 +534,7 @@ class TestUnselectedTriggerSkipping:
         assert len(wf.skipped_nodes) == 0
 
     @pytest.mark.asyncio
-    async def test_retry_reexecutes_trigger_without_restoring_source_timestamps(self) -> None:
+    async def test_retry_reexecutes_trigger_while_preserving_source_timestamps(self) -> None:
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
         graph = WorkflowGraph(backend)
@@ -561,7 +561,10 @@ class TestUnselectedTriggerSkipping:
             )
 
         execute_activity.assert_awaited_once()
-        assert "trigger" not in wf._restored_node_timestamps
+        assert wf._restored_node_timestamps["trigger"] == {
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:05:00+00:00",
+        }
         assert wf.resolver.get_namespace("trigger") == {"status": "ok"}
 
     @pytest.mark.asyncio

@@ -130,7 +130,7 @@ function ActivityRow({
   const displayName = name ?? id
   const jobUrl = isAAPNodeType(type) ? extractAAPJobUrl(state?.outputData) : null
   const columnCount = hasAAPColumn ? 6 : 5
-  const { replayed, retainedFailure } = getRetryActivityMarkers(state, replayBaselineAt, type)
+  const { replayed, retainedFailure, triggerInputReused } = getRetryActivityMarkers(state, replayBaselineAt, type)
 
   return (
     <Fragment>
@@ -149,6 +149,7 @@ function ActivityRow({
             nodeType={type}
             replayed={replayed}
             retainedFailure={retainedFailure}
+            triggerInputReused={triggerInputReused}
           />
         </Td>
         {hasAAPColumn && <Td dataLabel="AAP Job">{jobUrl ? <AAPJobLink url={jobUrl} /> : null}</Td>}

@@ -845,43 +845,16 @@ async def test_validate_retry_empty_selection_defaults_to_all_failed() -> None:
 
 
 @pytest.mark.asyncio
-async def test_validate_retry_rejects_loop_control_as_explicit_start_point() -> None:
+async def test_validate_retry_keeps_loop_control_as_a_failed_start_point() -> None:
     execution = _make_execution(ExecutionStatus.FAILED)
-    verdict = await validate_retry_from_failure(
-        _run_session(execution, _loop_definition(), failed=[_make_activity("loop_1")]),
-        execution.id,
-        ["loop_1"],
-    )
-    assert verdict.eligible is False
-    assert "loop control nodes cannot be selected as retry start points" in (verdict.reason or "")
-
-
-@pytest.mark.asyncio
-async def test_validate_retry_default_skips_loop_control_and_keeps_failed_body_selectable() -> None:
-    execution = _make_execution(ExecutionStatus.FAILED)
-    verdict = await validate_retry_from_failure(
-        _run_session(
-            execution,
-            _loop_definition(),
-            failed=[_make_activity("loop_1"), _make_activity("body_step")],
-        ),
-        execution.id,
-        [],
-    )
-    assert verdict.eligible is True
-    assert verdict.eligible_point_ids == ["body_step"]
-
-
-@pytest.mark.asyncio
-async def test_validate_retry_default_rejects_when_only_loop_control_failed() -> None:
-    execution = _make_execution(ExecutionStatus.FAILED)
-    verdict = await validate_retry_from_failure(
-        _run_session(execution, _loop_definition(), failed=[_make_activity("loop_1")]),
-        execution.id,
-        [],
-    )
-    assert verdict.eligible is False
-    assert "loop control nodes cannot be selected as retry start points" in (verdict.reason or "")
+    for selection in (["loop_1"], []):
+        verdict = await validate_retry_from_failure(
+            _run_session(execution, _loop_definition(), failed=[_make_activity("loop_1")]),
+            execution.id,
+            selection,
+        )
+        assert verdict.eligible is True
+        assert verdict.eligible_point_ids == ["loop_1"]
 
 
 @pytest.mark.asyncio

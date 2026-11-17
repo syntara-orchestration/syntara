@@ -1,9 +1,11 @@
+import { Stack, StackItem } from '@patternfly/react-core'
 import {
   RhUiCheckCircleIcon,
   RhUiClockIcon,
   RhUiCloseCircleIcon,
   RhUiEllipsisHorizontalFillIcon,
   RhUiHourglassIcon,
+  RhUiHistoryIcon,
   RhUiMinusCircleFillIcon,
   RhUiPauseCircleFillIcon,
   RhUiStopCircleFillIcon,
@@ -17,6 +19,7 @@ import { ReplayedOutputBadge } from '../../components/labels/ReplayedOutputBadge
 import { SynLabel } from '../../components/labels/SynLabel'
 import { capitalize } from '../../utils/capitalize'
 
+import styles from './ExecutionStatus.module.css'
 import { activityStatusDisplayLabels, executionStatusDisplayLabels } from './executionStatusConstants'
 
 type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
@@ -84,38 +87,57 @@ export function ActivityStatusLabel({
   nodeType,
   replayed = false,
   retainedFailure = false,
-}: Readonly<{ status: ActivityStatus; nodeType?: string; replayed?: boolean; retainedFailure?: boolean }>) {
-  if (nodeType === ActivityTypeEnum.WAIT && status === 'waiting') {
-    return (
-      <SynLabel variant="outline" status="custom" icon={<RhUiSyncIcon />}>
-        Running
-      </SynLabel>
-    )
-  }
+  triggerInputReused = false,
+}: Readonly<{
+  status: ActivityStatus
+  nodeType?: string
+  replayed?: boolean
+  retainedFailure?: boolean
+  triggerInputReused?: boolean
+}>) {
+  const isRunningWait = nodeType === ActivityTypeEnum.WAIT && status === 'waiting'
 
   const IconComponent = activityStatusIcons[status] ?? RhUiEllipsisHorizontalFillIcon
   const variant = activityStatusVariant[status] ?? 'custom'
   const displayLabel = activityStatusDisplayLabels[status] ?? capitalize(status)
+  const statusLabel = isRunningWait ? (
+    <SynLabel variant="outline" status="custom" icon={<RhUiSyncIcon />}>
+      Running
+    </SynLabel>
+  ) : (
+    <SynLabel variant="outline" status={variant} icon={<IconComponent />}>
+      {displayLabel}
+    </SynLabel>
+  )
+
+  if (!retainedFailure && !replayed && !triggerInputReused) return statusLabel
 
   return (
-    <>
-      <SynLabel variant="outline" status={variant} icon={<IconComponent />}>
-        {displayLabel}
-      </SynLabel>
+    <Stack className={styles.activityStatusDetails} role="group" aria-label="Activity status and retry information">
+      <StackItem>{statusLabel}</StackItem>
       {retainedFailure && (
-        <>
-          {' '}
+        <StackItem>
           <SynLabel variant="outline" status="warning">
             Retained failure
           </SynLabel>
-        </>
+        </StackItem>
       )}
       {replayed && (
-        <>
-          {' '}
+        <StackItem>
           <ReplayedOutputBadge />
-        </>
+        </StackItem>
       )}
-    </>
+      {triggerInputReused && (
+        <StackItem>
+          <SynLabel
+            variant="outline"
+            icon={<RhUiHistoryIcon />}
+            title="The trigger ran again with input from the source run; its output was generated in this retry."
+          >
+            Reused trigger input
+          </SynLabel>
+        </StackItem>
+      )}
+    </Stack>
   )
 }

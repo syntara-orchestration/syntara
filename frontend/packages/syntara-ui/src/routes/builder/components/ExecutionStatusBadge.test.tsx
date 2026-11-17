@@ -171,5 +171,13 @@ describe('ExecutionStatusBadge', () => {
       expect(badge).toHaveAttribute('data-retained-failure')
       expect(badge).toHaveAttribute('data-replayed')
     })
+
+    it('identifies reused trigger input without claiming the output was reused', () => {
+      render(<ExecutionStatusBadge status="completed" triggerInputReused />)
+
+      expect(
+        screen.getByLabelText('Success — reused trigger input; output generated in this retry')
+      ).toBeInTheDocument()
+    })
   })
 })

@@ -79,7 +79,6 @@ from typing import TYPE_CHECKING, Any
 
 from sqlmodel import select
 
-from syntara.workflow_core.models import NodeType
 from syntara.workflow_core.utils.credential_scrubber import REDACTED
 from syntara.workflows.exceptions import ExecutionNotFoundError
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
@@ -206,28 +205,17 @@ def _selection_reason(
     normalized: list[str],
     failed_ids: set[str],
     replacement_ids: set[str] | None = None,
-    loop_control_ids: set[str] | None = None,
 ) -> str | None:
     """Rejection reason for an empty or ineligible selection, else None.
 
     ``normalized`` has already been resolved to the default (all currently
-    failed non-loop nodes) if the caller's selection was empty, so an empty
-    result here only happens when no failed node can be used as a retry start.
-    Sanitized replacements for failed nodes are also allowed: they replace the
-    failed node as the selectable start point. Loop control nodes are never
-    valid start points because retrying them alone cannot replay their body.
+    failed nodes) if the caller's selection was empty, so an empty result here
+    only happens when there are no failed nodes at all to default to. Sanitized
+    replacements for failed nodes are also allowed: they replace the failed
+    node as the selectable start point.
     """
     if not normalized:
-        loop_failures = sorted(failed_ids & (loop_control_ids or set()))
-        if loop_failures:
-            return (
-                "no selectable failed nodes; loop control nodes cannot be selected as retry start points: "
-                f"{', '.join(loop_failures)}"
-            )
         return "no failed nodes in this execution to retry from"
-    loop_controls = sorted(set(normalized) & (loop_control_ids or set()))
-    if loop_controls:
-        return f"loop control nodes cannot be selected as retry start points: {', '.join(loop_controls)}"
     allowed = failed_ids | (replacement_ids or set())
     unknown = [point for point in normalized if point not in allowed]
     if unknown:
@@ -584,7 +572,6 @@ def _retry_selection_reason(
     snapshot: WorkflowVersion | None,
     snapshot_def: dict[str, Any],
     failed_ids: set[str],
-    loop_control_ids: set[str],
     completed_ids: set[str],
     replacement_ids: set[str],
     completed_outputs: dict[str, list[Any]],
@@ -601,7 +588,7 @@ def _retry_selection_reason(
     )
     reason = (
         _state_reason(source)
-        or _selection_reason(normalized, failed_ids, replacement_ids, loop_control_ids)
+        or _selection_reason(normalized, failed_ids, replacement_ids)
         or _converge_reason(snapshot_def, normalized, completed_ids, successors)
         or version_reason
     )
@@ -615,20 +602,16 @@ def _retry_selection_reason(
                 failed_ids=failed_ids,
             )
         )
-        loop_starts = sorted(set(reported_selection) & loop_control_ids)
-        if loop_starts:
-            reason = f"loop control nodes cannot be selected as retry start points: {', '.join(loop_starts)}"
         # Only meaningful once the earlier guards have passed: overrides target
         # failed nodes that re-execute, not starting points.
-        if reason is None:
-            reason = _override_reason(
-                snapshot.workflow_definition if snapshot is not None else None,
-                reported_selection,
-                failed_ids,
-                set(sanitized),
-                overrides,
-                successors,
-            )
+        reason = _override_reason(
+            snapshot.workflow_definition if snapshot is not None else None,
+            reported_selection,
+            failed_ids,
+            set(sanitized),
+            overrides,
+            successors,
+        )
     else:
         reported_selection = normalized
     return reason, reported_selection, sanitized, auto_included
@@ -646,16 +629,9 @@ def _retry_result_counts(
         return {}, 0, 0
 
     retry_path = collect_downstream_node_ids(snapshot_def, reported_selection, successors)
-    trigger_ids = {
-        trigger["id"]
-        for trigger in (snapshot_def.get("triggers", []) or [])
-        if isinstance(trigger, dict) and isinstance(trigger.get("id"), str)
-    }
     step_counts, total_steps = _step_counts(snapshot_def, reported_selection, successors)
     retained_result_count = sum(
-        strip_all_iteration_suffixes(activity.activity_name) not in retry_path
-        and strip_all_iteration_suffixes(activity.activity_name) not in trigger_ids
-        for activity in completed
+        strip_all_iteration_suffixes(activity.activity_name) not in retry_path for activity in completed
     )
     return step_counts, total_steps, retained_result_count
 
@@ -680,9 +656,8 @@ async def validate_retry_from_failure(
     (state, selection, converge-mootness, retained-version, sanitized-taint,
     input-override). Never mutates state.
 
-    An empty ``retry_point_ids`` means the default selection — all currently
-    failed non-loop nodes (SDP R11/AC-15) — not an error. Loop control nodes
-    are excluded because they cannot be retried without replaying their body.
+    An empty ``retry_point_ids`` means the default selection — all
+    currently failed nodes (SDP R11/AC-15) — not an error.
 
     ``input_parameter_overrides`` is validated, never applied: this layer only
     decides whether the retry may proceed with them (SDP AC-14/R10c). The engine
@@ -740,24 +715,14 @@ async def validate_retry_from_failure(
     snapshot = snapshot_result.one_or_none()
 
     snapshot_def = (snapshot.workflow_definition or {}) if snapshot is not None else {}
-    loop_control_ids = {
-        node["id"]
-        for node in definition_nodes(snapshot_def)
-        if node.get("type") == NodeType.LOOP and isinstance(node.get("id"), str)
-    }
     if is_default_selection:
-        # Loop control owns the body replay; retry from failed body nodes, not
-        # from the loop node itself.
-        normalized = sorted(failed_ids - loop_control_ids)
+        normalized = sorted(failed_ids)
     # One adjacency build for the whole validation, shared by every downstream
     # walk below (converge-mootness, sanitized expansion, step counts, eligible
     # points, and the per-failed-node replacement scan).
     successors = build_successors(snapshot_def) if snapshot is not None else {}
-    retryable_failed_ids = failed_ids - loop_control_ids
     replacements = (
-        _sanitized_replacements(snapshot_def, retryable_failed_ids, completed_outputs, successors)
-        if snapshot is not None
-        else {}
+        _sanitized_replacements(snapshot_def, failed_ids, completed_outputs, successors) if snapshot is not None else {}
     )
     replacement_ids = {node_id for ids in replacements.values() for node_id in ids}
 
@@ -768,7 +733,6 @@ async def validate_retry_from_failure(
         snapshot=snapshot,
         snapshot_def=snapshot_def,
         failed_ids=failed_ids,
-        loop_control_ids=loop_control_ids,
         completed_ids=completed_ids,
         replacement_ids=replacement_ids,
         completed_outputs=completed_outputs,

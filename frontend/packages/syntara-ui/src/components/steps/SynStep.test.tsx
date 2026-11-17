@@ -1,5 +1,5 @@
 import { ExecutorTypeEnum } from '@syntara/contracts'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { NodeProps } from '@xyflow/react'
 import { Position, ReactFlowProvider } from '@xyflow/react'
@@ -22,6 +22,7 @@ vi.mock('@xyflow/react', async (importOriginal) => {
 })
 
 import { SynStep } from './SynStep'
+import stepStyles from './SynStep.module.css'
 import { SynStepBody } from './SynStepBody'
 import { SynStepExpandedAllContext } from './SynStepExpandedAllContext'
 
@@ -83,6 +84,22 @@ describe('SynStep semantic zoom', () => {
     expect(screen.queryByText('Task Agent')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Analyze, Task Agent' })).toBeInTheDocument()
     expect(screen.getByTestId('semantic-zoom-icon')).toBeInTheDocument()
+  })
+
+  it('keeps retry origin details accessible while compact zoom hides text markers', () => {
+    viewportState.zoom = 0.5
+    renderWithFlow(
+      <SynStep
+        nodeProps={{ ...baseNodeProps, type: 'manual_trigger' }}
+        semanticZoomSummary={{ title: 'Trigger', typeLabel: 'Manual trigger' }}
+        executionState={{ status: 'completed', triggerInputReused: true } as never}
+      >
+        <span>Detailed body</span>
+      </SynStep>
+    )
+
+    expect(screen.queryByTestId('step-bottom-badges')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Success — reused trigger input; output generated in this retry')).toBeInTheDocument()
   })
 
   it('does not add a second tab stop on the step panel at full zoom', () => {
@@ -391,6 +408,38 @@ describe('SynStep validation and interaction', () => {
     )
 
     expect(screen.getByTestId('replayed-output-badge')).toBeInTheDocument()
+  })
+
+  it('keeps stacked retry badges below and outside the step panel', () => {
+    renderWithFlow(
+      <SynStep
+        nodeProps={baseNodeProps}
+        rootTestId="retry-step-panel"
+        executionState={{ status: 'failed', replayed: true, retainedFailure: true } as never}
+      >
+        <span>Content</span>
+      </SynStep>
+    )
+
+    const panel = screen.getByTestId('retry-step-panel')
+    const bottomBadges = screen.getByTestId('step-bottom-badges')
+    expect(within(panel).queryByTestId('step-bottom-badges')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('step-node-container')).getByTestId('step-bottom-badges')).toBe(bottomBadges)
+    expect(bottomBadges).toHaveClass(stepStyles.bottomBadges)
+  })
+
+  it('labels reused trigger input separately from reused action output', () => {
+    renderWithFlow(
+      <SynStep
+        nodeProps={{ ...baseNodeProps, type: 'manual_trigger' }}
+        executionState={{ status: 'completed', triggerInputReused: true } as never}
+      >
+        <span>Content</span>
+      </SynStep>
+    )
+
+    expect(screen.getByText('Reused trigger input')).toBeInTheDocument()
+    expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
   })
 
   it('does not show the reused-output badge for an ordinary step', () => {

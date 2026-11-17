@@ -357,15 +357,16 @@ describe('StepExecutionDetailsPanel', () => {
     expect(screen.getByText('Failed')).toBeInTheDocument()
   })
 
-  it('renders only the completion timestamp when step has both start and end times', () => {
+  it('renders the start, completion, and elapsed time when both timestamps are available', () => {
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
-    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(1)
-    expect(screen.queryByText(/ - /)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Elapsed time:/)).not.toBeInTheDocument()
+    expect(screen.getByText(/^Started:/)).toBeInTheDocument()
+    expect(screen.getByText(/^Completed:/)).toBeInTheDocument()
+    expect(screen.getByText('Elapsed time: 1m 30s')).toBeInTheDocument()
+    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(2)
   })
 
-  it('renders only start timestamp when completion time is missing', () => {
+  it('renders only the start timestamp when completion time is missing', () => {
     const propsWithoutCompletedAt = {
       ...defaultProps,
       stepState: {
@@ -375,8 +376,10 @@ describe('StepExecutionDetailsPanel', () => {
     }
     render(<StepExecutionDetailsPanel {...propsWithoutCompletedAt} />, { wrapper })
 
+    expect(screen.getByText(/^Started:/)).toBeInTheDocument()
+    expect(screen.queryByText(/^Completed:/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Elapsed time:/)).not.toBeInTheDocument()
     expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(1)
-    expect(screen.queryByText(/ - /)).not.toBeInTheDocument()
   })
 
   it('switches between different view modes for input pane', async () => {

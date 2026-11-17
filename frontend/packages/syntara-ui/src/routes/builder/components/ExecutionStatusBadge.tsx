@@ -23,6 +23,8 @@ type ExecutionStatusBadgeProps = {
   nodeType?: string
   /** True when this step reused a previous run's output instead of executing. */
   replayed?: boolean
+  /** True when a trigger ran again using input from the source run. */
+  triggerInputReused?: boolean
   /** True when this failed step still shows the failure from the source run. */
   retainedFailure?: boolean
   /** True when this step is the selected retry origin. */
@@ -111,6 +113,7 @@ export function ExecutionStatusBadge({
   retryCount,
   nodeType,
   replayed = false,
+  triggerInputReused = false,
   retainedFailure = false,
   retryOrigin = false,
 }: Readonly<ExecutionStatusBadgeProps>) {
@@ -122,6 +125,7 @@ export function ExecutionStatusBadge({
     baseTitle,
     retainedFailure ? 'Retained failure' : null,
     replayed ? 'reused output from a previous run' : null,
+    triggerInputReused ? 'reused trigger input; output generated in this retry' : null,
   ]
     .filter(Boolean)
     .join(' — ')

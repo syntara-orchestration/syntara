@@ -62,6 +62,7 @@ export function CompactActivityList({
                   nodeType={type}
                   replayed={retryMarkers.replayed}
                   retainedFailure={retryMarkers.retainedFailure}
+                  triggerInputReused={retryMarkers.triggerInputReused}
                 />
               </Td>
             </Tr>

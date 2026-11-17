@@ -297,7 +297,7 @@ class TestPreviewRetryFromFailure:
         assert data["eligible_point_ids"] == ["step_2"]
         assert data["step_count_by_eligible_point"] == {"step_2": 2}
         assert data["total_step_count"] == 2
-        assert data["retained_result_count"] == 0
+        assert data["retained_result_count"] == 1
 
     async def test_preview_uses_explicit_selection_to_calculate_subset_counts(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow
@@ -317,7 +317,7 @@ class TestPreviewRetryFromFailure:
         assert data["eligible_point_ids"] == ["step_2"]
         assert data["step_count_by_eligible_point"] == {"step_2": 2}
         assert data["total_step_count"] == 2
-        assert data["retained_result_count"] == 0
+        assert data["retained_result_count"] == 1
 
     async def test_preview_empty_selection_defaults_to_all_failed(
         self, auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_workflow: Workflow

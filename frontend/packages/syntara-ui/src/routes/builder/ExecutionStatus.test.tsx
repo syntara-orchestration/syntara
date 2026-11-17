@@ -102,6 +102,9 @@ describe('ActivityStatusLabel', () => {
     render(<ActivityStatusLabel status="completed" replayed />)
     expect(screen.getByText('Successful')).toBeInTheDocument()
     expect(screen.getByTestId('replayed-output-badge')).toBeInTheDocument()
+    const details = screen.getByRole('group', { name: 'Activity status and retry information' })
+    expect(details).toContainElement(screen.getByText('Successful'))
+    expect(details).toContainElement(screen.getByTestId('replayed-output-badge'))
   })
 
   it('does not show the replayed badge when replayed is explicitly false', () => {
@@ -114,5 +117,13 @@ describe('ActivityStatusLabel', () => {
 
     expect(screen.getByText('Failed')).toBeInTheDocument()
     expect(screen.getByText('Retained failure')).toBeInTheDocument()
+  })
+
+  it('labels reused trigger input separately from reused action output', () => {
+    render(<ActivityStatusLabel status="completed" triggerInputReused />)
+
+    expect(screen.getByText('Successful')).toBeInTheDocument()
+    expect(screen.getByText('Reused trigger input')).toBeInTheDocument()
+    expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
   })
 })

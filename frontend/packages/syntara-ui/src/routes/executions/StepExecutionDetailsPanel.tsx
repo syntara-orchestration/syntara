@@ -35,6 +35,7 @@ import { SynErrorState } from '../../components/states/SynErrorState'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
 import { capitalize } from '../../utils/capitalize'
+import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { highlightTextLines } from '../../utils/highlightText'
 import { ActivityStatusLabel } from '../builder/ExecutionStatus'
@@ -276,11 +277,15 @@ function UsedToolsSection({ tools }: Readonly<{ tools: UsedTool[] }>) {
 
 function StepDetailsHeader({
   stepName,
-  stepTimestamp,
+  startedAt,
+  completedAt,
+  elapsedLabel,
   status,
 }: Readonly<{
   stepName: string
-  stepTimestamp: string | null
+  startedAt: string | null
+  completedAt: string | null
+  elapsedLabel: string | null
   status?: ActivityState['status']
 }>) {
   return (
@@ -291,24 +296,35 @@ function StepDetailsHeader({
             {stepName}
           </Title>
         </FlexItem>
-        <FlexItem>
-          <Flex gap={{ default: 'gapMd' }} alignItems={{ default: 'alignItemsCenter' }}>
-            {stepTimestamp && (
-              <Content
-                component={ContentVariants.small}
-                style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
-              >
-                <ExecutionTimestamp dateString={stepTimestamp} />
-              </Content>
-            )}
-            {status && (
-              <FlexItem style={{ display: 'flex', alignItems: 'center' }}>
-                <ActivityStatusLabel status={status} />
-              </FlexItem>
-            )}
-          </Flex>
-        </FlexItem>
+        {status && (
+          <FlexItem style={{ display: 'flex', alignItems: 'center' }}>
+            <ActivityStatusLabel status={status} />
+          </FlexItem>
+        )}
       </Flex>
+      {(startedAt || completedAt || elapsedLabel) && (
+        <Stack className={styles.stepTiming}>
+          {startedAt && (
+            <StackItem>
+              <Content component={ContentVariants.small}>
+                Started: <ExecutionTimestamp dateString={startedAt} />
+              </Content>
+            </StackItem>
+          )}
+          {completedAt && (
+            <StackItem>
+              <Content component={ContentVariants.small}>
+                Completed: <ExecutionTimestamp dateString={completedAt} />
+              </Content>
+            </StackItem>
+          )}
+          {elapsedLabel && (
+            <StackItem>
+              <Content component={ContentVariants.small}>Elapsed time: {elapsedLabel}</Content>
+            </StackItem>
+          )}
+        </Stack>
+      )}
     </StackItem>
   )
 }
@@ -456,12 +472,25 @@ export function StepExecutionDetailsPanel({
   const approvalAudit = useMemo(() => extractApprovalAudit(outputData), [outputData])
   const usedTools = useMemo(() => extractUsedTools(outputData), [outputData])
 
-  const stepTimestamp = stepState?.completedAt ?? stepState?.startedAt ?? null
+  const startedAt = stepState?.startedAt ?? null
+  const completedAt = stepState?.completedAt ?? null
+  const startedAtMs = startedAt ? Date.parse(startedAt) : Number.NaN
+  const completedAtMs = completedAt ? Date.parse(completedAt) : Number.NaN
+  const elapsedLabel =
+    Number.isFinite(startedAtMs) && Number.isFinite(completedAtMs)
+      ? formatElapsedTime(Math.max(0, completedAtMs - startedAtMs))
+      : null
   const stepIsFailed = stepState?.status === 'failed'
 
   return (
     <Stack className={styles.contentContainer}>
-      <StepDetailsHeader stepName={stepName} stepTimestamp={stepTimestamp} status={stepState?.status} />
+      <StepDetailsHeader
+        stepName={stepName}
+        startedAt={startedAt}
+        completedAt={completedAt}
+        elapsedLabel={elapsedLabel}
+        status={stepState?.status}
+      />
 
       {/* Approval audit strip (shown only for decided approval steps) */}
       {approvalAudit && (

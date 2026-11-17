@@ -68,6 +68,15 @@ export function isReplayedStep(
   return predatesRetry(startedAt, replayBaselineAt)
 }
 
+/** Whether a trigger used the source run's input while executing again in this retry. */
+export function isReusedTriggerInput(
+  startedAt: string | null | undefined,
+  replayBaselineAt: string | null | undefined,
+  nodeType?: string | null
+): boolean {
+  return isTriggerNodeType(nodeType) && predatesRetry(startedAt, replayBaselineAt)
+}
+
 /** Classify the retry markers for an activity row or canvas node. */
 export function getRetryActivityMarkers(
   state:
@@ -79,11 +88,12 @@ export function getRetryActivityMarkers(
     | undefined,
   replayBaselineAt: string | null | undefined,
   nodeType?: string | null
-): { replayed: boolean; retainedFailure: boolean } {
+): { replayed: boolean; retainedFailure: boolean; triggerInputReused: boolean } {
   const { startedAt, status, outputData } = state ?? {}
   return {
     replayed: isReplayedStep(startedAt, replayBaselineAt, status, { outputData, nodeType }),
     retainedFailure: isRetainedFailure(startedAt, replayBaselineAt, status, nodeType),
+    triggerInputReused: isReusedTriggerInput(startedAt, replayBaselineAt, nodeType),
   }
 }
 

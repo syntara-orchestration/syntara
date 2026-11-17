@@ -1,7 +1,12 @@
 import { TriggerTypeEnum } from '@syntara/contracts'
 
 import { ACTIVITY_STATUS } from './executionState/executionHelpers'
-import { isReplayedStep, resolveRetryReplayBaseline } from './replayedNodes'
+import {
+  getRetryActivityMarkers,
+  isReplayedStep,
+  isReusedTriggerInput,
+  resolveRetryReplayBaseline,
+} from './replayedNodes'
 
 /** Retry execution was created at 12:00; the source run happened at 11:00. */
 const RETRY_CREATED_AT = '2026-10-09T12:00:00Z'
@@ -67,6 +72,17 @@ describe('isReplayedStep', () => {
         nodeType: TriggerTypeEnum.MANUAL_TRIGGER,
       })
     ).toBe(false)
+  })
+
+  it('identifies original trigger input separately from reused output', () => {
+    expect(isReusedTriggerInput(SOURCE_RUN_START, RETRY_CREATED_AT, TriggerTypeEnum.MANUAL_TRIGGER)).toBe(true)
+    expect(
+      getRetryActivityMarkers(
+        { startedAt: SOURCE_RUN_START, status: ACTIVITY_STATUS.COMPLETED },
+        RETRY_CREATED_AT,
+        TriggerTypeEnum.MANUAL_TRIGGER
+      )
+    ).toEqual({ replayed: false, retainedFailure: false, triggerInputReused: true })
   })
 
   it('does not flag anything without a baseline', () => {
