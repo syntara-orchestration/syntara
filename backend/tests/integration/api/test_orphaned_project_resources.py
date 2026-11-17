@@ -21,6 +21,9 @@ if TYPE_CHECKING:
     from syntara.core.models import User
 
 
+pytestmark = pytest.mark.usefixtures("ep_deletion_acknowledged")
+
+
 @pytest.fixture
 async def bearer_type(test_db_session: AsyncSession) -> CredentialType:
     """Create a bearer token credential type for testing."""

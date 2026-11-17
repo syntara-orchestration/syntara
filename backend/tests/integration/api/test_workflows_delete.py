@@ -23,6 +23,9 @@ if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
 
 
+pytestmark = pytest.mark.usefixtures("ep_deletion_acknowledged")
+
+
 @pytest.mark.asyncio
 async def test_delete_workflow_removes_row(
     auth_client: AsyncClient,
@@ -236,3 +239,26 @@ async def test_delete_workflow_cleans_up_approval_requests(
     test_db_session.expire_all()
     ar_result = await test_db_session.exec(select(ApprovalRequest).where(ApprovalRequest.id == approval_id))
     assert ar_result.one_or_none() is None, "ApprovalRequest should be cleaned up on workflow delete"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scope", ["project", "workflow"])
+async def test_delete_owner_returns_503_and_retains_rows_when_ep_is_unavailable(
+    auth_client, test_db_session, test_execution, ep_deletion_acknowledged, scope
+):
+    from syntara.authz.models.project import Project
+    from syntara.execution_plane.client import ExecutionPlaneUnavailableError
+    from syntara.workflows.models.execution import ExecutionStatus
+
+    test_execution.status = ExecutionStatus.CANCELLED
+    await test_db_session.commit()
+    execution_id = test_execution.id
+    owner_id = test_execution.project_id if scope == "project" else test_execution.workflow_id
+    ep_deletion_acknowledged.side_effect = ExecutionPlaneUnavailableError()
+
+    response = await auth_client.delete(f"/api/v1/{scope}s/{owner_id}")
+
+    assert response.status_code == 503, response.text
+    assert await test_db_session.get(Execution, execution_id, populate_existing=True) is not None
+    model = Project if scope == "project" else Workflow
+    assert await test_db_session.get(model, owner_id, populate_existing=True) is not None

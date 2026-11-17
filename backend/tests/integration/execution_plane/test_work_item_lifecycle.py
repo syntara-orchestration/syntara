@@ -1,9 +1,10 @@
-"""Use real AO state to scope cancellation and schedule EP cleanup after owner deletion."""
+"""Use real AO state to scope cancellation and require EP acknowledgment before owner deletion."""
 
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4, uuid5
 
 import pytest
+from execution_plane_client.commands.bulk_work import WorkItemSelector
 from sqlmodel import select
 
 from syntara.execution_plane.reconciliation import reconcile_work_item_cancellations
@@ -49,14 +50,14 @@ async def test_reconciliation_only_cancels_work_for_cancelled_executions(test_db
 
     assert await reconcile_work_item_cancellations(test_db_session, client) == int(status is ExecutionStatus.CANCELLED)
     if status is ExecutionStatus.CANCELLED:
-        client.cancel_work_item.assert_awaited_once_with(work_item_id=item_id)
+        client.cancel_work_items.assert_awaited_once_with(selector=WorkItemSelector(work_item_ids=[item_id]))
     else:
-        client.cancel_work_item.assert_not_awaited()
+        client.cancel_work_items.assert_not_awaited()
     client.delete_work_item.assert_not_awaited()
 
 
 @pytest.mark.parametrize("scope", ["project", "workflow"])
-async def test_owner_deletion_schedules_ep_lookup_only_after_commit(
+async def test_owner_deletion_requires_ep_ack_before_commit(
     test_db_session,
     test_execution,
     test_user,
@@ -76,16 +77,16 @@ async def test_owner_deletion_schedules_ep_lookup_only_after_commit(
         await original_commit()
         committed = True
 
-    def schedule(**kwargs: object) -> None:
-        assert committed is True
+    async def schedule(**kwargs: object) -> None:
+        assert committed is False
         assert kwargs == {"owner_field": f"{scope}_id", "owner_id": owner_id}
 
-    scheduled = Mock(side_effect=schedule)
+    scheduled = AsyncMock(side_effect=schedule)
     monkeypatch.setattr(test_db_session, "commit", commit)
     schedule_module = (
         "syntara.projects.service" if scope == "project" else "syntara.workflows.services.workflow_service"
     )
-    monkeypatch.setattr(f"{schedule_module}.schedule_work_item_deletion", scheduled)
+    monkeypatch.setattr(f"{schedule_module}.delete_execution_plane_work_items", scheduled)
     if scope == "project":
         service = ProjectService(test_db_session, test_user)
         monkeypatch.setattr(service, "_cleanup_temporal_schedules", AsyncMock())
@@ -95,7 +96,7 @@ async def test_owner_deletion_schedules_ep_lookup_only_after_commit(
         service = WorkflowService(test_db_session, test_user)
         monkeypatch.setattr(service, "_schedule_trigger_deletion", Mock())
         await service.delete_workflow(test_execution.workflow_id)
-    scheduled.assert_called_once_with(owner_field=f"{scope}_id", owner_id=owner_id)
+    scheduled.assert_awaited_once_with(owner_field=f"{scope}_id", owner_id=owner_id)
     assert (await test_db_session.exec(select(Execution.id).where(Execution.id == execution_id))).first() is None
     assert (
         await test_db_session.exec(select(ActivityExecution.id).where(ActivityExecution.id == item_id))
@@ -103,17 +104,17 @@ async def test_owner_deletion_schedules_ep_lookup_only_after_commit(
 
 
 @pytest.mark.parametrize("scope", ["project", "workflow"])
-async def test_failed_commit_does_not_schedule_ep_deletion(
+async def test_failed_commit_can_follow_acknowledged_ep_deletion(
     test_db_session, test_execution, test_user, monkeypatch, scope
 ):
     await _seed_activities(test_db_session, test_execution)
     test_execution.status = ExecutionStatus.CANCELLED
     await test_db_session.commit()
-    scheduled = Mock()
+    scheduled = AsyncMock()
     schedule_module = (
         "syntara.projects.service" if scope == "project" else "syntara.workflows.services.workflow_service"
     )
-    monkeypatch.setattr(f"{schedule_module}.schedule_work_item_deletion", scheduled)
+    monkeypatch.setattr(f"{schedule_module}.delete_execution_plane_work_items", scheduled)
     monkeypatch.setattr(test_db_session, "commit", AsyncMock(side_effect=RuntimeError("commit failed")))
     if scope == "project":
         service = ProjectService(test_db_session, test_user)
@@ -125,7 +126,37 @@ async def test_failed_commit_does_not_schedule_ep_deletion(
         operation = service.delete_workflow(test_execution.workflow_id)
     with pytest.raises(RuntimeError, match="commit failed"):
         await operation
-    scheduled.assert_not_called()
+    scheduled.assert_awaited_once()
     await test_db_session.rollback()
     # The fixture's teardown may commit after the test; restore its original method.
     monkeypatch.undo()
+
+
+@pytest.mark.parametrize("scope", ["project", "workflow"])
+async def test_ep_failure_retains_owner_and_executions(test_db_session, test_execution, test_user, monkeypatch, scope):
+    from syntara.authz.models.project import Project
+    from syntara.execution_plane.exceptions import ExecutionPlaneDeletionError
+    from syntara.workflows.models.workflow import Workflow
+
+    test_execution.status = ExecutionStatus.CANCELLED
+    await test_db_session.commit()
+    execution_id = test_execution.id
+    owner_id = test_execution.project_id if scope == "project" else test_execution.workflow_id
+    module = "syntara.projects.service" if scope == "project" else "syntara.workflows.services.workflow_service"
+    monkeypatch.setattr(
+        f"{module}.delete_execution_plane_work_items", AsyncMock(side_effect=ExecutionPlaneDeletionError("offline"))
+    )
+    commit = AsyncMock(wraps=test_db_session.commit)
+    monkeypatch.setattr(test_db_session, "commit", commit)
+    if scope == "project":
+        service = ProjectService(test_db_session, test_user)
+        operation = service.delete_project(owner_id)
+    else:
+        service = WorkflowService(test_db_session, test_user)
+        operation = service.delete_workflow(owner_id)
+    with pytest.raises(ExecutionPlaneDeletionError):
+        await operation
+    commit.assert_not_awaited()
+    await test_db_session.rollback()
+    assert await test_db_session.get(Execution, execution_id) is not None
+    assert await test_db_session.get(Project if scope == "project" else Workflow, owner_id) is not None

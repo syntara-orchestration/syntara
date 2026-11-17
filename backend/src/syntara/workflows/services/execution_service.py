@@ -1144,7 +1144,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         # this execution.  Execution Plane work use async-completion, so the
         # Temporal cancellation above does not reach work running externally.
         try:
-            await cancel_execution_plane_work_for_execution(self.session, execution_id)
+            await cancel_execution_plane_work_for_execution(execution_id)
         except Exception:
             logger.exception(
                 "Best-effort Execution Plane work cancellation failed",

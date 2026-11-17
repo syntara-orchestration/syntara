@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 import structlog
+from execution_plane_client.commands.bulk_work import WorkItemSelector
 from sqlmodel import col, or_, select
 
 from syntara.core.config.base import get_settings
@@ -49,19 +50,18 @@ async def reconcile_work_item_cancellations(session: AsyncSession, client: Execu
                     or_(col(ActivityExecution.iteration).is_(None), col(ActivityExecution.iteration) == 0),
                 )
             )
-            for item_id, execution_id, activity_name in rows.all():
-                if item_id != execution_plane_work_item_id(execution_id, activity_name):
-                    continue
+            eligible = [
+                item_id
+                for item_id, execution_id, activity_name in rows.all()
+                if item_id == execution_plane_work_item_id(execution_id, activity_name)
+            ]
+            if eligible:
                 try:
-                    await client.cancel_work_item(work_item_id=item_id)
+                    await client.cancel_work_items(selector=WorkItemSelector(work_item_ids=eligible))
                 except Exception:
-                    logger.exception(
-                        "Execution Plane cancellation reconciliation failed; a later pass can retry",
-                        execution_id=execution_id,
-                        work_item_id=item_id,
-                    )
+                    logger.exception("Execution Plane cancellation reconciliation failed; a later pass can retry")
                 else:
-                    accepted += 1
+                    accepted += len(eligible)
         next_cursor = page.get("next")
         if next_cursor is None:
             return accepted

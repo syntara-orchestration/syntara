@@ -18,6 +18,8 @@ from syntara.authz.models import Project, RoleAssignment
 from syntara.core.models import User
 from syntara.core.models.group import Group, user_groups
 
+pytestmark = pytest.mark.usefixtures("ep_deletion_acknowledged")
+
 
 def _auth_as(user: User) -> None:
     """Override the current user dependency to act as a user."""

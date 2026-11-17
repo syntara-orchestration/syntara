@@ -1,71 +1,46 @@
-"""Unit tests for Execution Plane work-item cancellation."""
+"""Bulk cancellation preserves dispatch identity and bounds explicit ID batches."""
 
-from typing import Self
-from unittest.mock import patch
-from uuid import UUID, uuid4, uuid5
+from unittest.mock import AsyncMock
+from uuid import uuid4, uuid5
 
 import pytest
 
-from syntara.execution_plane.cancellation import (
-    cancel_execution_plane_work_items,
-)
-from syntara.execution_plane.client import ExecutionPlaneRejectedError
-from syntara.execution_plane.utils import execution_plane_work_item_id
-
-
-class _FakeExecutionPlaneClient:
-    def __init__(self, failures: dict[UUID, Exception] | None = None) -> None:
-        self.failures = failures or {}
-        self.cancelled: list[UUID] = []
-
-    async def __aenter__(self) -> Self:
-        return self
-
-    async def __aexit__(self, *_: object) -> None:
-        return None
-
-    async def cancel_work_item(self, *, work_item_id: UUID) -> None:
-        failure = self.failures.get(work_item_id)
-        if failure is not None:
-            raise failure
-        self.cancelled.append(work_item_id)
-
-
-def test_work_item_identity_matches_dispatch_strategy() -> None:
-    execution_id = uuid4()
-    activity_id = "script-node"
-
-    assert execution_plane_work_item_id(execution_id, activity_id) == uuid5(execution_id, activity_id)
+from syntara.execution_plane import cancellation
 
 
 @pytest.mark.asyncio
-async def test_cancellation_uses_deterministic_work_item_ids() -> None:
+async def test_ten_activity_cancellations_use_one_request(monkeypatch):
     execution_id = uuid4()
-    client = _FakeExecutionPlaneClient()
-
-    with patch("syntara.execution_plane.cancellation.ExecutionPlaneHttpClient", return_value=client):
-        cancelled = await cancel_execution_plane_work_items(execution_id, ["script-node", "other-script"])
-
-    assert cancelled == [uuid5(execution_id, "script-node"), uuid5(execution_id, "other-script")]
-    assert client.cancelled == cancelled
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    monkeypatch.setattr(cancellation, "ExecutionPlaneHttpClient", lambda: client)
+    names = [str(i) for i in range(10)]
+    accepted = await cancellation.cancel_execution_plane_work_items(execution_id, names)
+    assert accepted == [uuid5(execution_id, name) for name in names]
+    client.cancel_work_items.assert_awaited_once()
+    assert client.cancel_work_items.call_args.kwargs["selector"].work_item_ids == accepted
 
 
 @pytest.mark.asyncio
-async def test_cancellation_continues_after_one_work_item_fails() -> None:
+async def test_failed_batch_does_not_prevent_next_batch(monkeypatch):
     execution_id = uuid4()
-    first_id = uuid5(execution_id, "first")
-    second_id = uuid5(execution_id, "second")
-    client = _FakeExecutionPlaneClient(
-        {
-            first_id: ExecutionPlaneRejectedError(
-                "Execution Plane work item not found",
-                status_code=404,
-            )
-        }
-    )
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    client.cancel_work_items.side_effect = [RuntimeError("offline"), None]
+    monkeypatch.setattr(cancellation, "ExecutionPlaneHttpClient", lambda: client)
+    accepted = await cancellation.cancel_execution_plane_work_items(execution_id, [str(i) for i in range(101)])
+    assert accepted == [uuid5(execution_id, "100")]
+    assert [len(c.kwargs["selector"].work_item_ids) for c in client.cancel_work_items.await_args_list] == [100, 1]
 
-    with patch("syntara.execution_plane.cancellation.ExecutionPlaneHttpClient", return_value=client):
-        cancelled = await cancel_execution_plane_work_items(execution_id, ["first", "second"])
 
-    assert cancelled == [second_id]
-    assert client.cancelled == [second_id]
+@pytest.mark.asyncio
+async def test_execution_cancellation_uses_filter_without_activity_lookup(monkeypatch):
+    execution_id = uuid4()
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    monkeypatch.setattr(cancellation, "ExecutionPlaneHttpClient", lambda: client)
+    await cancellation.cancel_execution_plane_work_for_execution(execution_id)
+    client.cancel_work_items.assert_awaited_once()
+    assert client.cancel_work_items.call_args.kwargs["selector"].model_dump(exclude_none=True) == {
+        "runtime_context": {"execution_id": str(execution_id)}
+    }
