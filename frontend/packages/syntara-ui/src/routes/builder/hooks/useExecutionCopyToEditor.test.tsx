@@ -22,6 +22,7 @@ vi.mock('../utils/parseImportedDefinition', () => ({
 function buildOptions(overrides: Partial<Parameters<typeof useExecutionCopyToEditor>[0]> = {}) {
   return {
     executionCopy: undefined as ExecutionCopyData | undefined,
+    isWorkflowInitialized: true,
     dispatch: vi.fn(),
     markDirty: vi.fn(),
     showSuccess: vi.fn(),
@@ -59,6 +60,12 @@ describe('useExecutionCopyToEditor', () => {
   it('does nothing when currentWorkflow is null', () => {
     useWorkflowStore.getState().setWorkflow(null)
     const opts = buildOptions({ executionCopy: buildExecutionCopy() })
+    renderHook(() => useExecutionCopyToEditor(opts))
+    expect(opts.dispatch).not.toHaveBeenCalled()
+  })
+
+  it('does nothing until workflow initialization completes', () => {
+    const opts = buildOptions({ executionCopy: buildExecutionCopy(), isWorkflowInitialized: false })
     renderHook(() => useExecutionCopyToEditor(opts))
     expect(opts.dispatch).not.toHaveBeenCalled()
   })

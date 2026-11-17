@@ -1,6 +1,6 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, type Dispatch } from 'react'
+import { useEffect, useRef, useState, type Dispatch } from 'react'
 
 import { workflowClient } from '../../../client'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
@@ -32,7 +32,7 @@ export function useBuilderWorkflowLifecycle(options: {
     nodePositions?: Record<string, { x: number; y: number }>,
     projectId?: string | null
   ) => void
-}): void {
+}): { isWorkflowInitialized: boolean } {
   const {
     workflowId,
     isNew,
@@ -56,6 +56,7 @@ export function useBuilderWorkflowLifecycle(options: {
   const hasInitedNewWorkflowRef = useRef(false)
   const hasAppliedDefaultNameRef = useRef(false)
   const hasRefetchedWorkflowsOnceRef = useRef(false)
+  const [isWorkflowInitialized, setIsWorkflowInitialized] = useState(false)
 
   useEffect(() => {
     if (prevWorkflowIdRef.current !== workflowId) {
@@ -65,6 +66,7 @@ export function useBuilderWorkflowLifecycle(options: {
       hasInitedNewWorkflowRef.current = false
       hasAppliedDefaultNameRef.current = false
       hasRefetchedWorkflowsOnceRef.current = false
+      setIsWorkflowInitialized(false)
       prevWorkflowIdRef.current = workflowId
     }
   }, [workflowId, setWorkflow, setStoredEdges])
@@ -89,6 +91,7 @@ export function useBuilderWorkflowLifecycle(options: {
           type: 'INIT_WORKFLOW',
           payload: { name: defaultName, description: 'New workflow' },
         })
+        setIsWorkflowInitialized(true)
       })
     } else if (workflow?.version?.workflow_definition && !hasLoadedRef.current && workflow.id === workflowId) {
       const { flattenedWorkflow, generatedEdges, nodePositions, initPayload } = processExistingWorkflow(workflow)
@@ -97,6 +100,7 @@ export function useBuilderWorkflowLifecycle(options: {
         loadWorkflowWithEdges(flattenedWorkflow, generatedEdges, nodePositions, workflow.project_id ?? null)
         dispatch({ type: 'INIT_WORKFLOW', payload: { ...initPayload, initialViewVersion } })
         hasLoadedRef.current = true
+        setIsWorkflowInitialized(true)
       })
     }
   }, [isNew, workflow, workflowId, loadWorkflowWithEdges, workflowsListResources, dispatch, initialViewVersion])
@@ -116,6 +120,7 @@ export function useBuilderWorkflowLifecycle(options: {
           description: workflow.description ?? workflow.name ?? DEFAULT_WORKFLOW_NAME,
         },
       })
+      setIsWorkflowInitialized(true)
     })
   }, [workflow, workflowId, isNew, dispatch])
 
@@ -143,4 +148,6 @@ export function useBuilderWorkflowLifecycle(options: {
       })
     )
   }, [isNew, queryClient, workflowsListDataUndefined, workflowsListIsPending, workflowsListError])
+
+  return { isWorkflowInitialized }
 }

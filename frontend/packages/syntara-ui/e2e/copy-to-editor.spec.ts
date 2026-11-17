@@ -13,7 +13,13 @@
  */
 
 import { type Page, test, expect, toAppUrl } from './fixtures'
-import { buildUniqueName, createBasicWorkflowViaApi, deleteWorkflow, waitForUIReady } from './helpers/workflows'
+import {
+  buildUniqueName,
+  createBasicWorkflowViaApi,
+  deleteWorkflow,
+  openWorkflowInBuilder,
+  waitForUIReady,
+} from './helpers/workflows'
 import { publishWorkflowViaApi, deleteWorkflowViaApi } from './utils/api'
 
 /** Run a workflow from the Workflows list page and wait for navigation to the execution detail page. */
@@ -39,7 +45,17 @@ async function runWorkflowFromList(app: Page, workflowName: string) {
   await expect(app).toHaveURL(/\/executions\//, { timeout: 15_000 })
 }
 
+async function confirmCopyToEditorInBuilder(app: Page) {
+  await app.getByRole('button', { name: 'Copy to editor' }).click()
+  await expect(app.getByRole('heading', { name: 'Copy run to editor' })).toBeVisible()
+  const replaceButton = app.getByRole('dialog').getByRole('button', { name: 'Replace current workflow' })
+  await replaceButton.click()
+  await expect(app).toHaveURL(/\/workflow-builder\//, { timeout: 15_000 })
+  await expect(app.getByRole('heading', { name: 'Run details' })).toBeVisible({ timeout: 15_000 })
+}
+
 test.describe('Copy Run to Editor', () => {
+  test.skip(!process.env['SYNTARA_E2E_HAS_EXECUTION_ENGINE'], 'Execution engine unavailable (globalSetup probe)')
   test('replaces current workflow via confirmation dialog', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-copy-to-editor')
     const { id, versionNumber } = await createBasicWorkflowViaApi(app, workflowName, 'Copy action')
@@ -66,6 +82,36 @@ test.describe('Copy Run to Editor', () => {
 
       // Verify navigation to builder with workflow loaded
       await expect(app).toHaveURL(/\/workflow-builder\//)
+      await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName, { timeout: 15_000 })
+      await expect(app.getByRole('heading', { name: 'Run details' })).toBeVisible({ timeout: 15_000 })
+    } finally {
+      await deleteWorkflow(app, workflowName)
+    }
+  })
+
+  test('copy from run history keeps run details after workflow was already open in builder', async ({ app }) => {
+    const workflowName = buildUniqueName('e2e-copy-history')
+    const { id, versionNumber } = await createBasicWorkflowViaApi(app, workflowName, 'History copy action')
+
+    try {
+      await publishWorkflowViaApi(app, id, versionNumber)
+      await runWorkflowFromList(app, workflowName)
+      const executionUrl = app.url()
+
+      await openWorkflowInBuilder(app, workflowName, id)
+      await app.goto(executionUrl)
+
+      await expect(app.getByRole('button', { name: 'Copy to editor' })).toBeVisible({ timeout: 15_000 })
+      await app.getByLabel('Run history').click()
+      await expect(app.getByRole('heading', { name: 'Run history' })).toBeVisible()
+
+      const runHistoryPanel = app.getByRole('region', { name: 'Run history' })
+      const executionButtons = runHistoryPanel.locator('button[class*="simpleList"]')
+      await expect(executionButtons).toHaveCount(1, { timeout: 15_000 })
+      await executionButtons.click()
+
+      await expect(app.getByRole('button', { name: 'Copy to editor' })).toBeVisible({ timeout: 15_000 })
+      await confirmCopyToEditorInBuilder(app)
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName, { timeout: 15_000 })
     } finally {
       await deleteWorkflow(app, workflowName)
