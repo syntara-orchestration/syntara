@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4, uuid5
 
 import pytest
+from structlog.testing import capture_logs
 from temporalio.exceptions import ApplicationError
 
 from syntara.workflows.models.execution import Execution, ExecutionStatus
@@ -148,3 +149,127 @@ async def test_unauthorized_actor_denied_before_child_creation(
     assert exc.value.non_retryable is True
     async with test_db_session_factory() as session:
         assert await session.get(Execution, _child_id(parent_exec)) is None
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_authorized_actor_links_child_to_parent(
+    test_db_session: AsyncSession,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    """An allowed actor's child Execution carries parent lineage metadata (AC: authorized invocation links child)."""
+    child_wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
+    parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
+    setup = SubWorkflowSetupActivity(
+        session_factory=test_db_session_factory, task_queue=_TASK_QUEUE, evaluator=_StubEvaluator(allow=True)
+    )
+
+    result = await setup.run(_params(child_wf_id), parent_exec, _NODE_ID, str(test_user.id), 0)
+
+    async with test_db_session_factory() as session:
+        child = await session.get(Execution, UUID(result["execution_id"]))
+    assert child is not None
+    # Lineage points back at the authoritative parent execution + canvas node id.
+    metadata = child.execution_metadata
+    assert metadata is not None
+    assert metadata["parent_execution_id"] == parent_exec
+    assert metadata["parent_node_id"] == _NODE_ID
+    # DB ownership is the propagated top-level initiator (the authorized actor).
+    assert str(child.created_by) == str(test_user.id)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_unauthorized_actor_denied_before_trigger_validation_detail(
+    test_db_session: AsyncSession,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    """Security-ordering regression: an unauthorized caller gets a generic authz denial, not trigger detail.
+
+    The child is published and enabled, but the invocation targets a trigger that does not exist. If
+    trigger validation ran first, the caller would get ``TriggerNotFoundError`` naming it. Authz runs
+    before trigger/input validation, so the caller gets the sanitized ``SubWorkflowAuthorizationError``
+    and learns nothing child-specific.
+
+    A published-but-disabled child cannot exist (an enabled workflow must have a published version, and
+    the setup activity resolves the child via that published version), so the reachable child-detail
+    disclosures after authz are trigger and input validation.
+    """
+    child_wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
+    parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
+    setup = SubWorkflowSetupActivity(
+        session_factory=test_db_session_factory, task_queue=_TASK_QUEUE, evaluator=_StubEvaluator(allow=False)
+    )
+    # Target a trigger that does not exist: trigger validation would raise TriggerNotFoundError naming it.
+    missing_trigger = "nonexistent_trigger"
+    bad_params: dict[str, Any] = {
+        "workflow_id": str(child_wf_id),
+        "trigger_node_id": missing_trigger,
+        "input_mapping": {},
+    }
+
+    with pytest.raises(ApplicationError) as exc:
+        await setup.run(bad_params, parent_exec, _NODE_ID, str(test_user.id), 0)
+
+    # Authorization denial wins over the trigger-not-found detail: the caller cannot learn whether the
+    # trigger exists, nor the child workflow id.
+    assert exc.value.type == _AUTHZ_ERROR
+    assert exc.value.type != "TriggerNotFoundError"
+    assert exc.value.non_retryable is True
+    message = str(exc.value)
+    assert missing_trigger not in message
+    assert str(child_wf_id) not in message
+    # Nothing is persisted for an unauthorized caller.
+    async with test_db_session_factory() as session:
+        assert await session.get(Execution, _child_id(parent_exec)) is None
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_denied_message_is_sanitized_and_logs_diagnostics(
+    test_db_session: AsyncSession,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    """Policy deny (real DB): sanitized message, with child details only in the protected log.
+
+    The raised and persisted message discloses no child metadata, in the message or on the error
+    details. The structured diagnostics (child id/name, project_id, denial_reason) go to the
+    authorization-denial log.
+    """
+    child_wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
+    parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
+    async with test_db_session_factory() as session:
+        child = await session.get(Workflow, child_wf_id)
+    assert child is not None
+    setup = SubWorkflowSetupActivity(
+        session_factory=test_db_session_factory, task_queue=_TASK_QUEUE, evaluator=_StubEvaluator(allow=False)
+    )
+
+    with capture_logs() as logs, pytest.raises(ApplicationError) as exc:
+        await setup.run(_params(child_wf_id), parent_exec, _NODE_ID, str(test_user.id), 0)
+
+    # Sanitized message: no child metadata, since it is persisted and may be read by callers
+    # who are not allowed to see the child.
+    assert exc.value.type == _AUTHZ_ERROR
+    assert exc.value.message == "Not authorized to run child workflow."
+    message = exc.value.message or ""
+    assert child.name not in message
+    assert str(child_wf_id) not in message
+    assert str(child.project_id) not in message
+    # Sensitive child metadata must not ride on the Temporal error details either.
+    details_text = str(exc.value.details)
+    assert child.name not in details_text
+    assert str(child.project_id) not in details_text
+
+    # Protected structured diagnostics are emitted (internal sink only).
+    entry = next(log for log in logs if log["event"] == "Sub-workflow invocation authorization denied")
+    assert entry["child_workflow_id"] == str(child_wf_id)
+    assert entry["child_workflow_name"] == child.name
+    assert entry["project_id"] == str(child.project_id)
+    assert entry["denial_reason"] == "policy_deny"

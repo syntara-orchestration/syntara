@@ -83,6 +83,16 @@ async def authorize_child_invocation(
     # worker has no session, so fail closed here.
     actor = await session.get(User, actor_id)
     if actor is None or not actor.is_enabled:
+        # Log the child identifiers and denial reason for diagnostics. The raised
+        # message stays generic so it never leaks child details to the caller.
+        logger.info(
+            "Sub-workflow invocation authorization denied",
+            actor_id=str(actor_id),
+            child_workflow_id=str(child_workflow.id),
+            child_workflow_name=child_workflow.name,
+            project_id=str(child_workflow.project_id),
+            denial_reason="principal_missing" if actor is None else "principal_disabled",
+        )
         msg = "Sub-workflow invocation principal is missing or disabled; refusing to create child execution."
         raise ApplicationError(msg, type="SubWorkflowAuthorizationError", non_retryable=True)
 
@@ -104,6 +114,9 @@ async def authorize_child_invocation(
             "Sub-workflow invocation authorization denied",
             actor_id=str(actor_id),
             child_workflow_id=str(child_workflow.id),
+            child_workflow_name=child_workflow.name,
+            project_id=str(child_workflow.project_id),
+            denial_reason="policy_deny",
             denied_by=authz_result.denied_by,
         )
         msg = "Not authorized to run child workflow."
