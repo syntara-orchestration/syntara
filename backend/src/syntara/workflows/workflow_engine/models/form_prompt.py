@@ -19,4 +19,3 @@ class FormPromptActivityInput(TypedDict):
     message: str | None
     submit_label: str | None
     success_message: str | None
-    css_override: str | None

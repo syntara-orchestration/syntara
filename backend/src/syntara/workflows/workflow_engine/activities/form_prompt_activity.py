@@ -73,7 +73,6 @@ async def create_form_prompt_activity(activity_input: FormPromptActivityInput) -
         "message": activity_input["message"],
         "submit_label": activity_input["submit_label"],
         "success_message": activity_input["success_message"],
-        "css_override": activity_input["css_override"],
     }
 
     try:

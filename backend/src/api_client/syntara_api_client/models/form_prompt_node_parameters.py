@@ -33,7 +33,6 @@ class FormPromptNodeParameters:
             times out with continue_on_failure enabled
         submit_label (None | str | Unset): Submit button label.
         success_message (None | str | Unset): Shown after submission.
-        css_override (None | str | Unset): Custom CSS applied to the form view.
     """
 
     form_definition: FormPromptDefinition
@@ -44,7 +43,6 @@ class FormPromptNodeParameters:
     fallback_decision: FormPromptNodeParametersFallbackDecisionType0 | None | Unset = UNSET
     submit_label: None | str | Unset = UNSET
     success_message: None | str | Unset = UNSET
-    css_override: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         form_definition = self.form_definition.to_dict()
@@ -99,12 +97,6 @@ class FormPromptNodeParameters:
         else:
             success_message = self.success_message
 
-        css_override: None | str | Unset
-        if isinstance(self.css_override, Unset):
-            css_override = UNSET
-        else:
-            css_override = self.css_override
-
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -126,8 +118,6 @@ class FormPromptNodeParameters:
             field_dict["submit_label"] = submit_label
         if success_message is not UNSET:
             field_dict["success_message"] = success_message
-        if css_override is not UNSET:
-            field_dict["css_override"] = css_override
 
         return field_dict
 
@@ -225,15 +215,6 @@ class FormPromptNodeParameters:
 
         success_message = _parse_success_message(d.pop("success_message", UNSET))
 
-        def _parse_css_override(data: object) -> None | str | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(None | str | Unset, data)
-
-        css_override = _parse_css_override(d.pop("css_override", UNSET))
-
         form_prompt_node_parameters = cls(
             form_definition=form_definition,
             message=message,
@@ -243,7 +224,6 @@ class FormPromptNodeParameters:
             fallback_decision=fallback_decision,
             submit_label=submit_label,
             success_message=success_message,
-            css_override=css_override,
         )
 
         return form_prompt_node_parameters

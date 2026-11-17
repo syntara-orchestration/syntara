@@ -373,14 +373,14 @@ class TestFormPromptFindingPaths:
     def test_non_form_definition_parameter_path_keeps_parameters_prefix(self) -> None:
         workflow_def = _workflow_with_form_prompt(
             _VALID_FORM_DEFINITION["fields"],
-            extra_parameters={"css_override": ".form { background: url(https://example.test); }"},
+            extra_parameters={"submit_label": "x" * 65},
         )
 
         result = WorkflowValidator().collect_findings(workflow_def)
 
         finding = next(f for f in result.findings if f.node_id == "form")
-        assert finding.category == ValidationCategory.form_prompt_configuration
-        assert finding.field_path == "parameters.css_override"
+        assert finding.category == ValidationCategory.schema_violation
+        assert finding.field_path == "parameters.submit_label"
 
     def test_nested_form_field_path_preserves_form_definition_segment(self) -> None:
         workflow_def = _workflow_with_form_prompt([{"type": "text", "value_name": "bad name", "label": "Answer"}])
